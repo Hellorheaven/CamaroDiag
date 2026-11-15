@@ -54,8 +54,8 @@ The catalogue deliberately treats E-family labels as nominal profile hints. A re
 - The app launcher icon uses a Bumblebee-inspired yellow/black Camaro treatment.
 - The new ECU workspace reads the standard OBD Mode 09 CAL ID (PID 04) and CVN (PID 06) from a connected vehicle and displays the raw ECU responses.
 - Local calibration-file import is limited to 32 MiB, stores the file in private app storage and records the file name, size, SHA-256 digest and a short hex preview. The imported file can be exported back to a user-selected location using Android Storage Access Framework.
-- These identifiers and local-file checks are **not** a binary ECU map read, map editor, or ECU flash operation. The local export action saves an imported file; it does not upload/write it to the ECU.
-- Full read/write support is not enabled. Camaro Gen 5/Gen 6 controllers (Bosch E69, GM E38, E39/E39A, E67, E92/E93 variants) require exact OS/calibration identification, a verified OEM read/write procedure, seed-key handling where applicable, checksum correction, a recovery/bench-flash path and validation on the matching hardware. No generic OBDLink/ELM command is treated as a flash protocol.
+- These identifiers do **not** read the binary memory of the ECU. The local calibration editor can decode and modify tables only when the user imports a matching, explicit table-definition file. It saves a new local image and does not write to the ECU.
+- ECU memory read and ECU programming are not enabled. Camaro Gen 5/Gen 6 controllers (Bosch E69, GM E38, E39/E39A, E67, E80, E92/E93 variants) require exact OS/calibration identification, a verified programming procedure, authorized security access where applicable, controller-specific checksum processing, a recovery/bench programming path and validation on matching hardware. No generic OBD command is treated as a programming protocol.
 - A future write feature must remain disabled until the exact vehicle/ECU profile and recovery method are confirmed. Never flash a calibration solely because the file extension or nominal engine family matches.
 
 ## Pilotage carrosserie
@@ -115,3 +115,14 @@ The full OBD-II scanner is now exposed in the app navigation. It presents suppor
 The ECU workspace now inspects raw BIN, Intel HEX and Motorola S-record inputs. Intel HEX and S-record records are checked for structure and format checksums. Two raw BIN images can be compared byte-for-byte, with differing offsets, changed-byte count and file-size differences. Files remain local and can be exported using Android's Storage Access Framework.
 
 These file functions are not an ECU memory read, calibration table editor or ECU flash. Les conteneurs propriétaires non documentés ne sont pas interprétés. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
+
+
+## Calibration table editor
+
+The ECU workspace supports offline editing of calibration tables when a matching definition file is supplied. Use the **Export TSV definition template** action, then provide one row per table with these fields:
+
+`id;name;offset;rows;columns;type;endian;scale;bias;unit;minimum;maximum`
+
+Supported storage types are U8, S8, U16, S16, U32, S32 and F32. Endianness is LE or BE. The editor validates image bounds, dimensions, numeric type and optional engineering limits. Applying edits creates a separate local BIN image; the originally imported file is kept as the reference. The active image can then be exported or compared.
+
+No Camaro table addresses, offsets or scaling factors are guessed or bundled. A table definition must be verified against the exact controller hardware, OS and calibration before use. The current editor does not modify the running ECU. The live-data screen remains a diagnostic data stream; ECU programming requires a separate, validated GM programming transport and recovery process.
