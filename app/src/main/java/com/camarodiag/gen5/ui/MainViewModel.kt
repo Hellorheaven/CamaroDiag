@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 import java.security.MessageDigest
+import java.io.File
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -155,11 +156,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 require(bytes.isNotEmpty()) { "Le fichier sélectionné est vide." }
                 val sha256 = MessageDigest.getInstance("SHA-256").digest(bytes)
                     .joinToString("") { "%02x".format(it) }
+                val storageDir = File(getApplication<Application>().filesDir, "calibrations")
+                check(storageDir.exists() || storageDir.mkdirs()) { "Impossible de créer le dossier local des cartographies." }
+                val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifBlank { "calibration.bin" }
+                val storedFile = File(storageDir, "${System.currentTimeMillis()}_${safeName}")
+                storedFile.writeBytes(bytes)
+                val preview = bytes.take(64).joinToString(" ") { "%02X".format(it) }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     importedFileName = displayName,
                     importedFileSize = bytes.size.toLong(),
                     importedFileSha256 = sha256,
-                    message = "Fichier importé localement. Compatibilité ECU et checksum constructeur non vérifiés."
+                    importedFilePreview = preview,
+                    importedFilePath = storedFile.absolutePath,
+                    message = "Fichier copié dans le stockage privé de l'application. Compatibilité ECU et checksum constructeur non vérifiés."
                 )
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -170,10 +179,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearCalibrationFile() {
+        _calibrationWorkspace.value.importedFilePath?.let { path -> runCatching { File(path).delete() } }
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             importedFileName = null,
             importedFileSize = null,
             importedFileSha256 = null,
+            importedFilePreview = null,
+            importedFilePath = null,
             message = ""
         )
     }
