@@ -52,7 +52,7 @@ SHA-256, CRC d'intégrité et checksums de format Intel HEX/S-record ne sont pas
 
 ## Lecture binaire ECU, édition et flashage : limites actuelles
 
-La lecture intégrale de la mémoire ECM, la conversion en tables moteur, l'édition de tables et l'écriture ECU ne sont pas implémentées. Il ne faut pas envoyer de commandes UDS de programmation génériques ni tenter un flash avec un simple adaptateur ELM/STN.
+La lecture intégrale de la mémoire ECM et la programmation ECU ne sont pas implémentées. L'éditeur local de tables est disponible, mais il ne décode une table que lorsqu'un fichier de définitions explicite (offset, dimensions, type, endianness et échelle) est fourni et correspond exactement à l'image chargée. Il ne faut pas envoyer de commandes UDS de programmation génériques ni tenter une écriture ECU avec un adaptateur OBD générique.
 
 Pour chaque famille de calculateur, il faut disposer et valider :
 
