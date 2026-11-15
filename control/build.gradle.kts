@@ -1,0 +1,6 @@
+plugins { id("com.android.library"); id("org.jetbrains.kotlin.android") }
+android { namespace = "com.camarodiag.control"; compileSdk = 36; defaultConfig { minSdk = 29 } }
+dependencies {
+    api(project(":core"))
+    testImplementation("junit:junit:4.13.2")
+}

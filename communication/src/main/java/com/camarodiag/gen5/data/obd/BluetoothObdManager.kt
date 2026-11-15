@@ -1,0 +1,210 @@
+package com.camarodiag.gen5.data.obd
+
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothSocket
+import android.content.Context
+import com.camarodiag.gen5.domain.model.*
+import com.camarodiag.gen5.data.obd.Obd2FeatureEngine
+import com.camarodiag.gen5.data.obd.ObdCommandChannel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.UUID
+import java.net.Socket
+import android.hardware.usb.UsbDevice
+import com.hoho.android.usbserial.driver.UsbSerialProber
+import com.hoho.android.usbserial.driver.UsbSerialPort
+
+class BluetoothObdManager(context: Context) {
+
+    private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager?.adapter
+    private val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+    private var socket: BluetoothSocket? = null
+    private var inputStream: InputStream? = null
+    private var outputStream: OutputStream? = null
+    private val commandMutex = Mutex()
+    private val usbTransport = ElmUsbTransport(context)
+    private val wifiTransport = ElmWifiTransport()
+    private var activeTransport: String = "BLUETOOTH"
+
+    fun getUsbDevices(): List<String> = usbTransport.availableDevices()
+
+    var isDemoMode: Boolean = true
+        private set
+
+    @SuppressLint("MissingPermission")
+    fun getPairedDevices(): List<Pair<String, String>> {
+        return try {
+            bluetoothAdapter?.bondedDevices
+                ?.map { (it.name ?: "Unknown OBD Device") to it.address }
+                ?.sortedByDescending { it.first.contains("OBD", true) || it.first.contains("ELM", true) || it.first.contains("vLinker", true) }
+                ?: emptyList()
+        } catch (_: SecurityException) {
+            emptyList()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    suspend fun connectAndProbe(macAddress: String): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
+        disconnect()
+        try {
+            val device: BluetoothDevice = bluetoothAdapter?.getRemoteDevice(macAddress)
+                ?: return@withContext Result.failure(IllegalStateException("Bluetooth adapter unavailable"))
+
+            val btSocket = device.createRfcommSocketToServiceRecord(sppUuid)
+            bluetoothAdapter.cancelDiscovery()
+            btSocket.connect()
+
+            activeTransport = "BLUETOOTH"
+            socket = btSocket
+            inputStream = btSocket.inputStream
+            outputStream = btSocket.outputStream
+            isDemoMode = false
+
+            val atz = sendAtCommand("ATZ")
+            sendAtCommand("ATE0")
+            sendAtCommand("ATL0")
+            sendAtCommand("ATH1")
+            val sti = sendAtCommand("STI")
+            val atal = sendAtCommand("ATAL")
+            val stp61 = sendAtCommand("STP 61")
+            sendAtCommand("ATSP 6")
+
+            val caps = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = device.name ?: "Bluetooth OBD-II",
+                macAddress = macAddress,
+                atzResp = atz,
+                stiResp = sti,
+                atalResp = atal,
+                stp61Resp = stp61
+            )
+            Result.success(caps)
+        } catch (e: Exception) {
+            disconnect()
+            Result.failure(e)
+        }
+    }
+
+
+    suspend fun connectWifi(host: String, port: Int = 35000): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
+        disconnect()
+        val connected = wifiTransport.connect(host, port)
+        if (connected.isFailure) return@withContext Result.failure(connected.exceptionOrNull()!!)
+        activeTransport = "WIFI"
+        val atz = sendAtCommand("ATZ")
+        sendAtCommand("ATE0"); sendAtCommand("ATL0"); sendAtCommand("ATH1")
+        val sti = sendAtCommand("STI"); val atal = sendAtCommand("ATAL"); val stp = sendAtCommand("STP 61")
+        sendAtCommand("ATSP 6")
+        isDemoMode = false
+        Result.success(CamaroUdsProtocol.evaluateAdapterProbe("ELM327 Wi-Fi ($host:$port)", host, atz, sti, atal, stp))
+    }
+
+    suspend fun connectUsb(deviceId: Int, baudRate: Int = 38400): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
+        disconnect()
+        val connected = usbTransport.connect(deviceId, baudRate)
+        if (connected.isFailure) return@withContext Result.failure(connected.exceptionOrNull()!!)
+        activeTransport = "USB"
+        val atz = sendAtCommand("ATZ"); sendAtCommand("ATE0"); sendAtCommand("ATL0"); sendAtCommand("ATH1")
+        val sti = sendAtCommand("STI"); val atal = sendAtCommand("ATAL"); val stp = sendAtCommand("STP 61")
+        sendAtCommand("ATSP 6")
+        isDemoMode = false
+        Result.success(CamaroUdsProtocol.evaluateAdapterProbe("ELM327 USB #$deviceId", "USB:$deviceId", atz, sti, atal, stp))
+    }
+
+    suspend fun activateSimulatedAdapter(preset: String): AdapterCapabilities = withContext(Dispatchers.Default) {
+        disconnect()
+        isDemoMode = true
+        delay(350)
+        when (preset) {
+            "MX_PLUS" -> CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "OBDLink MX+ (Simulated)",
+                macAddress = "00:04:3E:8A:12:9F",
+                atzResp = "ELM327 v1.4b",
+                stiResp = "STN2255 v5.6.5",
+                atalResp = "OK",
+                stp61Resp = "OK"
+            )
+            "ELM_15" -> CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "Genuine ELM327 v1.5 (Simulated)",
+                macAddress = "00:1D:A5:01:44:2B",
+                atzResp = "ELM327 v1.5",
+                stiResp = "?",
+                atalResp = "OK",
+                stp61Resp = "?"
+            )
+            else -> CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "Generic ELM327 v2.1 Clone (Simulated)",
+                macAddress = "AA:BB:CC:11:22:33",
+                atzResp = "ELM327 v2.1",
+                stiResp = "?",
+                atalResp = "?",
+                stp61Resp = "?"
+            )
+        }
+    }
+
+    suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String = withContext(Dispatchers.IO) {
+        commandMutex.withLock {
+            val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
+            if (activeTransport == "USB") {
+                usbTransport.write(payload)
+                val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
+                while (System.currentTimeMillis() - start < timeoutMs) {
+                    val n = usbTransport.read(bytes, 100)
+                    if (n > 0) { val chunk = String(bytes, 0, n, Charsets.US_ASCII); if (chunk.contains('>')) { buffer.append(chunk.substringBefore('>')); break }; buffer.append(chunk) }
+                    else delay(10)
+                }
+                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+            } else if (activeTransport == "WIFI") {
+                wifiTransport.write(payload)
+                val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
+                while (System.currentTimeMillis() - start < timeoutMs) {
+                    try { val n = wifiTransport.read(bytes); if (n > 0) { val chunk = String(bytes, 0, n, Charsets.US_ASCII); if (chunk.contains('>')) { buffer.append(chunk.substringBefore('>')); break }; buffer.append(chunk) } }
+                    catch (_: java.net.SocketTimeoutException) { }
+                    delay(10)
+                }
+                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+            } else {
+                val out = outputStream; val inp = inputStream
+                if (out == null || inp == null) return@withLock "NO_SOCKET"
+                while (inp.available() > 0) inp.read()
+                out.write(payload); out.flush()
+                val buffer = StringBuilder(); val start = System.currentTimeMillis()
+                while (System.currentTimeMillis() - start < timeoutMs) {
+                    if (inp.available() > 0) { val c = inp.read().toChar(); if (c == '>') break; buffer.append(c) } else delay(15)
+                }
+                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+            }
+        }
+    }
+
+    /** Creates the standards-based read-only OBD-II engine over the currently connected ELM transport. */
+    fun createObd2FeatureEngine(): Obd2FeatureEngine = Obd2FeatureEngine(
+        ObdCommandChannel { command, timeoutMs -> sendAtCommand(command, timeoutMs) }
+    )
+
+    fun disconnect() {
+        try {
+            usbTransport.close(); wifiTransport.close()
+            inputStream?.close()
+            outputStream?.close()
+            socket?.close()
+        } catch (_: Exception) {
+        } finally {
+            inputStream = null
+            outputStream = null
+            socket = null
+            activeTransport = "BLUETOOTH"
+            isDemoMode = true
+        }
+    }
+}
