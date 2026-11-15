@@ -28,12 +28,33 @@ Application Android native Kotlin / Jetpack Compose pour diagnostic Chevrolet Ca
 - Carbyte est un produit GM dédié à certaines fonctions AFM/DFM/Stop-Start, pas un adaptateur de diagnostic OBD générique exploitable comme MX+/EX.
 - VXDIAG/J2534 : non déclaré opérationnel sur Android. Il faut le SDK Android officiel ou un protocole documenté propre au modèle exact; aucune compatibilité n'est simulée.
 
+## Camaro Gen 5 / Gen 6 ECU calibration coverage
+
+The calibration catalogue covers all engine profiles currently represented for Camaro Gen 5 and Gen 6:
+
+| Generation | Engine RPO | Model years | Nominal controller family in the vehicle profile |
+|---|---|---:|---|
+| Gen 5 | LLT 3.6 V6 | 2010–2011 | Bosch E69 (profile label; confirm on ECU) |
+| Gen 5 | LFX 3.6 V6 | 2012–2015 | ACDelco E39 / E39A (profile label; confirm on ECU) |
+| Gen 5 | LS3 6.2 V8 | 2010–2015 | ACDelco E38 (profile label; confirm on ECU) |
+| Gen 5 | L99 6.2 V8 | 2010–2015 | ACDelco E38 (profile label; confirm on ECU) |
+| Gen 5 | LSA 6.2 supercharged V8 | 2012–2015 | ACDelco E67 (profile label; confirm on ECU) |
+| Gen 5 | LS7 7.0 V8 | 2014–2015 | ACDelco E38 (profile label; confirm on ECU) |
+| Gen 6 | LTG 2.0 turbo I4 | 2016–2020 | GM E80 (confirm part number/CAL ID; GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG) |
+| Gen 6 | LGX 3.6 V6 | 2016–2024 | GM E92 / E93 variant-dependent (confirm on ECU) |
+| Gen 6 | LT1 6.2 V8 | 2016–2024 | GM E92 (profile label; confirm on ECU) |
+| Gen 6 | LT4 6.2 supercharged V8 | 2017–2024 | GM E92 (profile label; confirm on ECU) |
+
+HP Tuners' public vehicle list advertises Camaro coverage for Gen 5 3.6 / 6.2 / 7.0, Gen 6 2.0 (2016 and 2017–2020), 3.6 (2016–2024), and 6.2 (2016 and 2017–2024). This is **HP Tuners' compatibility statement**, not proof that CamaroDiag can read or flash those ECUs. Exact controller support is hardware/software dependent. Sources: [HP Tuners supported vehicles](https://www.hptuners.com/vehicles/) and [HP Tuners supported controller families](https://support.hptuners.com/support/solutions/articles/153000103165-supported-controllers).
+
+The catalogue deliberately treats E-family labels as nominal profile hints. A real operation must identify the installed controller, hardware number, CAL ID, CVN and OS before selecting a binary definition. The Mode 09 CAL ID/CVN read and local file import/export are available as data-handling functions; they do not constitute a binary ECU read or flash.
+
 ## ECU / calibration workspace
 
 - The app launcher icon uses a Bumblebee-inspired yellow/black Camaro treatment.
 - The new ECU workspace reads the standard OBD Mode 09 CAL ID (PID 04) and CVN (PID 06) from a connected vehicle and displays the raw ECU responses.
-- Local calibration-file import is limited to 32 MiB and records the file name, size and SHA-256 digest for inventory/integrity checking.
-- These identifiers and local-file checks are **not** a binary ECU map read, map editor, or ECU flash operation.
+- Local calibration-file import is limited to 32 MiB, stores the file in private app storage and records the file name, size, SHA-256 digest and a short hex preview. The imported file can be exported back to a user-selected location using Android Storage Access Framework.
+- These identifiers and local-file checks are **not** a binary ECU map read, map editor, or ECU flash operation. The local export action saves an imported file; it does not upload/write it to the ECU.
 - Full read/write support is not enabled. Camaro Gen 5/Gen 6 controllers (Bosch E69, GM E38, E39/E39A, E67, E92/E93 variants) require exact OS/calibration identification, a verified OEM read/write procedure, seed-key handling where applicable, checksum correction, a recovery/bench-flash path and validation on the matching hardware. No generic OBDLink/ELM command is treated as a flash protocol.
 - A future write feature must remain disabled until the exact vehicle/ECU profile and recovery method are confirmed. Never flash a calibration solely because the file extension or nominal engine family matches.
 

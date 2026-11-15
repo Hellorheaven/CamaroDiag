@@ -36,6 +36,7 @@ enum class CamaroEngine(
     L99("L99", "6.2L V8 AFM Auto (400 HP)", "6.2L V8 AFM Auto (400 ch)", "6.2L V8", 2010..2015, "ACDelco E38"),
     LSA("LSA", "6.2L V8 Supercharged ZL1 (580 HP)", "6.2L V8 Compresseur ZL1 (580 ch)", "6.2L V8", 2012..2015, "ACDelco E67"),
     LS7("LS7", "7.0L V8 Z/28 (505 HP)", "7.0L V8 Z/28 (505 ch)", "7.0L V8", 2014..2015, "ACDelco E38"),
+    LTG("LTG", "2.0L Turbo I4 (275 HP)", "2.0L Turbo 4 cylindres (275 ch)", "2.0L Turbo", 2016..2020, "GM E80 (RPO LTG; CAL ID verification required)"),
     LGX("LGX", "3.6L V6 SIDI (335 HP)", "3.6L V6 SIDI (335 ch)", "3.6L V6", 2016..2024, "GM E92 / E93 (variant-dependent)"),
     LT1("LT1", "6.2L V8 DI (455 HP)", "6.2L V8 injection directe (455 ch)", "6.2L V8", 2016..2024, "GM E92"),
     LT4("LT4", "6.2L V8 Supercharged ZL1 (650 HP)", "6.2L V8 compresseur ZL1 (650 ch)", "6.2L V8", 2017..2024, "GM E92")
