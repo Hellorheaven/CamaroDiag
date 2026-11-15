@@ -99,6 +99,7 @@ fun CalibrationWorkspaceScreen(
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onImportDefinitions: () -> Unit,
+    onExportDefinitionTemplate: () -> Unit,
     onSelectMap: (String) -> Unit,
     onCellChange: (Int, Int, String) -> Unit,
     onApplyMap: () -> Unit,
@@ -280,6 +281,9 @@ fun CalibrationWorkspaceScreen(
                         enabled = state.importedFilePath != null && state.inspectionFormat == "BIN / raw binary",
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(if (isFr) "Importer les définitions de tables (.csv / .tsv)" else "Import table definitions (.csv / .tsv)") }
+                    TextButton(onClick = onExportDefinitionTemplate, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (isFr) "Exporter le modèle de définitions TSV" else "Export TSV definition template")
+                    }
                     if (state.mapDefinitions.isNotEmpty()) {
                         OutlinedButton(onClick = { mapMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
                             Text(selectedMap?.let { "${it.name} • ${it.rows} × ${it.columns}" }
