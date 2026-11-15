@@ -6,7 +6,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.FolderOpen
@@ -19,14 +24,23 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.camarodiag.gen5.ui.theme.CamaroAmber
@@ -84,6 +98,11 @@ fun CalibrationWorkspaceScreen(
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
+    onImportDefinitions: () -> Unit,
+    onSelectMap: (String) -> Unit,
+    onCellChange: (Int, Int, String) -> Unit,
+    onApplyMap: () -> Unit,
+    onDiscardMap: () -> Unit,
     onExportFile: () -> Unit,
     onClearFile: () -> Unit
 ) {
@@ -241,6 +260,112 @@ fun CalibrationWorkspaceScreen(
                         }
                         TextButton(onClick = onClearFile) { Text(if (isFr) "Retirer les fichiers" else "Remove files") }
                     }
+                }
+            }
+        }
+        item {
+            var mapMenuExpanded by remember { mutableStateOf(false) }
+            val selectedMap = state.mapDefinitions.firstOrNull { it.id == state.selectedMapId }
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text(if (isFr) "Éditeur de tables de calibration" else "Calibration table editor",
+                        color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isFr) "Charge un fichier de définitions TSV contenant les offsets, dimensions, type numérique, ordre des octets et facteur d'échelle exacts de ton fichier BIN. CamaroDiag ne fournit pas d'adresses de tables supposées."
+                        else "Import a TSV definition file containing exact offsets, dimensions, numeric type, byte order and scaling for your BIN image. CamaroDiag does not guess table addresses.",
+                        color = TextMuted, fontSize = 11.sp
+                    )
+                    OutlinedButton(
+                        onClick = onImportDefinitions,
+                        enabled = state.importedFilePath != null && state.inspectionFormat == "BIN / raw binary",
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (isFr) "Importer les définitions de tables (.csv / .tsv)" else "Import table definitions (.csv / .tsv)") }
+                    if (state.mapDefinitions.isNotEmpty()) {
+                        OutlinedButton(onClick = { mapMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(selectedMap?.let { "${it.name} • ${it.rows} × ${it.columns}" }
+                                ?: if (isFr) "Choisir une table" else "Select a table")
+                        }
+                        DropdownMenu(expanded = mapMenuExpanded, onDismissRequest = { mapMenuExpanded = false }) {
+                            state.mapDefinitions.forEach { definition ->
+                                DropdownMenuItem(
+                                    text = { Text("${definition.name} • ${definition.rows} × ${definition.columns}") },
+                                    onClick = {
+                                        mapMenuExpanded = false
+                                        onSelectMap(definition.id)
+                                    }
+                                )
+                            }
+                        }
+                        selectedMap?.let { definition ->
+                            Text(
+                                "${definition.id} • offset 0x${definition.fileOffset.toString(16).uppercase()} • ${definition.valueType} • ${definition.endian} • ×${definition.scale} + ${definition.bias} ${definition.unit}",
+                                color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        state.mapDefinitionsWarnings.forEach { warning ->
+                            Text(warning, color = CamaroAmber, fontSize = 10.sp)
+                        }
+                        state.mapError?.let { Text(it, color = androidx.compose.ui.graphics.Color(0xFFFF6B6B), fontSize = 11.sp) }
+                        if (state.mapValues.isNotEmpty()) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (isFr) "Valeurs de table" else "Table values", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    if (state.mapDirty) (if (isFr) "Modifications en attente" else "Unsaved edits")
+                                    else (if (isFr) "Chargée" else "Loaded"),
+                                    color = if (state.mapDirty) CamaroAmber else OkGreen, fontSize = 10.sp
+                                )
+                            }
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth().height(320.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                itemsIndexed(state.mapValues) { rowIndex, rowValues ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "%02d".format(rowIndex),
+                                            modifier = Modifier.width(28.dp),
+                                            color = TextMuted, fontSize = 10.sp
+                                        )
+                                        rowValues.forEachIndexed { columnIndex, value ->
+                                            OutlinedTextField(
+                                                value = value,
+                                                onValueChange = { onCellChange(rowIndex, columnIndex, it) },
+                                                modifier = Modifier.width(88.dp).height(58.dp),
+                                                singleLine = true,
+                                                textStyle = TextStyle(
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 10.sp,
+                                                    color = TextPrimary
+                                                ),
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = onDiscardMap,
+                                    enabled = state.mapDirty,
+                                    modifier = Modifier.weight(1f)
+                                ) { Text(if (isFr) "Annuler" else "Discard") }
+                                Button(
+                                    onClick = onApplyMap,
+                                    enabled = state.mapDirty,
+                                    modifier = Modifier.weight(1f)
+                                ) { Text(if (isFr) "Appliquer au fichier" else "Apply to file") }
+                            }
+                        }
+                    }
+                    Text(
+                        if (isFr) "L'application des cellules crée une nouvelle image BIN locale et conserve l'original. Elle n'envoie aucune modification à l'ECU. Les définitions et les facteurs doivent être vérifiés pour le CAL ID et l'OS exacts."
+                        else "Applying cell edits creates a new local BIN image and preserves the original. It sends no changes to the ECU. Definitions and scaling must be verified for the exact CAL ID and OS.",
+                        color = TextMuted, fontSize = 10.sp
+                    )
                 }
             }
         }
