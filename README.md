@@ -53,8 +53,8 @@ The catalogue deliberately treats E-family labels as nominal profile hints. A re
 
 - The app launcher icon uses a Bumblebee-inspired yellow/black Camaro treatment.
 - The new ECU workspace reads the standard OBD Mode 09 CAL ID (PID 04) and CVN (PID 06) from a connected vehicle and displays the raw ECU responses.
-- Local calibration-file import is limited to 32 MiB and records the file name, size and SHA-256 digest for inventory/integrity checking.
-- These identifiers and local-file checks are **not** a binary ECU map read, map editor, or ECU flash operation.
+- Local calibration-file import is limited to 32 MiB, stores the file in private app storage and records the file name, size, SHA-256 digest and a short hex preview. The imported file can be exported back to a user-selected location using Android Storage Access Framework.
+- These identifiers and local-file checks are **not** a binary ECU map read, map editor, or ECU flash operation. The local export action saves an imported file; it does not upload/write it to the ECU.
 - Full read/write support is not enabled. Camaro Gen 5/Gen 6 controllers (Bosch E69, GM E38, E39/E39A, E67, E92/E93 variants) require exact OS/calibration identification, a verified OEM read/write procedure, seed-key handling where applicable, checksum correction, a recovery/bench-flash path and validation on the matching hardware. No generic OBDLink/ELM command is treated as a flash protocol.
 - A future write feature must remain disabled until the exact vehicle/ECU profile and recovery method are confirmed. Never flash a calibration solely because the file extension or nominal engine family matches.
 
