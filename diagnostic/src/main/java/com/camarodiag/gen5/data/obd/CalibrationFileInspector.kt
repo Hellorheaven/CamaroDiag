@@ -110,7 +110,7 @@ object CalibrationFileInspector {
                                 listOf("L'archive originale reste importée sans extraction.")
                             )
                         }
-                        val name = entry.name.replace('\\\\', '/').take(160)
+                        val name = entry.name.replace('\\', '/').take(160)
                         if (entries.size < MAX_ARCHIVE_DISPLAY_ENTRIES) entries += name
                         name.substringAfterLast('.', "").lowercase(Locale.ROOT)
                             .takeIf(String::isNotBlank)?.let(suffixes::add)
