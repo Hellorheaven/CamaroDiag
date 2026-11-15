@@ -50,6 +50,16 @@ Les opérations locales disponibles sont les suivantes :
 
 SHA-256, CRC d'intégrité et checksums de format Intel HEX/S-record ne sont pas des checksums de calibration GM. La comparaison binaire ne donne pas de signification moteur aux offsets et ne certifie pas que le fichier peut être utilisé sur un ECM.
 
+## Fondation UDS sur CAN (lecture seule, non raccordée à un matériel réel)
+
+Une base de transport CAN classique, de segmentation ISO-TP et de client UDS en lecture seule est présente dans le module `diagnostic`. Les services exposés sont limités à ReadDataByIdentifier (0x22) et ReadDTCInformation (0x19, sous-fonction 0x02). Le client vérifie le service positif, le DID retourné et les réponses négatives ; la session profilée impose une liste blanche de DID.
+
+Avant d'ouvrir une session, le profil doit correspondre au véhicule sélectionné (année, génération, RPO et VIN), au module, à la famille de contrôleur, aux références matériel/OS, au CAL ID, au CVN, aux DID d'identification et à une référence documentaire traçable. Une discordance empêche l'émission des requêtes. Un profil de test synthétique n'est pas une définition GM exploitable sur un véhicule.
+
+**Limite d'intégration actuelle :** aucun fournisseur matériel de trames CAN brutes n'est raccordé au ViewModel ni à l'interface. Les transports ELM actuels échangent des commandes ASCII et ne sont pas assimilés à un canal J2534/ISO-TP transparent. Le point d'intégration VXDIAG reste un contrat sans pilote fournisseur. La couche UDS est donc compilée et testée sur transport simulé, mais elle ne réalise pas encore un scan GM réel sur BCM, TCM, EBCM/ABS, IPC, SDM ou ECM.
+
+Cette fondation ne contient aucune adresse GM, aucun DID constructeur, aucune clé de sécurité ni aucune procédure de programmation supposée. Elle ne fournit pas de session de programmation, SecurityAccess, RequestDownload, transfert mémoire, écriture de DID, routine d'actionneur, écriture RAM, flashage ou recovery. Ces services restent absents et ne doivent pas être déduits d'un profil d'essai.
+
 ## Lecture binaire ECU, édition et flashage : limites actuelles
 
 La lecture intégrale de la mémoire ECM et la programmation ECU ne sont pas implémentées. L'éditeur local de tables est disponible, mais il ne décode une table que lorsqu'un fichier de définitions explicite (offset, dimensions, type, endianness et échelle) est fourni et correspond exactement à l'image chargée. Il ne faut pas envoyer de commandes UDS de programmation génériques ni tenter une écriture ECU avec un adaptateur OBD générique.
