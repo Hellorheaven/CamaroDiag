@@ -35,6 +35,7 @@ import com.camarodiag.gen5.ui.theme.SurfaceDark
 import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
+import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
@@ -62,7 +63,14 @@ data class CalibrationWorkspaceState(
     val comparisonAppendedBytes: Long? = null,
     val comparisonMissingBytes: Long? = null,
     val comparisonRanges: List<String> = emptyList(),
-    val comparisonIdentical: Boolean? = null
+    val comparisonIdentical: Boolean? = null,
+    val activeFilePath: String? = null,
+    val mapDefinitions: List<CalibrationMapDefinition> = emptyList(),
+    val selectedMapId: String? = null,
+    val mapValues: List<List<String>> = emptyList(),
+    val mapDefinitionsWarnings: List<String> = emptyList(),
+    val mapDirty: Boolean = false,
+    val mapError: String? = null
 )
 
 @Composable
