@@ -17,6 +17,9 @@ import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -64,6 +67,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isStreamingLive = MutableStateFlow(true)
     val isStreamingLive: StateFlow<Boolean> = _isStreamingLive.asStateFlow()
+    private val _liveTelemetryMessage = MutableStateFlow<String?>(null)
+    val liveTelemetryMessage: StateFlow<String?> = _liveTelemetryMessage.asStateFlow()
 
     private val recordedLiveSamples = mutableListOf<RecordedLiveSample>()
     private val maxLiveRecordingSamples = 10_000
@@ -699,11 +704,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isBusy.value = true
             try {
-                if (obdManager.isDemoMode) {
+                if (obdManager.isSimulationActive) {
                     _dtcs.value = listOf(
                         DiagnosticDtc("P0171", "ECM", "Sample / Confirmed", "Exemple / Confirmé", "System Too Lean (Bank 1)", "Mélange trop pauvre (Banc 1)"),
                         DiagnosticDtc("P0014", "ECM", "Sample / Pending", "Exemple / En attente", "Exhaust Camshaft Position Timing Over-Advanced (Bank 1)", "Calage arbre à cames échappement trop avancé (Banc 1)", true)
                     )
+                    _connectionMessage.value = "Résultats simulés : aucune réponse ECU réelle."
+                } else if (obdManager.isDemoMode) {
+                    _dtcs.value = emptyList()
+                    _connectionMessage.value = "Connecte une interface OBD réelle pour lire les défauts."
                 } else {
                     val (confirmed, pending, permanent) = obdManager.createObd2FeatureEngine().readDtcs()
                     _dtcs.value = (confirmed + pending + permanent).distinctBy { it.code to it.status }.map { dtc ->
@@ -771,8 +780,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isBusy.value = true
             try {
-                if (obdManager.isDemoMode) {
+                if (obdManager.isSimulationActive) {
                     _dtcs.value = emptyList()
+                    _connectionMessage.value = "Défauts de démonstration effacés localement ; aucun ECU interrogé."
+                } else if (obdManager.isDemoMode) {
+                    _connectionMessage.value = "Connecte une interface OBD réelle avant de demander l'effacement."
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
                     if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
@@ -847,7 +859,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             if (obdManager.isDemoMode) {
                 _obdScanReport.value = null
-                _obdScanMessage.value = "Mode démo : aucun calculateur réel n'est interrogé."
+                _obdScanMessage.value = if (obdManager.isSimulationActive) {
+                    "Mode simulation : aucun calculateur réel n'est interrogé."
+                } else {
+                    "Aucune interface OBD réelle connectée. Connecte un adaptateur avant le scan."
+                }
                 return@launch
             }
             _isObdScanning.value = true
@@ -913,7 +929,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun startLiveTelemetryLoop() {
         viewModelScope.launch {
             var tick = 0.0
+            var consecutiveFailures = 0
             val histories = mutableMapOf<String, ArrayDeque<Double>>()
+
             fun push(id: String, value: Double): List<Double> {
                 val queue = histories.getOrPut(id) { ArrayDeque() }
                 if (queue.size >= 24) queue.removeFirst()
@@ -921,70 +939,111 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return queue.toList()
             }
 
-            while (true) {
-                if (_isStreamingLive.value) {
-                    if (obdManager.isDemoMode) {
-                        tick += 0.35
-                        val rpm = (740.0 + sin(tick) * 45.0 + Random.nextDouble(-12.0, 12.0)).coerceAtLeast(620.0)
-                        val coolantC = (91.0 + sin(tick * 0.2) * 2.5).coerceIn(85.0, 104.0)
-                        val oilKpa = (245.0 + sin(tick * 0.8) * 18.0).coerceIn(180.0, 380.0)
-                        val stft = (1.6 + sin(tick * 0.6) * 2.1).coerceIn(-6.0, 6.0)
-                        val voltage = 14.1 + sin(tick * 0.3) * 0.15
-                        _livePids.value = listOf(
-                            LivePidValue("RPM", "Engine Speed (DEMO)", "Régime moteur (DÉMO)", rpm, "tr/min", rpm, "RPM", 600.0, 7000.0, push("RPM", rpm)),
-                            LivePidValue("ECT", "Coolant Temp (DEMO)", "Temp. liquide (DÉMO)", coolantC, "°C", coolantC * 1.8 + 32.0, "°F", 40.0, 120.0, push("ECT", coolantC)),
-                            LivePidValue("OIL", "Oil Pressure (DEMO)", "Pression huile (DÉMO)", oilKpa, "kPa", oilKpa * 0.145038, "PSI", 100.0, 500.0, push("OIL", oilKpa)),
-                            LivePidValue("STFT", "Short Term Fuel Trim B1 (DEMO)", "Correction carburant B1 (DÉMO)", stft, "%", stft, "%", -15.0, 15.0, push("STFT", stft)),
-                            LivePidValue("BAT", "Control Module Voltage (DEMO)", "Tension calculateur (DÉMO)", voltage, "V", voltage, "V", 11.5, 15.2, push("BAT", voltage))
-                        )
-                    } else {
-                        val values = mutableListOf<LivePidValue>()
-                        suspend fun read(pid: String): IntArray? = CamaroUdsProtocol.parsePidBytes(obdManager.sendAtCommand("01$pid", 700L), pid)
-                        read("0C")?.takeIf { it.size >= 2 }?.let { b ->
-                            val v = (b[0] * 256 + b[1]) / 4.0
-                            values += LivePidValue("RPM", "Engine Speed", "Régime moteur", v, "tr/min", v, "RPM", 0.0, 7000.0, push("RPM", v))
-                        }
-                        read("05")?.firstOrNull()?.let { b ->
-                            val v = (b - 40).toDouble()
-                            values += LivePidValue("ECT", "Coolant Temperature", "Température liquide", v, "°C", v * 1.8 + 32.0, "°F", -40.0, 215.0, push("ECT", v))
-                        }
-                        read("0D")?.firstOrNull()?.let { b ->
-                            val v = b.toDouble()
-                            values += LivePidValue("SPD", "Vehicle Speed", "Vitesse véhicule", v, "km/h", v / 1.609344, "mph", 0.0, 255.0, push("SPD", v))
-                        }
-                        read("11")?.firstOrNull()?.let { b ->
-                            val v = b * 100.0 / 255.0
-                            values += LivePidValue("TPS", "Throttle Position", "Position papillon", v, "%", v, "%", 0.0, 100.0, push("TPS", v))
-                        }
-                        read("04")?.firstOrNull()?.let { b ->
-                            val v = b * 100.0 / 255.0
-                            values += LivePidValue("LOAD", "Calculated Engine Load", "Charge moteur calculée", v, "%", v, "%", 0.0, 100.0, push("LOAD", v))
-                        }
-                        read("0B")?.firstOrNull()?.let { b ->
-                            val v = b.toDouble()
-                            values += LivePidValue("MAP", "Intake Manifold Pressure", "Pression collecteur admission", v, "kPa", v * 0.145038, "PSI", 0.0, 255.0, push("MAP", v))
-                        }
-                        read("0F")?.firstOrNull()?.let { b ->
-                            val v = (b - 40).toDouble()
-                            values += LivePidValue("IAT", "Intake Air Temperature", "Température air admission", v, "°C", v * 1.8 + 32.0, "°F", -40.0, 215.0, push("IAT", v))
-                        }
-                        read("10")?.takeIf { it.size >= 2 }?.let { b ->
-                            val v = (b[0] * 256 + b[1]) / 100.0
-                            values += LivePidValue("MAF", "Mass Air Flow", "Débit massique d'air", v, "g/s", v * 0.002205, "lb/s", 0.0, 655.35, push("MAF", v))
-                        }
-                        read("06")?.firstOrNull()?.let { b ->
-                            val v = b * 100.0 / 128.0 - 100.0
-                            values += LivePidValue("STFT", "Short Term Fuel Trim B1", "Correction carburant court terme B1", v, "%", v, "%", -100.0, 99.2, push("STFT", v))
-                        }
-                        read("42")?.takeIf { it.size >= 2 }?.let { b ->
-                            val v = (b[0] * 256 + b[1]) / 1000.0
-                            values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
-                        }
-                        _livePids.value = values
-                    }
-                    captureLiveTelemetrySample(_livePids.value)
+            suspend fun read(pid: String): IntArray? {
+                val response = obdManager.sendAtCommand("01" + pid, 900L)
+                if (response.equals("NO_SOCKET", ignoreCase = true) ||
+                    response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
+                    throw IllegalStateException("La connexion OBD a été interrompue.")
                 }
-                delay(if (obdManager.isDemoMode) 450 else 900)
+                return CamaroUdsProtocol.parsePidBytes(response, pid)
+            }
+
+            while (currentCoroutineContext().isActive) {
+                if (_isStreamingLive.value) {
+                    try {
+                        when {
+                            obdManager.isSimulationActive -> {
+                                tick += 0.35
+                                val rpm = (740.0 + sin(tick) * 45.0 + Random.nextDouble(-12.0, 12.0)).coerceAtLeast(620.0)
+                                val coolantC = (91.0 + sin(tick * 0.2) * 2.5).coerceIn(85.0, 104.0)
+                                val oilKpa = (245.0 + sin(tick * 0.8) * 18.0).coerceIn(180.0, 380.0)
+                                val stft = (1.6 + sin(tick * 0.6) * 2.1).coerceIn(-6.0, 6.0)
+                                val voltage = 14.1 + sin(tick * 0.3) * 0.15
+                                _livePids.value = listOf(
+                                    LivePidValue("RPM", "Engine Speed (DEMO)", "Régime moteur (DÉMO)", rpm, "tr/min", rpm, "RPM", 600.0, 7000.0, push("RPM", rpm)),
+                                    LivePidValue("ECT", "Coolant Temp (DEMO)", "Temp. liquide (DÉMO)", coolantC, "°C", coolantC * 1.8 + 32.0, "°F", 40.0, 120.0, push("ECT", coolantC)),
+                                    LivePidValue("OIL", "Oil Pressure (DEMO)", "Pression huile (DÉMO)", oilKpa, "kPa", oilKpa * 0.145038, "PSI", 100.0, 500.0, push("OIL", oilKpa)),
+                                    LivePidValue("STFT", "Short Term Fuel Trim B1 (DEMO)", "Correction carburant B1 (DÉMO)", stft, "%", stft, "%", -6.0, 6.0, push("STFT", stft)),
+                                    LivePidValue("BAT", "Control Module Voltage (DEMO)", "Tension calculateur (DÉMO)", voltage, "V", voltage, "V", 11.5, 15.2, push("BAT", voltage))
+                                )
+                                _liveTelemetryMessage.value = "Simulation active : les valeurs affichées ne proviennent pas du véhicule."
+                            }
+                            obdManager.isDemoMode -> {
+                                _livePids.value = emptyList()
+                                _liveTelemetryMessage.value = "Aucune interface connectée. Les valeurs simulées ne sont pas affichées automatiquement."
+                            }
+                            else -> {
+                                val values = mutableListOf<LivePidValue>()
+                                read("0C")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = (b[0] * 256 + b[1]) / 4.0
+                                    values += LivePidValue("RPM", "Engine Speed", "Régime moteur", v, "tr/min", v, "RPM", 0.0, 7000.0, push("RPM", v))
+                                }
+                                read("05")?.firstOrNull()?.let { b ->
+                                    val v = (b - 40).toDouble()
+                                    values += LivePidValue("ECT", "Coolant Temperature", "Température liquide", v, "°C", v * 1.8 + 32.0, "°F", -40.0, 215.0, push("ECT", v))
+                                }
+                                read("0D")?.firstOrNull()?.let { b ->
+                                    val v = b.toDouble()
+                                    values += LivePidValue("SPD", "Vehicle Speed", "Vitesse véhicule", v, "km/h", v / 1.609344, "mph", 0.0, 255.0, push("SPD", v))
+                                }
+                                read("11")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("TPS", "Throttle Position", "Position papillon", v, "%", v, "%", 0.0, 100.0, push("TPS", v))
+                                }
+                                read("04")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("LOAD", "Calculated Engine Load", "Charge moteur calculée", v, "%", v, "%", 0.0, 100.0, push("LOAD", v))
+                                }
+                                read("0B")?.firstOrNull()?.let { b ->
+                                    val v = b.toDouble()
+                                    values += LivePidValue("MAP", "Intake Manifold Pressure", "Pression collecteur admission", v, "kPa", v * 0.145038, "PSI", 0.0, 255.0, push("MAP", v))
+                                }
+                                read("0F")?.firstOrNull()?.let { b ->
+                                    val v = (b - 40).toDouble()
+                                    values += LivePidValue("IAT", "Intake Air Temperature", "Température air admission", v, "°C", v * 1.8 + 32.0, "°F", -40.0, 215.0, push("IAT", v))
+                                }
+                                read("10")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = (b[0] * 256 + b[1]) / 100.0
+                                    values += LivePidValue("MAF", "Mass Air Flow", "Débit massique d'air", v, "g/s", v * 0.002205, "lb/s", 0.0, 655.35, push("MAF", v))
+                                }
+                                read("06")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 128.0 - 100.0
+                                    values += LivePidValue("STFT", "Short Term Fuel Trim B1", "Correction carburant court terme B1", v, "%", v, "%", -100.0, 99.2, push("STFT", v))
+                                }
+                                read("42")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = (b[0] * 256 + b[1]) / 1000.0
+                                    values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
+                                }
+                                _livePids.value = values
+                                _liveTelemetryMessage.value = if (values.isEmpty()) {
+                                    "Aucune réponse exploitable des PIDs demandés. Vérifie le protocole et la compatibilité de l'adaptateur."
+                                } else {
+                                    null
+                                }
+                            }
+                        }
+                        captureLiveTelemetrySample(_livePids.value)
+                        consecutiveFailures = 0
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        consecutiveFailures++
+                        _liveTelemetryMessage.value = error.localizedMessage ?: "Erreur de lecture OBD live."
+                        if (_liveRecordingState.value.isRecording) {
+                            stopLiveRecording()
+                            _liveRecordingState.value = _liveRecordingState.value.copy(
+                                message = "Enregistrement arrêté : la communication OBD a échoué. Les derniers échantillons restent exportables."
+                            )
+                        }
+                    }
+                }
+
+                val pauseMs = when {
+                    obdManager.isSimulationActive -> 450L
+                    consecutiveFailures == 0 -> 900L
+                    else -> (900L * (1L shl consecutiveFailures.coerceAtMost(3))).coerceAtMost(5_000L)
+                }
+                delay(pauseMs)
             }
         }
     }
