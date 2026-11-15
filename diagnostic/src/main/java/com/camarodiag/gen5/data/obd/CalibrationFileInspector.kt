@@ -1,13 +1,17 @@
 package com.camarodiag.gen5.data.obd
 
+import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
+import java.util.zip.ZipInputStream
 import java.util.Locale
 
 enum class CalibrationFileFormat(val label: String) {
     RAW_BINARY("BIN / raw binary"),
     INTEL_HEX("Intel HEX"),
     MOTOROLA_S_RECORD("Motorola S-record"),
-    UNKNOWN("Unknown")
+    ZIP_ARCHIVE("Archive de cartographie (ZIP)"),
+    EXTERNAL_DEFINITION("Définition de tables externe"),
+    UNKNOWN("Fichier externe non reconnu")
 }
 
 data class CalibrationAddressRange(val start: Long, val endInclusive: Long) {
@@ -36,11 +40,16 @@ object CalibrationFileInspector {
 
     private const val MAX_RECORDS = 2_000_000
     private const val MAX_ADDRESS_SPAN = 64L * 1024L * 1024L
+    private const val MAX_ARCHIVE_ENTRIES = 1_000
+    private const val MAX_ARCHIVE_UNCOMPRESSED_BYTES = 128L * 1024L * 1024L
+    private const val MAX_ARCHIVE_DISPLAY_ENTRIES = 30
 
     fun inspect(fileName: String, content: ByteArray): CalibrationFileInspection {
         if (content.isEmpty()) return invalid(CalibrationFileFormat.UNKNOWN, "Fichier vide.", "Empty file.")
         val extension = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)
         return when {
+            isZipArchive(content) -> inspectZipArchive(content)
+            extension in setOf("xdf", "a2l", "xml", "mapdef") -> externalDefinitionInspection(content.size.toLong(), extension)
             extension in setOf("hex", "ihx") -> inspectIntelHex(content)
             extension in setOf("s19", "srec", "s28", "s37", "mot") -> inspectSRecord(content)
             extension in setOf("bin", "rom", "ori", "mod", "cal", "img") ->
@@ -66,6 +75,98 @@ object CalibrationFileInspector {
             }
         }
     }
+
+    private fun isZipArchive(content: ByteArray): Boolean =
+        content.size >= 4 &&
+            content[0] == 0x50.toByte() &&
+            content[1] == 0x4B.toByte() &&
+            (
+                (content[2] == 0x03.toByte() && content[3] == 0x04.toByte()) ||
+                (content[2] == 0x05.toByte() && content[3] == 0x06.toByte()) ||
+                (content[2] == 0x07.toByte() && content[3] == 0x08.toByte())
+            )
+
+    /**
+     * Archives are imported byte-for-byte. Inspection lists a bounded set of
+     * members but does not extract or decode vendor-specific binary payloads.
+     */
+    private fun inspectZipArchive(content: ByteArray): CalibrationFileInspection {
+        val entries = mutableListOf<String>()
+        val suffixes = linkedSetOf<String>()
+        var entryCount = 0
+        var uncompressedBytes = 0L
+        return try {
+            ZipInputStream(ByteArrayInputStream(content)).use { zip ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    if (!entry.isDirectory) {
+                        entryCount++
+                        if (entryCount > MAX_ARCHIVE_ENTRIES) {
+                            return CalibrationFileInspection(
+                                CalibrationFileFormat.ZIP_ARCHIVE, false,
+                                "Archive détectée, mais nombre de fichiers internes supérieur à la limite d'inspection.",
+                                content.size.toLong(), entryCount, emptyList(), "Inspection interrompue",
+                                listOf("L'archive originale reste importée sans extraction.")
+                            )
+                        }
+                        val name = entry.name.replace('\\\\', '/').take(160)
+                        if (entries.size < MAX_ARCHIVE_DISPLAY_ENTRIES) entries += name
+                        name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+                            .takeIf(String::isNotBlank)?.let(suffixes::add)
+                        while (true) {
+                            val read = zip.read(buffer)
+                            if (read < 0) break
+                            uncompressedBytes += read
+                            if (uncompressedBytes > MAX_ARCHIVE_UNCOMPRESSED_BYTES) {
+                                return CalibrationFileInspection(
+                                    CalibrationFileFormat.ZIP_ARCHIVE, false,
+                                    "Archive détectée ; limite de décompression d'inspection atteinte.",
+                                    content.size.toLong(), entryCount, emptyList(), "Inspection interrompue",
+                                    listOf("Archive conservée telle quelle ; aucun fichier interne n'a été extrait.")
+                                )
+                            }
+                        }
+                    }
+                    zip.closeEntry()
+                }
+            }
+            val details = buildList {
+                add("Archive conservée telle quelle ; aucune cartographie interne n'est extraite ou décodée automatiquement.")
+                if (entries.isNotEmpty()) add("Fichiers détectés : " + entries.joinToString(", "))
+                if (entryCount > entries.size) add("${entryCount - entries.size} autre(s) entrée(s) non affichée(s).")
+                if (suffixes.isNotEmpty()) add("Extensions internes : " + suffixes.take(20).joinToString(", "))
+            }
+            CalibrationFileInspection(
+                CalibrationFileFormat.ZIP_ARCHIVE,
+                valid = entryCount > 0,
+                summary = "Archive de cartographie importable : $entryCount fichier(s), $uncompressedBytes octets décompressés inspectés.",
+                payloadBytes = uncompressedBytes,
+                recordCount = entryCount,
+                addressRanges = emptyList(),
+                checksumValidation = "Conteneur ZIP lisible ; contenu ECU non vérifié",
+                warnings = details
+            )
+        } catch (error: Exception) {
+            CalibrationFileInspection(
+                CalibrationFileFormat.ZIP_ARCHIVE, false,
+                "Archive reconnue mais impossible à inspecter entièrement : ${error.localizedMessage ?: "contenu protégé ou invalide"}.",
+                content.size.toLong(), entryCount, emptyList(), "Non vérifié",
+                listOf("Le fichier original est conservé sans extraction ni interprétation.")
+            )
+        }
+    }
+
+    private fun externalDefinitionInspection(size: Long, extension: String) =
+        CalibrationFileInspection(
+            CalibrationFileFormat.EXTERNAL_DEFINITION, false,
+            "Fichier de définition externe .$extension importable et conservé, mais non encore converti en tables CamaroDiag.",
+            size, 0, emptyList(), "Non vérifié",
+            listOf(
+                "Le contenu est conservé à l'identique mais ses adresses, axes, types numériques et facteurs d'échelle ne sont pas appliqués.",
+                "Pour modifier les tables hors ligne, convertir la définition vers le modèle TSV documenté puis vérifier chaque offset et chaque facteur sur le CAL ID/OS exact."
+            )
+        )
 
     private fun inspectIntelHex(content: ByteArray): CalibrationFileInspection {
         val lines = content.toString(StandardCharsets.US_ASCII)
