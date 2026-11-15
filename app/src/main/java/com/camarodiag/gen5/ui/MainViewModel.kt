@@ -758,8 +758,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-    private fun standardDtcDescription(code: String, isFr: Boolean): String {
-        val descriptions = mapOf(
+    private val standardDtcDescriptions = mapOf(
             "P0101" to ("Mass or Volume Air Flow Circuit Range/Performance" to "Débitmètre d'air : plage / performance"),
             "P0102" to ("Mass or Volume Air Flow Circuit Low Input" to "Débitmètre d'air : signal trop faible"),
             "P0103" to ("Mass or Volume Air Flow Circuit High Input" to "Débitmètre d'air : signal trop élevé"),
@@ -794,7 +793,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "P0191" to ("Fuel Rail Pressure Sensor Circuit Range/Performance" to "Capteur de pression de rampe : plage / performance"),
             "P0299" to ("Turbocharger/Supercharger Underboost" to "Sous-pression de suralimentation"),
         )
-        val entry = descriptions[code] ?: return if (isFr) "Description non disponible dans le dictionnaire local ; vérifier la documentation GM correspondant au VIN." else "Description unavailable in the local dictionary; check GM service information for this VIN."
+
+    private fun standardDtcDescription(code: String, isFr: Boolean): String {
+        val entry = standardDtcDescriptions[code]
+            ?: return if (isFr) {
+                "Description non disponible dans le dictionnaire local ; vérifier la documentation GM correspondant au VIN."
+            } else {
+                "Description unavailable in the local dictionary; check GM service information for this VIN."
+            }
         return if (isFr) entry.second else entry.first
     }
 
