@@ -752,7 +752,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "P0089" to ("Fuel Pressure Regulator Performance" to "Régulateur de pression carburant : performance"),
             "P0191" to ("Fuel Rail Pressure Sensor Circuit Range/Performance" to "Capteur de pression de rampe : plage / performance"),
             "P0299" to ("Turbocharger/Supercharger Underboost" to "Sous-pression de suralimentation"),
-            "P0300" to ("Random/Multiple Cylinder Misfire Detected" to "Ratés d'allumage aléatoires / multiples")
         )
         val entry = descriptions[code] ?: return if (isFr) "Description non disponible dans le dictionnaire local ; vérifier la documentation GM correspondant au VIN." else "Description unavailable in the local dictionary; check GM service information for this VIN."
         return if (isFr) entry.second else entry.first
