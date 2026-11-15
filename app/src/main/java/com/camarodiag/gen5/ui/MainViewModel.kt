@@ -136,6 +136,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectRealBluetooth(macAddress: String) {
+        val selectedName = _pairedDevices.value.firstOrNull { it.second == macAddress }?.first.orEmpty()
+        if (selectedName.contains("OBDLink CX", ignoreCase = true)) {
+            _connectionMessage.value = "OBDLink CX détecté en BLE, mais le fabricant indique qu’il n’est pas compatible avec les véhicules GM. Utilisez MX+, MX, LX ou une interface GM compatible."
+            return
+        }
         viewModelScope.launch {
             _isBusy.value = true
             _connectionMessage.value = null
