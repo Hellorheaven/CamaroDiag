@@ -350,6 +350,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapDefinitions = parsed.definitions,
                     selectedMapId = first.id,
                     mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
+                    mapXAxisValues = decoded.xAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
+                    mapYAxisValues = decoded.yAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
                     mapDefinitionsWarnings = parsed.warnings,
                     mapDirty = false,
                     mapError = null,
@@ -377,6 +379,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = current.copy(
                 selectedMapId = mapId,
                 mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
+                mapXAxisValues = decoded.xAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
+                mapYAxisValues = decoded.yAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
                 mapDirty = false,
                 mapError = null
             )
@@ -444,6 +448,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     },
                     inspectionWarnings = inspection.warnings,
                     mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
+                    mapXAxisValues = decoded.xAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
+                    mapYAxisValues = decoded.yAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
                     mapDirty = false,
                     mapError = null,
                     message = "Table enregistrée dans une nouvelle image locale. L'original importé reste conservé. Aucun octet n'a été envoyé à l'ECU."
@@ -474,6 +480,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             mapDefinitions = emptyList(),
             selectedMapId = null,
             mapValues = emptyList(),
+            mapXAxisValues = emptyList(),
+            mapYAxisValues = emptyList(),
             mapDefinitionsWarnings = emptyList(),
             mapDirty = false,
             mapError = null,
