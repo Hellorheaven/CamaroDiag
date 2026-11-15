@@ -12,6 +12,7 @@ import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
+import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
@@ -725,18 +726,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _connectionMessage.value = "Connecte une interface OBD réelle pour lire les défauts."
                 } else {
                     val (confirmed, pending, permanent) = obdManager.createObd2FeatureEngine().readDtcs()
-                    _dtcs.value = (confirmed + pending + permanent).distinctBy { it.code to it.status }.map { dtc ->
-                        val pendingCode = dtc.status == "pending"
-                        DiagnosticDtc(
-                            code = dtc.code,
-                            module = "ECM",
-                            statusEn = when (dtc.status) { "pending" -> "Pending"; "permanent" -> "Permanent"; else -> "Confirmed" },
-                            statusFr = when (dtc.status) { "pending" -> "En attente"; "permanent" -> "Permanent"; else -> "Confirmé" },
-                            descEn = standardDtcDescription(dtc.code, false),
-                            descFr = standardDtcDescription(dtc.code, true),
-                            isPending = pendingCode
-                        )
-                    }
+                    _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                 }
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Échec du scan des défauts."
@@ -745,6 +735,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    /** Converts standard OBD DTC records once for both the quick and full scan screens. */
+    private fun mapObdDtcs(records: List<ObdDtc>): List<DiagnosticDtc> =
+        records.distinctBy { it.code to it.status }.map { dtc ->
+            DiagnosticDtc(
+                code = dtc.code,
+                module = "ECM",
+                statusEn = when (dtc.status) {
+                    "pending" -> "Pending"
+                    "permanent" -> "Permanent"
+                    else -> "Confirmed"
+                },
+                statusFr = when (dtc.status) {
+                    "pending" -> "En attente"
+                    "permanent" -> "Permanent"
+                    else -> "Confirmé"
+                },
+                descEn = standardDtcDescription(dtc.code, false),
+                descFr = standardDtcDescription(dtc.code, true),
+                isPending = dtc.status == "pending"
+            )
+        }
 
     private fun standardDtcDescription(code: String, isFr: Boolean): String {
         val descriptions = mapOf(
@@ -882,17 +894,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val report = obdManager.createObd2FeatureEngine().fullReadOnlyScan()
                 _obdScanReport.value = report
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
-                _dtcs.value = allDtcs.distinctBy { it.code to it.status }.map { dtc ->
-                    DiagnosticDtc(
-                        code = dtc.code,
-                        module = "ECM",
-                        statusEn = when (dtc.status) { "pending" -> "Pending"; "permanent" -> "Permanent"; else -> "Confirmed" },
-                        statusFr = when (dtc.status) { "pending" -> "En attente"; "permanent" -> "Permanent"; else -> "Confirmé" },
-                        descEn = standardDtcDescription(dtc.code, false),
-                        descFr = standardDtcDescription(dtc.code, true),
-                        isPending = dtc.status == "pending"
-                    )
-                }
+                _dtcs.value = mapObdDtcs(allDtcs)
                 _obdScanMessage.value = "Scan OBD-II terminé : ${report.supportedPids.size} PIDs supportés, ${allDtcs.size} défaut(s) retourné(s)."
             } catch (error: Exception) {
                 _obdScanMessage.value = error.localizedMessage ?: "Échec du scan OBD-II."
