@@ -111,7 +111,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isBusy.value = true
             _connectionMessage.value = null
-            obdManager.connectUsb(id).onSuccess { caps -> _adapter.value = caps; refreshTopologyAndDefaults() }
+            val baudRate = if (deviceLabel.contains("OBDLink", true)) 115200 else 38400
+            obdManager.connectUsb(id, baudRate).onSuccess { caps -> _adapter.value = caps; refreshTopologyAndDefaults() }
                 .onFailure { _connectionMessage.value = it.localizedMessage ?: "USB OBD connection failed" }
             _isBusy.value = false
         }
