@@ -52,7 +52,16 @@ data class CalibrationWorkspaceState(
     val inspectionRecordCount: Int? = null,
     val inspectionChecksumStatus: String? = null,
     val inspectionAddressRanges: List<String> = emptyList(),
-    val inspectionWarnings: List<String> = emptyList()
+    val inspectionWarnings: List<String> = emptyList(),
+    val comparisonFileName: String? = null,
+    val comparisonFilePath: String? = null,
+    val comparisonFileSize: Long? = null,
+    val comparisonSummary: String? = null,
+    val comparisonChangedBytes: Long? = null,
+    val comparisonAppendedBytes: Long? = null,
+    val comparisonMissingBytes: Long? = null,
+    val comparisonRanges: List<String> = emptyList(),
+    val comparisonIdentical: Boolean? = null
 )
 
 @Composable
@@ -65,6 +74,7 @@ fun CalibrationWorkspaceScreen(
     onReadIdentification: () -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
+    onImportComparisonFile: () -> Unit,
     onExportFile: () -> Unit,
     onClearFile: () -> Unit
 ) {
@@ -195,7 +205,32 @@ fun CalibrationWorkspaceScreen(
                             androidx.compose.material3.Icon(Icons.Default.CloudUpload, contentDescription = null)
                             Text(if (isFr) "Exporter / télécharger le fichier" else "Export / download file")
                         }
-                        TextButton(onClick = onClearFile) { Text(if (isFr) "Retirer le fichier" else "Remove file") }
+                        if (state.inspectionFormat == "BIN / raw binary") {
+                            OutlinedButton(onClick = onImportComparisonFile, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (isFr) "Importer un second BIN pour comparer" else "Import a second BIN to compare")
+                            }
+                        } else {
+                            Text(
+                                if (isFr) "La comparaison octet par octet est activée pour les images BIN brutes uniquement."
+                                else "Byte-for-byte comparison is enabled for raw BIN images only.",
+                                color = TextMuted, fontSize = 10.sp
+                            )
+                        }
+                        state.comparisonFileName?.let { comparisonName ->
+                            HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                            Text(if (isFr) "Comparaison : $comparisonName" else "Comparison: $comparisonName", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(state.comparisonSummary.orEmpty(), color = TextPrimary, fontSize = 12.sp)
+                            Text(
+                                if (isFr) "Octets modifiés : ${state.comparisonChangedBytes ?: 0L} • Ajoutés : ${state.comparisonAppendedBytes ?: 0L} • Manquants : ${state.comparisonMissingBytes ?: 0L}"
+                                else "Changed bytes: ${state.comparisonChangedBytes ?: 0L} • Appended: ${state.comparisonAppendedBytes ?: 0L} • Missing: ${state.comparisonMissingBytes ?: 0L}",
+                                color = TextMuted, fontSize = 11.sp
+                            )
+                            state.comparisonRanges.forEach { range ->
+                                Text(range, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            }
+                            if (state.comparisonIdentical == true) Text(if (isFr) "Images identiques" else "Images are identical", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        TextButton(onClick = onClearFile) { Text(if (isFr) "Retirer les fichiers" else "Remove files") }
                     }
                 }
             }
