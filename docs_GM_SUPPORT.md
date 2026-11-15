@@ -44,7 +44,7 @@ Les opérations locales disponibles sont les suivantes :
 - Détection des formats binaires bruts BIN, Intel HEX et Motorola S-record.
 - Vérification structurelle des enregistrements Intel HEX : checksum, longueur, EOF, types d'enregistrement et chevauchement d'adresses.
 - Vérification structurelle des Motorola S-record : compte, checksum, terminaison et chevauchement d'adresses.
-- Identification des fichiers .hpt comme conteneurs HP Tuners non décodés.
+- Les formats propriétaires non documentés restent identifiés comme inconnus et ne sont pas interprétés.
 - Comparaison octet par octet de deux images BIN brutes, rapport des octets modifiés, plages d'offset, octets ajoutés/manquants.
 - Export local d'un fichier importé vers un emplacement choisi par l'utilisateur.
 
@@ -63,7 +63,7 @@ Pour chaque famille de calculateur, il faut disposer et valider :
 5. Un contrôle d'alimentation stable, une stratégie de reprise, un mode recovery/bench testé et des images de sauvegarde vérifiées.
 6. Un plan de test sur matériel de laboratoire avant toute validation en véhicule.
 
-Les interfaces GM de programmation et leurs logiciels officiels ne sont pas interchangeables avec les interfaces OBD génériques. Le projet ne prétend pas remplacer GDS2/SPS/MDI2 ni HP Tuners sans les protocoles, licences, définitions et procédures nécessaires.
+Les interfaces GM de programmation et leurs logiciels officiels ne sont pas interchangeables avec les interfaces OBD génériques. CamaroDiag ne remplace pas les outils d'atelier GM officiels sans les protocoles, licences, définitions et procédures nécessaires.
 
 ## BCM / odomètre / pilotage
 
