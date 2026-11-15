@@ -951,27 +951,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveCurrentSession() {
         viewModelScope.launch {
-            val v = _vehicle.value
-            val report = _mileageReport.value
-            val entity = SavedSessionEntity(
-                timestamp = System.currentTimeMillis(),
-                vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} (${v.market.code})",
-                vin = v.vin,
-                adapterName = _adapter.value.deviceName,
-                dtcSummary = if (_dtcs.value.isEmpty()) "0 DTC" else _dtcs.value.joinToString(", ") { it.code },
-                mileageSummary = report?.let {
-                    if (_language.value == AppLanguage.FR) it.summaryFr else it.summaryEn
-                } ?: "Audit non exécuté",
-                hasMileageDiscrepancy = report?.hasDiscrepancy ?: false,
-                maxDeltaKm = report?.maxDeltaKm ?: 0.0
-            )
-            sessionDao.insertSession(entity)
+            try {
+                val v = _vehicle.value
+                val report = _mileageReport.value
+                val entity = SavedSessionEntity(
+                    timestamp = System.currentTimeMillis(),
+                    vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} (${v.market.code})",
+                    vin = v.vin,
+                    adapterName = _adapter.value.deviceName,
+                    dtcSummary = if (_dtcs.value.isEmpty()) "0 DTC" else _dtcs.value.joinToString(", ") { it.code },
+                    mileageSummary = report?.let {
+                        if (_language.value == AppLanguage.FR) it.summaryFr else it.summaryEn
+                    } ?: "Audit non exécuté",
+                    hasMileageDiscrepancy = report?.hasDiscrepancy ?: false,
+                    maxDeltaKm = report?.maxDeltaKm ?: 0.0
+                )
+                sessionDao.insertSession(entity)
+                _connectionMessage.value = "Session de diagnostic sauvegardée."
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _connectionMessage.value = error.localizedMessage ?: "Sauvegarde de la session impossible."
+            }
         }
     }
 
     fun deleteSavedSession(session: SavedSessionEntity) {
         viewModelScope.launch {
-            sessionDao.deleteSession(session)
+            try {
+                sessionDao.deleteSession(session)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _connectionMessage.value = error.localizedMessage ?: "Suppression de la session impossible."
+            }
         }
     }
 
