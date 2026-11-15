@@ -7,7 +7,6 @@ enum class CalibrationFileFormat(val label: String) {
     RAW_BINARY("BIN / raw binary"),
     INTEL_HEX("Intel HEX"),
     MOTOROLA_S_RECORD("Motorola S-record"),
-    HP_TUNERS_CONTAINER("HP Tuners container (not decoded)"),
     UNKNOWN("Unknown")
 }
 
@@ -42,12 +41,6 @@ object CalibrationFileInspector {
         if (content.isEmpty()) return invalid(CalibrationFileFormat.UNKNOWN, "Fichier vide.", "Empty file.")
         val extension = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)
         return when {
-            extension == "hpt" -> CalibrationFileInspection(
-                CalibrationFileFormat.HP_TUNERS_CONTAINER, false,
-                "Conteneur HP Tuners détecté par extension ; format propriétaire non décodé.",
-                content.size.toLong(), 0, emptyList(), "Non vérifié",
-                listOf("Aucune interprétation des tables ou de la compatibilité ECU n'est réalisée.")
-            )
             extension in setOf("hex", "ihx") -> inspectIntelHex(content)
             extension in setOf("s19", "srec", "s28", "s37", "mot") -> inspectSRecord(content)
             extension in setOf("bin", "rom", "ori", "mod", "cal", "img") ->
