@@ -190,6 +190,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    /** Exports the selected local calibration file through Android's Storage Access Framework. */
+    fun exportCalibrationFile(destinationUri: Uri) {
+        viewModelScope.launch {
+            try {
+                val sourcePath = _calibrationWorkspace.value.importedFilePath
+                    ?: error("Aucun fichier de calibration n'est chargé.")
+                val source = File(sourcePath)
+                check(source.isFile && source.exists()) { "Le fichier local de calibration est introuvable." }
+                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
+                    ?: error("Impossible de créer le fichier de destination.")
+                source.inputStream().use { input ->
+                    output.use { target -> input.copyTo(target) }
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    message = "Fichier exporté. Cette opération sauvegarde le fichier local et ne programme pas l'ECU."
+                )
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    message = error.localizedMessage ?: "Export du fichier impossible."
+                )
+            }
+        }
+    }
+
     fun refreshPairedDevices() {
         viewModelScope.launch {
             _pairedDevices.value = obdManager.getPairedDevices()
