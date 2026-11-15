@@ -42,7 +42,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _vehicle = MutableStateFlow(VehicleProfile())
     val vehicle: StateFlow<VehicleProfile> = _vehicle.asStateFlow()
 
-    private val _adapter = MutableStateFlow(AdapterCapabilities())
+    private val _adapter = MutableStateFlow(
+        AdapterCapabilities(
+            deviceName = "Not connected",
+            macAddress = "",
+            tier = AdapterTier.DISCONNECTED,
+            firmwareId = "",
+            supportsLongFrames = false,
+            supportsSwCan = false,
+            supportsCanHeaders = false
+        )
+    )
     val adapter: StateFlow<AdapterCapabilities> = _adapter.asStateFlow()
 
     private val _pairedDevices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
