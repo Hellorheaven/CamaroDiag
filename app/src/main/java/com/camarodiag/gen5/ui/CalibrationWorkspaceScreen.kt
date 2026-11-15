@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.camarodiag.gen5.ui.theme.CamaroAmber
+import com.camarodiag.gen5.ui.theme.OkGreen
 import com.camarodiag.gen5.ui.theme.SurfaceDark
 import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
