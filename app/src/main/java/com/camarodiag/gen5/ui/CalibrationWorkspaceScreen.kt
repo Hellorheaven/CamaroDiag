@@ -40,7 +40,8 @@ data class CalibrationWorkspaceState(
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
-    val importedFilePreview: String? = null
+    val importedFilePreview: String? = null,
+    val importedFilePath: String? = null
 )
 
 @Composable
