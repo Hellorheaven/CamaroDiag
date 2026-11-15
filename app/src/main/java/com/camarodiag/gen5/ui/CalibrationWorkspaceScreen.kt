@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -31,6 +33,8 @@ import com.camarodiag.gen5.ui.theme.CamaroAmber
 import com.camarodiag.gen5.ui.theme.SurfaceDark
 import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
+import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
+import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
@@ -52,9 +56,14 @@ fun CalibrationWorkspaceScreen(
     isConnected: Boolean,
     isFr: Boolean,
     onReadIdentification: () -> Unit,
+    vehicle: VehicleProfile,
     onImportFile: () -> Unit,
+    onExportFile: () -> Unit,
     onClearFile: () -> Unit
 ) {
+    val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
+    val allProfiles = remember { CamaroCalibrationCatalog.profiles }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -64,8 +73,44 @@ fun CalibrationWorkspaceScreen(
                 Text(if (isFr) "ATELIER ECU / CALIBRATION" else "ECU / CALIBRATION WORKSPACE",
                     color = CamaroAmber, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
                 Text(vehicleLabel, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                Text(if (isFr) "Calculateur prévu : ${ecmType}" else "Configured controller: ${ecmType}",
+                Text(if (isFr) "Famille calculateur indicative : ${ecmType}" else "Indicative controller family: ${ecmType}",
                     color = TextMuted, fontSize = 12.sp)
+                Text(
+                    if (isFr) currentProfile?.let { "Profil moteur : ${it.engine.rpo} • ${it.generation.label} • ${it.modelYears.first}–${it.modelYears.last}" } ?: "Profil moteur non répertorié pour cette année"
+                    else currentProfile?.let { "Engine profile: ${it.engine.rpo} • ${it.generation.label} • ${it.modelYears.first}–${it.modelYears.last}" } ?: "No engine profile for this model year",
+                    color = CamaroAmber, fontSize = 12.sp
+                )
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (isFr) "Couverture moteurs Camaro Gen 5 / Gen 6" else "Camaro Gen 5 / Gen 6 engine coverage",
+                        color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isFr) "Tous les profils moteur répertoriés sont présents. La famille ECM affichée est indicative : le CAL ID, le CVN, le numéro matériel et l'OS doivent identifier l'ECU réellement installé."
+                        else "All catalogued engine profiles are listed. The displayed ECM family is indicative: CAL ID, CVN, hardware number and OS must identify the ECU actually installed.",
+                        color = TextMuted, fontSize = 12.sp
+                    )
+                    allProfiles.forEach { profile ->
+                        HorizontalDivider(color = TextMuted.copy(alpha = .18f))
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                "${profile.engine.rpo} • ${profile.generation.label} • ${profile.modelYears.first}–${profile.modelYears.last}",
+                                color = if (profile.engine == vehicle.engine) CamaroAmber else TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Text(if (isFr) profile.engine.nameFr else profile.engine.nameEn, color = TextPrimary, fontSize = 12.sp)
+                            Text("ECM : ${profile.nominalControllerFamily}", color = TextMuted, fontSize = 11.sp)
+                            Text(
+                                if (isFr) "CAL ID/CVN : lecture standard • Dump binaire, édition et écriture : procédure ECU à valider"
+                                else "CAL ID/CVN: standard read • Binary dump, editing and write: ECU procedure must be validated",
+                                color = TextMuted, fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
             }
         }
         item {
@@ -128,6 +173,10 @@ fun CalibrationWorkspaceScreen(
                         Text(state.importedFileSha256.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                         Text(if (isFr) "Aperçu hexadécimal (64 premiers octets)" else "Hex preview (first 64 bytes)", color = TextMuted, fontSize = 11.sp)
                         Text(state.importedFilePreview.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                        OutlinedButton(onClick = onExportFile, modifier = Modifier.fillMaxWidth()) {
+                            androidx.compose.material3.Icon(Icons.Default.CloudUpload, contentDescription = null)
+                            Text(if (isFr) "Exporter / télécharger le fichier" else "Export / download file")
+                        }
                         TextButton(onClick = onClearFile) { Text(if (isFr) "Retirer le fichier" else "Remove file") }
                     }
                 }
@@ -142,8 +191,8 @@ fun CalibrationWorkspaceScreen(
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        if (isFr) "La lecture intégrale et le flashage ne sont pas encore activés. Sur Camaro, les procédures GM dépendent du calculateur exact (E38, E39/E39A, E67, E92…), de son OS/calibration, du protocole constructeur, du seed-key et des contrôles de checksum. Un adaptateur OBDLink seul ne garantit pas l'accès à la mémoire."
-                        else "Full binary reads and flashing are not enabled yet. Camaro GM procedures depend on the exact controller (E38, E39/E39A, E67, E92…), its OS/calibration, OEM protocol, seed-key security and checksum routines. An OBDLink adapter alone does not guarantee memory access.",
+                        if (isFr) "Les 10 profils moteur Gen 5/Gen 6 sont catalogués, mais la lecture mémoire binaire, l'édition des tables et le flashage ne sont pas encore implémentés. Il faut identifier le contrôleur exact, le CAL ID/CVN, le matériel, l'OS, le protocole de programmation constructeur, les checksums et la récupération."
+                        else "All 10 Gen 5 / Gen 6 engine profiles are catalogued, but binary memory reads, table editing and flashing are not implemented. The exact controller, CAL ID/CVN, hardware, OS, OEM programming protocol, checksums and recovery path must be identified.",
                         color = TextMuted, fontSize = 12.sp
                     )
                     Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
