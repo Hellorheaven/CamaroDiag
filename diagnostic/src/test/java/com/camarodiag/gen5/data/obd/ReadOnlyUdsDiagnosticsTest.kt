@@ -102,16 +102,16 @@ class ReadOnlyUdsDiagnosticsTest {
             requestCanId = 0x7A0,
             responseCanId = 0x7A8,
             extendedCanId = false,
-            hardwarePartNumber = "HW-123",
-            operatingSystemId = "OS-123",
-            calibrationId = "CAL-123",
-            calibrationVerificationNumber = "CVN-123",
+            hardwarePartNumber = "HW1",
+            operatingSystemId = "OS1",
+            calibrationId = "CAL1",
+            calibrationVerificationNumber = "A1B2",
             readableDids = setOf(0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106),
             identityDids = listOf(
                 UdsIdentityDidDefinition(UdsIdentityField.HARDWARE_PART_NUMBER, 0x0101, UdsIdentityEncoding.ASCII),
                 UdsIdentityDidDefinition(UdsIdentityField.OPERATING_SYSTEM_ID, 0x0102, UdsIdentityEncoding.ASCII),
                 UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_ID, 0x0103, UdsIdentityEncoding.ASCII),
-                UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER, 0x0104, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER, 0x0104, UdsIdentityEncoding.HEX),
                 UdsIdentityDidDefinition(UdsIdentityField.VIN, 0x0105, UdsIdentityEncoding.ASCII)
             ),
             verifiedVin = "1G1FA1RXXR0123456",
@@ -165,7 +165,7 @@ class ReadOnlyUdsDiagnosticsTest {
                 singleFrameResponse(0x0101, "HW-123".toByteArray(Charsets.US_ASCII)),
                 singleFrameResponse(0x0102, "OS-123".toByteArray(Charsets.US_ASCII)),
                 singleFrameResponse(0x0103, "CAL-123".toByteArray(Charsets.US_ASCII)),
-                singleFrameResponse(0x0104, "WRONG-CVN".toByteArray(Charsets.US_ASCII))
+                singleFrameResponse(0x0104, byteArrayOf(0xFF.toByte(), 0xEE.toByte()))
             )
         )
 
