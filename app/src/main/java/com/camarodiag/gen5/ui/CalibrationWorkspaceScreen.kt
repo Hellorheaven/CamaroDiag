@@ -111,6 +111,7 @@ fun CalibrationWorkspaceScreen(
 ) {
     val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
+    val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -140,6 +141,12 @@ fun CalibrationWorkspaceScreen(
                         else "All catalogued engine profiles are listed. The displayed ECM family is indicative: CAL ID, CVN, hardware number and OS must identify the ECU actually installed.",
                         color = TextMuted, fontSize = 12.sp
                     )
+                    Text(
+                        if (isFr) "Motorisations répertoriées pour ${vehicle.modelYear} : " + yearProfiles.joinToString(", ") { it.engine.rpo }.ifBlank { "aucune" }
+                        else "Catalogued engines for ${vehicle.modelYear}: " + yearProfiles.joinToString(", ") { it.engine.rpo }.ifBlank { "none" },
+                        color = CamaroAmber,
+                        fontSize = 11.sp
+                    )
                     allProfiles.forEach { profile ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .18f))
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -151,6 +158,12 @@ fun CalibrationWorkspaceScreen(
                             )
                             Text(if (isFr) profile.engine.nameFr else profile.engine.nameEn, color = TextPrimary, fontSize = 12.sp)
                             Text("ECM : ${profile.nominalControllerFamily}", color = TextMuted, fontSize = 11.sp)
+                            Text(
+                                if (isFr) "CAL ID/CVN : lecture standard ${if (profile.supportsStandardCalIdRead && profile.supportsStandardCvnRead) "prévue" else "non validée"} • Lecture binaire : ${if (profile.supportsBinaryRead) "validée" else "non disponible"} • Tables moteur validées : ${if (profile.supportsTableEditing) "oui" else "non fournies"} • Flash ECU : ${if (profile.supportsEcuWrite) "validé" else "désactivé"}"
+                                else "CAL ID/CVN: standard read ${if (profile.supportsStandardCalIdRead && profile.supportsStandardCvnRead) "profiled" else "not verified"} • Binary read: ${if (profile.supportsBinaryRead) "validated" else "unavailable"} • Validated engine tables: ${if (profile.supportsTableEditing) "available" else "not supplied"} • ECU flash: ${if (profile.supportsEcuWrite) "validated" else "disabled"}",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
                             Text(if (isFr) profile.notesFr else profile.notesEn, color = TextMuted, fontSize = 10.sp)
                             Text(
                                 if (isFr) "CAL ID/CVN : lecture standard • Dump binaire, édition et écriture : procédure ECU à valider"
