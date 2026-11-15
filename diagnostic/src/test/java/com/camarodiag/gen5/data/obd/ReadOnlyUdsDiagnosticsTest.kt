@@ -90,7 +90,7 @@ class ReadOnlyUdsDiagnosticsTest {
     fun checksExactVehicleAndEcuIdentifiersBeforeAllowingProfileDids() {
         val profile = syntheticReadProfile()
         val vehicle = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456")
-        val matching = UdsEcuIdentity("BCM-family-example", "HW1", "OS1", "CAL1", "A1B2", "1G1FA1RXXR0123456")
+        val matching = UdsEcuIdentity("BCM", "HW1", "OS1", "CAL1", "A1B2", "1G1FA1RXXR0123456")
         val mismatching = matching.copy(calibrationVerificationNumber = "A1B3")
 
         assertTrue(profile.compatibilityIssues(vehicle, matching).isEmpty())
@@ -103,14 +103,15 @@ class ReadOnlyUdsDiagnosticsTest {
     fun opensProfiledSessionOnlyAfterReadingAndMatchingEveryIdentityDid() = runBlocking {
         val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
         val responses = listOf(
-            singleFrameResponse(0x0101, "HW1".toByteArray(Charsets.US_ASCII)),
-            singleFrameResponse(0x0102, "OS1".toByteArray(Charsets.US_ASCII)),
-            singleFrameResponse(0x0103, "CAL1".toByteArray(Charsets.US_ASCII)),
-            singleFrameResponse(0x0104, byteArrayOf(0xA1.toByte(), 0xB2.toByte())),
-            CanFrame(0x7A8, byteArrayOf(0x10, 0x14, 0x62, 0x01, 0x05, vin[0], vin[1], vin[2])),
+            singleFrameResponse(0x0101, "BCM".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0102, "HW1".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0103, "OS1".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0104, "CAL1".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0105, byteArrayOf(0xA1.toByte(), 0xB2.toByte())),
+            CanFrame(0x7A8, byteArrayOf(0x10, 0x14, 0x62, 0x01, 0x06, vin[0], vin[1], vin[2])),
             CanFrame(0x7A8, byteArrayOf(0x21, vin[3], vin[4], vin[5], vin[6], vin[7], vin[8], vin[9])),
             CanFrame(0x7A8, byteArrayOf(0x22, vin[10], vin[11], vin[12], vin[13], vin[14], vin[15], vin[16])),
-            singleFrameResponse(0x0106, byteArrayOf(0x55))
+            singleFrameResponse(0x0107, byteArrayOf(0x55))
         )
         val transport = FakeCanTransport(responses)
 
@@ -120,23 +121,25 @@ class ReadOnlyUdsDiagnosticsTest {
             profile = syntheticReadProfile()
         )
 
+        assertEquals("BCM", session.identity.controllerFamily)
         assertEquals("HW1", session.identity.hardwarePartNumber)
         assertEquals("OS1", session.identity.operatingSystemId)
         assertEquals("CAL1", session.identity.calibrationId)
         assertEquals("A1B2", session.identity.calibrationVerificationNumber)
         assertEquals("1G1FA1RXXR0123456", session.identity.vin)
-        assertArrayEquals(byteArrayOf(0x55), session.readDid(0x0106))
-        assertTrue(runCatching { session.readDid(0x0107) }.isFailure)
+        assertArrayEquals(byteArrayOf(0x55), session.readDid(0x0107))
+        assertTrue(runCatching { session.readDid(0x0108) }.isFailure)
     }
 
     @Test
     fun rejectsProfileWhenEcuReportsDifferentCalibrationBeforeOpeningSession() = runBlocking {
         val transport = FakeCanTransport(
             listOf(
-                singleFrameResponse(0x0101, "HW1".toByteArray(Charsets.US_ASCII)),
-                singleFrameResponse(0x0102, "OS1".toByteArray(Charsets.US_ASCII)),
-                singleFrameResponse(0x0103, "CAL1".toByteArray(Charsets.US_ASCII)),
-                singleFrameResponse(0x0104, byteArrayOf(0xFF.toByte(), 0xEE.toByte()))
+                singleFrameResponse(0x0101, "BCM".toByteArray(Charsets.US_ASCII)),
+                singleFrameResponse(0x0102, "HW1".toByteArray(Charsets.US_ASCII)),
+                singleFrameResponse(0x0103, "OS1".toByteArray(Charsets.US_ASCII)),
+                singleFrameResponse(0x0104, "CAL1".toByteArray(Charsets.US_ASCII)),
+                singleFrameResponse(0x0105, byteArrayOf(0xFF.toByte(), 0xEE.toByte()))
             )
         )
 
@@ -170,7 +173,7 @@ class ReadOnlyUdsDiagnosticsTest {
         generation = CamaroGeneration.GEN5,
         modelYears = 2012..2015,
         engineRpo = "LFX",
-        controllerFamily = "BCM-family-example",
+        controllerFamily = "BCM",
         requestCanId = 0x7A0,
         responseCanId = 0x7A8,
         extendedCanId = false,
@@ -178,13 +181,14 @@ class ReadOnlyUdsDiagnosticsTest {
         operatingSystemId = "OS1",
         calibrationId = "CAL1",
         calibrationVerificationNumber = "A1B2",
-        readableDids = setOf(0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106),
+        readableDids = setOf(0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106, 0x0107),
         identityDids = listOf(
-            UdsIdentityDidDefinition(UdsIdentityField.HARDWARE_PART_NUMBER, 0x0101, UdsIdentityEncoding.ASCII),
-            UdsIdentityDidDefinition(UdsIdentityField.OPERATING_SYSTEM_ID, 0x0102, UdsIdentityEncoding.ASCII),
-            UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_ID, 0x0103, UdsIdentityEncoding.ASCII),
-            UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER, 0x0104, UdsIdentityEncoding.HEX),
-            UdsIdentityDidDefinition(UdsIdentityField.VIN, 0x0105, UdsIdentityEncoding.ASCII)
+            UdsIdentityDidDefinition(UdsIdentityField.CONTROLLER_FAMILY, 0x0101, UdsIdentityEncoding.ASCII),
+            UdsIdentityDidDefinition(UdsIdentityField.HARDWARE_PART_NUMBER, 0x0102, UdsIdentityEncoding.ASCII),
+            UdsIdentityDidDefinition(UdsIdentityField.OPERATING_SYSTEM_ID, 0x0103, UdsIdentityEncoding.ASCII),
+            UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_ID, 0x0104, UdsIdentityEncoding.ASCII),
+            UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER, 0x0105, UdsIdentityEncoding.HEX),
+            UdsIdentityDidDefinition(UdsIdentityField.VIN, 0x0106, UdsIdentityEncoding.ASCII)
         ),
         verifiedVin = "1G1FA1RXXR0123456",
         evidenceReference = "Synthetic unit-test fixture; not a real vehicle definition"
