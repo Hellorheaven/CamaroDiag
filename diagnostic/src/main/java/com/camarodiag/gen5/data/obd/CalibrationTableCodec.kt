@@ -305,8 +305,9 @@ object CalibrationTableCodec {
         count: Int,
         lineNumber: Int
     ): CalibrationAxisDefinition? {
-        if (columns.none { fields[it].isNullOrBlank() }) return null
-        require(columns.all { !fields[it].isNullOrBlank() }) {
+        val axisValues = columns.map { fields[it] }
+        if (axisValues.all { it.isNullOrBlank() }) return null
+        require(axisValues.all { !it.isNullOrBlank() }) {
             "Ligne " + lineNumber + " : une définition d'axe doit renseigner toutes ses colonnes."
         }
         val offset = parseAddress(fields.getValue(columns[0]))
