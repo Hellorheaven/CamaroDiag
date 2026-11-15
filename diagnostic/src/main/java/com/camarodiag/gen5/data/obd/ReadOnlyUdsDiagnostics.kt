@@ -118,6 +118,7 @@ internal class IsoTpChannel(
         if (frameType != 0x1) throw IsoTpException("Expected an ISO-TP single or first frame.")
         val length = ((first.data[0].toInt() and 0x0F) shl 8) or (first.data[1].toInt() and 0xFF)
         require(length in 8..MAX_PAYLOAD_BYTES) { "Invalid or unsupported ISO-TP first-frame length." }
+        requireFrameLength(first, 8, "ISO-TP first response")
 
         val output = ByteArray(length)
         val initialCount = minOf(6, length)
@@ -138,6 +139,7 @@ internal class IsoTpChannel(
             }
             expectedSequence = (expectedSequence + 1) and 0x0F
             val count = minOf(7, length - copied)
+            requireFrameLength(frame, count + 1, "ISO-TP consecutive response")
             frame.data.copyInto(output, destinationOffset = copied, startIndex = 1, endIndex = 1 + count)
             copied += count
         }
