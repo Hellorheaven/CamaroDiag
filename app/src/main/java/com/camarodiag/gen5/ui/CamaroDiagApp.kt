@@ -91,6 +91,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         uri?.let { viewModel.importCalibrationFile(it) }
     }
 
+    val calibrationComparisonPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importComparisonCalibrationFile(it) }
+    }
+
     val calibrationFileExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
@@ -297,6 +303,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
+                    onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
                     onExportFile = {
                         calibrationWorkspace.importedFileName?.let { fileName ->
                             calibrationFileExporter.launch(fileName)
