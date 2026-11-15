@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.ui
 
 import android.app.Application
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.camarodiag.gen5.data.db.DiagnosticDatabase
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
+import java.security.MessageDigest
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -88,6 +91,91 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateVin(vin: String) {
         _vehicle.value = _vehicle.value.copy(vin = vin.uppercase().filter { it.isLetterOrDigit() }.take(17))
+    }
+
+    private val _calibrationWorkspace = MutableStateFlow(CalibrationWorkspaceState())
+    val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
+
+    /** Reads only standardized OBD Mode 09 calibration identifiers; this is not a binary map read. */
+    fun readCalibrationIdentification() {
+        viewModelScope.launch {
+            if (obdManager.isDemoMode) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    message = "Mode démo ou interface non connectée : aucune donnée ECU réelle n'a été lue."
+                )
+                return@launch
+            }
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isReading = true, message = "")
+            try {
+                val calId = obdManager.sendAtCommand("0904", 3500L)
+                val cvn = obdManager.sendAtCommand("0906", 3500L)
+                val validCal = calId.isNotBlank() && !calId.contains("NO_SOCKET") && !calId.contains("NO DATA", true)
+                val validCvn = cvn.isNotBlank() && !cvn.contains("NO_SOCKET") && !cvn.contains("NO DATA", true)
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isReading = false,
+                    calibrationIdResponse = if (validCal) calId else "",
+                    cvnResponse = if (validCvn) cvn else "",
+                    message = if (validCal || validCvn) {
+                        "Identifiants Mode 09 lus. Ils ne représentent pas le contenu binaire de la cartographie."
+                    } else {
+                        "Aucun CAL ID/CVN exploitable retourné. Le calculateur ou l'interface peut ne pas prendre ces PID en charge."
+                    }
+                )
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isReading = false,
+                    message = error.localizedMessage ?: "Échec de lecture des identifiants ECU."
+                )
+            }
+        }
+    }
+
+    /** Imports a local calibration file for inventory and integrity checks only. */
+    fun importCalibrationFile(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val resolver = getApplication<Application>().contentResolver
+                val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    } ?: uri.lastPathSegment ?: "calibration.bin"
+                val bytes = resolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    var total = 0
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= 32 * 1024 * 1024) { "Fichier trop volumineux (limite locale : 32 Mio)." }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("Impossible d'ouvrir le fichier sélectionné.")
+                require(bytes.isNotEmpty()) { "Le fichier sélectionné est vide." }
+                val sha256 = MessageDigest.getInstance("SHA-256").digest(bytes)
+                    .joinToString("") { "%02x".format(it) }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    importedFileName = displayName,
+                    importedFileSize = bytes.size.toLong(),
+                    importedFileSha256 = sha256,
+                    message = "Fichier importé localement. Compatibilité ECU et checksum constructeur non vérifiés."
+                )
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    message = error.localizedMessage ?: "Import du fichier impossible."
+                )
+            }
+        }
+    }
+
+    fun clearCalibrationFile() {
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            importedFileName = null,
+            importedFileSize = null,
+            importedFileSha256 = null,
+            message = ""
+        )
     }
 
     fun refreshPairedDevices() {

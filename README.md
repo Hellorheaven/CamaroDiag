@@ -28,6 +28,15 @@ Application Android native Kotlin / Jetpack Compose pour diagnostic Chevrolet Ca
 - Carbyte est un produit GM dédié à certaines fonctions AFM/DFM/Stop-Start, pas un adaptateur de diagnostic OBD générique exploitable comme MX+/EX.
 - VXDIAG/J2534 : non déclaré opérationnel sur Android. Il faut le SDK Android officiel ou un protocole documenté propre au modèle exact; aucune compatibilité n'est simulée.
 
+## ECU / calibration workspace
+
+- The app launcher icon uses a Bumblebee-inspired yellow/black Camaro treatment.
+- The new ECU workspace reads the standard OBD Mode 09 CAL ID (PID 04) and CVN (PID 06) from a connected vehicle and displays the raw ECU responses.
+- Local calibration-file import is limited to 32 MiB and records the file name, size and SHA-256 digest for inventory/integrity checking.
+- These identifiers and local-file checks are **not** a binary ECU map read, map editor, or ECU flash operation.
+- Full read/write support is not enabled. Camaro Gen 5/Gen 6 controllers (Bosch E69, GM E38, E39/E39A, E67, E92/E93 variants) require exact OS/calibration identification, a verified OEM read/write procedure, seed-key handling where applicable, checksum correction, a recovery/bench-flash path and validation on the matching hardware. No generic OBDLink/ELM command is treated as a flash protocol.
+- A future write feature must remain disabled until the exact vehicle/ECU profile and recovery method are confirmed. Never flash a calibration solely because the file extension or nominal engine family matches.
+
 ## Pilotage carrosserie
 
 L'écran Pilotage présente les fonctions candidates (vitres, toit ouvrant, verrouillage, éclairage, klaxon, rétroviseurs, coffre). Elles restent verrouillées par défaut. Les commandes GM dépendent du VIN, du BCM, du marché, de la finition, de la calibration et des sessions de sécurité. Ne pas envoyer de trames arbitraires : une fonction ne doit être activée qu'après validation sur un véhicule réel et documentation du DID / service / paramètres.
