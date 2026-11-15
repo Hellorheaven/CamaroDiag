@@ -17,6 +17,8 @@ class CalibrationTableCodecTest {
         assertEquals(16, table.columns)
         assertEquals(CalibrationValueType.U16, table.valueType)
         assertEquals(CalibrationEndian.LITTLE, table.endian)
+        assertEquals(null, table.xAxis)
+        assertEquals(null, table.yAxis)
     }
 
     @Test
