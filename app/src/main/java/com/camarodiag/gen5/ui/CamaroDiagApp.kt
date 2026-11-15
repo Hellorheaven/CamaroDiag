@@ -73,9 +73,17 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         viewModel.refreshPairedDevices()
     }
 
+    val bleLocationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.refreshPairedDevices()
+    }
+
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         } else {
             viewModel.refreshPairedDevices()
         }
@@ -400,8 +408,8 @@ fun AdapterScreen(
             }
             if (pairedDevices.isEmpty()) {
                 Text(
-                    if (isFr) "Aucun périphérique Bluetooth appairé détecté. Appairez votre OBDLink MX+ ou ELM327 dans les paramètres Android."
-                    else "No paired Bluetooth devices found. Pair your OBDLink MX+ or ELM327 in Android Bluetooth settings.",
+                    if (isFr) "Aucun adaptateur détecté. Les OBDLink MX+, MX, LX et autres Bluetooth classiques doivent être appairés ; le CX est recherché en BLE à proximité."
+                    else "No adapter detected. Pair OBDLink MX+, MX, LX and other Classic Bluetooth adapters; CX is discovered nearby over BLE.",
                     color = TextMuted, fontSize = 13.sp
                 )
             } else {
@@ -425,7 +433,7 @@ fun AdapterScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (isFr) "Connexion USB (ELM327 / interface série)" else "USB connection (ELM327 / serial adapter)", fontWeight = FontWeight.Bold)
+                    Text(if (isFr) "Connexion USB (OBDLink EX / SX, ELM327 et interfaces série)" else "USB connection (OBDLink EX / SX, ELM327 and serial adapters)", fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(if (isFr) "Périphériques USB détectés" else "Detected USB devices", modifier = Modifier.weight(1f))
                         TextButton(onClick = onRefreshUsb) { Text(if (isFr) "Actualiser" else "Refresh") }

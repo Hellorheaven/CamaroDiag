@@ -91,8 +91,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshPairedDevices() {
-        _pairedDevices.value = obdManager.getPairedDevices()
-        _usbDevices.value = obdManager.getUsbDevices()
+        viewModelScope.launch {
+            _pairedDevices.value = obdManager.getPairedDevices()
+            _usbDevices.value = obdManager.getUsbDevices()
+            val nearbyBle = obdManager.scanNearbyBleDevices()
+            _pairedDevices.value = (_pairedDevices.value + nearbyBle)
+                .distinctBy { it.second }
+                .sortedByDescending { it.first.contains("OBD", true) || it.first.contains("ELM", true) || it.first.contains("vLinker", true) }
+        }
     }
 
     fun connectWifi(host: String, port: Int) {
@@ -111,7 +117,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isBusy.value = true
             _connectionMessage.value = null
-            obdManager.connectUsb(id).onSuccess { caps -> _adapter.value = caps; refreshTopologyAndDefaults() }
+            val baudRate = if (deviceLabel.contains("OBDLink", true)) 115200 else 38400
+            obdManager.connectUsb(id, baudRate).onSuccess { caps -> _adapter.value = caps; refreshTopologyAndDefaults() }
                 .onFailure { _connectionMessage.value = it.localizedMessage ?: "USB OBD connection failed" }
             _isBusy.value = false
         }
@@ -129,6 +136,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectRealBluetooth(macAddress: String) {
+        val selectedName = _pairedDevices.value.firstOrNull { it.second == macAddress }?.first.orEmpty()
+        if (selectedName.contains("OBDLink CX", ignoreCase = true)) {
+            _connectionMessage.value = "OBDLink CX détecté en BLE, mais le fabricant indique qu’il n’est pas compatible avec les véhicules GM. Utilisez MX+, MX, LX ou une interface GM compatible."
+            return
+        }
         viewModelScope.launch {
             _isBusy.value = true
             _connectionMessage.value = null
