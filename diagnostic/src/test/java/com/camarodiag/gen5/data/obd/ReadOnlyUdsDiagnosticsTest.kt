@@ -82,7 +82,7 @@ class ReadOnlyUdsDiagnosticsTest {
         )
         val client = UdsReadOnlyClient(transport, 0x7E0, 0x7E8)
 
-        assertArrayEquals(byteArrayOf(0x02, 0xFF.toByte(), 0x01, 0x02), client.readDtcInformation())
+        assertArrayEquals(byteArrayOf(0xFF.toByte(), 0x01, 0x02), client.readDtcInformation())
         assertArrayEquals(byteArrayOf(0x03, 0x19, 0x02, 0xFF.toByte()), transport.sent.single().data)
     }
 
