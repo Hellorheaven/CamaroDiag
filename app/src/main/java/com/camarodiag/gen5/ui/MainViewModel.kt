@@ -833,8 +833,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun runMileageAudit() {
         viewModelScope.launch {
             _isBusy.value = true
+            _mileageReport.value = null
+            val readings = mutableListOf<MileageSourceReading>()
             try {
-                val readings = mutableListOf<MileageSourceReading>()
                 if (obdManager.isDemoMode) {
                     readings += MileageSourceReading(
                         "DEMO", "Demo data only", "Données de démonstration uniquement",
@@ -876,6 +877,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
+                _connectionMessage.value = null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
+                _connectionMessage.value = error.localizedMessage ?: "Échec de lecture pendant l'audit kilométrique."
             } finally {
                 _isBusy.value = false
             }
