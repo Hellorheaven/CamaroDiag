@@ -122,11 +122,15 @@ object CalibrationTableCodec {
         require(optionalColumns.all { it in allowedOptional }) {
             "Une colonne optionnelle n'est pas reconnue."
         }
-        require((xAxisColumns.any { it in header }) == xAxisColumns.all { it in header }) {
-            "La définition de l'axe X doit fournir les six colonnes x_offset, x_type, x_endian, x_scale, x_bias et x_unit."
+        if (xAxisColumns.any { it in header }) {
+            require(xAxisColumns.all { it in header }) {
+                "La définition de l'axe X doit fournir les six colonnes x_offset, x_type, x_endian, x_scale, x_bias et x_unit."
+            }
         }
-        require((yAxisColumns.any { it in header }) == yAxisColumns.all { it in header }) {
-            "La définition de l'axe Y doit fournir les six colonnes y_offset, y_type, y_endian, y_scale, y_bias et y_unit."
+        if (yAxisColumns.any { it in header }) {
+            require(yAxisColumns.all { it in header }) {
+                "La définition de l'axe Y doit fournir les six colonnes y_offset, y_type, y_endian, y_scale, y_bias et y_unit."
+            }
         }
 
         val definitions = mutableListOf<CalibrationMapDefinition>()
