@@ -1,9 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android") 
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+val appVersionProperties = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
+val appVersionPrefix = appVersionProperties.getProperty("VERSION_PREFIX")
+    ?: error("VERSION_PREFIX is missing from version.properties")
+val appVersionCodeBase = appVersionProperties.getProperty("VERSION_CODE_BASE")?.toIntOrNull()
+    ?: error("VERSION_CODE_BASE is missing or invalid in version.properties")
+val releasePatch = providers.gradleProperty("releasePatch").orElse("0").get().toIntOrNull()
+    ?: error("releasePatch must be a non-negative integer")
+require(releasePatch >= 0) { "releasePatch must be non-negative" }
+
 
 android {
     namespace = "com.camarodiag.gen5"
@@ -13,8 +27,8 @@ android {
         applicationId = "com.camarodiag.gen5"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.5.0"
+        versionCode = appVersionCodeBase + releasePatch
+        versionName = "$appVersionPrefix.$releasePatch"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

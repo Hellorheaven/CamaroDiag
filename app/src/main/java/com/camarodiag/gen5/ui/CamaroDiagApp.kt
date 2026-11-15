@@ -61,6 +61,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val dtcs by viewModel.dtcs.collectAsState()
     val livePids by viewModel.livePids.collectAsState()
     val isStreaming by viewModel.isStreamingLive.collectAsState()
+    val liveRecording by viewModel.liveRecordingState.collectAsState()
     val mileageReport by viewModel.mileageReport.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
@@ -107,6 +108,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         ActivityResultContracts.CreateDocument("text/tab-separated-values")
     ) { uri ->
         uri?.let { viewModel.exportCalibrationDefinitionTemplate(it) }
+    }
+
+    val liveRecordingExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { viewModel.exportLiveRecording(it) }
     }
 
     val calibrationFileExporter = rememberLauncherForActivityResult(
@@ -289,9 +296,21 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules, isFr)
-                DiagTab.LIVE -> LiveDataScreen(livePids, units, isStreaming, isFr, { viewModel.toggleLiveStream() }, {
-                    viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
-                })
+                DiagTab.LIVE -> LiveDataScreen(
+                    pids = livePids,
+                    units = units,
+                    isStreaming = isStreaming,
+                    isFr = isFr,
+                    recording = liveRecording,
+                    onToggleStream = { viewModel.toggleLiveStream() },
+                    onToggleUnits = {
+                        viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
+                    },
+                    onToggleRecording = { viewModel.toggleLiveRecording() },
+                    onExportRecording = {
+                        liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
+                    }
+                )
                 DiagTab.DTCS -> DtcScreen(dtcs, isFr, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, isFr, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
                 DiagTab.OBD_SCAN -> ObdScanScreen(
@@ -607,19 +626,66 @@ fun LiveDataScreen(
     units: UnitSystem,
     isStreaming: Boolean,
     isFr: Boolean,
+    recording: LiveRecordingState,
     onToggleStream: () -> Unit,
-    onToggleUnits: () -> Unit
+    onToggleUnits: () -> Unit,
+    onToggleRecording: () -> Unit,
+    onExportRecording: () -> Unit
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle(if (isFr) "Données Moteur Temps Réel" else "Live Engine Telemetry")
-                Row {
-                    TextButton(onClick = onToggleUnits) {
-                        Text(if (units == UnitSystem.METRIC) "SI / Metric" else "Imperial", color = CamaroBlue)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    SectionTitle(if (isFr) "Données Moteur Temps Réel" else "Live Engine Telemetry")
+                    Row {
+                        TextButton(onClick = onToggleUnits) {
+                            Text(if (units == UnitSystem.METRIC) "SI / Metric" else "Imperial", color = CamaroBlue)
+                        }
+                        TextButton(onClick = onToggleStream) {
+                            Text(if (isStreaming) "Pause" else if (isFr) "Reprendre" else "Resume", color = CamaroAmber)
+                        }
                     }
-                    TextButton(onClick = onToggleStream) {
-                        Text(if (isStreaming) (if (isFr) "Pause" else "Pause") else (if (isFr) "Reprendre" else "Resume"), color = CamaroAmber)
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = onToggleRecording,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (recording.isRecording) WarnRed else CamaroAmber)
+                            ) {
+                                Text(
+                                    if (recording.isRecording) {
+                                        if (isFr) "Arrêter l'enregistrement" else "Stop recording"
+                                    } else {
+                                        if (isFr) "Enregistrer les données" else "Record live data"
+                                    },
+                                    color = Color.Black
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = onExportRecording,
+                                enabled = recording.sampleCount > 0 && !recording.isRecording,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (isFr) "Exporter CSV" else "Export CSV")
+                            }
+                        }
+                        Text(
+                            if (isFr) "${recording.sampleCount} échantillon(s) • ${if (recording.isRecording) "ENREGISTREMENT" else "ARRÊTÉ"}"
+                            else "${recording.sampleCount} sample(s) • ${if (recording.isRecording) "RECORDING" else "STOPPED"}",
+                            color = if (recording.isRecording) CamaroAmber else TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        recording.message.takeIf { it.isNotBlank() }?.let {
+                            Text(it, color = TextMuted, fontSize = 11.sp)
+                        }
+                        Text(
+                            if (isFr) "Le journal enregistre les valeurs OBD affichées (métrique) avec leur horodatage. Il ne modifie pas les tables du calculateur."
+                            else "The logger records displayed OBD values (metric) with timestamps. It does not alter ECU calibration tables.",
+                            color = TextMuted, fontSize = 10.sp
+                        )
                     }
                 }
             }

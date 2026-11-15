@@ -212,6 +212,11 @@ fun CalibrationWorkspaceScreen(
                         androidx.compose.material3.Icon(Icons.Default.CloudDownload, contentDescription = null)
                         Text(if (isFr) "Importer un fichier de cartographie" else "Import a calibration file")
                     }
+                    Text(
+                        if (isFr) "Importe les BIN, HEX, S-record, archives ZIP et fichiers de projet/définition externes. Les formats propriétaires sont conservés tels quels pour sauvegarde/export ; seuls les BIN, HEX et S-record sont inspectés ici. Les définitions XDF/A2L doivent encore être converties en TSV avant édition des tables."
+                        else "Import BIN, HEX, S-record, ZIP archives and external project/definition files. Proprietary formats are preserved unchanged for backup/export; only BIN, HEX and S-record are inspected here. XDF/A2L definitions must still be converted to TSV before table editing.",
+                        color = TextMuted, fontSize = 11.sp
+                    )
                     state.importedFileName?.let { name ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(name, color = CamaroAmber, fontWeight = FontWeight.Bold)
@@ -382,8 +387,8 @@ fun CalibrationWorkspaceScreen(
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        if (isFr) "Les 10 profils moteur Gen 5/Gen 6 sont catalogués, mais la lecture mémoire binaire, l'édition des tables et le flashage ne sont pas encore implémentés. Il faut identifier le contrôleur exact, le CAL ID/CVN, le matériel, l'OS, le protocole de programmation constructeur, les checksums et la récupération."
-                        else "All 10 Gen 5 / Gen 6 engine profiles are catalogued, but binary memory reads, table editing and flashing are not implemented. The exact controller, CAL ID/CVN, hardware, OS, OEM programming protocol, checksums and recovery path must be identified.",
+                        if (isFr) "Les 10 profils moteur Gen 5/Gen 6 sont catalogués. L'éditeur hors ligne de tables fonctionne sur un fichier BIN importé lorsque tu fournis une définition exacte (offset, dimensions, type, ordre des octets, échelle et biais) correspondant au CAL ID et à l'OS relevés. CamaroDiag ne fournit pas encore de définitions moteur validées, ne lit pas directement la mémoire de l'ECM et ne programme pas l'ECU."
+                        else "All 10 Gen 5 / Gen 6 engine profiles are catalogued. The offline table editor works on an imported BIN when you provide an exact definition (offset, dimensions, data type, byte order, scaling and bias) for the identified CAL ID and OS. CamaroDiag does not yet ship validated engine table definitions, read ECM memory directly or program the ECU.",
                         color = TextMuted, fontSize = 12.sp
                     )
                     Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {

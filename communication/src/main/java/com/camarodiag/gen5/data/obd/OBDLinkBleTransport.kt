@@ -107,13 +107,9 @@ internal class OBDLinkBleTransport(private val context: Context) {
             else writeResult?.completeExceptionally(IllegalStateException("BLE write failed ($status)"))
         }
 
-        @Suppress("DEPRECATION")
         override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-            // Android versions below API 33 only expose the characteristic value through this callback.
-            // API 33+ uses the overload below, which supplies an immutable value snapshot directly.
             if (characteristic.uuid == notifyUuid) {
-                val legacyValue = characteristic.value
-                if (legacyValue != null) incoming.trySend(legacyValue.copyOf())
+                readLegacyNotificationValue(characteristic)?.let { incoming.trySend(it) }
             }
         }
 
@@ -154,17 +150,32 @@ internal class OBDLinkBleTransport(private val context: Context) {
             val started = if (Build.VERSION.SDK_INT >= 33) {
                 g.writeCharacteristic(characteristic, chunk, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothStatusCodes.SUCCESS
             } else {
-                @Suppress("DEPRECATION")
-                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                @Suppress("DEPRECATION")
-                characteristic.value = chunk
-                @Suppress("DEPRECATION")
-                g.writeCharacteristic(characteristic)
+                writeLegacyCharacteristic(g, characteristic, chunk)
             }
             check(started) { "Unable to start OBDLink BLE write" }
             withTimeout(4_000) { writeResult!!.await() }
             offset += count
         }
+    }
+
+    /**
+     * Android before API 33 has no value parameter on onCharacteristicChanged,
+     * so the deprecated getter is required only for that legacy callback.
+     */
+    @Suppress("DEPRECATION")
+    private fun readLegacyNotificationValue(characteristic: BluetoothGattCharacteristic): ByteArray? =
+        characteristic.value?.copyOf()
+
+    /** Isolates deprecated characteristic setters used only by Android before API 33. */
+    @Suppress("DEPRECATION")
+    private fun writeLegacyCharacteristic(
+        bluetoothGatt: BluetoothGatt,
+        characteristic: BluetoothGattCharacteristic,
+        chunk: ByteArray
+    ): Boolean {
+        characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        characteristic.value = chunk
+        return bluetoothGatt.writeCharacteristic(characteristic)
     }
 
     suspend fun read(buffer: ByteArray, timeoutMs: Int): Int {

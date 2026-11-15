@@ -16,6 +16,8 @@ import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.math.sin
@@ -62,6 +64,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isStreamingLive = MutableStateFlow(true)
     val isStreamingLive: StateFlow<Boolean> = _isStreamingLive.asStateFlow()
+
+    private val recordedLiveSamples = mutableListOf<RecordedLiveSample>()
+    private val maxLiveRecordingSamples = 10_000
+    private val _liveRecordingState = MutableStateFlow(LiveRecordingState())
+    val liveRecordingState: StateFlow<LiveRecordingState> = _liveRecordingState.asStateFlow()
 
     private val _mileageReport = MutableStateFlow<MileageAuditReport?>(null)
     val mileageReport: StateFlow<MileageAuditReport?> = _mileageReport.asStateFlow()
@@ -584,6 +591,100 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isStreamingLive.value = !_isStreamingLive.value
     }
 
+    /** Records actual live OBD samples; demo values are deliberately excluded. */
+    fun toggleLiveRecording() {
+        if (_liveRecordingState.value.isRecording) {
+            stopLiveRecording()
+            return
+        }
+        if (obdManager.isDemoMode) {
+            _liveRecordingState.value = _liveRecordingState.value.copy(
+                message = "Enregistrement réel indisponible en mode démo ou sans interface connectée."
+            )
+            return
+        }
+        recordedLiveSamples.clear()
+        _isStreamingLive.value = true
+        val now = System.currentTimeMillis()
+        _liveRecordingState.value = LiveRecordingState(
+            isRecording = true,
+            sampleCount = 0,
+            startedAtMillis = now,
+            message = "Enregistrement des données OBD réelles démarré."
+        )
+    }
+
+    fun stopLiveRecording() {
+        if (!_liveRecordingState.value.isRecording) return
+        _liveRecordingState.value = _liveRecordingState.value.copy(
+            isRecording = false,
+            stoppedAtMillis = System.currentTimeMillis(),
+            message = "Enregistrement arrêté : ${recordedLiveSamples.size} échantillon(s) capturé(s)."
+        )
+    }
+
+    fun exportLiveRecording(destinationUri: Uri) {
+        viewModelScope.launch {
+            try {
+                if (_liveRecordingState.value.isRecording) stopLiveRecording()
+                val snapshot = recordedLiveSamples.toList()
+                check(snapshot.isNotEmpty()) { "Aucune donnée enregistrée à exporter." }
+                val v = _vehicle.value
+                val csv = LiveTelemetryCsv.encode(
+                    samples = snapshot,
+                    vin = v.vin,
+                    vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
+                )
+                withContext(Dispatchers.IO) {
+                    val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
+                        ?: error("Impossible de créer le fichier CSV.")
+                    output.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                }
+                _liveRecordingState.value = _liveRecordingState.value.copy(
+                    message = "Journal CSV exporté : ${snapshot.size} échantillon(s)."
+                )
+            } catch (error: Exception) {
+                _liveRecordingState.value = _liveRecordingState.value.copy(
+                    message = error.localizedMessage ?: "Export du journal CSV impossible."
+                )
+            }
+        }
+    }
+
+    private fun captureLiveTelemetrySample(values: List<LivePidValue>) {
+        if (!_liveRecordingState.value.isRecording) return
+        if (obdManager.isDemoMode) {
+            stopLiveRecording()
+            _liveRecordingState.value = _liveRecordingState.value.copy(
+                message = "Connexion réelle perdue : journal arrêté pour ne pas mélanger des données de démonstration."
+            )
+            return
+        }
+        if (values.isEmpty()) return
+        if (recordedLiveSamples.size >= maxLiveRecordingSamples) {
+            _liveRecordingState.value = _liveRecordingState.value.copy(
+                isRecording = false,
+                stoppedAtMillis = System.currentTimeMillis(),
+                sampleCount = recordedLiveSamples.size,
+                message = "Limite de sécurité atteinte ($maxLiveRecordingSamples échantillons) : enregistrement arrêté automatiquement."
+            )
+            return
+        }
+        val snapshot = values.map { pid ->
+            RecordedLivePid(
+                id = pid.id,
+                label = pid.labelEn,
+                value = pid.metricValue,
+                unit = pid.metricUnit
+            )
+        }
+        recordedLiveSamples += RecordedLiveSample(System.currentTimeMillis(), snapshot)
+        _liveRecordingState.value = _liveRecordingState.value.copy(
+            sampleCount = recordedLiveSamples.size,
+            message = "Enregistrement en cours : ${recordedLiveSamples.size} échantillon(s)."
+        )
+    }
+
     fun scanDtcs() {
         viewModelScope.launch {
             _isBusy.value = true
@@ -872,6 +973,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         _livePids.value = values
                     }
+                    captureLiveTelemetrySample(_livePids.value)
                 }
                 delay(if (obdManager.isDemoMode) 450 else 900)
             }

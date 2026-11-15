@@ -80,3 +80,21 @@ minSdk = 29 (Android 10), compileSdk/targetSdk = 36. USB Host, réseau TCP et pe
 ## Conditions pour achever le flashage GM et VXDIAG
 
 Obtenir auprès de VXDIAG les SDK/API officiellement autorisés pour chaque VCX SE/NANO, les identifiants USB/réseau, versions de firmware, documentation de transport et droits de redistribution. Pour le flash GM, obtenir les définitions, licences, procédures et moyens de récupération approuvés pour chaque ECM. En leur absence, les fonctions correspondantes doivent rester explicitement indisponibles plutôt que d'exécuter des trames supposées.
+
+
+## Enregistrement télémétrique en direct
+
+L'écran Live peut enregistrer les valeurs réellement retournées par l'interface OBD puis les exporter en CSV. Chaque point comporte l'horodatage, le VIN, le profil véhicule, le PID, le libellé, la valeur et l'unité. Une session est limitée à 10 000 cycles d'acquisition et s'arrête si l'interface réelle est déconnectée ; les valeurs de démonstration ne sont jamais ajoutées à un journal réel.
+
+## Édition des tables et télémétrie live
+
+CamaroDiag comprend un éditeur hors ligne de tables pour une image BIN importée, à condition que l'utilisateur fournisse un fichier de définitions vérifiées pour cette image précise. Chaque définition comporte l'offset, les dimensions, le type numérique, l'ordre des octets, l'échelle, le biais et les limites éventuelles. Le fichier original est conservé et les modifications produisent une image locale distincte.
+
+La lecture/enregistrement des capteurs pendant que le moteur tourne est distincte de l'édition d'une image de calibration. CamaroDiag ne modifie pas actuellement les tables dans l'ECU moteur tournant et n'effectue aucune écriture de calibration en direct. Aucun pack de définitions de tables Gen 5/Gen 6 validé n'est fourni ; la lecture binaire directe de l'ECM et sa programmation restent indisponibles tant que les procédures adaptées au contrôleur/OS exact et la récupération ne sont pas validées.
+
+
+## Import de cartographies externes
+
+L'import accepte les fichiers sélectionnés par Android et conserve leur contenu original. BIN brut, Intel HEX et Motorola S-record sont inspectés ; les archives ZIP sont identifiées et leurs entrées sont listées sans extraction automatique. Les fichiers de définition externes XDF/A2L/XML et les conteneurs inconnus restent des pièces jointes opaques, sans conversion ou modification.
+
+Pour utiliser l'éditeur de tables, il faut une image BIN brute et un TSV de définitions adapté à son CAL ID/OS. Chaque définition fournit les offsets, dimensions, axes représentés par la matrice, type numérique, ordre des octets, échelle, biais et limites. L'import d'un conteneur propriétaire n'implique ni son décodage, ni l'accès à ses tables, ni l'autorisation de flasher son contenu.

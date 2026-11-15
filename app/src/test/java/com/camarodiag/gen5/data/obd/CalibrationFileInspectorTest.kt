@@ -3,6 +3,9 @@ package com.camarodiag.gen5.data.obd
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import org.junit.Test
 
 class CalibrationFileInspectorTest {
@@ -61,8 +64,39 @@ class CalibrationFileInspectorTest {
     }
 
     @Test
-    fun leavesUndocumentedContainerFormatsUninterpreted() {
-        val result = CalibrationFileInspector.inspect("opaque.dat", byteArrayOf(1, 2, 3, 4))
+    fun acceptsZipTuneArchiveWithoutClaimingToDecodeItsContents() {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            zip.putNextEntry(ZipEntry("read/stock.bin"))
+            zip.write(byteArrayOf(1, 2, 3, 4))
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("definitions/table.xdf"))
+            zip.write("<XDF/>".toByteArray())
+            zip.closeEntry()
+        }
+
+        val result = CalibrationFileInspector.inspect("external-calibration.zip", output.toByteArray())
+
+        assertEquals(CalibrationFileFormat.ZIP_ARCHIVE, result.format)
+        assertTrue(result.valid)
+        assertEquals(2, result.recordCount)
+        assertTrue(result.warnings.any { it.contains("stock.bin") })
+        assertTrue(result.warnings.any { it.contains("aucune cartographie interne") })
+    }
+
+    @Test
+    fun acceptsExternalMapDefinitionFilesAsAttachmentsWithoutApplyingGuessedTables() {
+        val result = CalibrationFileInspector.inspect("engine-map.xdf", "<XDF/>".toByteArray())
+
+        assertEquals(CalibrationFileFormat.EXTERNAL_DEFINITION, result.format)
+        assertFalse(result.valid)
+        assertTrue(result.summary.contains("non encore converti"))
+        assertTrue(result.warnings.any { it.contains("offset") })
+    }
+
+    @Test
+    fun keepsUnrecognizedCalibrationContainersOpaque() {
+        val result = CalibrationFileInspector.inspect("vendor-map.opaque", byteArrayOf(1, 2, 3, 4))
         assertEquals(CalibrationFileFormat.UNKNOWN, result.format)
         assertFalse(result.valid)
         assertTrue(result.summary.contains("non reconnu"))

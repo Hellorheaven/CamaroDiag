@@ -2,32 +2,34 @@ name: Release APKs to GitHub Releases
 
 on:
   workflow_dispatch:
-    inputs:
-      version_prefix:
-        description: 'Version majeure et mineure (ex: v1.0)'
-        required: true
-        default: 'v1.4'
   push:
     branches:
-      - main # Se déclenche automatiquement à chaque push validé sur main
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: camaro-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Indispensable pour créer une release et modifier les tags du dépôt
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Nécessaire pour récupérer l'historique des tags existants
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -39,86 +41,89 @@ jobs:
         with:
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+      - name: Determine next release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Decode Keystore
+          VERSION_PREFIX="$(sed -n 's/^VERSION_PREFIX=//p' version.properties | head -n 1 | tr -d '\r')"
+          VERSION_CODE_BASE="$(sed -n 's/^VERSION_CODE_BASE=//p' version.properties | head -n 1 | tr -d '\r')"
+
+          if [[ ! "$VERSION_PREFIX" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION_PREFIX must use MAJOR.MINOR format (for example 1.6)." >&2
+            exit 1
+          fi
+          if [[ ! "$VERSION_CODE_BASE" =~ ^[0-9]+$ ]]; then
+            echo "VERSION_CODE_BASE must be a positive integer." >&2
+            exit 1
+          fi
+
+          PREFIX_PATTERN="${VERSION_PREFIX//./\\.}"
+          LAST_PATCH="$(git tag --list "v${VERSION_PREFIX}.*" | sed -nE "s/^v${PREFIX_PATTERN}\.([0-9]+)$/\1/p" | sort -n | tail -n 1)"
+
+          if [[ -z "$LAST_PATCH" ]]; then
+            NEXT_PATCH=0
+          else
+            NEXT_PATCH=$((LAST_PATCH + 1))
+          fi
+
+          VERSION_CODE=$((VERSION_CODE_BASE + NEXT_PATCH))
+          VERSION_NAME="${VERSION_PREFIX}.${NEXT_PATCH}"
+          TAG_NAME="v${VERSION_NAME}"
+
+          if git rev-parse -q --verify "refs/tags/${TAG_NAME}" >/dev/null; then
+            echo "Tag ${TAG_NAME} already exists; refusing to overwrite a release." >&2
+            exit 1
+          fi
+
+          echo "prefix=${VERSION_PREFIX}" >> "$GITHUB_OUTPUT"
+          echo "patch=${NEXT_PATCH}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+
+          echo "Release: ${TAG_NAME} (versionCode ${VERSION_CODE})"
+
+      - name: Decode signing keystore
         run: |
           mkdir -p app
           printf "%s" "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+          test -s app/release.jks
 
-      - name: Generate Gradle Wrapper and Build APKs
+      - name: Generate Gradle wrapper and build APKs
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          RELEASE_PATCH: ${{ steps.version.outputs.patch }}
         run: |
-          # Génère dynamiquement le wrapper Gradle sur le runner
+          set -euo pipefail
           gradle wrapper --gradle-version 8.11.1
-          
-          # Rend le script exécutable et lance le build
           chmod +x gradlew
-          ./gradlew testDebugUnitTest --stacktrace
-          ./gradlew app:assembleDebug --stacktrace
-          ./gradlew app:assembleRelease --stacktrace
+          ./gradlew testDebugUnitTest -PreleasePatch="$RELEASE_PATCH" --stacktrace
+          ./gradlew app:assembleDebug -PreleasePatch="$RELEASE_PATCH" --stacktrace
+          ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace
 
-      - name: Generate Automatic or Manual Version Tag
-        id: tag
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            PREFIX="${{ github.event.inputs.version_prefix }}"
-            PREFIX_CLEAN=$(echo "$PREFIX" | sed 's/^v//')
-            
-            LAST_PATCH=$(git tag -l "v${PREFIX_CLEAN}.*" | sed "s/v${PREFIX_CLEAN}\.//" | sort -n | tail -n 1)
-            if [ -z "$LAST_PATCH" ]; then
-              NEXT_PATCH=0
-            else
-              NEXT_PATCH=$((LAST_PATCH + 1))
-            fi
-            TAG_NAME="v${PREFIX_CLEAN}.${NEXT_PATCH}"
-            echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-            
-          else
-            LAST_TAG=$(git describe --tags --match "v1.4.*" --abbrev=0 2>/dev/null || echo "v1.4.0")
-            echo "Dernier tag détecté : $LAST_TAG"
-            
-            PREFIX=$(echo "$LAST_TAG" | cut -d. -f1-2)
-            PATCH=$(echo "$LAST_TAG" | cut -d. -f3)
-            
-            if [ -z "$PATCH" ]; then
-              NEXT_PATCH=1
-            else
-              NEXT_PATCH=$((PATCH + 1))
-            fi
-            
-            TAG_NAME="${PREFIX}.${NEXT_PATCH}"
-            echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create Git Tag
+      - name: Create Git tag
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          git tag ${{ steps.tag.outputs.tag }}
-          git push origin ${{ steps.tag.outputs.tag }}
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
 
-      - name: Publish Release and Upload APKs
+      - name: Publish release and upload APKs
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: "CamaroDiag - Release ${{ steps.tag.outputs.tag }}"
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "CamaroDiag - Release ${{ steps.version.outputs.tag }}"
           body: |
-            ## 🚗 CamaroDiag • Chevrolet Camaro Gen 5 & Gen 6
-            - **Version** : `${{ steps.tag.outputs.tag }}`
-            - **Type de build** : Automatisé / Signé
-            - **APK Debug & Release** disponibles ci-dessous.
+            ## CamaroDiag • Chevrolet Camaro Gen 5 & Gen 6
+            - Version: ${{ steps.version.outputs.version_name }}
+            - Android versionCode: ${{ steps.version.outputs.version_code }}
+            - Signed debug and release APKs are attached.
           files: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
