@@ -159,6 +159,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Aucun CAL ID/CVN exploitable retourné. Le calculateur ou l'interface peut ne pas prendre ces informations en charge."
                     }
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
@@ -243,6 +245,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonIdentical = null,
                     message = "Fichier copié localement. L'analyse de format ne prouve pas sa compatibilité ECU ni la validité d'un checksum GM."
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = error.localizedMessage ?: "Import du fichier impossible."
@@ -311,6 +315,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonIdentical = comparison.identical,
                     message = "Comparaison locale terminée. Les écarts ne sont pas interprétés comme des tables moteur et ne valident pas la compatibilité d'un flash."
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 storedFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -329,6 +335,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = "Modèle TSV exporté. Remplace les exemples par les offsets et facteurs vérifiés de la calibration exacte."
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     mapError = error.localizedMessage ?: "Export du modèle TSV impossible."
@@ -375,6 +383,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapError = null,
                     message = "${parsed.definitions.size} table(s) chargée(s). Les adresses proviennent de ton fichier de définitions et ne sont pas certifiées par CamaroDiag."
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     mapError = error.localizedMessage ?: "Import des définitions impossible.",
@@ -402,7 +412,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 mapDirty = false,
                 mapError = null
             )
-        } catch (error: Exception) {
+        } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
             _calibrationWorkspace.value = current.copy(mapError = error.localizedMessage ?: "Lecture de la table impossible.")
         }
     }
@@ -472,6 +484,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapError = null,
                     message = "Table enregistrée dans une nouvelle image locale. L'original importé reste conservé. Aucun octet n'a été envoyé à l'ECU."
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 createdFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -540,6 +554,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = "Fichier exporté. Cette opération sauvegarde le fichier local et ne programme pas l'ECU."
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = error.localizedMessage ?: "Export du fichier impossible."
@@ -566,6 +582,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: fallbackMessage
             } finally {
@@ -587,6 +605,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             it.first.contains("ELM", true) ||
                             it.first.contains("vLinker", true)
                     }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -623,6 +643,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _adapter.value = caps
                 _connectionMessage.value = null
                 refreshTopologyAndDefaults()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -701,6 +723,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _liveRecordingState.value = _liveRecordingState.value.copy(
                     message = "Journal CSV exporté : ${snapshot.size} échantillon(s)."
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _liveRecordingState.value = _liveRecordingState.value.copy(
                     message = error.localizedMessage ?: "Export du journal CSV impossible."
@@ -760,6 +784,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val (confirmed, pending, permanent) = obdManager.createObd2FeatureEngine().readDtcs()
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Échec du scan des défauts."
             } finally {
@@ -854,6 +880,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _connectionMessage.value = "Effacement non confirmé par une réponse positive Mode 04 : $response"
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Échec de l'effacement des défauts."
             } finally {
@@ -912,6 +940,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _connectionMessage.value = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
                 _connectionMessage.value = error.localizedMessage ?: "Échec de lecture pendant l'audit kilométrique."
@@ -941,6 +971,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
                 _dtcs.value = mapObdDtcs(allDtcs)
                 _obdScanMessage.value = "Scan OBD-II terminé : ${report.supportedPids.size} PIDs supportés, ${allDtcs.size} défaut(s) retourné(s)."
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _obdScanMessage.value = error.localizedMessage ?: "Échec du scan OBD-II."
             } finally {
@@ -970,6 +1002,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _connectionMessage.value = "Session de diagnostic sauvegardée."
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Sauvegarde de la session impossible."
             }
@@ -980,6 +1014,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 sessionDao.deleteSession(session)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -1096,7 +1132,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
                         throw cancelled
-                    } catch (error: Exception) {
+                    } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                         consecutiveFailures++
                         _liveTelemetryMessage.value = error.localizedMessage ?: "Erreur de lecture OBD live."
                         if (_liveRecordingState.value.isRecording) {
