@@ -256,6 +256,7 @@ class UdsReadOnlyClient(
 }
 
 enum class UdsIdentityField {
+    CONTROLLER_FAMILY,
     HARDWARE_PART_NUMBER,
     OPERATING_SYSTEM_ID,
     CALIBRATION_ID,
@@ -309,7 +310,9 @@ data class DocumentedUdsReadProfile(
         if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) add("CAN addressing is invalid.")
         if (readableDids.isEmpty() || readableDids.any { it !in 0..0xFFFF }) add("No valid read-only DID allowlist is defined.")
         val requiredIdentityFields = UdsIdentityField.entries.toSet()
-        if (identityDids.map { it.field }.toSet() != requiredIdentityFields) add("Identity DID definitions must cover all five identity fields.")
+        if (identityDids.size != requiredIdentityFields.size || identityDids.map { it.field }.toSet() != requiredIdentityFields) {
+            add("Identity DID definitions must cover all six identity fields exactly once.")
+        }
         if (identityDids.any { it.did !in 0..0xFFFF || it.did !in readableDids }) add("Identity DIDs must be included in the read-only allowlist.")
         if (identityDids.map { it.did }.distinct().size != identityDids.size) add("Identity DID definitions must not repeat a DID.")
         if (evidenceReference.isBlank()) add("A traceable service-information reference is required.")
@@ -330,7 +333,9 @@ data class DocumentedUdsReadProfile(
         if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) add("CAN addressing is invalid.")
         if (readableDids.isEmpty() || readableDids.any { it !in 0..0xFFFF }) add("No valid read-only DID allowlist is defined.")
         val requiredIdentityFields = UdsIdentityField.entries.toSet()
-        if (identityDids.map { it.field }.toSet() != requiredIdentityFields) add("Identity DID definitions must cover hardware, OS, calibration, CVN and VIN.")
+        if (identityDids.size != requiredIdentityFields.size || identityDids.map { it.field }.toSet() != requiredIdentityFields) {
+            add("Identity DID definitions must cover controller family, hardware, OS, calibration, CVN and VIN exactly once.")
+        }
         if (identityDids.any { it.did !in 0..0xFFFF || it.did !in readableDids }) add("Every identity DID must be a valid member of the read-only DID allowlist.")
         if (identityDids.map { it.did }.distinct().size != identityDids.size) add("Identity DID definitions must not repeat a DID.")
         if (evidenceReference.isBlank()) add("A traceable service-information reference is required.")
@@ -380,7 +385,9 @@ class ProfiledUdsReadSession private constructor(
                 definition.field to client.readDataByIdentifier(definition.did)
             }
             val identity = UdsEcuIdentity(
-                controllerFamily = profile.controllerFamily,
+                controllerFamily = rawIdentity[UdsIdentityField.CONTROLLER_FAMILY]?.let {
+                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CONTROLLER_FAMILY)
+                }.orEmpty(),
                 hardwarePartNumber = rawIdentity[UdsIdentityField.HARDWARE_PART_NUMBER]?.let {
                     decodeIdentity(it, profile.identityDids, UdsIdentityField.HARDWARE_PART_NUMBER)
                 },
