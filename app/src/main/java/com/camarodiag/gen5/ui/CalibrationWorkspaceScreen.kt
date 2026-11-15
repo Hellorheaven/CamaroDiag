@@ -212,6 +212,11 @@ fun CalibrationWorkspaceScreen(
                         androidx.compose.material3.Icon(Icons.Default.CloudDownload, contentDescription = null)
                         Text(if (isFr) "Importer un fichier de cartographie" else "Import a calibration file")
                     }
+                    Text(
+                        if (isFr) "Importe les BIN, HEX, S-record, archives ZIP et fichiers de projet/définition externes. Les formats propriétaires sont conservés tels quels pour sauvegarde/export ; seuls les BIN, HEX et S-record sont inspectés ici. Les définitions XDF/A2L doivent encore être converties en TSV avant édition des tables."
+                        else "Import BIN, HEX, S-record, ZIP archives and external project/definition files. Proprietary formats are preserved unchanged for backup/export; only BIN, HEX and S-record are inspected here. XDF/A2L definitions must still be converted to TSV before table editing.",
+                        color = TextMuted, fontSize = 11.sp
+                    )
                     state.importedFileName?.let { name ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(name, color = CamaroAmber, fontWeight = FontWeight.Bold)
