@@ -162,6 +162,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val storedFile = File(storageDir, "${System.currentTimeMillis()}_${safeName}")
                 storedFile.writeBytes(bytes)
                 val preview = bytes.take(64).joinToString(" ") { "%02X".format(it) }
+                _calibrationWorkspace.value.importedFilePath?.let { previousPath ->
+                    if (previousPath != storedFile.absolutePath) runCatching { File(previousPath).delete() }
+                }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     importedFileName = displayName,
                     importedFileSize = bytes.size.toLong(),
