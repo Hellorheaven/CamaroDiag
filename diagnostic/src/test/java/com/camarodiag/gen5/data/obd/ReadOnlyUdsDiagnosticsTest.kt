@@ -96,7 +96,7 @@ class ReadOnlyUdsDiagnosticsTest {
         assertTrue(profile.compatibilityIssues(vehicle, matching).isEmpty())
         assertTrue(profile.compatibilityIssues(vehicle, mismatching).any { it.contains("CVN") })
         assertTrue(profile.allowsDid(0x0106))
-        assertTrue(!profile.allowsDid(0x0107))
+        assertTrue(!profile.allowsDid(0x0108))
     }
 
     @Test
