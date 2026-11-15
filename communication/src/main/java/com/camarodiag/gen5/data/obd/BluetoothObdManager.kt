@@ -5,6 +5,9 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import com.camarodiag.gen5.domain.model.*
 import com.camarodiag.gen5.data.obd.Obd2FeatureEngine
@@ -52,6 +55,32 @@ class BluetoothObdManager(context: Context) {
         } catch (_: SecurityException) {
             emptyList()
         }
+    }
+
+    /** Scans nearby BLE OBD adapters, including unpaired OBDLink CX devices. */
+    @SuppressLint("MissingPermission")
+    suspend fun scanNearbyBleDevices(scanDurationMs: Long = 5000L): List<Pair<String, String>> = withContext(Dispatchers.IO) {
+        val scanner = bluetoothAdapter?.bluetoothLeScanner ?: return@withContext emptyList()
+        val found = java.util.concurrent.ConcurrentHashMap<String, String>()
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                val name = result.device.name ?: result.scanRecord?.deviceName ?: return
+                if (name.contains("OBD", true) || name.contains("ELM", true) || name.contains("vLinker", true)) {
+                    found[result.device.address] = name
+                }
+            }
+            override fun onBatchScanResults(results: MutableList<ScanResult>) {
+                results.forEach { onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, it) }
+            }
+        }
+        try {
+            scanner.startScan(callback)
+            delay(scanDurationMs)
+        } catch (_: SecurityException) {
+        } finally {
+            try { scanner.stopScan(callback) } catch (_: Exception) { }
+        }
+        found.entries.map { it.value to it.key }.sortedBy { it.first }
     }
 
     @SuppressLint("MissingPermission")
