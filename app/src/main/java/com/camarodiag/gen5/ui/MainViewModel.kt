@@ -9,6 +9,9 @@ import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
+import com.camarodiag.gen5.data.obd.CalibrationFileInspector
+import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
+import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
@@ -62,6 +65,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _mileageReport = MutableStateFlow<MileageAuditReport?>(null)
     val mileageReport: StateFlow<MileageAuditReport?> = _mileageReport.asStateFlow()
 
+    private val _obdScanReport = MutableStateFlow<ObdScanReport?>(null)
+    val obdScanReport: StateFlow<ObdScanReport?> = _obdScanReport.asStateFlow()
+
+    private val _obdScanMessage = MutableStateFlow<String?>(null)
+    val obdScanMessage: StateFlow<String?> = _obdScanMessage.asStateFlow()
+
+    private val _isObdScanning = MutableStateFlow(false)
+    val isObdScanning: StateFlow<Boolean> = _isObdScanning.asStateFlow()
+
     val savedSessions: StateFlow<List<SavedSessionEntity>> = sessionDao.observeAllSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -108,18 +120,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isReading = true, message = "")
             try {
-                val calId = obdManager.sendAtCommand("0904", 3500L)
-                val cvn = obdManager.sendAtCommand("0906", 3500L)
-                val validCal = calId.isNotBlank() && !calId.contains("NO_SOCKET") && !calId.contains("NO DATA", true)
-                val validCvn = cvn.isNotBlank() && !cvn.contains("NO_SOCKET") && !cvn.contains("NO DATA", true)
+                val engine = obdManager.createObd2FeatureEngine()
+                val calIds = engine.readCalibrationIds()
+                val cvns = engine.readCalibrationVerificationNumbers()
+                val validCal = calIds.isNotEmpty()
+                val validCvn = cvns.isNotEmpty()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
-                    calibrationIdResponse = if (validCal) calId else "",
-                    cvnResponse = if (validCvn) cvn else "",
+                    calibrationIdResponse = calIds.joinToString("\\n").ifBlank { "Non disponible" },
+                    cvnResponse = cvns.joinToString("\\n").ifBlank { "Non disponible" },
                     message = if (validCal || validCvn) {
-                        "Identifiants Mode 09 lus. Ils ne représentent pas le contenu binaire de la cartographie."
+                        "CAL ID / CVN décodés depuis Mode 09. Ils identifient le logiciel mais ne constituent pas une lecture de cartographie binaire."
                     } else {
-                        "Aucun CAL ID/CVN exploitable retourné. Le calculateur ou l'interface peut ne pas prendre ces PID en charge."
+                        "Aucun CAL ID/CVN exploitable retourné. Le calculateur ou l'interface peut ne pas prendre ces informations en charge."
                     }
                 )
             } catch (error: Exception) {
@@ -156,6 +169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 require(bytes.isNotEmpty()) { "Le fichier sélectionné est vide." }
                 val sha256 = MessageDigest.getInstance("SHA-256").digest(bytes)
                     .joinToString("") { "%02x".format(it) }
+                val inspection = CalibrationFileInspector.inspect(displayName, bytes)
                 val storageDir = File(getApplication<Application>().filesDir, "calibrations")
                 check(storageDir.exists() || storageDir.mkdirs()) { "Impossible de créer le dossier local des cartographies." }
                 val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifBlank { "calibration.bin" }
@@ -165,13 +179,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value.importedFilePath?.let { previousPath ->
                     if (previousPath != storedFile.absolutePath) runCatching { File(previousPath).delete() }
                 }
+                _calibrationWorkspace.value.comparisonFilePath?.let { comparisonPath ->
+                    runCatching { File(comparisonPath).delete() }
+                }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     importedFileName = displayName,
                     importedFileSize = bytes.size.toLong(),
                     importedFileSha256 = sha256,
                     importedFilePreview = preview,
                     importedFilePath = storedFile.absolutePath,
-                    message = "Fichier copié dans le stockage privé de l'application. Compatibilité ECU et checksum constructeur non vérifiés."
+                    inspectionFormat = inspection.format.label,
+                    inspectionSummary = inspection.summary,
+                    inspectionPayloadBytes = inspection.payloadBytes,
+                    inspectionRecordCount = inspection.recordCount,
+                    inspectionChecksumStatus = inspection.checksumValidation,
+                    inspectionAddressRanges = inspection.addressRanges.map { "0x${it.start.toString(16).uppercase()}–0x${it.endInclusive.toString(16).uppercase()} (${it.length} octets)" },
+                    inspectionWarnings = inspection.warnings,
+                    comparisonFileName = null,
+                    comparisonFilePath = null,
+                    comparisonFileSize = null,
+                    comparisonSummary = null,
+                    comparisonChangedBytes = null,
+                    comparisonAppendedBytes = null,
+                    comparisonMissingBytes = null,
+                    comparisonRanges = emptyList(),
+                    comparisonIdentical = null,
+                    message = "Fichier copié localement. L'analyse de format ne prouve pas sa compatibilité ECU ni la validité d'un checksum GM."
                 )
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -181,14 +214,100 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Imports a second raw BIN image and compares it byte-for-byte with the loaded reference. */
+    fun importComparisonCalibrationFile(uri: Uri) {
+        viewModelScope.launch {
+            var storedFile: File? = null
+            try {
+                val current = _calibrationWorkspace.value
+                require(current.importedFilePath != null && current.inspectionFormat == "BIN / raw binary") {
+                    "Charge d'abord une image de référence BIN brute."
+                }
+                val resolver = getApplication<Application>().contentResolver
+                val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+                    ?: uri.lastPathSegment ?: "modified.bin"
+                val bytes = resolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    var total = 0
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= 32 * 1024 * 1024) { "Fichier trop volumineux (limite locale : 32 Mio)." }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("Impossible d'ouvrir le second fichier.")
+                require(bytes.isNotEmpty()) { "Le fichier sélectionné est vide." }
+                val inspection = CalibrationFileInspector.inspect(displayName, bytes)
+                require(inspection.format.name == "RAW_BINARY") {
+                    "La comparaison octet par octet nécessite un second fichier BIN brut."
+                }
+                val reference = File(current.importedFilePath!!)
+                check(reference.isFile && reference.exists()) { "Le fichier BIN de référence est introuvable." }
+                val referenceBytes = reference.readBytes()
+                val comparison = CalibrationBinaryComparer.compare(referenceBytes, bytes)
+                val storageDir = File(getApplication<Application>().filesDir, "calibrations")
+                check(storageDir.exists() || storageDir.mkdirs()) { "Impossible de créer le dossier local des cartographies." }
+                val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifBlank { "modified.bin" }
+                storedFile = File(storageDir, "comparison_${System.currentTimeMillis()}_${safeName}")
+                storedFile!!.writeBytes(bytes)
+                val summary = when {
+                    comparison.identical -> "Les deux images BIN sont identiques octet par octet."
+                    comparison.referenceSize != comparison.modifiedSize -> "Comparaison de ${comparison.comparedBytes} octets communs ; les tailles des fichiers diffèrent."
+                    else -> "${comparison.changedBytes} octets différents répartis dans ${comparison.changedRanges.size + comparison.omittedRangeCount} zone(s)."
+                }
+                val ranges = comparison.changedRanges.take(25).map {
+                    "0x${it.startOffset.toString(16).uppercase().padStart(8, '0')}–0x${it.endOffsetInclusive.toString(16).uppercase().padStart(8, '0')} (${it.changedBytes} octets)"
+                } + if (comparison.omittedRangeCount > 0) listOf("${comparison.omittedRangeCount} zone(s) supplémentaire(s) non affichées") else emptyList()
+                _calibrationWorkspace.value = current.copy(
+                    comparisonFileName = displayName,
+                    comparisonFilePath = storedFile!!.absolutePath,
+                    comparisonFileSize = bytes.size.toLong(),
+                    comparisonSummary = summary,
+                    comparisonChangedBytes = comparison.changedBytes,
+                    comparisonAppendedBytes = comparison.appendedBytes,
+                    comparisonMissingBytes = comparison.missingBytes,
+                    comparisonRanges = ranges,
+                    comparisonIdentical = comparison.identical,
+                    message = "Comparaison locale terminée. Les écarts ne sont pas interprétés comme des tables moteur et ne valident pas la compatibilité d'un flash."
+                )
+            } catch (error: Exception) {
+                storedFile?.let { runCatching { it.delete() } }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    message = error.localizedMessage ?: "Comparaison des fichiers impossible."
+                )
+            }
+        }
+    }
+
     fun clearCalibrationFile() {
         _calibrationWorkspace.value.importedFilePath?.let { path -> runCatching { File(path).delete() } }
+        _calibrationWorkspace.value.comparisonFilePath?.let { path -> runCatching { File(path).delete() } }
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             importedFileName = null,
             importedFileSize = null,
             importedFileSha256 = null,
             importedFilePreview = null,
             importedFilePath = null,
+            inspectionFormat = null,
+            inspectionSummary = null,
+            inspectionPayloadBytes = null,
+            inspectionRecordCount = null,
+            inspectionChecksumStatus = null,
+            inspectionAddressRanges = emptyList(),
+            inspectionWarnings = emptyList(),
+            comparisonFileName = null,
+            comparisonFilePath = null,
+            comparisonFileSize = null,
+            comparisonSummary = null,
+            comparisonChangedBytes = null,
+            comparisonAppendedBytes = null,
+            comparisonMissingBytes = null,
+            comparisonRanges = emptyList(),
+            comparisonIdentical = null,
             message = ""
         )
     }
@@ -296,14 +415,67 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         DiagnosticDtc("P0014", "ECM", "Sample / Pending", "Exemple / En attente", "Exhaust Camshaft Position Timing Over-Advanced (Bank 1)", "Calage arbre à cames échappement trop avancé (Banc 1)", true)
                     )
                 } else {
-                    val confirmed = obdManager.sendAtCommand("03", 2500L)
-                    val pending = obdManager.sendAtCommand("07", 2500L)
-                    _dtcs.value = CamaroUdsProtocol.parseDtcResponses(confirmed, pending)
+                    val (confirmed, pending, permanent) = obdManager.createObd2FeatureEngine().readDtcs()
+                    _dtcs.value = (confirmed + pending + permanent).distinctBy { it.code to it.status }.map { dtc ->
+                        val pendingCode = dtc.status == "pending"
+                        DiagnosticDtc(
+                            code = dtc.code,
+                            module = "ECM",
+                            statusEn = when (dtc.status) { "pending" -> "Pending"; "permanent" -> "Permanent"; else -> "Confirmed" },
+                            statusFr = when (dtc.status) { "pending" -> "En attente"; "permanent" -> "Permanent"; else -> "Confirmé" },
+                            descEn = standardDtcDescription(dtc.code, false),
+                            descFr = standardDtcDescription(dtc.code, true),
+                            isPending = pendingCode
+                        )
+                    }
                 }
+            } catch (error: Exception) {
+                _connectionMessage.value = error.localizedMessage ?: "Échec du scan des défauts."
             } finally {
                 _isBusy.value = false
             }
         }
+    }
+
+    private fun standardDtcDescription(code: String, isFr: Boolean): String {
+        val descriptions = mapOf(
+            "P0101" to ("Mass or Volume Air Flow Circuit Range/Performance" to "Débitmètre d'air : plage / performance"),
+            "P0102" to ("Mass or Volume Air Flow Circuit Low Input" to "Débitmètre d'air : signal trop faible"),
+            "P0103" to ("Mass or Volume Air Flow Circuit High Input" to "Débitmètre d'air : signal trop élevé"),
+            "P0113" to ("Intake Air Temperature Sensor 1 Circuit High" to "Sonde de température d'air admission : signal élevé"),
+            "P0128" to ("Coolant Thermostat (Coolant Temperature Below Thermostat Regulating Temperature)" to "Thermostat moteur : température sous le seuil de régulation"),
+            "P0171" to ("System Too Lean (Bank 1)" to "Mélange trop pauvre (banc 1)"),
+            "P0172" to ("System Too Rich (Bank 1)" to "Mélange trop riche (banc 1)"),
+            "P0174" to ("System Too Lean (Bank 2)" to "Mélange trop pauvre (banc 2)"),
+            "P0175" to ("System Too Rich (Bank 2)" to "Mélange trop riche (banc 2)"),
+            "P0300" to ("Random/Multiple Cylinder Misfire Detected" to "Ratés d'allumage aléatoires / multiples"),
+            "P0301" to ("Cylinder 1 Misfire Detected" to "Ratés d'allumage cylindre 1"),
+            "P0302" to ("Cylinder 2 Misfire Detected" to "Ratés d'allumage cylindre 2"),
+            "P0303" to ("Cylinder 3 Misfire Detected" to "Ratés d'allumage cylindre 3"),
+            "P0304" to ("Cylinder 4 Misfire Detected" to "Ratés d'allumage cylindre 4"),
+            "P0305" to ("Cylinder 5 Misfire Detected" to "Ratés d'allumage cylindre 5"),
+            "P0306" to ("Cylinder 6 Misfire Detected" to "Ratés d'allumage cylindre 6"),
+            "P0307" to ("Cylinder 7 Misfire Detected" to "Ratés d'allumage cylindre 7"),
+            "P0308" to ("Cylinder 8 Misfire Detected" to "Ratés d'allumage cylindre 8"),
+            "P0420" to ("Catalyst System Efficiency Below Threshold (Bank 1)" to "Efficacité du catalyseur sous le seuil (banc 1)"),
+            "P0430" to ("Catalyst System Efficiency Below Threshold (Bank 2)" to "Efficacité du catalyseur sous le seuil (banc 2)"),
+            "P0442" to ("EVAP System Small Leak Detected" to "Circuit EVAP : petite fuite détectée"),
+            "P0455" to ("EVAP System Large Leak Detected" to "Circuit EVAP : fuite importante détectée"),
+            "P0496" to ("EVAP Flow During Non-Purge Condition" to "Débit EVAP détecté hors phase de purge"),
+            "P0507" to ("Idle Control System RPM Higher Than Expected" to "Régime de ralenti supérieur à la consigne"),
+            "P06DD" to ("Engine Oil Pressure Control Solenoid Performance" to "Commande de pression d'huile moteur : performance"),
+            "P1101" to ("Intake Air Flow System Performance" to "Système de débit d'air admission : performance"),
+            "P0010" to ("Intake Camshaft Position Actuator Circuit (Bank 1)" to "Commande d'actionneur d'arbre à cames admission (banc 1)"),
+            "P0011" to ("Intake Camshaft Position Timing Over-Advanced (Bank 1)" to "Calage arbre à cames admission trop avancé (banc 1)"),
+            "P0014" to ("Exhaust Camshaft Position Timing Over-Advanced (Bank 1)" to "Calage arbre à cames échappement trop avancé (banc 1)"),
+            "P0087" to ("Fuel Rail/System Pressure Too Low" to "Pression de rampe / circuit carburant trop faible"),
+            "P0089" to ("Fuel Pressure Regulator Performance" to "Régulateur de pression carburant : performance"),
+            "P0191" to ("Fuel Rail Pressure Sensor Circuit Range/Performance" to "Capteur de pression de rampe : plage / performance"),
+            "P0299" to ("Turbocharger/Supercharger Underboost" to "Sous-pression de suralimentation"),
+            "P0300" to ("Random/Multiple Cylinder Misfire Detected" to "Ratés d'allumage aléatoires / multiples")
+        )
+        val entry = descriptions[code] ?: return if (isFr) "Description non disponible dans le dictionnaire local ; vérifier la documentation GM correspondant au VIN." else "Description unavailable in the local dictionary; check GM service information for this VIN."
+        return if (isFr) entry.second else entry.first
     }
 
     fun clearDtcs() {
@@ -314,13 +486,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = emptyList()
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
-                    if (response.contains("44", ignoreCase = true) || response.contains("OK", ignoreCase = true)) {
+                    if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
                         _dtcs.value = emptyList()
                         _connectionMessage.value = null
                     } else {
-                        _connectionMessage.value = "Effacement non confirmé par le calculateur : $response"
+                        _connectionMessage.value = "Effacement non confirmé par une réponse positive Mode 04 : $response"
                     }
                 }
+            } catch (error: Exception) {
+                _connectionMessage.value = error.localizedMessage ?: "Échec de l'effacement des défauts."
             } finally {
                 _isBusy.value = false
             }
@@ -375,6 +549,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
             } finally {
                 _isBusy.value = false
+            }
+        }
+    }
+
+    /** Executes a complete, standards-based read-only OBD-II scan on the connected Camaro. */
+    fun runFullObdScan() {
+        viewModelScope.launch {
+            if (obdManager.isDemoMode) {
+                _obdScanReport.value = null
+                _obdScanMessage.value = "Mode démo : aucun calculateur réel n'est interrogé."
+                return@launch
+            }
+            _isObdScanning.value = true
+            _obdScanMessage.value = null
+            try {
+                val report = obdManager.createObd2FeatureEngine().fullReadOnlyScan()
+                _obdScanReport.value = report
+                val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
+                _dtcs.value = allDtcs.distinctBy { it.code to it.status }.map { dtc ->
+                    DiagnosticDtc(
+                        code = dtc.code,
+                        module = "ECM",
+                        statusEn = when (dtc.status) { "pending" -> "Pending"; "permanent" -> "Permanent"; else -> "Confirmed" },
+                        statusFr = when (dtc.status) { "pending" -> "En attente"; "permanent" -> "Permanent"; else -> "Confirmé" },
+                        descEn = standardDtcDescription(dtc.code, false),
+                        descFr = standardDtcDescription(dtc.code, true),
+                        isPending = dtc.status == "pending"
+                    )
+                }
+                _obdScanMessage.value = "Scan OBD-II terminé : ${report.supportedPids.size} PIDs supportés, ${allDtcs.size} défaut(s) retourné(s)."
+            } catch (error: Exception) {
+                _obdScanMessage.value = error.localizedMessage ?: "Échec du scan OBD-II."
+            } finally {
+                _isObdScanning.value = false
             }
         }
     }

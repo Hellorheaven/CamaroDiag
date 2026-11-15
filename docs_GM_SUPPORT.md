@@ -1,41 +1,82 @@
-# CamaroDiag – intégration GM et VXDIAG (v1.4.0)
+# CamaroDiag – intégration GM, diagnostic OBD-II et atelier calibration
 
 ## Matériel visé
 
 | Interface | Liaison | État de l'intégration Android |
 |---|---|---|
-| ELM327 | Bluetooth | Transport existant ; commandes ELM classiques uniquement |
-| ELM327 | USB série | Transport existant via usb-serial-for-android |
-| ELM327 | Wi-Fi TCP | Transport existant ; hôte/port configurables |
+| ELM327 | Bluetooth SPP | Transport ELM ; capacités réelles déterminées par sondage |
+| OBDLink / STN | Bluetooth | Transport existant ; accès limité aux commandes et protocoles réellement supportés |
+| ELM / STN | USB série | Transport existant via usb-serial-for-android |
+| ELM / STN | Wi-Fi TCP | Transport existant ; hôte/port configurables |
 | VXDIAG VCX SE | USB-C | Profil matériel déclaré ; SDK/pilote Android constructeur requis |
 | VXDIAG VCX SE | Wi-Fi | Profil matériel déclaré ; SDK/protocole constructeur requis |
 | VXDIAG VCX NANO | USB | Variante matérielle distincte ; SDK/pilote Android constructeur requis |
 | VXDIAG VCX NANO | Wi-Fi | Variante matérielle distincte ; SDK/protocole constructeur requis |
 
-Le NANO USB et le NANO Wi-Fi sont traités comme deux variantes matérielles, pas comme deux liens garantis sur un seul boîtier. Les profils VXDIAG sont prêts à être sélectionnés, mais aucune implémentation J2534 Android propriétaire n'est incluse. `VxdiagProvider` est le point d'injection réservé au SDK redistribuable fourni par VXDIAG ou à une API documentée.
+Les variantes VCX SE/NANO sont représentées dans la matrice. VxdiagProvider est un point d'intégration, pas un pilote J2534 effectif : MissingVxdiagProvider retourne une erreur tant que VXDIAG n'a pas fourni un SDK Android redistribuable ou une API documentée et autorisée. Ne pas confondre les SDK disponibles pour d'autres modèles VXDIAG avec ceux de VCX SE/NANO.
 
-## GM Gen 5 et Gen 6
+## Couverture Camaro Gen 5 / Gen 6
 
-Les profils véhicule restent séparés par génération, année, motorisation, transmission et marché. Le balayage doit identifier les calculateurs par réponses réellement reçues ; aucune adresse BCM/IPC ni DID kilométrique ne doit être déduite uniquement de l'année ou de la génération.
+Le catalogue des véhicules comprend dix profils RPO : LLT, LFX, LS3, L99, LSA, LS7, LTG, LGX, LT1 et LT4. Les années, marchés, transmissions et familles de contrôleurs affichées sont des indices de sélection, pas des identifiants de programmation. Avant toute opération sur une image, relever les informations réelles du module : VIN, CAL ID, CVN, nom ECU, références matériel et OS lorsqu'elles sont disponibles.
 
-### Audit kilométrique
+Les libellés E38, E39/E39A, E67, E69, E80 et E92/E93 sont des familles nominales associées aux profils. Une année ou un RPO ne suffit pas à sélectionner une définition de mémoire.
 
-Sources prévues : BCM, IPC, ECM et historique local. Une lecture n'est considérée indépendante que si l'identité ECU, la réponse brute, l'adresse de réponse et le profil véhicule sont vérifiés. Une divergence est un indice à investiguer (remplacement de module, reprogrammation, configuration, réparation), pas une preuve automatique de fraude. Ne jamais substituer un PID « distance depuis effacement » à un kilométrage total.
+## Diagnostic OBD-II standard (lecture seule)
 
-### Pilotage BCM et démarrage
+L'atelier « Scan OBD complet » utilise le moteur SAE J1979 sur le canal ELM connecté. Il peut interroger, si l'ECU et l'adaptateur les prennent en charge :
 
-Le catalogue de commandes reste fermé tant qu'une routine OEM/documentée n'est pas validée pour le VIN, l'année, le BCM et la version logicielle. Le démarrage à distance n'est pas une commande CAN générique : sur le système OEM documenté du Camaro 2012, la demande passe par le transmetteur RKE ; le BCM contrôle notamment capot fermé, portes verrouillées, feux de détresse éteints et antivol, puis transmet une demande à l'ECM. L'ECM applique ses propres conditions (P, vitesse nulle, défauts et autres paramètres). `RemoteStartSafetyGate` ne fait qu'évaluer les conditions connues ; il ne démarre pas le moteur et ne contourne jamais l'antidémarrage.
+- Mode 01 : bitmap des PIDs supportés, données moteur usuelles, état readiness.
+- Modes 03, 07 et 0A : DTC confirmés, en attente et permanents.
+- Mode 02 : données freeze-frame.
+- Mode 06 : résultats de tests de moniteur, présentés comme données brutes lorsqu'ils ne sont pas décodés.
+- Mode 09 : VIN, CAL ID, CVN et nom ECU.
+- Adaptateur : protocole détecté, tension retournée et journal brut des échanges.
 
-## Compatibilité Android
+Les résultats sont issus des réponses réelles de l'ECU accessible. Une réponse absente ou mal formée n'est pas remplacée par une valeur fictive. Le scanner générique ne balaie pas à lui seul les modules BCM, IPC, TCM, EBCM, SDM ou les calculateurs de confort. Il ne réalise ni codage, ni tests d'actionneurs, ni accès sécurité, ni programmation.
 
-`minSdk = 29` (Android 10) et `compileSdk/targetSdk = 36` (Android 16). USB Host, réseau TCP et permissions Bluetooth doivent être testés sur appareil réel, notamment les variantes Android 12+ et 14+.
+L'effacement des DTC utilise le service OBD Mode 04 uniquement après confirmation de l'utilisateur. L'application ne confirme l'effacement que si une réponse positive 0x44 est reçue. L'effacement peut réinitialiser les moniteurs readiness et ne répare pas la cause du défaut.
 
-## Pour terminer le vrai pilote VXDIAG
+## Atelier fichiers de calibration
 
-Obtenir auprès de VXDIAG le SDK Android/NDK ou une spécification d'API officiellement utilisable, les droits de redistribution, les IDs USB, les versions firmware testées et la documentation J2534/PDU. Sans ces éléments, la couche ne doit pas prétendre exécuter des transactions J2534.
+Les opérations locales disponibles sont les suivantes :
 
-## Standard OBD-II coverage added in CamaroDiag 1.5.0
+- Import d'un fichier local (limite applicative 32 Mio), stockage privé, SHA-256 et aperçu hexadécimal.
+- Détection des formats binaires bruts BIN, Intel HEX et Motorola S-record.
+- Vérification structurelle des enregistrements Intel HEX : checksum, longueur, EOF, types d'enregistrement et chevauchement d'adresses.
+- Vérification structurelle des Motorola S-record : compte, checksum, terminaison et chevauchement d'adresses.
+- Identification des fichiers .hpt comme conteneurs HP Tuners non décodés.
+- Comparaison octet par octet de deux images BIN brutes, rapport des octets modifiés, plages d'offset, octets ajoutés/manquants.
+- Export local d'un fichier importé vers un emplacement choisi par l'utilisateur.
 
-`Obd2FeatureEngine` adds a reusable read-only SAE J1979 scanner over the existing ELM command channel. It discovers supported Mode 01 PIDs and reads common live data, confirmed/pending/permanent powertrain DTCs (Modes 03/07/0A), freeze-frame data (Mode 02), VIN/calibration/ECU-name records (Mode 09), readiness (Mode 01 PID 01), module voltage and raw Mode 06 monitor results. The engine is connected to the existing Bluetooth/USB/Wi-Fi manager; it is not a simulation.
+SHA-256, CRC d'intégrité et checksums de format Intel HEX/S-record ne sont pas des checksums de calibration GM. La comparaison binaire ne donne pas de signification moteur aux offsets et ne certifie pas que le fichier peut être utilisé sur un ECM.
 
-The result is limited to what the connected adapter and ECU actually answer. Generic ELM access normally exposes the legislated powertrain OBD services, not all GM body/chassis modules. GM BCM/IPC/TCM/EBCM/SDM discovery, mileage DID reads, actuator tests, coding and remote start remain disabled until exact VIN/year/calibration-specific GM service definitions and safe procedures are verified. VXDIAG remains behind the provider boundary pending its licensed Android SDK/API.
+## Lecture binaire ECU, édition et flashage : limites actuelles
+
+La lecture intégrale de la mémoire ECM, la conversion en tables moteur, l'édition de tables et l'écriture ECU ne sont pas implémentées. Il ne faut pas envoyer de commandes UDS de programmation génériques ni tenter un flash avec un simple adaptateur ELM/STN.
+
+Pour chaque famille de calculateur, il faut disposer et valider :
+
+1. Une interface et une pile de transport adaptées au canal de programmation réel (pas seulement un transport ELM).
+2. Les procédures GM autorisées pour identifier le module, sélectionner la session, sécuriser l'accès et lire/écrire les blocs mémoire.
+3. Les définitions OS/calibration et les adresses/formats des tables pour la variante matérielle et logicielle exactes.
+4. Les règles de checksum propres au calculateur et à sa calibration.
+5. Un contrôle d'alimentation stable, une stratégie de reprise, un mode recovery/bench testé et des images de sauvegarde vérifiées.
+6. Un plan de test sur matériel de laboratoire avant toute validation en véhicule.
+
+Les interfaces GM de programmation et leurs logiciels officiels ne sont pas interchangeables avec les interfaces OBD génériques. Le projet ne prétend pas remplacer GDS2/SPS/MDI2 ni HP Tuners sans les protocoles, licences, définitions et procédures nécessaires.
+
+## BCM / odomètre / pilotage
+
+Le catalogue de commandes carrosserie reste fermé tant qu'une routine OEM documentée n'est pas validée pour le VIN, l'année, le BCM et la version logicielle. L'adressage GM étendu et les DID kilométriques ne doivent pas être devinés à partir de l'année ou du moteur.
+
+Pour l'audit kilométrique, une lecture n'est considérée indépendante que si l'identité ECU, la réponse brute, l'adresse de réponse et le profil véhicule sont vérifiés. Un écart est un indice à investiguer (remplacement de module, reprogrammation, configuration ou réparation), pas une preuve automatique de fraude. Ne jamais substituer un PID « distance depuis effacement » à un kilométrage total.
+
+Le démarrage à distance n'est pas une commande CAN générique. RemoteStartSafetyGate est une évaluation de conditions uniquement ; il ne lance pas le moteur, ne contourne aucun antidémarrage et ne remplace pas le dispositif OEM.
+
+## Compatibilité Android et essais terrain
+
+minSdk = 29 (Android 10), compileSdk/targetSdk = 36. USB Host, réseau TCP et permissions Bluetooth doivent être validés sur les appareils réels visés. Les tests unitaires et l'assemblage APK CI ne remplacent pas les essais sur VCX/ELM, sur toutes les générations et sur chaque calculateur.
+
+## Conditions pour achever le flashage GM et VXDIAG
+
+Obtenir auprès de VXDIAG les SDK/API officiellement autorisés pour chaque VCX SE/NANO, les identifiants USB/réseau, versions de firmware, documentation de transport et droits de redistribution. Pour le flash GM, obtenir les définitions, licences, procédures et moyens de récupération approuvés pour chaque ECM. En leur absence, les fonctions correspondantes doivent rester explicitement indisponibles plutôt que d'exécuter des trames supposées.

@@ -41,6 +41,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String) {
     DTCS("DTCs", "Défauts"),
     MILEAGE("Mileage", "Odomètre"),
     CALIBRATION("ECU / Maps", "ECU / Cartographie"),
+    OBD_SCAN("Full OBD Scan", "Scan OBD complet"),
     GUIDE("Guide", "Guide"),
     CONTROL("Controls", "Pilotage"),
     SETTINGS("Settings", "Réglages")
@@ -63,6 +64,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val mileageReport by viewModel.mileageReport.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
+    val obdScanReport by viewModel.obdScanReport.collectAsState()
+    val obdScanMessage by viewModel.obdScanMessage.collectAsState()
+    val isObdScanning by viewModel.isObdScanning.collectAsState()
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
@@ -85,6 +89,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { viewModel.importCalibrationFile(it) }
+    }
+
+    val calibrationComparisonPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importComparisonCalibrationFile(it) }
     }
 
     val calibrationFileExporter = rememberLauncherForActivityResult(
@@ -196,6 +206,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
                         DiagTab.CALIBRATION,
+                        DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.SETTINGS
@@ -218,6 +229,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
                         DiagTab.CALIBRATION,
+                        DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.SETTINGS
@@ -270,6 +282,16 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 })
                 DiagTab.DTCS -> DtcScreen(dtcs, isFr, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, isFr, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.OBD_SCAN -> ObdScanScreen(
+                    report = obdScanReport,
+                    isScanning = isObdScanning,
+                    message = obdScanMessage,
+                    isConnected = adapter.tier != AdapterTier.DISCONNECTED &&
+                        !adapter.deviceName.contains("Demo", ignoreCase = true) &&
+                        !adapter.deviceName.contains("Simulated", ignoreCase = true),
+                    isFr = isFr,
+                    onRunScan = { viewModel.runFullObdScan() }
+                )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
                     vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.generation.label}",
@@ -281,6 +303,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
+                    onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
                     onExportFile = {
                         calibrationWorkspace.importedFileName?.let { fileName ->
                             calibrationFileExporter.launch(fileName)
@@ -622,21 +645,29 @@ fun Sparkline(values: List<Double>, minVal: Double, maxVal: Double) {
 
 @Composable
 fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onClear: () -> Unit) {
+    var confirmClear by remember { mutableStateOf(false) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 SectionTitle(if (isFr) "Codes Défaut (DTC)" else "Diagnostic Trouble Codes")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onScan) { Text(if (isFr) "Scanner" else "Scan") }
-                    Button(onClick = onClear, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
+                    Button(onClick = { confirmClear = true }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
                         Text(if (isFr) "Effacer" else "Clear", color = Color.White)
                     }
                 }
             }
         }
+        item {
+            Text(
+                if (isFr) "L'effacement Mode 04 supprime les défauts d'émissions et réinitialise certains moniteurs de readiness. Enregistrer le rapport avant de continuer."
+                else "Mode 04 clearing removes emissions-related trouble codes and resets some readiness monitors. Save the report before continuing.",
+                color = TextMuted, fontSize = 11.sp
+            )
+        }
         if (dtcs.isEmpty()) {
             item {
-                Text(if (isFr) "Aucun code défaut actif détecté." else "No active fault codes detected.", color = OkGreen)
+                Text(if (isFr) "Aucun code défaut retourné par le dernier scan." else "No trouble codes returned by the last scan.", color = OkGreen)
             }
         } else {
             items(dtcs) { dtc ->
@@ -651,6 +682,26 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
                 }
             }
         }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text(if (isFr) "Confirmer l'effacement des défauts ?" else "Confirm DTC clearing?") },
+            text = { Text(if (isFr) "Cette opération envoie le service OBD Mode 04 à l'ECU. Les données de readiness peuvent être réinitialisées. Elle ne répare pas la cause du défaut." else "This sends OBD Mode 04 to the ECU. Readiness data may be reset. It does not repair the cause of a fault.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmClear = false
+                        onClear()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = WarnRed)
+                ) { Text(if (isFr) "Effacer les défauts" else "Clear codes") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text(if (isFr) "Annuler" else "Cancel") }
+            }
+        )
     }
 }
 

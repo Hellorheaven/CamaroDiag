@@ -106,3 +106,12 @@ Implemented requests include adapter initialization/protocol/voltage, supported-
 All queries are read-only. Unsupported PIDs are skipped; raw responses are retained in the scan report. Mode 06 is deliberately kept raw because test-ID scaling and limits are ECU/calibration-specific. Mode 09 multi-frame responses and Mode 02 freeze-frame decoding must be validated against real adapter captures before being treated as complete. This engine does not claim access to GM enhanced modules (BCM/IPC/ABS/SDM/TCM), nor does it send actuator, coding, security-access or engine-start commands. Those require verified vehicle-specific GM service definitions and a capable CAN interface.
 
 The full scan is exposed as `BluetoothObdManager.createObd2FeatureEngine().fullReadOnlyScan()` after a real adapter connection. Demo mode must not be used to represent a vehicle scan.
+
+
+## v1.6.0 – OBD scan and calibration file analysis
+
+The full OBD-II scanner is now exposed in the app navigation. It presents supported PIDs, decoded live values, confirmed/pending/permanent DTCs, freeze-frame data, VIN, CAL ID, CVN, ECU name, readiness, adapter voltage/protocol and raw Mode 06 results. The scanner sends standardized read-only OBD services; a missing ECU response remains missing and is never replaced with sample data. Mode 04 clearing requires a separate user confirmation and is accepted only on a positive response.
+
+The ECU workspace now inspects raw BIN, Intel HEX and Motorola S-record inputs. Intel HEX and S-record records are checked for structure and format checksums. Two raw BIN images can be compared byte-for-byte, with differing offsets, changed-byte count and file-size differences. Files remain local and can be exported using Android's Storage Access Framework.
+
+These file functions are not an ECU memory read, calibration table editor or ECU flash. Proprietary HP Tuners containers are detected but not decoded. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
