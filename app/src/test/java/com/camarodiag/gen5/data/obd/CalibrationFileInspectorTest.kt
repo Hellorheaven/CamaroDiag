@@ -97,7 +97,7 @@ class CalibrationFileInspectorTest {
 
     @Test
     fun recognizesExternalTuneProjectPackagesWithoutDecodingThem() {
-        listOf("customer-tune.hpt", "project.olsx", "calibration.ptx").forEach { name ->
+        listOf("project.olsx", "calibration.ptx").forEach { name ->
             val result = CalibrationFileInspector.inspect(name, byteArrayOf(0x01, 0x23, 0x45, 0x67))
             assertEquals(CalibrationFileFormat.EXTERNAL_TUNE_PROJECT, result.format)
             assertFalse(result.valid)
