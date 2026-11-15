@@ -1,0 +1,53 @@
+name: Delete merged pull request branches
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete-merged-pr-branches:
+    if: github.event_name == 'push' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete head branches of merged pull requests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pullRequests = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: "closed",
+              per_page: 100
+            });
+
+            for (const pr of pullRequests) {
+              if (!pr.merged_at) continue;
+              if (!pr.head?.ref || pr.head.ref === "main") continue;
+              if (pr.head.repo?.full_name !== `${owner}/${repo}`) continue;
+
+              try {
+                await github.rest.git.deleteRef({
+                  owner,
+                  repo,
+                  ref: `heads/${pr.head.ref}`
+                });
+                core.info(`Deleted merged PR #${pr.number} branch: ${pr.head.ref}`);
+              } catch (error) {
+                if (error.status === 404 || error.status === 422) {
+                  core.info(`Branch already absent: ${pr.head.ref}`);
+                  continue;
+                }
+                throw error;
+              }
+            }

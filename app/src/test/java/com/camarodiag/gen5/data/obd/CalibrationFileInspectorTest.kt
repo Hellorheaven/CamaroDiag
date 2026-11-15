@@ -94,6 +94,18 @@ class CalibrationFileInspectorTest {
         assertTrue(result.warnings.any { it.contains("offset") })
     }
 
+
+    @Test
+    fun recognizesExternalTuneProjectPackagesWithoutDecodingThem() {
+        listOf("customer-tune.hpt", "project.olsx", "calibration.ptx").forEach { name ->
+            val result = CalibrationFileInspector.inspect(name, byteArrayOf(0x01, 0x23, 0x45, 0x67))
+            assertEquals(CalibrationFileFormat.EXTERNAL_TUNE_PROJECT, result.format)
+            assertFalse(result.valid)
+            assertTrue(result.summary.contains("non décodé"))
+            assertTrue(result.warnings.any { it.contains("conservé octet par octet") })
+        }
+    }
+
     @Test
     fun keepsUnrecognizedCalibrationContainersOpaque() {
         val result = CalibrationFileInspector.inspect("vendor-map.opaque", byteArrayOf(1, 2, 3, 4))

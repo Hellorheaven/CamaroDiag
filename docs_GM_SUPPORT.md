@@ -98,3 +98,10 @@ La lecture/enregistrement des capteurs pendant que le moteur tourne est distinct
 L'import accepte les fichiers sélectionnés par Android et conserve leur contenu original. BIN brut, Intel HEX et Motorola S-record sont inspectés ; les archives ZIP sont identifiées et leurs entrées sont listées sans extraction automatique. Les fichiers de définition externes XDF/A2L/XML et les conteneurs inconnus restent des pièces jointes opaques, sans conversion ou modification.
 
 Pour utiliser l'éditeur de tables, il faut une image BIN brute et un TSV de définitions adapté à son CAL ID/OS. Chaque définition fournit les offsets, dimensions, axes représentés par la matrice, type numérique, ordre des octets, échelle, biais et limites. L'import d'un conteneur propriétaire n'implique ni son décodage, ni l'accès à ses tables, ni l'autorisation de flasher son contenu.
+
+
+## Import de projets de cartographie externes
+
+L'importeur accepte les images BIN/ORI/MOD, Intel HEX et Motorola S-record, les archives ZIP, les fichiers de définition externes ainsi que les projets/conteneurs issus d'outils tiers. Les projets dont le format interne n'est pas décodé sont conservés tels quels avec leur nom, taille et empreinte SHA-256, puis peuvent être exportés. Les archives ZIP sont inspectées en lecture seule avec des limites de nombre d'entrées et de taille décompressée.
+
+Pour utiliser l'éditeur de tables, il faut extraire ou exporter depuis le logiciel d'origine une image binaire brute, puis charger un fichier de définitions CamaroDiag contenant offsets, dimensions, types numériques, endian, facteurs d'échelle et limites. Les définitions XML externes ne sont pas encore converties automatiquement. L'import d'un projet propriétaire ne signifie pas que ses tables sont lisibles, que le fichier est compatible avec l'ECM, ou qu'il peut être écrit dans le véhicule.

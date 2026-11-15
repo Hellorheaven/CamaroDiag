@@ -11,6 +11,7 @@ enum class CalibrationFileFormat(val label: String) {
     MOTOROLA_S_RECORD("Motorola S-record"),
     ZIP_ARCHIVE("Archive de cartographie (ZIP)"),
     EXTERNAL_DEFINITION("Définition de tables externe"),
+    EXTERNAL_TUNE_PROJECT("Projet de cartographie externe (conservé tel quel)"),
     UNKNOWN("Fichier externe non reconnu")
 }
 
@@ -43,13 +44,17 @@ object CalibrationFileInspector {
     private const val MAX_ARCHIVE_ENTRIES = 1_000
     private const val MAX_ARCHIVE_UNCOMPRESSED_BYTES = 128L * 1024L * 1024L
     private const val MAX_ARCHIVE_DISPLAY_ENTRIES = 30
+    private val externalTuneProjectExtensions = setOf(
+        "hpt", "ctz", "coz", "ols", "olsx", "ptm", "ptx", "xpr", "7z", "rar"
+    )
 
     fun inspect(fileName: String, content: ByteArray): CalibrationFileInspection {
         if (content.isEmpty()) return invalid(CalibrationFileFormat.UNKNOWN, "Fichier vide.", "Empty file.")
         val extension = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)
         return when {
             isZipArchive(content) -> inspectZipArchive(content)
-            extension in setOf("xdf", "a2l", "xml", "mapdef") -> externalDefinitionInspection(content.size.toLong(), extension)
+            extension in externalTuneProjectExtensions -> externalTuneProjectInspection(content.size.toLong(), extension)
+            extension in setOf("xdf", "a2l", "xml", "mapdef", "dam", "dcm") -> externalDefinitionInspection(content.size.toLong(), extension)
             extension in setOf("hex", "ihx") -> inspectIntelHex(content)
             extension in setOf("s19", "srec", "s28", "s37", "mot") -> inspectSRecord(content)
             extension in setOf("bin", "rom", "ori", "mod", "cal", "img") ->
@@ -156,6 +161,22 @@ object CalibrationFileInspector {
             )
         }
     }
+
+    private fun externalTuneProjectInspection(size: Long, extension: String) =
+        CalibrationFileInspection(
+            CalibrationFileFormat.EXTERNAL_TUNE_PROJECT,
+            valid = false,
+            summary = "Projet de cartographie externe détecté (.$extension) ; format interne non décodé.",
+            payloadBytes = size,
+            recordCount = 0,
+            addressRanges = emptyList(),
+            checksumValidation = "Non vérifié",
+            warnings = listOf(
+                "Le fichier original est conservé octet par octet et peut être exporté.",
+                "Pour éditer les tables dans CamaroDiag, exporte depuis le logiciel source une image BIN/ORI/MOD brute et importe une définition de tables vérifiée pour le CAL ID et l'OS exacts.",
+                "La détection du conteneur ne valide ni son contenu, ni sa compatibilité ECU, ni sa possibilité de programmation."
+            )
+        )
 
     private fun externalDefinitionInspection(size: Long, extension: String) =
         CalibrationFileInspection(

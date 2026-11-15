@@ -17,6 +17,16 @@ Application Android native Kotlin / Jetpack Compose pour diagnostic Chevrolet Ca
 - Interface adaptative Compose.
 - Les permissions Bluetooth sont différenciées avant/après Android 12.
 
+## Versioning et releases
+
+Le versionnage Android et GitHub Release utilise `version.properties` comme source unique :
+- `VERSION_PREFIX=1.6` définit la série `1.6.x`.
+- `VERSION_CODE_BASE=7` définit la base du `versionCode` Android.
+- À chaque publication sur `main`, le workflow cherche le dernier tag `v1.6.N`, incrémente automatiquement `N`, puis construit `versionName=1.6.N` et `versionCode=7+N`.
+- Le workflow crée le tag et la GitHub Release et joint les APK Debug et Release signés.
+
+Le README décrit les fonctionnalités par série (`1.6.x`) plutôt que de maintenir manuellement le numéro de patch. Pour passer à une nouvelle série MAJOR.MINOR, mettre à jour `VERSION_PREFIX` et choisir une `VERSION_CODE_BASE` strictement supérieure au dernier `versionCode` déjà publié. Ne pas remettre les versions en dur dans `app/build.gradle.kts`.
+
 ## Interfaces OBD
 
 - OBDLink MX+ / MX / LX et adaptateurs Bluetooth classiques compatibles : transport Bluetooth SPP.
@@ -108,13 +118,13 @@ All queries are read-only. Unsupported PIDs are skipped; raw responses are retai
 The full scan is exposed as `BluetoothObdManager.createObd2FeatureEngine().fullReadOnlyScan()` after a real adapter connection. Demo mode must not be used to represent a vehicle scan.
 
 
-## v1.6.0 – OBD scan and calibration file analysis
+## v1.6.x – OBD scan and calibration file analysis
 
 The full OBD-II scanner is now exposed in the app navigation. It presents supported PIDs, decoded live values, confirmed/pending/permanent DTCs, freeze-frame data, VIN, CAL ID, CVN, ECU name, readiness, adapter voltage/protocol and raw Mode 06 results. The scanner sends standardized read-only OBD services; a missing ECU response remains missing and is never replaced with sample data. Mode 04 clearing requires a separate user confirmation and is accepted only on a positive response.
 
-The ECU workspace now inspects raw BIN, Intel HEX and Motorola S-record inputs. Intel HEX and S-record records are checked for structure and format checksums. Two raw BIN images can be compared byte-for-byte, with differing offsets, changed-byte count and file-size differences. Files remain local and can be exported using Android's Storage Access Framework.
+The ECU workspace imports raw BIN/ORI/MOD, Intel HEX, Motorola S-record, ZIP archives, external table definitions and external calibration-project packages. Intel HEX and S-record records are checked for structure and format checksums. ZIP archives are inspected within bounded limits and retained byte-for-byte; opaque project packages are also retained byte-for-byte and can be exported. Two raw BIN images can be compared byte-for-byte, with differing offsets, changed-byte count and file-size differences.
 
-These file functions are not an ECU memory read, calibration table editor or ECU flash. Les conteneurs propriétaires non documentés ne sont pas interprétés. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
+The offline table editor works on raw binary images when the user supplies explicit, verified table definitions (offset, dimensions, data type, byte order, scaling and bias). External XDF/A2L/XML-style definitions are preserved as attachments but are not automatically converted into table definitions. Unknown or proprietary project packages are not decoded. These operations are not an ECU memory read or ECU flash. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
 
 
 ## Calibration table editor
