@@ -382,8 +382,8 @@ fun CalibrationWorkspaceScreen(
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        if (isFr) "Les 10 profils moteur Gen 5/Gen 6 sont catalogués, mais la lecture mémoire binaire, l'édition des tables et le flashage ne sont pas encore implémentés. Il faut identifier le contrôleur exact, le CAL ID/CVN, le matériel, l'OS, le protocole de programmation constructeur, les checksums et la récupération."
-                        else "All 10 Gen 5 / Gen 6 engine profiles are catalogued, but binary memory reads, table editing and flashing are not implemented. The exact controller, CAL ID/CVN, hardware, OS, OEM programming protocol, checksums and recovery path must be identified.",
+                        if (isFr) "Les 10 profils moteur Gen 5/Gen 6 sont catalogués. L'éditeur hors ligne de tables fonctionne sur un fichier BIN importé lorsque tu fournis une définition exacte (offset, dimensions, type, ordre des octets, échelle et biais) correspondant au CAL ID et à l'OS relevés. CamaroDiag ne fournit pas encore de définitions moteur validées, ne lit pas directement la mémoire de l'ECM et ne programme pas l'ECU."
+                        else "All 10 Gen 5 / Gen 6 engine profiles are catalogued. The offline table editor works on an imported BIN when you provide an exact definition (offset, dimensions, data type, byte order, scaling and bias) for the identified CAL ID and OS. CamaroDiag does not yet ship validated engine table definitions, read ECM memory directly or program the ECU.",
                         color = TextMuted, fontSize = 12.sp
                     )
                     Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
