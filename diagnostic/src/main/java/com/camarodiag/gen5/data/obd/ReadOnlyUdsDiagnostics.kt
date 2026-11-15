@@ -237,7 +237,7 @@ class UdsReadOnlyClient(
         require(response.size >= 3 && (response[1].toInt() and 0xFF) == 0x02) {
             "UDS ReadDTCInformation response did not echo subfunction 0x02."
         }
-        return response.copyOfRange(1, response.size)
+        return response.copyOfRange(2, response.size)
     }
 
     private fun verifyPositiveResponse(response: ByteArray, requestedService: Int) {
