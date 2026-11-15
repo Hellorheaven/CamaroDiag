@@ -98,9 +98,9 @@ object CalibrationTableCodec {
 
     fun parseDefinitions(content: String): CalibrationDefinitionParseResult {
         val normalized = content.removePrefix("\uFEFF").replace("\r", "")
+        // Keep trailing delimiters: they represent optional empty CSV/TSV columns.
         val lines = normalized.split("\n")
-            .map(String::trim)
-            .filter { it.isNotEmpty() && !it.startsWith("#") }
+            .filter { it.isNotBlank() && !it.trimStart().startsWith("#") }
         require(lines.size >= 2) { "Le fichier de définitions doit contenir un en-tête et au moins une table." }
         require(lines.size <= MAX_DEFINITIONS + 1) {
             "Le fichier dépasse la limite de " + MAX_DEFINITIONS + " tables."
