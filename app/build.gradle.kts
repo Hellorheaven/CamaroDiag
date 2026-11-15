@@ -1,5 +1,12 @@
 import java.util.Properties
 
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android") 
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
+}
+
 val appVersionProperties = Properties().apply {
     rootProject.file("version.properties").inputStream().use { load(it) }
 }
@@ -11,12 +18,6 @@ val releasePatch = providers.gradleProperty("releasePatch").orElse("0").get().to
     ?: error("releasePatch must be a non-negative integer")
 require(releasePatch >= 0) { "releasePatch must be non-negative" }
 
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android") 
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
-}
 
 android {
     namespace = "com.camarodiag.gen5"
