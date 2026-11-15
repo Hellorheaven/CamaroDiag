@@ -638,21 +638,29 @@ fun Sparkline(values: List<Double>, minVal: Double, maxVal: Double) {
 
 @Composable
 fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onClear: () -> Unit) {
+    var confirmClear by remember { mutableStateOf(false) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 SectionTitle(if (isFr) "Codes Défaut (DTC)" else "Diagnostic Trouble Codes")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onScan) { Text(if (isFr) "Scanner" else "Scan") }
-                    Button(onClick = onClear, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
+                    Button(onClick = { confirmClear = true }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
                         Text(if (isFr) "Effacer" else "Clear", color = Color.White)
                     }
                 }
             }
         }
+        item {
+            Text(
+                if (isFr) "L'effacement Mode 04 supprime les défauts d'émissions et réinitialise certains moniteurs de readiness. Enregistrer le rapport avant de continuer."
+                else "Mode 04 clearing removes emissions-related trouble codes and resets some readiness monitors. Save the report before continuing.",
+                color = TextMuted, fontSize = 11.sp
+            )
+        }
         if (dtcs.isEmpty()) {
             item {
-                Text(if (isFr) "Aucun code défaut actif détecté." else "No active fault codes detected.", color = OkGreen)
+                Text(if (isFr) "Aucun code défaut retourné par le dernier scan." else "No trouble codes returned by the last scan.", color = OkGreen)
             }
         } else {
             items(dtcs) { dtc ->
@@ -667,6 +675,26 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
                 }
             }
         }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text(if (isFr) "Confirmer l'effacement des défauts ?" else "Confirm DTC clearing?") },
+            text = { Text(if (isFr) "Cette opération envoie le service OBD Mode 04 à l'ECU. Les données de readiness peuvent être réinitialisées. Elle ne répare pas la cause du défaut." else "This sends OBD Mode 04 to the ECU. Readiness data may be reset. It does not repair the cause of a fault.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmClear = false
+                        onClear()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = WarnRed)
+                ) { Text(if (isFr) "Effacer les défauts" else "Clear codes") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text(if (isFr) "Annuler" else "Cancel") }
+            }
+        )
     }
 }
 
