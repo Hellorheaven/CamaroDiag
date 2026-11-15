@@ -40,6 +40,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String) {
     LIVE("Live", "Direct"),
     DTCS("DTCs", "Défauts"),
     MILEAGE("Mileage", "Odomètre"),
+    CALIBRATION("ECU / Maps", "ECU / Cartographie"),
     GUIDE("Guide", "Guide"),
     CONTROL("Controls", "Pilotage"),
     SETTINGS("Settings", "Réglages")
@@ -61,6 +62,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val isStreaming by viewModel.isStreamingLive.collectAsState()
     val mileageReport by viewModel.mileageReport.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
+    val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
@@ -77,6 +79,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) viewModel.refreshPairedDevices()
+    }
+
+    val calibrationFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importCalibrationFile(it) }
     }
 
     LaunchedEffect(Unit) {
@@ -181,6 +189,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab in setOf(
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
+                        DiagTab.CALIBRATION,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.SETTINGS
@@ -202,6 +211,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     listOf(
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
+                        DiagTab.CALIBRATION,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.SETTINGS
@@ -254,6 +264,18 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 })
                 DiagTab.DTCS -> DtcScreen(dtcs, isFr, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, isFr, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
+                    state = calibrationWorkspace,
+                    vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.generation.label}",
+                    ecmType = vehicle.engine.ecmType,
+                    isConnected = !adapter.deviceName.contains("Demo", ignoreCase = true) &&
+                        !adapter.deviceName.contains("Simulated", ignoreCase = true) &&
+                        adapter.tier != AdapterTier.DISCONNECTED,
+                    isFr = isFr,
+                    onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
+                    onClearFile = { viewModel.clearCalibrationFile() }
+                )
                 DiagTab.GUIDE -> HardwareGuideScreen(isFr)
                 DiagTab.CONTROL -> VehicleControlsScreen(vehicle, isFr)
                 DiagTab.SETTINGS -> SettingsScreen(lang, units, savedSessions, isFr,
