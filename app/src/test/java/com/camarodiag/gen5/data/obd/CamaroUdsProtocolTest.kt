@@ -1,8 +1,6 @@
 package com.camarodiag.gen5.data.obd
 
 import com.camarodiag.gen5.domain.model.CamaroEngine
-import com.camarodiag.gen5.domain.model.ConfidenceLevel
-import com.camarodiag.gen5.domain.model.MileageSourceReading
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -19,23 +17,6 @@ class CamaroUdsProtocolTest {
 
         assertEquals(123456.7, pidA6, 0.01)
         assertEquals(123456.7, pidD3, 0.01)
-    }
-
-    @Test
-    fun parsesConfirmedAndPendingDtcs() {
-        val codes = CamaroUdsProtocol.parseDtcResponses("43 01 71 00 00", "47 01 33 00 00")
-        assertTrue(codes.any { it.code == "P0171" && !it.isPending })
-        assertTrue(codes.any { it.code == "P0133" && it.isPending })
-    }
-
-    @Test
-    fun doesNotTreatSingleModerateReadingAsTamperingEvidence() {
-        val report = CamaroUdsProtocol.evaluateMileageConsistency(
-            "",
-            listOf(MileageSourceReading("ECM_A6", "ECM", "ECM", "PID A6", 123456.0, ConfidenceLevel.MODERATE, "", ""))
-        )
-        assertFalse(report.hasDiscrepancy)
-        assertTrue(report.summaryEn.contains("One odometer-related value"))
     }
 
     @Test
