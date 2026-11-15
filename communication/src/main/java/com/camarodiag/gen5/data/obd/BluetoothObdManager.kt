@@ -34,6 +34,7 @@ class BluetoothObdManager(context: Context) {
     private val commandMutex = Mutex()
     private val usbTransport = ElmUsbTransport(context)
     private val wifiTransport = ElmWifiTransport()
+    private val bleTransport = OBDLinkBleTransport(context)
     private var activeTransport: String = "BLUETOOTH"
 
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
@@ -60,14 +61,21 @@ class BluetoothObdManager(context: Context) {
             val device: BluetoothDevice = bluetoothAdapter?.getRemoteDevice(macAddress)
                 ?: return@withContext Result.failure(IllegalStateException("Bluetooth adapter unavailable"))
 
-            val btSocket = device.createRfcommSocketToServiceRecord(sppUuid)
             bluetoothAdapter.cancelDiscovery()
-            btSocket.connect()
-
-            activeTransport = "BLUETOOTH"
-            socket = btSocket
-            inputStream = btSocket.inputStream
-            outputStream = btSocket.outputStream
+            val useBle = device.type == BluetoothDevice.DEVICE_TYPE_LE ||
+                (device.name ?: "").contains("OBDLink CX", ignoreCase = true)
+            if (useBle) {
+                val bleResult = bleTransport.connect(device)
+                if (bleResult.isFailure) return@withContext Result.failure(bleResult.exceptionOrNull()!!)
+                activeTransport = "BLE"
+            } else {
+                val btSocket = device.createRfcommSocketToServiceRecord(sppUuid)
+                btSocket.connect()
+                activeTransport = "BLUETOOTH"
+                socket = btSocket
+                inputStream = btSocket.inputStream
+                outputStream = btSocket.outputStream
+            }
             isDemoMode = false
 
             val atz = sendAtCommand("ATZ")
@@ -164,6 +172,15 @@ class BluetoothObdManager(context: Context) {
                     else delay(10)
                 }
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+            } else if (activeTransport == "BLE") {
+                bleTransport.write(payload)
+                val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
+                while (System.currentTimeMillis() - start < timeoutMs) {
+                    val n = bleTransport.read(bytes, 100)
+                    if (n > 0) { val chunk = String(bytes, 0, n, Charsets.US_ASCII); if (chunk.contains('>')) { buffer.append(chunk.substringBefore('>')); break }; buffer.append(chunk) }
+                    else delay(10)
+                }
+                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else if (activeTransport == "WIFI") {
                 wifiTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
@@ -194,7 +211,7 @@ class BluetoothObdManager(context: Context) {
 
     fun disconnect() {
         try {
-            usbTransport.close(); wifiTransport.close()
+            usbTransport.close(); wifiTransport.close(); bleTransport.close()
             inputStream?.close()
             outputStream?.close()
             socket?.close()
