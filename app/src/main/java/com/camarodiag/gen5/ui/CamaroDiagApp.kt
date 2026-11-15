@@ -97,6 +97,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         uri?.let { viewModel.importComparisonCalibrationFile(it) }
     }
 
+    val calibrationDefinitionsPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importCalibrationDefinitions(it) }
+    }
+
     val calibrationFileExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
@@ -304,6 +310,13 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
+                    onImportDefinitions = {
+                        calibrationDefinitionsPicker.launch(arrayOf("text/*", "text/csv", "text/tab-separated-values", "*/*"))
+                    },
+                    onSelectMap = { viewModel.selectCalibrationMap(it) },
+                    onCellChange = { row, column, value -> viewModel.updateCalibrationCell(row, column, value) },
+                    onApplyMap = { viewModel.applyCalibrationTableEdits() },
+                    onDiscardMap = { viewModel.discardCalibrationTableChanges() },
                     onExportFile = {
                         calibrationWorkspace.importedFileName?.let { fileName ->
                             calibrationFileExporter.launch(fileName)
