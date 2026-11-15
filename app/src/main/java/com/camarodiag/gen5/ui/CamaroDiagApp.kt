@@ -29,6 +29,12 @@ import androidx.compose.ui.unit.sp
 import com.camarodiag.gen5.domain.model.*
 import com.camarodiag.gen5.control.VehicleControlCatalog
 import com.camarodiag.gen5.control.ControlAvailability
+import com.camarodiag.gen5.control.RemoteStartSafetyGate
+import com.camarodiag.gen5.control.RemoteStartConditions
+import com.camarodiag.gen5.control.VehicleGear
+import com.camarodiag.gen5.control.VehicleSignal
+import com.camarodiag.gen5.control.VehicleControlId
+import com.camarodiag.gen5.data.obd.VxdiagProfiles
 import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -476,6 +482,7 @@ fun AdapterScreen(
 ) {
     var wifiHost by remember { mutableStateOf("192.168.0.10") }
     var wifiPort by remember { mutableStateOf("35000") }
+    val vxdiagProfiles = remember { VxdiagProfiles.all() }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             SectionTitle(if (isFr) "Interfaces OBD-II : Bluetooth, USB et Wi-Fi" else "Bluetooth OBD-II Adapter & CAN Probe")
@@ -548,6 +555,36 @@ fun AdapterScreen(
             }
         }
         item {
+            Text(if (isFr) "Interfaces VXDIAG déclarées" else "Declared VXDIAG interface profiles", fontWeight = FontWeight.Bold)
+            Text(
+                if (isFr) "Ces profils distinguent les modèles et liaisons physiques. Ils ne signifient pas qu'un pilote Android ou une communication véhicule est disponible."
+                else "These profiles distinguish hardware and link variants. They do not mean an Android driver or vehicle communication is available.",
+                color = TextMuted,
+                fontSize = 11.sp
+            )
+            vxdiagProfiles.forEach { profile ->
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark), modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(profile.label, color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(
+                                if (isFr) "DÉCOUVERTE SEULE" else "DISCOVERY ONLY",
+                                color = WarnRed,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(profile.protocols.joinToString(" • ") { it.name }, color = TextMuted, fontSize = 10.sp)
+                        Text(
+                            if (isFr) profile.noteFr else "Hardware profile only; an official Android SDK/API or documented bridge is still required.",
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+        }
+        item {
             Text(if (isFr) "Profils de Simulation (Test sans véhicule)" else "Simulated Hardware Profiles (Bench Test)", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onSelectSim("MX_PLUS") }) { Text("OBDLink MX+") }
@@ -561,6 +598,20 @@ fun AdapterScreen(
 @Composable
 fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
     val capabilities = remember(vehicle) { VehicleControlCatalog().forVehicle(vehicle) }
+    val remoteStartAssessment = remember(vehicle) {
+        RemoteStartSafetyGate.assess(
+            RemoteStartConditions(
+                gear = VehicleGear.UNKNOWN,
+                hoodClosed = VehicleSignal.UNKNOWN,
+                doorsLocked = VehicleSignal.UNKNOWN,
+                hazardsOff = VehicleSignal.UNKNOWN,
+                theftSystemReady = VehicleSignal.UNKNOWN,
+                criticalFaultsAbsent = VehicleSignal.UNKNOWN,
+                vehicleStationary = VehicleSignal.UNKNOWN,
+                oemRemoteStartEquipped = VehicleSignal.UNKNOWN
+            )
+        )
+    }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             SectionTitle(if (isFr) "Pilotage des équipements" else "Vehicle controls")
@@ -572,7 +623,20 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(if (isFr) capability.titleFr else capability.titleEn, fontWeight = FontWeight.Bold)
+                        Text(capability.vehicleContext, color = CamaroBlue, fontSize = 10.sp)
                         Text(if (isFr) capability.explanationFr else capability.explanationEn, color = TextMuted, fontSize = 12.sp)
+                        if (capability.id == VehicleControlId.REMOTE_START) {
+                            Text(
+                                if (isFr) "Évaluation des interverrouillages : " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmées" else "BLOQUÉE"
+                                else "Interlock assessment: " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmed" else "BLOCKED",
+                                color = WarnRed,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                            remoteStartAssessment.blockersFr.forEach { blocker ->
+                                Text("• " + blocker, color = WarnRed, fontSize = 10.sp)
+                            }
+                        }
                     }
                     Text(if (isFr) "NON VALIDÉ" else "NOT VERIFIED", color = WarnRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
