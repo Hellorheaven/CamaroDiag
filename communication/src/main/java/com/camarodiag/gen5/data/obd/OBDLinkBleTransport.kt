@@ -107,8 +107,14 @@ internal class OBDLinkBleTransport(private val context: Context) {
             else writeResult?.completeExceptionally(IllegalStateException("BLE write failed ($status)"))
         }
 
+        @Suppress("DEPRECATION")
         override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-            if (characteristic.uuid == notifyUuid) characteristic.value?.let { incoming.trySend(it.copyOf()) }
+            // Android versions below API 33 only expose the characteristic value through this callback.
+            // API 33+ uses the overload below, which supplies an immutable value snapshot directly.
+            if (characteristic.uuid == notifyUuid) {
+                val legacyValue = characteristic.value
+                if (legacyValue != null) incoming.trySend(legacyValue.copyOf())
+            }
         }
 
         override fun onCharacteristicChanged(

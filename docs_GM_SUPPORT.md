@@ -44,7 +44,7 @@ Les opérations locales disponibles sont les suivantes :
 - Détection des formats binaires bruts BIN, Intel HEX et Motorola S-record.
 - Vérification structurelle des enregistrements Intel HEX : checksum, longueur, EOF, types d'enregistrement et chevauchement d'adresses.
 - Vérification structurelle des Motorola S-record : compte, checksum, terminaison et chevauchement d'adresses.
-- Identification des fichiers .hpt comme conteneurs HP Tuners non décodés.
+- Les formats propriétaires non documentés restent identifiés comme inconnus et ne sont pas interprétés.
 - Comparaison octet par octet de deux images BIN brutes, rapport des octets modifiés, plages d'offset, octets ajoutés/manquants.
 - Export local d'un fichier importé vers un emplacement choisi par l'utilisateur.
 
@@ -52,7 +52,7 @@ SHA-256, CRC d'intégrité et checksums de format Intel HEX/S-record ne sont pas
 
 ## Lecture binaire ECU, édition et flashage : limites actuelles
 
-La lecture intégrale de la mémoire ECM, la conversion en tables moteur, l'édition de tables et l'écriture ECU ne sont pas implémentées. Il ne faut pas envoyer de commandes UDS de programmation génériques ni tenter un flash avec un simple adaptateur ELM/STN.
+La lecture intégrale de la mémoire ECM et la programmation ECU ne sont pas implémentées. L'éditeur local de tables est disponible, mais il ne décode une table que lorsqu'un fichier de définitions explicite (offset, dimensions, type, endianness et échelle) est fourni et correspond exactement à l'image chargée. Il ne faut pas envoyer de commandes UDS de programmation génériques ni tenter une écriture ECU avec un adaptateur OBD générique.
 
 Pour chaque famille de calculateur, il faut disposer et valider :
 
@@ -63,7 +63,7 @@ Pour chaque famille de calculateur, il faut disposer et valider :
 5. Un contrôle d'alimentation stable, une stratégie de reprise, un mode recovery/bench testé et des images de sauvegarde vérifiées.
 6. Un plan de test sur matériel de laboratoire avant toute validation en véhicule.
 
-Les interfaces GM de programmation et leurs logiciels officiels ne sont pas interchangeables avec les interfaces OBD génériques. Le projet ne prétend pas remplacer GDS2/SPS/MDI2 ni HP Tuners sans les protocoles, licences, définitions et procédures nécessaires.
+Les interfaces GM de programmation et leurs logiciels officiels ne sont pas interchangeables avec les interfaces OBD génériques. CamaroDiag ne remplace pas les outils d'atelier GM officiels sans les protocoles, licences, définitions et procédures nécessaires.
 
 ## BCM / odomètre / pilotage
 

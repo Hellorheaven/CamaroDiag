@@ -11,6 +11,7 @@ import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
+import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
@@ -176,8 +177,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val storedFile = File(storageDir, "${System.currentTimeMillis()}_${safeName}")
                 storedFile.writeBytes(bytes)
                 val preview = bytes.take(64).joinToString(" ") { "%02X".format(it) }
-                _calibrationWorkspace.value.importedFilePath?.let { previousPath ->
+                val previousState = _calibrationWorkspace.value
+                previousState.importedFilePath?.let { previousPath ->
                     if (previousPath != storedFile.absolutePath) runCatching { File(previousPath).delete() }
+                }
+                previousState.activeFilePath?.takeIf { it != previousState.importedFilePath }?.let { activePath ->
+                    if (activePath != storedFile.absolutePath) runCatching { File(activePath).delete() }
                 }
                 _calibrationWorkspace.value.comparisonFilePath?.let { comparisonPath ->
                     runCatching { File(comparisonPath).delete() }
@@ -188,6 +193,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     importedFileSha256 = sha256,
                     importedFilePreview = preview,
                     importedFilePath = storedFile.absolutePath,
+                    activeFilePath = storedFile.absolutePath,
+                    mapDefinitions = emptyList(),
+                    selectedMapId = null,
+                    mapValues = emptyList(),
+                    mapDefinitionsWarnings = emptyList(),
+                    mapDirty = false,
+                    mapError = null,
                     inspectionFormat = inspection.format.label,
                     inspectionSummary = inspection.summary,
                     inspectionPayloadBytes = inspection.payloadBytes,
@@ -245,7 +257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 require(inspection.format.name == "RAW_BINARY") {
                     "La comparaison octet par octet nécessite un second fichier BIN brut."
                 }
-                val reference = File(current.importedFilePath!!)
+                val reference = File(current.activeFilePath ?: current.importedFilePath!!)
                 check(reference.isFile && reference.exists()) { "Le fichier BIN de référence est introuvable." }
                 val referenceBytes = reference.readBytes()
                 val comparison = CalibrationBinaryComparer.compare(referenceBytes, bytes)
@@ -283,8 +295,167 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportCalibrationDefinitionTemplate(destinationUri: Uri) {
+        viewModelScope.launch {
+            try {
+                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
+                    ?: error("Impossible de créer le fichier modèle.")
+                output.use { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    message = "Modèle TSV exporté. Remplace les exemples par les offsets et facteurs vérifiés de la calibration exacte."
+                )
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    mapError = error.localizedMessage ?: "Export du modèle TSV impossible."
+                )
+            }
+        }
+    }
+
+    /** Imports a semicolon-separated table-definition file supplied for the exact calibration image. */
+    fun importCalibrationDefinitions(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val current = _calibrationWorkspace.value
+                require(current.importedFilePath != null && current.inspectionFormat == "BIN / raw binary") {
+                    "Importe d'abord une image BIN brute."
+                }
+                val resolver = getApplication<Application>().contentResolver
+                val text = resolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
+                    val result = StringBuilder()
+                    val buffer = CharArray(4096)
+                    var total = 0
+                    while (true) {
+                        val count = reader.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= 1024 * 1024) { "Le fichier de définitions dépasse 1 Mio." }
+                        result.append(buffer, 0, count)
+                    }
+                    result.toString()
+                } ?: error("Impossible d'ouvrir le fichier de définitions.")
+                val parsed = CalibrationTableCodec.parseDefinitions(text)
+                val workingFile = File(current.activeFilePath ?: current.importedFilePath!!)
+                check(workingFile.isFile && workingFile.exists()) { "L'image BIN active est introuvable." }
+                val first = parsed.definitions.first()
+                val decoded = CalibrationTableCodec.decode(workingFile.readBytes(), first)
+                _calibrationWorkspace.value = current.copy(
+                    mapDefinitions = parsed.definitions,
+                    selectedMapId = first.id,
+                    mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
+                    mapDefinitionsWarnings = parsed.warnings,
+                    mapDirty = false,
+                    mapError = null,
+                    message = "${parsed.definitions.size} table(s) chargée(s). Les adresses proviennent de ton fichier de définitions et ne sont pas certifiées par CamaroDiag."
+                )
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    mapError = error.localizedMessage ?: "Import des définitions impossible.",
+                    message = error.localizedMessage ?: "Import des définitions impossible."
+                )
+            }
+        }
+    }
+
+    fun selectCalibrationMap(mapId: String) {
+        val current = _calibrationWorkspace.value
+        try {
+            val definition = current.mapDefinitions.firstOrNull { it.id == mapId }
+                ?: error("Définition de table introuvable.")
+            val path = current.activeFilePath ?: current.importedFilePath
+                ?: error("Aucun fichier BIN chargé.")
+            val file = File(path)
+            check(file.isFile && file.exists()) { "Le fichier BIN actif est introuvable." }
+            val decoded = CalibrationTableCodec.decode(file.readBytes(), definition)
+            _calibrationWorkspace.value = current.copy(
+                selectedMapId = mapId,
+                mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
+                mapDirty = false,
+                mapError = null
+            )
+        } catch (error: Exception) {
+            _calibrationWorkspace.value = current.copy(mapError = error.localizedMessage ?: "Lecture de la table impossible.")
+        }
+    }
+
+    fun updateCalibrationCell(row: Int, column: Int, value: String) {
+        val current = _calibrationWorkspace.value
+        if (row !in current.mapValues.indices || column !in current.mapValues[row].indices) return
+        val updated = current.mapValues.mapIndexed { rowIndex, cells ->
+            if (rowIndex != row) cells else cells.mapIndexed { columnIndex, old ->
+                if (columnIndex == column) value else old
+            }
+        }
+        _calibrationWorkspace.value = current.copy(mapValues = updated, mapDirty = true, mapError = null)
+    }
+
+    fun discardCalibrationTableChanges() {
+        _calibrationWorkspace.value.selectedMapId?.let(::selectCalibrationMap)
+    }
+
+    /** Saves edited cells to a new local BIN image. No ECU programming command is sent. */
+    fun applyCalibrationTableEdits() {
+        viewModelScope.launch {
+            var createdFile: File? = null
+            try {
+                val current = _calibrationWorkspace.value
+                val mapId = current.selectedMapId ?: error("Aucune table sélectionnée.")
+                val definition = current.mapDefinitions.firstOrNull { it.id == mapId }
+                    ?: error("Définition de table introuvable.")
+                val activePath = current.activeFilePath ?: current.importedFilePath
+                    ?: error("Aucun fichier BIN chargé.")
+                val source = File(activePath)
+                check(source.isFile && source.exists()) { "Fichier BIN actif introuvable." }
+                val editedValues = current.mapValues.mapIndexed { row, cells ->
+                    cells.mapIndexed { column, value ->
+                        value.replace(',', '.').toDoubleOrNull()
+                            ?: error("Valeur non numérique à la cellule ligne ${row + 1}, colonne ${column + 1}.")
+                    }
+                }
+                val modifiedBytes = CalibrationTableCodec.applyEdits(source.readBytes(), definition, editedValues)
+                val directory = File(getApplication<Application>().filesDir, "calibrations")
+                check(directory.exists() || directory.mkdirs()) { "Impossible de créer le dossier de cartographies." }
+                val name = current.importedFileName.orEmpty().replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "calibration.bin" }
+                createdFile = File(directory, "edited_${System.currentTimeMillis()}_${name}")
+                createdFile!!.writeBytes(modifiedBytes)
+                val hash = MessageDigest.getInstance("SHA-256").digest(modifiedBytes)
+                    .joinToString("") { "%02x".format(it) }
+                val inspection = CalibrationFileInspector.inspect(current.importedFileName ?: "calibration.bin", modifiedBytes)
+                val decoded = CalibrationTableCodec.decode(modifiedBytes, definition)
+                if (activePath != current.importedFilePath) runCatching { source.delete() }
+                _calibrationWorkspace.value = current.copy(
+                    activeFilePath = createdFile!!.absolutePath,
+                    importedFileSize = modifiedBytes.size.toLong(),
+                    importedFileSha256 = hash,
+                    importedFilePreview = modifiedBytes.take(64).joinToString(" ") { "%02X".format(it) },
+                    inspectionSummary = inspection.summary,
+                    inspectionPayloadBytes = inspection.payloadBytes,
+                    inspectionRecordCount = inspection.recordCount,
+                    inspectionChecksumStatus = inspection.checksumValidation,
+                    inspectionAddressRanges = inspection.addressRanges.map {
+                        "0x${it.start.toString(16).uppercase()}–0x${it.endInclusive.toString(16).uppercase()} (${it.length} octets)"
+                    },
+                    inspectionWarnings = inspection.warnings,
+                    mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
+                    mapDirty = false,
+                    mapError = null,
+                    message = "Table enregistrée dans une nouvelle image locale. L'original importé reste conservé. Aucun octet n'a été envoyé à l'ECU."
+                )
+            } catch (error: Exception) {
+                createdFile?.let { runCatching { it.delete() } }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    mapError = error.localizedMessage ?: "Modification de la table impossible.",
+                    message = error.localizedMessage ?: "Modification de la table impossible."
+                )
+            }
+        }
+    }
+
     fun clearCalibrationFile() {
         _calibrationWorkspace.value.importedFilePath?.let { path -> runCatching { File(path).delete() } }
+        _calibrationWorkspace.value.activeFilePath?.takeIf { it != _calibrationWorkspace.value.importedFilePath }?.let { path ->
+            runCatching { File(path).delete() }
+        }
         _calibrationWorkspace.value.comparisonFilePath?.let { path -> runCatching { File(path).delete() } }
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             importedFileName = null,
@@ -292,6 +463,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             importedFileSha256 = null,
             importedFilePreview = null,
             importedFilePath = null,
+            activeFilePath = null,
+            mapDefinitions = emptyList(),
+            selectedMapId = null,
+            mapValues = emptyList(),
+            mapDefinitionsWarnings = emptyList(),
+            mapDirty = false,
+            mapError = null,
             inspectionFormat = null,
             inspectionSummary = null,
             inspectionPayloadBytes = null,
@@ -316,7 +494,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun exportCalibrationFile(destinationUri: Uri) {
         viewModelScope.launch {
             try {
-                val sourcePath = _calibrationWorkspace.value.importedFilePath
+                val sourcePath = _calibrationWorkspace.value.activeFilePath
+                    ?: _calibrationWorkspace.value.importedFilePath
                     ?: error("Aucun fichier de calibration n'est chargé.")
                 val source = File(sourcePath)
                 check(source.isFile && source.exists()) { "Le fichier local de calibration est introuvable." }

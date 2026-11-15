@@ -61,10 +61,10 @@ class CalibrationFileInspectorTest {
     }
 
     @Test
-    fun doesNotPretendToDecodeHpTunersContainers() {
-        val result = CalibrationFileInspector.inspect("read.hpt", byteArrayOf(1, 2, 3, 4))
-        assertEquals(CalibrationFileFormat.HP_TUNERS_CONTAINER, result.format)
+    fun leavesUndocumentedContainerFormatsUninterpreted() {
+        val result = CalibrationFileInspector.inspect("opaque.dat", byteArrayOf(1, 2, 3, 4))
+        assertEquals(CalibrationFileFormat.UNKNOWN, result.format)
         assertFalse(result.valid)
-        assertTrue(result.summary.contains("propriétaire"))
+        assertTrue(result.summary.contains("non reconnu"))
     }
 }
