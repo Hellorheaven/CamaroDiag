@@ -1,6 +1,10 @@
 package com.camarodiag.gen5.data.obd
 
+import com.camarodiag.gen5.domain.model.AdapterCapabilities
+import com.camarodiag.gen5.domain.model.AdapterTier
 import com.camarodiag.gen5.domain.model.CamaroEngine
+import com.camarodiag.gen5.domain.model.ModuleStatus
+import com.camarodiag.gen5.domain.model.VehicleProfile
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -17,6 +21,32 @@ class CamaroUdsProtocolTest {
 
         assertEquals(123456.7, pidA6, 0.01)
         assertEquals(123456.7, pidD3, 0.01)
+    }
+
+    @Test
+    fun marksStandardEcmAccessUnavailableWhenNoCanAdapterIsConnected() {
+        val modules = CamaroUdsProtocol.buildTopology(
+            VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX),
+            AdapterCapabilities(tier = AdapterTier.DISCONNECTED)
+        )
+
+        val ecm = modules.single { it.id == "ECM" }
+        assertEquals(ModuleStatus.UNSUPPORTED_BY_ADAPTER, ecm.status)
+        assertEquals("", ecm.txHeader)
+        assertEquals("", ecm.rxHeader)
+    }
+
+    @Test
+    fun usesFunctionalObdHeadersOnlyWhenCanAdapterIsAvailable() {
+        val modules = CamaroUdsProtocol.buildTopology(
+            VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1),
+            AdapterCapabilities(tier = AdapterTier.PRO_STN, supportsCanHeaders = true)
+        )
+
+        val ecm = modules.single { it.id == "ECM" }
+        assertEquals(ModuleStatus.ACCESSIBLE, ecm.status)
+        assertEquals("7DF", ecm.txHeader)
+        assertEquals("7E8", ecm.rxHeader)
     }
 
     @Test
