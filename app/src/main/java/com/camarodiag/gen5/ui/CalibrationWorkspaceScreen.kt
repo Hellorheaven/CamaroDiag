@@ -39,7 +39,8 @@ data class CalibrationWorkspaceState(
     val message: String = "",
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
-    val importedFileSha256: String? = null
+    val importedFileSha256: String? = null,
+    val importedFilePreview: String? = null
 )
 
 @Composable
@@ -124,6 +125,8 @@ fun CalibrationWorkspaceScreen(
                         Text("${state.importedFileSize ?: 0L} bytes", color = TextPrimary, fontSize = 12.sp)
                         Text("SHA-256", color = TextMuted, fontSize = 11.sp)
                         Text(state.importedFileSha256.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                        Text(if (isFr) "Aperçu hexadécimal (64 premiers octets)" else "Hex preview (first 64 bytes)", color = TextMuted, fontSize = 11.sp)
+                        Text(state.importedFilePreview.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                         TextButton(onClick = onClearFile) { Text(if (isFr) "Retirer le fichier" else "Remove file") }
                     }
                 }
