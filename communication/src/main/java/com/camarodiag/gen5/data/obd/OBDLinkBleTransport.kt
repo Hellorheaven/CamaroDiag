@@ -37,7 +37,6 @@ internal class OBDLinkBleTransport(private val context: Context) {
 
     private var connectResult: CompletableDeferred<Unit>? = null
     private var writeResult: CompletableDeferred<Unit>? = null
-    private var descriptorResult: CompletableDeferred<Unit>? = null
     private var mtuResult: CompletableDeferred<Unit>? = null
 
     private val callback = object : BluetoothGattCallback() {
@@ -77,7 +76,6 @@ internal class OBDLinkBleTransport(private val context: Context) {
                 connectResult?.completeExceptionally(IllegalStateException("BLE notification descriptor not found"))
                 return
             }
-            descriptorResult = CompletableDeferred()
             val started = if (Build.VERSION.SDK_INT >= 33) {
                 g.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == BluetoothStatusCodes.SUCCESS
             } else {
@@ -94,7 +92,6 @@ internal class OBDLinkBleTransport(private val context: Context) {
         override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) connectResult?.complete(Unit)
             else connectResult?.completeExceptionally(IllegalStateException("BLE notification subscription failed ($status)"))
-            descriptorResult?.complete(Unit)
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
@@ -198,7 +195,6 @@ internal class OBDLinkBleTransport(private val context: Context) {
         while (incoming.tryReceive().isSuccess) { }
         connectResult = null
         writeResult = null
-        descriptorResult = null
         mtuResult = null
     }
 }
