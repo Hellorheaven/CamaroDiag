@@ -423,6 +423,7 @@ class ProfiledUdsReadSession private constructor(
     }
 }
 
+data class UdsEcuIdentity(
     val controllerFamily: String,
     val hardwarePartNumber: String?,
     val operatingSystemId: String?,
