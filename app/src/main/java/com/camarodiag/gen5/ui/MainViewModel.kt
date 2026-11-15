@@ -91,8 +91,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshPairedDevices() {
-        _pairedDevices.value = obdManager.getPairedDevices()
-        _usbDevices.value = obdManager.getUsbDevices()
+        viewModelScope.launch {
+            _pairedDevices.value = obdManager.getPairedDevices()
+            _usbDevices.value = obdManager.getUsbDevices()
+            val nearbyBle = obdManager.scanNearbyBleDevices()
+            _pairedDevices.value = (_pairedDevices.value + nearbyBle)
+                .distinctBy { it.second }
+                .sortedByDescending { it.first.contains("OBD", true) || it.first.contains("ELM", true) || it.first.contains("vLinker", true) }
+        }
     }
 
     fun connectWifi(host: String, port: Int) {
