@@ -295,6 +295,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportCalibrationDefinitionTemplate(destinationUri: Uri) {
+        viewModelScope.launch {
+            try {
+                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
+                    ?: error("Impossible de créer le fichier modèle.")
+                output.use { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    message = "Modèle TSV exporté. Remplace les exemples par les offsets et facteurs vérifiés de la calibration exacte."
+                )
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    mapError = error.localizedMessage ?: "Export du modèle TSV impossible."
+                )
+            }
+        }
+    }
+
     /** Imports a semicolon-separated table-definition file supplied for the exact calibration image. */
     fun importCalibrationDefinitions(uri: Uri) {
         viewModelScope.launch {
