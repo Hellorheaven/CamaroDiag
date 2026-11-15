@@ -120,19 +120,21 @@ internal class OBDLinkBleTransport(private val context: Context) {
         }
     }
 
-    suspend fun connect(device: BluetoothDevice): Result<Unit> = try {
-        close()
-        connectResult = CompletableDeferred()
-        gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
-            ?: return Result.failure(IllegalStateException("Unable to create BLE connection"))
-        withTimeout(15_000) { connectResult!!.await() }
-        mtuResult = CompletableDeferred()
-        gatt?.requestMtu(247)
-        withTimeoutOrNull(3_000) { mtuResult?.await() }
-        Result.success(Unit)
-    } catch (e: Exception) {
-        close()
-        Result.failure(e)
+    suspend fun connect(device: BluetoothDevice): Result<Unit> {
+        return try {
+            close()
+            connectResult = CompletableDeferred()
+            gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
+                ?: throw IllegalStateException("Unable to create BLE connection")
+            withTimeout(15_000) { connectResult!!.await() }
+            mtuResult = CompletableDeferred()
+            gatt?.requestMtu(247)
+            withTimeoutOrNull(3_000) { mtuResult?.await() }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            close()
+            Result.failure(e)
+        }
     }
 
     suspend fun write(data: ByteArray) {
