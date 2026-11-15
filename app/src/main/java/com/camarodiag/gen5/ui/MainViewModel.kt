@@ -418,7 +418,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val (confirmed, pending, permanent) = obdManager.createObd2FeatureEngine().readDtcs()
                     _dtcs.value = (confirmed + pending + permanent).distinctBy { it.code to it.status }.map { dtc ->
                         val pendingCode = dtc.status == "pending"
-                        val permanentCode = dtc.status == "permanent"
                         DiagnosticDtc(
                             code = dtc.code,
                             module = "ECM",
