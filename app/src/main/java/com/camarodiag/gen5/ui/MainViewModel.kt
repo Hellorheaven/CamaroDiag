@@ -172,7 +172,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Imports a local calibration file for inventory and integrity checks only. */
     fun importCalibrationFile(uri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val resolver = getApplication<Application>().contentResolver
                 val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
@@ -257,7 +257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Imports a second raw BIN image and compares it byte-for-byte with the loaded reference. */
     fun importComparisonCalibrationFile(uri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             var storedFile: File? = null
             try {
                 val current = _calibrationWorkspace.value
@@ -347,7 +347,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Imports a semicolon-separated table-definition file supplied for the exact calibration image. */
     fun importCalibrationDefinitions(uri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val current = _calibrationWorkspace.value
                 require(current.importedFilePath != null && current.inspectionFormat == "BIN / raw binary") {
@@ -395,8 +395,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectCalibrationMap(mapId: String) {
-        val current = _calibrationWorkspace.value
-        try {
+        viewModelScope.launch(Dispatchers.IO) {
+            val current = _calibrationWorkspace.value
+            try {
             val definition = current.mapDefinitions.firstOrNull { it.id == mapId }
                 ?: error("Définition de table introuvable.")
             val path = current.activeFilePath ?: current.importedFilePath
@@ -412,10 +413,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 mapDirty = false,
                 mapError = null
             )
-        } catch (cancelled: CancellationException) {
+            } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-            _calibrationWorkspace.value = current.copy(mapError = error.localizedMessage ?: "Lecture de la table impossible.")
+                _calibrationWorkspace.value = current.copy(
+                    mapError = error.localizedMessage ?: "Lecture de la table impossible."
+                )
+            }
         }
     }
 
@@ -436,7 +440,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Saves edited cells to a new local BIN image. No ECU programming command is sent. */
     fun applyCalibrationTableEdits() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             var createdFile: File? = null
             try {
                 val current = _calibrationWorkspace.value
@@ -539,7 +543,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Exports the selected local calibration file through Android's Storage Access Framework. */
     fun exportCalibrationFile(destinationUri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val sourcePath = _calibrationWorkspace.value.activeFilePath
                     ?: _calibrationWorkspace.value.importedFilePath
