@@ -301,44 +301,66 @@ data class DocumentedUdsReadProfile(
     fun compatibilityDefinitionIssues(vehicle: VehicleProfile): List<String> = buildList {
         if (profileId.isBlank()) add("Profile ID is missing.")
         if (moduleId.isBlank()) add("Module ID is missing.")
+        if (controllerFamily.isBlank()) add("Controller family is missing.")
         if (vehicle.generation != generation || vehicle.modelYear !in modelYears) add("Model year/generation does not match.")
         if (!vehicle.engine.rpo.equals(engineRpo, ignoreCase = true)) add("Engine RPO does not match.")
+
+        val vinPattern = Regex("[A-HJ-NPR-Z0-9]{17}")
+        val selectedVin = vehicle.vin.trim().uppercase(Locale.ROOT)
+        val profileVin = verifiedVin.trim().uppercase(Locale.ROOT)
+        if (!selectedVin.matches(vinPattern)) add("Selected vehicle must have a valid 17-character VIN.")
+        if (!profileVin.matches(vinPattern)) add("The verified profile VIN must be a valid 17-character VIN.")
+        if (selectedVin != profileVin) add("Selected vehicle VIN does not match the VIN validated for this profile.")
+
         if (hardwarePartNumber.isBlank() || operatingSystemId.isBlank() || calibrationId.isBlank() ||
             calibrationVerificationNumber.isBlank()) add("Exact hardware, OS, calibration and CVN values are required.")
-        if (verifiedVin.length != 17) add("A 17-character VIN must be assigned to this profile.")
+
         val maxCanId = if (extendedCanId) 0x1FFFFFFF else 0x7FF
-        if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) add("CAN addressing is invalid.")
-        if (readableDids.isEmpty() || readableDids.any { it !in 0..0xFFFF }) add("No valid read-only DID allowlist is defined.")
+        if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) {
+            add("CAN addressing is invalid.")
+        }
+        if (readableDids.isEmpty() || readableDids.any { it !in 0..0xFFFF }) {
+            add("No valid read-only DID allowlist is defined.")
+        }
         val requiredIdentityFields = UdsIdentityField.entries.toSet()
-        if (identityDids.size != requiredIdentityFields.size || identityDids.map { it.field }.toSet() != requiredIdentityFields) {
+        if (identityDids.size != requiredIdentityFields.size ||
+            identityDids.map { it.field }.toSet() != requiredIdentityFields) {
             add("Identity DID definitions must cover all six identity fields exactly once.")
         }
-        if (identityDids.any { it.did !in 0..0xFFFF || it.did !in readableDids }) add("Identity DIDs must be included in the read-only allowlist.")
-        if (identityDids.map { it.did }.distinct().size != identityDids.size) add("Identity DID definitions must not repeat a DID.")
+        if (identityDids.any { it.did !in 0..0xFFFF || it.did !in readableDids }) {
+            add("Identity DIDs must be included in the read-only allowlist.")
+        }
+        if (identityDids.map { it.did }.distinct().size != identityDids.size) {
+            add("Identity DID definitions must not repeat a DID.")
+        }
         if (evidenceReference.isBlank()) add("A traceable service-information reference is required.")
     }
 
     fun compatibilityIssues(vehicle: VehicleProfile, identity: UdsEcuIdentity): List<String> = buildList {
-        if (profileId.isBlank()) add("Profile ID is missing.")
-        if (moduleId.isBlank()) add("Module ID is missing.")
-        if (vehicle.generation != generation || vehicle.modelYear !in modelYears) add("Model year/generation does not match.")
-        if (!vehicle.engine.rpo.equals(engineRpo, ignoreCase = true)) add("Engine RPO does not match.")
-        if (!identity.controllerFamily.equals(controllerFamily, ignoreCase = true)) add("Controller family does not match.")
-        if (identity.hardwarePartNumber.isNullOrBlank() || !identity.hardwarePartNumber.equals(hardwarePartNumber, ignoreCase = true)) add("Hardware part number does not match.")
-        if (identity.operatingSystemId.isNullOrBlank() || !identity.operatingSystemId.equals(operatingSystemId, ignoreCase = true)) add("Operating-system ID does not match.")
-        if (identity.calibrationId.isNullOrBlank() || !identity.calibrationId.equals(calibrationId, ignoreCase = true)) add("Calibration ID does not match.")
-        if (identity.calibrationVerificationNumber.isNullOrBlank() || !identity.calibrationVerificationNumber.equals(calibrationVerificationNumber, ignoreCase = true)) add("CVN does not match.")
-        if (verifiedVin.length != 17 || identity.vin.isNullOrBlank() || !identity.vin.equals(verifiedVin, ignoreCase = true)) add("VIN is not the VIN validated for this profile.")
-        val maxCanId = if (extendedCanId) 0x1FFFFFFF else 0x7FF
-        if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) add("CAN addressing is invalid.")
-        if (readableDids.isEmpty() || readableDids.any { it !in 0..0xFFFF }) add("No valid read-only DID allowlist is defined.")
-        val requiredIdentityFields = UdsIdentityField.entries.toSet()
-        if (identityDids.size != requiredIdentityFields.size || identityDids.map { it.field }.toSet() != requiredIdentityFields) {
-            add("Identity DID definitions must cover controller family, hardware, OS, calibration, CVN and VIN exactly once.")
+        addAll(compatibilityDefinitionIssues(vehicle))
+        if (!identity.controllerFamily.equals(controllerFamily, ignoreCase = true)) {
+            add("Controller family does not match.")
         }
-        if (identityDids.any { it.did !in 0..0xFFFF || it.did !in readableDids }) add("Every identity DID must be a valid member of the read-only DID allowlist.")
-        if (identityDids.map { it.did }.distinct().size != identityDids.size) add("Identity DID definitions must not repeat a DID.")
-        if (evidenceReference.isBlank()) add("A traceable service-information reference is required.")
+        if (identity.hardwarePartNumber.isNullOrBlank() ||
+            !identity.hardwarePartNumber.equals(hardwarePartNumber, ignoreCase = true)) {
+            add("Hardware part number does not match.")
+        }
+        if (identity.operatingSystemId.isNullOrBlank() ||
+            !identity.operatingSystemId.equals(operatingSystemId, ignoreCase = true)) {
+            add("Operating-system ID does not match.")
+        }
+        if (identity.calibrationId.isNullOrBlank() ||
+            !identity.calibrationId.equals(calibrationId, ignoreCase = true)) {
+            add("Calibration ID does not match.")
+        }
+        if (identity.calibrationVerificationNumber.isNullOrBlank() ||
+            !identity.calibrationVerificationNumber.equals(calibrationVerificationNumber, ignoreCase = true)) {
+            add("CVN does not match.")
+        }
+        if (identity.vin.isNullOrBlank() ||
+            !identity.vin.equals(verifiedVin.trim(), ignoreCase = true)) {
+            add("ECU VIN does not match the VIN validated for this profile.")
+        }
     }
 
     fun allowsDid(did: Int): Boolean = did in readableDids
