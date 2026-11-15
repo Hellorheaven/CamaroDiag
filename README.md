@@ -45,7 +45,7 @@ The calibration catalogue covers all engine profiles currently represented for C
 | Gen 6 | LT1 6.2 V8 | 2016–2024 | GM E92 (profile label; confirm on ECU) |
 | Gen 6 | LT4 6.2 supercharged V8 | 2017–2024 | GM E92 (profile label; confirm on ECU) |
 
-HP Tuners' public vehicle list advertises Camaro coverage for Gen 5 3.6 / 6.2 / 7.0, Gen 6 2.0 (2016 and 2017–2020), 3.6 (2016–2024), and 6.2 (2016 and 2017–2024). This is **HP Tuners' compatibility statement**, not proof that CamaroDiag can read or flash those ECUs. Exact controller support is hardware/software dependent. Sources: [HP Tuners supported vehicles](https://www.hptuners.com/vehicles/) and [HP Tuners supported controller families](https://support.hptuners.com/support/solutions/articles/153000103165-supported-controllers).
+La couverture de ces profils représente les motorisations et années cataloguées dans CamaroDiag. Elle ne garantit pas que chaque combinaison matérielle/logicielle soit déjà prise en charge pour la lecture mémoire ou la programmation. Les références de calculateur doivent être confirmées sur le véhicule, à partir du VIN, du CAL ID, du CVN, du numéro matériel et de l'OS.
 
 The catalogue deliberately treats E-family labels as nominal profile hints. A real operation must identify the installed controller, hardware number, CAL ID, CVN and OS before selecting a binary definition. The Mode 09 CAL ID/CVN read and local file import/export are available as data-handling functions; they do not constitute a binary ECU read or flash.
 
@@ -114,4 +114,4 @@ The full OBD-II scanner is now exposed in the app navigation. It presents suppor
 
 The ECU workspace now inspects raw BIN, Intel HEX and Motorola S-record inputs. Intel HEX and S-record records are checked for structure and format checksums. Two raw BIN images can be compared byte-for-byte, with differing offsets, changed-byte count and file-size differences. Files remain local and can be exported using Android's Storage Access Framework.
 
-These file functions are not an ECU memory read, calibration table editor or ECU flash. Proprietary HP Tuners containers are detected but not decoded. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
+These file functions are not an ECU memory read, calibration table editor or ECU flash. Les conteneurs propriétaires non documentés ne sont pas interprétés. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
