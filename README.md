@@ -137,3 +137,20 @@ The Live screen records values returned by the connected OBD adapter and exports
 CamaroDiag includes an offline table editor for an imported raw BIN image when the user supplies a verified table-definition file for the exact image. The definition specifies each table's byte offset, dimensions, data type, byte order, scaling, bias and optional limits. The original file is preserved and edits create a separate local image.
 
 Live sensor acquisition while the engine is running is separate from editing a calibration file. CamaroDiag does not currently change calibration tables inside the running ECM or live-write calibration changes. No verified Gen 5/Gen 6 table-definition packs are bundled yet, and direct ECM binary read/programming remains unavailable pending exact controller/OS procedures and recovery validation.
+
+
+## Import de cartographies et formats externes
+
+L'import local accepte les fichiers sélectionnés via Android, même lorsque leur conteneur n'est pas décodé. Les formats inspectés sont BIN brut, Intel HEX et Motorola S-record. Les archives ZIP sont reconnues et leurs entrées sont listées dans des limites de sécurité ; elles sont conservées sans extraction automatique. Les fichiers de définition externes (XDF/A2L/XML) et les projets propriétaires non reconnus sont également conservés et peuvent être réexportés tels quels.
+
+L'éditeur de tables ne décode pas encore automatiquement les projets/archives propriétaires ni les définitions XDF/A2L. Pour éditer une cartographie, il faut fournir l'image BIN brute et une définition TSV correspondante (offset, dimensions, type, endian, échelle, biais et limites). Aucun nom de logiciel tiers n'est utilisé comme preuve de compatibilité.
+
+## Version Android et publication
+
+Le fichier racine `version.properties` est l'unique source de vérité :
+- `VERSION_PREFIX=1.6` définit la branche majeure/mineure.
+- `VERSION_CODE_BASE=7` définit la base du numéro Android.
+
+Les builds locaux utilisent `1.6.0` / versionCode `7`. Le workflow de release recherche le plus grand tag `v1.6.N`, calcule le patch suivant, puis injecte ce même patch dans Gradle. Le nom de version de l'APK, le versionCode, le tag Git et le titre de la release sont ainsi cohérents. Les déclenchements manuels utilisent la même règle.
+
+Lors d'un changement de version majeure/mineure, modifier `VERSION_PREFIX` et choisir un `VERSION_CODE_BASE` strictement supérieur au dernier versionCode publié. Ajouter ensuite une entrée de notes de version correspondante dans ce README.
