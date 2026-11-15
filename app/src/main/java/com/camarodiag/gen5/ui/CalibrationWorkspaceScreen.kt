@@ -82,6 +82,8 @@ data class CalibrationWorkspaceState(
     val mapDefinitions: List<CalibrationMapDefinition> = emptyList(),
     val selectedMapId: String? = null,
     val mapValues: List<List<String>> = emptyList(),
+    val mapXAxisValues: List<String> = emptyList(),
+    val mapYAxisValues: List<String> = emptyList(),
     val mapDefinitionsWarnings: List<String> = emptyList(),
     val mapDirty: Boolean = false,
     val mapError: String? = null
@@ -310,6 +312,16 @@ fun CalibrationWorkspaceScreen(
                                 "${definition.id} • offset 0x${definition.fileOffset.toString(16).uppercase()} • ${definition.valueType} • ${definition.endian} • ×${definition.scale} + ${definition.bias} ${definition.unit}",
                                 color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                             )
+                            Text(
+                                if (isFr) "Axe X : ${definition.xAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " valeurs • " + it.unit } ?: "non défini"}"
+                                else "X axis: ${definition.xAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " values • " + it.unit } ?: "not defined"}",
+                                color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                if (isFr) "Axe Y : ${definition.yAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " valeurs • " + it.unit } ?: "non défini"}"
+                                else "Y axis: ${definition.yAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " values • " + it.unit } ?: "not defined"}",
+                                color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+                            )
                         }
                         state.mapDefinitionsWarnings.forEach { warning ->
                             Text(warning, color = CamaroAmber, fontSize = 10.sp)
@@ -324,6 +336,28 @@ fun CalibrationWorkspaceScreen(
                                     color = if (state.mapDirty) CamaroAmber else OkGreen, fontSize = 10.sp
                                 )
                             }
+                            if (state.mapXAxisValues.isNotEmpty()) {
+                                Text(
+                                    if (isFr) "Axe X : ${selectedMap?.xAxis?.unit.orEmpty()}" else "X axis: ${selectedMap?.xAxis?.unit.orEmpty()}",
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
+                                Row(
+                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("X", modifier = Modifier.width(48.dp), color = CamaroAmber, fontSize = 10.sp)
+                                    state.mapXAxisValues.forEach { axisValue ->
+                                        Text(
+                                            axisValue,
+                                            modifier = Modifier.width(88.dp),
+                                            color = CamaroAmber,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
                             LazyColumn(
                                 modifier = Modifier.fillMaxWidth().height(320.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -335,9 +369,11 @@ fun CalibrationWorkspaceScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            "%02d".format(rowIndex),
-                                            modifier = Modifier.width(28.dp),
-                                            color = TextMuted, fontSize = 10.sp
+                                            state.mapYAxisValues.getOrNull(rowIndex) ?: "%02d".format(rowIndex),
+                                            modifier = Modifier.width(48.dp),
+                                            color = CamaroAmber,
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace
                                         )
                                         rowValues.forEachIndexed { columnIndex, value ->
                                             OutlinedTextField(
