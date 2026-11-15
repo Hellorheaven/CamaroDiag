@@ -103,6 +103,7 @@ fun CalibrationWorkspaceScreen(
                             )
                             Text(if (isFr) profile.engine.nameFr else profile.engine.nameEn, color = TextPrimary, fontSize = 12.sp)
                             Text("ECM : ${profile.nominalControllerFamily}", color = TextMuted, fontSize = 11.sp)
+                            Text(if (isFr) profile.notesFr else profile.notesEn, color = TextMuted, fontSize = 10.sp)
                             Text(
                                 if (isFr) "CAL ID/CVN : lecture standard • Dump binaire, édition et écriture : procédure ECU à valider"
                                 else "CAL ID/CVN: standard read • Binary dump, editing and write: ECU procedure must be validated",
