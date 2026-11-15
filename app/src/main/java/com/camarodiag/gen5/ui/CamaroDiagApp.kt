@@ -640,7 +640,17 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
                             }
                         }
                     }
-                    Text(if (isFr) "NON VALIDÉ" else "NOT VERIFIED", color = WarnRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    val availabilityLabel = when (capability.availability) {
+                        ControlAvailability.NOT_VERIFIED -> if (isFr) "NON VALIDÉ" else "NOT VERIFIED"
+                        ControlAvailability.AVAILABLE -> if (isFr) "DISPONIBLE" else "AVAILABLE"
+                        ControlAvailability.NOT_EQUIPPED -> if (isFr) "NON ÉQUIPÉ" else "NOT EQUIPPED"
+                    }
+                    val availabilityColor = when (capability.availability) {
+                        ControlAvailability.NOT_VERIFIED -> WarnRed
+                        ControlAvailability.AVAILABLE -> OkGreen
+                        ControlAvailability.NOT_EQUIPPED -> TextMuted
+                    }
+                    Text(availabilityLabel, color = availabilityColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
