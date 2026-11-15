@@ -100,6 +100,23 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun refusesToOpenProfileWhenSelectedVehicleVinDoesNotMatch() = runBlocking {
+        val transport = FakeCanTransport()
+        val otherVin = "1G1FA1RXXR0123457"
+
+        val error = runCatching {
+            ProfiledUdsReadSession.open(
+                transport = transport,
+                vehicle = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX, vin = otherVin),
+                profile = syntheticReadProfile()
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error?.message?.contains("VIN") == true)
+        assertTrue("No CAN frame may be sent for a mismatched vehicle VIN.", transport.sent.isEmpty())
+    }
+
+    @Test
     fun opensProfiledSessionOnlyAfterReadingAndMatchingEveryIdentityDid() = runBlocking {
         val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
         val responses = listOf(
