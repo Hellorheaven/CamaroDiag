@@ -2,7 +2,6 @@ package com.camarodiag.gen5.data.obd
 
 import java.nio.charset.StandardCharsets
 import java.util.Locale
-import java.util.zip.CRC32
 
 enum class CalibrationFileFormat(val label: String) {
     RAW_BINARY("BIN / raw binary"),
@@ -181,7 +180,7 @@ object CalibrationFileInspector {
             if (encoded.length % 2 != 0) return invalid(CalibrationFileFormat.MOTOROLA_S_RECORD, "Longueur HEX invalide à la ligne ${lineIndex + 1}.", "Odd HEX length at line ${lineIndex + 1}.")
             val bytes = decodeHex(encoded) ?: return invalid(CalibrationFileFormat.MOTOROLA_S_RECORD, "Caractère HEX invalide à la ligne ${lineIndex + 1}.", "Invalid HEX character at line ${lineIndex + 1}.")
             if (bytes.isEmpty() || bytes.size != bytes[0] + 1) return invalid(CalibrationFileFormat.MOTOROLA_S_RECORD, "Champ count incohérent à la ligne ${lineIndex + 1}.", "Count field mismatch at line ${lineIndex + 1}.")
-            if ((bytes.drop(1).sum() and 0xFF) != 0xFF) return invalid(CalibrationFileFormat.MOTOROLA_S_RECORD, "Checksum S-record incorrect à la ligne ${lineIndex + 1}.", "S-record checksum mismatch at line ${lineIndex + 1}.")
+            if ((bytes.sum() and 0xFF) != 0xFF) return invalid(CalibrationFileFormat.MOTOROLA_S_RECORD, "Checksum S-record incorrect à la ligne ${lineIndex + 1}.", "S-record checksum mismatch at line ${lineIndex + 1}.")
             val addressWidth = when (type) {
                 0, 1, 5, 9 -> 2
                 2, 6, 8 -> 3
