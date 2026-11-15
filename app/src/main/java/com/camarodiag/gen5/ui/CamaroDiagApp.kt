@@ -73,9 +73,17 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         viewModel.refreshPairedDevices()
     }
 
+    val bleLocationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.refreshPairedDevices()
+    }
+
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         } else {
             viewModel.refreshPairedDevices()
         }
