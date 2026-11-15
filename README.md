@@ -127,6 +127,10 @@ The ECU workspace imports raw BIN/ORI/MOD, Intel HEX, Motorola S-record, ZIP arc
 The offline table editor works on raw binary images when the user supplies explicit, verified table definitions (offset, dimensions, data type, byte order, scaling and bias). External XDF/A2L/XML-style definitions are preserved as attachments but are not automatically converted into table definitions. Unknown or proprietary project packages are not decoded. These operations are not an ECU memory read or ECU flash. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
 
 
+## Fondation UDS GM en lecture seule
+
+Le module diagnostic contient désormais une base UDS/ISO-TP sur CAN classique pour les services de lecture 0x22 et 0x19/0x02, avec contrôle strict d'un profil lié au VIN et à l'identité exacte du calculateur. Cette base n'est pas encore reliée à un fournisseur CAN/J2534 réel ni à un écran de diagnostic GM étendu. Les adresses/DID GM non vérifiés restent absents ; les essais actuels utilisent un transport simulé.
+
 ## Calibration table editor
 
 The ECU workspace supports offline editing of calibration tables when a matching definition file is supplied. Use the **Export TSV definition template** action, then provide one row per table with these fields:
