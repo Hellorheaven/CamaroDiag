@@ -10,6 +10,7 @@ import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
+import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
@@ -178,6 +179,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value.importedFilePath?.let { previousPath ->
                     if (previousPath != storedFile.absolutePath) runCatching { File(previousPath).delete() }
                 }
+                _calibrationWorkspace.value.comparisonFilePath?.let { comparisonPath ->
+                    runCatching { File(comparisonPath).delete() }
+                }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     importedFileName = displayName,
                     importedFileSize = bytes.size.toLong(),
@@ -191,6 +195,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     inspectionChecksumStatus = inspection.checksumValidation,
                     inspectionAddressRanges = inspection.addressRanges.map { "0x${it.start.toString(16).uppercase()}–0x${it.endInclusive.toString(16).uppercase()} (${it.length} octets)" },
                     inspectionWarnings = inspection.warnings,
+                    comparisonFileName = null,
+                    comparisonFilePath = null,
+                    comparisonFileSize = null,
+                    comparisonSummary = null,
+                    comparisonChangedBytes = null,
+                    comparisonAppendedBytes = null,
+                    comparisonMissingBytes = null,
+                    comparisonRanges = emptyList(),
+                    comparisonIdentical = null,
                     message = "Fichier copié localement. L'analyse de format ne prouve pas sa compatibilité ECU ni la validité d'un checksum GM."
                 )
             } catch (error: Exception) {
@@ -201,8 +214,78 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Imports a second raw BIN image and compares it byte-for-byte with the loaded reference. */
+    fun importComparisonCalibrationFile(uri: Uri) {
+        viewModelScope.launch {
+            var storedFile: File? = null
+            try {
+                val current = _calibrationWorkspace.value
+                require(current.importedFilePath != null && current.inspectionFormat == "BIN / raw binary") {
+                    "Charge d'abord une image de référence BIN brute."
+                }
+                val resolver = getApplication<Application>().contentResolver
+                val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+                    ?: uri.lastPathSegment ?: "modified.bin"
+                val bytes = resolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    var total = 0
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= 32 * 1024 * 1024) { "Fichier trop volumineux (limite locale : 32 Mio)." }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("Impossible d'ouvrir le second fichier.")
+                require(bytes.isNotEmpty()) { "Le fichier sélectionné est vide." }
+                val inspection = CalibrationFileInspector.inspect(displayName, bytes)
+                require(inspection.format.name == "RAW_BINARY") {
+                    "La comparaison octet par octet nécessite un second fichier BIN brut."
+                }
+                val reference = File(current.importedFilePath!!)
+                check(reference.isFile && reference.exists()) { "Le fichier BIN de référence est introuvable." }
+                val referenceBytes = reference.readBytes()
+                val comparison = CalibrationBinaryComparer.compare(referenceBytes, bytes)
+                val storageDir = File(getApplication<Application>().filesDir, "calibrations")
+                check(storageDir.exists() || storageDir.mkdirs()) { "Impossible de créer le dossier local des cartographies." }
+                val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifBlank { "modified.bin" }
+                storedFile = File(storageDir, "comparison_${System.currentTimeMillis()}_${safeName}")
+                storedFile!!.writeBytes(bytes)
+                val summary = when {
+                    comparison.identical -> "Les deux images BIN sont identiques octet par octet."
+                    comparison.referenceSize != comparison.modifiedSize -> "Comparaison de ${comparison.comparedBytes} octets communs ; les tailles des fichiers diffèrent."
+                    else -> "${comparison.changedBytes} octets différents répartis dans ${comparison.changedRanges.size + comparison.omittedRangeCount} zone(s)."
+                }
+                val ranges = comparison.changedRanges.take(25).map {
+                    "0x${it.startOffset.toString(16).uppercase().padStart(8, '0')}–0x${it.endOffsetInclusive.toString(16).uppercase().padStart(8, '0')} (${it.changedBytes} octets)"
+                } + if (comparison.omittedRangeCount > 0) listOf("${comparison.omittedRangeCount} zone(s) supplémentaire(s) non affichées") else emptyList()
+                _calibrationWorkspace.value = current.copy(
+                    comparisonFileName = displayName,
+                    comparisonFilePath = storedFile!!.absolutePath,
+                    comparisonFileSize = bytes.size.toLong(),
+                    comparisonSummary = summary,
+                    comparisonChangedBytes = comparison.changedBytes,
+                    comparisonAppendedBytes = comparison.appendedBytes,
+                    comparisonMissingBytes = comparison.missingBytes,
+                    comparisonRanges = ranges,
+                    comparisonIdentical = comparison.identical,
+                    message = "Comparaison locale terminée. Les écarts ne sont pas interprétés comme des tables moteur et ne valident pas la compatibilité d'un flash."
+                )
+            } catch (error: Exception) {
+                storedFile?.let { runCatching { it.delete() } }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    message = error.localizedMessage ?: "Comparaison des fichiers impossible."
+                )
+            }
+        }
+    }
+
     fun clearCalibrationFile() {
         _calibrationWorkspace.value.importedFilePath?.let { path -> runCatching { File(path).delete() } }
+        _calibrationWorkspace.value.comparisonFilePath?.let { path -> runCatching { File(path).delete() } }
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             importedFileName = null,
             importedFileSize = null,
@@ -216,6 +299,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             inspectionChecksumStatus = null,
             inspectionAddressRanges = emptyList(),
             inspectionWarnings = emptyList(),
+            comparisonFileName = null,
+            comparisonFilePath = null,
+            comparisonFileSize = null,
+            comparisonSummary = null,
+            comparisonChangedBytes = null,
+            comparisonAppendedBytes = null,
+            comparisonMissingBytes = null,
+            comparisonRanges = emptyList(),
+            comparisonIdentical = null,
             message = ""
         )
     }
