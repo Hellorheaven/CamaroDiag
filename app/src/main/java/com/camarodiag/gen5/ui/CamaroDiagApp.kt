@@ -87,6 +87,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         uri?.let { viewModel.importCalibrationFile(it) }
     }
 
+    val calibrationFileExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri?.let { viewModel.exportCalibrationFile(it) }
+    }
+
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
@@ -272,8 +278,14 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         !adapter.deviceName.contains("Simulated", ignoreCase = true) &&
                         adapter.tier != AdapterTier.DISCONNECTED,
                     isFr = isFr,
+                    vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
+                    onExportFile = {
+                        calibrationWorkspace.importedFileName?.let { fileName ->
+                            calibrationFileExporter.launch(fileName)
+                        }
+                    },
                     onClearFile = { viewModel.clearCalibrationFile() }
                 )
                 DiagTab.GUIDE -> HardwareGuideScreen(isFr)
