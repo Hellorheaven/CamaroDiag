@@ -68,6 +68,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val livePids by viewModel.livePids.collectAsState()
     val isStreaming by viewModel.isStreamingLive.collectAsState()
     val liveRecording by viewModel.liveRecordingState.collectAsState()
+    val liveTelemetryMessage by viewModel.liveTelemetryMessage.collectAsState()
     val mileageReport by viewModel.mileageReport.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
@@ -308,6 +309,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isStreaming = isStreaming,
                     isFr = isFr,
                     recording = liveRecording,
+                    telemetryMessage = liveTelemetryMessage,
                     onToggleStream = { viewModel.toggleLiveStream() },
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
@@ -691,6 +693,7 @@ fun LiveDataScreen(
     isStreaming: Boolean,
     isFr: Boolean,
     recording: LiveRecordingState,
+    telemetryMessage: String?,
     onToggleStream: () -> Unit,
     onToggleUnits: () -> Unit,
     onToggleRecording: () -> Unit,
@@ -744,6 +747,9 @@ fun LiveDataScreen(
                         )
                         recording.message.takeIf { it.isNotBlank() }?.let {
                             Text(it, color = TextMuted, fontSize = 11.sp)
+                        }
+                        telemetryMessage?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, color = WarnRed, fontSize = 11.sp)
                         }
                         Text(
                             if (isFr) "Le journal enregistre les valeurs OBD affichées (métrique) avec leur horodatage. Il ne modifie pas les tables du calculateur."
