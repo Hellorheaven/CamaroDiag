@@ -61,7 +61,6 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return result
     }
 
-    /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
     /**
      * Detects 11-bit CAN response identifiers returned to the standard OBD
      * functional request 0100. These are observed response IDs only; they are
@@ -90,6 +89,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         }
     }
 
+    /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
     suspend fun discoverSupportedPids(): Set<Int> {
         val supported = linkedSetOf<Int>()
         var basePid = 0x00
