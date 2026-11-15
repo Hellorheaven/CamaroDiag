@@ -13,13 +13,13 @@ class Obd2FeatureEngineTest {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             commands += command
             when (command) {
-                "0904" -> "490401414243444546474849303132333435"
+                "0904" -> "49040141424344454647483132333435363738"
                 "0906" -> "4906019F3E61C2"
                 else -> "NO DATA"
             }
         })
 
-        assertEquals(listOf("ABCDEFGHI012345"), engine.readCalibrationIds())
+        assertEquals(listOf("ABCDEFGH12345678"), engine.readCalibrationIds())
         assertEquals(listOf("9F3E61C2"), engine.readCalibrationVerificationNumbers())
         assertTrue(commands.containsAll(listOf("0904", "0906")))
     }
