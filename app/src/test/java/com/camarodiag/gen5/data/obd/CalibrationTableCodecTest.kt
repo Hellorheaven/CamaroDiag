@@ -20,6 +20,84 @@ class CalibrationTableCodecTest {
     }
 
     @Test
+    fun parsesCommaSeparatedDefinitionsWithQuotedNamesAndExplicitAxes() {
+        val csv = listOf(
+            "id,name,offset,rows,columns,type,endian,scale,bias,unit,minimum,maximum,x_offset,x_type,x_endian,x_scale,x_bias,x_unit,y_offset,y_type,y_endian,y_scale,y_bias,y_unit",
+            "fuel_main,\"Fuel, main\",0x4,1,2,U16,LE,0.1,0,mg,0,100,0x0,U8,LE,1,0,rpm,0x2,U8,LE,1,0,kPa"
+        ).joinToString("\n")
+
+        val parsed = CalibrationTableCodec.parseDefinitions(csv)
+        val definition = parsed.definitions.single()
+
+        assertEquals("Fuel, main", definition.name)
+        assertEquals(0L, definition.xAxis?.fileOffset)
+        assertEquals(2, definition.xAxis?.count)
+        assertEquals(2L, definition.yAxis?.fileOffset)
+        assertEquals(1, definition.yAxis?.count)
+    }
+
+    @Test
+    fun decodesSeparateXAxisAndYAxisValuesFromBinaryImage() {
+        val csv = listOf(
+            "id;name;offset;rows;columns;type;endian;scale;bias;unit;x_offset;x_type;x_endian;x_scale;x_bias;x_unit;y_offset;y_type;y_endian;y_scale;y_bias;y_unit",
+            "fuel;Fuel table;4;1;2;U16;LE;0.1;0;mg;0;U8;LE;1;0;rpm;2;U8;LE;1;0;kPa"
+        ).joinToString("\n")
+        val definition = CalibrationTableCodec.parseDefinitions(csv).definitions.single()
+        val binary = byteArrayOf(100, 200.toByte(), 30, 40, 100, 0, 200.toByte(), 0)
+
+        val decoded = CalibrationTableCodec.decode(binary, definition)
+
+        assertEquals(listOf(100.0, 200.0), decoded.xAxisValues)
+        assertEquals(listOf(30.0), decoded.yAxisValues)
+        assertEquals(10.0, decoded.values[0][0], 0.0001)
+        assertEquals(20.0, decoded.values[0][1], 0.0001)
+    }
+
+    @Test
+    fun rejectsAxisRangesThatExtendBeyondTheBinaryImage() {
+        val definition = CalibrationMapDefinition(
+            id = "axis-outside", name = "Axis outside", fileOffset = 0, rows = 1, columns = 1,
+            valueType = CalibrationValueType.U8, endian = CalibrationEndian.LITTLE,
+            scale = 1.0, bias = 0.0, unit = "",
+            xAxis = CalibrationAxisDefinition(
+                fileOffset = 4, count = 2, valueType = CalibrationValueType.U16,
+                endian = CalibrationEndian.LITTLE, scale = 1.0, bias = 0.0, unit = ""
+            )
+        )
+
+        assertFalse(runCatching { CalibrationTableCodec.decode(byteArrayOf(1, 2, 3, 4, 5), definition) }.isSuccess)
+    }
+
+    @Test
+    fun rejectsOverflowingDefinitionOffsetsAndOversizedDirectDefinitions() {
+        val overflow = CalibrationMapDefinition(
+            id = "overflow", name = "Overflow", fileOffset = Long.MAX_VALUE - 1,
+            rows = 1, columns = 2, valueType = CalibrationValueType.U32,
+            endian = CalibrationEndian.LITTLE, scale = 1.0, bias = 0.0, unit = ""
+        )
+        val oversized = CalibrationMapDefinition(
+            id = "oversized", name = "Oversized", fileOffset = 0,
+            rows = 256, columns = 256, valueType = CalibrationValueType.U8,
+            endian = CalibrationEndian.LITTLE, scale = 1.0, bias = 0.0, unit = ""
+        )
+
+        assertFalse(runCatching { CalibrationTableCodec.decode(ByteArray(32), overflow) }.isSuccess)
+        assertFalse(runCatching { CalibrationTableCodec.decode(ByteArray(65_536), oversized) }.isSuccess)
+    }
+
+    @Test
+    fun rejectsNonFiniteFloatValuesWhenDecoding() {
+        val definition = CalibrationMapDefinition(
+            id = "float", name = "Float", fileOffset = 0, rows = 1, columns = 1,
+            valueType = CalibrationValueType.F32, endian = CalibrationEndian.LITTLE,
+            scale = 1.0, bias = 0.0, unit = ""
+        )
+        val nanBytes = byteArrayOf(0x00, 0x00, 0xC0.toByte(), 0x7F)
+
+        assertFalse(runCatching { CalibrationTableCodec.decode(nanBytes, definition) }.isSuccess)
+    }
+
+    @Test
     fun decodesAndEditsLittleEndianU16WithoutChangingOtherBytes() {
         val definition = CalibrationMapDefinition(
             id = "fuel", name = "Fuel", fileOffset = 2, rows = 1, columns = 2,
