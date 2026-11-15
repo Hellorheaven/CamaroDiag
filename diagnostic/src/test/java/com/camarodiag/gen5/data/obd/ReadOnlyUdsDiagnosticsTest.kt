@@ -133,13 +133,17 @@ class ReadOnlyUdsDiagnosticsTest {
 
     @Test
     fun rejectsProfileWhenEcuReportsDifferentCalibrationBeforeOpeningSession() = runBlocking {
+        val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
         val transport = FakeCanTransport(
             listOf(
                 singleFrameResponse(0x0101, "BCM".toByteArray(Charsets.US_ASCII)),
                 singleFrameResponse(0x0102, "HW1".toByteArray(Charsets.US_ASCII)),
                 singleFrameResponse(0x0103, "OS1".toByteArray(Charsets.US_ASCII)),
                 singleFrameResponse(0x0104, "CAL1".toByteArray(Charsets.US_ASCII)),
-                singleFrameResponse(0x0105, byteArrayOf(0xFF.toByte(), 0xEE.toByte()))
+                singleFrameResponse(0x0105, byteArrayOf(0xFF.toByte(), 0xEE.toByte())),
+                CanFrame(0x7A8, byteArrayOf(0x10, 0x14, 0x62, 0x01, 0x06, vin[0], vin[1], vin[2])),
+                CanFrame(0x7A8, byteArrayOf(0x21, vin[3], vin[4], vin[5], vin[6], vin[7], vin[8], vin[9])),
+                CanFrame(0x7A8, byteArrayOf(0x22, vin[10], vin[11], vin[12], vin[13], vin[14], vin[15], vin[16]))
             )
         )
 
