@@ -14,8 +14,11 @@ class CamaroUdsProtocolTest {
 
     @Test
     fun parsesOdometerPidsWithTenthKilometreResolution() {
-        assertEquals(123456.7, CamaroUdsProtocol.parseOdometerPidA6("41 A6 00 12 D6 87"), 0.01)
-        assertEquals(123456.7, CamaroUdsProtocol.parseOdometerPidD3("41 D3 00 12 D6 87"), 0.01)
+        val pidA6 = requireNotNull(CamaroUdsProtocol.parseOdometerPidA6("41 A6 00 12 D6 87"))
+        val pidD3 = requireNotNull(CamaroUdsProtocol.parseOdometerPidD3("41 D3 00 12 D6 87"))
+
+        assertEquals(123456.7, pidA6, 0.01)
+        assertEquals(123456.7, pidD3, 0.01)
     }
 
     @Test
