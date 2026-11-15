@@ -432,7 +432,7 @@ fun AdapterScreen(
                     }
                     if (usbDevices.isEmpty()) Text(if (isFr) "Aucun adaptateur série USB détecté." else "No USB serial adapter detected.", color = TextMuted)
                     usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, modifier = Modifier.fillMaxWidth()) { Text("Connecter : $label") } }
-                    Divider(color = TextMuted.copy(alpha = .25f))
+                    HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                     Text(if (isFr) "Connexion Wi-Fi ELM327" else "Wi-Fi ELM327 connection", fontWeight = FontWeight.Bold)
                     OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(if (isFr) "Adresse IP de l'adaptateur" else "Adapter IP address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text("Port TCP (souvent 35000 ou 23)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
