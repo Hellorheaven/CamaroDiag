@@ -41,6 +41,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String) {
     DTCS("DTCs", "Défauts"),
     MILEAGE("Mileage", "Odomètre"),
     CALIBRATION("ECU / Maps", "ECU / Cartographie"),
+    OBD_SCAN("Full OBD Scan", "Scan OBD complet"),
     GUIDE("Guide", "Guide"),
     CONTROL("Controls", "Pilotage"),
     SETTINGS("Settings", "Réglages")
@@ -63,6 +64,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val mileageReport by viewModel.mileageReport.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
+    val obdScanReport by viewModel.obdScanReport.collectAsState()
+    val obdScanMessage by viewModel.obdScanMessage.collectAsState()
+    val isObdScanning by viewModel.isObdScanning.collectAsState()
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
@@ -270,6 +274,16 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 })
                 DiagTab.DTCS -> DtcScreen(dtcs, isFr, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, isFr, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.OBD_SCAN -> ObdScanScreen(
+                    report = obdScanReport,
+                    isScanning = isObdScanning,
+                    message = obdScanMessage,
+                    isConnected = adapter.tier != AdapterTier.DISCONNECTED &&
+                        !adapter.deviceName.contains("Demo", ignoreCase = true) &&
+                        !adapter.deviceName.contains("Simulated", ignoreCase = true),
+                    isFr = isFr,
+                    onRunScan = { viewModel.runFullObdScan() }
+                )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
                     vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.generation.label}",
