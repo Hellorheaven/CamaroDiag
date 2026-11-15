@@ -46,9 +46,21 @@ object CamaroUdsProtocol {
     }
 
     fun buildTopology(vehicle: VehicleProfile, adapter: AdapterCapabilities): List<EcuModule> {
+        // Standard powertrain OBD access depends on a selected CAN-capable adapter.
+        // BCM/TCM/IPC/EBCM/SDM remain undiscovered until a VIN-specific profile exists.
+        val standardObdAvailable =
+            adapter.tier != AdapterTier.DISCONNECTED && adapter.supportsCanHeaders
+        val ecmStatus = if (standardObdAvailable) {
+            ModuleStatus.ACCESSIBLE
+        } else {
+            ModuleStatus.UNSUPPORTED_BY_ADAPTER
+        }
+        val ecmTxHeader = if (standardObdAvailable) "7DF" else ""
+        val ecmRxHeader = if (standardObdAvailable) "7E8" else ""
+
         if (vehicle.generation == CamaroGeneration.GEN6) {
             return listOf(
-                EcuModule("ECM", "ECM", "Engine Control Module (${vehicle.engine.ecmType})", "Calculateur moteur (${vehicle.engine.ecmType})", "7E0", "7E8", CanBusType.HS_CAN, ModuleStatus.ACCESSIBLE, notesEn = "Standard OBD-II powertrain access. Enhanced GM services and exact ECU addressing depend on model year, calibration and adapter.", notesFr = "Accès groupe motopropulseur OBD-II standard. Les services GM étendus et l'adressage exact dépendent de l'année, de la calibration et de l'interface."),
+                EcuModule("ECM", "ECM", "Engine Control Module (${vehicle.engine.ecmType})", "Calculateur moteur (${vehicle.engine.ecmType})", ecmTxHeader, ecmRxHeader, CanBusType.HS_CAN, ecmStatus, notesEn = "Standard OBD-II functional request/response example (7DF/7E8 on 11-bit CAN). This does not define a GM enhanced physical diagnostic address or authorize enhanced services.", notesFr = "Exemple de requête/réponse OBD-II fonctionnelle (7DF/7E8 sur CAN 11 bits). Ceci ne définit pas une adresse physique GM étendue et n'autorise pas les services constructeur."),
                 EcuModule("TCM", "TCM", "Transmission Control Module", "Calculateur de transmission", "", "", CanBusType.UNKNOWN, if (vehicle.transmission == TransmissionType.MANUAL) ModuleStatus.NOT_EQUIPPED else ModuleStatus.DISCOVERY_REQUIRED, notesEn = "Module address and supported services must be discovered on the vehicle; not assumed from Gen 5 topology.", notesFr = "Adresse et services à découvrir sur le véhicule ; aucune adresse Gen 5 n'est réutilisée par hypothèse."),
                 EcuModule("BCM", "BCM", "Body Control Module", "Calculateur habitacle", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = if (vehicle.modelYear <= 2018) "GM bulletin 07-08-49-020M lists the BCM as the Camaro odometer storage module through 2018. Diagnostic address and read DID still require VIN-specific verification." else "For 2019–2024, confirm the odometer storage architecture and diagnostic identifiers for this VIN before reading.", notesFr = if (vehicle.modelYear <= 2018) "Le bulletin GM 07-08-49-020M désigne le BCM comme module de stockage du kilométrage Camaro jusqu'en 2018. L'adresse de diagnostic et le DID de lecture restent à vérifier selon le VIN." else "Pour 2019–2024, confirmer l'architecture de stockage et les identifiants de diagnostic de ce VIN avant toute lecture."),
                 EcuModule("IPC", "IPC", "Instrument Panel Cluster", "Combiné d'instruments", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "Secondary odometer storage is described in 2012 Camaro service information; verify the exact module data and VIN relationship before comparing.", notesFr = "Le stockage secondaire du kilométrage est décrit dans la documentation d'atelier Camaro 2012 ; vérifier les données du module et la relation VIN avant comparaison."),
@@ -58,7 +70,7 @@ object CamaroUdsProtocol {
         }
         val tcmStatus = if (vehicle.transmission == TransmissionType.AUTOMATIC) ModuleStatus.DISCOVERY_REQUIRED else ModuleStatus.NOT_EQUIPPED
         return listOf(
-            EcuModule("ECM", "ECM", "Engine Control Module (${vehicle.engine.ecmType})", "Calculateur moteur (${vehicle.engine.ecmType})", "7E0", "7E8", CanBusType.HS_CAN, ModuleStatus.ACCESSIBLE, notesEn = "Standard OBD-II powertrain diagnostics. Enhanced GM data identifiers are vehicle/calibration-specific.", notesFr = "Diagnostic OBD-II standard du groupe motopropulseur. Les identifiants GM étendus dépendent du véhicule et de sa calibration."),
+            EcuModule("ECM", "ECM", "Engine Control Module (${vehicle.engine.ecmType})", "Calculateur moteur (${vehicle.engine.ecmType})", ecmTxHeader, ecmRxHeader, CanBusType.HS_CAN, ecmStatus, notesEn = "Standard OBD-II functional request/response example (7DF/7E8 on 11-bit CAN). This does not define a GM enhanced physical diagnostic address or authorize enhanced services.", notesFr = "Exemple de requête/réponse OBD-II fonctionnelle (7DF/7E8 sur CAN 11 bits). Ceci ne définit pas une adresse physique GM étendue et n'autorise pas les services constructeur."),
             EcuModule("TCM", "TCM", "Transmission Control Module", "Calculateur de boîte", "", "", CanBusType.UNKNOWN, tcmStatus, notesEn = "Presence, address and supported data must be discovered on the vehicle.", notesFr = "Présence, adresse et données prises en charge à identifier sur le véhicule."),
             EcuModule("EBCM", "ABS", "Electronic Brake Control Module", "Calculateur ABS / StabiliTrak", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "GM enhanced addressing is not assumed; perform a verified module scan.", notesFr = "L'adressage GM étendu n'est pas supposé ; effectuer une identification réelle du calculateur."),
             EcuModule("BCM", "BCM", "Body Control Module", "Calculateur habitacle", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "GM bulletin 07-08-49-020I identifies the BCM as the Camaro odometer storage module for 2010–2015. Exact diagnostic addressing and read DID are not assumed.", notesFr = "Le bulletin GM 07-08-49-020I identifie le BCM comme module de stockage du kilométrage Camaro 2010–2015. L'adressage de diagnostic et le DID de lecture ne sont pas supposés."),
