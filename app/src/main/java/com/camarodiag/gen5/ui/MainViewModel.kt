@@ -151,8 +151,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val validCvn = cvns.isNotEmpty()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
-                    calibrationIdResponse = calIds.joinToString("\\n").ifBlank { "Non disponible" },
-                    cvnResponse = cvns.joinToString("\\n").ifBlank { "Non disponible" },
+                    calibrationIdResponse = calIds.joinToString("\n").ifBlank { "Non disponible" },
+                    cvnResponse = cvns.joinToString("\n").ifBlank { "Non disponible" },
                     message = if (validCal || validCvn) {
                         "CAL ID / CVN décodés depuis Mode 09. Ils identifient le logiciel mais ne constituent pas une lecture de cartographie binaire."
                     } else {
