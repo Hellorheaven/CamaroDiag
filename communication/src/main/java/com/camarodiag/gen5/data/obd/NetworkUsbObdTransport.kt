@@ -181,15 +181,3 @@ class UsbPermissionReceiver : BroadcastReceiver() {
         const val ACTION = "com.camarodiag.gen5.USB_PERMISSION"
     }
 }
-
-/** Extension point for vendor-specific J2534/VCX implementations. No generic J2534 Android API exists. */
-interface VxdiagAndroidProvider {
-
-    val modelName: String
-
-    suspend fun open(): Result<Unit>
-
-    suspend fun exchange(request: ByteArray): Result<ByteArray>
-
-    fun close()
-}
