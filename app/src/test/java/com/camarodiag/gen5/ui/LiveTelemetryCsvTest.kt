@@ -25,7 +25,7 @@ class LiveTelemetryCsvTest {
         val lines = csv.trim().lines()
         assertEquals("timestamp_ms,vin,vehicle,pid,label,value,unit", lines.first())
         assertEquals(3, lines.size)
-        assertTrue(lines[1].contains(",RPM,"))
+        assertTrue(lines[1].contains(",\"RPM\","))
         assertTrue(lines[1].contains(",1726.00000,"))
         assertTrue(lines[2].contains(",91.50000,"))
     }
