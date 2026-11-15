@@ -223,6 +223,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
                         DiagTab.CALIBRATION,
+                        DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.SETTINGS
