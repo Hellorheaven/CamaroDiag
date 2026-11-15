@@ -45,7 +45,14 @@ data class CalibrationWorkspaceState(
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
     val importedFilePreview: String? = null,
-    val importedFilePath: String? = null
+    val importedFilePath: String? = null,
+    val inspectionFormat: String? = null,
+    val inspectionSummary: String? = null,
+    val inspectionPayloadBytes: Long? = null,
+    val inspectionRecordCount: Int? = null,
+    val inspectionChecksumStatus: String? = null,
+    val inspectionAddressRanges: List<String> = emptyList(),
+    val inspectionWarnings: List<String> = emptyList()
 )
 
 @Composable
@@ -174,6 +181,16 @@ fun CalibrationWorkspaceScreen(
                         Text(state.importedFileSha256.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                         Text(if (isFr) "Aperçu hexadécimal (64 premiers octets)" else "Hex preview (first 64 bytes)", color = TextMuted, fontSize = 11.sp)
                         Text(state.importedFilePreview.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                        state.inspectionFormat?.let { format ->
+                            HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                            Text(if (isFr) "Analyse du fichier : $format" else "File inspection: $format", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(state.inspectionSummary.orEmpty(), color = TextPrimary, fontSize = 12.sp)
+                            state.inspectionPayloadBytes?.let { Text(if (isFr) "Données utiles : $it octets" else "Payload: $it bytes", color = TextMuted, fontSize = 11.sp) }
+                            state.inspectionRecordCount?.takeIf { it > 0 }?.let { Text(if (isFr) "Enregistrements : $it" else "Records: $it", color = TextMuted, fontSize = 11.sp) }
+                            Text(if (isFr) "Contrôle d'intégrité du format : ${state.inspectionChecksumStatus}" else "Format checksum validation: ${state.inspectionChecksumStatus}", color = TextMuted, fontSize = 11.sp)
+                            state.inspectionAddressRanges.forEach { range -> Text(range, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp) }
+                            state.inspectionWarnings.forEach { warning -> Text("• $warning", color = CamaroAmber, fontSize = 10.sp) }
+                        }
                         OutlinedButton(onClick = onExportFile, modifier = Modifier.fillMaxWidth()) {
                             androidx.compose.material3.Icon(Icons.Default.CloudUpload, contentDescription = null)
                             Text(if (isFr) "Exporter / télécharger le fichier" else "Export / download file")
