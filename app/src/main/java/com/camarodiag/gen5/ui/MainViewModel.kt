@@ -548,48 +548,88 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun connectWithResult(
+        connect: suspend () -> Result<AdapterCapabilities>,
+        fallbackMessage: String
+    ) {
+        viewModelScope.launch {
+            _isBusy.value = true
+            _connectionMessage.value = null
+            try {
+                connect()
+                    .onSuccess { capabilities ->
+                        _adapter.value = capabilities
+                        refreshTopologyAndDefaults()
+                    }
+                    .onFailure { error ->
+                        _connectionMessage.value = error.localizedMessage ?: fallbackMessage
+                    }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _connectionMessage.value = error.localizedMessage ?: fallbackMessage
+            } finally {
+                _isBusy.value = false
+            }
+        }
+    }
+
     fun refreshPairedDevices() {
         viewModelScope.launch {
-            _pairedDevices.value = obdManager.getPairedDevices()
-            _usbDevices.value = obdManager.getUsbDevices()
-            val nearbyBle = obdManager.scanNearbyBleDevices()
-            _pairedDevices.value = (_pairedDevices.value + nearbyBle)
-                .distinctBy { it.second }
-                .sortedByDescending { it.first.contains("OBD", true) || it.first.contains("ELM", true) || it.first.contains("vLinker", true) }
+            try {
+                _pairedDevices.value = obdManager.getPairedDevices()
+                _usbDevices.value = obdManager.getUsbDevices()
+                val nearbyBle = obdManager.scanNearbyBleDevices()
+                _pairedDevices.value = (_pairedDevices.value + nearbyBle)
+                    .distinctBy { it.second }
+                    .sortedByDescending {
+                        it.first.contains("OBD", true) ||
+                            it.first.contains("ELM", true) ||
+                            it.first.contains("vLinker", true)
+                    }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _connectionMessage.value = error.localizedMessage ?: "Actualisation des interfaces impossible."
+            }
         }
     }
 
     fun connectWifi(host: String, port: Int) {
-        viewModelScope.launch {
-            _isBusy.value = true
-            _connectionMessage.value = null
-            obdManager.connectWifi(host.trim(), port).onSuccess { caps -> _adapter.value = caps; refreshTopologyAndDefaults() }
-                .onFailure { _connectionMessage.value = it.localizedMessage ?: "Wi-Fi OBD connection failed" }
-            _isBusy.value = false
-        }
+        connectWithResult(
+            connect = { obdManager.connectWifi(host.trim(), port) },
+            fallbackMessage = "Wi-Fi OBD connection failed"
+        )
     }
 
     fun connectUsb(deviceLabel: String) {
         val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
-        if (id == null) { _connectionMessage.value = "USB device identifier unavailable"; return }
-        viewModelScope.launch {
-            _isBusy.value = true
-            _connectionMessage.value = null
-            val baudRate = if (deviceLabel.contains("OBDLink", true)) 115200 else 38400
-            obdManager.connectUsb(id, baudRate).onSuccess { caps -> _adapter.value = caps; refreshTopologyAndDefaults() }
-                .onFailure { _connectionMessage.value = it.localizedMessage ?: "USB OBD connection failed" }
-            _isBusy.value = false
+        if (id == null) {
+            _connectionMessage.value = "USB device identifier unavailable"
+            return
         }
+        val baudRate = if (deviceLabel.contains("OBDLink", true)) 115200 else 38400
+        connectWithResult(
+            connect = { obdManager.connectUsb(id, baudRate) },
+            fallbackMessage = "USB OBD connection failed"
+        )
     }
 
     fun selectSimulatedAdapter(preset: String) {
         viewModelScope.launch {
             _isBusy.value = true
-            val caps = obdManager.activateSimulatedAdapter(preset)
-            _adapter.value = caps
-            _connectionMessage.value = null
-            refreshTopologyAndDefaults()
-            _isBusy.value = false
+            try {
+                val caps = obdManager.activateSimulatedAdapter(preset)
+                _adapter.value = caps
+                _connectionMessage.value = null
+                refreshTopologyAndDefaults()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _connectionMessage.value = error.localizedMessage ?: "Activation du mode simulation impossible."
+            } finally {
+                _isBusy.value = false
+            }
         }
     }
 
@@ -599,18 +639,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _connectionMessage.value = "OBDLink CX détecté en BLE, mais le fabricant indique qu’il n’est pas compatible avec les véhicules GM. Utilisez MX+, MX, LX ou une interface GM compatible."
             return
         }
-        viewModelScope.launch {
-            _isBusy.value = true
-            _connectionMessage.value = null
-            val res = obdManager.connectAndProbe(macAddress)
-            res.onSuccess { caps ->
-                _adapter.value = caps
-                refreshTopologyAndDefaults()
-            }.onFailure { err ->
-                _connectionMessage.value = err.localizedMessage ?: "Bluetooth SPP connection failed"
-            }
-            _isBusy.value = false
-        }
+        connectWithResult(
+            connect = { obdManager.connectAndProbe(macAddress) },
+            fallbackMessage = "Bluetooth SPP connection failed"
+        )
     }
 
     fun toggleLiveStream() {
