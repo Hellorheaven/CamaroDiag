@@ -1,4 +1,10 @@
-plugins { id("com.android.library"); id("org.jetbrains.kotlin.android"); id("com.google.devtools.ksp") }
+
+plugins {
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
+    id("com.google.devtools.ksp")
+}
+
 android {
     namespace = "com.camarodiag.storage"
     compileSdk = 36
@@ -16,10 +22,15 @@ android {
         jvmTarget = "17"
     }
 }
+
 dependencies {
     api(project(":core"))
-    implementation("androidx.room:room-runtime:2.6.1")
+
+    // Exposé aux modules qui utilisent DiagnosticDatabase
+    api("androidx.room:room-runtime:2.6.1")
+
     implementation("androidx.room:room-ktx:2.6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
     ksp("androidx.room:room-compiler:2.6.1")
 }
