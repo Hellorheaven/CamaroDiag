@@ -106,7 +106,14 @@ class ReadOnlyUdsDiagnosticsTest {
             operatingSystemId = "OS-123",
             calibrationId = "CAL-123",
             calibrationVerificationNumber = "CVN-123",
-            readableDids = setOf(0xF190),
+            readableDids = setOf(0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106),
+            identityDids = listOf(
+                UdsIdentityDidDefinition(UdsIdentityField.HARDWARE_PART_NUMBER, 0x0101, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.OPERATING_SYSTEM_ID, 0x0102, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_ID, 0x0103, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER, 0x0104, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.VIN, 0x0105, UdsIdentityEncoding.ASCII)
+            ),
             verifiedVin = "1G1FA1RXXR0123456",
             evidenceReference = "GM service document reference supplied for this exact vehicle"
         )
@@ -116,9 +123,98 @@ class ReadOnlyUdsDiagnosticsTest {
 
         assertTrue(profile.compatibilityIssues(vehicle, matching).isEmpty())
         assertTrue(profile.compatibilityIssues(vehicle, mismatching).any { it.contains("CVN") })
-        assertTrue(profile.allowsDid(0xF190))
-        assertTrue(!profile.allowsDid(0xF187))
+        assertTrue(profile.allowsDid(0x0105))
+        assertTrue(!profile.allowsDid(0x0107))
     }
+
+    @Test
+    fun opensProfiledSessionOnlyAfterReadingAndMatchingAllIdentityDids() = runBlocking {
+        val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
+        val responses = listOf(
+            singleFrameResponse(0x0101, "HW-123".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0102, "OS-123".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0103, "CAL-123".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0104, "CVN-123".toByteArray(Charsets.US_ASCII)),
+            CanFrame(0x7A8, byteArrayOf(0x10, 0x14, 0x62, 0x01, 0x05, vin[0], vin[1], vin[2])),
+            CanFrame(0x7A8, byteArrayOf(0x21, vin[3], vin[4], vin[5], vin[6], vin[7], vin[8], vin[9])),
+            CanFrame(0x7A8, byteArrayOf(0x22, vin[10], vin[11], vin[12], vin[13], vin[14], vin[15], vin[16])),
+            singleFrameResponse(0x0106, byteArrayOf(0x55))
+        )
+        val transport = FakeCanTransport(responses)
+        val profile = syntheticReadProfile()
+
+        val session = ProfiledUdsReadSession.open(
+            transport = transport,
+            vehicle = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456"),
+            profile = profile
+        )
+
+        assertEquals("HW-123", session.identity.hardwarePartNumber)
+        assertEquals("OS-123", session.identity.operatingSystemId)
+        assertEquals("CAL-123", session.identity.calibrationId)
+        assertEquals("CVN-123", session.identity.calibrationVerificationNumber)
+        assertEquals("1G1FA1RXXR0123456", session.identity.vin)
+        assertArrayEquals(byteArrayOf(0x55), session.readDid(0x0106))
+        assertTrue(runCatching { session.readDid(0x0107) }.isFailure)
+    }
+
+    @Test
+    fun rejectsProfileWhenTheEcuReportsDifferentCalibrationBeforeOpeningSession() = runBlocking {
+        val transport = FakeCanTransport(
+            listOf(
+                singleFrameResponse(0x0101, "HW-123".toByteArray(Charsets.US_ASCII)),
+                singleFrameResponse(0x0102, "OS-123".toByteArray(Charsets.US_ASCII)),
+                singleFrameResponse(0x0103, "CAL-123".toByteArray(Charsets.US_ASCII)),
+                singleFrameResponse(0x0104, "WRONG-CVN".toByteArray(Charsets.US_ASCII))
+            )
+        )
+
+        val error = runCatching {
+            ProfiledUdsReadSession.open(
+                transport = transport,
+                vehicle = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456"),
+                profile = syntheticReadProfile()
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error?.message?.contains("CVN") == true)
+    }
+
+    private fun singleFrameResponse(did: Int, value: ByteArray): CanFrame {
+        val payload = byteArrayOf(
+            0x62,
+            (did shr 8).toByte(),
+            did.toByte()
+        ) + value
+        require(payload.size <= 7)
+        return CanFrame(0x7A8, byteArrayOf(payload.size.toByte()) + payload)
+    }
+
+    private fun syntheticReadProfile() = DocumentedUdsReadProfile(
+        profileId = "synthetic-test-profile",
+        moduleId = "BCM",
+        generation = CamaroGeneration.GEN5,
+        modelYears = 2012..2015,
+        engineRpo = "LFX",
+        controllerFamily = "BCM-family-example",
+        requestCanId = 0x7A0,
+        responseCanId = 0x7A8,
+        extendedCanId = false,
+        hardwarePartNumber = "HW-123",
+        operatingSystemId = "OS-123",
+        calibrationId = "CAL-123",
+        calibrationVerificationNumber = "CVN-123",
+        readableDids = setOf(0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106),
+        identityDids = listOf(
+            UdsIdentityDidDefinition(UdsIdentityField.HARDWARE_PART_NUMBER, 0x0101, UdsIdentityEncoding.ASCII),
+            UdsIdentityDidDefinition(UdsIdentityField.OPERATING_SYSTEM_ID, 0x0102, UdsIdentityEncoding.ASCII),
+            UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_ID, 0x0103, UdsIdentityEncoding.ASCII),
+            UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER, 0x0104, UdsIdentityEncoding.ASCII),
+            UdsIdentityDidDefinition(UdsIdentityField.VIN, 0x0105, UdsIdentityEncoding.ASCII)
+        ),
+        verifiedVin = "1G1FA1RXXR0123456",
+        evidenceReference = "Synthetic unit-test fixture; not a real vehicle definition"
+    )
 
     @Test
     fun rejectsInvalidCanIdentifiersAndPayloadLengths() {
