@@ -45,6 +45,10 @@ class BluetoothObdManager(context: Context) {
     var isDemoMode: Boolean = true
         private set
 
+    /** True only after the user explicitly selects a simulated adapter profile. */
+    var isSimulationActive: Boolean = false
+        private set
+
     @SuppressLint("MissingPermission")
     fun getPairedDevices(): List<Pair<String, String>> {
         return try {
@@ -160,6 +164,7 @@ class BluetoothObdManager(context: Context) {
     suspend fun activateSimulatedAdapter(preset: String): AdapterCapabilities = withContext(Dispatchers.Default) {
         disconnect()
         isDemoMode = true
+        isSimulationActive = true
         delay(350)
         when (preset) {
             "MX_PLUS" -> CamaroUdsProtocol.evaluateAdapterProbe(
@@ -251,6 +256,7 @@ class BluetoothObdManager(context: Context) {
             socket = null
             activeTransport = "BLUETOOTH"
             isDemoMode = true
+            isSimulationActive = false
         }
     }
 }
