@@ -255,6 +255,25 @@ class UdsReadOnlyClient(
     }
 }
 
+enum class UdsIdentityField {
+    HARDWARE_PART_NUMBER,
+    OPERATING_SYSTEM_ID,
+    CALIBRATION_ID,
+    CALIBRATION_VERIFICATION_NUMBER,
+    VIN
+}
+
+enum class UdsIdentityEncoding {
+    ASCII,
+    HEX
+}
+
+data class UdsIdentityDidDefinition(
+    val field: UdsIdentityField,
+    val did: Int,
+    val encoding: UdsIdentityEncoding
+)
+
 /**
  * A profile becomes usable only when exact module, vehicle, hardware, operating-system,
  * calibration, CVN and VIN values match and a traceable evidence reference is present.
@@ -274,9 +293,28 @@ data class DocumentedUdsReadProfile(
     val calibrationId: String,
     val calibrationVerificationNumber: String,
     val readableDids: Set<Int>,
+    val identityDids: List<UdsIdentityDidDefinition>,
     val verifiedVin: String,
     val evidenceReference: String
 ) {
+    fun compatibilityDefinitionIssues(vehicle: VehicleProfile): List<String> = buildList {
+        if (profileId.isBlank()) add("Profile ID is missing.")
+        if (moduleId.isBlank()) add("Module ID is missing.")
+        if (vehicle.generation != generation || vehicle.modelYear !in modelYears) add("Model year/generation does not match.")
+        if (!vehicle.engine.rpo.equals(engineRpo, ignoreCase = true)) add("Engine RPO does not match.")
+        if (hardwarePartNumber.isBlank() || operatingSystemId.isBlank() || calibrationId.isBlank() ||
+            calibrationVerificationNumber.isBlank()) add("Exact hardware, OS, calibration and CVN values are required.")
+        if (verifiedVin.length != 17) add("A 17-character VIN must be assigned to this profile.")
+        val maxCanId = if (extendedCanId) 0x1FFFFFFF else 0x7FF
+        if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) add("CAN addressing is invalid.")
+        if (readableDids.isEmpty() || readableDids.any { it !in 0..0xFFFF }) add("No valid read-only DID allowlist is defined.")
+        val requiredIdentityFields = UdsIdentityField.entries.toSet()
+        if (identityDids.map { it.field }.toSet() != requiredIdentityFields) add("Identity DID definitions must cover all five identity fields.")
+        if (identityDids.any { it.did !in 0..0xFFFF || it.did !in readableDids }) add("Identity DIDs must be included in the read-only allowlist.")
+        if (identityDids.map { it.did }.distinct().size != identityDids.size) add("Identity DID definitions must not repeat a DID.")
+        if (evidenceReference.isBlank()) add("A traceable service-information reference is required.")
+    }
+
     fun compatibilityIssues(vehicle: VehicleProfile, identity: UdsEcuIdentity): List<String> = buildList {
         if (profileId.isBlank()) add("Profile ID is missing.")
         if (moduleId.isBlank()) add("Module ID is missing.")
@@ -291,13 +329,100 @@ data class DocumentedUdsReadProfile(
         val maxCanId = if (extendedCanId) 0x1FFFFFFF else 0x7FF
         if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) add("CAN addressing is invalid.")
         if (readableDids.isEmpty() || readableDids.any { it !in 0..0xFFFF }) add("No valid read-only DID allowlist is defined.")
+        val requiredIdentityFields = UdsIdentityField.entries.toSet()
+        if (identityDids.map { it.field }.toSet() != requiredIdentityFields) add("Identity DID definitions must cover hardware, OS, calibration, CVN and VIN.")
+        if (identityDids.any { it.did !in 0..0xFFFF || it.did !in readableDids }) add("Every identity DID must be a valid member of the read-only DID allowlist.")
+        if (identityDids.map { it.did }.distinct().size != identityDids.size) add("Identity DID definitions must not repeat a DID.")
         if (evidenceReference.isBlank()) add("A traceable service-information reference is required.")
     }
 
     fun allowsDid(did: Int): Boolean = did in readableDids
 }
 
-data class UdsEcuIdentity(
+/**
+ * A verified, read-only UDS session. It is created only after the profile has
+ * read back every identity DID and matched exact vehicle/controller identifiers.
+ */
+class ProfiledUdsReadSession private constructor(
+    val profile: DocumentedUdsReadProfile,
+    val identity: UdsEcuIdentity,
+    private val client: UdsReadOnlyClient
+) {
+    suspend fun readDid(did: Int): ByteArray {
+        require(profile.allowsDid(did)) {
+            "DID 0x" + did.toString(16).uppercase(Locale.ROOT) + " is not in this profile's read-only allowlist."
+        }
+        return client.readDataByIdentifier(did)
+    }
+
+    suspend fun readDtcInformation(statusMask: Int = 0xFF): ByteArray =
+        client.readDtcInformation(statusMask)
+
+    companion object {
+        suspend fun open(
+            transport: RawCanFrameTransport,
+            vehicle: VehicleProfile,
+            profile: DocumentedUdsReadProfile,
+            timeoutMs: Long = 3000L
+        ): ProfiledUdsReadSession {
+            val issuesBeforeReading = profile.compatibilityDefinitionIssues(vehicle)
+            require(issuesBeforeReading.isEmpty()) {
+                "UDS read profile rejected: " + issuesBeforeReading.joinToString("; ")
+            }
+            val client = UdsReadOnlyClient(
+                transport = transport,
+                requestCanId = profile.requestCanId,
+                responseCanId = profile.responseCanId,
+                extendedCanId = profile.extendedCanId,
+                timeoutMs = timeoutMs
+            )
+            val rawIdentity = profile.identityDids.associate { definition ->
+                definition.field to client.readDataByIdentifier(definition.did)
+            }
+            val identity = UdsEcuIdentity(
+                controllerFamily = profile.controllerFamily,
+                hardwarePartNumber = rawIdentity[UdsIdentityField.HARDWARE_PART_NUMBER]?.let {
+                    decodeIdentity(it, profile.identityDids, UdsIdentityField.HARDWARE_PART_NUMBER)
+                },
+                operatingSystemId = rawIdentity[UdsIdentityField.OPERATING_SYSTEM_ID]?.let {
+                    decodeIdentity(it, profile.identityDids, UdsIdentityField.OPERATING_SYSTEM_ID)
+                },
+                calibrationId = rawIdentity[UdsIdentityField.CALIBRATION_ID]?.let {
+                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CALIBRATION_ID)
+                },
+                calibrationVerificationNumber = rawIdentity[UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER]?.let {
+                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER)
+                },
+                vin = rawIdentity[UdsIdentityField.VIN]?.let {
+                    decodeIdentity(it, profile.identityDids, UdsIdentityField.VIN)
+                }
+            )
+            val issues = profile.compatibilityIssues(vehicle, identity)
+            require(issues.isEmpty()) {
+                "UDS module identity rejected: " + issues.joinToString("; ")
+            }
+            return ProfiledUdsReadSession(profile, identity, client)
+        }
+
+        private fun decodeIdentity(
+            bytes: ByteArray,
+            definitions: List<UdsIdentityDidDefinition>,
+            field: UdsIdentityField
+        ): String {
+            val encoding = definitions.single { it.field == field }.encoding
+            return when (encoding) {
+                UdsIdentityEncoding.ASCII -> bytes.toString(Charsets.US_ASCII)
+                    .trim()
+                    .trim('\u0000')
+                    .uppercase(Locale.ROOT)
+                UdsIdentityEncoding.HEX -> bytes.joinToString("") {
+                    "%02X".format(Locale.ROOT, it.toInt() and 0xFF)
+                }
+            }
+        }
+    }
+}
+
     val controllerFamily: String,
     val hardwarePartNumber: String?,
     val operatingSystemId: String?,
