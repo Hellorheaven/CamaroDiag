@@ -61,8 +61,8 @@ class CalibrationFileInspectorTest {
     }
 
     @Test
-    fun leavesUndocumentedContainerFormatsUninterpreted() {
-        val result = CalibrationFileInspector.inspect("opaque.dat", byteArrayOf(1, 2, 3, 4))
+    fun keepsUnrecognizedCalibrationContainersOpaque() {
+        val result = CalibrationFileInspector.inspect("vendor-map.opaque", byteArrayOf(1, 2, 3, 4))
         assertEquals(CalibrationFileFormat.UNKNOWN, result.format)
         assertFalse(result.valid)
         assertTrue(result.summary.contains("non reconnu"))
