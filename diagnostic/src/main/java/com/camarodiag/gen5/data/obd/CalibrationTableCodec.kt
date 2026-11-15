@@ -58,9 +58,19 @@ data class CalibrationTable(
     val yAxisValues: List<Double> = emptyList()
 )
 
+data class CalibrationDefinitionMetadata(
+    val vin: String,
+    val calibrationId: String,
+    val cvn: String,
+    val operatingSystemId: String,
+    val hardwarePartNumber: String,
+    val sourceSha256: String
+)
+
 data class CalibrationDefinitionParseResult(
     val definitions: List<CalibrationMapDefinition>,
-    val warnings: List<String>
+    val warnings: List<String>,
+    val metadata: CalibrationDefinitionMetadata? = null
 )
 
 /**
@@ -87,6 +97,12 @@ object CalibrationTableCodec {
     )
 
     val template: String = listOf(
+        "#VIN=1G1FA1RXXR0123456",
+        "#CAL_ID=EXAMPLE_CAL_ID",
+        "#CVN=00000000",
+        "#OS_ID=EXAMPLE_OS",
+        "#HARDWARE_PART_NUMBER=EXAMPLE_HW",
+        "#SOURCE_SHA256=" + "0".repeat(64),
         (baseColumns + listOf("minimum", "maximum") + xAxisColumns + yAxisColumns).joinToString("\t"),
         listOf(
             "example_fuel", "Example fuel table", "0x1000", "16", "16", "U16", "LE",
@@ -98,6 +114,7 @@ object CalibrationTableCodec {
 
     fun parseDefinitions(content: String): CalibrationDefinitionParseResult {
         val normalized = content.removePrefix("\uFEFF").replace("\r", "")
+        val metadata = parseMetadata(normalized)
         // Keep trailing delimiters: they represent optional empty CSV/TSV columns.
         val lines = normalized.split("\n")
             .filter { it.isNotBlank() && !it.trimStart().startsWith("#") }
@@ -135,6 +152,11 @@ object CalibrationTableCodec {
 
         val definitions = mutableListOf<CalibrationMapDefinition>()
         val warnings = mutableListOf<String>()
+        if (metadata == null) {
+            warnings += "Métadonnées de calibration absentes : l'import ne peut pas être lié à un VIN, CAL ID, CVN, OS, matériel et binaire source exacts."
+        } else {
+            warnings += "OS et référence matérielle saisis dans les métadonnées : ils doivent être vérifiés indépendamment dans la documentation de service du calculateur."
+        }
         for ((lineIndex, line) in lines.drop(1).withIndex()) {
             val cells = parseDelimitedLine(line, delimiter).map(String::trim)
             require(cells.size == header.size) {
@@ -209,7 +231,53 @@ object CalibrationTableCodec {
                 break
             }
         }
-        return CalibrationDefinitionParseResult(definitions, warnings)
+        return CalibrationDefinitionParseResult(definitions, warnings, metadata)
+    }
+
+    private fun parseMetadata(content: String): CalibrationDefinitionMetadata? {
+        val recognized = setOf(
+            "vin", "cal_id", "cvn", "os_id", "hardware_part_number", "source_sha256"
+        )
+        val entries = content.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("#") && it.drop(1).contains("=") }
+            .mapNotNull { line ->
+                val entry = line.drop(1).trim()
+                val separator = entry.indexOf('=')
+                val key = entry.substring(0, separator).trim().lowercase(Locale.ROOT)
+                if (key in recognized) key to entry.substring(separator + 1).trim() else null
+            }
+            .toList()
+        if (entries.isEmpty()) return null
+        require(entries.map { it.first }.distinct().size == entries.size) {
+            "Les métadonnées contiennent une clé en double."
+        }
+        val values = entries.toMap()
+        val missing = recognized.filter { values[it].isNullOrBlank() }
+        require(missing.isEmpty()) {
+            "Métadonnées incomplètes : " + missing.joinToString(", ") + "."
+        }
+        val vin = values.getValue("vin").uppercase(Locale.ROOT)
+        val cvn = values.getValue("cvn").uppercase(Locale.ROOT)
+        val sourceSha256 = values.getValue("source_sha256").lowercase(Locale.ROOT)
+        require(vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
+            "La métadonnée VIN doit contenir 17 caractères valides."
+        }
+        require(values.getValue("cal_id").length <= 128) { "CAL ID trop long." }
+        require(cvn.matches(Regex("[0-9A-F]{8}"))) { "CVN doit contenir exactement 8 caractères hexadécimaux." }
+        require(values.getValue("os_id").length <= 128) { "OS ID trop long." }
+        require(values.getValue("hardware_part_number").length <= 128) { "Référence matérielle trop longue." }
+        require(sourceSha256.matches(Regex("[0-9a-f]{64}"))) {
+            "SOURCE_SHA256 doit contenir une empreinte SHA-256 de 64 caractères hexadécimaux."
+        }
+        return CalibrationDefinitionMetadata(
+            vin = vin,
+            calibrationId = values.getValue("cal_id"),
+            cvn = cvn,
+            operatingSystemId = values.getValue("os_id"),
+            hardwarePartNumber = values.getValue("hardware_part_number"),
+            sourceSha256 = sourceSha256
+        )
     }
 
     fun decode(binary: ByteArray, definition: CalibrationMapDefinition): CalibrationTable {
