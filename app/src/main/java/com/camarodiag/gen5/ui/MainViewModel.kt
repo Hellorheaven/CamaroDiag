@@ -204,6 +204,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapDefinitions = emptyList(),
                     selectedMapId = null,
                     mapValues = emptyList(),
+                    mapXAxisValues = emptyList(),
+                    mapYAxisValues = emptyList(),
                     mapDefinitionsWarnings = emptyList(),
                     mapDirty = false,
                     mapError = null,
