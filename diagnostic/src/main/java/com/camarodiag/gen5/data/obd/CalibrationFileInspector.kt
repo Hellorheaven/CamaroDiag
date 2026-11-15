@@ -45,7 +45,7 @@ object CalibrationFileInspector {
     private const val MAX_ARCHIVE_UNCOMPRESSED_BYTES = 128L * 1024L * 1024L
     private const val MAX_ARCHIVE_DISPLAY_ENTRIES = 30
     private val externalTuneProjectExtensions = setOf(
-        "hpt", "ctz", "coz", "ols", "olsx", "ptm", "ptx", "xpr", "7z", "rar"
+        "ctz", "coz", "ols", "olsx", "ptm", "ptx", "xpr", "7z", "rar"
     )
 
     fun inspect(fileName: String, content: ByteArray): CalibrationFileInspection {
