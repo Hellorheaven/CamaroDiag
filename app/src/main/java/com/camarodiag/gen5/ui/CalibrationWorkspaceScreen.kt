@@ -579,8 +579,7 @@ fun CalibrationWorkspaceScreen(
                                 com.camarodiag.gen5.data.obd.CanTraceDirection.RX -> "RX"
                                 com.camarodiag.gen5.data.obd.CanTraceDirection.UNKNOWN -> "?"
                             }
-                            val result = if (observation.positiveResponse) "POS" else
-                                observation.negativeResponseCode?.let { "NRC %02X".format(it) } ?: "REQ/OBS"
+                            val result = if (observation.positiveResponse) "POS" else "REQ/OBS"
                             Text(
                                 "$direction • CAN ${observation.canId.toString(16).uppercase()} • DID ${observation.did.toString(16).uppercase().padStart(4, '0')} • ${result}",
                                 color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
