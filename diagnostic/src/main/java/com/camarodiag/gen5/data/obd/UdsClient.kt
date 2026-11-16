@@ -116,7 +116,8 @@ data class UdsDtcRecord(
 class UdsClient private constructor(
     private val channel: UdsPayloadTransport,
     private val policy: UdsAccessPolicy,
-    private val timeoutMs: Long
+    private val timeoutMs: Long,
+    @Suppress("UNUSED_PARAMETER") marker: Boolean
 ) {
     constructor(
         transport: RawCanFrameTransport,
@@ -125,7 +126,7 @@ class UdsClient private constructor(
         extendedCanId: Boolean = false,
         policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
         timeoutMs: Long = 3000L
-    ) : this(IsoTpUdsPayloadTransport(transport, requestCanId, responseCanId, extendedCanId), policy, timeoutMs)
+    ) : this(IsoTpUdsPayloadTransport(transport, requestCanId, responseCanId, extendedCanId), policy, timeoutMs, true)
 
     constructor(
         payloadTransport: UdsPayloadTransport,
@@ -133,12 +134,6 @@ class UdsClient private constructor(
         timeoutMs: Long = 3000L
     ) : this(payloadTransport, policy, timeoutMs, true)
 
-    private constructor(
-        payloadTransport: UdsPayloadTransport,
-        policy: UdsAccessPolicy,
-        timeoutMs: Long,
-        @Suppress("UNUSED_PARAMETER") marker: Boolean
-    ) : this(payloadTransport, policy, timeoutMs)
     private var activeSession = 0x01
     private val requestedSecuritySeeds = mutableSetOf<Int>()
     private var securityUnlocked = false
