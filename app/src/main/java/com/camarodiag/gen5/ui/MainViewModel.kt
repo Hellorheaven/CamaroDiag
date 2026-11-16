@@ -43,17 +43,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _vehicle = MutableStateFlow(VehicleProfile())
     val vehicle: StateFlow<VehicleProfile> = _vehicle.asStateFlow()
 
-    private val _adapter = MutableStateFlow(
-        AdapterCapabilities(
-            deviceName = "Not connected",
-            macAddress = "",
-            tier = AdapterTier.DISCONNECTED,
-            firmwareId = "",
-            supportsLongFrames = false,
-            supportsSwCan = false,
-            supportsCanHeaders = false
-        )
-    )
+    private val _adapter = MutableStateFlow(AdapterCapabilities())
     val adapter: StateFlow<AdapterCapabilities> = _adapter.asStateFlow()
 
     private val _pairedDevices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
@@ -594,15 +584,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun markAdapterDisconnected() {
-        _adapter.value = AdapterCapabilities(
-            deviceName = "Not connected",
-            macAddress = "",
-            tier = AdapterTier.DISCONNECTED,
-            firmwareId = "",
-            supportsLongFrames = false,
-            supportsSwCan = false,
-            supportsCanHeaders = false
-        )
+        _adapter.value = AdapterCapabilities()
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         _livePids.value = emptyList()
         _dtcs.value = emptyList()
