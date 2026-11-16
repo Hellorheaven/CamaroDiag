@@ -31,6 +31,7 @@ class BluetoothObdManager(context: Context) {
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
     private val commandMutex = Mutex()
+    private val commandSessionMutex = Mutex()
     private val usbTransport = ElmUsbTransport(context)
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
@@ -218,9 +219,37 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
-    suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String = withContext(Dispatchers.IO) {
+    /**
+     * Runs a multi-command OBD transaction without allowing live telemetry or
+     * another diagnostic action to interleave adapter setup and response parsing.
+     */
+    suspend fun <T> withObdCommandSession(block: suspend (Obd2FeatureEngine) -> T): T {
+        commandSessionMutex.lock()
+        try {
+            val engine = Obd2FeatureEngine(
+                ObdCommandChannel { command, timeoutMs ->
+                    sendAtCommandInternal(command, timeoutMs)
+                }
+            )
+            return block(engine)
+        } finally {
+            commandSessionMutex.unlock()
+        }
+    }
+
+    suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String =
+        withContext(Dispatchers.IO) {
+            commandSessionMutex.withLock {
+                sendAtCommandInternal(command, timeoutMs)
+            }
+        }
+
+    private suspend fun sendAtCommandInternal(
+        command: String,
+        timeoutMs: Long
+    ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
-            val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
+            val payload = (command.trim() + "\\r").toByteArray(Charsets.US_ASCII)
             if (activeTransport == "USB") {
                 usbTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
@@ -229,7 +258,7 @@ class BluetoothObdManager(context: Context) {
                     if (n > 0) { val chunk = String(bytes, 0, n, Charsets.US_ASCII); if (chunk.contains('>')) { buffer.append(chunk.substringBefore('>')); break }; buffer.append(chunk) }
                     else delay(10)
                 }
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                buffer.toString().replace("\\r", " ").replace("\\n", " ").replace(command, "").trim()
             } else if (activeTransport == "BLE") {
                 bleTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
@@ -238,7 +267,7 @@ class BluetoothObdManager(context: Context) {
                     if (n > 0) { val chunk = String(bytes, 0, n, Charsets.US_ASCII); if (chunk.contains('>')) { buffer.append(chunk.substringBefore('>')); break }; buffer.append(chunk) }
                     else delay(10)
                 }
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                buffer.toString().replace("\\r", " ").replace("\\n", " ").replace(command, "").trim()
             } else if (activeTransport == "WIFI") {
                 wifiTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
@@ -247,7 +276,7 @@ class BluetoothObdManager(context: Context) {
                     catch (_: java.net.SocketTimeoutException) { }
                     delay(10)
                 }
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                buffer.toString().replace("\\r", " ").replace("\\n", " ").replace(command, "").trim()
             } else {
                 val out = outputStream; val inp = inputStream
                 if (out == null || inp == null) return@withLock "NO_SOCKET"
@@ -255,9 +284,9 @@ class BluetoothObdManager(context: Context) {
                 out.write(payload); out.flush()
                 val buffer = StringBuilder(); val start = System.currentTimeMillis()
                 while (System.currentTimeMillis() - start < timeoutMs) {
-                    if (inp.available() > 0) { val c = inp.read().toChar(); if (c == '>') break; buffer.append(c) } else delay(15)
+                    if (inp.available() > 0) { val char = inp.read().toChar(); if (char == '>') break; buffer.append(char) } else delay(15)
                 }
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                buffer.toString().replace("\\r", " ").replace("\\n", " ").replace(command, "").trim()
             }
         }
     }
