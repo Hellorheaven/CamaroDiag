@@ -39,13 +39,12 @@ class UdsClientTest {
             readDids = setOf(0xF190, 0x1234),
             writeDids = writeDids,
             allowedSessions = sessions,
-            allowedRoutineIds = emptySet(),
-            ioControlDids = ioDids,
+            routineControlPermissions = emptyMap(),
+            ioControlPermissions = ioDids.associateWith { setOf(0x03) },
             allowedSecurityLevels = setOf(0x01),
+            allowedDtcGroups = if (allowClear) setOf(0xFFFFFF) else emptySet(),
             memoryRegions = memoryRegions,
             maxTransferBytes = maxTransferBytes,
-            allowClearDtc = allowClear,
-            allowEcuReset = false,
             requireSecurityAccess = requireSecurity,
             evidenceReference = "Synthetic unit-test policy"
         )
@@ -167,11 +166,9 @@ class UdsClientTest {
                 readDids = emptySet(),
                 writeDids = setOf(0x1234),
                 allowedSessions = setOf(1),
-                allowedRoutineIds = emptySet(),
+                routineControlPermissions = emptyMap(),
                 memoryRegions = emptyList(),
                 maxTransferBytes = 0,
-                allowClearDtc = false,
-                allowEcuReset = false,
                 requireSecurityAccess = true,
                 evidenceReference = "synthetic"
             )
