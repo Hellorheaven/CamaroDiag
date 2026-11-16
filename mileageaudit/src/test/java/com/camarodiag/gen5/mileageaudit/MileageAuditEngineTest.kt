@@ -40,6 +40,15 @@ class MileageAuditEngineTest {
         assertFalse(report.hasDiscrepancy)
     }
 
+    @Test fun nonFiniteOdometerValuesAreIgnored() {
+        val report = MileageAuditEngine.evaluate("VIN", listOf(
+            reading("BCM", Double.POSITIVE_INFINITY, ConfidenceLevel.HIGH, profileVerified = true),
+            reading("IPC", 120000.0, ConfidenceLevel.HIGH, profileVerified = true)
+        ))
+        assertFalse(report.hasDiscrepancy)
+        assertEquals(0.0, report.maxDeltaKm, 0.0)
+    }
+
     @Test fun noDataDoesNotInventMileage() {
         val report = MileageAuditEngine.evaluate("VIN", listOf(reading("BCM", null, ConfidenceLevel.UNAVAILABLE)))
         assertFalse(report.hasDiscrepancy)
