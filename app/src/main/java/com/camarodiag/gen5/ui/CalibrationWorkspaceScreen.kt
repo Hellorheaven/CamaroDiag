@@ -139,6 +139,10 @@ fun CalibrationWorkspaceScreen(
     var selectedObdbSignalId by remember { mutableStateOf("") }
     val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
         ?: state.obdbSignals.firstOrNull()
+    val profileUses29BitIds = udsCanProtocol in setOf("34", "36", "64")
+    val canIdsMatchProfile = udsRequestCanId.length == udsResponseCanId.length &&
+        (udsRequestCanId.length == 8) == profileUses29BitIds &&
+        udsRequestCanId.length in setOf(3, 8)
     val filteredObdbSignals = state.obdbSignals.filter {
         obdbSignalSearch.isBlank() ||
             it.name.contains(obdbSignalSearch, true) ||
@@ -319,8 +323,8 @@ fun CalibrationWorkspaceScreen(
                                     },
                                     enabled = !state.isJ2534BridgeConnecting &&
                                         j2534Host.isNotBlank() && j2534Port.isNotBlank() &&
-                                        j2534Token.isNotBlank() && udsRequestCanId.isNotBlank() &&
-                                        udsResponseCanId.isNotBlank() && udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
+                                        j2534Token.isNotBlank() && canIdsMatchProfile &&
+                                        udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     if (state.isJ2534BridgeConnecting) CircularProgressIndicator()
@@ -346,7 +350,7 @@ fun CalibrationWorkspaceScreen(
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
                         enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
-                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsDid.length == 4 &&
+                            canIdsMatchProfile && udsDid.length == 4 &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -361,7 +365,7 @@ fun CalibrationWorkspaceScreen(
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
                         enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
-                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() &&
+                            canIdsMatchProfile &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -457,6 +461,7 @@ fun CalibrationWorkspaceScreen(
                             onClick = { onReadObdbSignal(signal.id, udsCanProtocol) },
                             enabled = (isConnected || state.isJ2534BridgeConnected) &&
                                 signal.hasSupportedPhysicalCanAddressing &&
+                                !profileUses29BitIds &&
                                 signal.service == 0x22 &&
                                 !state.isObdbSignalReading,
                             modifier = Modifier.fillMaxWidth()
