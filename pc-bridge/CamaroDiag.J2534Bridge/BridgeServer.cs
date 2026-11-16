@@ -78,14 +78,23 @@ internal sealed class BridgeServer
                         var requestId = ParseHexId(root, "requestCanId");
                         var responseId = ParseHexId(root, "responseCanId");
                         var can29 = root.TryGetProperty("can29Bit", out var canElement) && canElement.GetBoolean();
-                        var baudRate = root.TryGetProperty("baudRate", out var baudElement) ? baudElement.GetInt32() : 500000;
-                        device.Open(requestId, responseId, can29, baudRate);
+                        var protocolNumber = root.TryGetProperty("protocolNumber", out var protocolElement)
+                            ? protocolElement.GetInt32() : 33;
+                        var baudRate = protocolNumber switch
+                        {
+                            33 or 34 => 500000,
+                            35 or 36 => 250000,
+                            63 or 64 => 62500,
+                            _ => throw new ArgumentOutOfRangeException(nameof(protocolNumber), "Unsupported CAN protocol preset.")
+                        };
+                        device.Open(requestId, responseId, can29, protocolNumber);
                         await writer.WriteLineAsync(JsonSerializer.Serialize(new
                         {
                             ok = true,
                             adapter = device.AdapterName,
                             driver = Path.GetFileName(device.DriverPath),
-                            protocol = "ISO15765",
+                            protocol = protocolNumber is 63 or 64 ? "SW-ISO15765" : "ISO15765",
+                            protocolNumber,
                             baudRate,
                             requestCanId = requestId.ToString(can29 ? "X8" : "X3"),
                             responseCanId = responseId.ToString(can29 ? "X8" : "X3"),
