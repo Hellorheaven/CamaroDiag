@@ -80,6 +80,24 @@ class StnUdsPayloadTransportTest {
         assertTrue(commands.any { it.startsWith("STPX") && it.endsWith("r:0") })
     }
 
+    @Test fun selectsSingleWireCanIso15765PresetWhenRequested() = runBlocking {
+        val commands = mutableListOf<String>()
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 63) { command, _ ->
+            commands += command
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") -> "7E8 62 F1 90 01"
+                else -> "OK"
+            }
+        }
+
+        assertArrayEquals(byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte(), 0x01), transport.exchange(
+            byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), 1000
+        ))
+        assertTrue(commands.contains("STP 63"))
+    }
+
     @Test fun rejectsCanIdentifierAndProtocolFormatMismatch() {
         assertTrue(runCatching { StnUdsPayloadTransport(0x7E0, 0x7E8, 34) { _, _ -> "OK" } }.isFailure)
         assertTrue(runCatching { StnUdsPayloadTransport(0x18DA10F1, 0x18DAF110, 34) { _, _ -> "OK" } }.isSuccess)
