@@ -37,7 +37,9 @@ object CamaroLfxObdSimulator {
             "0100" -> bitmapResponse(0x00)
             "0120" -> bitmapResponse(0x20)
             "0140" -> bitmapResponse(0x40)
-            "0101" -> "410100000000"
+            // Two confirmed DTCs are returned by Mode 03 below; keep the PID 01
+            // DTC count consistent while leaving the MIL bit clear.
+            "0101" -> "410102000000"
             "0105" -> "41057F"
             "010C" -> "410C0BB8"
             "010D" -> "410D00"
@@ -75,7 +77,7 @@ object CamaroLfxObdSimulator {
             "0906" -> "490601" + SIMULATED_CVN
             "090A" -> asciiRecord(0x0A, simulatedEcuName)
             "0600" -> "NO DATA"
-            else -> if (normalized.startsWith("02")) "NO DATA" else "NO DATA"
+            else -> "NO DATA"
         }
     }
 
