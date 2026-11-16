@@ -130,7 +130,7 @@ class UdsClient(
     suspend fun testerPresent(suppressPositiveResponse: Boolean = false) {
         val subFunction = if (suppressPositiveResponse) 0x80 else 0x00
         if (suppressPositiveResponse) {
-            channel.exchange(byteArrayOf(0x3E, subFunction.toByte()), timeoutMs)
+            channel.sendOnly(byteArrayOf(0x3E, subFunction.toByte()), timeoutMs)
         } else {
             val response = request(0x3E, byteArrayOf(subFunction.toByte()))
             require(response.size >= 2 && (response[1].toInt() and 0x7F) == 0)
@@ -148,6 +148,7 @@ class UdsClient(
     suspend fun writeDataByIdentifier(did: Int, data: ByteArray) {
         require(did in policy.writeDids) { "DID write is not allowed by the verified ECU profile." }
         require(data.isNotEmpty() && data.size <= 0x0FFF - 3)
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x2E, byteArrayOf((did shr 8).toByte(), did.toByte()) + data)
         require(response.size >= 3 && readU16(response, 1) == did) { "ECU did not confirm the written DID." }
@@ -165,7 +166,7 @@ class UdsClient(
     suspend fun readDtcByStatusMask(statusMask: Int = 0xFF): List<UdsDtcRecord> {
         require(statusMask in 0..0xFF)
         val data = readDtcInformation(0x02, byteArrayOf(statusMask.toByte()))
-        require(data.size >= 2) { "Incomplete ReadDTCInformation response." }
+        require(data.isNotEmpty()) { "Incomplete ReadDTCInformation response." }
         val availabilityMask = data[0].toInt() and 0xFF
         val records = data.copyOfRange(1, data.size)
         require(records.size % 4 == 0) { "DTC record payload is not a multiple of four bytes." }
@@ -183,6 +184,7 @@ class UdsClient(
     suspend fun clearDiagnosticInformation(groupOfDtc: Int = 0xFFFFFF) {
         require(policy.allowClearDtc) { "DTC clearing is disabled by the ECU profile." }
         require(groupOfDtc in 0..0xFFFFFF)
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         request(0x14, byteArrayOf(
             (groupOfDtc shr 16).toByte(), (groupOfDtc shr 8).toByte(), groupOfDtc.toByte()
@@ -192,6 +194,7 @@ class UdsClient(
     suspend fun ecuReset(resetType: Int) {
         require(policy.allowEcuReset) { "ECU reset is disabled by the ECU profile." }
         require(resetType in 1..0x7F)
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x11, byteArrayOf(resetType.toByte()))
         require(response.size >= 2 && (response[1].toInt() and 0x7F) == resetType) { "ECU did not echo reset type." }
@@ -224,6 +227,7 @@ class UdsClient(
     suspend fun routineControl(controlType: Int, routineId: Int, parameters: ByteArray = byteArrayOf()): ByteArray {
         require(controlType in 1..3)
         require(routineId in policy.allowedRoutineIds) { "Routine is not allowlisted for this ECU." }
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         val requestData = byteArrayOf(
             controlType.toByte(), (routineId shr 8).toByte(), routineId.toByte()
@@ -244,6 +248,7 @@ class UdsClient(
     suspend fun writeMemoryByAddressAndLength(address: Long, data: ByteArray, addressLength: Int = 4, sizeLength: Int = 2) {
         requireAllowedMemory(address, data.size.toLong())
         require(data.isNotEmpty())
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         val format = addressLength shl 4 or sizeLength
         val requestData = byteArrayOf(format.toByte()) + encodeUnsigned(address, addressLength) +
@@ -255,6 +260,7 @@ class UdsClient(
         require(!downloadActive && !uploadActive) { "A data transfer is already active." }
         requireAllowedMemory(address, size)
         require(size <= policy.maxTransferBytes.toLong()) { "Transfer exceeds the verified profile limit." }
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         require(dataFormatIdentifier in 0..0xFF)
         val format = addressLength shl 4 or sizeLength
@@ -326,6 +332,7 @@ class UdsClient(
     suspend fun inputOutputControlByIdentifier(did: Int, controlParameter: Int, data: ByteArray = byteArrayOf()): ByteArray {
         require(did in policy.ioControlDids) { "I/O control DID is not allowlisted for this ECU." }
         require(controlParameter in 0..0xFF)
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x2F, byteArrayOf((did shr 8).toByte(), did.toByte(), controlParameter.toByte()) + data)
         require(response.size >= 4 && readU16(response, 1) == did &&
@@ -376,6 +383,12 @@ class UdsClient(
             "Unexpected UDS response service 0x" + responseService.toString(16).uppercase(Locale.ROOT)
         }
         return response
+    }
+
+    private fun requireProgrammingSession() {
+        require(activeSession != 0x01 && activeSession in policy.allowedSessions) {
+            "A verified non-default diagnostic session is required for this operation."
+        }
     }
 
     private fun requireSecurityIfConfigured() {
