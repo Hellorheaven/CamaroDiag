@@ -9,7 +9,7 @@ class StnUdsPayloadTransportTest {
 
     @Test fun configuresVerifiedMxPlusAndExchangesCompleteUdsPayload() = runBlocking {
         val commands = mutableListOf<String>()
-        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 6) { command, _ ->
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
             commands += command
             when {
                 command == "STI" -> "STN2255 v5.10.3"
@@ -22,7 +22,7 @@ class StnUdsPayloadTransportTest {
         val response = transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), 3000)
 
         assertArrayEquals(byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()) + vin.toByteArray(), response)
-        assertTrue(commands.contains("STP 6"))
+        assertTrue(commands.contains("STP 33"))
         assertTrue(commands.contains("STCSEGR 1"))
         assertTrue(commands.contains("STCSEGT 1"))
         assertTrue(commands.contains("STCFCPA 7E0, 7E8"))
@@ -31,7 +31,7 @@ class StnUdsPayloadTransportTest {
 
     @Test fun collectsFinalUdsResponseAfterResponsePending() = runBlocking {
         val commands = mutableListOf<String>()
-        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 6) { command, _ ->
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
             commands += command
             when {
                 command == "STI" -> "STN2255 v5.10.3"
@@ -51,7 +51,7 @@ class StnUdsPayloadTransportTest {
 
     @Test fun rejectsNonMxPlusHardwareBeforeSendingAnyUdsRequest() = runBlocking {
         val commands = mutableListOf<String>()
-        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 6) { command, _ ->
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
             commands += command
             when (command) {
                 "STI" -> "STN2255 v5.10.3"
@@ -66,7 +66,7 @@ class StnUdsPayloadTransportTest {
 
     @Test fun sendsSuppressedTesterPresentWithoutWaitingForEcuReply() = runBlocking {
         val commands = mutableListOf<String>()
-        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 6) { command, _ ->
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
             commands += command
             when {
                 command == "STI" -> "STN2255 v5.10.3"
@@ -81,7 +81,9 @@ class StnUdsPayloadTransportTest {
     }
 
     @Test fun rejectsCanIdentifierAndProtocolFormatMismatch() {
-        assertTrue(runCatching { StnUdsPayloadTransport(0x7E0, 0x7E8, 7) { _, _ -> "OK" } }.isFailure)
-        assertTrue(runCatching { StnUdsPayloadTransport(0x18DA10F1, 0x18DAF110, 7) { _, _ -> "OK" } }.isSuccess)
+        assertTrue(runCatching { StnUdsPayloadTransport(0x7E0, 0x7E8, 34) { _, _ -> "OK" } }.isFailure)
+        assertTrue(runCatching { StnUdsPayloadTransport(0x18DA10F1, 0x18DAF110, 34) { _, _ -> "OK" } }.isSuccess)
+        assertTrue(runCatching { StnUdsPayloadTransport(0x7E0, 0x7E8, 63) { _, _ -> "OK" } }.isSuccess)
+        assertTrue(runCatching { StnUdsPayloadTransport(0x18DA10F1, 0x18DAF110, 63) { _, _ -> "OK" } }.isFailure)
     }
 }
