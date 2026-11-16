@@ -265,7 +265,7 @@ class BluetoothObdManager(context: Context) {
     fun createStnUdsClient(
         requestCanId: Int,
         responseCanId: Int,
-        protocolNumber: Int = 6,
+        protocolNumber: Int = 33,
         policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
         timeoutMs: Long = 3000L
     ): UdsClient {
