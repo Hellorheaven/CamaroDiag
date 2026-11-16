@@ -11,6 +11,7 @@ namespace CamaroDiag.J2534Bridge;
 internal sealed class J2534Device : IDisposable
 {
     private const uint ProtocolIso15765 = 6;
+    private const uint ProtocolSwIso15765 = 0x8007;
     private const uint FlowControlFilter = 3;
     private const uint StatusNoError = 0;
     private const uint ErrorTimeout = 0x09;
@@ -65,6 +66,7 @@ internal sealed class J2534Device : IDisposable
     private PassThruGetLastErrorDelegate? _getLastError;
     private uint _deviceId;
     private uint _channelId;
+    private uint _protocolId = ProtocolIso15765;
     private uint? _filterId;
     private int _requestCanId;
     private int _responseCanId;
@@ -79,16 +81,24 @@ internal sealed class J2534Device : IDisposable
     public string DriverPath => _adapter.FunctionLibrary;
     public bool IsOpen => _opened;
 
-    public void Open(int requestCanId, int responseCanId, bool can29Bit, int baudRate)
+    public void Open(int requestCanId, int responseCanId, bool can29Bit, int protocolNumber)
     {
         if (_opened) Close();
+        var isSwCan = protocolNumber is 63 or 64;
         var maxId = can29Bit ? 0x1FFFFFFF : 0x7FF;
+        var baudRate = protocolNumber switch
+        {
+            33 or 34 => 500000,
+            35 or 36 => 250000,
+            63 or 64 => 62500,
+            _ => throw new ArgumentOutOfRangeException(nameof(protocolNumber), "Supported profiles: 33-36 HS-CAN, 63-64 SW-CAN.")
+        };
+        _protocolId = isSwCan ? ProtocolSwIso15765 : ProtocolIso15765;
+        if (isSwCan && can29Bit != (protocolNumber == 64))
+            throw new ArgumentException("SW-CAN protocol 63 requires 11-bit IDs and protocol 64 requires 29-bit IDs.");
         if (requestCanId < 0 || responseCanId < 0 || requestCanId > maxId || responseCanId > maxId ||
             requestCanId == responseCanId)
             throw new ArgumentOutOfRangeException(nameof(requestCanId), "CAN identifiers do not match the selected 11/29-bit format.");
-        if (baudRate is not (250000 or 500000))
-            throw new ArgumentOutOfRangeException(nameof(baudRate), "Only 250000 and 500000 bit/s HS-CAN are enabled.");
-
         _requestCanId = requestCanId;
         _responseCanId = responseCanId;
         _can29Bit = can29Bit;
@@ -110,7 +120,8 @@ internal sealed class J2534Device : IDisposable
             Check(_open(IntPtr.Zero, out _deviceId), "PassThruOpen");
             _deviceOpened = true;
             var flags = can29Bit ? Can29BitId : 0u;
-            Check(_connect(_deviceId, ProtocolIso15765, flags, (uint)baudRate, out _channelId), "PassThruConnect(ISO15765)");
+            Check(_connect(_deviceId, _protocolId, flags, (uint)baudRate, out _channelId),
+                isSwCan ? "PassThruConnect(SW_ISO15765_PS)" : "PassThruConnect(ISO15765)");
             _channelConnected = true;
 
             var mask = CreateCanIdMessage(maxId, can29Bit, 0xFFFFFFFFu);
@@ -213,7 +224,7 @@ internal sealed class J2534Device : IDisposable
         }
         return new PassThruMsg
         {
-            ProtocolId = ProtocolIso15765,
+            ProtocolId = _protocolId,
             TxFlags = can29Bit ? Can29BitId : 0u,
             DataSize = 4,
             Data = data
@@ -222,7 +233,7 @@ internal sealed class J2534Device : IDisposable
 
     private static PassThruMsg NewMessage() => new()
     {
-        ProtocolId = ProtocolIso15765,
+        ProtocolId = _protocolId,
         Data = new byte[MaxData]
     };
 
