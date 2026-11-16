@@ -90,10 +90,21 @@ object CanTraceAnalyzer {
         RegexOption.IGNORE_CASE
     )
 
+    private val elmFrameRegex = Regex(
+        """^\s*([0-9A-Fa-f]{3,8})\s+([0-9A-Fa-f]{1,2})\s+((?:[0-9A-Fa-f]{2}\s*)*)$"""
+    )
+
     fun analyze(text: String, sourceName: String = "trace.asc"): CanTraceAnalysisReport {
         val lines = text.lineSequence().toList()
         val ascLike = sourceName.endsWith(".asc", true) || lines.any { ascFrameRegex.matches(it) }
-        val parsed = if (ascLike) parseAsc(lines) else parseCsv(lines)
+        val csvLike = sourceName.endsWith(".csv", true)
+        val elmLike = lines.any { elmFrameRegex.matches(it) }
+        val parsed = when {
+            ascLike -> parseAsc(lines)
+            csvLike -> parseCsv(lines)
+            elmLike -> parseElm(lines)
+            else -> parseCsv(lines)
+        }
         val (messages, isoTpErrors, incomplete) = reassemble(parsed.frames)
         val allErrors = parsed.errors + isoTpErrors
         val observations = messages.mapNotNull { message ->
@@ -143,6 +154,28 @@ object CanTraceAnalyzer {
             }
             frames += CanTraceFrame(index + 1, timestamp, canId, direction, bytes.take(dlc))
         }
+        return ParsedFrames(frames, errors)
+    }
+
+    /**
+     * Parses ELM327 monitor logs with headers enabled (CAN ID, DLC, data bytes).
+     * ELM logs do not normally carry a timestamp or TX/RX marker, so those remain unknown.
+     */
+    private fun parseElm(lines: List<String>): ParsedFrames {
+        val frames = mutableListOf<CanTraceFrame>()
+        val errors = mutableListOf<String>()
+        lines.forEachIndexed { index, line ->
+            val match = elmFrameRegex.matchEntire(line) ?: return@forEachIndexed
+            val canId = parseCanId(match.groupValues[1])
+            val dlc = match.groupValues[2].toIntOrNull(16)
+            val bytes = parseHexBytes(match.groupValues[3])
+            if (canId == null || dlc == null || bytes == null || dlc !in 0..8 || bytes.size < dlc) {
+                errors += "Line ${index + 1}: invalid ELM327 header/DLC/data record."
+                return@forEachIndexed
+            }
+            frames += CanTraceFrame(index + 1, null, canId, CanTraceDirection.UNKNOWN, bytes.take(dlc))
+        }
+        if (frames.isEmpty()) errors += "No ELM327 header records found; enable CAN headers and save the monitor output."
         return ParsedFrames(frames, errors)
     }
 
