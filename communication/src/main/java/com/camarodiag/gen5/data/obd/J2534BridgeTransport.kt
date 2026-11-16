@@ -59,8 +59,8 @@ class J2534BridgeTransport(
                     JSONObject()
                         .put("op", "open")
                         .put("token", pairingToken)
-                        .put("requestCanId", requestCanId.toString(if (can29Bit) "X8" else "X3"))
-                        .put("responseCanId", responseCanId.toString(if (can29Bit) "X8" else "X3"))
+                        .put("requestCanId", requestCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0'))
+                        .put("responseCanId", responseCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0'))
                         .put("can29Bit", can29Bit)
                         .put("protocolNumber", protocolNumber),
                     10_000
