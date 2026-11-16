@@ -142,7 +142,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 return@launch
             }
-            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isReading = true, message = "")
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isReading = true,
+                ecuVinResponse = "",
+                calibrationIdResponse = "",
+                cvnResponse = "",
+                message = ""
+            )
             try {
                 val engine = obdManager.createObd2FeatureEngine()
                 val ecuVin = engine.readVin()
@@ -156,7 +162,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     calibrationIdResponse = calIds.joinToString("\n").ifBlank { "Non disponible" },
                     cvnResponse = cvns.joinToString("\n").ifBlank { "Non disponible" },
                     message = if (validCal || validCvn) {
-                        "CAL ID / CVN décodés depuis Mode 09. Ils identifient le logiciel mais ne constituent pas une lecture de cartographie binaire."
+                        "VIN / CAL ID / CVN lus depuis Mode 09. Ces identifiants ne constituent pas une lecture de cartographie binaire."
                     } else {
                         "Aucun CAL ID/CVN exploitable retourné. Le calculateur ou l'interface peut ne pas prendre ces informations en charge."
                     }
@@ -591,6 +597,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isBusy.value = true
             _connectionMessage.value = null
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                ecuVinResponse = "",
+                calibrationIdResponse = "",
+                cvnResponse = ""
+            )
             try {
                 connect()
                     .onSuccess { capabilities ->
@@ -654,6 +665,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectSimulatedAdapter(preset: String) {
         viewModelScope.launch {
             _isBusy.value = true
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                ecuVinResponse = "",
+                calibrationIdResponse = "",
+                cvnResponse = ""
+            )
             try {
                 val caps = obdManager.activateSimulatedAdapter(preset)
                 _adapter.value = caps
