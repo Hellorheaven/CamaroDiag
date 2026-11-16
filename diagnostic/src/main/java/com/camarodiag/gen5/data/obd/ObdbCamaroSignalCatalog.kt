@@ -116,8 +116,8 @@ data class ObdbCamaroSignal(
     val hasSupportedPhysicalCanAddressing: Boolean
         get() = requestCanId != null && responseCanId != null &&
             extendedAddressHex == null && canPriorityHex == null && testerAddressHex == null &&
-            diagnosticLevelIn == null && diagnosticLevelOut == null &&
-            (protocol == null || protocol in setOf("15765-4-11bit", "15765-4-29bit"))
+            timeoutHex == null && diagnosticLevelIn == null && diagnosticLevelOut == null &&
+            (protocol == null || protocol == "15765-4-11bit")
 
     fun isAvailableForYear(modelYear: Int): Boolean =
         (filter?.matches(modelYear) != false) &&
