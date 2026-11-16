@@ -137,9 +137,23 @@ private fun calibrationProfileNotesResource(engine: com.camarodiag.gen5.domain.m
 }
 
 @Composable
-private fun localizedAxisDetails(offset: Long?, count: Long?, unit: String?): String =
-    if (offset == null || count == null) stringResource(R.string.cal_axis_undefined)
-    else stringResource(R.string.cal_axis_values, offset.toString(16).uppercase(), count, unit.orEmpty())
+private fun localizedAxisSummary(
+    axisLabelResource: Int,
+    axis: CalibrationAxisDefinition?
+): String {
+    val axisLabel = stringResource(axisLabelResource)
+    val details = if (axis == null) {
+        stringResource(R.string.cal_axis_undefined)
+    } else {
+        stringResource(
+            R.string.cal_axis_values,
+            axis.fileOffset.toString(16).uppercase(),
+            axis.count,
+            axis.unit
+        )
+    }
+    return stringResource(R.string.cal_axis_summary, axisLabel, details)
+}
 
 @Composable
 fun CalibrationWorkspaceScreen(
@@ -676,11 +690,11 @@ fun CalibrationWorkspaceScreen(
                                 color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                stringResource(R.string.cal_axis_summary, stringResource(R.string.cal_axis_x), localizedAxisDetails(definition.xAxis?.fileOffset, definition.xAxis?.count, definition.xAxis?.unit)),
+                                localizedAxisSummary(R.string.cal_axis_x, definition.xAxis),
                                 color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                stringResource(R.string.cal_axis_summary, stringResource(R.string.cal_axis_y), localizedAxisDetails(definition.yAxis?.fileOffset, definition.yAxis?.count, definition.yAxis?.unit)),
+                                localizedAxisSummary(R.string.cal_axis_y, definition.yAxis),
                                 color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                             )
                         }
