@@ -44,6 +44,9 @@ class J2534BridgeTransport(
             require(requestCanId in 0..maxId && responseCanId in 0..maxId && requestCanId != responseCanId) {
                 "Identifiants CAN incompatibles avec le format sélectionné."
             }
+            require(can29Bit == (protocolNumber in setOf(34, 36, 64))) {
+                "La largeur des identifiants CAN ne correspond pas au profil sélectionné."
+            }
             try {
                 val connected = Socket()
                 connected.tcpNoDelay = true
