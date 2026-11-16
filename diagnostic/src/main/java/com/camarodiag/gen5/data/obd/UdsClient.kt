@@ -113,15 +113,32 @@ data class UdsDtcRecord(
  * Read services are available by default. Any state-changing service requires an
  * explicit, identity-bound policy; no seed/key algorithm or GM address is guessed.
  */
-class UdsClient(
-    transport: RawCanFrameTransport,
-    requestCanId: Int,
-    responseCanId: Int,
-    extendedCanId: Boolean = false,
-    private val policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
-    private val timeoutMs: Long = 3000L
+class UdsClient private constructor(
+    private val channel: UdsPayloadTransport,
+    private val policy: UdsAccessPolicy,
+    private val timeoutMs: Long
 ) {
-    private val channel = IsoTpChannel(transport, requestCanId, responseCanId, extendedCanId)
+    constructor(
+        transport: RawCanFrameTransport,
+        requestCanId: Int,
+        responseCanId: Int,
+        extendedCanId: Boolean = false,
+        policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
+        timeoutMs: Long = 3000L
+    ) : this(IsoTpUdsPayloadTransport(transport, requestCanId, responseCanId, extendedCanId), policy, timeoutMs)
+
+    constructor(
+        payloadTransport: UdsPayloadTransport,
+        policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
+        timeoutMs: Long = 3000L
+    ) : this(payloadTransport, policy, timeoutMs, true)
+
+    private constructor(
+        payloadTransport: UdsPayloadTransport,
+        policy: UdsAccessPolicy,
+        timeoutMs: Long,
+        @Suppress("UNUSED_PARAMETER") marker: Boolean
+    ) : this(payloadTransport, policy, timeoutMs)
     private var activeSession = 0x01
     private val requestedSecuritySeeds = mutableSetOf<Int>()
     private var securityUnlocked = false
