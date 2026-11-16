@@ -254,7 +254,8 @@ fun CalibrationWorkspaceScreen(
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
                         enabled = isConnected && !state.isUdsReading &&
-                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsDid.length == 4 && udsCanProtocol.length in 2..3,
+                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsDid.length == 4 &&
+                            udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (state.isUdsReading) CircularProgressIndicator()
@@ -268,7 +269,8 @@ fun CalibrationWorkspaceScreen(
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
                         enabled = isConnected && !state.isUdsReading &&
-                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsCanProtocol.length in 2..3,
+                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() &&
+                            udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (isFr) "Lire les DTC UDS" else "Read UDS DTCs")
