@@ -43,6 +43,32 @@ class CalibrationTableCodecTest {
     }
 
     @Test
+    fun rejectsCvnThatBelongsToAnotherCalibrationIdRecord() {
+        val binary = byteArrayOf(0x10, 0x20, 0x30, 0x40)
+        val sha256 = java.security.MessageDigest.getInstance("SHA-256").digest(binary)
+            .joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+        val metadata = CalibrationDefinitionMetadata(
+            vin = "1G1FA1RXXR0123456",
+            calibrationId = "CAL-123",
+            cvn = "A1B2C3D4",
+            operatingSystemId = "OS-123",
+            hardwarePartNumber = "HW-123",
+            sourceSha256 = sha256
+        )
+
+        val issues = CalibrationTableCodec.validateMetadataForImage(
+            metadata,
+            "1G1FA1RXXR0123456",
+            "1G1FA1RXXR0123456",
+            binary,
+            listOf("CAL-123", "CAL-456"),
+            listOf("00000000", "A1B2C3D4")
+        )
+
+        assertTrue(issues.any { it.contains("associé au CAL ID") })
+    }
+
+    @Test
     fun parsesUserSuppliedTsvDefinition() {
         val definitions = CalibrationTableCodec.parseDefinitions(CalibrationTableCodec.template)
         val table = definitions.definitions.single()
