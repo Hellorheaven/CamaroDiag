@@ -145,7 +145,7 @@ fun CalibrationWorkspaceScreen(
             it.name.contains(obdbSignalSearch, true) ||
             it.id.contains(obdbSignalSearch, true) ||
             it.path.contains(obdbSignalSearch, true)
-    }.take(100)
+    }
     val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
     val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
