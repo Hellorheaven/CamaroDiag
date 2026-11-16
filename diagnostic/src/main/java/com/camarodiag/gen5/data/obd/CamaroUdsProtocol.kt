@@ -12,7 +12,8 @@ object CamaroUdsProtocol {
         atalResp: String,
         stp61Resp: String,
         headersResp: String = "OK",
-        protocolResp: String = "OK"
+        protocolResp: String = "OK",
+        swCanWiringVerified: Boolean = false
     ): AdapterCapabilities {
         val logs = listOf(
             "> ATZ  -> $atzResp",
@@ -28,7 +29,9 @@ object CamaroUdsProtocol {
             deviceName.contains("OBDLink", ignoreCase = true) ||
             deviceName.contains("vLinker", ignoreCase = true)
 
-        val supportsSwCan = isStn && (stp61Resp.contains("OK", ignoreCase = true) || stiResp.contains("STN2255") || stiResp.contains("STN1170"))
+        // STP 61 acceptance proves only protocol command support, not that the adapter is physically wired to DLC pin 1.
+        val supportsSwCan = swCanWiringVerified && isStn &&
+            (stp61Resp.contains("OK", ignoreCase = true) || stiResp.contains("STN2255") || stiResp.contains("STN1170"))
         val supportsLong = atalResp.contains("OK", ignoreCase = true)
 
         val tier = when {
