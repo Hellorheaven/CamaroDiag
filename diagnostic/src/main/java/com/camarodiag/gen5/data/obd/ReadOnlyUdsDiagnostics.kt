@@ -23,6 +23,26 @@ interface RawCanFrameTransport {
     suspend fun receive(timeoutMs: Long): CanFrame?
 }
 
+/** Complete UDS payload transport. The provider may perform ISO-TP itself (e.g. STPX). */
+interface UdsPayloadTransport {
+    suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray
+    suspend fun sendOnly(payload: ByteArray, timeoutMs: Long)
+}
+
+/** Adapts a raw Classical CAN provider to complete UDS payload exchanges using ISO-TP. */
+class IsoTpUdsPayloadTransport(
+    transport: RawCanFrameTransport,
+    requestCanId: Int,
+    responseCanId: Int,
+    extendedCanId: Boolean = false
+) : UdsPayloadTransport {
+    private val channel = IsoTpChannel(transport, requestCanId, responseCanId, extendedCanId)
+    override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+        channel.exchange(payload, timeoutMs)
+    override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) =
+        channel.sendOnly(payload, timeoutMs)
+}
+
 class IsoTpException(message: String) : IllegalStateException(message)
 
 /** Classical CAN ISO-TP normal-addressing channel. */
