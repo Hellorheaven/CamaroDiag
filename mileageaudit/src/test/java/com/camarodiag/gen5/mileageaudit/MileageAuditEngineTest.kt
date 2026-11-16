@@ -10,14 +10,14 @@ class MileageAuditEngineTest {
         id: String,
         km: Double?,
         confidence: ConfidenceLevel,
-        profileVerified: Boolean = false
+        profileEvidenceReference: String? = null
     ) = MileageSourceReading(
-        id, id, id, "test response", km, confidence, "test", "test", profileVerified
+        id, id, id, "test response", km, confidence, "test", "test", profileEvidenceReference
     )
 
     @Test fun twoVerifiedIndependentModulesFlagLargeDifference() {
         val report = MileageAuditEngine.evaluate("VIN", listOf(
-            reading("BCM", 100000.0, ConfidenceLevel.HIGH, profileVerified = true),
+            reading("BCM", 100000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile"),
             reading("IPC", 120000.0, ConfidenceLevel.HIGH, profileVerified = true)
         ))
         assertTrue(report.hasDiscrepancy)
