@@ -24,7 +24,7 @@ const string channel="release";
    var ps=$@"$ErrorActionPreference='Stop'
 try {{
  Wait-Process -Id {Environment.ProcessId} -ErrorAction SilentlyContinue
- Start-Process -FilePath '{Esc(installer)}' -ArgumentList @('/SILENT','/NORESTART','/DIR=""{Esc(dest)}""') -Verb RunAs -Wait
+ Start-Process -FilePath '{Esc(installer)}' -ArgumentList @('/SILENT','/NORESTART','/DIR=""{Esc(dest)}""') -Wait
  Remove-Item '{Esc(installer)}' -Force -ErrorAction SilentlyContinue
  Write-Host 'CamaroDiag Bridge updated.' -ForegroundColor Green
 }} catch {{ Write-Host ('Update failed: '+$_.Exception.Message) -ForegroundColor Red }}
