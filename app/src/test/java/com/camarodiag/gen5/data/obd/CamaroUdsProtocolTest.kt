@@ -76,6 +76,25 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun genericElmCloneCanUseStandardCanWithoutClaimingUdsCapabilities() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "ELM327 Bluetooth",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "ELM327 v2.1",
+            stiResp = "?",
+            atalResp = "?",
+            stp61Resp = "?",
+            headersResp = "OK",
+            protocolResp = "OK"
+        )
+
+        assertEquals(AdapterTier.CLONE_ELM, capabilities.tier)
+        assertTrue(capabilities.supportsCanHeaders)
+        assertFalse(capabilities.supportsLongFrames)
+        assertFalse(capabilities.supportsSwCan)
+    }
+
+    @Test
     fun enablesSwCanOnlyForDocumentedMxHardwareWithAcceptedProtocol() {
         val mxPlus = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "OBDLink MX+",
