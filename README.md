@@ -64,6 +64,17 @@ Les familles ECM sont indicatives et doivent être confirmées sur le véhicule 
 
 Le catalogue OBDb est communautaire, non certifié par GM. Un signal répertorié n'est pas nécessairement présent sur chaque finition, marché, transmission ou calibration. Une absence de réponse n'est jamais remplacée par une valeur fictive.
 
+## Télécharger la version Debug
+
+Les APK Debug sont publiés comme artefacts des exécutions GitHub Actions (ils ne sont pas ajoutés aux Releases) :
+
+1. Ouvrir https://github.com/Hellorheaven/CamaroDiag/actions.
+2. Ouvrir la dernière exécution réussie de **Android CI** sur `main`.
+3. Dans **Artifacts**, télécharger `CamaroDiag-debug-<commit>`.
+4. Décompresser l'archive et installer `CamaroDiag-debug.apk`.
+
+Chaque artefact est conservé 30 jours. Les Releases restent réservées aux APK Release et aux installateurs du pont Windows.
+
 ## Installation Android
 
 Prérequis : Android 10 ou supérieur (API 29 à 36 déclarées), Bluetooth ou Wi-Fi selon l'adaptateur, et USB Host/OTG pour les interfaces USB.
