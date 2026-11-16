@@ -283,4 +283,25 @@
     <string name="remote_start_blocker_faults">No se ha confirmado la ausencia de fallos críticos.</string>
     <string name="remote_start_blocker_stationary">No se ha confirmado que el vehículo esté inmovilizado.</string>
     <string name="remote_start_blocker_equipment">No se ha confirmado el equipamiento OEM de arranque remoto.</string>
+    <string name="units_metric">SI / Métrico</string>
+    <string name="units_imperial">Imperial</string>
+    <string name="live_pause">Pausa</string>
+    <string name="live_recording_status">%1$d muestra(s) • %2$s</string>
+    <string name="live_recording_state_active">GRABANDO</string>
+    <string name="live_recording_state_stopped">DETENIDO</string>
+    <string name="live_pid_rpm">Régimen del motor</string>
+    <string name="live_pid_rpm_demo">Régimen del motor (DEMO)</string>
+    <string name="live_pid_ect">Temperatura del refrigerante</string>
+    <string name="live_pid_ect_demo">Temperatura del refrigerante (DEMO)</string>
+    <string name="live_pid_oil_demo">Presión de aceite (DEMO)</string>
+    <string name="live_pid_stft">Ajuste de combustible a corto plazo B1</string>
+    <string name="live_pid_stft_demo">Ajuste de combustible B1 (DEMO)</string>
+    <string name="live_pid_bat">Tensión del módulo de control</string>
+    <string name="live_pid_bat_demo">Tensión del módulo de control (DEMO)</string>
+    <string name="live_pid_speed">Velocidad del vehículo</string>
+    <string name="live_pid_throttle">Posición del acelerador</string>
+    <string name="live_pid_load">Carga calculada del motor</string>
+    <string name="live_pid_map">Presión del colector de admisión</string>
+    <string name="live_pid_iat">Temperatura del aire de admisión</string>
+    <string name="live_pid_maf">Caudal másico de aire</string>
 </resources>

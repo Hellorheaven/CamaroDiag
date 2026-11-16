@@ -283,4 +283,25 @@
     <string name="remote_start_blocker_faults">L'assenza di guasti critici non è confermata.</string>
     <string name="remote_start_blocker_stationary">Lo stato di veicolo fermo non è confermato.</string>
     <string name="remote_start_blocker_equipment">L'equipaggiamento OEM per l'avviamento remoto non è confermato.</string>
+    <string name="units_metric">SI / Metrico</string>
+    <string name="units_imperial">Imperiale</string>
+    <string name="live_pause">Pausa</string>
+    <string name="live_recording_status">%1$d campione/i • %2$s</string>
+    <string name="live_recording_state_active">REGISTRAZIONE</string>
+    <string name="live_recording_state_stopped">FERMATO</string>
+    <string name="live_pid_rpm">Regime motore</string>
+    <string name="live_pid_rpm_demo">Regime motore (DEMO)</string>
+    <string name="live_pid_ect">Temperatura liquido refrigerante</string>
+    <string name="live_pid_ect_demo">Temperatura liquido refrigerante (DEMO)</string>
+    <string name="live_pid_oil_demo">Pressione olio (DEMO)</string>
+    <string name="live_pid_stft">Correzione carburante a breve termine B1</string>
+    <string name="live_pid_stft_demo">Correzione carburante B1 (DEMO)</string>
+    <string name="live_pid_bat">Tensione centralina</string>
+    <string name="live_pid_bat_demo">Tensione centralina (DEMO)</string>
+    <string name="live_pid_speed">Velocità veicolo</string>
+    <string name="live_pid_throttle">Posizione farfalla</string>
+    <string name="live_pid_load">Carico motore calcolato</string>
+    <string name="live_pid_map">Pressione collettore aspirazione</string>
+    <string name="live_pid_iat">Temperatura aria aspirata</string>
+    <string name="live_pid_maf">Portata massica aria</string>
 </resources>

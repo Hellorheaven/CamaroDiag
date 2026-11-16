@@ -283,4 +283,25 @@
     <string name="remote_start_blocker_faults">לא אושר שאין תקלות קריטיות.</string>
     <string name="remote_start_blocker_stationary">לא אושר שהרכב במצב עמידה.</string>
     <string name="remote_start_blocker_equipment">לא אושר שקיימת מערכת התנעה מרחוק OEM.</string>
+    <string name="units_metric">SI / מטרי</string>
+    <string name="units_imperial">אימפריאלי</string>
+    <string name="live_pause">השהה</string>
+    <string name="live_recording_status">%1$d דגימות • %2$s</string>
+    <string name="live_recording_state_active">מקליט</string>
+    <string name="live_recording_state_stopped">מופסק</string>
+    <string name="live_pid_rpm">מהירות מנוע</string>
+    <string name="live_pid_rpm_demo">מהירות מנוע (הדגמה)</string>
+    <string name="live_pid_ect">טמפרטורת נוזל קירור</string>
+    <string name="live_pid_ect_demo">טמפרטורת נוזל קירור (הדגמה)</string>
+    <string name="live_pid_oil_demo">לחץ שמן (הדגמה)</string>
+    <string name="live_pid_stft">תיקון דלק לטווח קצר B1</string>
+    <string name="live_pid_stft_demo">תיקון דלק B1 (הדגמה)</string>
+    <string name="live_pid_bat">מתח מחשב הרכב</string>
+    <string name="live_pid_bat_demo">מתח מחשב הרכב (הדגמה)</string>
+    <string name="live_pid_speed">מהירות הרכב</string>
+    <string name="live_pid_throttle">מיקום המצערת</string>
+    <string name="live_pid_load">עומס מנוע מחושב</string>
+    <string name="live_pid_map">לחץ סעפת יניקה</string>
+    <string name="live_pid_iat">טמפרטורת אוויר יניקה</string>
+    <string name="live_pid_maf">ספיקת אוויר מסית</string>
 </resources>
