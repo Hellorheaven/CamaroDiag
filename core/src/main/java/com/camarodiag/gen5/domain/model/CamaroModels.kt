@@ -130,7 +130,7 @@ data class MileageSourceReading(
     val confidence: ConfidenceLevel,
     val caveatEn: String,
     val caveatFr: String,
-    val profileVerified: Boolean = false
+    val profileEvidenceReference: String? = null
 )
 
 data class MileageAuditReport(
