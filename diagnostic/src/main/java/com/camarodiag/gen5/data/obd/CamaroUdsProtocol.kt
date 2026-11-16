@@ -51,12 +51,12 @@ object CamaroUdsProtocol {
         val standardObdAvailable =
             adapter.tier != AdapterTier.DISCONNECTED && adapter.supportsCanHeaders
         val ecmStatus = if (standardObdAvailable) {
-            ModuleStatus.ACCESSIBLE
+            ModuleStatus.DISCOVERY_REQUIRED
         } else {
             ModuleStatus.UNSUPPORTED_BY_ADAPTER
         }
         val ecmTxHeader = if (standardObdAvailable) "7DF" else ""
-        val ecmRxHeader = if (standardObdAvailable) "7E8" else ""
+        val ecmRxHeader = ""
 
         if (vehicle.generation == CamaroGeneration.GEN6) {
             return listOf(
