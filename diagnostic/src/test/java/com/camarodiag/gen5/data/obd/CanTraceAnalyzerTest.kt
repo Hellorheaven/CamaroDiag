@@ -11,7 +11,7 @@ class CanTraceAnalyzerTest {
         val trace = """
             date Mon Nov 16 13:00:00.000 2026
             0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00
-            0.001000 1 7E8 Rx d 8 06 62 F1 90 31 47 30 31
+            0.001000 1 7E8 Rx d 8 07 62 F1 90 31 47 30 31
         """.trimIndent()
 
         val report = CanTraceAnalyzer.analyze(trace, "camaro.asc")
