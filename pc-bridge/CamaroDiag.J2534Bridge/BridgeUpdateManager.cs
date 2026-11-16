@@ -10,11 +10,7 @@ internal static class BridgeUpdateManager {
  private static HttpClient MakeClient(){var h=new HttpClient{Timeout=TimeSpan.FromSeconds(30)};h.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("CamaroDiag-J2534-Bridge","1.0"));h.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));return h;}
  public static async Task<bool> CheckAndOfferUpdateAsync(){
   try{
-#if DEBUG
-   return false; // Debug builds are not distributed through GitHub Releases.
-#else
-   const string channel="release";
-#endif
+const string channel="release";
    var arch=RuntimeInformation.ProcessArchitecture switch{Architecture.X64=>"win-x64",Architecture.X86=>"win-x86",_=>null};if(arch is null)return false;
    using var res=await Http.GetAsync(Api);res.EnsureSuccessStatusCode();await using var st=await res.Content.ReadAsStreamAsync();using var doc=await JsonDocument.ParseAsync(st);var root=doc.RootElement;
    if((root.TryGetProperty("draft",out var d)&&d.GetBoolean())||(root.TryGetProperty("prerelease",out var p)&&p.GetBoolean()))return false;
