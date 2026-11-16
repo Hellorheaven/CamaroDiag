@@ -13,15 +13,15 @@ data class UdsAccessPolicy internal constructor(
     val readDids: Set<Int>,
     val writeDids: Set<Int>,
     val allowedSessions: Set<Int>,
-    val allowedRoutineIds: Set<Int>,
-    val ioControlDids: Set<Int>,
+    val routineControlPermissions: Map<Int, Set<Int>>,
+    val ioControlPermissions: Map<Int, Set<Int>>,
     val allowedSecurityLevels: Set<Int>,
-    val allowCommunicationControl: Boolean,
-    val allowDtcSetting: Boolean,
+    val allowedCommunicationControls: Set<Pair<Int, Int>>,
+    val allowedDtcSettingTypes: Set<Int>,
+    val allowedDtcGroups: Set<Int>,
+    val allowedEcuResetTypes: Set<Int>,
     val memoryRegions: List<UdsMemoryRegion>,
     val maxTransferBytes: Int,
-    val allowClearDtc: Boolean,
-    val allowEcuReset: Boolean,
     val requireSecurityAccess: Boolean,
     val evidenceReference: String
 ) {
@@ -30,11 +30,13 @@ data class UdsAccessPolicy internal constructor(
             readDids = readDids,
             writeDids = emptySet(),
             allowedSessions = setOf(0x01),
-            allowedRoutineIds = emptySet(),
-            ioControlDids = emptySet(),
+            routineControlPermissions = emptyMap(),
+            ioControlPermissions = emptyMap(),
             allowedSecurityLevels = emptySet(),
-            allowCommunicationControl = false,
-            allowDtcSetting = false,
+            allowedCommunicationControls = emptySet(),
+            allowedDtcSettingTypes = emptySet(),
+            allowedDtcGroups = emptySet(),
+            allowedEcuResetTypes = emptySet(),
             memoryRegions = emptyList(),
             maxTransferBytes = 0,
             allowClearDtc = false,
@@ -55,11 +57,13 @@ data class UdsAccessPolicy internal constructor(
             readDids: Set<Int>,
             writeDids: Set<Int>,
             allowedSessions: Set<Int>,
-            allowedRoutineIds: Set<Int>,
-            ioControlDids: Set<Int> = emptySet(),
+            routineControlPermissions: Map<Int, Set<Int>>,
+            ioControlPermissions: Map<Int, Set<Int>> = emptyMap(),
             allowedSecurityLevels: Set<Int> = emptySet(),
-            allowCommunicationControl: Boolean = false,
-            allowDtcSetting: Boolean = false,
+            allowedCommunicationControls: Set<Pair<Int, Int>> = emptySet(),
+            allowedDtcSettingTypes: Set<Int> = emptySet(),
+            allowedDtcGroups: Set<Int> = emptySet(),
+            allowedEcuResetTypes: Set<Int> = emptySet(),
             memoryRegions: List<UdsMemoryRegion>,
             maxTransferBytes: Int,
             allowClearDtc: Boolean,
@@ -78,13 +82,19 @@ data class UdsAccessPolicy internal constructor(
             require(evidenceReference.isNotBlank()) { "Traceable OEM evidence is required." }
             require(readDids.all { it in 0..0xFFFF } && writeDids.all { it in 0..0xFFFF })
             require(allowedSessions.isNotEmpty() && allowedSessions.all { it in 1..0x7F })
-            require(allowedRoutineIds.all { it in 0..0xFFFF } && ioControlDids.all { it in 0..0xFFFF })
+            require(routineControlPermissions.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 1..3 } })
+            require(ioControlPermissions.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 0..0xFF } })
             require(allowedSecurityLevels.all { it in 1..0x7D && it % 2 == 1 })
+            require(allowedCommunicationControls.all { (type, communication) -> type in 0..3 && communication in 0..0xFF })
+            require(allowedDtcSettingTypes.all { it in 1..2 })
+            require(allowedDtcGroups.all { it in 0..0xFFFFFF })
+            require(allowedEcuResetTypes.all { it in 1..0x7F })
             require(maxTransferBytes >= 0)
             return UdsAccessPolicy(
-                readDids, writeDids, allowedSessions, allowedRoutineIds, ioControlDids,
-                allowedSecurityLevels, allowCommunicationControl, allowDtcSetting, memoryRegions,
-                maxTransferBytes, allowClearDtc, allowEcuReset, requireSecurityAccess, evidenceReference
+                readDids, writeDids, allowedSessions, routineControlPermissions, ioControlPermissions,
+                allowedSecurityLevels, allowedCommunicationControls, allowedDtcSettingTypes,
+                allowedDtcGroups, allowedEcuResetTypes, memoryRegions,
+                maxTransferBytes, requireSecurityAccess, evidenceReference
             )
         }
     }
@@ -99,8 +109,6 @@ data class UdsMemoryRegion(val startAddress: Long, val length: Long) {
     fun contains(address: Long, size: Long): Boolean =
         address >= startAddress && size > 0 && address <= startAddress + length - size
 }
-
-data class UdsResponse(val service: Int, val payload: ByteArray)
 
 data class UdsDtcRecord(
     val dtc: Int,
@@ -211,8 +219,7 @@ class UdsClient private constructor(
     }
 
     suspend fun clearDiagnosticInformation(groupOfDtc: Int = 0xFFFFFF) {
-        require(policy.allowClearDtc) { "DTC clearing is disabled by the ECU profile." }
-        require(groupOfDtc in 0..0xFFFFFF)
+        require(groupOfDtc in policy.allowedDtcGroups) { "DTC group is not allowlisted for this ECU." }
         requireProgrammingSession()
         requireSecurityIfConfigured()
         request(0x14, byteArrayOf(
@@ -221,8 +228,7 @@ class UdsClient private constructor(
     }
 
     suspend fun ecuReset(resetType: Int) {
-        require(policy.allowEcuReset) { "ECU reset is disabled by the ECU profile." }
-        require(resetType in 1..0x7F)
+        require(resetType in policy.allowedEcuResetTypes) { "ECU reset type is not allowlisted for this ECU." }
         requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x11, byteArrayOf(resetType.toByte()))
@@ -256,7 +262,9 @@ class UdsClient private constructor(
 
     suspend fun routineControl(controlType: Int, routineId: Int, parameters: ByteArray = byteArrayOf()): ByteArray {
         require(controlType in 1..3)
-        require(routineId in policy.allowedRoutineIds) { "Routine is not allowlisted for this ECU." }
+        require(controlType in policy.routineControlPermissions[routineId].orEmpty()) {
+            "Routine/control-type pair is not allowlisted for this ECU."
+        }
         requireProgrammingSession()
         requireSecurityIfConfigured()
         val requestData = byteArrayOf(
@@ -269,6 +277,8 @@ class UdsClient private constructor(
 
     suspend fun readMemoryByAddressAndLength(address: Long, size: Int, addressLength: Int = 4, sizeLength: Int = 2): ByteArray {
         requireAllowedMemory(address, size.toLong())
+        requireProgrammingSession()
+        requireSecurityIfConfigured()
         require(size in 1..4092) { "Memory read length exceeds the supported single UDS response limit." }
         val format = addressLength shl 4 or sizeLength
         val requestData = byteArrayOf(format.toByte()) + encodeUnsigned(address, addressLength) + encodeUnsigned(size.toLong(), sizeLength)
@@ -362,8 +372,9 @@ class UdsClient private constructor(
     }
 
     suspend fun inputOutputControlByIdentifier(did: Int, controlParameter: Int, data: ByteArray = byteArrayOf()): ByteArray {
-        require(did in policy.ioControlDids) { "I/O control DID is not allowlisted for this ECU." }
-        require(controlParameter in 0..0xFF)
+        require(controlParameter in policy.ioControlPermissions[did].orEmpty()) {
+            "I/O control DID/parameter pair is not allowlisted for this ECU."
+        }
         requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x2F, byteArrayOf((did shr 8).toByte(), did.toByte(), controlParameter.toByte()) + data)
@@ -373,8 +384,9 @@ class UdsClient private constructor(
     }
 
     suspend fun communicationControl(controlType: Int, communicationType: Int) {
-        require(policy.allowCommunicationControl) { "Communication control is disabled by the ECU profile." }
-        require(controlType in 0..3 && communicationType in 0..0xFF)
+        require((controlType to communicationType) in policy.allowedCommunicationControls) {
+            "Communication control type is not allowlisted for this ECU."
+        }
         requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x28, byteArrayOf(controlType.toByte(), communicationType.toByte()))
@@ -383,8 +395,7 @@ class UdsClient private constructor(
     }
 
     suspend fun controlDtcSetting(settingType: Int, record: ByteArray = byteArrayOf()) {
-        require(policy.allowDtcSetting) { "DTC setting control is disabled by the ECU profile." }
-        require(settingType in 1..2)
+        require(settingType in policy.allowedDtcSettingTypes) { "DTC setting type is not allowlisted for this ECU." }
         requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x85, byteArrayOf(settingType.toByte()) + record)
