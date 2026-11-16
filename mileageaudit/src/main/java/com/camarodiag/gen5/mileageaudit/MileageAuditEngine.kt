@@ -40,14 +40,14 @@ object MileageAuditEngine {
             discrepancy -> "Écart de ${"%.1f".format(independentDelta)} km entre sources indépendantes vérifiées. Contrôler remplacement/reprogrammation des modules et historique. Indice à investiguer, pas preuve isolée de fraude."
             independentValues.size >= 2 -> "Les sources indépendantes vérifiées concordent à ${"%.1f".format(independentDelta)} km près. Cela ne garantit pas l'authenticité de l'historique."
             valid.isEmpty() -> "Aucune valeur totale fiable n'a été lue. BCM et IPC restent non vérifiés ; aucune valeur n'est simulée."
-            else -> "Seulement ${valid.size} source(s) kilométrique(s) exploitable(s), dont ${independentValues.size} indépendante(s) à haute confiance. Comparaison insuffisante pour conclure."
+            else -> "Seulement ${valid.size} lecture(s) kilométrique(s) exploitable(s), représentant ${independentValues.size} calculateur(s) indépendant(s) vérifié(s) à haute confiance. Comparaison insuffisante pour conclure."
         }
 
         val en = when {
             discrepancy -> "${"%.1f".format(independentDelta)} km difference between verified independent sources. Check module replacement/reprogramming and service history. This is an investigation flag, not proof of tampering."
             independentValues.size >= 2 -> "Verified independent sources agree within ${"%.1f".format(independentDelta)} km. This does not guarantee an authentic mileage history."
             valid.isEmpty() -> "No reliable total-odometer value was read. BCM and IPC remain unverified; no value is simulated."
-            else -> "Only ${valid.size} usable mileage source(s), including ${independentValues.size} high-confidence independent source(s). Insufficient comparison to conclude."
+            else -> "Only ${valid.size} usable mileage reading(s), representing ${independentValues.size} high-confidence verified independent ECU(s). Insufficient comparison to conclude."
         }
 
         return MileageAuditReport(
