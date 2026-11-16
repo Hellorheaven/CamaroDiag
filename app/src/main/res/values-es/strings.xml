@@ -122,7 +122,7 @@
     <string name="settings_title">Ajustes e informes guardados</string>
     <string name="settings_unit_system">Unidades de medida</string>
     <string name="settings_saved_sessions">Sesiones de diagnóstico guardadas (base de datos Room local)</string>
-    <string name="settings_no_sessions">Todavía no hay sesiones guardadas. Usa 'Guardar' en la pestaña Kilometraje.</string>
+    <string name="settings_no_sessions">Todavía no hay sesiones guardadas. Usa \'Guardar\' en la pestaña Kilometraje.</string>
     <string name="cal_workspace_title">ÁREA ECU / CALIBRACIÓN</string>
     <string name="cal_ecm_family">Familia de ECU orientativa: %1$s</string>
     <string name="cal_engine_coverage">Cobertura de motores Camaro Gen 5 / Gen 6</string>

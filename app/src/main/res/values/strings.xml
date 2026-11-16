@@ -75,7 +75,7 @@
     <string name="adapter_ip_address">Adapter IP address</string>
     <string name="adapter_tcp_port">TCP port (often 35000 or 23)</string>
     <string name="adapter_connect_wifi">Connect over Wi-Fi</string>
-    <string name="adapter_vxdiag_android_limit">VXDIAG: transport architecture is prepared, but J2534 interfaces are not claimed Android-compatible without the model's official Android SDK. No J2534 access is simulated.</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: transport architecture is prepared, but J2534 interfaces are not claimed Android-compatible without the model\'s official Android SDK. No J2534 access is simulated.</string>
     <string name="adapter_vxdiag_profiles">Declared VXDIAG interface profiles</string>
     <string name="adapter_vxdiag_profiles_hint">These profiles distinguish hardware and link variants. They do not mean an Android driver or vehicle communication is available.</string>
     <string name="adapter_discovery_only">DISCOVERY ONLY</string>
@@ -122,7 +122,7 @@
     <string name="settings_title">Settings &amp; Saved Reports</string>
     <string name="settings_unit_system">Measurement Units</string>
     <string name="settings_saved_sessions">Saved Diagnostic Sessions (Local Room DB)</string>
-    <string name="settings_no_sessions">No saved sessions yet. Use 'Save' in the Mileage tab.</string>
+    <string name="settings_no_sessions">No saved sessions yet. Use \'Save\' in the Mileage tab.</string>
     <string name="cal_workspace_title">ECU / CALIBRATION WORKSPACE</string>
     <string name="cal_ecm_family">Indicative controller family: %1$s</string>
     <string name="cal_engine_coverage">Camaro Gen 5 / Gen 6 engine coverage</string>
@@ -260,7 +260,7 @@
     <string name="control_conditions_confirmed">conditions confirmed</string>
     <string name="control_blocked">BLOCKED</string>
     <string name="control_windows_title">Windows</string>
-    <string name="control_windows_explanation">GM command must be identified and validated for this VIN's BCM. No universal frame is assumed.</string>
+    <string name="control_windows_explanation">GM command must be identified and validated for this VIN\'s BCM. No universal frame is assumed.</string>
     <string name="control_sunroof_title">Sunroof</string>
     <string name="control_sunroof_explanation">Only if equipped and a validated BCM command is available.</string>
     <string name="control_door_locks_title">Door locks</string>

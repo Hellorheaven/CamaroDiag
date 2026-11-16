@@ -122,7 +122,7 @@
     <string name="settings_title">הגדרות ודוחות שמורים</string>
     <string name="settings_unit_system">יחידות מידה</string>
     <string name="settings_saved_sessions">מפגשי אבחון שמורים (מסד נתונים מקומי Room)</string>
-    <string name="settings_no_sessions">עדיין אין מפגשים שמורים. השתמש ב'שמור' בכרטיסיית מד המרחק.</string>
+    <string name="settings_no_sessions">עדיין אין מפגשים שמורים. השתמש ב\'שמור\' בכרטיסיית מד המרחק.</string>
     <string name="cal_workspace_title">סביבת ECU / כיול</string>
     <string name="cal_ecm_family">משפחת מחשב משוערת: %1$s</string>
     <string name="cal_engine_coverage">כיסוי מנועי Camaro דור 5 / דור 6</string>
