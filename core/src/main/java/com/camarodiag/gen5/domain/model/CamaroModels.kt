@@ -45,7 +45,7 @@ enum class CamaroEngine(
 data class VehicleProfile(
     val modelYear: Int = 2012,
     val engine: CamaroEngine = CamaroEngine.LFX,
-    val transmission: TransmissionType = TransmissionType.AUTOMATIC,
+    val transmission: TransmissionType = TransmissionType.MANUAL,
     val market: MarketRegion = MarketRegion.EU_ECE,
     val vin: String = ""
 ) {

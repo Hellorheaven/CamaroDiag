@@ -40,7 +40,7 @@ Les familles ECM sont des indications de profil. Confirmer le numéro matériel,
 | OBDLink LX | Bluetooth SPP | Oui | Non | Non annoncé |
 | OBDLink EX / SX | USB série | Oui | Non activé | Selon modèle |
 | OBDLink CX | Bluetooth LE | Non pour Camaro/GM | Non | Non |
-| ELM327 SPP | Bluetooth classique | Oui selon qualité | Non | Non garanti |
+| ELM327 SPP | Bluetooth classique | Oui selon qualité ; Mode 01/02/03/06/07/09 selon ECU | Non | Non garanti | ATI/AT@1, ATSP6 ; clones limités selon firmware |
 | ELM/STN USB | USB OTG | Oui selon interface | Non | Non garanti |
 | ELM/STN Wi-Fi | TCP/IP | Oui selon interface | Non | Non garanti |
 | VXDIAG VCX SE | PC Windows + J2534 | Non via pont UDS | Oui, lecture UDS via pont | SW-ISO15765 si pilote J2534-2 compatible |
@@ -53,7 +53,7 @@ Le lecteur UDS direct Android est actuellement destiné à l'OBDLink MX+ authent
 | Fonction | État |
 |---|---|
 | VIN, CAL ID, CVN, nom ECU | Lorsque les services standards sont pris en charge et répondent |
-| PIDs moteur normalisés | Mode 01, PIDs annoncés et retournés |
+| PIDs moteur normalisés | Mode 01, PIDs annoncés et retournés ; décodage des sondes lambda large bande 0x24–0x2B et 0x34–0x3B, pression de rail 0x22, températures catalyseur 0x3C–0x3F et autres PIDs implémentés |
 | DTC confirmés / en attente / permanents | Modes 03 / 07 / 0A |
 | Freeze-frame | Mode 02, selon données retournées |
 | Readiness | Mode 01 |

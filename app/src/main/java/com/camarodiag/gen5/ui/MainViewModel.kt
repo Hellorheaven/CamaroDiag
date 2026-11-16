@@ -548,10 +548,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 message = ""
             )
             try {
-                val engine = obdManager.createObd2FeatureEngine()
-                val ecuVin = engine.readVin()
-                val calIds = engine.readCalibrationIds()
-                val cvns = engine.readCalibrationVerificationNumbers()
+                val (ecuVin, calIds, cvns) = obdManager.withObdCommandSession { engine ->
+                    Triple(
+                        engine.readVin(),
+                        engine.readCalibrationIds(),
+                        engine.readCalibrationVerificationNumbers()
+                    )
+                }
                 val validCal = calIds.isNotEmpty()
                 val validCvn = cvns.isNotEmpty()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -1216,7 +1219,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = "Connecte une interface OBD réelle pour lire les défauts."
                 } else {
-                    val (confirmed, pending, permanent) = obdManager.createObd2FeatureEngine().readDtcs()
+                    val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
+                        engine.readDtcs()
+                    }
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                 }
             } catch (cancelled: CancellationException) {
@@ -1339,23 +1344,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Le mode démo ne représente jamais le kilométrage réel du véhicule."
                     )
                 } else {
-                    val a6Response = obdManager.sendAtCommand("01A6", 1800L)
-                    val a6Km = CamaroUdsProtocol.parseOdometerPidA6(a6Response)
+                    val (a6Response, d3Response) = obdManager.withObdCommandSession { engine ->
+                        val supportedPids = engine.discoverSupportedPids()
+                        engine.readMode01PidIfSupported(0xA6, supportedPids) to
+                            engine.readMode01PidIfSupported(0xD3, supportedPids)
+                    }
+                    val a6Km = a6Response?.let { CamaroUdsProtocol.parseOdometerPidA6(it) }
                     readings += MileageSourceReading(
                         "ECM_A6", "OBD odometer (PID A6)", "Odomètre OBD (PID A6)",
-                        "Mode 01 PID A6 • $a6Response", a6Km,
+                        "Mode 01 PID A6 • ${a6Response ?: "not advertised by ECU"}", a6Km,
                         if (a6Km != null) ConfidenceLevel.MODERATE else ConfidenceLevel.UNAVAILABLE,
-                        if (a6Km != null) "ECU-reported OBD odometer value. It is one ECU datum, not an independent cross-module check." else "PID A6 not supported or no valid response.",
-                        if (a6Km != null) "Valeur odométrique déclarée par l'ECU. Il s'agit d'une donnée d'un calculateur, pas d'une comparaison intermodules indépendante." else "PID A6 non pris en charge ou réponse invalide."
+                        if (a6Km != null) "ECU-reported OBD odometer value. It is one ECU datum, not an independent cross-module check." else "PID A6 was not advertised by the ECU or returned no valid response.",
+                        if (a6Km != null) "Valeur odométrique déclarée par l'ECU. Il s'agit d'une donnée d'un calculateur, pas d'une comparaison intermodules indépendante." else "PID A6 non annoncé par l'ECU ou réponse invalide."
                     )
-                    val d3Response = obdManager.sendAtCommand("01D3", 1800L)
-                    val d3Km = CamaroUdsProtocol.parseOdometerPidD3(d3Response)
+                    val d3Km = d3Response?.let { CamaroUdsProtocol.parseOdometerPidD3(it) }
                     readings += MileageSourceReading(
                         "ECM_D3", "Engine odometer (PID D3)", "Odomètre moteur (PID D3)",
-                        "Mode 01 PID D3 • $d3Response", d3Km,
+                        "Mode 01 PID D3 • ${d3Response ?: "not advertised by ECU"}", d3Km,
                         if (d3Km != null) ConfidenceLevel.MODERATE else ConfidenceLevel.UNAVAILABLE,
-                        if (d3Km != null) "Engine ECU value only; not an independent BCM/IPC confirmation." else "PID D3 not supported or no valid response.",
-                        if (d3Km != null) "Valeur du calculateur moteur uniquement ; ce n'est pas une confirmation indépendante BCM/IPC." else "PID D3 non pris en charge ou réponse invalide."
+                        if (d3Km != null) "Engine ECU value only; not an independent BCM/IPC confirmation." else "PID D3 was not advertised by the ECU or returned no valid response.",
+                        if (d3Km != null) "Valeur du calculateur moteur uniquement ; ce n'est pas une confirmation indépendante BCM/IPC." else "PID D3 non annoncé par l'ECU ou réponse invalide."
                     )
                     // Explicitly report unavailable module sources instead of implying they were read.
                     readings += MileageSourceReading(
@@ -1399,7 +1407,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isObdScanning.value = true
             _obdScanMessage.value = null
             try {
-                val report = obdManager.createObd2FeatureEngine().fullReadOnlyScan()
+                val report = obdManager.withObdCommandSession { engine ->
+                    engine.fullReadOnlyScan()
+                }
                 _obdScanReport.value = report
                 _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
                     topology = _modules.value,

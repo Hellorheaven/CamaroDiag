@@ -56,6 +56,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         listOf("ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP6").forEach {
             result[it] = ask(it, 2500L)
         }
+        result["IDENTIFICATION"] = ask("ATI")
+        result["DESCRIPTION"] = ask("AT@1")
         result["PROTOCOL"] = ask("ATDP")
         result["VOLTAGE"] = ask("ATRV")
         return result
@@ -112,20 +114,34 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return supported
     }
 
+    /**
+     * Reads one Mode 01 PID only when the ECU has advertised it in its support bitmap.
+     * Returns the raw ELM response so vehicle-specific presentation code can retain
+     * the original response alongside any decoded value.
+     */
+    suspend fun readMode01PidIfSupported(pid: Int, supportedPids: Set<Int>): String? {
+        require(pid in 0x01..0xFF) { "Mode 01 PID must be a single byte." }
+        if (pid !in supportedPids) return null
+        return ask("01%02X".format(Locale.US, pid), 1800L)
+    }
+
     suspend fun readLiveData(supportedPids: Set<Int>): List<ObdValue> {
         val requested = listOf(
             0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
             0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1C, 0x1F,
-            0x21, 0x23, 0x2C, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x42, 0x43,
-            0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D,
-            0x4E, 0x5C, 0x5D, 0x5E, 0x5F, 0x61, 0x62, 0x63
+            0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A,
+            0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34,
+            0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E,
+            0x3F, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A,
+            0x4B, 0x4C, 0x4D, 0x4E, 0x52, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F,
+            0x59, 0x61, 0x62, 0x63
         )
         val values = mutableListOf<ObdValue>()
         for (pid in requested) {
             if (pid !in supportedPids) continue
             val response = ask("01%02X".format(Locale.US, pid), 1200L)
             val data = payload(response, 0x41, pid) ?: continue
-            decode(pid, data)?.let(values::add)
+            values += decode(pid, data)
         }
         return values
     }
@@ -219,7 +235,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
      */
     private fun parseResponseBytes(response: String): List<Int>? {
         val cleaned = response.uppercase(Locale.ROOT)
-            .replace(Regex("SEARCHING|BUS INIT[^\\r\\n]*|CAN ERROR|NO DATA|STOPPED|\\bOK\\b|\\bERROR\\b|UNABLE TO CONNECT"), " ")
+            .replace(
+                Regex("SEARCHING(?:\\.\\.\\.)?|BUS INIT[^\\r\\n]*|CAN ERROR|BUS ERROR|DATA ERROR|BUFFER FULL|FB ERROR|LP ALERT|NO DATA|STOPPED|UNABLE TO CONNECT|\\bOK\\b|\\bERROR\\b|>"),
+                " "
+            )
         val tokens = cleaned.split(Regex("[^0-9A-F]+")).filter(String::isNotBlank)
         val bytes = mutableListOf<Int>()
         for (token in tokens) {
@@ -288,67 +307,120 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         }
     }
 
-    private fun decode(pid: Int, data: List<Int>): ObdValue? {
-        val a = data.getOrNull(0) ?: return null
+    private fun decode(pid: Int, data: List<Int>): List<ObdValue> {
+        val a = data.getOrNull(0) ?: return emptyList()
         val b = data.getOrNull(1) ?: 0
         fun word(): Int? = if (data.size >= 2) (a shl 8) or b else null
         fun percent(value: Int) = value * 100.0 / 255.0
-        val decoded: Triple<String, Double, String> = when (pid) {
-            0x01 -> return null // Monitor status is displayed in the dedicated readiness card.
-            0x03 -> return ObdValue(pid, "Fuel system status", data.joinToString(" ") { "%02X".format(Locale.US, it) }, "raw", data)
-            0x04 -> Triple("Calculated engine load", percent(a), "%")
-            0x05 -> Triple("Coolant temperature", (a - 40).toDouble(), "°C")
-            0x06 -> Triple("Short-term fuel trim bank 1", a * 100.0 / 128.0 - 100.0, "%")
-            0x07 -> Triple("Long-term fuel trim bank 1", a * 100.0 / 128.0 - 100.0, "%")
-            0x08 -> Triple("Short-term fuel trim bank 2", a * 100.0 / 128.0 - 100.0, "%")
-            0x09 -> Triple("Long-term fuel trim bank 2", a * 100.0 / 128.0 - 100.0, "%")
-            0x0A -> Triple("Fuel pressure", (a * 3.0), "kPa")
-            0x0B -> Triple("Intake manifold pressure", a.toDouble(), "kPa")
-            0x0C -> Triple("Engine speed", (word() ?: return null) / 4.0, "rpm")
-            0x0D -> Triple("Vehicle speed", a.toDouble(), "km/h")
-            0x0E -> Triple("Timing advance", a / 2.0 - 64.0, "°")
-            0x0F -> Triple("Intake air temperature", (a - 40).toDouble(), "°C")
-            0x10 -> Triple("Mass air flow", (word() ?: return null) / 100.0, "g/s")
-            0x11 -> Triple("Throttle position", percent(a), "%")
-            0x12, 0x13, 0x1C -> return ObdValue(pid, pidName(pid), data.joinToString(" ") { "%02X".format(Locale.US, it) }, "raw", data)
-            0x1F -> Triple("Run time since engine start", (word() ?: return null).toDouble(), "s")
-            0x21 -> Triple("Distance with MIL on", (word() ?: return null).toDouble(), "km")
-            0x23 -> Triple("Fuel rail pressure", (word() ?: return null) * 10.0, "kPa")
-            0x2C -> Triple("Commanded EGR", percent(a), "%")
-            0x2F -> Triple("Fuel tank level", percent(a), "%")
-            0x30 -> Triple("Warm-ups since DTC clear", a.toDouble(), "count")
-            0x31 -> Triple("Distance since DTC clear", (word() ?: return null).toDouble(), "km")
-            0x32 -> Triple("Evaporative system vapour pressure", ((word() ?: return null) - 32767) / 4.0, "Pa")
-            0x33 -> Triple("Barometric pressure", a.toDouble(), "kPa")
-            0x42 -> Triple("Control module voltage", (word() ?: return null) / 1000.0, "V")
-            0x43 -> Triple("Absolute load", (word() ?: return null) * 100.0 / 255.0, "%")
-            0x44 -> Triple("Commanded equivalence ratio", (word() ?: return null) / 32768.0, "lambda")
-            0x45 -> Triple("Relative throttle position", percent(a), "%")
-            0x46 -> Triple("Ambient air temperature", (a - 40).toDouble(), "°C")
-            0x47 -> Triple("Absolute throttle position B", percent(a), "%")
-            0x48 -> Triple("Absolute throttle position C", percent(a), "%")
-            0x49 -> Triple("Accelerator pedal position D", percent(a), "%")
-            0x4A -> Triple("Accelerator pedal position E", percent(a), "%")
-            0x4B -> Triple("Accelerator pedal position F", percent(a), "%")
-            0x4C -> Triple("Commanded throttle actuator", percent(a), "%")
-            0x4D -> Triple("Time with MIL on", (word() ?: return null).toDouble(), "min")
-            0x4E -> Triple("Time since DTC clear", (word() ?: return null).toDouble(), "min")
-            0x5C -> Triple("Engine oil temperature", (a - 40).toDouble(), "°C")
-            0x5D -> Triple("Fuel injection timing", ((word() ?: return null) / 128.0) - 210.0, "°")
-            0x5E -> Triple("Engine fuel rate", (word() ?: return null) / 20.0, "L/h")
-            0x5F -> Triple("Hybrid / alternate fuel system status", percent(a), "%")
-            0x61 -> Triple("Driver demand engine torque", (a - 125).toDouble(), "%")
-            0x62 -> Triple("Actual engine torque", (a - 125).toDouble(), "%")
-            0x63 -> Triple("Engine reference torque", (word() ?: return null).toDouble(), "Nm")
-            else -> return null
-        }
-        return ObdValue(
-            pid = pid,
-            name = decoded.first,
-            value = String.format(Locale.US, "%.2f", decoded.second),
-            unit = decoded.third,
-            raw = data
+        fun value(name: String, number: Double, unit: String) = listOf(
+            ObdValue(
+                pid = pid,
+                name = name,
+                value = String.format(Locale.US, "%.2f", number),
+                unit = unit,
+                raw = data
+            )
         )
+        fun raw(name: String = pidName(pid)) = listOf(
+            ObdValue(
+                pid = pid,
+                name = name,
+                value = data.joinToString(" ") { "%02X".format(Locale.US, it) },
+                unit = "raw",
+                raw = data
+            )
+        )
+
+        if (pid in 0x24..0x2B) {
+            if (data.size < 4) return emptyList()
+            val sensorIndex = pid - 0x24
+            val bank = if (sensorIndex < 4) 1 else 2
+            val sensor = sensorIndex % 4 + 1
+            val sensorLabel = "Bank $bank sensor $sensor"
+            val equivalenceRatio = ((data[0] shl 8) or data[1]) * 2.0 / 65536.0
+            val voltage = ((data[2] shl 8) or data[3]) * 8.0 / 65536.0
+            return value("O2 $sensorLabel equivalence ratio", equivalenceRatio, "lambda") +
+                value("O2 $sensorLabel voltage", voltage, "V")
+        }
+
+        if (pid in 0x34..0x3B) {
+            if (data.size < 4) return emptyList()
+            val sensorIndex = pid - 0x34
+            val bank = if (sensorIndex < 4) 1 else 2
+            val sensor = sensorIndex % 4 + 1
+            val sensorLabel = "Bank $bank sensor $sensor"
+            val equivalenceRatio = ((data[0] shl 8) or data[1]) * 2.0 / 65536.0
+            val current = ((data[2] shl 8) or data[3]) / 256.0 - 128.0
+            return value("O2 $sensorLabel equivalence ratio", equivalenceRatio, "lambda") +
+                value("O2 $sensorLabel current", current, "mA")
+        }
+
+        val decoded: Pair<String, Pair<Double, String>> = when (pid) {
+            0x01 -> return emptyList() // Monitor status is displayed in the dedicated readiness card.
+            0x03 -> return raw("Fuel system status")
+            0x04 -> "Calculated engine load" to (percent(a) to "%")
+            0x05 -> "Coolant temperature" to ((a - 40).toDouble() to "°C")
+            0x06 -> "Short-term fuel trim bank 1" to ((a * 100.0 / 128.0 - 100.0) to "%")
+            0x07 -> "Long-term fuel trim bank 1" to ((a * 100.0 / 128.0 - 100.0) to "%")
+            0x08 -> "Short-term fuel trim bank 2" to ((a * 100.0 / 128.0 - 100.0) to "%")
+            0x09 -> "Long-term fuel trim bank 2" to ((a * 100.0 / 128.0 - 100.0) to "%")
+            0x0A -> "Fuel pressure" to ((a * 3.0) to "kPa")
+            0x0B -> "Intake manifold pressure" to (a.toDouble() to "kPa")
+            0x0C -> "Engine speed" to ((word() ?: return emptyList()) / 4.0 to "rpm")
+            0x0D -> "Vehicle speed" to (a.toDouble() to "km/h")
+            0x0E -> "Timing advance" to ((a / 2.0 - 64.0) to "°")
+            0x0F -> "Intake air temperature" to ((a - 40).toDouble() to "°C")
+            0x10 -> "Mass air flow" to ((word() ?: return emptyList()) / 100.0 to "g/s")
+            0x11 -> "Throttle position" to (percent(a) to "%")
+            0x12, 0x13, 0x1C, 0x51 -> return raw()
+            0x1F -> "Run time since engine start" to ((word() ?: return emptyList()).toDouble() to "s")
+            0x21 -> "Distance with MIL on" to ((word() ?: return emptyList()).toDouble() to "km")
+            0x22 -> "Fuel rail pressure relative to manifold vacuum" to ((word() ?: return emptyList()) * 0.079 to "kPa")
+            0x23 -> "Fuel rail pressure" to ((word() ?: return emptyList()) * 10.0 to "kPa")
+            0x2C -> "Commanded EGR" to (percent(a) to "%")
+            0x2D -> "EGR error" to ((a * 100.0 / 128.0 - 100.0) to "%")
+            0x2E -> "Commanded evaporative purge" to (percent(a) to "%")
+            0x2F -> "Fuel tank level" to (percent(a) to "%")
+            0x30 -> "Warm-ups since DTC clear" to (a.toDouble() to "count")
+            0x31 -> "Distance since DTC clear" to ((word() ?: return emptyList()).toDouble() to "km")
+            0x32 -> "Evaporative system vapour pressure" to (((word() ?: return emptyList()) - 32768) / 4.0 to "Pa")
+            0x33 -> "Barometric pressure" to (a.toDouble() to "kPa")
+            0x3C, 0x3D, 0x3E, 0x3F -> {
+                val sensor = when (pid) {
+                    0x3C -> "Bank 1 sensor 1"
+                    0x3D -> "Bank 2 sensor 1"
+                    0x3E -> "Bank 1 sensor 2"
+                    else -> "Bank 2 sensor 2"
+                }
+                "$sensor catalyst temperature" to (((word() ?: return emptyList()) / 10.0 - 40.0) to "°C")
+            }
+            0x42 -> "Control module voltage" to ((word() ?: return emptyList()) / 1000.0 to "V")
+            0x43 -> "Absolute load" to ((word() ?: return emptyList()) * 100.0 / 255.0 to "%")
+            0x44 -> "Commanded equivalence ratio" to ((word() ?: return emptyList()) / 32768.0 to "lambda")
+            0x45 -> "Relative throttle position" to (percent(a) to "%")
+            0x46 -> "Ambient air temperature" to ((a - 40).toDouble() to "°C")
+            0x47 -> "Absolute throttle position B" to (percent(a) to "%")
+            0x48 -> "Absolute throttle position C" to (percent(a) to "%")
+            0x49 -> "Accelerator pedal position D" to (percent(a) to "%")
+            0x4A -> "Accelerator pedal position E" to (percent(a) to "%")
+            0x4B -> "Accelerator pedal position F" to (percent(a) to "%")
+            0x4C -> "Commanded throttle actuator" to (percent(a) to "%")
+            0x4D -> "Time with MIL on" to ((word() ?: return emptyList()).toDouble() to "min")
+            0x4E -> "Time since DTC clear" to ((word() ?: return emptyList()).toDouble() to "min")
+            0x52 -> "Ethanol fuel percentage" to (percent(a) to "%")
+            0x59 -> "Fuel rail absolute pressure" to ((word() ?: return emptyList()) * 10.0 to "kPa")
+            0x5A -> "Relative accelerator pedal position" to (percent(a) to "%")
+            0x5B -> "Hybrid battery pack remaining life" to (percent(a) to "%")
+            0x5C -> "Engine oil temperature" to ((a - 40).toDouble() to "°C")
+            0x5D -> "Fuel injection timing" to (((word() ?: return emptyList()) / 128.0) - 210.0 to "°")
+            0x5E -> "Engine fuel rate" to ((word() ?: return emptyList()) / 20.0 to "L/h")
+            0x5F -> "Hybrid / alternate fuel system status" to (percent(a) to "%")
+            0x61 -> "Driver demand engine torque" to ((a - 125).toDouble() to "%")
+            0x62 -> "Actual engine torque" to ((a - 125).toDouble() to "%")
+            0x63 -> "Engine reference torque" to ((word() ?: return emptyList()).toDouble() to "Nm")
+            else -> return emptyList()
+        }
+        return value(decoded.first, decoded.second.first, decoded.second.second)
     }
 
     private fun pidName(pid: Int): String = when (pid) {

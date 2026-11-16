@@ -5,10 +5,20 @@ import com.camarodiag.gen5.domain.model.AdapterTier
 import com.camarodiag.gen5.domain.model.CamaroEngine
 import com.camarodiag.gen5.domain.model.ModuleStatus
 import com.camarodiag.gen5.domain.model.VehicleProfile
+import com.camarodiag.gen5.domain.model.TransmissionType
 import org.junit.Assert.*
 import org.junit.Test
 
 class CamaroUdsProtocolTest {
+    @Test
+    fun defaultVehicleProfileMatchesConfigured2012LfxManualCamaro() {
+        val vehicle = VehicleProfile()
+
+        assertEquals(2012, vehicle.modelYear)
+        assertEquals(CamaroEngine.LFX, vehicle.engine)
+        assertEquals(TransmissionType.MANUAL, vehicle.transmission)
+    }
+
     @Test
     fun parsesStandardLivePid() {
         assertArrayEquals(intArrayOf(0x1A, 0xF8), CamaroUdsProtocol.parsePidBytes("41 0C 1A F8", "0C"))
@@ -63,6 +73,25 @@ class CamaroUdsProtocolTest {
         )
 
         assertFalse(capabilities.supportsCanHeaders)
+    }
+
+    @Test
+    fun genericElmCloneCanUseStandardCanWithoutClaimingUdsCapabilities() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "ELM327 Bluetooth",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "ELM327 v2.1",
+            stiResp = "?",
+            atalResp = "?",
+            stp61Resp = "?",
+            headersResp = "OK",
+            protocolResp = "OK"
+        )
+
+        assertEquals(AdapterTier.CLONE_ELM, capabilities.tier)
+        assertTrue(capabilities.supportsCanHeaders)
+        assertFalse(capabilities.supportsLongFrames)
+        assertFalse(capabilities.supportsSwCan)
     }
 
     @Test
