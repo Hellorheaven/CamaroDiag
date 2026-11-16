@@ -135,11 +135,12 @@ class UdsClientTest {
 
     @Test fun memoryAccessMustStayInsideVerifiedRegion() = runBlocking {
         val transport = FakeTransport(emptyList())
-        val policy = verifiedPolicy(memoryRegions = listOf(UdsMemoryRegion(0x1000, 0x100)), requireSecurity = false)
+        val policy = verifiedPolicy(memoryRegions = listOf(UdsMemoryRegion(0x1000, 0x100)), maxTransferBytes = 0x100, requireSecurity = false)
         val client = UdsClient(transport, 0x7E0, 0x7E8, policy = policy)
 
         assertTrue(runCatching { client.readMemoryByAddressAndLength(0x0FFF, 4) }.isFailure)
         assertTrue(runCatching { client.readMemoryByAddressAndLength(0x10F0, 0x20) }.isFailure)
+        assertTrue(runCatching { client.writeMemoryByAddressAndLength(0x1000, byteArrayOf(0x01)) }.isFailure)
         assertTrue(transport.sent.isEmpty())
     }
 
