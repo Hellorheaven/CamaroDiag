@@ -122,7 +122,7 @@
     <string name="settings_title">설정 및 저장된 보고서</string>
     <string name="settings_unit_system">측정 단위</string>
     <string name="settings_saved_sessions">저장된 진단 세션(로컬 Room DB)</string>
-    <string name="settings_no_sessions">저장된 세션이 없습니다. 주행거리 탭에서 '저장'을 사용하세요.</string>
+    <string name="settings_no_sessions">저장된 세션이 없습니다. 주행거리 탭에서 \'저장\'을 사용하세요.</string>
     <string name="cal_workspace_title">ECU / CALIBRATION WORKSPACE</string>
     <string name="cal_ecm_family">Indicative controller family: %1$s</string>
     <string name="cal_engine_coverage">Camaro Gen 5 / Gen 6 engine coverage</string>
@@ -212,7 +212,7 @@
     <string name="update_downloading">다운로드 중…</string>
     <string name="update_available">업데이트 사용 가능</string>
     <string name="update_channel_only">%1$s 채널만 제공됩니다. Debug는 Debug로, Release는 Release로 유지됩니다.</string>
-    <string name="update_allow_unknown_sources">이 소스에서 설치를 허용한 뒤 돌아와 '설치'를 누르세요.</string>
+    <string name="update_allow_unknown_sources">이 소스에서 설치를 허용한 뒤 돌아와 \'설치\'를 누르세요.</string>
     <string name="update_install">설치</string>
     <string name="update_download">다운로드</string>
     <string name="update_later">나중에</string>
