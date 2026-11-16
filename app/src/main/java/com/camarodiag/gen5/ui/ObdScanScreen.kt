@@ -144,6 +144,10 @@ fun ObdScanScreen(
 
             item {
                 InfoCard(title = if (isFr) "Freeze frame (Mode 02)" else "Freeze frame (Mode 02)") {
+                    InfoLine(
+                        if (isFr) "DTC déclencheur" else "Trigger DTC",
+                        report.freezeFrameDtc?.code ?: unavailable
+                    )
                     if (report.freezeFrame.isEmpty()) {
                         Text(if (isFr) "Aucune donnée figée exploitable." else "No usable freeze-frame data.", color = TextMuted, fontSize = 12.sp)
                     } else {

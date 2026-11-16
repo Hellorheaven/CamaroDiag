@@ -3,6 +3,7 @@ package com.camarodiag.gen5.data.obd
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class Obd2FeatureEngineTest {
@@ -52,6 +53,69 @@ class Obd2FeatureEngineTest {
             command == "04" || command.startsWith("2E") || command.startsWith("31") ||
                 command.startsWith("34") || command.startsWith("36") || command.startsWith("11")
         })
+    }
+
+    @Test
+    fun decodesFreezeFrameDtcAndKeepsOnlyTheFrameNumberOutOfSensorData() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "020200" -> "4202000171"
+                "020000" -> "42000008100000"
+                "020500" -> "4205007F"
+                "020C00" -> "420C001AF8"
+                else -> "NO DATA"
+            }
+        })
+
+        val triggerDtc = engine.readFreezeFrameDtc()
+        val supported = engine.discoverFreezeFrameSupportedPids()
+        val values = engine.readFreezeFrame(supported)
+
+        assertEquals("P0171", triggerDtc?.code)
+        assertEquals("freeze-frame", triggerDtc?.status)
+        assertEquals(setOf(0x05, 0x0C), supported)
+        assertEquals(listOf(0x7F), values[0x05])
+        assertEquals(listOf(0x1A, 0xF8), values[0x0C])
+        assertEquals(setOf(0x05, 0x0C), values.keys)
+        assertEquals(listOf("020200", "020000", "020500", "020C00"), commands)
+    }
+
+    @Test
+    fun discoversMode02PidsWithoutCountingBitmapContinuationMarkers() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "020000" -> "42000000000001"
+                "022000" -> "42200000000001"
+                "024000" -> "42400080000000"
+                else -> "NO DATA"
+            }
+        })
+
+        assertEquals(setOf(0x41), engine.discoverFreezeFrameSupportedPids())
+        assertEquals(listOf("020000", "022000", "024000"), commands)
+    }
+
+    @Test
+    fun doesNotQueryFreezeFrameValuesWhenNoTriggerDtcIsStored() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000000"
+                "020200" -> "4202000000"
+                else -> "NO DATA"
+            }
+        })
+
+        val report = engine.fullReadOnlyScan()
+
+        assertNull(report.freezeFrameDtc)
+        assertTrue(report.freezeFrame.isEmpty())
+        assertEquals(listOf("020200"), commands.filter { it.startsWith("02") })
     }
 
     @Test
