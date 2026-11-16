@@ -548,10 +548,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 message = ""
             )
             try {
-                val engine = obdManager.createObd2FeatureEngine()
-                val ecuVin = engine.readVin()
-                val calIds = engine.readCalibrationIds()
-                val cvns = engine.readCalibrationVerificationNumbers()
+                val (ecuVin, calIds, cvns) = obdManager.withObdCommandSession { engine ->
+                    Triple(
+                        engine.readVin(),
+                        engine.readCalibrationIds(),
+                        engine.readCalibrationVerificationNumbers()
+                    )
+                }
                 val validCal = calIds.isNotEmpty()
                 val validCvn = cvns.isNotEmpty()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -1216,7 +1219,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = "Connecte une interface OBD réelle pour lire les défauts."
                 } else {
-                    val (confirmed, pending, permanent) = obdManager.createObd2FeatureEngine().readDtcs()
+                    val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
+                        engine.readDtcs()
+                    }
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                 }
             } catch (cancelled: CancellationException) {
@@ -1399,7 +1404,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isObdScanning.value = true
             _obdScanMessage.value = null
             try {
-                val report = obdManager.createObd2FeatureEngine().fullReadOnlyScan()
+                val report = obdManager.withObdCommandSession { engine ->
+                    engine.fullReadOnlyScan()
+                }
                 _obdScanReport.value = report
                 _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
                     topology = _modules.value,
