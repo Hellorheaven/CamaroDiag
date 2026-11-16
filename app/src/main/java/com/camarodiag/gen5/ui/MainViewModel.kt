@@ -154,7 +154,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
 
     /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
-    fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String) {
+    fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String, protocolNumberText: String) {
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
@@ -172,7 +172,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val responseId = parseHex(responseCanIdHex, 8)
                 val did = parseHex(didHex, 4)
                 require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
-                val protocolNumber = if (requestId > 0x7FF || responseId > 0x7FF) 7 else 6
+                val protocolNumber = protocolNumberText.toIntOrNull()
+                    ?: error("Protocole STN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
                 val client = obdManager.createStnUdsClient(
                     requestCanId = requestId,
                     responseCanId = responseId,
@@ -207,7 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Reads UDS ReadDTCInformation (0x19/0x02) from the selected physical ECU. */
-    fun readUdsDtcs(requestCanIdHex: String, responseCanIdHex: String) {
+    fun readUdsDtcs(requestCanIdHex: String, responseCanIdHex: String, protocolNumberText: String) {
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
@@ -224,7 +226,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val requestId = parseHex(requestCanIdHex)
                 val responseId = parseHex(responseCanIdHex)
                 require(requestId != responseId)
-                val protocolNumber = if (requestId > 0x7FF || responseId > 0x7FF) 7 else 6
+                val protocolNumber = protocolNumberText.toIntOrNull()
+                    ?: error("Protocole STN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
                 val client = obdManager.createStnUdsClient(
                     requestCanId = requestId,
                     responseCanId = responseId,
