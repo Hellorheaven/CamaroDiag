@@ -139,6 +139,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun clearVehicleEvidence() {
+        if (obdManager.isJ2534BridgeConnected()) {
+            obdManager.disconnect()
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isJ2534BridgeConnecting = false,
+                isJ2534BridgeConnected = false,
+                j2534BridgeMessage = if (_language.value == AppLanguage.FR)
+                    "Pont PC déconnecté après changement d'identité véhicule."
+                else "PC bridge disconnected after vehicle identity change."
+            )
+        }
         _dtcs.value = emptyList()
         _livePids.value = emptyList()
         _mileageReport.value = null
