@@ -100,6 +100,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         uri?.let { viewModel.importCalibrationFile(it) }
     }
 
+    val canTracePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.analyzeCanTrace(it) }
+    }
+
     val calibrationComparisonPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -357,6 +363,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onDisconnectJ2534Bridge = { viewModel.disconnectJ2534Bridge() },
                     onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
+                    onImportTrace = { canTracePicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel", "*/*")) },
                     onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
                     onImportDefinitions = {
                         calibrationDefinitionsPicker.launch(arrayOf("text/*", "text/csv", "text/tab-separated-values", "*/*"))
