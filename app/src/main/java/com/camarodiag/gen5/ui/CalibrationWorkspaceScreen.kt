@@ -593,6 +593,12 @@ fun CalibrationWorkspaceScreen(
                                 color = TextMuted, fontSize = 10.sp
                             )
                         }
+                        report.messages.filter { it.negativeResponseCode != null }.take(20).forEach { message ->
+                            Text(
+                                "NRC • CAN ${message.canId.toString(16).uppercase()} • SVC ${message.service?.toString(16)?.uppercase()} • NRC ${message.negativeResponseCode?.toString(16)?.uppercase()?.padStart(2, '0')}",
+                                color = CamaroAmber, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                            )
+                        }
                         report.errors.take(10).forEach { error ->
                             Text(error, color = CamaroAmber, fontSize = 10.sp)
                         }
