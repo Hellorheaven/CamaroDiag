@@ -195,4 +195,16 @@
     <string name="cal_offline_editor_scope">All 10 Gen 5 / Gen 6 engine profiles are catalogued. The offline table editor works on an imported BIN when you provide an exact definition (offset, dimensions, data type, byte order, scaling and bias) for the identified CAL ID and OS. CamaroDiag does not yet ship validated engine table definitions, read ECM memory directly or program the ECU.</string>
     <string name="cal_ecu_write_unavailable">ECU write unavailable – verified OEM profile required</string>
     <string name="cal_no_calibration_write">No calibration will be written until the ECU profile, file compatibility and recovery procedure have been validated.</string>
+    <string name="vm_bridge_disconnected_vehicle_changed">PC bridge disconnected after vehicle identity change.</string>
+    <string name="vm_native_catalog_loaded">%1$d first-party Camaro definition(s) for model year %2$d. Live reads require vehicle evidence.</string>
+    <string name="vm_community_catalog_loaded">%1$d community signal definitions available for model year %2$d.</string>
+    <string name="vm_sentinel_unavailable">Unavailable (sentinel value)</string>
+    <string name="vm_obdb_signal_read">%1$s read from 0x%2$s → 0x%3$s.</string>
+    <string name="vm_j2534_connected">J2534 bridge connected: %1$s</string>
+    <string name="vm_pc_bridge_disconnected">PC bridge disconnected.</string>
+    <string name="vm_uds_response_received">Real UDS response received from CAN ID %1$s.</string>
+    <string name="vm_no_dtcs_returned">No DTCs returned by the ECU.</string>
+    <string name="vm_uds_read_complete">UDS 0x19 read completed.</string>
+    <string name="vm_j2534_no_elm_channel">The J2534 bridge provides UDS transport, not the ELM channel required for OBD-II Mode 09.</string>
+    <string name="vm_no_obd_data_read">Demo mode or no OBD adapter connected: no real ECU data was read.</string>
 </resources>

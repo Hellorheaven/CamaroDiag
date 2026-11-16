@@ -195,4 +195,16 @@
     <string name="cal_offline_editor_scope">כל 10 פרופילי המנוע של דור 5 / דור 6 מקוטלגים. עורך הטבלאות הלא מקוון פועל על קובץ BIN שיובא כאשר מספקים הגדרה מדויקת (היסט, ממדים, סוג נתונים, סדר בתים, קנה מידה והטיה) עבור CAL ID ומערכת ההפעלה שזוהו. CamaroDiag עדיין אינו כולל הגדרות מאומתות לטבלאות מנוע, אינו קורא ישירות את זיכרון ה-ECM ואינו מתכנת את מחשב הרכב.</string>
     <string name="cal_ecu_write_unavailable">כתיבה למחשב הרכב אינה זמינה – נדרש פרופיל יצרן מאומת</string>
     <string name="cal_no_calibration_write">לא תיכתב כל מפת כיול עד לאימות פרופיל מחשב הרכב, תאימות הקובץ ונוהל השחזור.</string>
+    <string name="vm_bridge_disconnected_vehicle_changed">גשר המחשב נותק לאחר שינוי זהות הרכב.</string>
+    <string name="vm_native_catalog_loaded">%1$d הגדרות Camaro מקוריות לשנת דגם %2$d. קריאות בזמן אמת דורשות ראיות מהרכב.</string>
+    <string name="vm_community_catalog_loaded">%1$d הגדרות אותות קהילתיות זמינות לשנת דגם %2$d.</string>
+    <string name="vm_sentinel_unavailable">לא זמין (ערך sentinel)</string>
+    <string name="vm_obdb_signal_read">%1$s נקרא מ-0x%2$s → 0x%3$s.</string>
+    <string name="vm_j2534_connected">גשר J2534 מחובר: %1$s</string>
+    <string name="vm_pc_bridge_disconnected">גשר המחשב נותק.</string>
+    <string name="vm_uds_response_received">התקבלה תגובת UDS אמיתית ממזהה CAN ‏%1$s.</string>
+    <string name="vm_no_dtcs_returned">מחשב הרכב לא החזיר קודי DTC.</string>
+    <string name="vm_uds_read_complete">קריאת UDS ‏0x19 הושלמה.</string>
+    <string name="vm_j2534_no_elm_channel">גשר J2534 מספק תעבורת UDS ולא את ערוץ ELM הדרוש ל-OBD-II מצב 09.</string>
+    <string name="vm_no_obd_data_read">מצב הדגמה או שאין מתאם OBD מחובר: לא נקראו נתונים אמיתיים ממחשב הרכב.</string>
 </resources>

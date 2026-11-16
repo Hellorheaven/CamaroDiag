@@ -195,4 +195,16 @@
     <string name="cal_offline_editor_scope">Les 10 profils moteur Gen 5/Gen 6 sont catalogués. L'éditeur hors ligne de tables fonctionne sur un fichier BIN importé lorsque tu fournis une définition exacte (offset, dimensions, type, ordre des octets, échelle et biais) correspondant au CAL ID et à l'OS relevés. CamaroDiag ne fournit pas encore de définitions moteur validées, ne lit pas directement la mémoire de l'ECM et ne programme pas l'ECU.</string>
     <string name="cal_ecu_write_unavailable">Écriture ECU indisponible – profil constructeur requis</string>
     <string name="cal_no_calibration_write">Aucune cartographie ne sera envoyée tant que le profil ECU, la compatibilité du fichier et la procédure de récupération ne seront pas validés.</string>
+    <string name="vm_bridge_disconnected_vehicle_changed">Pont PC déconnecté après changement d'identité véhicule.</string>
+    <string name="vm_native_catalog_loaded">%1$d définition(s) natives Camaro pour l'année modèle %2$d. Aucune lecture autorisée sans preuve véhicule.</string>
+    <string name="vm_community_catalog_loaded">%1$d signaux communautaires disponibles pour l'année modèle %2$d.</string>
+    <string name="vm_sentinel_unavailable">Non disponible (valeur sentinelle)</string>
+    <string name="vm_obdb_signal_read">%1$s lu sur 0x%2$s → 0x%3$s.</string>
+    <string name="vm_j2534_connected">Pont J2534 connecté : %1$s</string>
+    <string name="vm_pc_bridge_disconnected">Pont PC déconnecté.</string>
+    <string name="vm_uds_response_received">Réponse UDS réelle reçue depuis CAN ID %1$s.</string>
+    <string name="vm_no_dtcs_returned">Aucun DTC retourné par le calculateur.</string>
+    <string name="vm_uds_read_complete">Lecture UDS 0x19 terminée.</string>
+    <string name="vm_j2534_no_elm_channel">Le pont J2534 fournit le transport UDS, pas le canal ELM nécessaire au Mode 09 OBD-II.</string>
+    <string name="vm_no_obd_data_read">Mode démo ou interface OBD non connectée : aucune donnée ECU réelle n'a été lue.</string>
 </resources>

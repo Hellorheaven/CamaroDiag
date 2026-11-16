@@ -195,4 +195,16 @@
     <string name="cal_offline_editor_scope">Tutti e 10 i profili motore Gen 5 / Gen 6 sono catalogati. L'editor offline delle tabelle funziona su un file BIN importato quando fornisci una definizione esatta (offset, dimensioni, tipo, ordine dei byte, scala e bias) per il CAL ID e il sistema operativo identificati. CamaroDiag non include ancora definizioni validate delle tabelle motore, non legge direttamente la memoria ECM e non programma la centralina.</string>
     <string name="cal_ecu_write_unavailable">Scrittura ECU non disponibile: è richiesto un profilo OEM verificato</string>
     <string name="cal_no_calibration_write">Non verrà scritta alcuna calibrazione finché il profilo ECU, la compatibilità del file e la procedura di ripristino non saranno stati convalidati.</string>
+    <string name="vm_bridge_disconnected_vehicle_changed">Bridge PC disconnesso dopo la modifica dell'identità del veicolo.</string>
+    <string name="vm_native_catalog_loaded">%1$d definizioni Camaro originali per l'anno modello %2$d. Le letture in tempo reale richiedono prove sul veicolo.</string>
+    <string name="vm_community_catalog_loaded">%1$d definizioni di segnali della community disponibili per l'anno modello %2$d.</string>
+    <string name="vm_sentinel_unavailable">Non disponibile (valore sentinella)</string>
+    <string name="vm_obdb_signal_read">%1$s letto da 0x%2$s → 0x%3$s.</string>
+    <string name="vm_j2534_connected">Bridge J2534 connesso: %1$s</string>
+    <string name="vm_pc_bridge_disconnected">Bridge PC disconnesso.</string>
+    <string name="vm_uds_response_received">Ricevuta risposta UDS reale dall'ID CAN %1$s.</string>
+    <string name="vm_no_dtcs_returned">La centralina non ha restituito DTC.</string>
+    <string name="vm_uds_read_complete">Lettura UDS 0x19 completata.</string>
+    <string name="vm_j2534_no_elm_channel">Il bridge J2534 fornisce il trasporto UDS, non il canale ELM necessario per OBD-II Modalità 09.</string>
+    <string name="vm_no_obd_data_read">Modalità demo o adattatore OBD non collegato: non sono stati letti dati reali dalla centralina.</string>
 </resources>

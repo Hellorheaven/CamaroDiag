@@ -195,4 +195,16 @@
     <string name="cal_offline_editor_scope">Los 10 perfiles de motor Gen 5 / Gen 6 están catalogados. El editor de tablas sin conexión funciona con un archivo BIN importado cuando proporcionas una definición exacta (offset, dimensiones, tipo de datos, orden de bytes, escala y sesgo) para el CAL ID y el sistema operativo identificados. CamaroDiag todavía no incluye definiciones validadas de tablas de motor, no lee directamente la memoria del ECM ni programa la ECU.</string>
     <string name="cal_ecu_write_unavailable">Escritura de ECU no disponible: se requiere un perfil OEM verificado</string>
     <string name="cal_no_calibration_write">No se escribirá ninguna calibración hasta que se validen el perfil de la ECU, la compatibilidad del archivo y el procedimiento de recuperación.</string>
+    <string name="vm_bridge_disconnected_vehicle_changed">Puente del PC desconectado tras cambiar la identidad del vehículo.</string>
+    <string name="vm_native_catalog_loaded">%1$d definiciones propias de Camaro para el año del modelo %2$d. Las lecturas en vivo requieren pruebas del vehículo.</string>
+    <string name="vm_community_catalog_loaded">Hay %1$d definiciones de señales comunitarias disponibles para el año del modelo %2$d.</string>
+    <string name="vm_sentinel_unavailable">No disponible (valor centinela)</string>
+    <string name="vm_obdb_signal_read">%1$s leído desde 0x%2$s → 0x%3$s.</string>
+    <string name="vm_j2534_connected">Puente J2534 conectado: %1$s</string>
+    <string name="vm_pc_bridge_disconnected">Puente del PC desconectado.</string>
+    <string name="vm_uds_response_received">Se recibió una respuesta UDS real del ID CAN %1$s.</string>
+    <string name="vm_no_dtcs_returned">La ECU no devolvió ningún DTC.</string>
+    <string name="vm_uds_read_complete">Lectura UDS 0x19 completada.</string>
+    <string name="vm_j2534_no_elm_channel">El puente J2534 proporciona transporte UDS, no el canal ELM necesario para OBD-II Modo 09.</string>
+    <string name="vm_no_obd_data_read">Modo de demostración o adaptador OBD no conectado: no se han leído datos reales de la ECU.</string>
 </resources>
