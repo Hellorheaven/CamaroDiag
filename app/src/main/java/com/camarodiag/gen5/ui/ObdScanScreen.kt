@@ -40,6 +40,7 @@ fun ObdScanScreen(
     isFr: Boolean,
     onRunScan: () -> Unit
 ) {
+    val unavailable = if (isFr) unavailable else "Not available"
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -75,10 +76,10 @@ fun ObdScanScreen(
         if (report != null) {
             item {
                 InfoCard(title = if (isFr) "Identification véhicule / ECU" else "Vehicle / ECU identification") {
-                    InfoLine(if (isFr) "VIN" else "VIN", report.vin ?: "Non disponible")
-                    InfoLine(if (isFr) "CAL ID" else "CAL ID", report.calibrationIds.joinToString(" | ").ifBlank { "Non disponible" })
-                    InfoLine(if (isFr) "CVN" else "CVN", report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { "Non disponible" })
-                    InfoLine(if (isFr) "Nom ECU" else "ECU name", report.ecuNames.joinToString(" | ").ifBlank { "Non disponible" })
+                    InfoLine(if (isFr) "VIN" else "VIN", report.vin ?: unavailable)
+                    InfoLine(if (isFr) "CAL ID" else "CAL ID", report.calibrationIds.joinToString(" | ").ifBlank { unavailable })
+                    InfoLine(if (isFr) "CVN" else "CVN", report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { unavailable })
+                    InfoLine(if (isFr) "Nom ECU" else "ECU name", report.ecuNames.joinToString(" | ").ifBlank { unavailable })
                     InfoLine(if (isFr) "PIDs supportés" else "Supported PIDs", report.supportedPids.size.toString())
                     InfoLine(
                         if (isFr) "Adresses CAN répondantes" else "Responding CAN IDs",
@@ -142,7 +143,7 @@ fun ObdScanScreen(
 
             item {
                 InfoCard(title = if (isFr) "Résultats Mode 06" else "Mode 06 monitor results") {
-                    Text(report.monitorTestRaw ?: if (isFr) "Non disponible" else "Not available",
+                    Text(report.monitorTestRaw ?: if (isFr) unavailable else "Not available",
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                 }
             }
