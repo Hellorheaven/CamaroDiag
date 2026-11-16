@@ -143,12 +143,67 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             ecuVinResponse = "",
             calibrationIdResponse = "",
-            cvnResponse = ""
+            cvnResponse = "",
+            udsDidResponse = "",
+            udsMessage = ""
         )
     }
 
     private val _calibrationWorkspace = MutableStateFlow(CalibrationWorkspaceState())
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
+
+    /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
+    fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String) {
+        viewModelScope.launch {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isUdsReading = true,
+                udsDidResponse = "",
+                udsMessage = ""
+            )
+            try {
+                fun parseHex(value: String, maxDigits: Int): Int {
+                    val normalized = value.trim().removePrefix("0x").removePrefix("0X")
+                    require(normalized.isNotEmpty() && normalized.length <= maxDigits &&
+                        normalized.all { it.digitToIntOrNull(16) != null }) { "Identifiant hexadécimal invalide : $value" }
+                    return normalized.toInt(16)
+                }
+                val requestId = parseHex(requestCanIdHex, 8)
+                val responseId = parseHex(responseCanIdHex, 8)
+                val did = parseHex(didHex, 4)
+                require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
+                val protocolNumber = if (requestId > 0x7FF || responseId > 0x7FF) 7 else 6
+                val client = obdManager.createStnUdsClient(
+                    requestCanId = requestId,
+                    responseCanId = responseId,
+                    protocolNumber = protocolNumber,
+                    timeoutMs = 5000L
+                )
+                val data = client.readDataByIdentifier(did)
+                val hex = data.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
+                val isVinDid = did == 0xF190
+                val rendered = if (isVinDid) {
+                    val ascii = data.toString(Charsets.US_ASCII).trim().trim('\u0000')
+                    if (ascii.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) "$ascii\n$hex" else hex
+                } else hex
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isUdsReading = false,
+                    udsDidResponse = rendered,
+                    udsMessage = if (_language.value == AppLanguage.FR)
+                        "Réponse UDS réelle reçue depuis CAN ID ${responseCanIdHex.uppercase()}."
+                    else "Real UDS response received from CAN ID ${responseCanIdHex.uppercase()}."
+                )
+            } catch (cancelled: CancellationException) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isUdsReading = false,
+                    udsDidResponse = "",
+                    udsMessage = error.localizedMessage ?: "Échec de lecture UDS."
+                )
+            }
+        }
+    }
 
     /** Reads only standardized OBD Mode 09 calibration identifiers; this is not a binary map read. */
     fun readCalibrationIdentification() {
