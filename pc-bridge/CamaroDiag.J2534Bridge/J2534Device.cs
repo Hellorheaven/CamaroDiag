@@ -211,7 +211,7 @@ internal sealed class J2534Device : IDisposable
         return message;
     }
 
-    private static PassThruMsg CreateCanIdMessage(int canId, bool can29Bit, uint mask = 0)
+    private PassThruMsg CreateCanIdMessage(int canId, bool can29Bit, uint mask = 0)
     {
         var data = new byte[MaxData];
         var id = (uint)canId;
@@ -232,7 +232,7 @@ internal sealed class J2534Device : IDisposable
         };
     }
 
-    private static PassThruMsg NewMessage() => new()
+    private PassThruMsg NewMessage() => new()
     {
         ProtocolId = _protocolId,
         Data = new byte[MaxData]
