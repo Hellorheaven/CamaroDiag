@@ -243,13 +243,18 @@ object CalibrationTableCodec {
     fun validateMetadataForImage(
         metadata: CalibrationDefinitionMetadata,
         selectedVin: String,
+        ecuVin: String,
         binary: ByteArray,
         ecuCalibrationIds: Collection<String>,
         ecuCvns: Collection<String>
     ): List<String> = buildList {
         val normalizedVin = selectedVin.trim().uppercase(Locale.ROOT)
+        val normalizedEcuVin = ecuVin.trim().uppercase(Locale.ROOT)
         if (!normalizedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) || metadata.vin != normalizedVin) {
             add("Le VIN des définitions ne correspond pas au VIN du véhicule sélectionné.")
+        }
+        if (!normalizedEcuVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) || metadata.vin != normalizedEcuVin) {
+            add("Le VIN des définitions ne correspond pas au VIN réellement lu sur l'ECU.")
         }
 
         val imageSha256 = MessageDigest.getInstance("SHA-256").digest(binary)
