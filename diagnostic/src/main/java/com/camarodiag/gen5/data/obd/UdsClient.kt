@@ -278,7 +278,7 @@ class UdsClient private constructor(
 
     suspend fun writeMemoryByAddressAndLength(address: Long, data: ByteArray, addressLength: Int = 4, sizeLength: Int = 2) {
         requireAllowedMemory(address, data.size.toLong())
-        require(data.isNotEmpty() && data.size <= 4090)
+        require(data.isNotEmpty() && data.size + 2 + addressLength + sizeLength <= 4095)
         requireProgrammingSession()
         requireSecurityIfConfigured()
         val format = addressLength shl 4 or sizeLength
