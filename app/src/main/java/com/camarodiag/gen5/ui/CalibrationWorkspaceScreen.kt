@@ -53,6 +53,7 @@ import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
 import com.camarodiag.gen5.data.obd.CamaroSignalDefinition
+import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
@@ -74,6 +75,9 @@ data class CalibrationWorkspaceState(
     val isObdbSignalReading: Boolean = false,
     val obdbSignalValue: String = "",
     val obdbSignalMessage: String = "",
+    val isTraceAnalyzing: Boolean = false,
+    val traceMessage: String = "",
+    val canTraceReport: CanTraceAnalysisReport? = null,
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -121,6 +125,7 @@ fun CalibrationWorkspaceScreen(
     onReadObdbSignal: (String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
+    onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onImportDefinitions: () -> Unit,
     onExportDefinitionTemplate: () -> Unit,
@@ -528,6 +533,83 @@ fun CalibrationWorkspaceScreen(
                     }
                     if (state.obdbSignalValue.isNotBlank()) {
                         Text(state.obdbSignalValue, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        if (isFr) "Analyseur de traces CAN / UDS hors ligne" else "Offline CAN / UDS trace analyzer",
+                        color = TextPrimary, fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (isFr) "Importe une capture Vector ASC, un journal ELM327 avec en-têtes CAN ou un CSV. CamaroDiag reconstruit les messages ISO-TP et relève les services UDS et DID observés, sans envoyer de commande au véhicule."
+                        else "Import a Vector ASC capture, header-enabled ELM327 monitor log or CAN CSV. CamaroDiag reassembles ISO-TP messages and lists observed UDS services and DIDs without sending commands to a vehicle.",
+                        color = TextMuted, fontSize = 12.sp
+                    )
+                    OutlinedButton(
+                        onClick = onImportTrace,
+                        enabled = !state.isTraceAnalyzing,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (state.isTraceAnalyzing) CircularProgressIndicator(modifier = Modifier.width(18.dp).height(18.dp))
+                        else androidx.compose.material3.Icon(Icons.Default.FolderOpen, contentDescription = null)
+                        Text(if (isFr) "Importer une trace CAN (.asc / .csv / journal ELM)" else "Import CAN trace (.asc / .csv / ELM log)")
+                    }
+                    if (state.traceMessage.isNotBlank()) {
+                        Text(state.traceMessage, color = CamaroAmber, fontSize = 12.sp)
+                    }
+                    state.canTraceReport?.let { report ->
+                        HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                        Text(report.sourceName, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "CAN IDs: ${report.observedCanIds.joinToString { "0x" + it.toString(16).uppercase() }}",
+                            color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                        )
+                        Text(
+                            "UDS: ${report.udsServices.joinToString { "0x" + it.toString(16).uppercase().padStart(2, '0') }}",
+                            color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                        )
+                        Text(
+                            if (isFr) "DID candidats : ${report.readDidCandidates.joinToString { "0x" + it.toString(16).uppercase().padStart(4, '0') }.ifBlank { "aucun" }}"
+                            else "DID candidates: ${report.readDidCandidates.joinToString { "0x" + it.toString(16).uppercase().padStart(4, '0') }.ifBlank { "none" }}",
+                            color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp
+                        )
+                        report.didObservations.take(20).forEach { observation ->
+                            val direction = when (observation.direction) {
+                                com.camarodiag.gen5.data.obd.CanTraceDirection.TX -> "TX"
+                                com.camarodiag.gen5.data.obd.CanTraceDirection.RX -> "RX"
+                                com.camarodiag.gen5.data.obd.CanTraceDirection.UNKNOWN -> "?"
+                            }
+                            val result = if (observation.positiveResponse) "POS" else "REQ/OBS"
+                            Text(
+                                "$direction • CAN ${observation.canId.toString(16).uppercase()} • SVC ${observation.responseService.toString(16).uppercase()} • DID ${observation.did.toString(16).uppercase().padStart(4, '0')} • ${result}",
+                                color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                            )
+                        }
+                        if (report.didObservations.size > 20) {
+                            Text(
+                                if (isFr) "… et ${report.didObservations.size - 20} observation(s) supplémentaire(s)."
+                                else "… and ${report.didObservations.size - 20} more observation(s).",
+                                color = TextMuted, fontSize = 10.sp
+                            )
+                        }
+                        report.messages.filter { it.negativeResponseCode != null }.take(20).forEach { message ->
+                            Text(
+                                "NRC • CAN ${message.canId.toString(16).uppercase()} • SVC ${message.service?.toString(16)?.uppercase()} • NRC ${message.negativeResponseCode?.toString(16)?.uppercase()?.padStart(2, '0')}",
+                                color = CamaroAmber, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                            )
+                        }
+                        report.errors.take(10).forEach { error ->
+                            Text(error, color = CamaroAmber, fontSize = 10.sp)
+                        }
+                        Text(
+                            if (isFr) "Les DID détectés sont des observations de trace uniquement. Ils ne sont ni décodés ni promus comme signaux vérifiés."
+                            else "Detected DIDs are trace observations only. They are not decoded or promoted as verified signals.",
+                            color = CamaroAmber, fontSize = 11.sp
+                        )
                     }
                 }
             }
