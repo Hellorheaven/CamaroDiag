@@ -32,8 +32,8 @@ Ce pont est générique J2534. Il ne fournit aucun pilote VXDIAG et ne remplace 
 
 ## Installation et connexion
 
-1. Installer le pilote Windows correspondant exactement au VCX ou à l'interface J2534.
-2. Pour VXDIAG, installer VX Manager et vérifier la détection de l'interface.
+1. Faire installer par un administrateur Windows le pilote correspondant exactement au VCX ou à l'interface J2534.
+2. Pour VXDIAG, faire installer VX Manager et vérifier la détection de l'interface. Cette étape nécessite généralement des droits administrateur.
 3. Ouvrir les [releases CamaroDiag](https://github.com/Hellorheaven/CamaroDiag/releases/latest).
 4. Télécharger l'installateur **Setup Release** correspondant à l'architecture du DLL J2534 :
    - `CamaroDiag-J2534-Bridge-Setup-release-win-x64.exe` pour un fournisseur J2534 64 bits.
@@ -43,12 +43,11 @@ Ce pont est générique J2534. Il ne fournit aucun pilote VXDIAG et ne remplace 
 7. Relever l'adresse IP du PC, le port TCP et le jeton d'appairage affichés.
 8. Connecter le PC et Android au même réseau privé.
 9. Saisir IP, port, jeton et CAN ID physiques documentés du calculateur dans CamaroDiag.
-10. Si Windows Firewall le demande, autoriser le programme uniquement sur les réseaux privés.
+10. Si Windows Firewall le demande, demander à l'administrateur d'autoriser le programme uniquement sur les réseaux privés.
 
-Les installateurs **Debug** sont également publiés pour les tests. Debug et Release sont installés dans des emplacements séparés et peuvent coexister. Le pont vérifie les mises à jour au démarrage et ne propose que le même canal et la même architecture que la version installée.
+**Important pour les PC sans droits administrateur :** l'utilisateur peut installer le pont CamaroDiag avec le Setup dans son profil Windows, mais il ne peut pas installer lui-même VX Manager ni le pilote J2534 si la politique informatique réserve ces opérations à l'administrateur. Le pilote et l'interface doivent donc être préparés par le service informatique avant l'utilisation.
 
-Les archives ZIP portables restent disponibles dans les mêmes releases pour une installation manuelle ou un usage sans installateur. Le programme nécessite toujours le pilote J2534 du fabricant : aucun pilote VXDIAG n'est inclus dans le setup.
-
+Les builds Debug restent réservés aux vérifications internes et ne sont pas joints aux releases publiques. Les releases publiques ne contiennent que l'APK Android de production et les deux installateurs Windows Release.
 
 ## Sécurité réseau
 
@@ -71,7 +70,7 @@ Les CAN ID, débits et services doivent provenir d'une documentation fiable pour
 
 ## Dépannage
 
-- Aucun fournisseur détecté : réinstaller le pilote constructeur et vérifier l'enregistrement J2534.
+- Aucun fournisseur détecté : demander à l'administrateur de réinstaller le pilote constructeur et vérifier l'enregistrement J2534.
 - Erreur DLL : vérifier que le pont et le DLL fournisseur sont tous deux x86 ou tous deux x64.
 - Connexion TCP impossible : vérifier IP, port, réseau et pare-feu.
 - Échec d'ouverture du protocole : le pilote peut ne pas prendre en charge le profil sélectionné.
