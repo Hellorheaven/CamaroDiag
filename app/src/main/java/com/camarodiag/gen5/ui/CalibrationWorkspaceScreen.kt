@@ -114,7 +114,7 @@ fun CalibrationWorkspaceScreen(
     onReadUdsDtcs: (String, String, String) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
-    onReadObdbSignal: (String) -> Unit,
+    onReadObdbSignal: (String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
@@ -454,7 +454,7 @@ fun CalibrationWorkspaceScreen(
                             )
                         }
                         Button(
-                            onClick = { onReadObdbSignal(signal.id) },
+                            onClick = { onReadObdbSignal(signal.id, udsCanProtocol) },
                             enabled = (isConnected || state.isJ2534BridgeConnected) &&
                                 signal.hasSupportedPhysicalCanAddressing &&
                                 signal.service == 0x22 &&
