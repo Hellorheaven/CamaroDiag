@@ -143,6 +143,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun clearVehicleEvidence() {
+        obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
             obdManager.disconnect()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -528,15 +529,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Reads only standardized OBD Mode 09 calibration identifiers; this is not a binary map read. */
     fun readCalibrationIdentification() {
         viewModelScope.launch {
-            if (obdManager.isDemoMode) {
+            if (!obdManager.isObdCommandChannelAvailable) {
                 val isFr = _language.value == AppLanguage.FR
+                val bridgeOnly = obdManager.isJ2534BridgeConnected()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
                     calibrationIdResponse = "",
                     cvnResponse = "",
-                    message = if (isFr) "Mode démo ou interface non connectée : aucune donnée ECU réelle n'a été lue."
-                    else "Demo mode or no adapter connected: no real ECU data was read."
+                    message = if (bridgeOnly) {
+                        if (isFr) "Le pont J2534 fournit le transport UDS, pas le canal ELM nécessaire au Mode 09 OBD-II."
+                        else "The J2534 bridge provides UDS transport, not the ELM channel required for OBD-II Mode 09."
+                    } else {
+                        if (isFr) "Mode démo ou interface OBD non connectée : aucune donnée ECU réelle n'a été lue."
+                        else "Demo mode or no OBD adapter connected: no real ECU data was read."
+                    }
                 )
                 return@launch
             }
@@ -1115,9 +1122,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             stopLiveRecording()
             return
         }
-        if (obdManager.isDemoMode) {
+        if (!obdManager.isObdCommandChannelAvailable) {
             _liveRecordingState.value = _liveRecordingState.value.copy(
-                message = "Enregistrement réel indisponible en mode démo ou sans interface connectée."
+                message = if (obdManager.isJ2534BridgeConnected())
+                    "Enregistrement OBD-II indisponible : le pont J2534 actuel expose uniquement le transport UDS."
+                else "Enregistrement réel indisponible en mode démo ou sans interface connectée."
             )
             return
         }
@@ -1173,10 +1182,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun captureLiveTelemetrySample(values: List<LivePidValue>) {
         if (!_liveRecordingState.value.isRecording) return
-        if (obdManager.isDemoMode) {
+        if (!obdManager.isObdCommandChannelAvailable) {
             stopLiveRecording()
             _liveRecordingState.value = _liveRecordingState.value.copy(
-                message = "Connexion réelle perdue : journal arrêté pour ne pas mélanger des données de démonstration."
+                message = "Canal OBD-II indisponible : journal arrêté pour ne pas mélanger des données de démonstration ou des transports UDS."
             )
             return
         }
@@ -1214,9 +1223,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         obdManager.createSimulatedObd2FeatureEngine().readDtcs()
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                     _connectionMessage.value = "DTC simulés par le profil Camaro LFX : aucune réponse ECU réelle."
-                } else if (obdManager.isDemoMode) {
+                } else if (!obdManager.isObdCommandChannelAvailable) {
                     _dtcs.value = emptyList()
-                    _connectionMessage.value = "Connecte une interface OBD réelle pour lire les défauts."
+                    _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
+                        "Le pont J2534 connecté ne fournit pas le canal ELM nécessaire au scan DTC OBD-II."
+                    else "Connecte une interface OBD réelle pour lire les défauts."
                 } else {
                     val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
                         engine.readDtcs()
@@ -1308,8 +1319,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (obdManager.isSimulationActive) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = "Défauts de démonstration effacés localement ; aucun ECU interrogé."
-                } else if (obdManager.isDemoMode) {
-                    _connectionMessage.value = "Connecte une interface OBD réelle avant de demander l'effacement."
+                } else if (!obdManager.isObdCommandChannelAvailable) {
+                    _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
+                        "Effacement OBD-II indisponible via le pont J2534 : aucun canal ELM n'est connecté."
+                    else "Connecte une interface OBD réelle avant de demander l'effacement."
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
                     if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
@@ -1335,13 +1348,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _mileageReport.value = null
             val readings = mutableListOf<MileageSourceReading>()
             try {
-                if (obdManager.isDemoMode) {
-                    readings += MileageSourceReading(
-                        "DEMO", "Demo data only", "Données de démonstration uniquement",
-                        "No vehicle ECU queried", null, ConfidenceLevel.UNAVAILABLE,
-                        "Demo mode never represents the actual vehicle mileage.",
-                        "Le mode démo ne représente jamais le kilométrage réel du véhicule."
-                    )
+                if (!obdManager.isObdCommandChannelAvailable) {
+                    if (obdManager.isJ2534BridgeConnected()) {
+                        readings += MileageSourceReading(
+                            "J2534", "J2534 bridge (UDS only)", "Pont J2534 (UDS uniquement)",
+                            "Mode 01 OBD-II unavailable on this transport", null, ConfidenceLevel.UNAVAILABLE,
+                            "The connected PC bridge exposes UDS payload transport, not an ELM/SAE J1979 command channel. No OBD odometer PID was queried.",
+                            "Le pont PC connecté expose le transport UDS, pas un canal ELM/SAE J1979. Aucun PID kilométrique OBD n'a été interrogé."
+                        )
+                    } else {
+                        readings += MileageSourceReading(
+                            "DEMO", "Demo data only", "Données de démonstration uniquement",
+                            "No vehicle ECU queried", null, ConfidenceLevel.UNAVAILABLE,
+                            "Demo mode never represents the actual vehicle mileage.",
+                            "Le mode démo ne représente jamais le kilométrage réel du véhicule."
+                        )
+                    }
                 } else {
                     val (a6Response, d3Response) = obdManager.withObdCommandSession { engine ->
                         val supportedPids = engine.discoverSupportedPids()
@@ -1394,9 +1416,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Executes a complete, standards-based read-only OBD-II scan on the connected Camaro. */
     fun runFullObdScan() {
         viewModelScope.launch {
-            if (obdManager.isDemoMode && !obdManager.isSimulationActive) {
+            if (!obdManager.isSimulationActive && !obdManager.isObdCommandChannelAvailable) {
                 _obdScanReport.value = null
-                _obdScanMessage.value = "Aucune interface OBD réelle connectée. Sélectionne le profil de simulation pour tester l'écran hors véhicule."
+                _obdScanMessage.value = if (obdManager.isJ2534BridgeConnected())
+                    "Le pont J2534 est réservé au transport UDS : il ne fournit pas le canal ELM requis pour un scan OBD-II standard."
+                else "Aucune interface OBD réelle connectée. Sélectionne le profil de simulation pour tester l'écran hors véhicule."
                 return@launch
             }
             _isObdScanning.value = true
@@ -1472,7 +1496,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun refreshTopologyAndDefaults(runInitialScans: Boolean = false) {
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
-        if (runInitialScans && !obdManager.isDemoMode) {
+        if (runInitialScans && obdManager.isObdCommandChannelAvailable) {
             scanDtcs()
             runMileageAudit()
         }
@@ -1492,7 +1516,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             suspend fun read(pid: String): IntArray? {
-                val response = obdManager.sendAtCommand("01" + pid, 900L)
+                val pidValue = pid.toIntOrNull(16)
+                    ?: throw IllegalArgumentException("PID OBD invalide : $pid")
+                val response = obdManager.readMode01PidIfSupported(pidValue) ?: return null
                 if (response.equals("NO_SOCKET", ignoreCase = true) ||
                     response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
                     throw IllegalStateException("La connexion OBD a été interrompue.")
@@ -1523,6 +1549,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             obdManager.isDemoMode -> {
                                 _livePids.value = emptyList()
                                 _liveTelemetryMessage.value = "Aucune interface connectée. Les valeurs simulées ne sont pas affichées automatiquement."
+                            }
+                            !obdManager.isObdCommandChannelAvailable -> {
+                                _livePids.value = emptyList()
+                                _liveTelemetryMessage.value = "Le pont J2534 connecté fournit le transport UDS, pas le canal ELM nécessaire à la télémétrie OBD-II standard."
                             }
                             else -> {
                                 val values = mutableListOf<LivePidValue>()
