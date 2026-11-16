@@ -44,9 +44,25 @@ class CamaroUdsProtocolTest {
         )
 
         val ecm = modules.single { it.id == "ECM" }
-        assertEquals(ModuleStatus.ACCESSIBLE, ecm.status)
+        assertEquals(ModuleStatus.DISCOVERY_REQUIRED, ecm.status)
         assertEquals("7DF", ecm.txHeader)
-        assertEquals("7E8", ecm.rxHeader)
+        assertEquals("", ecm.rxHeader)
+    }
+
+    @Test
+    fun marksStandardEcmAccessibleOnlyAfterAReal7E8Response() {
+        val topology = CamaroUdsProtocol.buildTopology(
+            VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1),
+            AdapterCapabilities(tier = AdapterTier.PRO_STN, supportsCanHeaders = true)
+        )
+
+        val confirmed = CamaroUdsProtocol.applyStandardObdDiscovery(topology, listOf("7E8", "7E9"))
+        val unconfirmed = CamaroUdsProtocol.applyStandardObdDiscovery(topology, listOf("7E9"))
+
+        assertEquals(ModuleStatus.ACCESSIBLE, confirmed.single { it.id == "ECM" }.status)
+        assertEquals("7E8", confirmed.single { it.id == "ECM" }.rxHeader)
+        assertEquals(ModuleStatus.DISCOVERY_REQUIRED, unconfirmed.single { it.id == "ECM" }.status)
+        assertEquals("", unconfirmed.single { it.id == "ECM" }.rxHeader)
     }
 
     @Test
