@@ -66,6 +66,29 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun enablesSwCanOnlyForDocumentedMxHardwareWithAcceptedProtocol() {
+        val mxPlus = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "OBDLink MX+",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "OBDLink",
+            stiResp = "STN2120 v5.6.5",
+            atalResp = "OK",
+            stp61Resp = "OK"
+        )
+        val genericStn = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "Generic STN adapter",
+            macAddress = "00:00:00:00:00:01",
+            atzResp = "STN",
+            stiResp = "STN2120 v5.6.5",
+            atalResp = "OK",
+            stp61Resp = "OK"
+        )
+
+        assertTrue(mxPlus.supportsSwCan)
+        assertFalse(genericStn.supportsSwCan)
+    }
+
+    @Test
     fun doesNotClaimSwCanFromProtocolCommandAcceptanceAlone() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "STN adapter",
