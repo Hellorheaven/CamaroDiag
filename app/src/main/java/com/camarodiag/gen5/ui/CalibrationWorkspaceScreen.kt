@@ -134,7 +134,6 @@ fun CalibrationWorkspaceScreen(
     var j2534Host by remember { mutableStateOf("192.168.1.100") }
     var j2534Port by remember { mutableStateOf("35001") }
     var j2534Token by remember { mutableStateOf("") }
-    var j2534BaudRate by remember { mutableStateOf("500000") }
     var obdbSignalSearch by remember { mutableStateOf("") }
     var obdbSignalMenuExpanded by remember { mutableStateOf(false) }
     var selectedObdbSignalId by remember { mutableStateOf("") }
@@ -264,7 +263,7 @@ fun CalibrationWorkspaceScreen(
                     OutlinedTextField(
                         value = udsCanProtocol,
                         onValueChange = { udsCanProtocol = it.filter(Char::isDigit).take(2) },
-                        label = { Text(if (isFr) "Protocole STN : 33/34 HS-CAN 500k • 35/36 250k • 63/64 SW-CAN" else "STN protocol: 33/34 HS-CAN 500k • 35/36 250k • 63/64 SW-CAN") },
+                        label = { Text(if (isFr) "Profil CAN : 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN" else "CAN profile: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -294,24 +293,14 @@ fun CalibrationWorkspaceScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = j2534Port,
-                                    onValueChange = { j2534Port = it.filter(Char::isDigit).take(5) },
-                                    label = { Text("Port TCP") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                                )
-                                OutlinedTextField(
-                                    value = j2534BaudRate,
-                                    onValueChange = { j2534BaudRate = it.filter(Char::isDigit).take(6) },
-                                    label = { Text(if (isFr) "Débit CAN" else "CAN bitrate") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                                )
-                            }
+                            OutlinedTextField(
+                                value = j2534Port,
+                                onValueChange = { j2534Port = it.filter(Char::isDigit).take(5) },
+                                label = { Text("Port TCP") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
                             OutlinedTextField(
                                 value = j2534Token,
                                 onValueChange = { j2534Token = it.trim().take(128) },
@@ -325,13 +314,13 @@ fun CalibrationWorkspaceScreen(
                                     onClick = {
                                         onConnectJ2534Bridge(
                                             j2534Host, j2534Port, j2534Token,
-                                            udsRequestCanId, udsResponseCanId, j2534BaudRate
+                                            udsRequestCanId, udsResponseCanId, udsCanProtocol
                                         )
                                     },
                                     enabled = !state.isJ2534BridgeConnecting &&
                                         j2534Host.isNotBlank() && j2534Port.isNotBlank() &&
                                         j2534Token.isNotBlank() && udsRequestCanId.isNotBlank() &&
-                                        udsResponseCanId.isNotBlank() && j2534BaudRate in setOf("250000", "500000"),
+                                        udsResponseCanId.isNotBlank() && udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     if (state.isJ2534BridgeConnecting) CircularProgressIndicator()
@@ -348,8 +337,8 @@ fun CalibrationWorkspaceScreen(
                                     fontSize = 11.sp)
                             }
                             Text(
-                                if (isFr) "Pont actuel : HS-CAN ISO15765 250/500 kbit/s, 11/29 bits. SW-CAN et CAN FD ne sont pas activés par ce pont."
-                                else "Current bridge: HS-CAN ISO15765 250/500 kbit/s, 11/29-bit IDs. SW-CAN and CAN FD are not enabled by this bridge.",
+                                if (isFr) "Pont actuel : HS-CAN ISO15765 250/500 kbit/s et SW-ISO15765 J2534-2 si le pilote le prend en charge. CAN FD reste désactivé."
+                                else "Bridge: HS-CAN ISO15765 250/500 kbit/s and J2534-2 SW-ISO15765 when supported by the driver. CAN FD remains disabled.",
                                 color = TextMuted, fontSize = 10.sp
                             )
                         }
