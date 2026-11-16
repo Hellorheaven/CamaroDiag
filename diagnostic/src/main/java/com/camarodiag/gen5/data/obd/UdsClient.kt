@@ -14,6 +14,7 @@ data class UdsAccessPolicy internal constructor(
     val writeDids: Set<Int>,
     val allowedSessions: Set<Int>,
     val allowedRoutineIds: Set<Int>,
+    val ioControlDids: Set<Int>,
     val memoryRegions: List<UdsMemoryRegion>,
     val maxTransferBytes: Int,
     val allowClearDtc: Boolean,
@@ -27,6 +28,7 @@ data class UdsAccessPolicy internal constructor(
             writeDids = emptySet(),
             allowedSessions = setOf(0x01),
             allowedRoutineIds = emptySet(),
+            ioControlDids = emptySet(),
             memoryRegions = emptyList(),
             maxTransferBytes = 0,
             allowClearDtc = false,
@@ -45,6 +47,7 @@ data class UdsAccessPolicy internal constructor(
             writeDids: Set<Int>,
             allowedSessions: Set<Int>,
             allowedRoutineIds: Set<Int>,
+            ioControlDids: Set<Int> = emptySet(),
             memoryRegions: List<UdsMemoryRegion>,
             maxTransferBytes: Int,
             allowClearDtc: Boolean,
@@ -60,10 +63,10 @@ data class UdsAccessPolicy internal constructor(
             require(evidenceReference.isNotBlank()) { "Traceable OEM evidence is required." }
             require(readDids.all { it in 0..0xFFFF } && writeDids.all { it in 0..0xFFFF })
             require(allowedSessions.isNotEmpty() && allowedSessions.all { it in 1..0x7F })
-            require(allowedRoutineIds.all { it in 0..0xFFFF })
+            require(allowedRoutineIds.all { it in 0..0xFFFF } && ioControlDids.all { it in 0..0xFFFF })
             require(maxTransferBytes >= 0)
             return UdsAccessPolicy(
-                readDids, writeDids, allowedSessions, allowedRoutineIds, memoryRegions,
+                readDids, writeDids, allowedSessions, allowedRoutineIds, ioControlDids, memoryRegions,
                 maxTransferBytes, allowClearDtc, allowEcuReset, requireSecurityAccess, evidenceReference
             )
         }
@@ -109,6 +112,8 @@ class UdsClient(
     private var transferSequence = 1
     private var downloadActive = false
     private var transferredBytes = 0
+    private var expectedTransferBytes = 0L
+    private var uploadActive = false
 
     suspend fun diagnosticSessionControl(session: Int): ByteArray {
         require(session in policy.allowedSessions) { "Diagnostic session is not allowed by the verified ECU profile." }
@@ -161,17 +166,16 @@ class UdsClient(
         require(statusMask in 0..0xFF)
         val data = readDtcInformation(0x02, byteArrayOf(statusMask.toByte()))
         require(data.size >= 2) { "Incomplete ReadDTCInformation response." }
-        val format = data[0].toInt() and 0xFF
-        val count = data[1].toInt() and 0xFF
-        val records = data.copyOfRange(2, data.size)
-        require(records.size == count * 4) { "DTC record count does not match response length." }
+        val availabilityMask = data[0].toInt() and 0xFF
+        val records = data.copyOfRange(1, data.size)
+        require(records.size % 4 == 0) { "DTC record payload is not a multiple of four bytes." }
         return records.asList().chunked(4).map { record ->
             val raw = record.map { it.toByte() }.toByteArray()
             UdsDtcRecord(
                 dtc = ((raw[0].toInt() and 0xFF) shl 16) or
                     ((raw[1].toInt() and 0xFF) shl 8) or (raw[2].toInt() and 0xFF),
                 status = raw[3].toInt() and 0xFF,
-                raw = byteArrayOf(format.toByte()) + raw
+                raw = byteArrayOf(availabilityMask.toByte()) + raw
             )
         }
     }
@@ -189,7 +193,8 @@ class UdsClient(
         require(policy.allowEcuReset) { "ECU reset is disabled by the ECU profile." }
         require(resetType in 1..0x7F)
         requireSecurityIfConfigured()
-        request(0x11, byteArrayOf(resetType.toByte()))
+        val response = request(0x11, byteArrayOf(resetType.toByte()))
+        require(response.size >= 2 && (response[1].toInt() and 0x7F) == resetType) { "ECU did not echo reset type." }
         activeSession = 0x01
         securityUnlocked = false
         downloadActive = false
@@ -247,7 +252,7 @@ class UdsClient(
     }
 
     suspend fun requestDownload(address: Long, size: Long, dataFormatIdentifier: Int = 0, addressLength: Int = 4, sizeLength: Int = 4) {
-        require(!downloadActive) { "A download is already active." }
+        require(!downloadActive && !uploadActive) { "A data transfer is already active." }
         requireAllowedMemory(address, size)
         require(size <= policy.maxTransferBytes.toLong()) { "Transfer exceeds the verified profile limit." }
         requireSecurityIfConfigured()
@@ -266,12 +271,14 @@ class UdsClient(
         require(downloadMaxBlockLength > 2) { "ECU returned an invalid maximum block length." }
         transferSequence = 1
         transferredBytes = 0
+        expectedTransferBytes = size
         downloadActive = true
     }
 
     suspend fun transferData(block: ByteArray) {
         require(downloadActive) { "No RequestDownload is active." }
         require(block.isNotEmpty() && block.size <= downloadMaxBlockLength - 2)
+        require(transferredBytes.toLong() + block.size <= expectedTransferBytes) { "Transfer exceeds the requested ECU range length." }
         require(transferredBytes.toLong() + block.size <= policy.maxTransferBytes.toLong())
         val response = request(0x36, byteArrayOf(transferSequence.toByte()) + block)
         require(response.size >= 2 && (response[1].toInt() and 0xFF) == transferSequence) {
@@ -279,17 +286,81 @@ class UdsClient(
         }
         transferredBytes += block.size
         transferSequence = (transferSequence + 1) and 0xFF
-        if (transferSequence == 0) transferSequence = 1
+    }
+
+    suspend fun requestUpload(address: Long, size: Long, dataFormatIdentifier: Int = 0, addressLength: Int = 4, sizeLength: Int = 4) {
+        require(!downloadActive && !uploadActive) { "A data transfer is already active." }
+        requireAllowedMemory(address, size)
+        require(size <= policy.maxTransferBytes.toLong()) { "Transfer exceeds the verified profile limit." }
+        requireSecurityIfConfigured()
+        require(dataFormatIdentifier in 0..0xFF)
+        val format = addressLength shl 4 or sizeLength
+        val response = request(0x35, byteArrayOf(dataFormatIdentifier.toByte(), format.toByte()) +
+            encodeUnsigned(address, addressLength) + encodeUnsigned(size, sizeLength))
+        require(response.size >= 3) { "Incomplete RequestUpload response." }
+        val lengthBytes = response[1].toInt() and 0x0F
+        require(lengthBytes in 1..4 && response.size >= 2 + lengthBytes)
+        downloadMaxBlockLength = readUnsigned(response, 2, lengthBytes).toInt()
+        require(downloadMaxBlockLength > 2) { "ECU returned an invalid maximum upload block length." }
+        transferSequence = 1
+        transferredBytes = 0
+        expectedTransferBytes = size
+        uploadActive = true
+    }
+
+    suspend fun requestUploadData(): ByteArray {
+        require(uploadActive) { "No RequestUpload is active." }
+        require(transferredBytes.toLong() < expectedTransferBytes) { "The requested upload range is already complete." }
+        val response = request(0x36, byteArrayOf(transferSequence.toByte()))
+        require(response.size >= 2 && (response[1].toInt() and 0xFF) == transferSequence) {
+            "ECU did not acknowledge the upload block sequence."
+        }
+        val data = response.copyOfRange(2, response.size)
+        require(data.isNotEmpty() && data.size <= downloadMaxBlockLength - 2)
+        require(transferredBytes.toLong() + data.size <= expectedTransferBytes)
+        transferredBytes += data.size
+        transferSequence = (transferSequence + 1) and 0xFF
+        return data
+    }
+
+    suspend fun inputOutputControlByIdentifier(did: Int, controlParameter: Int, data: ByteArray = byteArrayOf()): ByteArray {
+        require(did in policy.ioControlDids) { "I/O control DID is not allowlisted for this ECU." }
+        require(controlParameter in 0..0xFF)
+        requireSecurityIfConfigured()
+        val response = request(0x2F, byteArrayOf((did shr 8).toByte(), did.toByte(), controlParameter.toByte()) + data)
+        require(response.size >= 4 && readU16(response, 1) == did &&
+            (response[3].toInt() and 0xFF) == controlParameter) { "ECU did not confirm I/O control." }
+        return response.copyOfRange(4, response.size)
+    }
+
+    suspend fun communicationControl(controlType: Int, communicationType: Int) {
+        require(controlType in 0..3 && communicationType in 0..0xFF)
+        requireSecurityIfConfigured()
+        val response = request(0x28, byteArrayOf(controlType.toByte(), communicationType.toByte()))
+        require(response.size >= 3 && (response[1].toInt() and 0x7F) == controlType &&
+            (response[2].toInt() and 0xFF) == communicationType)
+    }
+
+    suspend fun controlDtcSetting(settingType: Int, record: ByteArray = byteArrayOf()) {
+        require(settingType in 1..2)
+        requireSecurityIfConfigured()
+        val response = request(0x85, byteArrayOf(settingType.toByte()) + record)
+        require(response.size >= 2 && (response[1].toInt() and 0x7F) == settingType)
     }
 
     suspend fun requestTransferExit(parameters: ByteArray = byteArrayOf()) {
-        require(downloadActive) { "No RequestDownload is active." }
+        require(downloadActive || uploadActive) { "No data transfer is active." }
+        if (downloadActive) require(transferredBytes.toLong() == expectedTransferBytes) { "Transferred byte count does not match the requested download length." }
+        if (uploadActive) require(transferredBytes.toLong() == expectedTransferBytes) { "Uploaded byte count does not match the requested upload length." }
         request(0x37, parameters)
         downloadActive = false
+        uploadActive = false
         downloadMaxBlockLength = 0
+        expectedTransferBytes = 0
     }
 
     fun isDownloadActive(): Boolean = downloadActive
+    fun isUploadActive(): Boolean = uploadActive
     fun isSecurityUnlocked(): Boolean = securityUnlocked
     fun activeDiagnosticSession(): Int = activeSession
 
