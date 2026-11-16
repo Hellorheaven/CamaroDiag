@@ -613,12 +613,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun markAdapterDisconnected() {
         _adapter.value = AdapterCapabilities()
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
-        _livePids.value = emptyList()
-        _dtcs.value = emptyList()
-        _mileageReport.value = null
-        _obdScanReport.value = null
-        _obdScanMessage.value = null
-        _liveTelemetryMessage.value = null
+        clearVehicleEvidence()
         _isObdScanning.value = false
     }
 
