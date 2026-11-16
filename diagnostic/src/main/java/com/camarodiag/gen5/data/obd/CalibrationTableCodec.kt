@@ -370,8 +370,8 @@ object CalibrationTableCodec {
         return edited
     }
 
-    fun formatEngineeringValue(value: Double): String =
-        String.format(Locale.US, "%.3f", value).trimEnd('0').trimEnd('.')
+    /** Round-trip-safe text representation: edited cells must not lose hidden precision. */
+    fun formatEngineeringValue(value: Double): String = value.toString()
 
     private fun detectDelimiter(header: String): Char {
         val candidates = listOf(';', '\t', ',')
