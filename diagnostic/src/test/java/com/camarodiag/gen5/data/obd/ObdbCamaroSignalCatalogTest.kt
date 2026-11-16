@@ -13,6 +13,13 @@ class ObdbCamaroSignalCatalogTest {
         assertEquals(byteArrayOf(0x22, 0x11, 0xA6.toByte()).toList(), signal.requestPayload().toList())
     }
 
+    @Test fun yearFilterCombinesInclusiveRangesAndExplicitYearExceptions() {
+        val filter = ObdbYearFilter(from = 2023, to = null, years = setOf(2012, 2014, 2015))
+        assertTrue(filter.matches(2014))
+        assertTrue(filter.matches(2024))
+        assertFalse(filter.matches(2018))
+    }
+
     @Test fun handlesSignedValuesAndNullSentinels() {
         val signed = ObdbSignalFormat(bitLength = 16, signed = true, divide = 8.0, unit = "rpm")
         assertEquals(-1.0, signed.decode(byteArrayOf(0xFF.toByte(), 0xF8.toByte())).value!!, 0.0)
