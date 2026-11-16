@@ -569,6 +569,10 @@ fun CalibrationWorkspaceScreen(
                             color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
                         )
                         Text(
+                            "UDS: ${report.udsServices.joinToString { "0x" + it.toString(16).uppercase().padStart(2, '0') }}",
+                            color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                        )
+                        Text(
                             if (isFr) "DID candidats : ${report.readDidCandidates.joinToString { "0x" + it.toString(16).uppercase().padStart(4, '0') }.ifBlank { "aucun" }}"
                             else "DID candidates: ${report.readDidCandidates.joinToString { "0x" + it.toString(16).uppercase().padStart(4, '0') }.ifBlank { "none" }}",
                             color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp
@@ -581,7 +585,7 @@ fun CalibrationWorkspaceScreen(
                             }
                             val result = if (observation.positiveResponse) "POS" else "REQ/OBS"
                             Text(
-                                "$direction • CAN ${observation.canId.toString(16).uppercase()} • DID ${observation.did.toString(16).uppercase().padStart(4, '0')} • ${result}",
+                                "$direction • CAN ${observation.canId.toString(16).uppercase()} • SVC ${observation.responseService.toString(16).uppercase()} • DID ${observation.did.toString(16).uppercase().padStart(4, '0')} • ${result}",
                                 color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
                             )
                         }
