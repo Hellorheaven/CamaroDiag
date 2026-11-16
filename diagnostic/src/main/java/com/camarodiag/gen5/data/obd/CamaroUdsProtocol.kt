@@ -79,6 +79,36 @@ object CamaroUdsProtocol {
         )
     }
 
+    /**
+     * A connected adapter is not proof that an ECU responded. Only mark the standard
+     * OBD powertrain responder as accessible after observing 7E8 in a real 0100 scan.
+     * This does not identify any GM enhanced physical address or other module.
+     */
+    fun applyStandardObdDiscovery(
+        topology: List<EcuModule>,
+        respondingAddresses: Collection<String>
+    ): List<EcuModule> {
+        val observedEcmResponse = respondingAddresses.any { it.trim().equals("7E8", ignoreCase = true) }
+        return topology.map { module ->
+            if (module.id != "ECM") return@map module
+            if (observedEcmResponse) {
+                module.copy(
+                    status = ModuleStatus.ACCESSIBLE,
+                    rxHeader = "7E8",
+                    notesEn = "Observed 7E8 response to standard OBD functional request 0100. This confirms standard powertrain OBD access only; it does not authorize GM enhanced services.",
+                    notesFr = "Réponse 7E8 observée à la requête OBD fonctionnelle standard 0100. Cela confirme uniquement l'accès OBD groupe motopropulseur ; aucun service GM étendu n'est autorisé."
+                )
+            } else {
+                module.copy(
+                    status = ModuleStatus.DISCOVERY_REQUIRED,
+                    rxHeader = "",
+                    notesEn = "No standard OBD 7E8 response was observed. Keep the ECM unverified until a real functional scan confirms it.",
+                    notesFr = "Aucune réponse OBD standard 7E8 observée. Le calculateur moteur reste non confirmé jusqu'à une réponse réelle au scan fonctionnel."
+                )
+            }
+        }
+    }
+
     fun parsePidBytes(response: String, pid: String): IntArray? {
         val cleaned = response.uppercase().replace(Regex("[^0-9A-F]"), "")
         val marker = "41${pid.uppercase().padStart(2, '0')}"
