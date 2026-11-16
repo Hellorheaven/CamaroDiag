@@ -58,6 +58,9 @@ data class CalibrationWorkspaceState(
     val calibrationIdResponse: String = "",
     val cvnResponse: String = "",
     val message: String = "",
+    val isUdsReading: Boolean = false,
+    val udsDidResponse: String = "",
+    val udsMessage: String = "",
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -98,6 +101,7 @@ fun CalibrationWorkspaceScreen(
     isConnected: Boolean,
     isFr: Boolean,
     onReadIdentification: () -> Unit,
+    onReadUdsDid: (String, String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
@@ -110,6 +114,9 @@ fun CalibrationWorkspaceScreen(
     onExportFile: () -> Unit,
     onClearFile: () -> Unit
 ) {
+    var udsRequestCanId by remember { mutableStateOf("") }
+    var udsResponseCanId by remember { mutableStateOf("") }
+    var udsDid by remember { mutableStateOf("F190") }
     val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
     val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
@@ -201,6 +208,52 @@ fun CalibrationWorkspaceScreen(
                         if (isFr) "Connecte une interface OBD avant la lecture réelle." else "Connect an OBD adapter before reading the real ECU.",
                         color = CamaroAmber, fontSize = 12.sp
                     )
+                    HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                    Text(if (isFr) "Diagnostic UDS sur CAN" else "UDS over CAN",
+                        color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isFr) "Transport STPX documenté pour OBDLink MX+ uniquement. Saisis les identifiants CAN physiques confirmés pour ton calculateur : aucune adresse GM n'est supposée."
+                        else "Documented STPX transport for OBDLink MX+ only. Enter the confirmed physical CAN IDs for your ECU: no GM address is assumed.",
+                        color = TextMuted, fontSize = 11.sp
+                    )
+                    OutlinedTextField(
+                        value = udsRequestCanId,
+                        onValueChange = { udsRequestCanId = it.uppercase().filter { ch -> ch.isDigit() || ch in 'A'..'F' }.take(8) },
+                        label = { Text(if (isFr) "CAN ID requête (ex. 7E0)" else "Request CAN ID (e.g. 7E0)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                    )
+                    OutlinedTextField(
+                        value = udsResponseCanId,
+                        onValueChange = { udsResponseCanId = it.uppercase().filter { ch -> ch.isDigit() || ch in 'A'..'F' }.take(8) },
+                        label = { Text(if (isFr) "CAN ID réponse (ex. 7E8)" else "Response CAN ID (e.g. 7E8)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                    )
+                    OutlinedTextField(
+                        value = udsDid,
+                        onValueChange = { udsDid = it.uppercase().filter { ch -> ch.isDigit() || ch in 'A'..'F' }.take(4) },
+                        label = { Text(if (isFr) "DID UDS (F190 = VIN)" else "UDS DID (F190 = VIN)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                    )
+                    Button(
+                        onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid) },
+                        enabled = isConnected && !state.isUdsReading &&
+                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsDid.length == 4,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (state.isUdsReading) CircularProgressIndicator()
+                        else Text(if (isFr) "Lire le DID UDS" else "Read UDS DID")
+                    }
+                    if (state.udsMessage.isNotBlank()) Text(state.udsMessage, color = CamaroAmber, fontSize = 11.sp)
+                    if (state.udsDidResponse.isNotBlank()) {
+                        Text("UDS $udsDid", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(state.udsDidResponse, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
                     if (state.ecuVinResponse.isNotBlank() || state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank()) {
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text("VIN • 09 02", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
