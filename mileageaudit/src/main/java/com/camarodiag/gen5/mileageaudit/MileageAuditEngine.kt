@@ -22,7 +22,7 @@ object MileageAuditEngine {
             !it.profileEvidenceReference.isNullOrBlank() &&
                 it.confidence == ConfidenceLevel.HIGH &&
                 it.moduleId.uppercase() in independentModuleIds
-        }
+        }.distinctBy { it.moduleId.uppercase() }
 
         val independentValues = independent.mapNotNull { it.kmValue }
 
