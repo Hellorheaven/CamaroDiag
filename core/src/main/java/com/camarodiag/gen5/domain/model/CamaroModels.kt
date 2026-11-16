@@ -66,13 +66,13 @@ enum class AdapterTier(val titleEn: String, val titleFr: String) {
 }
 
 data class AdapterCapabilities(
-    val deviceName: String = "Demo / Simulated STN2255",
-    val macAddress: String = "00:04:3E:00:00:00",
-    val tier: AdapterTier = AdapterTier.PRO_STN,
-    val firmwareId: String = "STN2255 v5.6.5",
-    val supportsLongFrames: Boolean = true,
-    val supportsSwCan: Boolean = true,
-    val supportsCanHeaders: Boolean = true,
+    val deviceName: String = "Not connected",
+    val macAddress: String = "",
+    val tier: AdapterTier = AdapterTier.DISCONNECTED,
+    val firmwareId: String = "",
+    val supportsLongFrames: Boolean = false,
+    val supportsSwCan: Boolean = false,
+    val supportsCanHeaders: Boolean = false,
     val rawProbeLog: List<String> = emptyList()
 )
 
