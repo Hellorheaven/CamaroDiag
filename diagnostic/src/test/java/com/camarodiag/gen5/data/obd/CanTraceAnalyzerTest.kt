@@ -67,8 +67,8 @@ class CanTraceAnalyzerTest {
     @Test
     fun parsesHeaderEnabledElm327MonitorLogWithoutInventingDirection() {
         val trace = """
-            7E0 03 22 F1 90
-            7E8 07 62 F1 90 31 47 30 31
+            7E0 04 03 22 F1 90
+            7E8 08 07 62 F1 90 31 47 30 31
         """.trimIndent()
 
         val report = CanTraceAnalyzer.analyze(trace, "elm327-monitor.txt")
