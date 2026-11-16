@@ -10,7 +10,9 @@ object CamaroUdsProtocol {
         atzResp: String,
         stiResp: String,
         atalResp: String,
-        stp61Resp: String
+        stp61Resp: String,
+        headersResp: String = "OK",
+        protocolResp: String = "OK"
     ): AdapterCapabilities {
         val logs = listOf(
             "> ATZ  -> $atzResp",
@@ -40,7 +42,8 @@ object CamaroUdsProtocol {
             firmwareId = if (stiResp.isNotBlank() && !stiResp.contains("?")) stiResp else atzResp,
             supportsLongFrames = supportsLong,
             supportsSwCan = supportsSwCan,
-            supportsCanHeaders = true,
+            supportsCanHeaders = headersResp.contains("OK", ignoreCase = true) &&
+                protocolResp.contains("OK", ignoreCase = true),
             rawProbeLog = logs
         )
     }
