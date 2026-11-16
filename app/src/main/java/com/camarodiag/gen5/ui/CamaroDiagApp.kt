@@ -561,11 +561,11 @@ fun AdapterScreen(
                         TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
                     }
                     if (usbDevices.isEmpty()) Text(if (isFr) "Aucun adaptateur série USB détecté." else "No USB serial adapter detected.", color = TextMuted)
-                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text("Connecter : $label") } }
+                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter : $label" else "Connect: $label") } }
                     HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                     Text(if (isFr) "Connexion Wi-Fi ELM327" else "Wi-Fi ELM327 connection", fontWeight = FontWeight.Bold)
                     OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(if (isFr) "Adresse IP de l'adaptateur" else "Adapter IP address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text("Port TCP (souvent 35000 ou 23)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text(if (isFr) "Port TCP (souvent 35000 ou 23)" else "TCP port (often 35000 or 23)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter en Wi-Fi" else "Connect over Wi-Fi") }
                     Text(if (isFr) "VXDIAG : architecture de transport prévue, mais les interfaces J2534 ne sont pas déclarées compatibles Android sans SDK Android officiel du modèle. Aucun accès J2534 n'est simulé." else "VXDIAG: transport architecture is prepared, but J2534 interfaces are not claimed Android-compatible without the model's official Android SDK. No J2534 access is simulated.", color = TextMuted, fontSize = 12.sp)
                 }
