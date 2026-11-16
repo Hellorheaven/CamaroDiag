@@ -60,6 +60,14 @@ android {
         }
     }
 
+    // Same product name as the Windows bridge installer; channels remain distinct.
+    applicationVariants.all {
+        val apkName = "CamaroDiag-${name}.apk"
+        outputs.all {
+            outputFileName = apkName
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
