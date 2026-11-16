@@ -75,6 +75,27 @@ Pour chaque famille de calculateur, il faut disposer et valider :
 
 Les interfaces GM de programmation et leurs logiciels officiels ne sont pas interchangeables avec les interfaces OBD génériques. CamaroDiag ne remplace pas les outils d'atelier GM officiels sans les protocoles, licences, définitions et procédures nécessaires.
 
+
+## Pile UDS ISO-TP étendue – primitives génériques, accès contrôlé
+
+Le module `diagnostic` contient désormais un client UDS générique supplémentaire au-dessus du transport CAN brut et du canal ISO-TP classique. Il couvre les services normalisés suivants, lorsque l'ECU les implémente et les autorise :
+
+- Session et maintien : `0x10` DiagnosticSessionControl, `0x3E` TesterPresent (y compris suppression de réponse).
+- Identification et diagnostic : `0x22` ReadDataByIdentifier, `0x19` ReadDTCInformation, décodage des enregistrements DTC `0x02`.
+- Effacement et redémarrage : `0x14` ClearDiagnosticInformation, `0x11` ECUReset, uniquement avec autorisation explicite.
+- Accès protégé : `0x27` SecurityAccess (demande de seed et soumission d'une clé fournie par un fournisseur autorisé ; aucun algorithme de clé GM n'est inventé).
+- Paramètres et routines : `0x2E` WriteDataByIdentifier, `0x31` RoutineControl, `0x2F` InputOutputControlByIdentifier, avec listes blanches par DID/routine.
+- Mémoire et transfert : `0x23` ReadMemoryByAddressAndLength, `0x3D` WriteMemoryByAddressAndLength, `0x34` RequestDownload, `0x35` RequestUpload, `0x36` TransferData, `0x37` RequestTransferExit.
+- Gestion réseau : `0x28` CommunicationControl et `0x85` ControlDTCSetting, soumis à session et autorisation.
+
+La politique par défaut est **lecture seule**. Les écritures DID, routines, contrôles E/S, mémoire, transferts, effacement DTC et reset exigent une politique créée par le chemin interne de validation d'identité. Cette validation lie le VIN, le CAL ID, le CVN et une référence documentaire. Les opérations de programmation exigent en plus une session non-default, les plages mémoire autorisées, une limite de taille et, par défaut, un accès sécurité accepté. Le transfert contrôle le numéro de séquence, la taille de bloc et le nombre exact d'octets demandé.
+
+Le client gère les réponses négatives UDS et attend les réponses positives après NRC `0x78` ResponsePending. Le canal ISO-TP reste limité à Classical CAN et à la longueur normale 12 bits (4095 octets) ; CAN FD, addressing étendu ISO-TP, segmentation étendue 32 bits et adaptation de timing sub-millisecondes ne sont pas annoncés comme supportés.
+
+**Ce code est une pile de protocole générique, pas une validation GM.** Aucun profil de programmation GM n'est fourni : aucun DID d'écriture, aucune routine, aucune plage mémoire, aucune clé de sécurité, aucun checksum ni séquence de flashage n'est renseigné pour les Camaro. Les méthodes d'écriture existent derrière les contrôles, mais aucun véhicule ne reçoit d'autorisation d'écriture par défaut.
+
+**Matériel :** la pile a besoin d'un `RawCanFrameTransport` qui transporte les identifiants CAN et les trames sans les convertir en commandes ELM ASCII. Les VCX SE/NANO sont des interfaces J2534/ISO 22900 côté PC selon leur constructeur ; la documentation consultée ne fournit pas de pilote Android officiel redistribuable pour CamaroDiag. Le GM MDI2 est lui aussi documenté comme interface Pass-Thru J2534 pilotée par une application PC. Par conséquent, l'application Android n'est pas encore reliée à un VCI réel pour ce client UDS. Un pont PC J2534 ou un SDK Android officiellement fourni reste nécessaire avant les essais en véhicule.
+
 ## BCM / odomètre / pilotage
 
 Le catalogue de commandes carrosserie reste fermé tant qu'une routine OEM documentée n'est pas validée pour le VIN, l'année, le BCM et la version logicielle. L'adressage GM étendu et les DID kilométriques ne doivent pas être devinés à partir de l'année ou du moteur.
