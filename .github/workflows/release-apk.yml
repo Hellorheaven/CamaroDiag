@@ -130,6 +130,7 @@ jobs:
             - Signed Android release APK.
             - Windows J2534 Bridge release installers for x64 and x86.
             - VX Manager and the manufacturer's J2534 driver must be installed separately by an administrator when required.
+            - GitHub may also show automatic source-code archives (zip/tar.gz); these are not Windows installers. Download the .exe Setup or Android .apk assets only.
           files: |
             app/build/outputs/apk/release/*.apk
           draft: false
