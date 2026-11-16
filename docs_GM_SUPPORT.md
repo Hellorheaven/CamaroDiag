@@ -109,6 +109,8 @@ L'import accepte les fichiers sélectionnés par Android et conserve leur conten
 
 Pour utiliser l'éditeur de tables, il faut une image BIN brute et un TSV de définitions adapté à son CAL ID/OS. Chaque définition fournit les offsets, dimensions, axes représentés par la matrice, type numérique, ordre des octets, échelle, biais et limites. L'import d'un conteneur propriétaire n'implique ni son décodage, ni l'accès à ses tables, ni l'autorisation de flasher son contenu.
 
+Le chargement d'un TSV de définitions dans l'éditeur exige des métadonnées correspondant au VIN sélectionné, au VIN réellement lu sur l'ECU, au CAL ID et au CVN lus via Mode 09, ainsi qu'à l'empreinte SHA-256 de l'image BIN active. Une définition dont un de ces éléments diffère est refusée. L'OS et la référence matérielle doivent aussi figurer dans le TSV, mais Mode 09 standard ne permet pas de les confirmer ici : ils restent à vérifier dans la documentation spécifique du calculateur.
+
 
 ## Import de projets de cartographie externes
 
