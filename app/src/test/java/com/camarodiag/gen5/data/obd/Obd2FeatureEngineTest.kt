@@ -34,6 +34,27 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun fullScanUsesOnlyReadOnlyServicesAndAdapterSetupCommands() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100", "0101" -> if (command == "0101") "NO DATA" else "4100000000"
+                else -> "NO DATA"
+            }
+        })
+
+        val report = engine.fullReadOnlyScan()
+
+        assertTrue(report.supportedPids.isEmpty())
+        assertTrue(commands.containsAll(listOf("ATZ", "ATSP6", "ATI", "AT@1", "03", "07", "0A", "0902", "0904", "0906", "090A", "0600")))
+        assertTrue(commands.none { command ->
+            command == "04" || command.startsWith("2E") || command.startsWith("31") ||
+                command.startsWith("34") || command.startsWith("36") || command.startsWith("11")
+        })
+    }
+
+    @Test
     fun decodesMode09CalibrationIdAndCvnRecords() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
