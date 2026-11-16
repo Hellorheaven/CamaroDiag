@@ -159,11 +159,11 @@ class BluetoothObdManager(context: Context) {
             val atz = sendAtCommand("ATZ")
             sendAtCommand("ATE0")
             sendAtCommand("ATL0")
-            sendAtCommand("ATH1")
+            val headersResp = sendAtCommand("ATH1")
             val sti = sendAtCommand("STI")
             val atal = sendAtCommand("ATAL")
             val stp61 = sendAtCommand("STP 61")
-            sendAtCommand("ATSP 6")
+            val protocolResp = sendAtCommand("ATSP 6")
 
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = deviceName,
@@ -171,7 +171,9 @@ class BluetoothObdManager(context: Context) {
                 atzResp = atz,
                 stiResp = sti,
                 atalResp = atal,
-                stp61Resp = stp61
+                stp61Resp = stp61,
+                headersResp = headersResp,
+                protocolResp = protocolResp
             )
             isDemoMode = false
             Result.success(capabilities)
