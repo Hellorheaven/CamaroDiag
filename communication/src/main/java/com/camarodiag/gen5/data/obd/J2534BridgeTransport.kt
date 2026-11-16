@@ -82,8 +82,9 @@ class J2534BridgeTransport(
                 JSONObject()
                     .put("op", "exchange")
                     .put("token", pairingToken)
-                    .put("payloadHex", payload.toHex()),
-                boundedTimeout
+                    .put("payloadHex", payload.toHex())
+                    .put("timeoutMs", boundedTimeout),
+                boundedTimeout + 3000
             )
             val hex = response.optString("payloadHex")
             require(hex.isNotBlank() && hex.length % 2 == 0) { "Réponse UDS vide ou mal formée du pont J2534." }
