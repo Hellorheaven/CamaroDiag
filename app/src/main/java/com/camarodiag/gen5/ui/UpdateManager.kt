@@ -12,6 +12,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.camarodiag.gen5.BuildConfig
+import com.camarodiag.gen5.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -63,7 +65,7 @@ private object CamaroDiagUpdateChecker {
     }
 }
 @Composable
-fun UpdateManagerDialog(isFr: Boolean) {
+fun UpdateManagerDialog() {
     val ctx = LocalContext.current
     var update by remember { mutableStateOf<CamaroDiagUpdate?>(null) }
     var downloading by remember { mutableStateOf(false) }
@@ -83,14 +85,14 @@ fun UpdateManagerDialog(isFr: Boolean) {
                 if (done != latestId.value || done < 0) return
                 val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
                 dm.query(DownloadManager.Query().setFilterById(done)).use { cur ->
-                    if (!cur.moveToFirst()) { setDownloading.value(false); setMessage.value("Download failed."); return }
+                    if (!cur.moveToFirst()) { setDownloading.value(false); setMessage.value(ctx.getString(R.string.update_download_failed)); return }
                     val si = cur.getColumnIndex(DownloadManager.COLUMN_STATUS)
                     val ui = cur.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
                     val file = if (ui >= 0) cur.getString(ui)?.let { Uri.parse(it).path?.let(::File) } else null
                     if (si < 0 || cur.getInt(si) != DownloadManager.STATUS_SUCCESSFUL || file == null || !file.isFile || !CamaroDiagUpdateChecker.signatureMatches(ctx, file)) {
-                        setDownloading.value(false); setMessage.value(if (isFr) "Téléchargement/signature invalide. Installation bloquée ; réinstallation manuelle éventuellement nécessaire." else "Download or signature invalid. Installation blocked; manual reinstall may be needed."); return
+                        setDownloading.value(false); setMessage.value(ctx.getString(R.string.update_download_invalid_signature)); return
                     }
-                    setApk.value(file); setDownloading.value(false); setMessage.value(if (isFr) "Téléchargement terminé." else "Download complete.")
+                    setApk.value(file); setDownloading.value(false); setMessage.value(ctx.getString(R.string.update_download_complete))
                 }
             }
         }
@@ -99,25 +101,25 @@ fun UpdateManagerDialog(isFr: Boolean) {
     }
     if (update != null || message != null) AlertDialog(
         onDismissRequest = { update = null; message = null },
-        title = { Text(if (apk != null) "CamaroDiag – prêt à installer" else if (downloading) "Téléchargement" else if (isFr) "Mise à jour disponible" else "Update available") },
+        title = { Text(if (apk != null) stringResource(R.string.update_ready_to_install) else if (downloading) stringResource(R.string.update_downloading) else stringResource(R.string.update_available)) },
         text = { androidx.compose.foundation.layout.Column {
-            update?.let { Text("Version ${it.version} • ${it.channel.uppercase()}"); Text(if (isFr) "Seul le canal ${it.channel} est proposé : Debug reste Debug, Release reste Release." else "Only the ${it.channel} channel is offered.") }
+            update?.let { Text("Version ${it.version} • ${it.channel.uppercase()}"); Text(stringResource(R.string.update_channel_only, it.channel)) }
             message?.let { Text(it) }
         } },
         confirmButton = { when {
             apk != null -> Button(onClick = {
                 if (Build.VERSION.SDK_INT >= 26 && !ctx.packageManager.canRequestPackageInstalls()) {
                     ctx.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    message = if (isFr) "Autorisez les installations depuis cette source, revenez puis appuyez sur Installer." else "Allow installs from this source, return and press Install."
+                    message = ctx.getString(R.string.update_allow_unknown_sources)
                 } else {
                     val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", apk!!)
                     ctx.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
                     update = null; message = null
                 }
-            }) { Text(if (isFr) "Installer" else "Install") }
+            }) { Text(stringResource(R.string.update_install)) }
             downloading -> Button(onClick = {}, enabled = false) { Text("…") }
-            update != null -> Button(onClick = { downloading = true; id = CamaroDiagUpdateChecker.enqueue(ctx, update!!) }) { Text(if (isFr) "Télécharger" else "Download") }
+            update != null -> Button(onClick = { downloading = true; id = CamaroDiagUpdateChecker.enqueue(ctx, update!!) }) { Text(stringResource(R.string.update_download)) }
         } },
-        dismissButton = { TextButton(onClick = { update = null; message = null }) { Text(if (isFr) "Plus tard" else "Later") } }
+        dismissButton = { TextButton(onClick = { update = null; message = null }) { Text(stringResource(R.string.update_later)) } }
     )
 }
