@@ -111,6 +111,11 @@ class CamaroSignalCatalogTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
+    fun rejectsNonCanPhysicalRequestAddress() {
+        CamaroSignalCatalog.fromJson(signalJson().replace("\"requestAddress\": \"7E0\"", "\"requestAddress\": \"7E\""))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
     fun rejectsDuplicateSignalIds() {
         val root = JSONObject(signalJson())
         val signals = root.getJSONArray("signals")
