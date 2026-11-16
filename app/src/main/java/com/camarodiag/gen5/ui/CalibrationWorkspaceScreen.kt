@@ -62,6 +62,9 @@ data class CalibrationWorkspaceState(
     val udsDidResponse: String = "",
     val udsDtcResponse: String = "",
     val udsMessage: String = "",
+    val isJ2534BridgeConnecting: Boolean = false,
+    val isJ2534BridgeConnected: Boolean = false,
+    val j2534BridgeMessage: String = "",
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -104,6 +107,8 @@ fun CalibrationWorkspaceScreen(
     onReadIdentification: () -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,
+    onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
+    onDisconnectJ2534Bridge: () -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
@@ -120,6 +125,10 @@ fun CalibrationWorkspaceScreen(
     var udsResponseCanId by remember { mutableStateOf("") }
     var udsDid by remember { mutableStateOf("F190") }
     var udsCanProtocol by remember { mutableStateOf("33") }
+    var j2534Host by remember { mutableStateOf("192.168.1.100") }
+    var j2534Port by remember { mutableStateOf("35001") }
+    var j2534Token by remember { mutableStateOf("") }
+    var j2534BaudRate by remember { mutableStateOf("500000") }
     val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
     val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
@@ -215,8 +224,8 @@ fun CalibrationWorkspaceScreen(
                     Text(if (isFr) "Diagnostic UDS sur CAN" else "UDS over CAN",
                         color = CamaroAmber, fontWeight = FontWeight.Bold)
                     Text(
-                        if (isFr) "Transport STPX documenté pour OBDLink MX+ uniquement. Saisis les identifiants CAN physiques confirmés pour ton calculateur : aucune adresse GM n'est supposée."
-                        else "Documented STPX transport for OBDLink MX+ only. Enter the confirmed physical CAN IDs for your ECU: no GM address is assumed.",
+                        if (isFr) "Transport STPX pour OBDLink MX+ ou pont PC J2534 pour VXDIAG. Saisis les identifiants CAN physiques confirmés : aucune adresse GM n'est supposée."
+                        else "STPX transport for OBDLink MX+ or a PC J2534 bridge for VXDIAG. Enter confirmed physical CAN IDs: no GM address is assumed.",
                         color = TextMuted, fontSize = 11.sp
                     )
                     OutlinedTextField(
@@ -251,9 +260,86 @@ fun CalibrationWorkspaceScreen(
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
                     )
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark.copy(alpha = .72f))) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text(if (isFr) "PONT PC J2534 • VXDIAG VCX SE / NANO" else "J2534 PC BRIDGE • VXDIAG VCX SE / NANO",
+                                color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(
+                                if (isFr) "Lance CamaroDiag.J2534Bridge.exe sur le PC Windows, puis saisis son IP et le jeton affiché dans la console. Le PC doit être sur le même réseau local."
+                                else "Run CamaroDiag.J2534Bridge.exe on the Windows PC, then enter its IP and the token shown in the console. Both devices must be on the same local network.",
+                                color = TextMuted, fontSize = 10.sp
+                            )
+                            OutlinedTextField(
+                                value = j2534Host,
+                                onValueChange = { j2534Host = it.trim().take(64) },
+                                label = { Text(if (isFr) "Adresse IP du PC" else "PC IP address") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = j2534Port,
+                                    onValueChange = { j2534Port = it.filter(Char::isDigit).take(5) },
+                                    label = { Text("Port TCP") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                                OutlinedTextField(
+                                    value = j2534BaudRate,
+                                    onValueChange = { j2534BaudRate = it.filter(Char::isDigit).take(6) },
+                                    label = { Text(if (isFr) "Débit CAN" else "CAN bitrate") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                            }
+                            OutlinedTextField(
+                                value = j2534Token,
+                                onValueChange = { j2534Token = it.trim().take(128) },
+                                label = { Text(if (isFr) "Jeton d'appairage du PC" else "PC pairing token") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                            )
+                            if (!state.isJ2534BridgeConnected) {
+                                Button(
+                                    onClick = {
+                                        onConnectJ2534Bridge(
+                                            j2534Host, j2534Port, j2534Token,
+                                            udsRequestCanId, udsResponseCanId, j2534BaudRate
+                                        )
+                                    },
+                                    enabled = !state.isJ2534BridgeConnecting &&
+                                        j2534Host.isNotBlank() && j2534Port.isNotBlank() &&
+                                        j2534Token.isNotBlank() && udsRequestCanId.isNotBlank() &&
+                                        udsResponseCanId.isNotBlank() && j2534BaudRate in setOf("250000", "500000"),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (state.isJ2534BridgeConnecting) CircularProgressIndicator()
+                                    else Text(if (isFr) "Connecter le pont J2534" else "Connect J2534 bridge")
+                                }
+                            } else {
+                                OutlinedButton(onClick = onDisconnectJ2534Bridge, modifier = Modifier.fillMaxWidth()) {
+                                    Text(if (isFr) "Déconnecter le pont PC" else "Disconnect PC bridge")
+                                }
+                            }
+                            if (state.isJ2534BridgeMessage.isNotBlank()) {
+                                Text(state.j2534BridgeMessage,
+                                    color = if (state.isJ2534BridgeConnected) OkGreen else CamaroAmber,
+                                    fontSize = 11.sp)
+                            }
+                            Text(
+                                if (isFr) "Pont actuel : HS-CAN ISO15765 250/500 kbit/s, 11/29 bits. SW-CAN et CAN FD ne sont pas activés par ce pont."
+                                else "Current bridge: HS-CAN ISO15765 250/500 kbit/s, 11/29-bit IDs. SW-CAN and CAN FD are not enabled by this bridge.",
+                                color = TextMuted, fontSize = 10.sp
+                            )
+                        }
+                    }
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
-                        enabled = isConnected && !state.isUdsReading &&
+                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
                             udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsDid.length == 4 &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
@@ -268,7 +354,7 @@ fun CalibrationWorkspaceScreen(
                     }
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
-                        enabled = isConnected && !state.isUdsReading &&
+                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
                             udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
