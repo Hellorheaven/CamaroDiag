@@ -114,6 +114,7 @@ fun CalibrationWorkspaceScreen(
     onReadUdsDtcs: (String, String, String) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
+    onReadObdbSignal: (String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
@@ -134,6 +135,17 @@ fun CalibrationWorkspaceScreen(
     var j2534Port by remember { mutableStateOf("35001") }
     var j2534Token by remember { mutableStateOf("") }
     var j2534BaudRate by remember { mutableStateOf("500000") }
+    var obdbSignalSearch by remember { mutableStateOf("") }
+    var obdbSignalMenuExpanded by remember { mutableStateOf(false) }
+    var selectedObdbSignalId by remember { mutableStateOf("") }
+    val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
+        ?: state.obdbSignals.firstOrNull()
+    val filteredObdbSignals = state.obdbSignals.filter {
+        obdbSignalSearch.isBlank() ||
+            it.name.contains(obdbSignalSearch, true) ||
+            it.id.contains(obdbSignalSearch, true) ||
+            it.path.contains(obdbSignalSearch, true)
+    }.take(100)
     val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
     val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
@@ -379,6 +391,93 @@ fun CalibrationWorkspaceScreen(
                         Text(state.calibrationIdResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text("CVN • 09 06", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.cvnResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text(if (isFr) "SIGNAUX SPÉCIFIQUES CAMARO • OBDb" else "CAMARO-SPECIFIC SIGNALS • OBDb",
+                        color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isFr) "Catalogue communautaire importé avec ses DID, adresses CAN, facteurs et filtres d'année. Ces définitions ne sont pas des validations GM : vérifie toujours la réponse du calculateur."
+                        else "Community catalogue imported with DIDs, CAN addresses, scaling factors and model-year filters. These definitions are not GM validation; always verify the ECU response.",
+                        color = TextMuted, fontSize = 11.sp
+                    )
+                    Text(state.obdbSignalMessage.ifBlank {
+                        if (isFr) "Chargement du catalogue Camaro…" else "Loading Camaro signal catalog…"
+                    }, color = TextMuted, fontSize = 10.sp)
+                    OutlinedTextField(
+                        value = obdbSignalSearch,
+                        onValueChange = { obdbSignalSearch = it.take(60) },
+                        label = { Text(if (isFr) "Rechercher un signal (nom, DID, système)" else "Search signal (name, DID, system)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box {
+                        TextButton(
+                            onClick = { obdbSignalMenuExpanded = true },
+                            enabled = state.obdbSignals.isNotEmpty()
+                        ) {
+                            Text(selectedObdbSignal?.let { "${it.name} • ${it.id}" }
+                                ?: if (isFr) "Aucun signal disponible" else "No signal available")
+                        }
+                        DropdownMenu(
+                            expanded = obdbSignalMenuExpanded,
+                            onDismissRequest = { obdbSignalMenuExpanded = false }
+                        ) {
+                            filteredObdbSignals.forEach { signal ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(signal.name, fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                "${signal.id} • ${signal.path} • ${signal.requestHeaderHex} → ${signal.responseHeaderHex ?: "?"}",
+                                                color = TextMuted,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        selectedObdbSignalId = signal.id
+                                        obdbSignalMenuExpanded = false
+                                        udsRequestCanId = signal.requestCanId?.toString(16)?.uppercase() ?: signal.requestHeaderHex
+                                        udsResponseCanId = signal.responseCanId?.toString(16)?.uppercase() ?: signal.responseHeaderHex.orEmpty()
+                                        udsDid = signal.identifierHex
+                                        udsCanProtocol = "33"
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    selectedObdbSignal?.let { signal ->
+                        Text(
+                            if (isFr) "DID 0x${signal.identifierHex} • Requête ${signal.requestHeaderHex} / réponse ${signal.responseHeaderHex ?: "non résolue"} • période ${signal.frequencySeconds}s"
+                            else "DID 0x${signal.identifierHex} • request ${signal.requestHeaderHex} / response ${signal.responseHeaderHex ?: "unresolved"} • interval ${signal.frequencySeconds}s",
+                            color = TextMuted, fontSize = 10.sp
+                        )
+                        if (!signal.hasSupportedPhysicalCanAddressing) {
+                            Text(
+                                if (isFr) "Adresse CAN non résolue : la lecture reste désactivée pour ce signal."
+                                else "CAN address is unresolved: reading is disabled for this signal.",
+                                color = CamaroAmber, fontSize = 11.sp
+                            )
+                        }
+                        Button(
+                            onClick = { onReadObdbSignal(signal.id) },
+                            enabled = (isConnected || state.isJ2534BridgeConnected) &&
+                                signal.hasSupportedPhysicalCanAddressing &&
+                                signal.service == 0x22 &&
+                                !state.isObdbSignalReading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (state.isObdbSignalReading) CircularProgressIndicator()
+                            else Text(if (isFr) "Lire ce signal sur l'ECU" else "Read this ECU signal")
+                        }
+                    }
+                    if (state.obdbSignalValue.isNotBlank()) {
+                        Text(state.obdbSignalValue, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                     }
                 }
             }
