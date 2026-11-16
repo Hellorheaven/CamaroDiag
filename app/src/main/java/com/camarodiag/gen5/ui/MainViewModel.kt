@@ -196,7 +196,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Reads and decodes one read-only Camaro signal from the imported OBDb signalset. */
-    fun readObdbSignal(signalId: String) {
+    fun readObdbSignal(signalId: String, protocolNumberText: String) {
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isObdbSignalReading = true,
@@ -219,10 +219,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val responseId = signal.responseCanId!!
                 val did = signal.identifierHex.toInt(16)
                 val policy = UdsAccessPolicy.readOnly(setOf(did))
+                val protocolNumber = protocolNumberText.toIntOrNull()
+                    ?: error("Profil CAN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
                 val client = if (obdManager.isJ2534BridgeConnected()) {
                     obdManager.createJ2534BridgeUdsClient(
                         requestCanId = requestId,
                         responseCanId = responseId,
+                        protocolNumber = protocolNumber,
                         policy = policy,
                         timeoutMs = 5000L
                     )
@@ -230,7 +234,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     obdManager.createStnUdsClient(
                         requestCanId = requestId,
                         responseCanId = responseId,
-                        protocolNumber = 33,
+                        protocolNumber = protocolNumber,
                         policy = policy,
                         timeoutMs = 5000L
                     )
@@ -362,16 +366,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val responseId = parseHex(responseCanIdHex, 8)
                 val did = parseHex(didHex, 4)
                 require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
+                val protocolNumber = protocolNumberText.toIntOrNull()
+                    ?: error("Profil CAN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
                 val client = if (obdManager.isJ2534BridgeConnected()) {
                     obdManager.createJ2534BridgeUdsClient(
                         requestCanId = requestId,
                         responseCanId = responseId,
+                        protocolNumber = protocolNumber,
                         timeoutMs = 5000L
                     )
                 } else {
-                    val protocolNumber = protocolNumberText.toIntOrNull()
-                        ?: error("Protocole STN invalide.")
-                    require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
                     obdManager.createStnUdsClient(
                         requestCanId = requestId,
                         responseCanId = responseId,
@@ -424,16 +429,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val requestId = parseHex(requestCanIdHex)
                 val responseId = parseHex(responseCanIdHex)
                 require(requestId != responseId)
+                val protocolNumber = protocolNumberText.toIntOrNull()
+                    ?: error("Profil CAN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
                 val client = if (obdManager.isJ2534BridgeConnected()) {
                     obdManager.createJ2534BridgeUdsClient(
                         requestCanId = requestId,
                         responseCanId = responseId,
+                        protocolNumber = protocolNumber,
                         timeoutMs = 5000L
                     )
                 } else {
-                    val protocolNumber = protocolNumberText.toIntOrNull()
-                        ?: error("Protocole STN invalide.")
-                    require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
                     obdManager.createStnUdsClient(
                         requestCanId = requestId,
                         responseCanId = responseId,
