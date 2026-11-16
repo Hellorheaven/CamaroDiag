@@ -18,7 +18,9 @@ object CamaroUdsProtocol {
             "> ATZ  -> $atzResp",
             "> STI  -> $stiResp",
             "> ATAL -> $atalResp",
-            "> STP 61 -> $stp61Resp"
+            "> STP 61 -> $stp61Resp",
+            "> ATH1 -> $headersResp",
+            "> ATSP 6 -> $protocolResp"
         )
 
         val isStn = stiResp.contains("STN", ignoreCase = true) ||
