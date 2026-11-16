@@ -146,14 +146,14 @@ private fun localizedAxisSummary(
     val details = if (axis == null) {
         stringResource(R.string.cal_axis_undefined)
     } else {
-        stringResource(
-            R.string.cal_axis_values,
-            axis.fileOffset.toString(16).uppercase(),
-            axis.count,
-            axis.unit
-        )
+        stringResource(R.string.cal_axis_values)
+            .replace("%1\u0024s", axis.fileOffset.toString(16).uppercase())
+            .replace("%2\u0024d", axis.count.toString())
+            .replace("%3\u0024s", axis.unit.orEmpty())
     }
-    return stringResource(R.string.cal_axis_summary, axisLabel, details)
+    return stringResource(R.string.cal_axis_summary)
+        .replace("%1\u0024s", axisLabel)
+        .replace("%2\u0024s", details)
 }
 
 @Composable
