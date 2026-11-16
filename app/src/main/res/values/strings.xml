@@ -452,4 +452,23 @@
     <string name="msg_live_csv_export_failed">Could not export the CSV log.</string>
     <string name="msg_live_recording_channel_lost">OBD-II channel unavailable: recording stopped to avoid mixing demo data or UDS transports.</string>
     <string name="msg_live_recording_max_samples">Safety limit reached (%1$d samples): recording stopped automatically.</string>
+    <string name="vehicle_ecm_label">ECM: %1$s</string>
+    <string name="vehicle_vin_placeholder">17 characters</string>
+    <string name="module_bus_hscan">HS-CAN (500 kbps)</string>
+    <string name="module_bus_swcan">SW-CAN GMLAN (33.3 kbps)</string>
+    <string name="module_bus_unknown">Bus to identify</string>
+    <string name="module_can_headers">TX: 0x%1$s | RX: 0x%2$s (%3$s)</string>
+    <string name="units_metric_details">Metric (km, °C, kPa)</string>
+    <string name="units_imperial_details">Imperial (mi, °F, PSI)</string>
+    <string name="session_vin_label">VIN: %1$s</string>
+    <string name="session_dtcs_label">DTCs: %1$s</string>
+    <string name="cal_tcp_port">TCP port</string>
+    <string name="cal_uds_did_title">UDS %1$s</string>
+    <string name="cal_mode09_vin_label">VIN • 09 02</string>
+    <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
+    <string name="cal_mode09_cvn_label">CVN • 09 06</string>
+    <string name="cal_file_size_bytes">%1$d bytes</string>
+    <string name="cal_file_hash_label">SHA-256</string>
+    <string name="update_version_channel">Version %1$s • %2$s</string>
+    <string name="update_notification_title">CamaroDiag %1$s</string>
 </resources>

@@ -452,4 +452,23 @@
     <string name="msg_live_csv_export_failed">לא ניתן לייצא את יומן ה-CSV.</string>
     <string name="msg_live_recording_channel_lost">ערוץ OBD-II אינו זמין: ההקלטה הופסקה כדי למנוע ערבוב של נתוני הדגמה או תעבורת UDS.</string>
     <string name="msg_live_recording_max_samples">הגעת למגבלת הבטיחות (%1$d דגימות): ההקלטה הופסקה אוטומטית.</string>
+    <string name="vehicle_ecm_label">ECM: %1$s</string>
+    <string name="vehicle_vin_placeholder">17 תווים</string>
+    <string name="module_bus_hscan">HS-CAN ‏(500 kbps)</string>
+    <string name="module_bus_swcan">SW-CAN GMLAN ‏(33.3 kbps)</string>
+    <string name="module_bus_unknown">אפיק לזיהוי</string>
+    <string name="module_can_headers">TX: ‏0x%1$s | RX: ‏0x%2$s ‏(%3$s)</string>
+    <string name="units_metric_details">מטרי (ק״מ, °C, kPa)</string>
+    <string name="units_imperial_details">אימפריאלי (mi, °F, PSI)</string>
+    <string name="session_vin_label">VIN: ‏%1$s</string>
+    <string name="session_dtcs_label">קודי DTC: %1$s</string>
+    <string name="cal_tcp_port">יציאת TCP</string>
+    <string name="cal_uds_did_title">UDS %1$s</string>
+    <string name="cal_mode09_vin_label">VIN • 09 02</string>
+    <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
+    <string name="cal_mode09_cvn_label">CVN • 09 06</string>
+    <string name="cal_file_size_bytes">%1$d בתים</string>
+    <string name="cal_file_hash_label">SHA-256</string>
+    <string name="update_version_channel">גרסה %1$s • %2$s</string>
+    <string name="update_notification_title">CamaroDiag %1$s</string>
 </resources>
