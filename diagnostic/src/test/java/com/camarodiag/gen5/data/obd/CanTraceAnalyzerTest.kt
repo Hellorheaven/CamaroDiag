@@ -65,6 +65,22 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun parsesHeaderEnabledElm327MonitorLogWithoutInventingDirection() {
+        val trace = """
+            7E0 03 22 F1 90
+            7E8 07 62 F1 90 31 47 30 31
+        """.trimIndent()
+
+        val report = CanTraceAnalyzer.analyze(trace, "elm327-monitor.txt")
+
+        assertEquals(2, report.frames.size)
+        assertEquals(listOf(0xF190), report.readDidCandidates)
+        assertEquals(CanTraceDirection.UNKNOWN, report.frames.first().direction)
+        assertEquals(CanTraceDirection.UNKNOWN, report.frames.last().direction)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
     fun rejectsOutOfSequenceConsecutiveFrameAndDoesNotInventDid() {
         val trace = """
             0.000000 1 7E8 Rx d 8 10 0A 62 F1 90 31 47 30 31
