@@ -154,12 +154,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun readCalibrationIdentification() {
         viewModelScope.launch {
             if (obdManager.isDemoMode) {
+                val isFr = _language.value == AppLanguage.FR
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
                     calibrationIdResponse = "",
                     cvnResponse = "",
-                    message = "Mode démo ou interface non connectée : aucune donnée ECU réelle n'a été lue."
+                    message = if (isFr) "Mode démo ou interface non connectée : aucune donnée ECU réelle n'a été lue."
+                    else "Demo mode or no adapter connected: no real ECU data was read."
                 )
                 return@launch
             }
