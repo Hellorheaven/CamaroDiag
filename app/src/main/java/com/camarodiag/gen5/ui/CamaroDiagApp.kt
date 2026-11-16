@@ -819,6 +819,26 @@ fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
     }
 }
 
+
+@Composable
+private fun localizedLivePidLabel(pid: LivePidValue): String {
+    val demo = pid.labelEn.contains("(DEMO)", ignoreCase = true)
+    return when (pid.id) {
+        "RPM" -> stringResource(if (demo) R.string.live_pid_rpm_demo else R.string.live_pid_rpm)
+        "ECT" -> stringResource(if (demo) R.string.live_pid_ect_demo else R.string.live_pid_ect)
+        "OIL" -> stringResource(R.string.live_pid_oil_demo)
+        "STFT" -> stringResource(if (demo) R.string.live_pid_stft_demo else R.string.live_pid_stft)
+        "BAT" -> stringResource(if (demo) R.string.live_pid_bat_demo else R.string.live_pid_bat)
+        "SPD" -> stringResource(R.string.live_pid_speed)
+        "TPS" -> stringResource(R.string.live_pid_throttle)
+        "LOAD" -> stringResource(R.string.live_pid_load)
+        "MAP" -> stringResource(R.string.live_pid_map)
+        "IAT" -> stringResource(R.string.live_pid_iat)
+        "MAF" -> stringResource(R.string.live_pid_maf)
+        else -> pid.labelEn
+    }
+}
+
 @Composable
 fun LiveDataScreen(
     pids: List<LivePidValue>,
@@ -839,10 +859,10 @@ fun LiveDataScreen(
                     SectionTitle(stringResource(R.string.live_engine_telemetry))
                     Row {
                         TextButton(onClick = onToggleUnits) {
-                            Text(if (units == UnitSystem.METRIC) "SI / Metric" else "Imperial", color = CamaroBlue)
+                            Text(if (units == UnitSystem.METRIC) stringResource(R.string.units_metric) else stringResource(R.string.units_imperial), color = CamaroBlue)
                         }
                         TextButton(onClick = onToggleStream) {
-                            Text(if (isStreaming) "Pause" else stringResource(R.string.live_resume), color = CamaroAmber)
+                            Text(if (isStreaming) stringResource(R.string.live_pause) else stringResource(R.string.live_resume), color = CamaroAmber)
                         }
                     }
                 }
@@ -872,8 +892,11 @@ fun LiveDataScreen(
                             }
                         }
                         Text(
-                            if (isFr) "${recording.sampleCount} échantillon(s) • ${if (recording.isRecording) "ENREGISTREMENT" else "ARRÊTÉ"}"
-                            else "${recording.sampleCount} sample(s) • ${if (recording.isRecording) "RECORDING" else "STOPPED"}",
+                            stringResource(
+                                R.string.live_recording_status,
+                                recording.sampleCount,
+                                stringResource(if (recording.isRecording) R.string.live_recording_state_active else R.string.live_recording_state_stopped)
+                            ),
                             color = if (recording.isRecording) CamaroAmber else TextMuted,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -898,7 +921,7 @@ fun LiveDataScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                        Text(if (isFr) pid.labelFr else pid.labelEn, color = TextMuted, fontSize = 13.sp)
+                        Text(localizedLivePidLabel(pid), color = TextMuted, fontSize = 13.sp)
                         Text(
                             text = "${String.format("%.1f", displayVal)} $displayUnit",
                             fontSize = 22.sp,
