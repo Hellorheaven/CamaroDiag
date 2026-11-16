@@ -85,6 +85,7 @@ class CamaroUdsProtocolTest {
         )
 
         assertTrue(mxPlus.supportsSwCan)
+        assertEquals(AdapterTier.PRO_STN, genericStn.tier)
         assertFalse(genericStn.supportsSwCan)
     }
 
