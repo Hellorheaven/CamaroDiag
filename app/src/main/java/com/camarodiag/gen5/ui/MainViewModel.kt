@@ -145,6 +145,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             calibrationIdResponse = "",
             cvnResponse = "",
             udsDidResponse = "",
+            udsDtcResponse = "",
             udsMessage = ""
         )
     }
@@ -200,6 +201,58 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isUdsReading = false,
                     udsDidResponse = "",
                     udsMessage = error.localizedMessage ?: "Échec de lecture UDS."
+                )
+            }
+        }
+    }
+
+    /** Reads UDS ReadDTCInformation (0x19/0x02) from the selected physical ECU. */
+    fun readUdsDtcs(requestCanIdHex: String, responseCanIdHex: String) {
+        viewModelScope.launch {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isUdsReading = true,
+                udsDtcResponse = "",
+                udsMessage = ""
+            )
+            try {
+                fun parseHex(value: String): Int {
+                    val normalized = value.trim().removePrefix("0x").removePrefix("0X")
+                    require(normalized.isNotEmpty() && normalized.length <= 8 &&
+                        normalized.all { it.digitToIntOrNull(16) != null }) { "CAN ID hexadécimal invalide : $value" }
+                    return normalized.toInt(16)
+                }
+                val requestId = parseHex(requestCanIdHex)
+                val responseId = parseHex(responseCanIdHex)
+                require(requestId != responseId)
+                val protocolNumber = if (requestId > 0x7FF || responseId > 0x7FF) 7 else 6
+                val client = obdManager.createStnUdsClient(
+                    requestCanId = requestId,
+                    responseCanId = responseId,
+                    protocolNumber = protocolNumber,
+                    timeoutMs = 5000L
+                )
+                val dtcs = client.readDtcByStatusMask()
+                val rendered = if (dtcs.isEmpty()) {
+                    if (_language.value == AppLanguage.FR) "Aucun DTC retourné par le calculateur." else "No DTCs returned by the ECU."
+                } else {
+                    dtcs.joinToString("\\n") { record ->
+                        "0x${record.dtc.toString(16).uppercase().padStart(6, '0')}  status=0x${record.status.toString(16).uppercase().padStart(2, '0')}"
+                    }
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isUdsReading = false,
+                    udsDtcResponse = rendered,
+                    udsMessage = if (_language.value == AppLanguage.FR) "Lecture UDS 0x19 terminée."
+                    else "UDS 0x19 read completed."
+                )
+            } catch (cancelled: CancellationException) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isUdsReading = false,
+                    udsDtcResponse = "",
+                    udsMessage = error.localizedMessage ?: "Échec de lecture des DTC UDS."
                 )
             }
         }
