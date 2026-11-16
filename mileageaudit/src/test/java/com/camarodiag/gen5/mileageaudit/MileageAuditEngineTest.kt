@@ -32,6 +32,15 @@ class MileageAuditEngineTest {
         assertFalse(report.hasDiscrepancy)
     }
 
+    @Test fun multipleReadingsFromTheSameModuleCountAsOneSource() {
+        val report = MileageAuditEngine.evaluate("VIN", listOf(
+            reading("BCM", 100000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile"),
+            reading("BCM", 120000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile")
+        ))
+        assertFalse(report.hasDiscrepancy)
+        assertEquals(0.0, report.maxDeltaKm, 0.0)
+    }
+
     @Test fun twoPidsFromPowertrainDoNotCountAsIndependentProof() {
         val report = MileageAuditEngine.evaluate("VIN", listOf(
             reading("ECM_A6", 100000.0, ConfidenceLevel.MODERATE),
