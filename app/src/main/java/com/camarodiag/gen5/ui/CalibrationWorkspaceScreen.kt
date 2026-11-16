@@ -52,6 +52,7 @@ import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
+import com.camarodiag.gen5.data.obd.CamaroSignalDefinition
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
@@ -67,6 +68,8 @@ data class CalibrationWorkspaceState(
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
     val j2534BridgeMessage: String = "",
+    val nativeSignals: List<CamaroSignalDefinition> = emptyList(),
+    val nativeSignalMessage: String = "",
     val obdbSignals: List<ObdbCamaroSignal> = emptyList(),
     val isObdbSignalReading: Boolean = false,
     val obdbSignalValue: String = "",
@@ -390,6 +393,44 @@ fun CalibrationWorkspaceScreen(
                         Text(state.calibrationIdResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text("CVN • 09 06", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.cvnResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (isFr) "CATALOGUE NATIF CAMARODIAG" else "CAMARODIAG FIRST-PARTY CATALOG",
+                        color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isFr) "Définitions maintenues par CamaroDiag, indépendantes des catalogues communautaires. Une définition proposée ou documentée n'est jamais envoyée à un calculateur."
+                        else "Definitions maintained by CamaroDiag, independent from community catalogues. Proposed or documented definitions are never sent to an ECU.",
+                        color = TextMuted, fontSize = 11.sp
+                    )
+                    Text(state.nativeSignalMessage.ifBlank {
+                        if (isFr) "Chargement du catalogue natif…" else "Loading first-party catalogue…"
+                    }, color = TextMuted, fontSize = 10.sp)
+                    if (state.nativeSignals.isEmpty()) {
+                        Text(
+                            if (isFr) "Aucun DID propriétaire Camaro n'est actuellement déclaré comme exploitable. Les adresses et facteurs inconnus ne sont pas inventés."
+                            else "No proprietary Camaro DID is currently declared as usable. Unknown addresses and scaling are not fabricated.",
+                            color = CamaroAmber, fontSize = 11.sp
+                        )
+                    } else {
+                        state.nativeSignals.forEach { signal ->
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(signal.name, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "${signal.id} • ${signal.category} • DID 0x${signal.identifierHex} • ${signal.verification}",
+                                    color = TextMuted, fontSize = 10.sp
+                                )
+                                Text(
+                                    if (isFr) "Lecture véhicule désactivée tant que l'adresse et le décodage ne sont pas vérifiés sur une configuration identique."
+                                    else "Vehicle read disabled until addressing and decoding are verified on an identical configuration.",
+                                    color = CamaroAmber, fontSize = 10.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
