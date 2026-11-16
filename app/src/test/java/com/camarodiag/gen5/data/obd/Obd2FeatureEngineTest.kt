@@ -102,4 +102,91 @@ class Obd2FeatureEngineTest {
         })
         assertEquals(vin, engine.readVin())
     }
+    @Test
+    fun decodesWidebandOxygenRatioAndVoltage() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0124") "4124 80 00 40 00" else "NO DATA"
+        })
+
+        val values = engine.readLiveData(setOf(0x24))
+
+        assertEquals(2, values.size)
+        assertEquals("O2 sensor 1 equivalence ratio", values[0].name)
+        assertEquals("1.00", values[0].value)
+        assertEquals("lambda", values[0].unit)
+        assertEquals("O2 sensor 1 voltage", values[1].name)
+        assertEquals("2.00", values[1].value)
+        assertEquals("V", values[1].unit)
+    }
+
+    @Test
+    fun decodesWidebandOxygenCurrent() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0134") "4134 80 00 80 00" else "NO DATA"
+        })
+
+        val values = engine.readLiveData(setOf(0x34))
+
+        assertEquals(2, values.size)
+        assertEquals("O2 sensor 1 equivalence ratio", values[0].name)
+        assertEquals("1.00", values[0].value)
+        assertEquals("O2 sensor 1 current", values[1].name)
+        assertEquals("0.00", values[1].value)
+        assertEquals("mA", values[1].unit)
+    }
+
+    @Test
+    fun decodesFuelRailPressureRelativeToManifoldVacuum() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0122") "4122 03E8" else "NO DATA"
+        })
+
+        val value = engine.readLiveData(setOf(0x22)).single()
+
+        assertEquals("Fuel rail pressure relative to manifold vacuum", value.name)
+        assertEquals("79.00", value.value)
+        assertEquals("kPa", value.unit)
+    }
+
+    @Test
+    fun decodesCatalystTemperature() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "013C") "413C 0320" else "NO DATA"
+        })
+
+        val value = engine.readLiveData(setOf(0x3C)).single()
+
+        assertEquals("Bank 1 sensor 1 catalyst temperature", value.name)
+        assertEquals("40.00", value.value)
+        assertEquals("°C", value.unit)
+    }
+
+    @Test
+    fun ignoresElmBufferFullTextInsteadOfParsingItAsHexBytes() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { _, _ -> "BUFFER FULL" })
+
+        assertTrue(engine.readLiveData(setOf(0x22)).isEmpty())
+    }
+
+    @Test
+    fun identifiesElmAdapterAndReturnsAdapterDescription() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "ATI" -> "ELM327 v1.5"
+                "AT@1" -> "OBDII to RS232 Interpreter"
+                "ATDP" -> "ISO 15765-4 CAN (11 bit ID, 500 kbaud)"
+                "ATRV" -> "12.4V"
+                else -> "OK"
+            }
+        })
+
+        val info = engine.initialize()
+
+        assertEquals("ELM327 v1.5", info["IDENTIFICATION"])
+        assertEquals("OBDII to RS232 Interpreter", info["DESCRIPTION"])
+        assertTrue(commands.containsAll(listOf("ATZ", "ATSP6", "ATI", "AT@1", "ATDP", "ATRV")))
+    }
+
 }
