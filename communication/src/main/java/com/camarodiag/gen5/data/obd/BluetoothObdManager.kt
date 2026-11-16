@@ -272,12 +272,12 @@ class BluetoothObdManager(context: Context) {
         requestCanId: Int,
         responseCanId: Int,
         can29Bit: Boolean,
-        baudRate: Int = 500_000
+        protocolNumber: Int = 33
     ): Result<String> = withContext(Dispatchers.IO) {
         disconnect()
         val bridge = J2534BridgeTransport(host, port, pairingToken)
         try {
-            val info = bridge.connect(requestCanId, responseCanId, can29Bit, baudRate)
+            val info = bridge.connect(requestCanId, responseCanId, can29Bit, protocolNumber)
             j2534BridgeTransport = bridge
             j2534BridgeRequestCanId = requestCanId
             j2534BridgeResponseCanId = responseCanId
