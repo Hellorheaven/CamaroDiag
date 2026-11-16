@@ -30,7 +30,7 @@ private object CamaroDiagUpdateChecker {
             @Suppress("DEPRECATION") info.versionCode.toLong()
         }
         val channel = if (BuildConfig.DEBUG) "debug" else "release"
-        val wanted = if (channel == "debug") "app-debug.apk" else "app-release.apk"
+        val wanted = if (channel == "debug") "CamaroDiag-debug.apk" else "CamaroDiag-release.apk"
         val con = URL(API).openConnection() as HttpURLConnection
         con.connectTimeout = 15000; con.readTimeout = 15000
         con.setRequestProperty("Accept", "application/vnd.github+json")
