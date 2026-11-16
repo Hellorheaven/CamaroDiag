@@ -190,6 +190,13 @@ jobs:
           choco install innosetup --yes --no-progress
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
 
+      - name: Materialize CamaroDiag installer icon
+        shell: pwsh
+        run: |
+          $encoded = (Get-Content ".\\pc-bridge\\installer\\assets\\CamaroDiag.ico.b64" -Raw).Trim()
+          $bytes = [Convert]::FromBase64String($encoded)
+          [System.IO.File]::WriteAllBytes(".\\pc-bridge\\installer\\assets\\CamaroDiag.ico", $bytes)
+
       - name: Build four Windows setup installers
         env:
           VERSION_NAME: ${{ needs.release.outputs.version_name }}
