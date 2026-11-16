@@ -13,6 +13,7 @@ import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
+import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
 import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
@@ -35,6 +36,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val obdManager = BluetoothObdManager(application)
     @Volatile private var obdbCamaroSignalSet: ObdbCamaroSignalSet? = null
+    @Volatile private var camaroSignalCatalog: CamaroSignalCatalog? = null
     private val sessionDao = DiagnosticDatabase.getInstance(application).sessionDao()
 
     private val _language = MutableStateFlow(AppLanguage.FR)
@@ -108,6 +110,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         refreshTopologyAndDefaults()
         loadObdbSignalCatalog()
+        loadNativeCamaroSignalCatalog()
         startLiveTelemetryLoop()
     }
 
@@ -131,6 +134,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         clearVehicleEvidence()
         refreshTopologyAndDefaults()
         refreshObdbSignalYear()
+        refreshNativeSignalYear()
     }
 
     fun updateVin(vin: String) {
@@ -168,6 +172,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _calibrationWorkspace = MutableStateFlow(CalibrationWorkspaceState())
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
 
+    private fun loadNativeCamaroSignalCatalog() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                getApplication<Application>().assets.open(CamaroSignalCatalog.ASSET_NAME)
+                    .bufferedReader(Charsets.UTF_8).use { CamaroSignalCatalog.fromJson(it.readText()) }
+            }.onSuccess { catalog ->
+                camaroSignalCatalog = catalog
+                val signals = catalog.forYear(_vehicle.value.modelYear)
+                withContext(Dispatchers.Main) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        nativeSignals = signals,
+                        nativeSignalMessage = if (_language.value == AppLanguage.FR)
+                            "${signals.size} définition(s) natives Camaro pour ${_vehicle.value.modelYear}. Aucune lecture autorisée sans preuve véhicule."
+                        else "${signals.size} first-party Camaro definition(s) for ${_vehicle.value.modelYear}. Live reads require vehicle evidence."
+                    )
+                }
+            }.onFailure { error ->
+                withContext(Dispatchers.Main) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        nativeSignalMessage = error.localizedMessage ?: "Native Camaro signal catalogue could not be loaded."
+                    )
+                }
+            }
+        }
+    }
+
     private fun loadObdbSignalCatalog() {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { ObdbCamaroSignalSet.load(getApplication<Application>()) }
@@ -191,6 +221,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
         }
+    }
+
+    private fun refreshNativeSignalYear() {
+        val catalog = camaroSignalCatalog ?: return
+        val signals = catalog.forYear(_vehicle.value.modelYear)
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            nativeSignals = signals,
+            nativeSignalMessage = if (_language.value == AppLanguage.FR)
+                "${signals.size} définition(s) natives Camaro pour ${_vehicle.value.modelYear}. Aucune lecture autorisée sans preuve véhicule."
+            else "${signals.size} first-party Camaro definition(s) for ${_vehicle.value.modelYear}. Live reads require vehicle evidence."
+        )
     }
 
     private fun refreshObdbSignalYear() {
