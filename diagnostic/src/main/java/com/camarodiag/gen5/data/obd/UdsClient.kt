@@ -20,7 +20,8 @@ data class UdsAccessPolicy internal constructor(
     val allowedDtcSettingTypes: Set<Int>,
     val allowedDtcGroups: Set<Int>,
     val allowedEcuResetTypes: Set<Int>,
-    val memoryRegions: List<UdsMemoryRegion>,
+    val readableMemoryRegions: List<UdsMemoryRegion>,
+    val writableMemoryRegions: List<UdsMemoryRegion>,
     val maxTransferBytes: Int,
     val requireSecurityAccess: Boolean,
     val evidenceReference: String
@@ -37,7 +38,8 @@ data class UdsAccessPolicy internal constructor(
             allowedDtcSettingTypes = emptySet(),
             allowedDtcGroups = emptySet(),
             allowedEcuResetTypes = emptySet(),
-            memoryRegions = emptyList(),
+            readableMemoryRegions = emptyList(),
+            writableMemoryRegions = emptyList(),
             maxTransferBytes = 0,
             requireSecurityAccess = true,
             evidenceReference = "Built-in read-only policy"
@@ -62,7 +64,8 @@ data class UdsAccessPolicy internal constructor(
             allowedDtcSettingTypes: Set<Int> = emptySet(),
             allowedDtcGroups: Set<Int> = emptySet(),
             allowedEcuResetTypes: Set<Int> = emptySet(),
-            memoryRegions: List<UdsMemoryRegion>,
+            readableMemoryRegions: List<UdsMemoryRegion>,
+            writableMemoryRegions: List<UdsMemoryRegion>,
             maxTransferBytes: Int,
             requireSecurityAccess: Boolean,
             evidenceReference: String
@@ -89,7 +92,7 @@ data class UdsAccessPolicy internal constructor(
             return UdsAccessPolicy(
                 readDids, writeDids, allowedSessions, routineControlPermissions, ioControlPermissions,
                 allowedSecurityLevels, allowedCommunicationControls, allowedDtcSettingTypes,
-                allowedDtcGroups, allowedEcuResetTypes, memoryRegions,
+                allowedDtcGroups, allowedEcuResetTypes, readableMemoryRegions, writableMemoryRegions,
                 maxTransferBytes, requireSecurityAccess, evidenceReference
             )
         }
@@ -272,7 +275,7 @@ class UdsClient private constructor(
     }
 
     suspend fun readMemoryByAddressAndLength(address: Long, size: Int, addressLength: Int = 4, sizeLength: Int = 2): ByteArray {
-        requireAllowedMemory(address, size.toLong())
+        requireAllowedMemory(address, size.toLong(), policy.readableMemoryRegions)
         requireProgrammingSession()
         requireSecurityIfConfigured()
         require(size in 1..4092) { "Memory read length exceeds the supported single UDS response limit." }
@@ -283,7 +286,7 @@ class UdsClient private constructor(
     }
 
     suspend fun writeMemoryByAddressAndLength(address: Long, data: ByteArray, addressLength: Int = 4, sizeLength: Int = 2) {
-        requireAllowedMemory(address, data.size.toLong())
+        requireAllowedMemory(address, data.size.toLong(), policy.writableMemoryRegions)
         require(data.isNotEmpty() && data.size + 2 + addressLength + sizeLength <= 4095)
         requireProgrammingSession()
         requireSecurityIfConfigured()
@@ -295,7 +298,7 @@ class UdsClient private constructor(
 
     suspend fun requestDownload(address: Long, size: Long, dataFormatIdentifier: Int = 0, addressLength: Int = 4, sizeLength: Int = 4) {
         require(!downloadActive && !uploadActive) { "A data transfer is already active." }
-        requireAllowedMemory(address, size)
+        requireAllowedMemory(address, size, policy.writableMemoryRegions)
         require(size <= policy.maxTransferBytes.toLong()) { "Transfer exceeds the verified profile limit." }
         requireProgrammingSession()
         requireSecurityIfConfigured()
@@ -333,7 +336,7 @@ class UdsClient private constructor(
 
     suspend fun requestUpload(address: Long, size: Long, dataFormatIdentifier: Int = 0, addressLength: Int = 4, sizeLength: Int = 4) {
         require(!downloadActive && !uploadActive) { "A data transfer is already active." }
-        requireAllowedMemory(address, size)
+        requireAllowedMemory(address, size, policy.readableMemoryRegions)
         require(size <= policy.maxTransferBytes.toLong()) { "Transfer exceeds the verified profile limit." }
         requireProgrammingSession()
         requireSecurityIfConfigured()
@@ -440,8 +443,8 @@ class UdsClient private constructor(
         }
     }
 
-    private fun requireAllowedMemory(address: Long, size: Long) {
-        require(policy.memoryRegions.any { it.contains(address, size) }) {
+    private fun requireAllowedMemory(address: Long, size: Long, regions: List<UdsMemoryRegion>) {
+        require(regions.any { it.contains(address, size) }) {
             "Memory range is outside the verified ECU profile."
         }
     }
