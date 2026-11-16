@@ -56,6 +56,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
+    private var activeBusyOperations = 0
+
+    private fun beginBusyOperation() {
+        activeBusyOperations += 1
+        _isBusy.value = true
+    }
+
+    private fun endBusyOperation() {
+        activeBusyOperations = (activeBusyOperations - 1).coerceAtLeast(0)
+        _isBusy.value = activeBusyOperations > 0
+    }
 
     private val _modules = MutableStateFlow<List<EcuModule>>(emptyList())
     val modules: StateFlow<List<EcuModule>> = _modules.asStateFlow()
@@ -597,7 +608,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fallbackMessage: String
     ) {
         viewModelScope.launch {
-            _isBusy.value = true
+            beginBusyOperation()
             _connectionMessage.value = null
             markAdapterDisconnected()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -619,7 +630,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: fallbackMessage
             } finally {
-                _isBusy.value = false
+                endBusyOperation()
             }
         }
     }
@@ -667,7 +678,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectSimulatedAdapter(preset: String) {
         viewModelScope.launch {
-            _isBusy.value = true
+            beginBusyOperation()
             markAdapterDisconnected()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 ecuVinResponse = "",
@@ -684,7 +695,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Activation du mode simulation impossible."
             } finally {
-                _isBusy.value = false
+                endBusyOperation()
             }
         }
     }
@@ -803,7 +814,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun scanDtcs() {
         viewModelScope.launch {
-            _isBusy.value = true
+            beginBusyOperation()
             try {
                 if (obdManager.isSimulationActive) {
                     _dtcs.value = listOf(
@@ -823,7 +834,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Échec du scan des défauts."
             } finally {
-                _isBusy.value = false
+                endBusyOperation()
             }
         }
     }
@@ -898,7 +909,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearDtcs() {
         viewModelScope.launch {
-            _isBusy.value = true
+            beginBusyOperation()
             try {
                 if (obdManager.isSimulationActive) {
                     _dtcs.value = emptyList()
@@ -919,14 +930,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Échec de l'effacement des défauts."
             } finally {
-                _isBusy.value = false
+                endBusyOperation()
             }
         }
     }
 
     fun runMileageAudit() {
         viewModelScope.launch {
-            _isBusy.value = true
+            beginBusyOperation()
             _mileageReport.value = null
             val readings = mutableListOf<MileageSourceReading>()
             try {
@@ -978,7 +989,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
                 _connectionMessage.value = error.localizedMessage ?: "Échec de lecture pendant l'audit kilométrique."
             } finally {
-                _isBusy.value = false
+                endBusyOperation()
             }
         }
     }
