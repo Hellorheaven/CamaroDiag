@@ -468,4 +468,17 @@
     <string name="cal_file_hash_label">SHA-256</string>
     <string name="update_version_channel">Version %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
+
+    <plurals name="vm_native_catalog_loaded">
+        <item quantity="one">Perfil Camaro oficial: %1$d para o ano de modelo %2$d. A leitura em tempo real requer evidências do veículo.</item>
+        <item quantity="other">Perfis Camaro oficiais: %1$d para o ano de modelo %2$d. A leitura em tempo real requer evidências do veículo.</item>
+    </plurals>
+    <plurals name="vm_community_catalog_loaded">
+        <item quantity="one">Definição comunitária de sinal disponível: %1$d para o ano de modelo %2$d.</item>
+        <item quantity="other">Definições comunitárias de sinais disponíveis: %1$d para o ano de modelo %2$d.</item>
+    </plurals>
+    <plurals name="cal_file_size_bytes">
+        <item quantity="one">%1$d byte</item>
+        <item quantity="other">%1$d bytes</item>
+    </plurals>
 </resources>
