@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">שפת האפליקציה</string>
     <string name="system_language_current">שפת המערכת: %1$s</string>
@@ -145,7 +145,7 @@
     <string name="cal_pc_pairing_token">אסימון צימוד של המחשב</string>
     <string name="cal_connect_j2534">חבר גשר J2534</string>
     <string name="cal_disconnect_pc_bridge">נתק את גשר המחשב</string>
-    <string name="cal_bridge_capabilities">גשר: ‏HS-CAN ISO15765 במהירות 250/500 kbit/s ו-SW-ISO15765 J2534-2 אם מנהל ההתקן תומך בכך. CAN FD נשאר מושבת.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">גשר: ‏HS-CAN ISO15765 במהירות 250/500 kbit/s ו-SW-ISO15765 J2534-2 אם מנהל ההתקן תומך בכך. CAN FD נשאר מושבת.</string>
     <string name="cal_read_uds_did">קרא DID של UDS</string>
     <string name="cal_read_uds_dtcs">קרא קודי DTC של UDS</string>
     <string name="cal_uds_trouble_codes">קודי תקלה UDS ‏(0x19)</string>
@@ -169,7 +169,7 @@
     <string name="cal_import_supported_formats">ייבא קובצי BIN,‏ HEX,‏ S-record, ארכיוני ZIP וקובצי פרויקט/הגדרה חיצוניים. פורמטים קנייניים נשמרים ללא שינוי לצורכי גיבוי/ייצוא; כאן נבדקים רק BIN,‏ HEX ו-S-record. עדיין יש להמיר הגדרות XDF/A2L ל-TSV לפני עריכת טבלאות.</string>
     <string name="cal_hex_preview">תצוגה הקסדצימלית (64 הבתים הראשונים)</string>
     <string name="cal_file_inspection">בדיקת קובץ: %1$s</string>
-    <string name="cal_payload_size">מטען נתונים: %1$d בתים</string>
+    <string name="cal_payload_size">מטען: %1$d B</string>
     <string name="cal_record_count">רשומות: %1$d</string>
     <string name="cal_checksum_validation">אימות סכום ביקורת של הפורמט: %1$s</string>
     <string name="cal_export_file">ייצא / הורד קובץ</string>
@@ -196,8 +196,8 @@
     <string name="cal_ecu_write_unavailable">כתיבה למחשב הרכב אינה זמינה – נדרש פרופיל יצרן מאומת</string>
     <string name="cal_no_calibration_write">לא תיכתב כל מפת כיול עד לאימות פרופיל מחשב הרכב, תאימות הקובץ ונוהל השחזור.</string>
     <string name="vm_bridge_disconnected_vehicle_changed">גשר המחשב נותק לאחר שינוי זהות הרכב.</string>
-    <string name="vm_native_catalog_loaded">%1$d הגדרות Camaro מקוריות לשנת דגם %2$d. קריאות בזמן אמת דורשות ראיות מהרכב.</string>
-    <string name="vm_community_catalog_loaded">%1$d הגדרות אותות קהילתיות זמינות לשנת דגם %2$d.</string>
+    <string name="vm_native_catalog_loaded">פרופילי Camaro מקוריים: %1$d לשנת דגם %2$d. קריאה חיה דורשת אימות ברכב עצמו.</string>
+    <string name="vm_community_catalog_loaded">הגדרות אותות מהקהילה זמינות: %1$d לשנת דגם %2$d.</string>
     <string name="vm_sentinel_unavailable">לא זמין (ערך sentinel)</string>
     <string name="vm_obdb_signal_read">%1$s נקרא מ-0x%2$s → 0x%3$s.</string>
     <string name="vm_j2534_connected">גשר J2534 מחובר: %1$s</string>
@@ -223,12 +223,12 @@
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel ‏(2012–2015)</string>
     <string name="engine_ls3">6.2L V8 ידני (426 כ״ס)</string>
     <string name="engine_l99">6.2L V8 AFM אוטומטי (400 כ״ס)</string>
-    <string name="engine_lsa">6.2L V8 מוגדש ZL1 ‏(580 כ״ס)</string>
+    <string name="engine_lsa" tools:ignore="Typos">6.2L V8 מוגדש ZL1 ‏(580 כ״ס)</string>
     <string name="engine_ls7">7.0L V8 Z/28 ‏(505 כ״ס)</string>
     <string name="engine_ltg">2.0L טורבו 4 צילינדרים (275 כ״ס)</string>
     <string name="engine_lgx">3.6L V6 SIDI ‏(335 כ״ס)</string>
-    <string name="engine_lt1">6.2L V8 הזרקה ישירה (455 כ״ס)</string>
-    <string name="engine_lt4">6.2L V8 מוגדש ZL1 ‏(650 כ״ס)</string>
+    <string name="engine_lt1" tools:ignore="Typos">6.2L V8 הזרקה ישירה (455 כ״ס)</string>
+    <string name="engine_lt4" tools:ignore="Typos">6.2L V8 מוגדש ZL1 ‏(650 כ״ס)</string>
     <string name="transmission_manual">ידנית (AY6 / TR6060 / TR3160)</string>
     <string name="transmission_automatic">אוטומטית (6L50 / 6L80 / 8L45 / 8L90 / 10L60 / 10L80; בהתאם לשנה)</string>
     <string name="market_us_ca">צפון אמריקה (ארה״ב / קנדה)</string>
@@ -248,8 +248,8 @@
     <string name="module_note_ecm_obd_missing">לא נצפתה תגובת OBD תקנית 7E8. יש להשאיר את ה-ECM לא מאומת עד שסריקה פונקציונלית אמיתית תאשר אותו.</string>
     <string name="module_note_tcm_gen5">יש לזהות ברכב את הנוכחות, הכתובת והנתונים הנתמכים.</string>
     <string name="module_note_tcm_gen6">יש לזהות ברכב את כתובת המודול והשירותים הנתמכים; אין להסיק אותם מטופולוגיית דור 5.</string>
-    <string name="module_note_bcm_gen5">עלון GM ‏07-08-49-020I מזהה את ה-BCM כמודול אחסון מד המרחק ב-Camaro ‏2010–2015. אין הנחה לגבי כתובת האבחון המדויקת או DID לקריאה.</string>
-    <string name="module_note_bcm_gen6_to2018">עלון GM ‏07-08-49-020M מציין את ה-BCM כמודול אחסון מד המרחק של Camaro עד 2018. עדיין נדרש אימות של כתובת האבחון ו-DID הקריאה לפי ה-VIN.</string>
+    <string name="module_note_bcm_gen5" tools:ignore="TypographyDashes">עלון GM ‏07-08-49-020I מזהה את ה-BCM כמודול אחסון מד המרחק ב-Camaro ‏2010–2015. אין הנחה לגבי כתובת האבחון המדויקת או DID לקריאה.</string>
+    <string name="module_note_bcm_gen6_to2018" tools:ignore="TypographyDashes">עלון GM ‏07-08-49-020M מציין את ה-BCM כמודול אחסון מד המרחק של Camaro עד 2018. עדיין נדרש אימות של כתובת האבחון ו-DID הקריאה לפי ה-VIN.</string>
     <string name="module_note_bcm_2019">בדגמי 2019–2024 יש לאמת את ארכיטקטורת אחסון מד המרחק ואת מזהי האבחון עבור VIN זה לפני הקריאה.</string>
     <string name="module_note_ipc_gen5">מידע השירות של Camaro משנת 2012 מתאר את ה-IPC כאחסון משני של מד המרחק. יש לאמת את נתוני הקריאה והכתובת המדויקים.</string>
     <string name="module_note_ipc_gen6">אחסון משני של מד המרחק מתואר במידע השירות של Camaro משנת 2012; יש לאמת את נתוני המודול המדויקים ואת הקשר ל-VIN לפני השוואה.</string>
@@ -286,7 +286,7 @@
     <string name="units_metric">SI / מטרי</string>
     <string name="units_imperial">אימפריאלי</string>
     <string name="live_pause">השהה</string>
-    <string name="live_recording_status">%1$d דגימות • %2$s</string>
+    <string name="live_recording_status">דגימות: %1$d • %2$s</string>
     <string name="live_recording_state_active">מקליט</string>
     <string name="live_recording_state_stopped">מופסק</string>
     <string name="live_pid_rpm">מהירות מנוע</string>
@@ -341,7 +341,7 @@
     <string name="mileage_summary_discrepancy">פער של %1$.1f ק״מ בין מקורות עצמאיים שאומתו. יש לבדוק החלפה/תכנות מחדש של מודולים והיסטוריית טיפולים. זהו סימן לבדיקה ולא הוכחה להתערבות במד המרחק.</string>
     <string name="mileage_summary_agreement">המקורות העצמאיים שאומתו תואמים בטווח של %1$.1f ק״מ. אין בכך הבטחה שהיסטוריית מד המרחק אותנטית.</string>
     <string name="mileage_summary_no_data">לא נקרא ערך אמין של מד המרחק הכולל. ה-BCM וה-IPC עדיין לא אומתו; לא מדמים שום ערך.</string>
-    <string name="mileage_summary_insufficient">רק %1$d קריאות מד מרחק שמישות, המייצגות %2$d מחשבי רכב עצמאיים שאומתו ברמת אמינות גבוהה. אין די נתונים להשוואה ולהסקת מסקנה.</string>
+    <string name="mileage_summary_insufficient">קריאות קילומטראז׳ שמישות: %1$d; מחשבי רכב עצמאיים מאומתים ברמת ביטחון גבוהה: %2$d. אין מספיק ראיות להשוואה.</string>
     <string name="mileage_source_j2534">גשר J2534 ‏(UDS בלבד)</string>
     <string name="mileage_source_demo">נתוני הדגמה בלבד</string>
     <string name="mileage_source_ecm_a6">מד מרחק OBD ‏(PID A6)</string>
@@ -381,18 +381,18 @@
     <string name="cal_axis_y">ציר Y</string>
     <string name="cal_axis_summary">%1$s: %2$s</string>
     <string name="cal_axis_undefined">לא הוגדר</string>
-    <string name="cal_axis_values">0x%1$s • %2$d ערכים • %3$s</string>
+    <string name="cal_axis_values">0x%1$s • כמות=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">פרופיל חומרה בלבד; עדיין נדרש SDK/API רשמי ל-Android או גשר מתועד.</string>
     <string name="cal_profile_notes_llt">Camaro דור 5 V6 LLT. משפחת מחשב נומינלית בפרופיל הרכב; יש לקרוא CAL ID,‏ CVN ומזהי חומרה/תוכנה בפועל לפני כל פעולה בינארית.</string>
     <string name="cal_profile_notes_lfx">Camaro דור 5 V6 LFX. ‏E39/E39A הוא רמז לפרופיל בלבד; יש להבחין בין מערכת ההפעלה לכיול באמצעות מזהים שנקראו ממחשב הרכב.</string>
     <string name="cal_profile_notes_ls3">Camaro דור 5 V8 LS3 אטמוספרי, בדרך כלל עם תיבת הילוכים ידנית. יש לאשר את מספר החומרה, מערכת ההפעלה ו-CAL ID של מחשב הרכב המותקן.</string>
     <string name="cal_profile_notes_l99">Camaro דור 5 V8 L99 עם AFM ותיבת הילוכים אוטומטית. אין להשתמש בכיול LS3; יש לאמת RPO, תיבת הילוכים ומזהי מחשב הרכב.</string>
-    <string name="cal_profile_notes_lsa">Camaro דור 5 ZL1 V8 LSA מוגדש. יש לבדוק את הכיול בהתאם למגדש, לדלק, לשוק ולגרסת התוכנה.</string>
+    <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro דור 5 ZL1 V8 LSA מוגדש. יש לבדוק את הכיול בהתאם למגדש, לדלק, לשוק ולגרסת התוכנה.</string>
     <string name="cal_profile_notes_ls7">Camaro דור 5 Z/28 V8 LS7. פרופיל נפרד מ-LS3/L99 למרות משפחת מחשב הרכב הנומינלית; זיהוי התוכנה חובה.</string>
     <string name="cal_profile_notes_ltg">Camaro דור 6 2.0 Turbo LTG (טווח הכיסוי 2016–2020). עלון GM ‏PIP5313B מציין E80 ב-Camaro LTG ‏2016–2017; יש לאמת שנים מאוחרות יותר לפי מספר חלק ו-CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro דור 6 V6 LGX. הפרופיל עשוי להשתנות לפי שנה, שוק וגרסה; יש לאשר את מחשב הרכב בפועל ואת ה-CVN לפני טעינת הגדרת טבלאות.</string>
-    <string name="cal_profile_notes_lt1">Camaro דור 6 V8 LT1 אטמוספרי. יש להבחין בין גרסאות כיול לפי CAL ID/CVN, שנה, שוק, תיבת הילוכים ומספרי חומרה.</string>
-    <string name="cal_profile_notes_lt4">Camaro דור 6 ZL1 V8 LT4 מוגדש. אין לערבב עם LT1; יש לאמת מספרי חלק ונתוני גדישה הייחודיים לכיול.</string>
+    <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro דור 6 V8 LT1 אטמוספרי. יש להבחין בין גרסאות כיול לפי CAL ID/CVN, שנה, שוק, תיבת הילוכים ומספרי חומרה.</string>
+    <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro דור 6 ZL1 V8 LT4 מוגדש. אין לערבב עם LT1; יש לאמת מספרי חלק ונתוני גדישה הייחודיים לכיול.</string>
     <string name="msg_refresh_adapters_failed">לא ניתן לרענן את המתאמים.</string>
     <string name="msg_usb_identifier_unavailable">מזהה התקן USB אינו זמין</string>
     <string name="msg_simulation_activation_failed">לא ניתן להפעיל מצב הדמיה.</string>
@@ -409,8 +409,8 @@
     <string name="msg_mileage_audit_failed">קריאת בדיקת מד המרחק נכשלה.</string>
     <string name="msg_full_scan_j2534_only">גשר J2534 מספק תעבורת UDS בלבד ואינו מספק את ערוץ ELM הדרוש לסריקת OBD-II תקנית.</string>
     <string name="msg_full_scan_adapter_required">לא מחובר מתאם OBD אמיתי. בחר בפרופיל ההדמיה כדי לבדוק את המסך ללא רכב.</string>
-    <string name="msg_full_scan_simulation_complete">הדמיה ללא רכב — %1$d מזהי PID ו-%2$d קודי DTC להדגמה. לא נקראו נתונים אמיתיים.</string>
-    <string name="msg_full_scan_complete">סריקת OBD-II הושלמה: ‏%1$d מזהי PID נתמכים, הוחזרו %2$d קודי תקלה.</string>
+    <string name="msg_full_scan_simulation_complete">הדמיה לא מקוונת — מספר מזהי PID: ‏%1$d; מספר קודי DTC להדגמה: ‏%2$d. לא נקראו נתונים אמיתיים.</string>
+    <string name="msg_full_scan_complete">סריקת OBD-II הושלמה: מספר מזהי PID נתמכים ‏%1$d; מספר קודי DTC שהוחזרו ‏%2$d.</string>
     <string name="msg_full_scan_failed">סריקת OBD-II נכשלה.</string>
     <string name="msg_session_saved">מפגש האבחון נשמר.</string>
     <string name="msg_session_save_failed">לא ניתן לשמור את מפגש האבחון.</string>
@@ -421,7 +421,7 @@
     <string name="msg_live_no_pid_response">לא התקבלה תגובה שמישה למזהי ה-PID המבוקשים. בדוק את הפרוטוקול ואת תאימות המתאם.</string>
     <string name="msg_live_read_failed">קריאת OBD בזמן אמת נכשלה.</string>
     <string name="msg_live_recording_stopped">ההקלטה הופסקה עקב כשל בתקשורת OBD. עדיין ניתן לייצא את הדגימות האחרונות.</string>
-    <string name="msg_live_recording_started">ההקלטה מתבצעת: %1$d דגימות.</string>
+    <string name="msg_live_recording_started">ההקלטה פועלת. מספר הדגימות: %1$d.</string>
     <string name="msg_wifi_connection_failed">חיבור OBD דרך Wi-Fi נכשל</string>
     <string name="msg_usb_connection_failed">חיבור OBD דרך USB נכשל</string>
     <string name="msg_bluetooth_connection_failed">חיבור Bluetooth SPP נכשל</string>
@@ -437,7 +437,7 @@
     <string name="msg_cal_comparison_failed">לא ניתן להשוות בין קובצי הכיול.</string>
     <string name="msg_cal_template_exported">תבנית TSV יוצאה. החלף את הדוגמאות בהיסטים ובמקדמים שאומתו עבור הכיול המדויק.</string>
     <string name="msg_cal_template_export_failed">לא ניתן לייצא את תבנית TSV.</string>
-    <string name="msg_cal_definitions_loaded">נטענו %1$d הגדרות טבלה. הכתובות מגיעות מקובץ ההגדרות שלך ואינן מאומתות על ידי CamaroDiag.</string>
+    <string name="msg_cal_definitions_loaded">הגדרות טבלאות שנטענו: %1$d. הכתובות מגיעות מקובץ ההגדרות שלך ואינן מאושרות על ידי CamaroDiag.</string>
     <string name="msg_cal_definitions_import_failed">לא ניתן לייבא את הגדרות הטבלאות.</string>
     <string name="msg_cal_map_read_failed">לא ניתן לקרוא את הטבלה שנבחרה.</string>
     <string name="msg_cal_table_saved">הטבלה נשמרה בתמונה מקומית חדשה. הקובץ המקורי שיובא נשמר. לא נשלחו בתים למחשב הרכב.</string>
@@ -447,11 +447,11 @@
     <string name="msg_live_recording_j2534_block">הקלטת OBD-II אינה זמינה: גשר J2534 הנוכחי מספק תעבורת UDS בלבד.</string>
     <string name="msg_live_recording_unavailable">הקלטה אמיתית אינה זמינה במצב הדגמה או ללא מתאם מחובר.</string>
     <string name="msg_live_recording_real_started">החלה הקלטה של נתוני OBD אמיתיים.</string>
-    <string name="msg_live_recording_stopped_count">ההקלטה הופסקה: נקלטו %1$d דגימות.</string>
-    <string name="msg_live_csv_exported">יומן CSV יוצא: %1$d דגימות.</string>
+    <string name="msg_live_recording_stopped_count">ההקלטה נעצרה. מספר הדגימות שנקלטו: %1$d.</string>
+    <string name="msg_live_csv_exported">יומן CSV יוצא. מספר הדגימות: %1$d.</string>
     <string name="msg_live_csv_export_failed">לא ניתן לייצא את יומן ה-CSV.</string>
     <string name="msg_live_recording_channel_lost">ערוץ OBD-II אינו זמין: ההקלטה הופסקה כדי למנוע ערבוב של נתוני הדגמה או תעבורת UDS.</string>
-    <string name="msg_live_recording_max_samples">הגעת למגבלת הבטיחות (%1$d דגימות): ההקלטה הופסקה אוטומטית.</string>
+    <string name="msg_live_recording_max_samples">הושגה מגבלת הבטיחות (%1$d); ההקלטה נעצרה אוטומטית.</string>
     <string name="vehicle_ecm_label">ECM: %1$s</string>
     <string name="vehicle_vin_placeholder">17 תווים</string>
     <string name="module_bus_hscan">HS-CAN ‏(500 kbps)</string>

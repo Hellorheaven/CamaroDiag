@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">App-Sprache</string>
     <string name="system_language_current">Systemsprache: %1$s</string>
@@ -145,7 +145,7 @@
     <string name="cal_pc_pairing_token">Kopplungs-Token des PCs</string>
     <string name="cal_connect_j2534">J2534-Brücke verbinden</string>
     <string name="cal_disconnect_pc_bridge">PC-Brücke trennen</string>
-    <string name="cal_bridge_capabilities">Brücke: HS-CAN ISO15765 mit 250/500 kbit/s und J2534-2 SW-ISO15765, sofern vom Treiber unterstützt. CAN FD bleibt deaktiviert.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Brücke: HS-CAN ISO15765 mit 250/500 kbit/s und J2534-2 SW-ISO15765, sofern vom Treiber unterstützt. CAN FD bleibt deaktiviert.</string>
     <string name="cal_read_uds_did">UDS-DID lesen</string>
     <string name="cal_read_uds_dtcs">UDS-Fehlercodes lesen</string>
     <string name="cal_uds_trouble_codes">UDS-Fehlercodes (0x19)</string>
@@ -169,7 +169,7 @@
     <string name="cal_import_supported_formats">Importiere BIN-, HEX-, S-Record-, ZIP-Archive sowie externe Projekt- und Definitionsdateien. Proprietäre Formate bleiben für Sicherung/Export unverändert; hier werden nur BIN, HEX und S-Record untersucht. XDF/A2L-Definitionen müssen vor der Tabellenbearbeitung weiterhin in TSV umgewandelt werden.</string>
     <string name="cal_hex_preview">Hex-Vorschau (erste 64 Byte)</string>
     <string name="cal_file_inspection">Dateiprüfung: %1$s</string>
-    <string name="cal_payload_size">Nutzdaten: %1$d Byte</string>
+    <string name="cal_payload_size">Nutzdaten: %1$d B</string>
     <string name="cal_record_count">Datensätze: %1$d</string>
     <string name="cal_checksum_validation">Prüfsummenprüfung des Formats: %1$s</string>
     <string name="cal_export_file">Datei exportieren / herunterladen</string>
@@ -196,8 +196,8 @@
     <string name="cal_ecu_write_unavailable">ECU-Schreiben nicht verfügbar – validiertes OEM-Profil erforderlich</string>
     <string name="cal_no_calibration_write">Es wird keine Kalibrierung geschrieben, bevor das ECU-Profil, die Dateikompatibilität und das Wiederherstellungsverfahren validiert wurden.</string>
     <string name="vm_bridge_disconnected_vehicle_changed">PC-Brücke nach Änderung der Fahrzeugidentität getrennt.</string>
-    <string name="vm_native_catalog_loaded">%1$d originale Camaro-Definition(en) für Modelljahr %2$d. Live-Auslesungen erfordern Fahrzeugnachweise.</string>
-    <string name="vm_community_catalog_loaded">%1$d Community-Signale für Modelljahr %2$d verfügbar.</string>
+    <string name="vm_native_catalog_loaded">Camaro-Profile aus erster Hand: %1$d für Modelljahr %2$d. Live-Auslesen erfordert fahrzeugbezogene Nachweise.</string>
+    <string name="vm_community_catalog_loaded">Community-Signaldefinitionen verfügbar: %1$d für Modelljahr %2$d.</string>
     <string name="vm_sentinel_unavailable">Nicht verfügbar (Platzhalterwert)</string>
     <string name="vm_obdb_signal_read">%1$s gelesen von 0x%2$s → 0x%3$s.</string>
     <string name="vm_j2534_connected">J2534-Brücke verbunden: %1$s</string>
@@ -223,12 +223,12 @@
     <string name="engine_lfx">3,6-L-V6-SIDI-FlexFuel (2012–2015)</string>
     <string name="engine_ls3">6,2-L-V8 manuell (426 PS)</string>
     <string name="engine_l99">6,2-L-V8 AFM Automatik (400 PS)</string>
-    <string name="engine_lsa">6,2-L-V8 Kompressor ZL1 (580 PS)</string>
+    <string name="engine_lsa" tools:ignore="Typos">6,2-L-V8 Kompressor ZL1 (580 PS)</string>
     <string name="engine_ls7">7,0-L-V8 Z/28 (505 PS)</string>
     <string name="engine_ltg">2,0-L-Turbo-Reihenvierzylinder (275 PS)</string>
     <string name="engine_lgx">3,6-L-V6-SIDI (335 PS)</string>
-    <string name="engine_lt1">6,2-L-V8 Direkteinspritzung (455 PS)</string>
-    <string name="engine_lt4">6,2-L-V8 Kompressor ZL1 (650 PS)</string>
+    <string name="engine_lt1" tools:ignore="Typos">6,2-L-V8 Direkteinspritzung (455 PS)</string>
+    <string name="engine_lt4" tools:ignore="Typos">6,2-L-V8 Kompressor ZL1 (650 PS)</string>
     <string name="transmission_manual">Manuell (AY6 / TR6060 / TR3160)</string>
     <string name="transmission_automatic">Automatik (6L50 / 6L80 / 8L45 / 8L90 / 10L60 / 10L80; abhängig vom Modelljahr)</string>
     <string name="market_us_ca">Nordamerika (USA / Kanada)</string>
@@ -248,8 +248,8 @@
     <string name="module_note_ecm_obd_missing">Es wurde keine standardmäßige OBD-7E8-Antwort beobachtet. Das ECM bleibt unbestätigt, bis ein echter Funktionstest es bestätigt.</string>
     <string name="module_note_tcm_gen5">Vorhandensein, Adresse und unterstützte Daten müssen am Fahrzeug ermittelt werden.</string>
     <string name="module_note_tcm_gen6">Moduladresse und unterstützte Dienste müssen am Fahrzeug ermittelt werden; sie werden nicht aus der Gen-5-Topologie abgeleitet.</string>
-    <string name="module_note_bcm_gen5">Das GM-Bulletin 07-08-49-020I bezeichnet das BCM für Camaro 2010–2015 als Speichermodul des Kilometerstands. Die genaue Diagnoseadressierung und der Lese-DID werden nicht vorausgesetzt.</string>
-    <string name="module_note_bcm_gen6_to2018">Das GM-Bulletin 07-08-49-020M führt das BCM bis 2018 als Speichermodul des Camaro-Kilometerstands auf. Diagnoseadresse und Lese-DID müssen weiterhin VIN-spezifisch überprüft werden.</string>
+    <string name="module_note_bcm_gen5" tools:ignore="TypographyDashes">Das GM-Bulletin 07-08-49-020I bezeichnet das BCM für Camaro 2010–2015 als Speichermodul des Kilometerstands. Die genaue Diagnoseadressierung und der Lese-DID werden nicht vorausgesetzt.</string>
+    <string name="module_note_bcm_gen6_to2018" tools:ignore="TypographyDashes">Das GM-Bulletin 07-08-49-020M führt das BCM bis 2018 als Speichermodul des Camaro-Kilometerstands auf. Diagnoseadresse und Lese-DID müssen weiterhin VIN-spezifisch überprüft werden.</string>
     <string name="module_note_bcm_2019">Für 2019–2024 müssen die Kilometerstands-Speicherarchitektur und die Diagnosekennungen für diese VIN vor dem Auslesen bestätigt werden.</string>
     <string name="module_note_ipc_gen5">Die Camaro-Serviceinformationen von 2012 beschreiben das IPC als sekundären Kilometerstandsspeicher. Genaue Lesedaten und Adresse müssen überprüft werden.</string>
     <string name="module_note_ipc_gen6">Ein sekundärer Kilometerstandsspeicher wird in den Camaro-Serviceinformationen von 2012 beschrieben; vor einem Vergleich sind die genauen Moduldaten und der VIN-Bezug zu prüfen.</string>
@@ -286,7 +286,7 @@
     <string name="units_metric">SI / Metrisch</string>
     <string name="units_imperial">Imperial</string>
     <string name="live_pause">Pause</string>
-    <string name="live_recording_status">%1$d Messwert(e) • %2$s</string>
+    <string name="live_recording_status">Messwerte: %1$d • %2$s</string>
     <string name="live_recording_state_active">AUFZEICHNUNG</string>
     <string name="live_recording_state_stopped">GESTOPPT</string>
     <string name="live_pid_rpm">Motordrehzahl</string>
@@ -341,7 +341,7 @@
     <string name="mileage_summary_discrepancy">Verifizierte unabhängige Quellen weichen um %1$.1f km voneinander ab. Modulwechsel/Neuprogrammierung und Wartungshistorie prüfen. Dies ist ein Untersuchungshinweis, kein Manipulationsnachweis.</string>
     <string name="mileage_summary_agreement">Verifizierte unabhängige Quellen stimmen bis auf %1$.1f km überein. Dies garantiert keine authentische Kilometerhistorie.</string>
     <string name="mileage_summary_no_data">Es wurde kein zuverlässiger Gesamtkilometerstand ausgelesen. BCM und IPC bleiben unbestätigt; es wird kein Wert simuliert.</string>
-    <string name="mileage_summary_insufficient">Nur %1$d verwertbare Kilometerstandsmessung(en), entsprechend %2$d unabhängigem Steuergerät mit hoher, bestätigter Vertrauensstufe. Für eine Schlussfolgerung reicht der Vergleich nicht aus.</string>
+    <string name="mileage_summary_insufficient">Verwertbare Kilometerstände: %1$d; unabhängig verifizierte Steuergeräte mit hoher Konfidenz: %2$d. Die Daten reichen für einen Vergleich nicht aus.</string>
     <string name="mileage_source_j2534">J2534-Brücke (nur UDS)</string>
     <string name="mileage_source_demo">Nur Demodaten</string>
     <string name="mileage_source_ecm_a6">OBD-Kilometerstand (PID A6)</string>
@@ -381,18 +381,18 @@
     <string name="cal_axis_y">Y-Achse</string>
     <string name="cal_axis_summary">%1$s: %2$s</string>
     <string name="cal_axis_undefined">nicht definiert</string>
-    <string name="cal_axis_values">0x%1$s • %2$d Werte • %3$s</string>
+    <string name="cal_axis_values">0x%1$s • Anzahl=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Nur Hardwareprofil; ein offizielles Android-SDK/API oder eine dokumentierte Bridge ist weiterhin erforderlich.</string>
     <string name="cal_profile_notes_llt">Camaro Gen 5 LLT V6. Nominale Steuergerätefamilie des Fahrzeugprofils; vor jedem Binärvorgang die tatsächlichen CAL-ID-, CVN- und Hardware-/Softwarekennungen auslesen.</string>
     <string name="cal_profile_notes_lfx">Camaro Gen 5 LFX V6. E39/E39A ist nur ein Profilhinweis; Betriebssystem und Kalibrierung anhand der aus dem Steuergerät ausgelesenen Kennungen unterscheiden.</string>
     <string name="cal_profile_notes_ls3">Camaro Gen 5 LS3 V8 ohne Aufladung, üblicherweise mit Schaltgetriebe. Hardware-Nummer, Betriebssystem und CAL ID des eingebauten Steuergeräts bestätigen.</string>
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8 mit AFM und Automatikgetriebe. Keine LS3-Kalibrierung wiederverwenden; RPO, Getriebe und Steuergerätekennungen prüfen.</string>
-    <string name="cal_profile_notes_lsa">Camaro Gen 5 ZL1 LSA V8 mit Kompressor. Kalibrierung für Kompressor, Kraftstoff, Markt und Softwareversion prüfen.</string>
+    <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 LSA V8 mit Kompressor. Kalibrierung für Kompressor, Kraftstoff, Markt und Softwareversion prüfen.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8. Eigenständiges Profil gegenüber LS3/L99 trotz gleicher nomineller Steuergerätefamilie; Softwareidentifikation ist zwingend.</string>
     <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (Abdeckungszeitraum 2016–2020). GM-Bulletin PIP5313B nennt E80 für Camaro LTG 2016–2017; spätere Jahre anhand Teilenummer und CAL ID prüfen.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6. Das Profil kann je nach Jahr, Markt und Version variieren; vor dem Laden einer Kennfelddefinition das tatsächliche Steuergerät und CVN bestätigen.</string>
-    <string name="cal_profile_notes_lt1">Camaro Gen 6 LT1 V8 ohne Aufladung. Kalibrierungsrevisionen anhand CAL ID/CVN, Modelljahr, Markt, Getriebe und Hardware-Nummern unterscheiden.</string>
-    <string name="cal_profile_notes_lt4">Camaro Gen 6 ZL1 LT4 V8 mit Kompressor. Nicht mit LT1 vermischen; Teilenummern und kalibrierungsspezifische Ladedruckdaten überprüfen.</string>
+    <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 LT1 V8 ohne Aufladung. Kalibrierungsrevisionen anhand CAL ID/CVN, Modelljahr, Markt, Getriebe und Hardware-Nummern unterscheiden.</string>
+    <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 LT4 V8 mit Kompressor. Nicht mit LT1 vermischen; Teilenummern und kalibrierungsspezifische Ladedruckdaten überprüfen.</string>
     <string name="msg_refresh_adapters_failed">Adapter konnten nicht aktualisiert werden.</string>
     <string name="msg_usb_identifier_unavailable">USB-Gerätekennung nicht verfügbar</string>
     <string name="msg_simulation_activation_failed">Simulationsmodus konnte nicht aktiviert werden.</string>
@@ -409,8 +409,8 @@
     <string name="msg_mileage_audit_failed">Auslesen für Kilometerstandsprüfung fehlgeschlagen.</string>
     <string name="msg_full_scan_j2534_only">Die J2534-Brücke stellt nur den UDS-Transport bereit; sie bietet nicht den für einen standardmäßigen OBD-II-Scan erforderlichen ELM-Kanal.</string>
     <string name="msg_full_scan_adapter_required">Es ist kein echter OBD-Adapter verbunden. Wähle das Simulationsprofil, um den Bildschirm ohne Fahrzeug zu testen.</string>
-    <string name="msg_full_scan_simulation_complete">OFFLINE-SIMULATION — %1$d PIDs und %2$d Demo-DTCs. Es wurden keine echten Daten ausgelesen.</string>
-    <string name="msg_full_scan_complete">OBD-II-Scan abgeschlossen: %1$d unterstützte PIDs, %2$d Fehlercode(s) zurückgegeben.</string>
+    <string name="msg_full_scan_simulation_complete">OFFLINE-SIMULATION — PID-Anzahl: %1$d; Demo-DTC-Anzahl: %2$d. Es wurden keine echten Daten ausgelesen.</string>
+    <string name="msg_full_scan_complete">OBD-II-Scan abgeschlossen: unterstützte PID-Anzahl %1$d; zurückgegebene DTC-Anzahl %2$d.</string>
     <string name="msg_full_scan_failed">OBD-II-Scan fehlgeschlagen.</string>
     <string name="msg_session_saved">Diagnosesitzung gespeichert.</string>
     <string name="msg_session_save_failed">Diagnosesitzung konnte nicht gespeichert werden.</string>
@@ -421,7 +421,7 @@
     <string name="msg_live_no_pid_response">Für die angeforderten PIDs wurde keine verwertbare Antwort empfangen. Prüfe Protokoll und Adapterkompatibilität.</string>
     <string name="msg_live_read_failed">Live-OBD-Auslesen fehlgeschlagen.</string>
     <string name="msg_live_recording_stopped">Aufzeichnung gestoppt, weil die OBD-Kommunikation fehlgeschlagen ist. Die letzten Messwerte können weiterhin exportiert werden.</string>
-    <string name="msg_live_recording_started">Aufzeichnung läuft: %1$d Messwert(e).</string>
+    <string name="msg_live_recording_started">Aufzeichnung läuft. Anzahl der Messwerte: %1$d.</string>
     <string name="msg_wifi_connection_failed">WLAN-OBD-Verbindung fehlgeschlagen</string>
     <string name="msg_usb_connection_failed">USB-OBD-Verbindung fehlgeschlagen</string>
     <string name="msg_bluetooth_connection_failed">Bluetooth-SPP-Verbindung fehlgeschlagen</string>
@@ -437,7 +437,7 @@
     <string name="msg_cal_comparison_failed">Kalibrierungsdateien konnten nicht verglichen werden.</string>
     <string name="msg_cal_template_exported">TSV-Vorlage exportiert. Ersetze die Beispiele durch Offsets und Skalierungsfaktoren, die für die genaue Kalibrierung bestätigt wurden.</string>
     <string name="msg_cal_template_export_failed">TSV-Vorlage konnte nicht exportiert werden.</string>
-    <string name="msg_cal_definitions_loaded">%1$d Tabellendefinition(en) geladen. Die Adressen stammen aus deiner Definitionsdatei und sind nicht von CamaroDiag zertifiziert.</string>
+    <string name="msg_cal_definitions_loaded">Tabellendefinitionen geladen: %1$d. Die Adressen stammen aus Ihrer Definitionsdatei und sind nicht von CamaroDiag zertifiziert.</string>
     <string name="msg_cal_definitions_import_failed">Tabellendefinitionen konnten nicht importiert werden.</string>
     <string name="msg_cal_map_read_failed">Ausgewähltes Kennfeld konnte nicht gelesen werden.</string>
     <string name="msg_cal_table_saved">Kennfeld in einem neuen lokalen Abbild gespeichert. Das importierte Original bleibt erhalten. Es wurden keine Bytes an das Steuergerät gesendet.</string>
@@ -447,11 +447,11 @@
     <string name="msg_live_recording_j2534_block">OBD-II-Aufzeichnung nicht verfügbar: Die aktuelle J2534-Brücke stellt nur UDS-Transport bereit.</string>
     <string name="msg_live_recording_unavailable">Echte Aufzeichnung ist im Demomodus oder ohne verbundenen Adapter nicht verfügbar.</string>
     <string name="msg_live_recording_real_started">Aufzeichnung echter OBD-Daten gestartet.</string>
-    <string name="msg_live_recording_stopped_count">Aufzeichnung gestoppt: %1$d Messwert(e) erfasst.</string>
-    <string name="msg_live_csv_exported">CSV-Protokoll exportiert: %1$d Messwert(e).</string>
+    <string name="msg_live_recording_stopped_count">Aufzeichnung beendet. Anzahl erfasster Messwerte: %1$d.</string>
+    <string name="msg_live_csv_exported">CSV-Protokoll exportiert. Anzahl der Messwerte: %1$d.</string>
     <string name="msg_live_csv_export_failed">CSV-Protokoll konnte nicht exportiert werden.</string>
     <string name="msg_live_recording_channel_lost">OBD-II-Kanal nicht verfügbar: Aufzeichnung gestoppt, um Demo-Daten und UDS-Transport nicht zu vermischen.</string>
-    <string name="msg_live_recording_max_samples">Sicherheitsgrenze erreicht (%1$d Messwerte): Aufzeichnung automatisch gestoppt.</string>
+    <string name="msg_live_recording_max_samples">Sicherheitsgrenze erreicht (%1$d); Aufzeichnung automatisch beendet.</string>
     <string name="vehicle_ecm_label">Motorsteuergerät: %1$s</string>
     <string name="vehicle_vin_placeholder">17 Zeichen</string>
     <string name="module_bus_hscan">HS-CAN (500 kbit/s)</string>
