@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.util.Base64
+import com.android.build.gradle.internal.api.BaseVariantOutputImpl
 
 plugins {
     id("com.android.application")
@@ -82,7 +83,7 @@ android {
     applicationVariants.all {
         val apkName = "CamaroDiag-${name}.apk"
         outputs.all {
-            outputFileName = apkName
+            (this as BaseVariantOutputImpl).outputFileName = apkName
         }
     }
 
