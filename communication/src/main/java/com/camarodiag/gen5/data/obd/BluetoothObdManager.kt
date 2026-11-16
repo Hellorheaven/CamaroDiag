@@ -376,6 +376,10 @@ class BluetoothObdManager(context: Context) {
         ObdCommandChannel { command, timeoutMs -> sendAtCommand(command, timeoutMs) }
     )
 
+    /** Creates a deterministic, clearly synthetic OBD-II channel for offline UI testing. */
+    fun createSimulatedObd2FeatureEngine(): Obd2FeatureEngine =
+        CamaroLfxObdSimulator.createEngine()
+
     fun disconnect() {
         // Close every transport independently: one failing close must not leak the others.
         runCatching { usbTransport.close() }

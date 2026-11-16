@@ -1210,11 +1210,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             beginBusyOperation()
             try {
                 if (obdManager.isSimulationActive) {
-                    _dtcs.value = listOf(
-                        DiagnosticDtc("P0171", "ECM", "Sample / Confirmed", "Exemple / Confirmé", "System Too Lean (Bank 1)", "Mélange trop pauvre (Banc 1)"),
-                        DiagnosticDtc("P0014", "ECM", "Sample / Pending", "Exemple / En attente", "Exhaust Camshaft Position Timing Over-Advanced (Bank 1)", "Calage arbre à cames échappement trop avancé (Banc 1)", true)
-                    )
-                    _connectionMessage.value = "Résultats simulés : aucune réponse ECU réelle."
+                    val (confirmed, pending, permanent) =
+                        obdManager.createSimulatedObd2FeatureEngine().readDtcs()
+                    _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
+                    _connectionMessage.value = "DTC simulés par le profil Camaro LFX : aucune réponse ECU réelle."
                 } else if (obdManager.isDemoMode) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = "Connecte une interface OBD réelle pour lire les défauts."
@@ -1395,20 +1394,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Executes a complete, standards-based read-only OBD-II scan on the connected Camaro. */
     fun runFullObdScan() {
         viewModelScope.launch {
-            if (obdManager.isDemoMode) {
+            if (obdManager.isDemoMode && !obdManager.isSimulationActive) {
                 _obdScanReport.value = null
-                _obdScanMessage.value = if (obdManager.isSimulationActive) {
-                    "Mode simulation : aucun calculateur réel n'est interrogé."
-                } else {
-                    "Aucune interface OBD réelle connectée. Connecte un adaptateur avant le scan."
-                }
+                _obdScanMessage.value = "Aucune interface OBD réelle connectée. Sélectionne le profil de simulation pour tester l'écran hors véhicule."
                 return@launch
             }
             _isObdScanning.value = true
             _obdScanMessage.value = null
             try {
-                val report = obdManager.withObdCommandSession { engine ->
-                    engine.fullReadOnlyScan()
+                val report = if (obdManager.isSimulationActive) {
+                    obdManager.createSimulatedObd2FeatureEngine().fullReadOnlyScan()
+                } else {
+                    obdManager.withObdCommandSession { engine ->
+                        engine.fullReadOnlyScan()
+                    }
                 }
                 _obdScanReport.value = report
                 _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
@@ -1417,7 +1416,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
                 _dtcs.value = mapObdDtcs(allDtcs)
-                _obdScanMessage.value = "Scan OBD-II terminé : ${report.supportedPids.size} PIDs supportés, ${allDtcs.size} défaut(s) retourné(s)."
+                _obdScanMessage.value = if (obdManager.isSimulationActive) {
+                    "SIMULATION HORS VÉHICULE — ${report.supportedPids.size} PIDs et ${allDtcs.size} DTC de démonstration. Aucune donnée réelle n'a été lue."
+                } else {
+                    "Scan OBD-II terminé : ${report.supportedPids.size} PIDs supportés, ${allDtcs.size} défaut(s) retourné(s)."
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

@@ -7,6 +7,7 @@ CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5
 - Identification OBD-II : VIN, CAL ID, CVN, nom ECU, protocole et tension lorsque ces données sont disponibles.
 - Diagnostic standard en lecture : paramètres moteur Mode 01 (dont pression de rail, sondes lambda large bande et températures catalyseur lorsque les PIDs sont annoncés), freeze-frame Mode 02, DTC confirmés Mode 03, en attente Mode 07, permanents Mode 0A, readiness et résultats Mode 06.
 - Compatibilité ELM327 Bluetooth SPP : identification ATI/AT@1, détection du protocole CAN 11 bits 500 kbit/s et filtrage des réponses d'erreur connues ; les clones restent limités selon leur firmware.
+- Simulation OBD-II hors véhicule pour tester le scan complet, les réponses DTC, VIN, CAL ID, CVN et données moteur ; tous les résultats simulés sont explicitement signalés.
 - Lecture UDS de données et de DTC (0x22 / 0x19) avec OBDLink MX+ STN ou pont PC J2534, lorsque l'adressage physique est connu.
 - Catalogue communautaire Camaro OBDb : 133 commandes et 136 définitions de signaux, filtrées par année et adressage.
 - Enregistrement télémétrique et export CSV.
