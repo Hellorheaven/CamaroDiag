@@ -124,11 +124,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             transmission = transmission,
             market = market
         )
+        clearVehicleEvidence()
         refreshTopologyAndDefaults()
     }
 
     fun updateVin(vin: String) {
         _vehicle.value = _vehicle.value.copy(vin = vin.uppercase().filter { it.isLetterOrDigit() }.take(17))
+        clearVehicleEvidence()
+    }
+
+    private fun clearVehicleEvidence() {
+        _dtcs.value = emptyList()
+        _livePids.value = emptyList()
+        _mileageReport.value = null
+        _obdScanReport.value = null
+        _obdScanMessage.value = null
+        _liveTelemetryMessage.value = null
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            ecuVinResponse = "",
+            calibrationIdResponse = "",
+            cvnResponse = ""
+        )
     }
 
     private val _calibrationWorkspace = MutableStateFlow(CalibrationWorkspaceState())
