@@ -510,9 +510,9 @@ fun AdapterScreen(
                     Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
                     Text(if (isFr) adapter.tier.titleFr else adapter.tier.titleEn, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BadgeChip("HS-CAN 500k", adapter.supportsCanHeaders)
+                        BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
                         BadgeChip(if (isFr) "SW-CAN câblage vérifié (Pin 1)" else "SW-CAN wiring verified (Pin 1)", adapter.supportsSwCan)
-                        BadgeChip("ISO-TP Long Frames", adapter.supportsLongFrames)
+                        BadgeChip(if (isFr) "Réponses longues (ATAL)" else "Long response mode (ATAL)", adapter.supportsLongFrames)
                     }
                     if (adapter.rawProbeLog.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
