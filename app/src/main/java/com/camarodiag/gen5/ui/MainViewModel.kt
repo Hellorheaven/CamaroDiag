@@ -466,7 +466,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDidResponse = "",
-                    udsMessage = error.localizedMessage ?: "Échec de lecture UDS."
+                    udsMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_uds_read_failed)
                 )
             }
         }
@@ -528,7 +528,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = "",
-                    udsMessage = error.localizedMessage ?: "Échec de lecture des DTC UDS."
+                    udsMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_uds_dtc_read_failed)
                 )
             }
         }
@@ -538,7 +538,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun readCalibrationIdentification() {
         viewModelScope.launch {
             if (!obdManager.isObdCommandChannelAvailable) {
-                val isFr = isSystemFrench()
                 val bridgeOnly = obdManager.isJ2534BridgeConnected()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
@@ -547,10 +546,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     cvnResponse = "",
                     message = if (bridgeOnly) {
                         getApplication<Application>().getString(R.string.vm_j2534_no_elm_channel)
-                        else "The J2534 bridge provides UDS transport, not the ELM channel required for OBD-II Mode 09."
                     } else {
                         getApplication<Application>().getString(R.string.vm_no_obd_data_read)
-                        else "Demo mode or no OBD adapter connected: no real ECU data was read."
                     }
                 )
                 return@launch
@@ -574,9 +571,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val validCvn = cvns.isNotEmpty()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
-                    ecuVinResponse = ecuVin ?: "Non disponible",
-                    calibrationIdResponse = calIds.joinToString("\n").ifBlank { "Non disponible" },
-                    cvnResponse = cvns.joinToString("\n").ifBlank { "Non disponible" },
+                    ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                    calibrationIdResponse = calIds.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
+                    cvnResponse = cvns.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
                     message = if (validCal || validCvn) {
                         "VIN / CAL ID / CVN lus depuis Mode 09. Ces identifiants ne constituent pas une lecture de cartographie binaire."
                     } else {
@@ -588,7 +585,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
-                    message = error.localizedMessage ?: "Échec de lecture des identifiants ECU."
+                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_identifiers_failed)
                 )
             }
         }
@@ -667,13 +664,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonMissingBytes = null,
                     comparisonRanges = emptyList(),
                     comparisonIdentical = null,
-                    message = "Fichier copié localement. L'analyse de format ne prouve pas sa compatibilité ECU ni la validité d'un checksum GM."
+                    message = getApplication<Application>().getString(R.string.msg_cal_file_imported)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = error.localizedMessage ?: "Import du fichier impossible."
+                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_file_import_failed)
                 )
             }
         }
@@ -737,7 +734,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonMissingBytes = comparison.missingBytes,
                     comparisonRanges = ranges,
                     comparisonIdentical = comparison.identical,
-                    message = "Comparaison locale terminée. Les écarts ne sont pas interprétés comme des tables moteur et ne valident pas la compatibilité d'un flash."
+                    message = getApplication<Application>().getString(R.string.msg_cal_comparison_complete)
                 )
                 current.comparisonFilePath?.let { previousPath ->
                     if (previousPath != storedFile!!.absolutePath) runCatching { File(previousPath).delete() }
@@ -747,7 +744,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 storedFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = error.localizedMessage ?: "Comparaison des fichiers impossible."
+                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_comparison_failed)
                 )
             }
         }
@@ -760,13 +757,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ?: error("Impossible de créer le fichier modèle.")
                 output.use { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = "Modèle TSV exporté. Remplace les exemples par les offsets et facteurs vérifiés de la calibration exacte."
+                    message = getApplication<Application>().getString(R.string.msg_cal_template_exported)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = error.localizedMessage ?: "Export du modèle TSV impossible."
+                    mapError = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_template_export_failed)
                 )
             }
         }
@@ -822,14 +819,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapDefinitionsWarnings = parsed.warnings + "OS et référence matérielle non lus par Mode 09 standard : vérification documentaire indépendante obligatoire.",
                     mapDirty = false,
                     mapError = null,
-                    message = "${parsed.definitions.size} table(s) chargée(s). Les adresses proviennent de ton fichier de définitions et ne sont pas certifiées par CamaroDiag."
+                    message = getApplication<Application>().getString(R.string.msg_cal_definitions_loaded, parsed.definitions.size)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = error.localizedMessage ?: "Import des définitions impossible.",
-                    message = error.localizedMessage ?: "Import des définitions impossible."
+                    mapError = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_definitions_import_failed),
+                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_definitions_import_failed)
                 )
             }
         }
@@ -858,7 +855,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = current.copy(
-                    mapError = error.localizedMessage ?: "Lecture de la table impossible."
+                    mapError = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_map_read_failed)
                 )
             }
         }
@@ -927,15 +924,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapYAxisValues = decoded.yAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
                     mapDirty = false,
                     mapError = null,
-                    message = "Table enregistrée dans une nouvelle image locale. L'original importé reste conservé. Aucun octet n'a été envoyé à l'ECU."
+                    message = getApplication<Application>().getString(R.string.msg_cal_table_saved)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 createdFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = error.localizedMessage ?: "Modification de la table impossible.",
-                    message = error.localizedMessage ?: "Modification de la table impossible."
+                    mapError = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_table_edit_failed),
+                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_table_edit_failed)
                 )
             }
         }
@@ -997,13 +994,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     output.use { target -> input.copyTo(target) }
                 }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = "Fichier exporté. Cette opération sauvegarde le fichier local et ne programme pas l'ECU."
+                    message = getApplication<Application>().getString(R.string.msg_cal_file_exported)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = error.localizedMessage ?: "Export du fichier impossible."
+                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_file_export_failed)
                 )
             }
         }
@@ -1132,9 +1129,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         if (!obdManager.isObdCommandChannelAvailable) {
             _liveRecordingState.value = _liveRecordingState.value.copy(
-                message = if (obdManager.isJ2534BridgeConnected())
-                    "Enregistrement OBD-II indisponible : le pont J2534 actuel expose uniquement le transport UDS."
-                else "Enregistrement réel indisponible en mode démo ou sans interface connectée."
+                message = getApplication<Application>().getString(if (obdManager.isJ2534BridgeConnected()) R.string.msg_live_recording_j2534_block else R.string.msg_live_recording_unavailable)
             )
             return
         }
@@ -1145,7 +1140,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isRecording = true,
             sampleCount = 0,
             startedAtMillis = now,
-            message = "Enregistrement des données OBD réelles démarré."
+            message = getApplication<Application>().getString(R.string.msg_live_recording_real_started)
         )
     }
 
@@ -1154,7 +1149,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveRecordingState.value = _liveRecordingState.value.copy(
             isRecording = false,
             stoppedAtMillis = System.currentTimeMillis(),
-            message = "Enregistrement arrêté : ${recordedLiveSamples.size} échantillon(s) capturé(s)."
+            message = getApplication<Application>().getString(R.string.msg_live_recording_stopped_count, recordedLiveSamples.size)
         )
     }
 
@@ -1176,13 +1171,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     output.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
                 }
                 _liveRecordingState.value = _liveRecordingState.value.copy(
-                    message = "Journal CSV exporté : ${snapshot.size} échantillon(s)."
+                    message = getApplication<Application>().getString(R.string.msg_live_csv_exported, snapshot.size)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _liveRecordingState.value = _liveRecordingState.value.copy(
-                    message = error.localizedMessage ?: "Export du journal CSV impossible."
+                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_live_csv_export_failed)
                 )
             }
         }
@@ -1193,7 +1188,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!obdManager.isObdCommandChannelAvailable) {
             stopLiveRecording()
             _liveRecordingState.value = _liveRecordingState.value.copy(
-                message = "Canal OBD-II indisponible : journal arrêté pour ne pas mélanger des données de démonstration ou des transports UDS."
+                message = getApplication<Application>().getString(R.string.msg_live_recording_channel_lost)
             )
             return
         }
@@ -1203,7 +1198,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isRecording = false,
                 stoppedAtMillis = System.currentTimeMillis(),
                 sampleCount = recordedLiveSamples.size,
-                message = "Limite de sécurité atteinte ($maxLiveRecordingSamples échantillons) : enregistrement arrêté automatiquement."
+                message = getApplication<Application>().getString(R.string.msg_live_recording_max_samples, maxLiveRecordingSamples)
             )
             return
         }
@@ -1330,7 +1325,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else if (!obdManager.isObdCommandChannelAvailable) {
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
                         getApplication<Application>().getString(R.string.msg_dtc_clear_j2534_unavailable)
-                    else "Connecte une interface OBD réelle avant de demander l'effacement."
+                    else getApplication<Application>().getString(R.string.msg_dtc_clear_adapter_required)
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
                     if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
@@ -1343,7 +1338,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: "Échec de l'effacement des défauts."
+                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_dtc_clear_failed)
             } finally {
                 endBusyOperation()
             }
@@ -1414,7 +1409,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
-                _connectionMessage.value = error.localizedMessage ?: "Échec de lecture pendant l'audit kilométrique."
+                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_mileage_audit_failed)
             } finally {
                 endBusyOperation()
             }
@@ -1449,7 +1444,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
                 _dtcs.value = mapObdDtcs(allDtcs)
                 _obdScanMessage.value = if (obdManager.isSimulationActive) {
-                    "SIMULATION HORS VÉHICULE — ${report.supportedPids.size} PIDs et ${allDtcs.size} DTC de démonstration. Aucune donnée réelle n'a été lue."
+                    getApplication<Application>().getString(R.string.msg_full_scan_simulation_complete, report.supportedPids.size, allDtcs.size)
                 } else {
                     getApplication<Application>().getString(R.string.msg_full_scan_complete, report.supportedPids.size, allDtcs.size)
                 }
@@ -1606,7 +1601,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                                 _livePids.value = values
                                 _liveTelemetryMessage.value = if (values.isEmpty()) {
-                                    "Aucune réponse exploitable des PIDs demandés. Vérifie le protocole et la compatibilité de l'adaptateur."
+                                    getApplication<Application>().getString(R.string.msg_live_no_pid_response)
                                 } else {
                                     null
                                 }
