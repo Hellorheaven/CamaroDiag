@@ -32,13 +32,21 @@ Ce pont est générique J2534. Il ne fournit aucun pilote VXDIAG et ne remplace 
 
 1. Installer le pilote Windows correspondant exactement au VCX ou à l'interface J2534.
 2. Pour VXDIAG, installer VX Manager et vérifier la détection de l'interface.
-3. Télécharger l'exécutable du pont depuis les releases ou artefacts CamaroDiag : https://github.com/Hellorheaven/CamaroDiag/actions.
-4. Choisir la version x64 ou x86 selon le DLL J2534.
-5. Lancer CamaroDiag.J2534Bridge.exe et sélectionner le fournisseur si plusieurs sont présents.
-6. Relever l'adresse IP du PC, le port TCP et le jeton d'appairage affichés.
-7. Connecter le PC et Android au même réseau privé.
-8. Saisir IP, port, jeton et CAN ID physiques documentés du calculateur dans CamaroDiag.
-9. Si Windows Firewall le demande, autoriser le programme uniquement sur les réseaux privés.
+3. Ouvrir les [releases CamaroDiag](https://github.com/Hellorheaven/CamaroDiag/releases/latest).
+4. Télécharger l'installateur **Setup Release** correspondant à l'architecture du DLL J2534 :
+   - `CamaroDiag-J2534-Bridge-Setup-release-win-x64.exe` pour un fournisseur J2534 64 bits.
+   - `CamaroDiag-J2534-Bridge-Setup-release-win-x86.exe` pour un fournisseur J2534 32 bits.
+5. Lancer l'installateur. Il installe le pont dans le profil Windows courant, sans droits administrateur, et crée un raccourci dans le menu Démarrer. Le raccourci Bureau est facultatif.
+6. Lancer **CamaroDiag J2534 Bridge** depuis le menu Démarrer. Si plusieurs fournisseurs sont présents, sélectionner celui à utiliser.
+7. Relever l'adresse IP du PC, le port TCP et le jeton d'appairage affichés.
+8. Connecter le PC et Android au même réseau privé.
+9. Saisir IP, port, jeton et CAN ID physiques documentés du calculateur dans CamaroDiag.
+10. Si Windows Firewall le demande, autoriser le programme uniquement sur les réseaux privés.
+
+Les installateurs **Debug** sont également publiés pour les tests. Debug et Release sont installés dans des emplacements séparés et peuvent coexister. Le pont vérifie les mises à jour au démarrage et ne propose que le même canal et la même architecture que la version installée.
+
+Les archives ZIP portables restent disponibles dans les mêmes releases pour une installation manuelle ou un usage sans installateur. Le programme nécessite toujours le pilote J2534 du fabricant : aucun pilote VXDIAG n'est inclus dans le setup.
+
 
 ## Sécurité réseau
 
