@@ -3,6 +3,7 @@ package com.camarodiag.gen5.data.obd
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class Obd2FeatureEngineTest {
@@ -76,6 +77,25 @@ class Obd2FeatureEngineTest {
         assertEquals(listOf(0x1A, 0xF8), values[0x0C])
         assertEquals(setOf(0x05, 0x0C), values.keys)
         assertEquals(listOf("020200", "020500", "020C00"), commands)
+    }
+
+    @Test
+    fun doesNotQueryFreezeFrameValuesWhenNoTriggerDtcIsStored() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000000"
+                "020200" -> "4202000000"
+                else -> "NO DATA"
+            }
+        })
+
+        val report = engine.fullReadOnlyScan()
+
+        assertNull(report.freezeFrameDtc)
+        assertTrue(report.freezeFrame.isEmpty())
+        assertEquals(listOf("020200"), commands.filter { it.startsWith("02") })
     }
 
     @Test
