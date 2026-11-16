@@ -74,7 +74,9 @@ data class CanTraceAnalysisReport(
 ) {
     val observedCanIds: List<Int> = frames.map { it.canId }.distinct().sorted()
     val udsServices: List<Int> = messages.mapNotNull { it.service }.distinct().sorted()
-    val readDidCandidates: List<Int> = didObservations.map { it.did }.distinct().sorted()
+    val readDidCandidates: List<Int> = didObservations
+        .filter { it.responseService == 0x22 || it.responseService == 0x62 }
+        .map { it.did }.distinct().sorted()
 }
 
 /**
@@ -174,7 +176,8 @@ object CanTraceAnalyzer {
             val canId = parseCanId(field(canIdIndex))
             val bytes = if (dataIndex >= 0) parseHexBytes(field(dataIndex)) else {
                 dataByteIndexes.mapNotNull { idx ->
-                    field(idx).takeIf(String::isNotBlank)?.removePrefix("0x")?.toIntOrNull(16)
+                    field(idx).takeIf(String::isNotBlank)?.removePrefix("0x")?.removePrefix("0X")
+                        ?.toIntOrNull(16)?.takeIf { it in 0..0xFF }
                 }
             }
             val timestamp = if (timestampIndex >= 0) field(timestampIndex).toDoubleOrNull() else null
