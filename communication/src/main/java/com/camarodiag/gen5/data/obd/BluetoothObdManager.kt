@@ -35,6 +35,7 @@ class BluetoothObdManager(context: Context) {
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
     private var activeTransport: String = "BLUETOOTH"
+    private var activeAdapterCapabilities: AdapterCapabilities? = null
 
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
@@ -172,6 +173,7 @@ class BluetoothObdManager(context: Context) {
                 protocolResp = protocolResp
             )
             isDemoMode = false
+            activeAdapterCapabilities = capabilities
             Result.success(capabilities)
         } catch (error: Exception) {
             disconnect()
@@ -256,6 +258,33 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /**
+     * Creates a UDS client through the adapter's documented STPX ISO-TP implementation.
+     * Only a positively identified OBDLink MX+ is enabled; generic ELM clones are rejected.
+     */
+    fun createStnUdsClient(
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int = 33,
+        policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
+        timeoutMs: Long = 3000L
+    ): UdsClient {
+        val capabilities = activeAdapterCapabilities
+            ?: error("No real adapter has been probed.")
+        check(!isDemoMode && !isSimulationActive) { "UDS CAN is disabled in demo mode." }
+        check(capabilities.tier == AdapterTier.PRO_STN &&
+            capabilities.supportsCanHeaders &&
+            capabilities.deviceName.contains("OBDLink MX+", ignoreCase = true)) {
+            "The STPX UDS provider is currently validated only for a connected OBDLink MX+ STN adapter with CAN headers enabled."
+        }
+        val transport = StnUdsPayloadTransport(
+            requestCanId = requestCanId,
+            responseCanId = responseCanId,
+            protocolNumber = protocolNumber
+        ) { command, commandTimeout -> sendAtCommand(command, commandTimeout) }
+        return UdsClient(transport, policy, timeoutMs)
+    }
+
     /** Creates the standards-based read-only OBD-II engine over the currently connected ELM transport. */
     fun createObd2FeatureEngine(): Obd2FeatureEngine = Obd2FeatureEngine(
         ObdCommandChannel { command, timeoutMs -> sendAtCommand(command, timeoutMs) }
@@ -276,5 +305,6 @@ class BluetoothObdManager(context: Context) {
         activeTransport = "BLUETOOTH"
         isDemoMode = true
         isSimulationActive = false
+        activeAdapterCapabilities = null
     }
 }

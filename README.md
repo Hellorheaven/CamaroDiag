@@ -169,3 +169,8 @@ Le fichier racine `version.properties` est l'unique source de vérité :
 Les builds locaux utilisent `1.6.0` / versionCode `7`. Le workflow de release recherche le plus grand tag `v1.6.N`, calcule le patch suivant, puis injecte ce même patch dans Gradle. Le nom de version de l'APK, le versionCode, le tag Git et le titre de la release sont ainsi cohérents. Les déclenchements manuels utilisent la même règle.
 
 Lors d'un changement de version majeure/mineure, modifier `VERSION_PREFIX` et choisir un `VERSION_CODE_BASE` strictement supérieur au dernier versionCode publié. Ajouter ensuite une entrée de notes de version correspondante dans ce README.
+
+
+### UDS CAN / ISO-TP
+
+The diagnostic module now includes a policy-gated UDS client for session control, tester-present, DID and DTC reads, security seed/key exchange, allowlisted DID/routine/I/O writes, memory access, upload/download and transfer control. Default policy is read-only; no GM programming profile, seed-key algorithm, address map or checksum is bundled. It requires a raw CAN-frame provider. VCX/J2534 and GM MDI2 currently require a PC/vendor provider; the Android app does not yet contain a validated physical CAN/J2534 driver.
