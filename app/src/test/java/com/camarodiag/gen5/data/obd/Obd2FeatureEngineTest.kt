@@ -55,6 +55,30 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun decodesFreezeFrameDtcAndKeepsOnlyTheFrameNumberOutOfSensorData() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "020200" -> "4202000171"
+                "020500" -> "4205007F"
+                "020C00" -> "420C001AF8"
+                else -> "NO DATA"
+            }
+        })
+
+        val triggerDtc = engine.readFreezeFrameDtc()
+        val values = engine.readFreezeFrame(setOf(0x05, 0x0C))
+
+        assertEquals("P0171", triggerDtc?.code)
+        assertEquals("freeze-frame", triggerDtc?.status)
+        assertEquals(listOf(0x7F), values[0x05])
+        assertEquals(listOf(0x1A, 0xF8), values[0x0C])
+        assertEquals(setOf(0x05, 0x0C), values.keys)
+        assertEquals(listOf("020200", "020500", "020C00"), commands)
+    }
+
+    @Test
     fun decodesMode09CalibrationIdAndCvnRecords() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
