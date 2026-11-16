@@ -13,6 +13,7 @@ internal sealed class J2534Device : IDisposable
     private const uint ProtocolIso15765 = 6;
     private const uint FlowControlFilter = 3;
     private const uint StatusNoError = 0;
+    private const uint ErrorTimeout = 0x09;
     private const uint ErrorBufferEmpty = 0x10;
     private const uint Can29BitId = 0x100;
     private const uint Iso15765FramePad = 0x40;
@@ -68,6 +69,8 @@ internal sealed class J2534Device : IDisposable
     private int _requestCanId;
     private int _responseCanId;
     private bool _can29Bit;
+    private bool _deviceOpened;
+    private bool _channelConnected;
     private bool _opened;
 
     public J2534Device(J2534Adapter adapter) => _adapter = adapter;
@@ -105,8 +108,10 @@ internal sealed class J2534Device : IDisposable
                 _getLastError = Marshal.GetDelegateForFunctionPointer<PassThruGetLastErrorDelegate>(lastError);
 
             Check(_open(IntPtr.Zero, out _deviceId), "PassThruOpen");
+            _deviceOpened = true;
             var flags = can29Bit ? Can29BitId : 0u;
             Check(_connect(_deviceId, ProtocolIso15765, flags, (uint)baudRate, out _channelId), "PassThruConnect(ISO15765)");
+            _channelConnected = true;
 
             var mask = CreateCanIdMessage(maxId, can29Bit, 0xFFFFFFFFu);
             var pattern = CreateCanIdMessage(_responseCanId, can29Bit);
@@ -143,7 +148,8 @@ internal sealed class J2534Device : IDisposable
             uint receivedCount = 1;
             var remainingMs = (int)Math.Clamp((deadline - Stopwatch.GetTimestamp()) * 1000.0 / Stopwatch.Frequency, 1, 250);
             var status = _read!(_channelId, received, ref receivedCount, (uint)remainingMs);
-            if (status == ErrorBufferEmpty || (status == StatusNoError && receivedCount == 0)) continue;
+            if (status == ErrorBufferEmpty || status == ErrorTimeout ||
+                (status == StatusNoError && receivedCount == 0)) continue;
             Check(status, "PassThruReadMsgs");
             if (receivedCount == 0) continue;
 
@@ -243,15 +249,17 @@ internal sealed class J2534Device : IDisposable
 
     public void Close()
     {
-        if (_channelId != 0)
+        if (_channelConnected)
         {
             if (_filterId.HasValue) try { _stopFilter?.Invoke(_channelId, _filterId.Value); } catch { }
             try { _disconnect?.Invoke(_channelId); } catch { }
         }
-        if (_deviceId != 0) try { _close?.Invoke(_deviceId); } catch { }
+        if (_deviceOpened) try { _close?.Invoke(_deviceId); } catch { }
         _filterId = null;
         _channelId = 0;
         _deviceId = 0;
+        _deviceOpened = false;
+        _channelConnected = false;
         _opened = false;
         if (_library != IntPtr.Zero)
         {
