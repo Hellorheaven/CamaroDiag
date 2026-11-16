@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
 import org.json.JSONArray
+import java.math.BigInteger
 import org.json.JSONObject
 import java.util.Locale
 
@@ -52,12 +53,13 @@ data class NativeCamaroSignal(
         require(bitOffset + bitLength <= totalBits) {
             "Signal $id requires ${bitOffset + bitLength} bits; received $totalBits."
         }
-        var raw = 0L
+        var raw = BigInteger.ZERO
         for (index in 0 until bitLength) {
             val absoluteBit = bitOffset + index
             val byteIndex = absoluteBit / 8
             val bitInByte = 7 - (absoluteBit % 8)
-            raw = (raw shl 1) or ((payload[byteIndex].toInt() ushr bitInByte) and 1).toLong()
+            val bit = (payload[byteIndex].toInt() ushr bitInByte) and 1
+            raw = raw.shiftLeft(1).or(BigInteger.valueOf(bit.toLong()))
         }
         return raw.toDouble() * scale + offset
     }
