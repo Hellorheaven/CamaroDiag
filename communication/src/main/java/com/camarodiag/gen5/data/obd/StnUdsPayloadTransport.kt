@@ -13,7 +13,7 @@ import java.util.Locale
 class StnUdsPayloadTransport(
     private val requestCanId: Int,
     private val responseCanId: Int,
-    private val protocolNumber: Int = 6,
+    private val protocolNumber: Int = 33,
     private val sendCommand: suspend (String, Long) -> String
 ) : UdsPayloadTransport {
     private val mutex = Mutex()
