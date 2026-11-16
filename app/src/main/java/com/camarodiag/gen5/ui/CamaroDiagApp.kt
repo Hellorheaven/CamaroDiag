@@ -957,6 +957,51 @@ fun Sparkline(values: List<Double>, minVal: Double, maxVal: Double) {
 }
 
 @Composable
+private fun localizedDtcStatus(dtc: DiagnosticDtc): String = when {
+    dtc.isPending -> stringResource(R.string.obd_pending)
+    dtc.statusEn.equals("Permanent", ignoreCase = true) -> stringResource(R.string.obd_permanent)
+    else -> stringResource(R.string.obd_confirmed)
+}
+
+@Composable
+private fun localizedDtcDescription(dtc: DiagnosticDtc): String = when (dtc.code.uppercase()) {
+    "P0101" -> stringResource(R.string.dtc_desc_p0101)
+    "P0102" -> stringResource(R.string.dtc_desc_p0102)
+    "P0103" -> stringResource(R.string.dtc_desc_p0103)
+    "P0113" -> stringResource(R.string.dtc_desc_p0113)
+    "P0128" -> stringResource(R.string.dtc_desc_p0128)
+    "P0171" -> stringResource(R.string.dtc_desc_p0171)
+    "P0172" -> stringResource(R.string.dtc_desc_p0172)
+    "P0174" -> stringResource(R.string.dtc_desc_p0174)
+    "P0175" -> stringResource(R.string.dtc_desc_p0175)
+    "P0300" -> stringResource(R.string.dtc_desc_p0300)
+    "P0301" -> stringResource(R.string.dtc_desc_p0301)
+    "P0302" -> stringResource(R.string.dtc_desc_p0302)
+    "P0303" -> stringResource(R.string.dtc_desc_p0303)
+    "P0304" -> stringResource(R.string.dtc_desc_p0304)
+    "P0305" -> stringResource(R.string.dtc_desc_p0305)
+    "P0306" -> stringResource(R.string.dtc_desc_p0306)
+    "P0307" -> stringResource(R.string.dtc_desc_p0307)
+    "P0308" -> stringResource(R.string.dtc_desc_p0308)
+    "P0420" -> stringResource(R.string.dtc_desc_p0420)
+    "P0430" -> stringResource(R.string.dtc_desc_p0430)
+    "P0442" -> stringResource(R.string.dtc_desc_p0442)
+    "P0455" -> stringResource(R.string.dtc_desc_p0455)
+    "P0496" -> stringResource(R.string.dtc_desc_p0496)
+    "P0507" -> stringResource(R.string.dtc_desc_p0507)
+    "P06DD" -> stringResource(R.string.dtc_desc_p06dd)
+    "P1101" -> stringResource(R.string.dtc_desc_p1101)
+    "P0010" -> stringResource(R.string.dtc_desc_p0010)
+    "P0011" -> stringResource(R.string.dtc_desc_p0011)
+    "P0014" -> stringResource(R.string.dtc_desc_p0014)
+    "P0087" -> stringResource(R.string.dtc_desc_p0087)
+    "P0089" -> stringResource(R.string.dtc_desc_p0089)
+    "P0191" -> stringResource(R.string.dtc_desc_p0191)
+    "P0299" -> stringResource(R.string.dtc_desc_p0299)
+    else -> stringResource(R.string.dtc_description_unavailable)
+}
+
+@Composable
 fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onClear: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -987,9 +1032,9 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("${dtc.code} (${dtc.module})", fontWeight = FontWeight.Bold, color = if (dtc.isPending) CamaroAmber else WarnRed, fontSize = 16.sp)
-                            Text(if (isFr) dtc.statusFr else dtc.statusEn, fontSize = 12.sp, color = TextMuted)
+                            Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
                         }
-                        Text(if (isFr) dtc.descFr else dtc.descEn)
+                        Text(localizedDtcDescription(dtc))
                     }
                 }
             }
