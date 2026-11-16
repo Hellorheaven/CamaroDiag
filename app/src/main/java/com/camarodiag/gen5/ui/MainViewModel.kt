@@ -1349,7 +1349,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         engine.readMode01PidIfSupported(0xA6, supportedPids) to
                             engine.readMode01PidIfSupported(0xD3, supportedPids)
                     }
-                    val a6Km = a6Response?.let(CamaroUdsProtocol::parseOdometerPidA6)
+                    val a6Km = a6Response?.let { CamaroUdsProtocol.parseOdometerPidA6(it) }
                     readings += MileageSourceReading(
                         "ECM_A6", "OBD odometer (PID A6)", "Odomètre OBD (PID A6)",
                         "Mode 01 PID A6 • ${a6Response ?: "not advertised by ECU"}", a6Km,
@@ -1357,7 +1357,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         if (a6Km != null) "ECU-reported OBD odometer value. It is one ECU datum, not an independent cross-module check." else "PID A6 was not advertised by the ECU or returned no valid response.",
                         if (a6Km != null) "Valeur odométrique déclarée par l'ECU. Il s'agit d'une donnée d'un calculateur, pas d'une comparaison intermodules indépendante." else "PID A6 non annoncé par l'ECU ou réponse invalide."
                     )
-                    val d3Km = d3Response?.let(CamaroUdsProtocol::parseOdometerPidD3)
+                    val d3Km = d3Response?.let { CamaroUdsProtocol.parseOdometerPidD3(it) }
                     readings += MileageSourceReading(
                         "ECM_D3", "Engine odometer (PID D3)", "Odomètre moteur (PID D3)",
                         "Mode 01 PID D3 • ${d3Response ?: "not advertised by ECU"}", d3Km,
