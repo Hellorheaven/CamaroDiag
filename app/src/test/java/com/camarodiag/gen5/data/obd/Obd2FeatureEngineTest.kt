@@ -69,14 +69,33 @@ class Obd2FeatureEngineTest {
         })
 
         val triggerDtc = engine.readFreezeFrameDtc()
-        val values = engine.readFreezeFrame(setOf(0x05, 0x0C))
+        val supported = engine.discoverFreezeFrameSupportedPids()
+        val values = engine.readFreezeFrame(supported)
 
         assertEquals("P0171", triggerDtc?.code)
         assertEquals("freeze-frame", triggerDtc?.status)
+        assertEquals(setOf(0x05, 0x0C), supported)
         assertEquals(listOf(0x7F), values[0x05])
         assertEquals(listOf(0x1A, 0xF8), values[0x0C])
         assertEquals(setOf(0x05, 0x0C), values.keys)
-        assertEquals(listOf("020200", "020500", "020C00"), commands)
+        assertEquals(listOf("020200", "020000", "020500", "020C00"), commands)
+    }
+
+    @Test
+    fun discoversMode02PidsWithoutCountingBitmapContinuationMarkers() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "020000" -> "42000000000001"
+                "022000" -> "42200000000001"
+                "024000" -> "42400080000000"
+                else -> "NO DATA"
+            }
+        })
+
+        assertEquals(setOf(0x41), engine.discoverFreezeFrameSupportedPids())
+        assertEquals(listOf("020000", "022000", "024000"), commands)
     }
 
     @Test
