@@ -614,7 +614,7 @@ fun CalibrationWorkspaceScreen(
                             Text(state.inspectionSummary.orEmpty(), color = TextPrimary, fontSize = 12.sp)
                             state.inspectionPayloadBytes?.let { Text(stringResource(R.string.cal_payload_size, it), color = TextMuted, fontSize = 11.sp) }
                             state.inspectionRecordCount?.takeIf { it > 0 }?.let { Text(stringResource(R.string.cal_record_count, it), color = TextMuted, fontSize = 11.sp) }
-                            Text(stringResource(R.string.cal_checksum_validation, state.inspectionChecksumStatus), color = TextMuted, fontSize = 11.sp)
+                            Text(stringResource(R.string.cal_checksum_validation, state.inspectionChecksumStatus.orEmpty()), color = TextMuted, fontSize = 11.sp)
                             state.inspectionAddressRanges.forEach { range -> Text(range, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp) }
                             state.inspectionWarnings.forEach { warning -> Text("• $warning", color = CamaroAmber, fontSize = 10.sp) }
                         }
