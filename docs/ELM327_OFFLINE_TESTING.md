@@ -54,6 +54,12 @@ Les tests unitaires utilisent `ObdCommandChannel` pour injecter des réponses d�
 
 Aucun de ces tests ne prouve une réponse réelle de la Camaro. Les données simulées restent exclusivement dans les tests.
 
+## Simulation OBD-II sans matériel
+
+Le profil adaptateur simulé peut maintenant lancer un scan OBD-II complet via `CamaroLfxObdSimulator`. Il retourne des bitmaps de PIDs, des valeurs moteur, des DTC, un VIN de démonstration, un CAL ID/CVN synthétiques et des réponses d'identification. L'écran affiche un avertissement permanent indiquant que ces données sont artificielles. Aucune commande n'est envoyée à un adaptateur ou à un véhicule.
+
+Le simulateur sert à vérifier le parcours UI, le décodage SAE J1979, les listes DTC et le journal brut. Il ne constitue pas une référence de valeurs réelles du LFX et ne doit jamais être utilisé pour diagnostiquer un véhicule.
+
 ## Références de décodage
 
 Les formules des PIDs normalisés sont alignées sur SAE J1979, notamment les tableaux publics de référence : https://law.resource.org/pub/us/cfr/ibr/005/sae.j1979.2002.pdf et https://www.dashlogic.com/docs/technical/obdii_pids. Ces références définissent les services et échelles standard, pas les données spécifiques au calculateur LFX.
