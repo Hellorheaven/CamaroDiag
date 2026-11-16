@@ -511,7 +511,7 @@ fun AdapterScreen(
                     Text(if (isFr) adapter.tier.titleFr else adapter.tier.titleEn, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         BadgeChip("HS-CAN 500k", adapter.supportsCanHeaders)
-                        BadgeChip("SW-CAN GMLAN (Pin 1)", adapter.supportsSwCan)
+                        BadgeChip(if (isFr) "SW-CAN câblage vérifié (Pin 1)" else "SW-CAN wiring verified (Pin 1)", adapter.supportsSwCan)
                         BadgeChip("ISO-TP Long Frames", adapter.supportsLongFrames)
                     }
                     if (adapter.rawProbeLog.isNotEmpty()) {
