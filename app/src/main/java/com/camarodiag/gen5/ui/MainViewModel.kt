@@ -586,8 +586,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (cancelled: CancellationException) {
-                throw cancelled
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: fallbackMessage
             } finally {
