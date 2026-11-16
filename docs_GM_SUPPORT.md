@@ -171,12 +171,13 @@ Le protocole TCP JSON Lines est protégé par un jeton aléatoire généré au d
 
 Limites actuelles :
 - HS-CAN ISO15765 250/500 kbit/s, identifiants 11 ou 29 bits.
+- SW-CAN/GMLAN via J2534-2 `SW_ISO15765_PS` (protocol ID `0x8007`, preset 62,5 kbit/s), uniquement si le fournisseur PassThru accepte ce protocole.
 - UDS lecture seule : 0x22, 0x19 et TesterPresent 0x3E.
-- SW-CAN/GMLAN, CAN FD, routines, effacement, actionneurs, accès sécurité et programmation refusés.
+- CAN FD, routines, effacement, actionneurs, accès sécurité et programmation refusés.
 - Le fournisseur J2534 Windows doit être installé et enregistré pour la révision exacte du VCX. Le pont ne remplace pas VX Manager ni le pilote constructeur.
 - La connexion doit rester sur un réseau privé de confiance ; le jeton n'est pas chiffré par TLS et le port ne doit jamais être exposé sur Internet.
 
-Le VCX SE est la cible prioritaire. Les variantes VCX Nano diffèrent selon carte, broches et connexion. Le projet OpenVCX est documenté comme fournisseur J2534 alternatif pour certaines variantes USB Nano, mais il n'est pas embarqué et ne fournit pas de SW-CAN ou CAN FD sur le matériel testé.
+Le VCX SE est la cible prioritaire ; VXDIAG publie la prise en charge SAE-J2411 SWCAN pour cette famille. Le test réel reste dépendant du pilote J2534-2 installé et du calculateur visé. Les variantes VCX Nano diffèrent selon carte, broches et connexion. Le projet OpenVCX est documenté comme fournisseur J2534 alternatif pour certaines variantes USB Nano, mais il n'est pas embarqué et ne fournit pas de SW-CAN ou CAN FD sur le matériel testé.
 
 ## Catalogue de signaux Camaro OBDb
 
