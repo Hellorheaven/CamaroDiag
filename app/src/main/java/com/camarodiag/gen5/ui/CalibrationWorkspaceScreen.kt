@@ -545,8 +545,8 @@ fun CalibrationWorkspaceScreen(
                         color = TextPrimary, fontWeight = FontWeight.Bold
                     )
                     Text(
-                        if (isFr) "Importe une capture Vector ASC ou un CSV CAN. CamaroDiag reconstruit les messages ISO-TP et relève les services UDS et DID observés, sans envoyer de commande au véhicule."
-                        else "Import a Vector ASC capture or CAN CSV. CamaroDiag reassembles ISO-TP messages and lists observed UDS services and DIDs without sending commands to a vehicle.",
+                        if (isFr) "Importe une capture Vector ASC, un journal ELM327 avec en-têtes CAN ou un CSV. CamaroDiag reconstruit les messages ISO-TP et relève les services UDS et DID observés, sans envoyer de commande au véhicule."
+                        else "Import a Vector ASC capture, header-enabled ELM327 monitor log or CAN CSV. CamaroDiag reassembles ISO-TP messages and lists observed UDS services and DIDs without sending commands to a vehicle.",
                         color = TextMuted, fontSize = 12.sp
                     )
                     OutlinedButton(
@@ -556,7 +556,7 @@ fun CalibrationWorkspaceScreen(
                     ) {
                         if (state.isTraceAnalyzing) CircularProgressIndicator(modifier = Modifier.width(18.dp).height(18.dp))
                         else androidx.compose.material3.Icon(Icons.Default.FolderOpen, contentDescription = null)
-                        Text(if (isFr) "Importer une trace CAN (.asc / .csv)" else "Import CAN trace (.asc / .csv)")
+                        Text(if (isFr) "Importer une trace CAN (.asc / .csv / journal ELM)" else "Import CAN trace (.asc / .csv / ELM log)")
                     }
                     if (state.traceMessage.isNotBlank()) {
                         Text(state.traceMessage, color = CamaroAmber, fontSize = 12.sp)
