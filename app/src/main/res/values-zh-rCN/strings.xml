@@ -5,7 +5,7 @@
     <string name="system_language_current">系统语言：%1$s</string>
     <string name="system_language_hint">CamaroDiag 在支持的情况下会使用设备语言。其他语言将使用英语。</string>
     <string name="tab_vehicle">车辆</string>
-    <string name="tab_connect">연결</string>
+    <string name="tab_connect">连接</string>
     <string name="tab_live">实时数据</string>
     <string name="tab_dtcs">故障码</string>
     <string name="tab_more">更多</string>

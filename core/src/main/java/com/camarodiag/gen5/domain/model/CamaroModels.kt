@@ -13,7 +13,10 @@ enum class AppLanguage(val code: String, val label: String) {
     ZH("zh", "简体中文"),
     JA("ja", "日本語"),
     KO("ko", "한국어"),
-    AR("ar", "العربية");
+    AR("ar", "العربية"),
+    PT("pt", "Português"),
+    NL("nl", "Nederlands"),
+    EL("el", "Ελληνικά");
 
     companion object {
         fun fromLocale(locale: Locale): AppLanguage =
