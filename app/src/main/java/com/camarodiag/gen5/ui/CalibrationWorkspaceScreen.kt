@@ -251,7 +251,7 @@ fun CalibrationWorkspaceScreen(
                                 fontSize = 13.sp
                             )
                             Text(localizedCalibrationEngineName(profile.engine), color = TextPrimary, fontSize = 12.sp)
-                            Text("ECM : ${profile.nominalControllerFamily}", color = TextMuted, fontSize = 11.sp)
+                            Text(stringResource(R.string.vehicle_ecm_label, profile.nominalControllerFamily), color = TextMuted, fontSize = 11.sp)
                             Text(
                                 stringResource(
                                     R.string.cal_profile_capabilities,
