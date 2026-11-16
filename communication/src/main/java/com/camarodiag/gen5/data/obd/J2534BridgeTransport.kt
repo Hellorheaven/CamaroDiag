@@ -140,20 +140,11 @@ class J2534BridgeTransport(
     }
 
     private fun closeInternal() {
-        if (opened && socket?.isConnected == true && socket?.isClosed == false) {
-            runCatching {
-                socket?.soTimeout = 1000
-                writer?.write(
-                    JSONObject().put("op", "close").put("token", pairingToken).toString()
-                )
-                writer?.newLine()
-                writer?.flush()
-                reader?.readLine()
-            }
-        }
+        // Closing the TCP socket is the release signal; the PC server disposes the J2534
+        // channel when it observes EOF. Avoid a blocking read on the Android UI thread.
+        runCatching { socket?.close() }
         runCatching { reader?.close() }
         runCatching { writer?.close() }
-        runCatching { socket?.close() }
         reader = null
         writer = null
         socket = null
