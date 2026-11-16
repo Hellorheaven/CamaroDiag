@@ -146,7 +146,7 @@ data class ObdbCamaroSignalSet(
                 val header = ecu.optString("hdr").normalizedHex()
                 if (header.isBlank()) null else ObdbEcuDefinition(
                     headerHex = header,
-                    responseHex = ecu.optString("rax").normalizedHex().ifBlank { null },
+                    responseHex = ecu.optString("rax").normalizedHex().takeIf { it.isNotBlank() },
                     type = ecu.optString("type", "unknown")
                 )
             }
@@ -159,7 +159,7 @@ data class ObdbCamaroSignalSet(
                 val identifier = commandObject.optString(serviceKey).normalizedHex()
                 if (identifier.isBlank() || identifier.length % 2 != 0) return@flatMap emptyList()
                 val requestHeader = command.optString("hdr").normalizedHex()
-                val responseHeader = command.optString("rax").normalizedHex().ifBlank { null }
+                val responseHeader = command.optString("rax").normalizedHex().takeIf { it.isNotBlank() }
                 val formatFilter = command.optJSONObject("filter")?.toYearFilter()
                 val debugFilter = command.optJSONObject("dbgfilter")?.toYearFilter()
                 val frequency = command.optDouble("freq", 1.0).takeIf { it > 0.0 } ?: 1.0
@@ -204,7 +204,7 @@ data class ObdbCamaroSignalSet(
                         filter = formatFilter,
                         debugFilter = debugFilter,
                         format = format,
-                        suggestedMetric = signal.optString("suggestedMetric").ifBlank { null }
+                        suggestedMetric = signal.optString("suggestedMetric").takeIf { it.isNotBlank() }
                     ).takeIf { it.id.isNotBlank() && it.name.isNotBlank() }
                 }
             }
