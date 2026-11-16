@@ -10,6 +10,7 @@ Application Android native Kotlin / Jetpack Compose pour diagnostic Chevrolet Ca
 - `:communication` — transport Bluetooth SPP, USB série ELM/STN et Wi-Fi TCP.
 - `:control` — catalogue des fonctions carrosserie et garde-fous de validation des commandes GM.
 - `:storage` — persistance Room des sessions de diagnostic.
+- `:mileageaudit` — comparaison des sources kilométriques, indépendance des calculateurs et niveau de confiance.
 
 ## Compatibilité Android
 
@@ -64,7 +65,7 @@ The catalogue deliberately treats E-family labels as nominal profile hints. A re
 - The app launcher icon uses a Bumblebee-inspired yellow/black Camaro treatment.
 - The new ECU workspace reads the standard OBD Mode 09 CAL ID (PID 04) and CVN (PID 06) from a connected vehicle and displays the raw ECU responses.
 - Local calibration-file import is limited to 32 MiB, stores the file in private app storage and records the file name, size, SHA-256 digest and a short hex preview. The imported file can be exported back to a user-selected location using Android Storage Access Framework.
-- These identifiers do **not** read the binary memory of the ECU. The local calibration editor can decode and modify tables only when the user imports a matching, explicit table-definition file. It saves a new local image and does not write to the ECU.
+- These identifiers do **not** read the binary memory of the ECU. The local calibration editor requires an explicit table-definition file whose VIN, CAL ID, CVN and SHA-256 source-image hash match the selected vehicle, the VIN/CAL ID/CVN read from the connected ECU and the exact active BIN image. OS and hardware metadata are required in the definition file but are not independently read by standard Mode 09; they must be verified against controller-specific service information. It saves a new local image and does not write to the ECU.
 - ECU memory read and ECU programming are not enabled. Camaro Gen 5/Gen 6 controllers (Bosch E69, GM E38, E39/E39A, E67, E80, E92/E93 variants) require exact OS/calibration identification, a verified programming procedure, authorized security access where applicable, controller-specific checksum processing, a recovery/bench programming path and validation on matching hardware. No generic OBD command is treated as a programming protocol.
 - A future write feature must remain disabled until the exact vehicle/ECU profile and recovery method are confirmed. Never flash a calibration solely because the file extension or nominal engine family matches.
 
@@ -133,7 +134,7 @@ Le module diagnostic contient désormais une base UDS/ISO-TP sur CAN classique p
 
 ## Calibration table editor
 
-The ECU workspace supports offline editing of calibration tables when a matching definition file is supplied. Use the **Export TSV definition template** action, then provide one row per table with these fields:
+The ECU workspace supports offline editing only after the definition metadata matches the selected VIN, ECU VIN, CAL ID, CVN and active BIN SHA-256. Use the **Export TSV definition template** action, replace every example metadata value with the exact values, then provide one row per table with these fields:
 
 `id;name;offset;rows;columns;type;endian;scale;bias;unit;minimum;maximum`
 
