@@ -14,7 +14,9 @@ class VxdiagProfilesTest {
         assertTrue(profiles.any { it.model == VxdiagModel.VCX_NANO && it.link == VxdiagLink.WIFI })
     }
 
-    @Test fun neverClaimsAndroidSdkIsBundled() {
-        assertTrue(VxdiagProfiles.all().all { it.readiness == VxdiagReadiness.DEVICE_DISCOVERY_ONLY })
+    @Test fun exposesTheImplementedWindowsBridgeWithoutClaimingAnAndroidDriver() {
+        assertTrue(VxdiagProfiles.all().all {
+            it.readiness == VxdiagReadiness.PC_BRIDGE_IMPLEMENTED_REQUIRES_VENDOR_DRIVER
+        })
     }
 }

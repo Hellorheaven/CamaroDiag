@@ -1,0 +1,49 @@
+name: PC J2534 Bridge CI
+
+on:
+  push:
+    paths:
+      - "pc-bridge/**"
+      - ".github/workflows/pc-bridge-ci.yml"
+  pull_request:
+    paths:
+      - "pc-bridge/**"
+      - ".github/workflows/pc-bridge-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build J2534 bridge
+        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release
+      - name: Publish self-contained x64 bridge
+        run: dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime win-x64 --self-contained true --output .\publish\win-x64
+      - name: Publish self-contained x86 bridge
+        run: dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime win-x86 --self-contained true --output .\publish\win-x86
+      - name: Package Windows builds
+        shell: pwsh
+        run: |
+          Compress-Archive -Path .\publish\win-x64\* -DestinationPath .\CamaroDiag-J2534-Bridge-win-x64.zip -Force
+          Compress-Archive -Path .\publish\win-x86\* -DestinationPath .\CamaroDiag-J2534-Bridge-win-x86.zip -Force
+      - name: Upload x64 bridge
+        uses: actions/upload-artifact@v4
+        with:
+          name: CamaroDiag-J2534-Bridge-win-x64
+          path: CamaroDiag-J2534-Bridge-win-x64.zip
+          if-no-files-found: error
+      - name: Upload x86 bridge
+        uses: actions/upload-artifact@v4
+        with:
+          name: CamaroDiag-J2534-Bridge-win-x86
+          path: CamaroDiag-J2534-Bridge-win-x86.zip
+          if-no-files-found: error

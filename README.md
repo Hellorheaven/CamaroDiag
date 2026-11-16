@@ -37,7 +37,7 @@ Le README décrit les fonctionnalités par série (`1.6.x`) plutôt que de maint
 - Détection Bluetooth des appareils appairés et scan BLE des appareils OBD à proximité. Les modèles BLE nécessitent les autorisations Android Bluetooth Scan/Connect (Android 12+) ou localisation (versions antérieures).
 - La prise en charge physique des bus reste propre au modèle : MX et MX+ prennent en charge GM SW-CAN; ne pas déduire SW-CAN du seul fait qu'un adaptateur OBDLink est détecté.
 - Carbyte est un produit GM dédié à certaines fonctions AFM/DFM/Stop-Start, pas un adaptateur de diagnostic OBD générique exploitable comme MX+/EX.
-- VXDIAG/J2534 : non déclaré opérationnel sur Android. Il faut le SDK Android officiel ou un protocole documenté propre au modèle exact; aucune compatibilité n'est simulée.
+- VXDIAG VCX SE / VCX Nano : pont PC Windows J2534 ajouté dans `pc-bridge/`. Il charge le fournisseur PassThru enregistré par le pilote VXDIAG (ou un autre fournisseur J2534 compatible), expose ISO15765 HS-CAN 250/500 kbit/s à CamaroDiag Android via TCP et applique un jeton d'appairage. Le pont est en lecture seule (UDS 0x22, 0x19 et TesterPresent 0x3E). Il prend en charge HS-CAN ISO15765 250/500 kbit/s et peut ouvrir SW-ISO15765 GMLAN via J2534-2 (protocole 0x8007, preset 62,5 kbit/s) si le pilote l'expose. CAN FD, effacement DTC, actionneurs et programmation ECU restent désactivés. Le pilote Windows correspondant au modèle/révision VCX reste obligatoire.
 
 ## Camaro Gen 5 / Gen 6 ECU calibration coverage
 
@@ -59,6 +59,12 @@ The calibration catalogue covers all engine profiles currently represented for C
 La couverture de ces profils représente les motorisations et années cataloguées dans CamaroDiag. Elle ne garantit pas que chaque combinaison matérielle/logicielle soit déjà prise en charge pour la lecture mémoire ou la programmation. Les références de calculateur doivent être confirmées sur le véhicule, à partir du VIN, du CAL ID, du CVN, du numéro matériel et de l'OS.
 
 The catalogue deliberately treats E-family labels as nominal profile hints. A real operation must identify the installed controller, hardware number, CAL ID, CVN and OS before selecting a binary definition. The Mode 09 CAL ID/CVN read and local file import/export are available as data-handling functions; they do not constitute a binary ECU read or flash.
+
+## Signaux spécifiques Camaro issus d'OBDb
+
+CamaroDiag embarque le fichier `signalsets/v3/default.json` du dépôt communautaire [OBDb/Chevrolet-Camaro](https://github.com/OBDb/Chevrolet-Camaro) (CC BY-SA 4.0, attribution dans `THIRD_PARTY_NOTICES.md`). Le jeu importé contient 133 commandes UDS Service 0x22 et 136 définitions de signaux : températures et pressions, ratés par cylindre, knock retard, injection, transmission, vitesses de roues, pression des pneus et autres mesures spécifiques.
+
+Le catalogue est filtré par année et conserve les en-têtes CAN, réponses, DID, facteurs, unités, fréquence et indicateurs de flow control. Les signaux avec adresses physiques 11 bits explicites peuvent être lus depuis l'atelier ECU via STPX MX+ ou le pont J2534. Les définitions dont l'adresse ne peut pas être représentée sans ambiguïté ne sont pas envoyées. Les facteurs et compatibilités restent des données communautaires : elles doivent être confirmées sur le véhicule et par la réponse du calculateur. Elles ne remplacent pas les identifiants VIN/CAL ID/CVN ni un profil GM validé.
 
 ## ECU / calibration workspace
 
@@ -173,4 +179,6 @@ Lors d'un changement de version majeure/mineure, modifier `VERSION_PREFIX` et ch
 
 ### UDS CAN / ISO-TP
 
-The diagnostic module now includes a policy-gated UDS client for session control, tester-present, DID and DTC reads, security seed/key exchange, allowlisted DID/routine/I/O writes, memory access, upload/download and transfer control. Default policy is read-only; no GM programming profile, seed-key algorithm, address map or checksum is bundled. It requires a raw CAN-frame provider. VCX/J2534 and GM MDI2 currently require a PC/vendor provider; the Android app does not yet contain a validated physical CAN/J2534 driver.
+The diagnostic module includes a policy-gated UDS client. The OBDLink MX+ path uses documented STPX ISO-TP payload transport. A Windows companion in `pc-bridge/` now connects Android to an installed J2534 PassThru DLL for VXDIAG VCX SE/Nano and other registered J2534 providers. The bridge currently enables ISO15765 HS-CAN at 250/500 kbit/s with 11/29-bit identifiers and read-only UDS services 0x22, 0x19 and 0x3E. SW-CAN/GMLAN, CAN FD and ECU-mutating services remain disabled on this PC path.
+
+The generic UDS client contains policy-gated primitives for other services, memory access and transfer control, but the PC bridge rejects write/programming services and no GM programming profile, seed-key algorithm, memory map, checksum, flash sequence or recovery procedure is bundled. See [PC bridge setup](pc-bridge/README.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

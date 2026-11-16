@@ -351,6 +351,11 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
                     onReadUdsDtcs = { requestId, responseId, protocol -> viewModel.readUdsDtcs(requestId, responseId, protocol) },
+                    onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
+                        viewModel.connectJ2534Bridge(host, port, token, requestId, responseId, baud)
+                    },
+                    onDisconnectJ2534Bridge = { viewModel.disconnectJ2534Bridge() },
+                    onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
                     onImportDefinitions = {

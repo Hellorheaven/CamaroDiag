@@ -12,6 +12,8 @@ import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
+import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
+import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
@@ -32,6 +34,7 @@ import java.io.File
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val obdManager = BluetoothObdManager(application)
+    @Volatile private var obdbCamaroSignalSet: ObdbCamaroSignalSet? = null
     private val sessionDao = DiagnosticDatabase.getInstance(application).sessionDao()
 
     private val _language = MutableStateFlow(AppLanguage.FR)
@@ -104,6 +107,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshTopologyAndDefaults()
+        loadObdbSignalCatalog()
         startLiveTelemetryLoop()
     }
 
@@ -126,6 +130,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         clearVehicleEvidence()
         refreshTopologyAndDefaults()
+        refreshObdbSignalYear()
     }
 
     fun updateVin(vin: String) {
@@ -134,6 +139,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun clearVehicleEvidence() {
+        if (obdManager.isJ2534BridgeConnected()) {
+            obdManager.disconnect()
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isJ2534BridgeConnecting = false,
+                isJ2534BridgeConnected = false,
+                j2534BridgeMessage = if (_language.value == AppLanguage.FR)
+                    "Pont PC déconnecté après changement d'identité véhicule."
+                else "PC bridge disconnected after vehicle identity change."
+            )
+        }
         _dtcs.value = emptyList()
         _livePids.value = emptyList()
         _mileageReport.value = null
@@ -152,6 +167,195 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _calibrationWorkspace = MutableStateFlow(CalibrationWorkspaceState())
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
+
+    private fun loadObdbSignalCatalog() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { ObdbCamaroSignalSet.load(getApplication<Application>()) }
+                .onSuccess { catalog ->
+                    obdbCamaroSignalSet = catalog
+                    val signals = catalog.forYear(_vehicle.value.modelYear)
+                    withContext(Dispatchers.Main) {
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            obdbSignals = signals,
+                            obdbSignalMessage = if (_language.value == AppLanguage.FR)
+                                "${signals.size} signaux communautaires disponibles pour ${_vehicle.value.modelYear}."
+                            else "${signals.size} community signal definitions available for ${_vehicle.value.modelYear}."
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    withContext(Dispatchers.Main) {
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            obdbSignalMessage = error.localizedMessage ?: "OBDb Camaro catalog could not be loaded."
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun refreshObdbSignalYear() {
+        val catalog = obdbCamaroSignalSet ?: return
+        val signals = catalog.forYear(_vehicle.value.modelYear)
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            obdbSignals = signals,
+            obdbSignalValue = "",
+            obdbSignalMessage = if (_language.value == AppLanguage.FR)
+                "${signals.size} signaux communautaires disponibles pour ${_vehicle.value.modelYear}."
+            else "${signals.size} community signal definitions available for ${_vehicle.value.modelYear}."
+        )
+    }
+
+    /** Reads and decodes one read-only Camaro signal from the imported OBDb signalset. */
+    fun readObdbSignal(signalId: String, protocolNumberText: String) {
+        viewModelScope.launch {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isObdbSignalReading = true,
+                obdbSignalValue = "",
+                obdbSignalMessage = ""
+            )
+            try {
+                val catalog = obdbCamaroSignalSet ?: ObdbCamaroSignalSet.load(getApplication<Application>()).also {
+                    obdbCamaroSignalSet = it
+                }
+                val signal = catalog.find(signalId) ?: error("Signal OBDb inconnu : $signalId")
+                require(signal.isAvailableForYear(_vehicle.value.modelYear)) {
+                    "Cette définition n'est pas disponible pour l'année du véhicule sélectionné."
+                }
+                require(signal.hasSupportedPhysicalCanAddressing) {
+                    "Adresse CAN non résolue dans la source OBDb : lecture désactivée pour éviter d'inventer une adresse."
+                }
+                require(signal.service == 0x22) { "Seuls les DID UDS 0x22 de ce catalogue sont actuellement pris en charge." }
+                val requestId = signal.requestCanId!!
+                val responseId = signal.responseCanId!!
+                val did = signal.identifierHex.toInt(16)
+                val policy = UdsAccessPolicy.readOnly(setOf(did))
+                val protocolNumber = protocolNumberText.toIntOrNull()
+                    ?: error("Profil CAN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
+                val client = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.createJ2534BridgeUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        policy = policy,
+                        timeoutMs = 5000L
+                    )
+                } else {
+                    obdManager.createStnUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        policy = policy,
+                        timeoutMs = 5000L
+                    )
+                }
+                val raw = client.readDataByIdentifier(did)
+                val decoded = signal.decode(raw)
+                val rendered = when {
+                    decoded.unavailable -> if (_language.value == AppLanguage.FR) "Non disponible (valeur sentinelle)" else "Unavailable (sentinel value)"
+                    decoded.mappedLabel != null -> decoded.mappedLabel
+                    decoded.value != null -> {
+                        val number = java.text.DecimalFormat("0.###", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.ROOT))
+                            .format(decoded.value)
+                        "$number ${decoded.unit}"
+                    }
+                    else -> decoded.raw
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isObdbSignalReading = false,
+                    obdbSignalValue = "$rendered\nRAW_DEC=${decoded.raw} • DID=0x${signal.identifierHex}",
+                    obdbSignalMessage = if (_language.value == AppLanguage.FR)
+                        "${signal.name} lu sur 0x${signal.requestHeaderHex} → 0x${signal.responseHeaderHex}."
+                    else "${signal.name} read from 0x${signal.requestHeaderHex} → 0x${signal.responseHeaderHex}."
+                )
+            } catch (cancelled: CancellationException) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isObdbSignalReading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isObdbSignalReading = false,
+                    obdbSignalValue = "",
+                    obdbSignalMessage = error.localizedMessage ?: "OBDb signal read failed."
+                )
+            }
+        }
+    }
+
+    /** Opens the Windows J2534 PC bridge for a real VXDIAG PassThru provider. */
+    fun connectJ2534Bridge(
+        host: String,
+        portText: String,
+        pairingToken: String,
+        requestCanIdHex: String,
+        responseCanIdHex: String,
+        protocolNumberText: String
+    ) {
+        viewModelScope.launch {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isJ2534BridgeConnecting = true,
+                isJ2534BridgeConnected = false,
+                j2534BridgeMessage = ""
+            )
+            try {
+                fun parseCanId(value: String): Pair<Int, String> {
+                    val normalized = value.trim().removePrefix("0x").removePrefix("0X").uppercase()
+                    require(normalized.length in setOf(3, 8) &&
+                        normalized.all { it.digitToIntOrNull(16) != null }) {
+                        "CAN ID doit contenir 3 chiffres hexadécimaux (11 bits) ou 8 (29 bits)."
+                    }
+                    return normalized.toInt(16) to normalized
+                }
+                val (requestId, requestText) = parseCanId(requestCanIdHex)
+                val (responseId, responseText) = parseCanId(responseCanIdHex)
+                require(requestText.length == responseText.length) {
+                    "Les deux identifiants CAN doivent utiliser le même format 11 ou 29 bits."
+                }
+                require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
+                val can29Bit = requestText.length == 8
+                val protocolNumber = protocolNumberText.toIntOrNull()
+                    ?: error("Profil CAN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
+                require(can29Bit == (protocolNumber in setOf(34, 36, 64))) {
+                    "Le profil CAN sélectionné ne correspond pas à la longueur des identifiants CAN."
+                }
+                val port = portText.toIntOrNull() ?: error("Port TCP invalide.")
+                val result = obdManager.connectJ2534Bridge(
+                    host = host.trim(),
+                    port = port,
+                    pairingToken = pairingToken.trim(),
+                    requestCanId = requestId,
+                    responseCanId = responseId,
+                    can29Bit = can29Bit,
+                    protocolNumber = protocolNumber
+                ).getOrThrow()
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534BridgeConnecting = false,
+                    isJ2534BridgeConnected = true,
+                    j2534BridgeMessage = if (_language.value == AppLanguage.FR)
+                        "Pont J2534 connecté : $result"
+                    else "J2534 bridge connected: $result"
+                )
+            } catch (cancelled: CancellationException) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534BridgeConnecting = false,
+                    isJ2534BridgeConnected = false,
+                    j2534BridgeMessage = error.localizedMessage ?: "Connexion au pont J2534 impossible."
+                )
+            }
+        }
+    }
+
+    fun disconnectJ2534Bridge() {
+        obdManager.disconnect()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isJ2534BridgeConnecting = false,
+            isJ2534BridgeConnected = false,
+            j2534BridgeMessage = if (_language.value == AppLanguage.FR) "Pont PC déconnecté." else "PC bridge disconnected."
+        )
+    }
 
     /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
     fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String, protocolNumberText: String) {
@@ -173,14 +377,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val did = parseHex(didHex, 4)
                 require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
                 val protocolNumber = protocolNumberText.toIntOrNull()
-                    ?: error("Protocole STN invalide.")
-                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
-                val client = obdManager.createStnUdsClient(
-                    requestCanId = requestId,
-                    responseCanId = responseId,
-                    protocolNumber = protocolNumber,
-                    timeoutMs = 5000L
-                )
+                    ?: error("Profil CAN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
+                val client = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.createJ2534BridgeUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        timeoutMs = 5000L
+                    )
+                } else {
+                    obdManager.createStnUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        timeoutMs = 5000L
+                    )
+                }
                 val data = client.readDataByIdentifier(did)
                 val hex = data.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
                 val isVinDid = did == 0xF190
@@ -227,14 +440,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val responseId = parseHex(responseCanIdHex)
                 require(requestId != responseId)
                 val protocolNumber = protocolNumberText.toIntOrNull()
-                    ?: error("Protocole STN invalide.")
-                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
-                val client = obdManager.createStnUdsClient(
-                    requestCanId = requestId,
-                    responseCanId = responseId,
-                    protocolNumber = protocolNumber,
-                    timeoutMs = 5000L
-                )
+                    ?: error("Profil CAN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
+                val client = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.createJ2534BridgeUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        timeoutMs = 5000L
+                    )
+                } else {
+                    obdManager.createStnUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        timeoutMs = 5000L
+                    )
+                }
                 val dtcs = client.readDtcByStatusMask()
                 val rendered = if (dtcs.isEmpty()) {
                     if (_language.value == AppLanguage.FR) "Aucun DTC retourné par le calculateur." else "No DTCs returned by the ECU."

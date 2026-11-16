@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,6 +51,7 @@ import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
+import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
@@ -62,6 +64,13 @@ data class CalibrationWorkspaceState(
     val udsDidResponse: String = "",
     val udsDtcResponse: String = "",
     val udsMessage: String = "",
+    val isJ2534BridgeConnecting: Boolean = false,
+    val isJ2534BridgeConnected: Boolean = false,
+    val j2534BridgeMessage: String = "",
+    val obdbSignals: List<ObdbCamaroSignal> = emptyList(),
+    val isObdbSignalReading: Boolean = false,
+    val obdbSignalValue: String = "",
+    val obdbSignalMessage: String = "",
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -104,6 +113,9 @@ fun CalibrationWorkspaceScreen(
     onReadIdentification: () -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,
+    onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
+    onDisconnectJ2534Bridge: () -> Unit,
+    onReadObdbSignal: (String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
@@ -120,6 +132,24 @@ fun CalibrationWorkspaceScreen(
     var udsResponseCanId by remember { mutableStateOf("") }
     var udsDid by remember { mutableStateOf("F190") }
     var udsCanProtocol by remember { mutableStateOf("33") }
+    var j2534Host by remember { mutableStateOf("192.168.1.100") }
+    var j2534Port by remember { mutableStateOf("35001") }
+    var j2534Token by remember { mutableStateOf("") }
+    var obdbSignalSearch by remember { mutableStateOf("") }
+    var obdbSignalMenuExpanded by remember { mutableStateOf(false) }
+    var selectedObdbSignalId by remember { mutableStateOf("") }
+    val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
+        ?: state.obdbSignals.firstOrNull()
+    val profileUses29BitIds = udsCanProtocol in setOf("34", "36", "64")
+    val canIdsMatchProfile = udsRequestCanId.length == udsResponseCanId.length &&
+        (udsRequestCanId.length == 8) == profileUses29BitIds &&
+        udsRequestCanId.length in setOf(3, 8)
+    val filteredObdbSignals = state.obdbSignals.filter {
+        obdbSignalSearch.isBlank() ||
+            it.name.contains(obdbSignalSearch, true) ||
+            it.id.contains(obdbSignalSearch, true) ||
+            it.path.contains(obdbSignalSearch, true)
+    }
     val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
     val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
@@ -215,8 +245,8 @@ fun CalibrationWorkspaceScreen(
                     Text(if (isFr) "Diagnostic UDS sur CAN" else "UDS over CAN",
                         color = CamaroAmber, fontWeight = FontWeight.Bold)
                     Text(
-                        if (isFr) "Transport STPX documenté pour OBDLink MX+ uniquement. Saisis les identifiants CAN physiques confirmés pour ton calculateur : aucune adresse GM n'est supposée."
-                        else "Documented STPX transport for OBDLink MX+ only. Enter the confirmed physical CAN IDs for your ECU: no GM address is assumed.",
+                        if (isFr) "Transport STPX pour OBDLink MX+ ou pont PC J2534 pour VXDIAG. Saisis les identifiants CAN physiques confirmés : aucune adresse GM n'est supposée."
+                        else "STPX transport for OBDLink MX+ or a PC J2534 bridge for VXDIAG. Enter confirmed physical CAN IDs: no GM address is assumed.",
                         color = TextMuted, fontSize = 11.sp
                     )
                     OutlinedTextField(
@@ -238,7 +268,7 @@ fun CalibrationWorkspaceScreen(
                     OutlinedTextField(
                         value = udsCanProtocol,
                         onValueChange = { udsCanProtocol = it.filter(Char::isDigit).take(2) },
-                        label = { Text(if (isFr) "Protocole STN : 33/34 HS-CAN 500k • 35/36 250k • 63/64 SW-CAN" else "STN protocol: 33/34 HS-CAN 500k • 35/36 250k • 63/64 SW-CAN") },
+                        label = { Text(if (isFr) "Profil CAN : 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN" else "CAN profile: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -251,10 +281,82 @@ fun CalibrationWorkspaceScreen(
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
                     )
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark.copy(alpha = .72f))) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text(if (isFr) "PONT PC J2534 • VXDIAG VCX SE / NANO" else "J2534 PC BRIDGE • VXDIAG VCX SE / NANO",
+                                color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(
+                                if (isFr) "Lance CamaroDiag.J2534Bridge.exe sur le PC Windows, puis saisis son IP et le jeton affiché dans la console. Le PC doit être sur le même réseau local."
+                                else "Run CamaroDiag.J2534Bridge.exe on the Windows PC, then enter its IP and the token shown in the console. Both devices must be on the same local network.",
+                                color = TextMuted, fontSize = 10.sp
+                            )
+                            Text(
+                                if (isFr) "Sécurité : jeton non chiffré par TLS. Utilise un réseau privé de confiance et n'expose jamais ce port à Internet."
+                                else "Security: the token is not TLS-encrypted. Use a trusted private network and never expose this port to the Internet.",
+                                color = CamaroAmber, fontSize = 10.sp
+                            )
+                            OutlinedTextField(
+                                value = j2534Host,
+                                onValueChange = { j2534Host = it.trim().take(64) },
+                                label = { Text(if (isFr) "Adresse IP du PC" else "PC IP address") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                            )
+                            OutlinedTextField(
+                                value = j2534Port,
+                                onValueChange = { j2534Port = it.filter(Char::isDigit).take(5) },
+                                label = { Text("Port TCP") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            OutlinedTextField(
+                                value = j2534Token,
+                                onValueChange = { j2534Token = it.trim().take(128) },
+                                label = { Text(if (isFr) "Jeton d'appairage du PC" else "PC pairing token") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                            )
+                            if (!state.isJ2534BridgeConnected) {
+                                Button(
+                                    onClick = {
+                                        onConnectJ2534Bridge(
+                                            j2534Host, j2534Port, j2534Token,
+                                            udsRequestCanId, udsResponseCanId, udsCanProtocol
+                                        )
+                                    },
+                                    enabled = !state.isJ2534BridgeConnecting &&
+                                        j2534Host.isNotBlank() && j2534Port.isNotBlank() &&
+                                        j2534Token.isNotBlank() && canIdsMatchProfile &&
+                                        udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (state.isJ2534BridgeConnecting) CircularProgressIndicator()
+                                    else Text(if (isFr) "Connecter le pont J2534" else "Connect J2534 bridge")
+                                }
+                            } else {
+                                OutlinedButton(onClick = onDisconnectJ2534Bridge, modifier = Modifier.fillMaxWidth()) {
+                                    Text(if (isFr) "Déconnecter le pont PC" else "Disconnect PC bridge")
+                                }
+                            }
+                            if (state.j2534BridgeMessage.isNotBlank()) {
+                                Text(state.j2534BridgeMessage,
+                                    color = if (state.isJ2534BridgeConnected) OkGreen else CamaroAmber,
+                                    fontSize = 11.sp)
+                            }
+                            Text(
+                                if (isFr) "Pont actuel : HS-CAN ISO15765 250/500 kbit/s et SW-ISO15765 J2534-2 si le pilote le prend en charge. CAN FD reste désactivé."
+                                else "Bridge: HS-CAN ISO15765 250/500 kbit/s and J2534-2 SW-ISO15765 when supported by the driver. CAN FD remains disabled.",
+                                color = TextMuted, fontSize = 10.sp
+                            )
+                        }
+                    }
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
-                        enabled = isConnected && !state.isUdsReading &&
-                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsDid.length == 4 &&
+                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
+                            canIdsMatchProfile && udsDid.length == 4 &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -268,8 +370,8 @@ fun CalibrationWorkspaceScreen(
                     }
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
-                        enabled = isConnected && !state.isUdsReading &&
-                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() &&
+                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
+                            canIdsMatchProfile &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -288,6 +390,103 @@ fun CalibrationWorkspaceScreen(
                         Text(state.calibrationIdResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text("CVN • 09 06", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.cvnResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text(if (isFr) "SIGNAUX SPÉCIFIQUES CAMARO • OBDb" else "CAMARO-SPECIFIC SIGNALS • OBDb",
+                        color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isFr) "Catalogue communautaire importé avec ses DID, adresses CAN, facteurs et filtres d'année. Ces définitions ne sont pas des validations GM : vérifie toujours la réponse du calculateur."
+                        else "Community catalogue imported with DIDs, CAN addresses, scaling factors and model-year filters. These definitions are not GM validation; always verify the ECU response.",
+                        color = TextMuted, fontSize = 11.sp
+                    )
+                    Text(state.obdbSignalMessage.ifBlank {
+                        if (isFr) "Chargement du catalogue Camaro…" else "Loading Camaro signal catalog…"
+                    }, color = TextMuted, fontSize = 10.sp)
+                    OutlinedTextField(
+                        value = obdbSignalSearch,
+                        onValueChange = { obdbSignalSearch = it.take(60) },
+                        label = { Text(if (isFr) "Rechercher un signal (nom, DID, système)" else "Search signal (name, DID, system)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box {
+                        TextButton(
+                            onClick = { obdbSignalMenuExpanded = true },
+                            enabled = state.obdbSignals.isNotEmpty()
+                        ) {
+                            Text(selectedObdbSignal?.let { "${it.name} • ${it.id}" }
+                                ?: if (isFr) "Aucun signal disponible" else "No signal available")
+                        }
+                        DropdownMenu(
+                            expanded = obdbSignalMenuExpanded,
+                            onDismissRequest = { obdbSignalMenuExpanded = false }
+                        ) {
+                            filteredObdbSignals.forEach { signal ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(signal.name, fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                "${signal.id} • ${signal.path} • ${signal.requestHeaderHex} → ${signal.responseHeaderHex ?: "?"}",
+                                                color = TextMuted,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        selectedObdbSignalId = signal.id
+                                        obdbSignalMenuExpanded = false
+                                        udsRequestCanId = signal.requestCanId?.toString(16)?.uppercase() ?: signal.requestHeaderHex
+                                        udsResponseCanId = signal.responseCanId?.toString(16)?.uppercase() ?: signal.responseHeaderHex.orEmpty()
+                                        udsDid = signal.identifierHex
+                                        udsCanProtocol = "33"
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    selectedObdbSignal?.let { signal ->
+                        Text(
+                            if (isFr) "DID 0x${signal.identifierHex} • Requête ${signal.requestHeaderHex} / réponse ${signal.responseHeaderHex ?: "non résolue"} • période ${signal.frequencySeconds}s"
+                            else "DID 0x${signal.identifierHex} • request ${signal.requestHeaderHex} / response ${signal.responseHeaderHex ?: "unresolved"} • interval ${signal.frequencySeconds}s",
+                            color = TextMuted, fontSize = 10.sp
+                        )
+                        if (signal.debugSignal) {
+                            Text(if (isFr) "Signal marqué DEBUG dans la source OBDb." else "Signal is marked DEBUG in the OBDb source.",
+                                color = CamaroAmber, fontSize = 10.sp)
+                        }
+                        if (signal.flowControlRequired) {
+                            Text(if (isFr) "Flow control requis par la définition source." else "Flow control is required by the source definition.",
+                                color = TextMuted, fontSize = 10.sp)
+                        }
+                        signal.description?.let { Text(it, color = TextMuted, fontSize = 10.sp) }
+                        if (!signal.hasSupportedPhysicalCanAddressing) {
+                            Text(
+                                if (isFr) "Adresse CAN non résolue : la lecture reste désactivée pour ce signal."
+                                else "CAN address is unresolved: reading is disabled for this signal.",
+                                color = CamaroAmber, fontSize = 11.sp
+                            )
+                        }
+                        Button(
+                            onClick = { onReadObdbSignal(signal.id, udsCanProtocol) },
+                            enabled = (isConnected || state.isJ2534BridgeConnected) &&
+                                signal.hasSupportedPhysicalCanAddressing &&
+                                !profileUses29BitIds &&
+                                signal.service == 0x22 &&
+                                !state.isObdbSignalReading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (state.isObdbSignalReading) CircularProgressIndicator()
+                            else Text(if (isFr) "Lire ce signal sur l'ECU" else "Read this ECU signal")
+                        }
+                    }
+                    if (state.obdbSignalValue.isNotBlank()) {
+                        Text(state.obdbSignalValue, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                     }
                 }
             }

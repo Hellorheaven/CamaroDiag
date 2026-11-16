@@ -34,6 +34,10 @@ class BluetoothObdManager(context: Context) {
     private val usbTransport = ElmUsbTransport(context)
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
+    private var j2534BridgeTransport: J2534BridgeTransport? = null
+    private var j2534BridgeRequestCanId: Int? = null
+    private var j2534BridgeResponseCanId: Int? = null
+    private var j2534BridgeProtocolNumber: Int? = null
     private var activeTransport: String = "BLUETOOTH"
     private var activeAdapterCapabilities: AdapterCapabilities? = null
 
@@ -259,6 +263,59 @@ class BluetoothObdManager(context: Context) {
     }
 
     /**
+     * Connects to the Windows J2534 bridge. The selected PC driver performs ISO-TP;
+     * the Android side exchanges complete UDS payloads only.
+     */
+    suspend fun connectJ2534Bridge(
+        host: String,
+        port: Int,
+        pairingToken: String,
+        requestCanId: Int,
+        responseCanId: Int,
+        can29Bit: Boolean,
+        protocolNumber: Int = 33
+    ): Result<String> = withContext(Dispatchers.IO) {
+        disconnect()
+        val bridge = J2534BridgeTransport(host, port, pairingToken)
+        try {
+            val info = bridge.connect(requestCanId, responseCanId, can29Bit, protocolNumber)
+            j2534BridgeTransport = bridge
+            j2534BridgeRequestCanId = requestCanId
+            j2534BridgeResponseCanId = responseCanId
+            j2534BridgeProtocolNumber = protocolNumber
+            activeTransport = "J2534_BRIDGE"
+            isDemoMode = false
+            isSimulationActive = false
+            Result.success(info)
+        } catch (error: Exception) {
+            bridge.close()
+            Result.failure(error)
+        }
+    }
+
+    fun createJ2534BridgeUdsClient(
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int,
+        policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
+        timeoutMs: Long = 5000L
+    ): UdsClient {
+        val transport = j2534BridgeTransport
+            ?: error("The Windows J2534 bridge is not connected.")
+        require(requestCanId == j2534BridgeRequestCanId && responseCanId == j2534BridgeResponseCanId &&
+            protocolNumber == j2534BridgeProtocolNumber) {
+            "The J2534 bridge is configured for CAN IDs 0x${j2534BridgeRequestCanId?.toString(16)?.uppercase()} → 0x${j2534BridgeResponseCanId?.toString(16)?.uppercase()}. Disconnect and reconnect after changing the ECU CAN IDs or CAN profile."
+        }
+        check(activeTransport == "J2534_BRIDGE" && !isDemoMode && !isSimulationActive) {
+            "J2534 UDS is disabled when no real PC bridge is connected."
+        }
+        return UdsClient(transport, policy, timeoutMs)
+    }
+
+    fun isJ2534BridgeConnected(): Boolean =
+        activeTransport == "J2534_BRIDGE" && j2534BridgeTransport != null
+
+    /**
      * Creates a UDS client through the adapter's documented STPX ISO-TP implementation.
      * Only a positively identified OBDLink MX+ is enabled; generic ELM clones are rejected.
      */
@@ -295,6 +352,11 @@ class BluetoothObdManager(context: Context) {
         runCatching { usbTransport.close() }
         runCatching { wifiTransport.close() }
         runCatching { bleTransport.close() }
+        runCatching { j2534BridgeTransport?.close() }
+        j2534BridgeTransport = null
+        j2534BridgeRequestCanId = null
+        j2534BridgeResponseCanId = null
+        j2534BridgeProtocolNumber = null
         runCatching { inputStream?.close() }
         runCatching { outputStream?.close() }
         runCatching { socket?.close() }
