@@ -56,9 +56,11 @@ Une base de transport CAN classique, de segmentation ISO-TP et de client UDS en 
 
 Avant d'ouvrir une session, le profil doit correspondre au véhicule sélectionné (année, génération, RPO et VIN), au module, à la famille de contrôleur, aux références matériel/OS, au CAL ID, au CVN, aux DID d'identification et à une référence documentaire traçable. Une discordance empêche l'émission des requêtes. Un profil de test synthétique n'est pas une définition GM exploitable sur un véhicule.
 
-**Limite d'intégration actuelle :** aucun fournisseur matériel de trames CAN brutes n'est raccordé au ViewModel ni à l'interface. Les transports ELM actuels échangent des commandes ASCII et ne sont pas assimilés à un canal J2534/ISO-TP transparent. Le point d'intégration VXDIAG reste un contrat sans pilote fournisseur. La couche UDS est donc compilée et testée sur transport simulé, mais elle ne réalise pas encore un scan GM réel sur BCM, TCM, EBCM/ABS, IPC, SDM ou ECM.
+**Intégration matérielle partielle :** un transport UDS réel via STPX est maintenant raccordé au ViewModel pour l'OBDLink MX+ (firmware STN reconnu). Le firmware de l'adaptateur réalise lui-même la segmentation/réassemblage ISO-TP avec STCSEGT/STCSEGR ; l'application envoie une transaction STPX et vérifie le CAN ID de réponse. L'écran ECU permet de saisir les CAN ID physiques vérifiés et de lire un DID, dont F190 (VIN). Cette voie ne fonctionne pas avec un clone ELM générique, un OBDLink CX, ni avec VCX SE/NANO.
 
-Cette fondation ne contient aucune adresse GM, aucun DID constructeur, aucune clé de sécurité ni aucune procédure de programmation supposée. Elle ne fournit pas de session de programmation, SecurityAccess, RequestDownload, transfert mémoire, écriture de DID, routine d'actionneur, écriture RAM, flashage ou recovery. Ces services restent absents et ne doivent pas être déduits d'un profil d'essai.
+Le client UDS fonctionne aussi sur le transport CAN brut simulé/testé. Le point d'intégration VXDIAG reste un contrat sans pilote fournisseur. Le scan automatique GM de BCM, TCM, EBCM/ABS, IPC, SDM et autres calculateurs n'est pas activé : il faut encore les adresses physiques et les profils DID exacts pour chaque VIN/OS.
+
+La pile générique contient les primitives UDS de session, TesterPresent, lecture/écriture DID, DTC, SecurityAccess seed/key, routines, I/O control, accès mémoire et transferts upload/download. Les opérations mutantes restent refusées par défaut et nécessitent un grant interne lié au VIN, à la famille ECU, au numéro matériel, à l'OS, au CAL ID, au CVN, aux DID/routines/plages mémoire autorisés et à une preuve documentaire. Aucun grant GM réel, algorithme seed-key, checksum ni séquence flash/recovery n'est fourni. Le seul écran exposé actuellement lance une lecture DID sur MX+ ; aucune écriture ECU n'est autorisée depuis l'interface.
 
 ## Lecture binaire ECU, édition et flashage : limites actuelles
 
@@ -94,7 +96,7 @@ Le client gère les réponses négatives UDS et attend les réponses positives a
 
 **Ce code est une pile de protocole générique, pas une validation GM.** Aucun profil de programmation GM n'est fourni : aucun DID d'écriture, aucune routine, aucune plage mémoire, aucune clé de sécurité, aucun checksum ni séquence de flashage n'est renseigné pour les Camaro. Les méthodes d'écriture existent derrière les contrôles, mais aucun véhicule ne reçoit d'autorisation d'écriture par défaut.
 
-**Matériel :** la pile a besoin d'un `RawCanFrameTransport` qui transporte les identifiants CAN et les trames sans les convertir en commandes ELM ASCII. Les VCX SE/NANO sont des interfaces J2534/ISO 22900 côté PC selon leur constructeur ; la documentation consultée ne fournit pas de pilote Android officiel redistribuable pour CamaroDiag. Le GM MDI2 est lui aussi documenté comme interface Pass-Thru J2534 pilotée par une application PC. Par conséquent, l'application Android n'est pas encore reliée à un VCI réel pour ce client UDS. Un pont PC J2534 ou un SDK Android officiellement fourni reste nécessaire avant les essais en véhicule.
+**Matériel :** pour l'accès UDS direct Android déjà raccordé, il faut un OBDLink MX+ authentique (STN2255/STN2256) et les CAN ID request/response exacts du calculateur. La documentation STN officielle décrit STPX, STCSEGR/STCSEGT, STCFCPA et la réassemblage ISO-TP. Pour les VCX SE/NANO, il faut encore un pont PC J2534/ISO 22900 ou un SDK Android officiellement fourni. Le GM MDI2 est documenté comme interface Pass-Thru J2534 pilotée par une application PC.
 
 ## BCM / odomètre / pilotage
 
@@ -153,3 +155,9 @@ Le chargement d'un TSV de définitions dans l'éditeur exige des métadonnées c
 L'importeur accepte les images BIN/ORI/MOD, Intel HEX et Motorola S-record, les archives ZIP, les fichiers de définition externes ainsi que les projets/conteneurs issus d'outils tiers. Les projets dont le format interne n'est pas décodé sont conservés tels quels avec leur nom, taille et empreinte SHA-256, puis peuvent être exportés. Les archives ZIP sont inspectées en lecture seule avec des limites de nombre d'entrées et de taille décompressée.
 
 Pour utiliser l'éditeur de tables, il faut extraire ou exporter depuis le logiciel d'origine une image binaire brute, puis charger un fichier de définitions CamaroDiag contenant offsets, dimensions, types numériques, endian, facteurs d'échelle et limites. Les définitions XML externes ne sont pas encore converties automatiquement. L'import d'un projet propriétaire ne signifie pas que ses tables sont lisibles, que le fichier est compatible avec l'ECM, ou qu'il peut être écrit dans le véhicule.
+
+### Références matérielles et protocole
+
+- [OBDLink Family Reference and Programming Manual, révision F (2025)](https://www.scantool.net/scantool/downloads/682/obdlink_frpm_f.pdf) : commandes STPX, STCSEGR/STCSEGT, STCFCPA, prise en charge raw CAN/ISO-TP.
+- [GM MDI 2 User Guide](https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf) : interface J2534 Pass-Thru et configuration sur PC.
+- [VXDIAG VCX Nano technical features](https://vxdiag.com/pages/vcx-nano-products-features) : J2534/ISO 22900 et protocoles CAN/SW-CAN côté interface ; cela ne constitue pas un SDK Android.
