@@ -38,7 +38,7 @@ object CamaroUdsProtocol {
         val supportsLong = atalResp.contains("OK", ignoreCase = true)
 
         val tier = when {
-            isStn && supportsSwCan -> AdapterTier.PRO_STN
+            isStn -> AdapterTier.PRO_STN
             supportsLong && !atzResp.contains("v2.1", ignoreCase = true) -> AdapterTier.GENUINE_ELM
             else -> AdapterTier.CLONE_ELM
         }
