@@ -102,7 +102,9 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
 
             for (bit in 0 until 32) {
                 val mask = 1 shl (7 - (bit % 8))
-                if ((bytes[bit / 8] and mask) != 0) {
+                if ((bytes[bit / 8] and mask) != 0 && bit != 31) {
+                    // Bit 31 is the continuation flag for the next bitmap page,
+                    // not a queryable Mode 01 PID (0x20, 0x40, ...).
                     supported += basePid + bit + 1
                 }
             }

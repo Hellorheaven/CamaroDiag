@@ -19,7 +19,7 @@ Les commandes de diagnostic ne doivent être envoyées qu'après une connexion B
 
 ## Décodage Mode 01 ajouté
 
-Le moteur interroge uniquement les PIDs annoncés par les bitmaps de support de l'ECU. L'audit kilométrique suit la même règle pour A6 (odomètre) et D3 (odomètre moteur) : aucun PID non annoncé n'est envoyé.
+Le moteur interroge uniquement les PIDs annoncés par les bitmaps de support de l'ECU. Le bit 31 de chaque bitmap sert uniquement à signaler la page suivante (PID 20, 40, etc.) et n'est pas comptabilisé comme un PID de données. L'audit kilométrique suit la même règle pour A6 (odomètre) et D3 (odomètre moteur) : aucun PID non annoncé n'est envoyé.
 
 - `22` : pression de rail relative à la dépression collecteur, `AB × 0,079 kPa`.
 - `24–2B` : rapport lambda et tension des sondes O2 large bande.

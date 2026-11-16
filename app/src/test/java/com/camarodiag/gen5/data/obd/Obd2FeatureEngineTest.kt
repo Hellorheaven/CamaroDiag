@@ -113,6 +113,25 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun followsContinuationPagesWithoutReportingTheirMarkerAsADataPid() = runBlocking {
+        val requested = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            requested += command
+            when (command) {
+                // Only the continuation flag (bit 31) is set on the first two pages.
+                "0100" -> "410000000001"
+                "0120" -> "412000000001"
+                // PID 0x41 is supported; no further page is advertised.
+                "0140" -> "414080000000"
+                else -> "NO DATA"
+            }
+        })
+
+        assertEquals(setOf(0x41), engine.discoverSupportedPids())
+        assertEquals(listOf("0100", "0120", "0140"), requested)
+    }
+
+    @Test
     fun stopsPidDiscoveryWhenTheAdapterDoesNotReturnAValidBitmap() = runBlocking {
         val requested = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
