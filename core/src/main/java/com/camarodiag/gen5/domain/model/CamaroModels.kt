@@ -62,17 +62,17 @@ enum class AdapterTier(val titleEn: String, val titleFr: String) {
     PRO_STN("STN1170 / STN2255 (OBDLink MX+ / vLinker MC+)", "STN1170 / STN2255 (OBDLink MX+ / vLinker MC+)"),
     GENUINE_ELM("Genuine ELM327 v1.4b/v1.5 (HS-CAN Only)", "ELM327 Authentique v1.4b/v1.5 (HS-CAN Seul)"),
     CLONE_ELM("Generic ELM327 v2.1 Clone (Limited)", "Clone ELM327 v2.1 Générique (Limité)"),
-    DISCONNECTED("Not Connected / Demo Mode", "Non Connecté / Mode Démo")
+    DISCONNECTED("Not connected", "Non connecté")
 }
 
 data class AdapterCapabilities(
-    val deviceName: String = "Demo / Simulated STN2255",
-    val macAddress: String = "00:04:3E:00:00:00",
-    val tier: AdapterTier = AdapterTier.PRO_STN,
-    val firmwareId: String = "STN2255 v5.6.5",
-    val supportsLongFrames: Boolean = true,
-    val supportsSwCan: Boolean = true,
-    val supportsCanHeaders: Boolean = true,
+    val deviceName: String = "Not connected",
+    val macAddress: String = "",
+    val tier: AdapterTier = AdapterTier.DISCONNECTED,
+    val firmwareId: String = "",
+    val supportsLongFrames: Boolean = false,
+    val supportsSwCan: Boolean = false,
+    val supportsCanHeaders: Boolean = false,
     val rawProbeLog: List<String> = emptyList()
 )
 
@@ -129,7 +129,8 @@ data class MileageSourceReading(
     val kmValue: Double?,
     val confidence: ConfidenceLevel,
     val caveatEn: String,
-    val caveatFr: String
+    val caveatFr: String,
+    val profileEvidenceReference: String? = null
 )
 
 data class MileageAuditReport(

@@ -13,7 +13,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -41,6 +40,7 @@ fun ObdScanScreen(
     isFr: Boolean,
     onRunScan: () -> Unit
 ) {
+    val unavailable = if (isFr) "Non disponible" else "Not available"
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -76,14 +76,27 @@ fun ObdScanScreen(
         if (report != null) {
             item {
                 InfoCard(title = if (isFr) "Identification véhicule / ECU" else "Vehicle / ECU identification") {
-                    InfoLine(if (isFr) "VIN" else "VIN", report.vin ?: "Non disponible")
-                    InfoLine(if (isFr) "CAL ID" else "CAL ID", report.calibrationIds.joinToString(" | ").ifBlank { "Non disponible" })
-                    InfoLine(if (isFr) "CVN" else "CVN", report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { "Non disponible" })
-                    InfoLine(if (isFr) "Nom ECU" else "ECU name", report.ecuNames.joinToString(" | ").ifBlank { "Non disponible" })
+                    InfoLine(if (isFr) "VIN" else "VIN", report.vin ?: unavailable)
+                    InfoLine(if (isFr) "CAL ID" else "CAL ID", report.calibrationIds.joinToString(" | ").ifBlank { unavailable })
+                    InfoLine(if (isFr) "CVN" else "CVN", report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { unavailable })
+                    InfoLine(if (isFr) "Nom ECU" else "ECU name", report.ecuNames.joinToString(" | ").ifBlank { unavailable })
                     InfoLine(if (isFr) "PIDs supportés" else "Supported PIDs", report.supportedPids.size.toString())
+                    InfoLine(
+                        if (isFr) "Adresses CAN répondantes" else "Responding CAN IDs",
+                        report.respondingEcuAddresses.joinToString(", ").ifBlank { if (isFr) "Aucune identifiée" else "None identified" }
+                    )
                     InfoLine(if (isFr) "Tension interface" else "Adapter voltage", report.adapterInfo["VOLTAGE"] ?: "—")
                     InfoLine(if (isFr) "Protocole" else "Protocol", report.adapterInfo["PROTOCOL"] ?: "—")
                 }
+            }
+
+            item {
+                Text(
+                    if (isFr) "Les identifiants CAN sont les réponses observées à la requête OBD fonctionnelle 0100. Ils ne suffisent pas à nommer un calculateur (BCM, TCM, ABS, IPC, SDM) ni à autoriser des services GM étendus."
+                    else "CAN identifiers are responses observed to the OBD functional request 0100. They are not sufficient to identify a module (BCM, TCM, ABS, IPC, SDM) or authorize GM enhanced services.",
+                    color = TextMuted,
+                    fontSize = 11.sp
+                )
             }
 
             item {
@@ -130,7 +143,7 @@ fun ObdScanScreen(
 
             item {
                 InfoCard(title = if (isFr) "Résultats Mode 06" else "Mode 06 monitor results") {
-                    Text(report.monitorTestRaw ?: if (isFr) "Non disponible" else "Not available",
+                    Text(report.monitorTestRaw ?: if (isFr) unavailable else "Not available",
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                 }
             }

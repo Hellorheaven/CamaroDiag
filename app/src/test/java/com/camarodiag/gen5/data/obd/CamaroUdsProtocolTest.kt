@@ -1,8 +1,10 @@
 package com.camarodiag.gen5.data.obd
 
+import com.camarodiag.gen5.domain.model.AdapterCapabilities
+import com.camarodiag.gen5.domain.model.AdapterTier
 import com.camarodiag.gen5.domain.model.CamaroEngine
-import com.camarodiag.gen5.domain.model.ConfidenceLevel
-import com.camarodiag.gen5.domain.model.MileageSourceReading
+import com.camarodiag.gen5.domain.model.ModuleStatus
+import com.camarodiag.gen5.domain.model.VehicleProfile
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -22,20 +24,108 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
-    fun parsesConfirmedAndPendingDtcs() {
-        val codes = CamaroUdsProtocol.parseDtcResponses("43 01 71 00 00", "47 01 33 00 00")
-        assertTrue(codes.any { it.code == "P0171" && !it.isPending })
-        assertTrue(codes.any { it.code == "P0133" && it.isPending })
+    fun marksStandardEcmAccessUnavailableWhenNoCanAdapterIsConnected() {
+        val modules = CamaroUdsProtocol.buildTopology(
+            VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX),
+            AdapterCapabilities(tier = AdapterTier.DISCONNECTED)
+        )
+
+        val ecm = modules.single { it.id == "ECM" }
+        assertEquals(ModuleStatus.UNSUPPORTED_BY_ADAPTER, ecm.status)
+        assertEquals("", ecm.txHeader)
+        assertEquals("", ecm.rxHeader)
     }
 
     @Test
-    fun doesNotTreatSingleModerateReadingAsTamperingEvidence() {
-        val report = CamaroUdsProtocol.evaluateMileageConsistency(
-            "",
-            listOf(MileageSourceReading("ECM_A6", "ECM", "ECM", "PID A6", 123456.0, ConfidenceLevel.MODERATE, "", ""))
+    fun usesFunctionalObdHeadersOnlyWhenCanAdapterIsAvailable() {
+        val modules = CamaroUdsProtocol.buildTopology(
+            VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1),
+            AdapterCapabilities(tier = AdapterTier.PRO_STN, supportsCanHeaders = true)
         )
-        assertFalse(report.hasDiscrepancy)
-        assertTrue(report.summaryEn.contains("One odometer-related value"))
+
+        val ecm = modules.single { it.id == "ECM" }
+        assertEquals(ModuleStatus.DISCOVERY_REQUIRED, ecm.status)
+        assertEquals("7DF", ecm.txHeader)
+        assertEquals("", ecm.rxHeader)
+    }
+
+    @Test
+    fun doesNotAssumeHeaderOrCanProtocolSupportWithoutPositiveAdapterResponses() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "Generic adapter",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "ELM327",
+            stiResp = "?",
+            atalResp = "?",
+            stp61Resp = "?",
+            headersResp = "?",
+            protocolResp = "?"
+        )
+
+        assertFalse(capabilities.supportsCanHeaders)
+    }
+
+    @Test
+    fun enablesSwCanOnlyForDocumentedMxHardwareWithAcceptedProtocol() {
+        val mxPlus = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "OBDLink MX+",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "OBDLink",
+            stiResp = "STN2120 v5.6.5",
+            atalResp = "OK",
+            stp61Resp = "OK"
+        )
+        val genericStn = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "Generic STN adapter",
+            macAddress = "00:00:00:00:00:01",
+            atzResp = "STN",
+            stiResp = "STN2120 v5.6.5",
+            atalResp = "OK",
+            stp61Resp = "OK"
+        )
+
+        assertTrue(mxPlus.supportsSwCan)
+        assertEquals(AdapterTier.PRO_STN, genericStn.tier)
+        assertFalse(genericStn.supportsSwCan)
+    }
+
+    @Test
+    fun doesNotClaimSwCanFromProtocolCommandAcceptanceAlone() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "STN adapter",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "OBDLink",
+            stiResp = "STN2255 v5.6.5",
+            atalResp = "OK",
+            stp61Resp = "OK"
+        )
+
+        assertFalse(capabilities.supportsSwCan)
+    }
+
+    @Test
+    fun adapterCapabilitiesDefaultToDisconnectedAndFailClosed() {
+        val adapter = AdapterCapabilities()
+        assertEquals(AdapterTier.DISCONNECTED, adapter.tier)
+        assertFalse(adapter.supportsCanHeaders)
+        assertFalse(adapter.supportsLongFrames)
+        assertFalse(adapter.supportsSwCan)
+    }
+
+    @Test
+    fun marksStandardEcmAccessibleOnlyAfterAReal7E8Response() {
+        val topology = CamaroUdsProtocol.buildTopology(
+            VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1),
+            AdapterCapabilities(tier = AdapterTier.PRO_STN, supportsCanHeaders = true)
+        )
+
+        val confirmed = CamaroUdsProtocol.applyStandardObdDiscovery(topology, listOf("7E8", "7E9"))
+        val unconfirmed = CamaroUdsProtocol.applyStandardObdDiscovery(topology, listOf("7E9"))
+
+        assertEquals(ModuleStatus.ACCESSIBLE, confirmed.single { it.id == "ECM" }.status)
+        assertEquals("7E8", confirmed.single { it.id == "ECM" }.rxHeader)
+        assertEquals(ModuleStatus.DISCOVERY_REQUIRED, unconfirmed.single { it.id == "ECM" }.status)
+        assertEquals("", unconfirmed.single { it.id == "ECM" }.rxHeader)
     }
 
     @Test

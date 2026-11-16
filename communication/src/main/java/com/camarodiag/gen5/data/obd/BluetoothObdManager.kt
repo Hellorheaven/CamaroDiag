@@ -20,10 +20,6 @@ import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
-import java.net.Socket
-import android.hardware.usb.UsbDevice
-import com.hoho.android.usbserial.driver.UsbSerialProber
-import com.hoho.android.usbserial.driver.UsbSerialPort
 
 class BluetoothObdManager(context: Context) {
 
@@ -43,6 +39,10 @@ class BluetoothObdManager(context: Context) {
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
     var isDemoMode: Boolean = true
+        private set
+
+    /** True only after the user explicitly selects a simulated adapter profile. */
+    var isSimulationActive: Boolean = false
         private set
 
     @SuppressLint("MissingPermission")
@@ -95,7 +95,10 @@ class BluetoothObdManager(context: Context) {
                 (device.name ?: "").contains("OBDLink CX", ignoreCase = true)
             if (useBle) {
                 val bleResult = bleTransport.connect(device)
-                if (bleResult.isFailure) return@withContext Result.failure(bleResult.exceptionOrNull()!!)
+                if (bleResult.isFailure) {
+                    disconnect()
+                    return@withContext Result.failure(bleResult.exceptionOrNull()!!)
+                }
                 activeTransport = "BLE"
             } else {
                 val btSocket = device.createRfcommSocketToServiceRecord(sppUuid)
@@ -105,61 +108,81 @@ class BluetoothObdManager(context: Context) {
                 inputStream = btSocket.inputStream
                 outputStream = btSocket.outputStream
             }
-            isDemoMode = false
-
-            val atz = sendAtCommand("ATZ")
-            sendAtCommand("ATE0")
-            sendAtCommand("ATL0")
-            sendAtCommand("ATH1")
-            val sti = sendAtCommand("STI")
-            val atal = sendAtCommand("ATAL")
-            val stp61 = sendAtCommand("STP 61")
-            sendAtCommand("ATSP 6")
-
-            val caps = CamaroUdsProtocol.evaluateAdapterProbe(
-                deviceName = device.name ?: "Bluetooth OBD-II",
-                macAddress = macAddress,
-                atzResp = atz,
-                stiResp = sti,
-                atalResp = atal,
-                stp61Resp = stp61
-            )
-            Result.success(caps)
-        } catch (e: Exception) {
+            probeConnectedAdapter(device.name ?: "Bluetooth OBD-II", macAddress)
+        } catch (error: Exception) {
             disconnect()
-            Result.failure(e)
+            Result.failure(error)
         }
     }
 
-
     suspend fun connectWifi(host: String, port: Int = 35000): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
         disconnect()
-        val connected = wifiTransport.connect(host, port)
-        if (connected.isFailure) return@withContext Result.failure(connected.exceptionOrNull()!!)
-        activeTransport = "WIFI"
-        val atz = sendAtCommand("ATZ")
-        sendAtCommand("ATE0"); sendAtCommand("ATL0"); sendAtCommand("ATH1")
-        val sti = sendAtCommand("STI"); val atal = sendAtCommand("ATAL"); val stp = sendAtCommand("STP 61")
-        sendAtCommand("ATSP 6")
-        isDemoMode = false
-        Result.success(CamaroUdsProtocol.evaluateAdapterProbe("ELM327 Wi-Fi ($host:$port)", host, atz, sti, atal, stp))
+        try {
+            val connected = wifiTransport.connect(host, port)
+            if (connected.isFailure) {
+                disconnect()
+                return@withContext Result.failure(connected.exceptionOrNull()!!)
+            }
+            activeTransport = "WIFI"
+            probeConnectedAdapter("ELM327 Wi-Fi ($host:$port)", host)
+        } catch (error: Exception) {
+            disconnect()
+            Result.failure(error)
+        }
     }
 
     suspend fun connectUsb(deviceId: Int, baudRate: Int = 38400): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
         disconnect()
-        val connected = usbTransport.connect(deviceId, baudRate)
-        if (connected.isFailure) return@withContext Result.failure(connected.exceptionOrNull()!!)
-        activeTransport = "USB"
-        val atz = sendAtCommand("ATZ"); sendAtCommand("ATE0"); sendAtCommand("ATL0"); sendAtCommand("ATH1")
-        val sti = sendAtCommand("STI"); val atal = sendAtCommand("ATAL"); val stp = sendAtCommand("STP 61")
-        sendAtCommand("ATSP 6")
-        isDemoMode = false
-        Result.success(CamaroUdsProtocol.evaluateAdapterProbe("ELM327 USB #$deviceId", "USB:$deviceId", atz, sti, atal, stp))
+        try {
+            val connected = usbTransport.connect(deviceId, baudRate)
+            if (connected.isFailure) {
+                disconnect()
+                return@withContext Result.failure(connected.exceptionOrNull()!!)
+            }
+            activeTransport = "USB"
+            probeConnectedAdapter("ELM327 USB #$deviceId", "USB:$deviceId")
+        } catch (error: Exception) {
+            disconnect()
+            Result.failure(error)
+        }
+    }
+
+    private suspend fun probeConnectedAdapter(
+        deviceName: String,
+        address: String
+    ): Result<AdapterCapabilities> {
+        return try {
+            val atz = sendAtCommand("ATZ")
+            sendAtCommand("ATE0")
+            sendAtCommand("ATL0")
+            val headersResp = sendAtCommand("ATH1")
+            val sti = sendAtCommand("STI")
+            val atal = sendAtCommand("ATAL")
+            val stp61 = sendAtCommand("STP 61")
+            val protocolResp = sendAtCommand("ATSP 6")
+
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = deviceName,
+                macAddress = address,
+                atzResp = atz,
+                stiResp = sti,
+                atalResp = atal,
+                stp61Resp = stp61,
+                headersResp = headersResp,
+                protocolResp = protocolResp
+            )
+            isDemoMode = false
+            Result.success(capabilities)
+        } catch (error: Exception) {
+            disconnect()
+            Result.failure(error)
+        }
     }
 
     suspend fun activateSimulatedAdapter(preset: String): AdapterCapabilities = withContext(Dispatchers.Default) {
         disconnect()
         isDemoMode = true
+        isSimulationActive = true
         delay(350)
         when (preset) {
             "MX_PLUS" -> CamaroUdsProtocol.evaluateAdapterProbe(
@@ -239,18 +262,19 @@ class BluetoothObdManager(context: Context) {
     )
 
     fun disconnect() {
-        try {
-            usbTransport.close(); wifiTransport.close(); bleTransport.close()
-            inputStream?.close()
-            outputStream?.close()
-            socket?.close()
-        } catch (_: Exception) {
-        } finally {
-            inputStream = null
-            outputStream = null
-            socket = null
-            activeTransport = "BLUETOOTH"
-            isDemoMode = true
-        }
+        // Close every transport independently: one failing close must not leak the others.
+        runCatching { usbTransport.close() }
+        runCatching { wifiTransport.close() }
+        runCatching { bleTransport.close() }
+        runCatching { inputStream?.close() }
+        runCatching { outputStream?.close() }
+        runCatching { socket?.close() }
+
+        inputStream = null
+        outputStream = null
+        socket = null
+        activeTransport = "BLUETOOTH"
+        isDemoMode = true
+        isSimulationActive = false
     }
 }

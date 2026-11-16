@@ -29,6 +29,12 @@ import androidx.compose.ui.unit.sp
 import com.camarodiag.gen5.domain.model.*
 import com.camarodiag.gen5.control.VehicleControlCatalog
 import com.camarodiag.gen5.control.ControlAvailability
+import com.camarodiag.gen5.control.RemoteStartSafetyGate
+import com.camarodiag.gen5.control.RemoteStartConditions
+import com.camarodiag.gen5.control.VehicleGear
+import com.camarodiag.gen5.control.VehicleSignal
+import com.camarodiag.gen5.control.VehicleControlId
+import com.camarodiag.gen5.data.obd.VxdiagProfiles
 import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -57,11 +63,13 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
     val connError by viewModel.connectionMessage.collectAsState()
+    val isBusy by viewModel.isBusy.collectAsState()
     val modules by viewModel.modules.collectAsState()
     val dtcs by viewModel.dtcs.collectAsState()
     val livePids by viewModel.livePids.collectAsState()
     val isStreaming by viewModel.isStreamingLive.collectAsState()
     val liveRecording by viewModel.liveRecordingState.collectAsState()
+    val liveTelemetryMessage by viewModel.liveTelemetryMessage.collectAsState()
     val mileageReport by viewModel.mileageReport.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
@@ -72,7 +80,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
     val isFr = lang == AppLanguage.FR
-    fun t(en: String, fr: String) = if (isFr) fr else en
 
     val btPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -153,10 +160,17 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     }
                 },
                 actions = {
-                    if (adapter.deviceName.contains("Demo", ignoreCase = true) || adapter.deviceName.contains("Simulated", ignoreCase = true)) {
-                        Text("DEMO", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    } else {
-                        Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    when {
+                        adapter.deviceName.contains("Demo", ignoreCase = true) ||
+                            adapter.deviceName.contains("Simulated", ignoreCase = true) -> {
+                            Text("DEMO", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        adapter.tier != AdapterTier.DISCONNECTED -> {
+                            Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        else -> {
+                            Text(if (isFr) "HORS LIGNE" else "OFFLINE", color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
                     }
                     TextButton(onClick = {
                         viewModel.setLanguage(if (isFr) AppLanguage.EN else AppLanguage.FR)
@@ -284,6 +298,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
                 DiagTab.ADAPTER -> AdapterScreen(
                     adapter = adapter,
+                    isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
                     isFr = isFr,
@@ -302,6 +317,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isStreaming = isStreaming,
                     isFr = isFr,
                     recording = liveRecording,
+                    telemetryMessage = liveTelemetryMessage,
                     onToggleStream = { viewModel.toggleLiveStream() },
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
@@ -463,6 +479,7 @@ fun VehicleSetupScreen(
 @Composable
 fun AdapterScreen(
     adapter: AdapterCapabilities,
+    isBusy: Boolean,
     pairedDevices: List<Pair<String, String>>,
     errorMsg: String?,
     isFr: Boolean,
@@ -476,9 +493,16 @@ fun AdapterScreen(
 ) {
     var wifiHost by remember { mutableStateOf("192.168.0.10") }
     var wifiPort by remember { mutableStateOf("35000") }
+    val vxdiagProfiles = remember { VxdiagProfiles.all() }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             SectionTitle(if (isFr) "Interfaces OBD-II : Bluetooth, USB et Wi-Fi" else "Bluetooth OBD-II Adapter & CAN Probe")
+            if (isBusy) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(if (isFr) "Connexion ou opération en cours…" else "Connection or operation in progress…", color = TextMuted, fontSize = 12.sp)
+                }
+            }
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -486,9 +510,9 @@ fun AdapterScreen(
                     Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
                     Text(if (isFr) adapter.tier.titleFr else adapter.tier.titleEn, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BadgeChip("HS-CAN 500k", true)
-                        BadgeChip("SW-CAN GMLAN (Pin 1)", adapter.supportsSwCan)
-                        BadgeChip("ISO-TP Long Frames", adapter.supportsLongFrames)
+                        BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
+                        BadgeChip(if (isFr) "SW-CAN câblage vérifié (Pin 1)" else "SW-CAN wiring verified (Pin 1)", adapter.supportsSwCan)
+                        BadgeChip(if (isFr) "Réponses longues (ATAL)" else "Long response mode (ATAL)", adapter.supportsLongFrames)
                     }
                     if (adapter.rawProbeLog.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
@@ -502,7 +526,7 @@ fun AdapterScreen(
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(if (isFr) "Appareils Bluetooth Appairés" else "Paired Bluetooth Devices", fontWeight = FontWeight.Bold)
-                TextButton(onClick = onRefreshDevices) { Text(if (isFr) "Actualiser" else "Refresh") }
+                TextButton(onClick = onRefreshDevices, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
             }
             if (pairedDevices.isEmpty()) {
                 Text(
@@ -513,7 +537,7 @@ fun AdapterScreen(
             } else {
                 pairedDevices.forEach { (name, mac) ->
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onConnectMac(mac) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(enabled = !isBusy) { onConnectMac(mac) },
                         colors = CardDefaults.cardColors(containerColor = SurfaceElevated)
                     ) {
                         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -534,25 +558,55 @@ fun AdapterScreen(
                     Text(if (isFr) "Connexion USB (OBDLink EX / SX, ELM327 et interfaces série)" else "USB connection (OBDLink EX / SX, ELM327 and serial adapters)", fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(if (isFr) "Périphériques USB détectés" else "Detected USB devices", modifier = Modifier.weight(1f))
-                        TextButton(onClick = onRefreshUsb) { Text(if (isFr) "Actualiser" else "Refresh") }
+                        TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
                     }
                     if (usbDevices.isEmpty()) Text(if (isFr) "Aucun adaptateur série USB détecté." else "No USB serial adapter detected.", color = TextMuted)
-                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, modifier = Modifier.fillMaxWidth()) { Text("Connecter : $label") } }
+                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter : $label" else "Connect: $label") } }
                     HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                     Text(if (isFr) "Connexion Wi-Fi ELM327" else "Wi-Fi ELM327 connection", fontWeight = FontWeight.Bold)
                     OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(if (isFr) "Adresse IP de l'adaptateur" else "Adapter IP address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text("Port TCP (souvent 35000 ou 23)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter en Wi-Fi" else "Connect over Wi-Fi") }
+                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text(if (isFr) "Port TCP (souvent 35000 ou 23)" else "TCP port (often 35000 or 23)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter en Wi-Fi" else "Connect over Wi-Fi") }
                     Text(if (isFr) "VXDIAG : architecture de transport prévue, mais les interfaces J2534 ne sont pas déclarées compatibles Android sans SDK Android officiel du modèle. Aucun accès J2534 n'est simulé." else "VXDIAG: transport architecture is prepared, but J2534 interfaces are not claimed Android-compatible without the model's official Android SDK. No J2534 access is simulated.", color = TextMuted, fontSize = 12.sp)
+                }
+            }
+        }
+        item {
+            Text(if (isFr) "Interfaces VXDIAG déclarées" else "Declared VXDIAG interface profiles", fontWeight = FontWeight.Bold)
+            Text(
+                if (isFr) "Ces profils distinguent les modèles et liaisons physiques. Ils ne signifient pas qu'un pilote Android ou une communication véhicule est disponible."
+                else "These profiles distinguish hardware and link variants. They do not mean an Android driver or vehicle communication is available.",
+                color = TextMuted,
+                fontSize = 11.sp
+            )
+            vxdiagProfiles.forEach { profile ->
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark), modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(profile.label, color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(
+                                if (isFr) "DÉCOUVERTE SEULE" else "DISCOVERY ONLY",
+                                color = WarnRed,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(profile.protocols.joinToString(" • ") { it.name }, color = TextMuted, fontSize = 10.sp)
+                        Text(
+                            if (isFr) profile.noteFr else "Hardware profile only; an official Android SDK/API or documented bridge is still required.",
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
         }
         item {
             Text(if (isFr) "Profils de Simulation (Test sans véhicule)" else "Simulated Hardware Profiles (Bench Test)", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }) { Text("OBDLink MX+") }
-                OutlinedButton(onClick = { onSelectSim("ELM_15") }) { Text("ELM327 v1.5") }
-                OutlinedButton(onClick = { onSelectSim("CLONE") }) { Text("Clone v2.1") }
+                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy) { Text("OBDLink MX+") }
+                OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy) { Text("ELM327 v1.5") }
+                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text("Clone v2.1") }
             }
         }
     }
@@ -561,6 +615,20 @@ fun AdapterScreen(
 @Composable
 fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
     val capabilities = remember(vehicle) { VehicleControlCatalog().forVehicle(vehicle) }
+    val remoteStartAssessment = remember(vehicle) {
+        RemoteStartSafetyGate.assess(
+            RemoteStartConditions(
+                gear = VehicleGear.UNKNOWN,
+                hoodClosed = VehicleSignal.UNKNOWN,
+                doorsLocked = VehicleSignal.UNKNOWN,
+                hazardsOff = VehicleSignal.UNKNOWN,
+                theftSystemReady = VehicleSignal.UNKNOWN,
+                criticalFaultsAbsent = VehicleSignal.UNKNOWN,
+                vehicleStationary = VehicleSignal.UNKNOWN,
+                oemRemoteStartEquipped = VehicleSignal.UNKNOWN
+            )
+        )
+    }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             SectionTitle(if (isFr) "Pilotage des équipements" else "Vehicle controls")
@@ -572,9 +640,32 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(if (isFr) capability.titleFr else capability.titleEn, fontWeight = FontWeight.Bold)
+                        Text(capability.vehicleContext, color = CamaroBlue, fontSize = 10.sp)
                         Text(if (isFr) capability.explanationFr else capability.explanationEn, color = TextMuted, fontSize = 12.sp)
+                        if (capability.id == VehicleControlId.REMOTE_START) {
+                            Text(
+                                if (isFr) "Évaluation des interverrouillages : " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmées" else "BLOQUÉE"
+                                else "Interlock assessment: " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmed" else "BLOCKED",
+                                color = WarnRed,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                            (if (isFr) remoteStartAssessment.blockersFr else remoteStartAssessment.blockersEn).forEach { blocker ->
+                                Text("• " + blocker, color = WarnRed, fontSize = 10.sp)
+                            }
+                        }
                     }
-                    Text(if (isFr) "NON VALIDÉ" else "NOT VERIFIED", color = WarnRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    val availabilityLabel = when (capability.availability) {
+                        ControlAvailability.NOT_VERIFIED -> if (isFr) "NON VALIDÉ" else "NOT VERIFIED"
+                        ControlAvailability.AVAILABLE -> if (isFr) "DISPONIBLE" else "AVAILABLE"
+                        ControlAvailability.NOT_EQUIPPED -> if (isFr) "NON ÉQUIPÉ" else "NOT EQUIPPED"
+                    }
+                    val availabilityColor = when (capability.availability) {
+                        ControlAvailability.NOT_VERIFIED -> WarnRed
+                        ControlAvailability.AVAILABLE -> OkGreen
+                        ControlAvailability.NOT_EQUIPPED -> TextMuted
+                    }
+                    Text(availabilityLabel, color = availabilityColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -627,6 +718,7 @@ fun LiveDataScreen(
     isStreaming: Boolean,
     isFr: Boolean,
     recording: LiveRecordingState,
+    telemetryMessage: String?,
     onToggleStream: () -> Unit,
     onToggleUnits: () -> Unit,
     onToggleRecording: () -> Unit,
@@ -680,6 +772,9 @@ fun LiveDataScreen(
                         )
                         recording.message.takeIf { it.isNotBlank() }?.let {
                             Text(it, color = TextMuted, fontSize = 11.sp)
+                        }
+                        telemetryMessage?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, color = WarnRed, fontSize = 11.sp)
                         }
                         Text(
                             if (isFr) "Le journal enregistre les valeurs OBD affichées (métrique) avec leur horodatage. Il ne modifie pas les tables du calculateur."

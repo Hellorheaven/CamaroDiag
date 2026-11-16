@@ -50,6 +50,16 @@ Les opérations locales disponibles sont les suivantes :
 
 SHA-256, CRC d'intégrité et checksums de format Intel HEX/S-record ne sont pas des checksums de calibration GM. La comparaison binaire ne donne pas de signification moteur aux offsets et ne certifie pas que le fichier peut être utilisé sur un ECM.
 
+## Fondation UDS sur CAN (lecture seule, non raccordée à un matériel réel)
+
+Une base de transport CAN classique, de segmentation ISO-TP et de client UDS en lecture seule est présente dans le module `diagnostic`. Les services exposés sont limités à ReadDataByIdentifier (0x22) et ReadDTCInformation (0x19, sous-fonction 0x02). Le client vérifie le service positif, le DID retourné et les réponses négatives ; la session profilée impose une liste blanche de DID.
+
+Avant d'ouvrir une session, le profil doit correspondre au véhicule sélectionné (année, génération, RPO et VIN), au module, à la famille de contrôleur, aux références matériel/OS, au CAL ID, au CVN, aux DID d'identification et à une référence documentaire traçable. Une discordance empêche l'émission des requêtes. Un profil de test synthétique n'est pas une définition GM exploitable sur un véhicule.
+
+**Limite d'intégration actuelle :** aucun fournisseur matériel de trames CAN brutes n'est raccordé au ViewModel ni à l'interface. Les transports ELM actuels échangent des commandes ASCII et ne sont pas assimilés à un canal J2534/ISO-TP transparent. Le point d'intégration VXDIAG reste un contrat sans pilote fournisseur. La couche UDS est donc compilée et testée sur transport simulé, mais elle ne réalise pas encore un scan GM réel sur BCM, TCM, EBCM/ABS, IPC, SDM ou ECM.
+
+Cette fondation ne contient aucune adresse GM, aucun DID constructeur, aucune clé de sécurité ni aucune procédure de programmation supposée. Elle ne fournit pas de session de programmation, SecurityAccess, RequestDownload, transfert mémoire, écriture de DID, routine d'actionneur, écriture RAM, flashage ou recovery. Ces services restent absents et ne doivent pas être déduits d'un profil d'essai.
+
 ## Lecture binaire ECU, édition et flashage : limites actuelles
 
 La lecture intégrale de la mémoire ECM et la programmation ECU ne sont pas implémentées. L'éditeur local de tables est disponible, mais il ne décode une table que lorsqu'un fichier de définitions explicite (offset, dimensions, type, endianness et échelle) est fourni et correspond exactement à l'image chargée. Il ne faut pas envoyer de commandes UDS de programmation génériques ni tenter une écriture ECU avec un adaptateur OBD générique.
@@ -77,6 +87,21 @@ Le démarrage à distance n'est pas une commande CAN générique. RemoteStartSaf
 
 minSdk = 29 (Android 10), compileSdk/targetSdk = 36. USB Host, réseau TCP et permissions Bluetooth doivent être validés sur les appareils réels visés. Les tests unitaires et l'assemblage APK CI ne remplacent pas les essais sur VCX/ELM, sur toutes les générations et sur chaque calculateur.
 
+## Profils d'adaptateurs OBDLink
+
+La détection SW-CAN n'est pas déduite du seul chipset STN ni de la réponse à `STP 61`. Le profil est activé uniquement pour les modèles MX/MX+ explicitement documentés, après acceptation de la commande de protocole. Les autres interfaces restent non vérifiées tant qu'une référence matérielle et son câblage DLC pin 1 ne sont pas confirmés.
+
+- [Matrice officielle des adaptateurs OBDLink](https://support.obdsol.com/support/solutions/articles/43000713351-which-obdlink-adapter-is-right-for-me-) : matrice des protocoles SW-CAN par modèle et compatibilité GM du CX.
+- [Fiche officielle OBDLink MX+](https://www.obdlink.com/products/obdlink-mxp/) : support SW-CAN et réseaux GM avancés.
+
+## Références techniques GM
+
+- [GM MDI 2 User Guide](https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf) : décrit le MDI 2, son fonctionnement avec un hôte PC, les interfaces J2534 / ISO 22900 et les logiciels de diagnostic/reprogrammation GM.
+- [GM MDI User Guide](https://gsitlc.ext.gm.com/userguides/GM_MDI_User_Guide.pdf) : précise que les emplacements des calculateurs et les connecteurs doivent être recherchés dans le Service Information du véhicule testé.
+- [GM TIS2Web User Guide](https://gsi.ext.gm.com/userguides/GM_TIS2Web_User_Guide.pdf) : décrit le rôle du VIN dans la sélection des CAL ID/CVN et les prérequis de programmation SPS, dont l'interface J2534 et la stabilité d'alimentation.
+
+Ces guides sont des documents d'architecture et de procédure générale, pas des listes d'adresses CAN/DID pour chaque Camaro. Les données de diagnostic détaillées doivent être extraites du Service Information correspondant au VIN, à l'année, au module et à sa calibration. Le guide MDI 2 décrit un environnement logiciel hôte PC ; il ne fournit pas de SDK Android directement intégrable dans CamaroDiag.
+
 ## Conditions pour achever le flashage GM et VXDIAG
 
 Obtenir auprès de VXDIAG les SDK/API officiellement autorisés pour chaque VCX SE/NANO, les identifiants USB/réseau, versions de firmware, documentation de transport et droits de redistribution. Pour le flash GM, obtenir les définitions, licences, procédures et moyens de récupération approuvés pour chaque ECM. En leur absence, les fonctions correspondantes doivent rester explicitement indisponibles plutôt que d'exécuter des trames supposées.
@@ -98,6 +123,8 @@ La lecture/enregistrement des capteurs pendant que le moteur tourne est distinct
 L'import accepte les fichiers sélectionnés par Android et conserve leur contenu original. BIN brut, Intel HEX et Motorola S-record sont inspectés ; les archives ZIP sont identifiées et leurs entrées sont listées sans extraction automatique. Les fichiers de définition externes XDF/A2L/XML et les conteneurs inconnus restent des pièces jointes opaques, sans conversion ou modification.
 
 Pour utiliser l'éditeur de tables, il faut une image BIN brute et un TSV de définitions adapté à son CAL ID/OS. Chaque définition fournit les offsets, dimensions, axes représentés par la matrice, type numérique, ordre des octets, échelle, biais et limites. L'import d'un conteneur propriétaire n'implique ni son décodage, ni l'accès à ses tables, ni l'autorisation de flasher son contenu.
+
+Le chargement d'un TSV de définitions dans l'éditeur exige des métadonnées correspondant au VIN sélectionné, au VIN réellement lu sur l'ECU, au CAL ID et au CVN lus via Mode 09, ainsi qu'à l'empreinte SHA-256 de l'image BIN active. Une définition dont un de ces éléments diffère est refusée. L'OS et la référence matérielle doivent aussi figurer dans le TSV, mais Mode 09 standard ne permet pas de les confirmer ici : ils restent à vérifier dans la documentation spécifique du calculateur.
 
 
 ## Import de projets de cartographie externes

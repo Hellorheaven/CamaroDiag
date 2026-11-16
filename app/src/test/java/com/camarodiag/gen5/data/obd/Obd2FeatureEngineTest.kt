@@ -42,6 +42,30 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun discoversObservedFunctionalObdCanResponseIdsAndRestoresElmFormatting() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "7E8 06 41 00 FF FF FF FF 7E9 06 41 00 80 00 00 00"
+                else -> "OK"
+            }
+        })
+
+        assertEquals(listOf("7E8", "7E9"), engine.discoverFunctionalObdResponders())
+        assertTrue(commands.containsAll(listOf("ATS1", "ATH1", "0100", "ATH0", "ATS0")))
+    }
+
+    @Test
+    fun doesNotTreatFunctionalObdRequestIdAsAnEcuResponse() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0100") "7DF 06 41 00 FF FF FF FF" else "OK"
+        })
+
+        assertTrue(engine.discoverFunctionalObdResponders().isEmpty())
+    }
+
+    @Test
     fun stopsPidDiscoveryWhenTheAdapterDoesNotReturnAValidBitmap() = runBlocking {
         val requested = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->

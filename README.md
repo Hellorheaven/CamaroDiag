@@ -10,6 +10,7 @@ Application Android native Kotlin / Jetpack Compose pour diagnostic Chevrolet Ca
 - `:communication` — transport Bluetooth SPP, USB série ELM/STN et Wi-Fi TCP.
 - `:control` — catalogue des fonctions carrosserie et garde-fous de validation des commandes GM.
 - `:storage` — persistance Room des sessions de diagnostic.
+- `:mileageaudit` — comparaison des sources kilométriques, indépendance des calculateurs et niveau de confiance.
 
 ## Compatibilité Android
 
@@ -34,7 +35,7 @@ Le README décrit les fonctionnalités par série (`1.6.x`) plutôt que de maint
 - OBDLink EX / SX et ELM327 USB série via usb-serial-for-android, OTG Android et débit 115200 bauds pour les appareils identifiés OBDLink.
 - OBDLink MX Wi-Fi et adaptateurs ELM327 Wi-Fi via TCP (adresse IP et port configurables; ports usuels 35000 ou 23 selon l'adaptateur).
 - Détection Bluetooth des appareils appairés et scan BLE des appareils OBD à proximité. Les modèles BLE nécessitent les autorisations Android Bluetooth Scan/Connect (Android 12+) ou localisation (versions antérieures).
-- La prise en charge physique des bus reste propre au modèle : MX+ prend en charge GM SW-CAN; ne pas déduire SW-CAN du seul fait qu'un adaptateur OBDLink est détecté.
+- La prise en charge physique des bus reste propre au modèle : MX et MX+ prennent en charge GM SW-CAN; ne pas déduire SW-CAN du seul fait qu'un adaptateur OBDLink est détecté.
 - Carbyte est un produit GM dédié à certaines fonctions AFM/DFM/Stop-Start, pas un adaptateur de diagnostic OBD générique exploitable comme MX+/EX.
 - VXDIAG/J2534 : non déclaré opérationnel sur Android. Il faut le SDK Android officiel ou un protocole documenté propre au modèle exact; aucune compatibilité n'est simulée.
 
@@ -64,7 +65,7 @@ The catalogue deliberately treats E-family labels as nominal profile hints. A re
 - The app launcher icon uses a Bumblebee-inspired yellow/black Camaro treatment.
 - The new ECU workspace reads the standard OBD Mode 09 CAL ID (PID 04) and CVN (PID 06) from a connected vehicle and displays the raw ECU responses.
 - Local calibration-file import is limited to 32 MiB, stores the file in private app storage and records the file name, size, SHA-256 digest and a short hex preview. The imported file can be exported back to a user-selected location using Android Storage Access Framework.
-- These identifiers do **not** read the binary memory of the ECU. The local calibration editor can decode and modify tables only when the user imports a matching, explicit table-definition file. It saves a new local image and does not write to the ECU.
+- These identifiers do **not** read the binary memory of the ECU. The local calibration editor requires an explicit table-definition file whose VIN, CAL ID, CVN and SHA-256 source-image hash match the selected vehicle, the VIN/CAL ID/CVN read from the connected ECU and the exact active BIN image. OS and hardware metadata are required in the definition file but are not independently read by standard Mode 09; they must be verified against controller-specific service information. It saves a new local image and does not write to the ECU.
 - ECU memory read and ECU programming are not enabled. Camaro Gen 5/Gen 6 controllers (Bosch E69, GM E38, E39/E39A, E67, E80, E92/E93 variants) require exact OS/calibration identification, a verified programming procedure, authorized security access where applicable, controller-specific checksum processing, a recovery/bench programming path and validation on matching hardware. No generic OBD command is treated as a programming protocol.
 - A future write feature must remain disabled until the exact vehicle/ECU profile and recovery method are confirmed. Never flash a calibration solely because the file extension or nominal engine family matches.
 
@@ -127,9 +128,13 @@ The ECU workspace imports raw BIN/ORI/MOD, Intel HEX, Motorola S-record, ZIP arc
 The offline table editor works on raw binary images when the user supplies explicit, verified table definitions (offset, dimensions, data type, byte order, scaling and bias). External XDF/A2L/XML-style definitions are preserved as attachments but are not automatically converted into table definitions. Unknown or proprietary project packages are not decoded. These operations are not an ECU memory read or ECU flash. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
 
 
+## Fondation UDS GM en lecture seule
+
+Le module diagnostic contient désormais une base UDS/ISO-TP sur CAN classique pour les services de lecture 0x22 et 0x19/0x02, avec contrôle strict d'un profil lié au VIN et à l'identité exacte du calculateur. Cette base n'est pas encore reliée à un fournisseur CAN/J2534 réel ni à un écran de diagnostic GM étendu. Les adresses/DID GM non vérifiés restent absents ; les essais actuels utilisent un transport simulé.
+
 ## Calibration table editor
 
-The ECU workspace supports offline editing of calibration tables when a matching definition file is supplied. Use the **Export TSV definition template** action, then provide one row per table with these fields:
+The ECU workspace supports offline editing only after the definition metadata matches the selected VIN, ECU VIN, CAL ID, CVN and active BIN SHA-256. Use the **Export TSV definition template** action, replace every example metadata value with the exact values, then provide one row per table with these fields:
 
 `id;name;offset;rows;columns;type;endian;scale;bias;unit;minimum;maximum`
 

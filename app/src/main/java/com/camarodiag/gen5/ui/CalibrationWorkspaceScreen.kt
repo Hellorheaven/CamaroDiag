@@ -54,6 +54,7 @@ import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
+    val ecuVinResponse: String = "",
     val calibrationIdResponse: String = "",
     val cvnResponse: String = "",
     val message: String = "",
@@ -82,6 +83,8 @@ data class CalibrationWorkspaceState(
     val mapDefinitions: List<CalibrationMapDefinition> = emptyList(),
     val selectedMapId: String? = null,
     val mapValues: List<List<String>> = emptyList(),
+    val mapXAxisValues: List<String> = emptyList(),
+    val mapYAxisValues: List<String> = emptyList(),
     val mapDefinitionsWarnings: List<String> = emptyList(),
     val mapDirty: Boolean = false,
     val mapError: String? = null
@@ -109,6 +112,7 @@ fun CalibrationWorkspaceScreen(
 ) {
     val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
+    val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -138,6 +142,12 @@ fun CalibrationWorkspaceScreen(
                         else "All catalogued engine profiles are listed. The displayed ECM family is indicative: CAL ID, CVN, hardware number and OS must identify the ECU actually installed.",
                         color = TextMuted, fontSize = 12.sp
                     )
+                    Text(
+                        if (isFr) "Motorisations répertoriées pour ${vehicle.modelYear} : " + yearProfiles.joinToString(", ") { it.engine.rpo }.ifBlank { "aucune" }
+                        else "Catalogued engines for ${vehicle.modelYear}: " + yearProfiles.joinToString(", ") { it.engine.rpo }.ifBlank { "none" },
+                        color = CamaroAmber,
+                        fontSize = 11.sp
+                    )
                     allProfiles.forEach { profile ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .18f))
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -149,6 +159,12 @@ fun CalibrationWorkspaceScreen(
                             )
                             Text(if (isFr) profile.engine.nameFr else profile.engine.nameEn, color = TextPrimary, fontSize = 12.sp)
                             Text("ECM : ${profile.nominalControllerFamily}", color = TextMuted, fontSize = 11.sp)
+                            Text(
+                                if (isFr) "CAL ID/CVN : lecture standard ${if (profile.supportsStandardCalIdRead && profile.supportsStandardCvnRead) "prévue" else "non validée"} • Lecture binaire : ${if (profile.supportsBinaryRead) "validée" else "non disponible"} • Tables moteur validées : ${if (profile.supportsTableEditing) "oui" else "non fournies"} • Flash ECU : ${if (profile.supportsEcuWrite) "validé" else "désactivé"}"
+                                else "CAL ID/CVN: standard read ${if (profile.supportsStandardCalIdRead && profile.supportsStandardCvnRead) "profiled" else "not verified"} • Binary read: ${if (profile.supportsBinaryRead) "validated" else "unavailable"} • Validated engine tables: ${if (profile.supportsTableEditing) "available" else "not supplied"} • ECU flash: ${if (profile.supportsEcuWrite) "validated" else "disabled"}",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
                             Text(if (isFr) profile.notesFr else profile.notesEn, color = TextMuted, fontSize = 10.sp)
                             Text(
                                 if (isFr) "CAL ID/CVN : lecture standard • Dump binaire, édition et écriture : procédure ECU à valider"
@@ -169,8 +185,8 @@ fun CalibrationWorkspaceScreen(
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        if (isFr) "Lecture des identifiants OBD normalisés Mode 09 : CAL ID (PID 04) et CVN (PID 06). Ces données identifient la calibration mais ne constituent pas une lecture de la cartographie binaire."
-                        else "Read standard OBD Mode 09 identifiers: CAL ID (PID 04) and CVN (PID 06). These identify the calibration but do not read the binary calibration map.",
+                        if (isFr) "Lecture des identifiants OBD Mode 09 : VIN (PID 02), CAL ID (PID 04) et CVN (PID 06). Ces identifiants ne constituent pas une lecture de la cartographie binaire."
+                        else "Read OBD Mode 09 identifiers: VIN (PID 02), CAL ID (PID 04) and CVN (PID 06). These identifiers do not read the binary calibration map.",
                         color = TextMuted, fontSize = 12.sp
                     )
                     Button(
@@ -179,14 +195,16 @@ fun CalibrationWorkspaceScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (state.isReading) CircularProgressIndicator()
-                        else Text(if (isFr) "Lire CAL ID / CVN sur l'ECU" else "Read ECU CAL ID / CVN")
+                        else Text(if (isFr) "Lire VIN / CAL ID / CVN sur l'ECU" else "Read ECU VIN / CAL ID / CVN")
                     }
                     if (!isConnected) Text(
                         if (isFr) "Connecte une interface OBD avant la lecture réelle." else "Connect an OBD adapter before reading the real ECU.",
                         color = CamaroAmber, fontSize = 12.sp
                     )
-                    if (state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank()) {
+                    if (state.ecuVinResponse.isNotBlank() || state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank()) {
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                        Text("VIN • 09 02", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(state.ecuVinResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text("CAL ID • 09 04", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.calibrationIdResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text("CVN • 09 06", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -310,6 +328,16 @@ fun CalibrationWorkspaceScreen(
                                 "${definition.id} • offset 0x${definition.fileOffset.toString(16).uppercase()} • ${definition.valueType} • ${definition.endian} • ×${definition.scale} + ${definition.bias} ${definition.unit}",
                                 color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                             )
+                            Text(
+                                if (isFr) "Axe X : ${definition.xAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " valeurs • " + it.unit } ?: "non défini"}"
+                                else "X axis: ${definition.xAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " values • " + it.unit } ?: "not defined"}",
+                                color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                if (isFr) "Axe Y : ${definition.yAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " valeurs • " + it.unit } ?: "non défini"}"
+                                else "Y axis: ${definition.yAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " values • " + it.unit } ?: "not defined"}",
+                                color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
+                            )
                         }
                         state.mapDefinitionsWarnings.forEach { warning ->
                             Text(warning, color = CamaroAmber, fontSize = 10.sp)
@@ -324,6 +352,28 @@ fun CalibrationWorkspaceScreen(
                                     color = if (state.mapDirty) CamaroAmber else OkGreen, fontSize = 10.sp
                                 )
                             }
+                            if (state.mapXAxisValues.isNotEmpty()) {
+                                Text(
+                                    if (isFr) "Axe X : ${selectedMap?.xAxis?.unit.orEmpty()}" else "X axis: ${selectedMap?.xAxis?.unit.orEmpty()}",
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
+                                Row(
+                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("X", modifier = Modifier.width(48.dp), color = CamaroAmber, fontSize = 10.sp)
+                                    state.mapXAxisValues.forEach { axisValue ->
+                                        Text(
+                                            axisValue,
+                                            modifier = Modifier.width(88.dp),
+                                            color = CamaroAmber,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
                             LazyColumn(
                                 modifier = Modifier.fillMaxWidth().height(320.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -335,9 +385,11 @@ fun CalibrationWorkspaceScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            "%02d".format(rowIndex),
-                                            modifier = Modifier.width(28.dp),
-                                            color = TextMuted, fontSize = 10.sp
+                                            state.mapYAxisValues.getOrNull(rowIndex) ?: "%02d".format(rowIndex),
+                                            modifier = Modifier.width(48.dp),
+                                            color = CamaroAmber,
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace
                                         )
                                         rowValues.forEachIndexed { columnIndex, value ->
                                             OutlinedTextField(

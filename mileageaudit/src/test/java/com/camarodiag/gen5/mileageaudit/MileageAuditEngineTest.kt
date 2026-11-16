@@ -6,16 +6,38 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MileageAuditEngineTest {
-    private fun reading(id: String, km: Double?, confidence: ConfidenceLevel) = MileageSourceReading(
-        id, id, id, "test response", km, confidence, "test", "test"
+    private fun reading(
+        id: String,
+        km: Double?,
+        confidence: ConfidenceLevel,
+        profileEvidenceReference: String? = null
+    ) = MileageSourceReading(
+        id, id, id, "test response", km, confidence, "test", "test", profileEvidenceReference
     )
 
     @Test fun twoVerifiedIndependentModulesFlagLargeDifference() {
         val report = MileageAuditEngine.evaluate("VIN", listOf(
+            reading("BCM", 100000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile"),
+            reading("IPC", 120000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile")
+        ))
+        assertTrue(report.hasDiscrepancy)
+        assertEquals(20000.0, report.maxDeltaKm, 0.01)
+    }
+
+    @Test fun highConfidenceWithoutVerifiedVehicleProfileDoesNotCountAsIndependent() {
+        val report = MileageAuditEngine.evaluate("VIN", listOf(
             reading("BCM", 100000.0, ConfidenceLevel.HIGH),
             reading("IPC", 120000.0, ConfidenceLevel.HIGH)
         ))
-        assertTrue(report.hasDiscrepancy)
+        assertFalse(report.hasDiscrepancy)
+    }
+
+    @Test fun multipleReadingsFromTheSameModuleCountAsOneSource() {
+        val report = MileageAuditEngine.evaluate("VIN", listOf(
+            reading("BCM", 100000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile"),
+            reading("BCM", 120000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile")
+        ))
+        assertFalse(report.hasDiscrepancy)
         assertEquals(20000.0, report.maxDeltaKm, 0.01)
     }
 
@@ -25,6 +47,15 @@ class MileageAuditEngineTest {
             reading("ECM_D3", 120000.0, ConfidenceLevel.MODERATE)
         ))
         assertFalse(report.hasDiscrepancy)
+    }
+
+    @Test fun nonFiniteOdometerValuesAreIgnored() {
+        val report = MileageAuditEngine.evaluate("VIN", listOf(
+            reading("BCM", Double.POSITIVE_INFINITY, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile"),
+            reading("IPC", 120000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile")
+        ))
+        assertFalse(report.hasDiscrepancy)
+        assertEquals(0.0, report.maxDeltaKm, 0.0)
     }
 
     @Test fun noDataDoesNotInventMileage() {

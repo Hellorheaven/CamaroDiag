@@ -8,6 +8,67 @@ import org.junit.Test
 class CalibrationTableCodecTest {
 
     @Test
+    fun validatesDefinitionMetadataAgainstVehicleImageAndEcuIdentifiers() {
+        val binary = byteArrayOf(0x10, 0x20, 0x30, 0x40)
+        val sha256 = java.security.MessageDigest.getInstance("SHA-256").digest(binary)
+            .joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+        val metadata = CalibrationDefinitionMetadata(
+            vin = "1G1FA1RXXR0123456",
+            calibrationId = "CAL-123",
+            cvn = "A1B2C3D4",
+            operatingSystemId = "OS-123",
+            hardwarePartNumber = "HW-123",
+            sourceSha256 = sha256
+        )
+
+        assertTrue(
+            CalibrationTableCodec.validateMetadataForImage(
+                metadata,
+                "1G1FA1RXXR0123456",
+                "1G1FA1RXXR0123456",
+                binary,
+                listOf("CAL-123"),
+                listOf("A1B2C3D4")
+            ).isEmpty()
+        )
+        val issues = CalibrationTableCodec.validateMetadataForImage(
+            metadata,
+            "1G1FA1RXXR0123457",
+            "1G1FA1RXXR0123457",
+            binary + byteArrayOf(0x50),
+            listOf("CAL-OTHER"),
+            listOf("00000000")
+        )
+        assertEquals(5, issues.size)
+    }
+
+    @Test
+    fun rejectsCvnThatBelongsToAnotherCalibrationIdRecord() {
+        val binary = byteArrayOf(0x10, 0x20, 0x30, 0x40)
+        val sha256 = java.security.MessageDigest.getInstance("SHA-256").digest(binary)
+            .joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+        val metadata = CalibrationDefinitionMetadata(
+            vin = "1G1FA1RXXR0123456",
+            calibrationId = "CAL-123",
+            cvn = "A1B2C3D4",
+            operatingSystemId = "OS-123",
+            hardwarePartNumber = "HW-123",
+            sourceSha256 = sha256
+        )
+
+        val issues = CalibrationTableCodec.validateMetadataForImage(
+            metadata,
+            "1G1FA1RXXR0123456",
+            "1G1FA1RXXR0123456",
+            binary,
+            listOf("CAL-123", "CAL-456"),
+            listOf("00000000", "A1B2C3D4")
+        )
+
+        assertTrue(issues.any { it.contains("associé au CAL ID") })
+    }
+
+    @Test
     fun parsesUserSuppliedTsvDefinition() {
         val definitions = CalibrationTableCodec.parseDefinitions(CalibrationTableCodec.template)
         val table = definitions.definitions.single()
@@ -17,6 +78,108 @@ class CalibrationTableCodecTest {
         assertEquals(16, table.columns)
         assertEquals(CalibrationValueType.U16, table.valueType)
         assertEquals(CalibrationEndian.LITTLE, table.endian)
+        assertEquals(null, table.xAxis)
+        assertEquals(null, table.yAxis)
+    }
+
+    @Test
+    fun parsesCommaSeparatedDefinitionsWithQuotedNamesAndExplicitAxes() {
+        val csv = listOf(
+            "id,name,offset,rows,columns,type,endian,scale,bias,unit,minimum,maximum,x_offset,x_type,x_endian,x_scale,x_bias,x_unit,y_offset,y_type,y_endian,y_scale,y_bias,y_unit",
+            "fuel_main,\"Fuel, main\",0x4,1,2,U16,LE,0.1,0,mg,0,100,0x0,U8,LE,1,0,rpm,0x2,U8,LE,1,0,kPa"
+        ).joinToString("\n")
+
+        val parsed = CalibrationTableCodec.parseDefinitions(csv)
+        val definition = parsed.definitions.single()
+
+        assertEquals("Fuel, main", definition.name)
+        assertEquals(0L, definition.xAxis?.fileOffset)
+        assertEquals(2, definition.xAxis?.count)
+        assertEquals(2L, definition.yAxis?.fileOffset)
+        assertEquals(1, definition.yAxis?.count)
+    }
+
+    @Test
+    fun decodesSeparateXAxisAndYAxisValuesFromBinaryImage() {
+        val csv = listOf(
+            "id;name;offset;rows;columns;type;endian;scale;bias;unit;x_offset;x_type;x_endian;x_scale;x_bias;x_unit;y_offset;y_type;y_endian;y_scale;y_bias;y_unit",
+            "fuel;Fuel table;4;1;2;U16;LE;0.1;0;mg;0;U8;LE;1;0;rpm;2;U8;LE;1;0;kPa"
+        ).joinToString("\n")
+        val definition = CalibrationTableCodec.parseDefinitions(csv).definitions.single()
+        val binary = byteArrayOf(100, 200.toByte(), 30, 40, 100, 0, 200.toByte(), 0)
+
+        val decoded = CalibrationTableCodec.decode(binary, definition)
+
+        assertEquals(listOf(100.0, 200.0), decoded.xAxisValues)
+        assertEquals(listOf(30.0), decoded.yAxisValues)
+        assertEquals(10.0, decoded.values[0][0], 0.0001)
+        assertEquals(20.0, decoded.values[0][1], 0.0001)
+    }
+
+    @Test
+    fun rejectsAxisRangesThatExtendBeyondTheBinaryImage() {
+        val definition = CalibrationMapDefinition(
+            id = "axis-outside", name = "Axis outside", fileOffset = 0, rows = 1, columns = 1,
+            valueType = CalibrationValueType.U8, endian = CalibrationEndian.LITTLE,
+            scale = 1.0, bias = 0.0, unit = "",
+            xAxis = CalibrationAxisDefinition(
+                fileOffset = 4, count = 2, valueType = CalibrationValueType.U16,
+                endian = CalibrationEndian.LITTLE, scale = 1.0, bias = 0.0, unit = ""
+            )
+        )
+
+        assertFalse(runCatching { CalibrationTableCodec.decode(byteArrayOf(1, 2, 3, 4, 5), definition) }.isSuccess)
+    }
+
+    @Test
+    fun rejectsOverflowingDefinitionOffsetsAndOversizedDirectDefinitions() {
+        val overflow = CalibrationMapDefinition(
+            id = "overflow", name = "Overflow", fileOffset = Long.MAX_VALUE - 1,
+            rows = 1, columns = 2, valueType = CalibrationValueType.U32,
+            endian = CalibrationEndian.LITTLE, scale = 1.0, bias = 0.0, unit = ""
+        )
+        val oversized = CalibrationMapDefinition(
+            id = "oversized", name = "Oversized", fileOffset = 0,
+            rows = 256, columns = 256, valueType = CalibrationValueType.U8,
+            endian = CalibrationEndian.LITTLE, scale = 1.0, bias = 0.0, unit = ""
+        )
+
+        assertFalse(runCatching { CalibrationTableCodec.decode(ByteArray(32), overflow) }.isSuccess)
+        assertFalse(runCatching { CalibrationTableCodec.decode(ByteArray(65_536), oversized) }.isSuccess)
+    }
+
+    @Test
+    fun rejectsNonFiniteFloatValuesWhenDecoding() {
+        val definition = CalibrationMapDefinition(
+            id = "float", name = "Float", fileOffset = 0, rows = 1, columns = 1,
+            valueType = CalibrationValueType.F32, endian = CalibrationEndian.LITTLE,
+            scale = 1.0, bias = 0.0, unit = ""
+        )
+        val nanBytes = byteArrayOf(0x00, 0x00, 0xC0.toByte(), 0x7F)
+
+        assertFalse(runCatching { CalibrationTableCodec.decode(nanBytes, definition) }.isSuccess)
+    }
+
+    @Test
+    fun formattingAndReapplyingFloatCellsPreservesUneditedBinaryPrecision() {
+        val definition = CalibrationMapDefinition(
+            id = "float-precision", name = "Float precision", fileOffset = 0,
+            rows = 1, columns = 2, valueType = CalibrationValueType.F32,
+            endian = CalibrationEndian.LITTLE, scale = 1.0, bias = 0.0, unit = ""
+        )
+        val original = java.nio.ByteBuffer.allocate(8)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            .putFloat(0.1234567f)
+            .putFloat(12345.678f)
+            .array()
+        val decoded = CalibrationTableCodec.decode(original, definition)
+        val roundTrippedValues = decoded.values.map { row ->
+            row.map { CalibrationTableCodec.formatEngineeringValue(it).toDouble() }
+        }
+
+        val reapplied = CalibrationTableCodec.applyEdits(original, definition, roundTrippedValues)
+
+        assertTrue(original.contentEquals(reapplied))
     }
 
     @Test

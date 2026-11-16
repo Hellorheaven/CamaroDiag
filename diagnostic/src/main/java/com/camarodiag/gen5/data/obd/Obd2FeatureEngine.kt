@@ -31,6 +31,7 @@ data class ObdScanReport(
     val freezeFrame: Map<Int, List<Int>>,
     val monitorTestRaw: String?,
     val adapterInfo: Map<String, String>,
+    val respondingEcuAddresses: List<String>,
     val rawLog: List<String>
 )
 
@@ -58,6 +59,34 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         result["PROTOCOL"] = ask("ATDP")
         result["VOLTAGE"] = ask("ATRV")
         return result
+    }
+
+    /**
+     * Detects 11-bit CAN response identifiers returned to the standard OBD
+     * functional request 0100. These are observed response IDs only; they are
+     * deliberately not mapped to GM module names without a verified vehicle profile.
+     */
+    suspend fun discoverFunctionalObdResponders(): List<String> {
+        return try {
+            ask("ATS1")
+            ask("ATH1")
+            val response = ask("0100", 2500L)
+            val ids = Regex("(?i)(?:^|\\s)([0-9A-F]{3})\\s+(?=(?:[0-9A-F]{2}\\s*){4,})")
+                .findAll(response)
+                .mapNotNull { match ->
+                    val id = match.groupValues[1].uppercase(Locale.ROOT)
+                    val numeric = id.toIntOrNull(16) ?: return@mapNotNull null
+                    id.takeIf { numeric in 0x700..0x7FF && numeric != 0x7DF }
+                }
+                .distinct()
+                .sorted()
+                .toList()
+            ids
+        } finally {
+            // Restore normal ELM output framing regardless of the scan result.
+            runCatching { ask("ATH0") }
+            runCatching { ask("ATS0") }
+        }
     }
 
     /** Reads Mode 01 supported-PID bitmaps (PID 00, 20, ... E0). */
@@ -146,6 +175,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     suspend fun fullReadOnlyScan(): ObdScanReport {
         log.clear()
         val adapter = initialize()
+        val respondingEcus = discoverFunctionalObdResponders()
         val supported = discoverSupportedPids()
         val live = readLiveData(supported)
         val (confirmed, pending, permanent) = readDtcs()
@@ -170,6 +200,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             freezeFrame = freeze,
             monitorTestRaw = mode06,
             adapterInfo = adapter,
+            respondingEcuAddresses = respondingEcus,
             rawLog = log.toList()
         )
     }
