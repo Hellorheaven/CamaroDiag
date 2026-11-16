@@ -56,6 +56,41 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     SETTINGS("Settings", "Réglages", R.string.tab_settings)
 }
 
+
+@Composable
+private fun localizedEngineName(engine: CamaroEngine): String = when (engine) {
+    CamaroEngine.LLT -> stringResource(R.string.engine_llt)
+    CamaroEngine.LFX -> stringResource(R.string.engine_lfx)
+    CamaroEngine.LS3 -> stringResource(R.string.engine_ls3)
+    CamaroEngine.L99 -> stringResource(R.string.engine_l99)
+    CamaroEngine.LSA -> stringResource(R.string.engine_lsa)
+    CamaroEngine.LS7 -> stringResource(R.string.engine_ls7)
+    CamaroEngine.LTG -> stringResource(R.string.engine_ltg)
+    CamaroEngine.LGX -> stringResource(R.string.engine_lgx)
+    CamaroEngine.LT1 -> stringResource(R.string.engine_lt1)
+    CamaroEngine.LT4 -> stringResource(R.string.engine_lt4)
+}
+
+@Composable
+private fun localizedTransmissionName(transmission: TransmissionType): String = when (transmission) {
+    TransmissionType.MANUAL -> stringResource(R.string.transmission_manual)
+    TransmissionType.AUTOMATIC -> stringResource(R.string.transmission_automatic)
+}
+
+@Composable
+private fun localizedMarketName(market: MarketRegion): String = when (market) {
+    MarketRegion.US_CA -> stringResource(R.string.market_us_ca)
+    MarketRegion.EU_ECE -> stringResource(R.string.market_eu_ece)
+}
+
+@Composable
+private fun localizedAdapterTierName(tier: AdapterTier): String = when (tier) {
+    AdapterTier.PRO_STN -> stringResource(R.string.adapter_tier_pro_stn)
+    AdapterTier.GENUINE_ELM -> stringResource(R.string.adapter_tier_genuine_elm)
+    AdapterTier.CLONE_ELM -> stringResource(R.string.adapter_tier_clone_elm)
+    AdapterTier.DISCONNECTED -> stringResource(R.string.adapter_tier_disconnected)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CamaroDiagApp(viewModel: MainViewModel) {
@@ -406,7 +441,7 @@ fun VehicleSetupScreen(
                             FilterChip(selected = vehicle.generation == gen, onClick = {
                                 val year = if (gen == CamaroGeneration.GEN5) 2015 else 2016
                                 onChange(year, vehicle.engine, vehicle.transmission, vehicle.market)
-                            }, label = { Text(if (isFr) gen.label.replace("Gen", "Génération") else gen.label) })
+                            }, label = { Text(stringResource(R.string.vehicle_generation_label, if (gen == CamaroGeneration.GEN5) 5 else 6)) })
                         }
                     }
                     Text(stringResource(R.string.vehicle_model_year), color = TextMuted, fontSize = 13.sp)
@@ -432,7 +467,7 @@ fun VehicleSetupScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("${eng.rpo} — ${if (isFr) eng.nameFr else eng.nameEn}", fontWeight = FontWeight.SemiBold)
+                                Text("${eng.rpo} — ${localizedEngineName(eng)}", fontWeight = FontWeight.SemiBold)
                                 Text("ECM: ${eng.ecmType}", fontSize = 12.sp, color = CamaroBlue)
                             }
                             if (vehicle.engine == eng) Icon(Icons.Default.CheckCircle, null, tint = CamaroAmber)
@@ -449,7 +484,7 @@ fun VehicleSetupScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(selected = vehicle.transmission == tr, onClick = { onChange(vehicle.modelYear, vehicle.engine, tr, vehicle.market) })
-                            Text(if (isFr) tr.labelFr else tr.labelEn)
+                            Text(localizedTransmissionName(tr))
                         }
                     }
 
@@ -463,7 +498,7 @@ fun VehicleSetupScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(selected = vehicle.market == mk, onClick = { onChange(vehicle.modelYear, vehicle.engine, vehicle.transmission, mk) })
-                            Text(if (isFr) mk.labelFr else mk.labelEn)
+                            Text(localizedMarketName(mk))
                         }
                     }
                     Text(stringResource(R.string.vehicle_vin), color = TextMuted, fontSize = 13.sp)
@@ -513,7 +548,7 @@ fun AdapterScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
-                    Text(if (isFr) adapter.tier.titleFr else adapter.tier.titleEn, fontSize = 13.sp)
+                    Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
                         BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)

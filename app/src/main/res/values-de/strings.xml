@@ -218,4 +218,23 @@
     <string name="update_install">Installieren</string>
     <string name="update_download">Herunterladen</string>
     <string name="update_later">Später</string>
+    <string name="vehicle_generation_label">Generation %1$d</string>
+    <string name="engine_llt">3,6-L-V6-SIDI (2010–2011)</string>
+    <string name="engine_lfx">3,6-L-V6-SIDI-FlexFuel (2012–2015)</string>
+    <string name="engine_ls3">6,2-L-V8 manuell (426 PS)</string>
+    <string name="engine_l99">6,2-L-V8 AFM Automatik (400 PS)</string>
+    <string name="engine_lsa">6,2-L-V8 Kompressor ZL1 (580 PS)</string>
+    <string name="engine_ls7">7,0-L-V8 Z/28 (505 PS)</string>
+    <string name="engine_ltg">2,0-L-Turbo-Reihenvierzylinder (275 PS)</string>
+    <string name="engine_lgx">3,6-L-V6-SIDI (335 PS)</string>
+    <string name="engine_lt1">6,2-L-V8 Direkteinspritzung (455 PS)</string>
+    <string name="engine_lt4">6,2-L-V8 Kompressor ZL1 (650 PS)</string>
+    <string name="transmission_manual">Manuell (AY6 / TR6060 / TR3160)</string>
+    <string name="transmission_automatic">Automatik (6L50 / 6L80 / 8L45 / 8L90 / 10L60 / 10L80; abhängig vom Modelljahr)</string>
+    <string name="market_us_ca">Nordamerika (USA / Kanada)</string>
+    <string name="market_eu_ece">Europa-Export (ECE / T96 / T84)</string>
+    <string name="adapter_tier_pro_stn">STN1170 / STN2255 (OBDLink MX+ / vLinker MC+)</string>
+    <string name="adapter_tier_genuine_elm">Originaler ELM327 v1.4b/v1.5 (nur HS-CAN)</string>
+    <string name="adapter_tier_clone_elm">Generischer ELM327-v2.1-Klon (eingeschränkt)</string>
+    <string name="adapter_tier_disconnected">Nicht verbunden</string>
 </resources>
