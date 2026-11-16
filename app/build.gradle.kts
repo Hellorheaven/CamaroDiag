@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -18,8 +19,25 @@ val releasePatch = providers.gradleProperty("releasePatch").orElse("0").get().to
     ?: error("releasePatch must be a non-negative integer")
 require(releasePatch >= 0) { "releasePatch must be non-negative" }
 
+// The generated artwork is stored as base64 so the repository remains text-only;
+// Gradle materializes the original WebP into the Android resource tree at build time.
+val artworkSource = layout.projectDirectory.file("src/main/artwork/camarodiag_car.webp.b64")
+val generatedArtworkRes = layout.buildDirectory.dir("generated/res/camarodiagArtwork")
+val decodeCamaroArtwork by tasks.registering {
+    inputs.file(artworkSource)
+    outputs.file(generatedArtworkRes.map { it.file("drawable-nodpi/camarodiag_car.webp") })
+    doLast {
+        val encoded = artworkSource.asFile.readText().trim()
+        val output = generatedArtworkRes.get().file("drawable-nodpi/camarodiag_car.webp").asFile
+        output.parentFile.mkdirs()
+        output.writeBytes(Base64.getDecoder().decode(encoded))
+    }
+}
+
 
 android {
+    sourceSets.getByName("main").res.srcDir(generatedArtworkRes)
+
     namespace = "com.camarodiag.gen5"
     compileSdk = 36
 
@@ -81,6 +99,10 @@ android {
         compose = true
         buildConfig = true
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(decodeCamaroArtwork)
 }
 
 dependencies {
