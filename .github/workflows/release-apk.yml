@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      release_tag: ${{ steps.version.outputs.tag }}
+      version_name: ${{ steps.version.outputs.version_name }}
 
     steps:
       - name: Checkout repository
@@ -104,12 +107,13 @@ jobs:
           ./gradlew testDebugUnitTest -PreleasePatch="$RELEASE_PATCH" --stacktrace
           ./gradlew app:assembleDebug -PreleasePatch="$RELEASE_PATCH" --stacktrace
           ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace
+
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
-      - name: Publish J2534 bridge variants
+      - name: Publish J2534 bridge portable packages
         env:
           VERSION_NAME: ${{ steps.version.outputs.version_name }}
         shell: pwsh
@@ -124,6 +128,7 @@ jobs:
           foreach ($variant in $variants) {
             $output = ".\publish\$($variant.Name)"
             dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration $variant.Configuration --runtime $variant.Runtime --self-contained true --output $output -p:Version="$env:VERSION_NAME" -p:AssemblyVersion="$($env:VERSION_NAME).0" -p:FileVersion="$($env:VERSION_NAME).0"
+            if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
             Compress-Archive -Path "$output\*" -DestinationPath ".\CamaroDiag-J2534-Bridge-$($variant.Name).zip" -Force
           }
 
@@ -136,7 +141,7 @@ jobs:
           git tag "$TAG_NAME"
           git push origin "$TAG_NAME"
 
-      - name: Publish release and upload APKs
+      - name: Publish release and upload APKs and portable bridge packages
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -146,7 +151,8 @@ jobs:
             - Version: ${{ steps.version.outputs.version_name }}
             - Android versionCode: ${{ steps.version.outputs.version_code }}
             - Signed debug and release APKs are attached.
-            - J2534 Bridge Debug and Release packages are attached for Windows x64 and x86.
+            - J2534 Bridge Debug and Release portable packages are attached for Windows x64 and x86.
+            - Windows setup installers are generated and uploaded by the bridge-installers job.
           files: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
@@ -156,5 +162,69 @@ jobs:
             CamaroDiag-J2534-Bridge-release-win-x86.zip
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  bridge-installers:
+    needs: release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the same source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+
+      - name: Build four Windows setup installers
+        env:
+          VERSION_NAME: ${{ needs.release.outputs.version_name }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iscc = Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
+
+          New-Item -ItemType Directory -Force -Path ".\dist" | Out-Null
+          $variants = @(
+            @{ Configuration = "Debug"; Channel = "debug"; Runtime = "win-x64"; Arch = "x64"; Name = "debug-win-x64" },
+            @{ Configuration = "Debug"; Channel = "debug"; Runtime = "win-x86"; Arch = "x86"; Name = "debug-win-x86" },
+            @{ Configuration = "Release"; Channel = "release"; Runtime = "win-x64"; Arch = "x64"; Name = "release-win-x64" },
+            @{ Configuration = "Release"; Channel = "release"; Runtime = "win-x86"; Arch = "x86"; Name = "release-win-x86" }
+          )
+
+          foreach ($variant in $variants) {
+            $output = Join-Path $PWD "publish\$($variant.Name)"
+            New-Item -ItemType Directory -Force -Path $output | Out-Null
+
+            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration $variant.Configuration --runtime $variant.Runtime --self-contained true --output $output "-p:Version=$env:VERSION_NAME" "-p:AssemblyVersion=$($env:VERSION_NAME).0" "-p:FileVersion=$($env:VERSION_NAME).0"
+            if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
+
+            & $iscc "/DAppVersion=$env:VERSION_NAME" "/DBuildDir=$output" "/DChannel=$($variant.Channel)" "/DArch=$($variant.Arch)" "/DOutputName=CamaroDiag-J2534-Bridge-Setup-$($variant.Name)" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss"
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed for $($variant.Name)" }
+          }
+
+      - name: Upload setup installers to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.release_tag }}
+          files: |
+            dist/CamaroDiag-J2534-Bridge-Setup-debug-win-x64.exe
+            dist/CamaroDiag-J2534-Bridge-Setup-debug-win-x86.exe
+            dist/CamaroDiag-J2534-Bridge-Setup-release-win-x64.exe
+            dist/CamaroDiag-J2534-Bridge-Setup-release-win-x86.exe
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
