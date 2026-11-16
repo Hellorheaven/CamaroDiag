@@ -2,6 +2,7 @@ package com.camarodiag.gen5.data.obd
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.MessageDigest
 import java.util.Locale
 import kotlin.math.roundToLong
 
@@ -232,6 +233,40 @@ object CalibrationTableCodec {
             }
         }
         return CalibrationDefinitionParseResult(definitions, warnings, metadata)
+    }
+
+    /**
+     * Validates that a supplied definition file belongs to the selected vehicle,
+     * the exact binary image, and the CAL ID/CVN read from the connected ECU.
+     * OS and hardware are deliberately not inferred from standard Mode 09 data.
+     */
+    fun validateMetadataForImage(
+        metadata: CalibrationDefinitionMetadata,
+        selectedVin: String,
+        binary: ByteArray,
+        ecuCalibrationIds: Collection<String>,
+        ecuCvns: Collection<String>
+    ): List<String> = buildList {
+        val normalizedVin = selectedVin.trim().uppercase(Locale.ROOT)
+        if (!normalizedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) || metadata.vin != normalizedVin) {
+            add("Le VIN des définitions ne correspond pas au VIN du véhicule sélectionné.")
+        }
+
+        val imageSha256 = MessageDigest.getInstance("SHA-256").digest(binary)
+            .joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 0xFF) }
+        if (!metadata.sourceSha256.equals(imageSha256, ignoreCase = true)) {
+            add("L'empreinte SHA-256 des définitions ne correspond pas à l'image BIN active.")
+        }
+
+        val knownCalibrationIds = ecuCalibrationIds.map { it.trim().uppercase(Locale.ROOT) }.filter(String::isNotBlank)
+        if (knownCalibrationIds.none { it == metadata.calibrationId.trim().uppercase(Locale.ROOT) }) {
+            add("Le CAL ID des définitions ne correspond à aucun CAL ID lu sur le calculateur.")
+        }
+
+        val knownCvns = ecuCvns.map { it.trim().uppercase(Locale.ROOT) }.filter(String::isNotBlank)
+        if (knownCvns.none { it == metadata.cvn.trim().uppercase(Locale.ROOT) }) {
+            add("Le CVN des définitions ne correspond à aucun CVN lu sur le calculateur.")
+        }
     }
 
     private fun parseMetadata(content: String): CalibrationDefinitionMetadata? {
