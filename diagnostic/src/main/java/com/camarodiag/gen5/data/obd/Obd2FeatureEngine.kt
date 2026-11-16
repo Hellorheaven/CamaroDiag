@@ -114,6 +114,17 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return supported
     }
 
+    /**
+     * Reads one Mode 01 PID only when the ECU has advertised it in its support bitmap.
+     * Returns the raw ELM response so vehicle-specific presentation code can retain
+     * the original response alongside any decoded value.
+     */
+    suspend fun readMode01PidIfSupported(pid: Int, supportedPids: Set<Int>): String? {
+        require(pid in 0x01..0xFF) { "Mode 01 PID must be a single byte." }
+        if (pid !in supportedPids) return null
+        return ask("01%02X".format(Locale.US, pid), 1800L)
+    }
+
     suspend fun readLiveData(supportedPids: Set<Int>): List<ObdValue> {
         val requested = listOf(
             0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
