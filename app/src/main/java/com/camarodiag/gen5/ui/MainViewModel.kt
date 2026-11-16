@@ -609,8 +609,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (cancelled: CancellationException) {
-                throw cancelled
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Actualisation des interfaces impossible."
             }
@@ -645,8 +643,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _adapter.value = caps
                 _connectionMessage.value = null
                 refreshTopologyAndDefaults()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -942,8 +938,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _connectionMessage.value = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (cancelled: CancellationException) {
-                throw cancelled
             } catch (error: Exception) {
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
                 _connectionMessage.value = error.localizedMessage ?: "Échec de lecture pendant l'audit kilométrique."
@@ -1004,8 +998,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _connectionMessage.value = "Session de diagnostic sauvegardée."
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (cancelled: CancellationException) {
-                throw cancelled
             } catch (error: Exception) {
                 _connectionMessage.value = error.localizedMessage ?: "Sauvegarde de la session impossible."
             }
@@ -1016,8 +1008,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 sessionDao.deleteSession(session)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -1134,9 +1124,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
                         throw cancelled
-                    } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
+                    } catch (error: Exception) {
                         consecutiveFailures++
                         _liveTelemetryMessage.value = error.localizedMessage ?: "Erreur de lecture OBD live."
                         if (_liveRecordingState.value.isRecording) {
