@@ -298,7 +298,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
                 DiagTab.ADAPTER -> AdapterScreen(
                     adapter = adapter,
-                    isBusy = isBusy,
+                    isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
                     isFr = isFr,
