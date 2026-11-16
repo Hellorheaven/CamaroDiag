@@ -225,7 +225,7 @@ jobs:
           for tag in "${release_tags[@]}"; do
             if [[ "$tag" != "$KEEP_TAG" ]]; then
               echo "Deleting release and associated tag: $tag"
-              gh release delete "$tag" --yes --cleanup-tag
+              gh release delete "$tag" --yes
             fi
           done
 
