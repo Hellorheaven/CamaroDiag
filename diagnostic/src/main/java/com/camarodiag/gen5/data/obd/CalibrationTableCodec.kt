@@ -263,14 +263,18 @@ object CalibrationTableCodec {
             add("L'empreinte SHA-256 des définitions ne correspond pas à l'image BIN active.")
         }
 
-        val knownCalibrationIds = ecuCalibrationIds.map { it.trim().uppercase(Locale.ROOT) }.filter(String::isNotBlank)
-        if (knownCalibrationIds.none { it == metadata.calibrationId.trim().uppercase(Locale.ROOT) }) {
+        val knownCalibrationIds = ecuCalibrationIds.map { it.trim().uppercase(Locale.ROOT) }
+        val knownCvns = ecuCvns.map { it.trim().uppercase(Locale.ROOT) }
+        val calibrationIdIndex = knownCalibrationIds.indexOf(metadata.calibrationId.trim().uppercase(Locale.ROOT))
+        if (calibrationIdIndex < 0) {
             add("Le CAL ID des définitions ne correspond à aucun CAL ID lu sur le calculateur.")
-        }
-
-        val knownCvns = ecuCvns.map { it.trim().uppercase(Locale.ROOT) }.filter(String::isNotBlank)
-        if (knownCvns.none { it == metadata.cvn.trim().uppercase(Locale.ROOT) }) {
-            add("Le CVN des définitions ne correspond à aucun CVN lu sur le calculateur.")
+            if (knownCvns.none { it == metadata.cvn.trim().uppercase(Locale.ROOT) }) {
+                add("Le CVN des définitions ne correspond à aucun CVN lu sur le calculateur.")
+            }
+        } else if (calibrationIdIndex >= knownCvns.size ||
+            knownCvns[calibrationIdIndex] != metadata.cvn.trim().uppercase(Locale.ROOT)
+        ) {
+            add("Le CVN des définitions n'est pas associé au CAL ID correspondant dans les réponses Mode 09.")
         }
     }
 
