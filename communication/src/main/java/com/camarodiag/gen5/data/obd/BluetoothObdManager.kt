@@ -32,6 +32,8 @@ class BluetoothObdManager(context: Context) {
     private var outputStream: OutputStream? = null
     private val commandMutex = Mutex()
     private val commandSessionMutex = Mutex()
+    private val supportedMode01PidsMutex = Mutex()
+    @Volatile private var cachedSupportedMode01Pids: Set<Int>? = null
     private val usbTransport = ElmUsbTransport(context)
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
@@ -50,6 +52,11 @@ class BluetoothObdManager(context: Context) {
     /** True only after the user explicitly selects a simulated adapter profile. */
     var isSimulationActive: Boolean = false
         private set
+
+    /** True only when the active transport accepts ELM/SAE J1979 command traffic. */
+    val isObdCommandChannelAvailable: Boolean
+        get() = !isDemoMode && !isSimulationActive &&
+            activeTransport in setOf("BLUETOOTH", "USB", "WIFI", "BLE")
 
     @SuppressLint("MissingPermission")
     fun getPairedDevices(): List<Pair<String, String>> {
@@ -224,6 +231,9 @@ class BluetoothObdManager(context: Context) {
      * another diagnostic action to interleave adapter setup and response parsing.
      */
     suspend fun <T> withObdCommandSession(block: suspend (Obd2FeatureEngine) -> T): T {
+        check(isObdCommandChannelAvailable) {
+            "No ELM/OBD-II command channel is available on the active transport."
+        }
         commandSessionMutex.lock()
         try {
             val engine = Obd2FeatureEngine(
@@ -234,6 +244,24 @@ class BluetoothObdManager(context: Context) {
             return block(engine)
         } finally {
             commandSessionMutex.unlock()
+        }
+    }
+
+    /**
+     * Reads a Mode 01 PID only after discovering that the connected ECU advertises it.
+     * The support bitmap is cached for the lifetime of the current adapter connection.
+     */
+    suspend fun readMode01PidIfSupported(pid: Int): String? {
+        check(isObdCommandChannelAvailable) {
+            "No ELM/OBD-II command channel is available on the active transport."
+        }
+        val supported = supportedMode01PidsMutex.withLock {
+            cachedSupportedMode01Pids ?: withObdCommandSession { engine ->
+                engine.discoverSupportedPids()
+            }.also { cachedSupportedMode01Pids = it }
+        }
+        return withObdCommandSession { engine ->
+            engine.readMode01PidIfSupported(pid, supported)
         }
     }
 
@@ -372,9 +400,14 @@ class BluetoothObdManager(context: Context) {
     }
 
     /** Creates the standards-based read-only OBD-II engine over the currently connected ELM transport. */
-    fun createObd2FeatureEngine(): Obd2FeatureEngine = Obd2FeatureEngine(
+    fun createObd2FeatureEngine(): Obd2FeatureEngine {
+        check(isObdCommandChannelAvailable) {
+            "No ELM/OBD-II command channel is available on the active transport."
+        }
+        return Obd2FeatureEngine(
         ObdCommandChannel { command, timeoutMs -> sendAtCommand(command, timeoutMs) }
-    )
+        )
+    }
 
     /** Creates a deterministic, clearly synthetic OBD-II channel for offline UI testing. */
     fun createSimulatedObd2FeatureEngine(): Obd2FeatureEngine =
@@ -398,6 +431,7 @@ class BluetoothObdManager(context: Context) {
         outputStream = null
         socket = null
         activeTransport = "BLUETOOTH"
+        cachedSupportedMode01Pids = null
         isDemoMode = true
         isSimulationActive = false
         activeAdapterCapabilities = null
