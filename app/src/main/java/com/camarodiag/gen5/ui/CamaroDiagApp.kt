@@ -22,6 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalConfiguration
+import com.camarodiag.gen5.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,24 +42,24 @@ import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class DiagTab(val labelEn: String, val labelFr: String) {
-    SETUP("Vehicle", "Véhicule"),
-    ADAPTER("Adapter", "Interface"),
-    MODULES("Modules", "Modules"),
-    LIVE("Live", "Direct"),
-    DTCS("DTCs", "Défauts"),
-    MILEAGE("Mileage", "Odomètre"),
-    CALIBRATION("ECU / Maps", "ECU / Cartographie"),
-    OBD_SCAN("Full OBD Scan", "Scan OBD complet"),
-    GUIDE("Guide", "Guide"),
-    CONTROL("Controls", "Pilotage"),
-    SETTINGS("Settings", "Réglages")
+enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId: Int) {
+    SETUP("Vehicle", "Véhicule", R.string.tab_vehicle),
+    ADAPTER("Adapter", "Interface", R.string.tab_connect),
+    MODULES("Modules", "Modules", R.string.tab_modules),
+    LIVE("Live", "Direct", R.string.tab_live),
+    DTCS("DTCs", "Défauts", R.string.tab_dtcs),
+    MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
+    CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
+    OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
+    GUIDE("Guide", "Guide", R.string.tab_guide),
+    CONTROL("Controls", "Pilotage", R.string.tab_controls),
+    SETTINGS("Settings", "Réglages", R.string.tab_settings)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CamaroDiagApp(viewModel: MainViewModel) {
-    val lang by viewModel.language.collectAsState()
+    val lang = AppLanguage.fromLocale(LocalConfiguration.current.locales[0])
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
@@ -170,13 +173,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                             Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                         else -> {
-                            Text(if (isFr) "HORS LIGNE" else "OFFLINE", color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(stringResource(R.string.obd_not_available), color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
-                    }
-                    TextButton(onClick = {
-                        viewModel.setLanguage(if (isFr) AppLanguage.EN else AppLanguage.FR)
-                    }) {
-                        Text(if (isFr) "FR 🇫🇷" else "EN 🇺🇸", color = CamaroBlue, fontWeight = FontWeight.Bold)
                     }
                 }
             )
@@ -191,7 +189,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab == DiagTab.SETUP,
                     onClick = { currentTab = DiagTab.SETUP },
                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text(if (isFr) "Véhicule" else "Vehicle") },
+                    label = { Text(stringResource(R.string.tab_vehicle)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -203,7 +201,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab == DiagTab.ADAPTER,
                     onClick = { currentTab = DiagTab.ADAPTER },
                     icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) },
-                    label = { Text(if (isFr) "Connexion" else "Connect") },
+                    label = { Text(stringResource(R.string.tab_connect)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -215,7 +213,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab == DiagTab.LIVE,
                     onClick = { currentTab = DiagTab.LIVE },
                     icon = { Icon(Icons.Default.Info, contentDescription = null) },
-                    label = { Text(if (isFr) "Données" else "Live") },
+                    label = { Text(stringResource(R.string.tab_live)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -227,7 +225,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab == DiagTab.DTCS,
                     onClick = { currentTab = DiagTab.DTCS },
                     icon = { Icon(Icons.Default.Build, contentDescription = null) },
-                    label = { Text(if (isFr) "Diagnostic" else "DTCs") },
+                    label = { Text(stringResource(R.string.tab_dtcs)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -247,7 +245,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     ),
                     onClick = { moreExpanded = true },
                     icon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
-                    label = { Text(if (isFr) "Plus" else "More") },
+                    label = { Text(stringResource(R.string.tab_more)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -270,7 +268,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     ).forEach { tab ->
                         DropdownMenuItem(
                             text = {
-                                Text(if (isFr) tab.labelFr else tab.labelEn)
+                                Text(stringResource(tab.labelResourceId))
                             },
                             onClick = {
                                 currentTab = tab
@@ -1006,6 +1004,7 @@ fun HardwareGuideScreen(isFr: Boolean) {
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun SettingsScreen(
     lang: AppLanguage,
@@ -1024,12 +1023,9 @@ fun SettingsScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(if (isFr) "Langue de l'application" else "Application Language", fontWeight = FontWeight.Bold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppLanguage.entries.forEach { l ->
-                            FilterChip(selected = lang == l, onClick = { onLang(l) }, label = { Text(l.label) })
-                        }
-                    }
+                    Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.system_language_current, lang.label), color = CamaroAmber)
+                    Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
                     Text(if (isFr) "Système d'unités" else "Measurement Units", fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text("Metric (km, °C, kPa)") })

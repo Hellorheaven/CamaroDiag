@@ -1,8 +1,19 @@
 package com.camarodiag.gen5.domain.model
 
+import java.util.Locale
+
 enum class AppLanguage(val code: String, val label: String) {
     EN("en", "English"),
-    FR("fr", "Français")
+    FR("fr", "Français"),
+    DE("de", "Deutsch"),
+    IT("it", "Italiano"),
+    ES("es", "Español"),
+    HE("he", "עברית");
+
+    companion object {
+        fun fromLocale(locale: Locale): AppLanguage =
+            entries.firstOrNull { it.code == locale.language.lowercase(Locale.ROOT) } ?: EN
+    }
 }
 
 enum class UnitSystem { METRIC, IMPERIAL }

@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.camarodiag.gen5.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,18 +42,17 @@ fun ObdScanScreen(
     isFr: Boolean,
     onRunScan: () -> Unit
 ) {
-    val unavailable = if (isFr) "Non disponible" else "Not available"
+    val unavailable = stringResource(R.string.obd_not_available)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(if (isFr) "SCAN OBD-II COMPLET" else "FULL OBD-II SCAN",
+                Text(stringResource(R.string.obd_scan_title),
                     color = CamaroAmber, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
                 Text(
-                    if (isFr) "Lecture normalisée SAE J1979 : données moteur, défauts, freeze frame et identifiants du calculateur."
-                    else "SAE J1979 read-only inspection: powertrain data, trouble codes, freeze frame and ECU identification.",
+                    stringResource(R.string.obd_scan_description),
                     color = TextMuted, fontSize = 12.sp
                 )
                 Button(
@@ -60,11 +61,10 @@ fun ObdScanScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (isScanning) CircularProgressIndicator()
-                    else Text(if (isFr) "Lancer le scan complet" else "Run full scan")
+                    else Text(stringResource(R.string.obd_run_full_scan))
                 }
                 if (!isConnected) Text(
-                    if (isFr) "Connecte une interface OBD réelle avant de lancer le scan. Le mode démo ne simule aucun résultat."
-                    else "Connect a real OBD adapter before scanning. Demo mode does not fabricate scan results.",
+                    stringResource(R.string.obd_connect_adapter_notice),
                     color = CamaroAmber, fontSize = 12.sp
                 )
                 message?.takeIf(String::isNotBlank)?.let {
@@ -79,8 +79,7 @@ fun ObdScanScreen(
             if (isSimulated) {
                 item {
                     Text(
-                        if (isFr) "SIMULATION HORS VÉHICULE — VIN, CAL ID, CVN, DTC et mesures ci-dessous sont synthétiques et ne proviennent d'aucune Camaro réelle."
-                        else "OFFLINE SIMULATION — VIN, CAL ID, CVN, DTCs and measurements below are synthetic and do not come from a real Camaro.",
+                        stringResource(R.string.obd_offline_simulation_notice),
                         color = CamaroAmber,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
@@ -88,42 +87,41 @@ fun ObdScanScreen(
                 }
             }
             item {
-                InfoCard(title = if (isFr) "Identification véhicule / ECU" else "Vehicle / ECU identification") {
-                    InfoLine(if (isFr) "VIN" else "VIN", report.vin ?: unavailable)
-                    InfoLine(if (isFr) "CAL ID" else "CAL ID", report.calibrationIds.joinToString(" | ").ifBlank { unavailable })
-                    InfoLine(if (isFr) "CVN" else "CVN", report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { unavailable })
-                    InfoLine(if (isFr) "Nom ECU" else "ECU name", report.ecuNames.joinToString(" | ").ifBlank { unavailable })
-                    InfoLine(if (isFr) "PIDs supportés" else "Supported PIDs", report.supportedPids.size.toString())
+                InfoCard(title = stringResource(R.string.obd_vehicle_ecu_identification)) {
+                    InfoLine(stringResource(R.string.obd_vin), report.vin ?: unavailable)
+                    InfoLine(stringResource(R.string.obd_cal_id), report.calibrationIds.joinToString(" | ").ifBlank { unavailable })
+                    InfoLine(stringResource(R.string.obd_cvn), report.calibrationVerificationNumbers.joinToString(" | ").ifBlank { unavailable })
+                    InfoLine(stringResource(R.string.obd_ecu_name), report.ecuNames.joinToString(" | ").ifBlank { unavailable })
+                    InfoLine(stringResource(R.string.obd_supported_pids), report.supportedPids.size.toString())
                     InfoLine(
-                        if (isFr) "Adresses CAN répondantes" else "Responding CAN IDs",
-                        report.respondingEcuAddresses.joinToString(", ").ifBlank { if (isFr) "Aucune identifiée" else "None identified" }
+                        stringResource(R.string.obd_responding_can_ids),
+                        report.respondingEcuAddresses.joinToString(", ").ifBlank { stringResource(R.string.obd_none_identified) }
                     )
-                    InfoLine(if (isFr) "Tension interface" else "Adapter voltage", report.adapterInfo["VOLTAGE"] ?: "—")
-                    InfoLine(if (isFr) "Protocole" else "Protocol", report.adapterInfo["PROTOCOL"] ?: "—")
+                    InfoLine(stringResource(R.string.obd_adapter_voltage), report.adapterInfo["VOLTAGE"] ?: "—")
+                    InfoLine(stringResource(R.string.obd_protocol), report.adapterInfo["PROTOCOL"] ?: "—")
                 }
             }
 
             item {
                 Text(
-                    if (isFr) "Les identifiants CAN sont les réponses observées à la requête OBD fonctionnelle 0100. Ils ne suffisent pas à nommer un calculateur (BCM, TCM, ABS, IPC, SDM) ni à autoriser des services GM étendus."
-                    else "CAN identifiers are responses observed to the OBD functional request 0100. They are not sufficient to identify a module (BCM, TCM, ABS, IPC, SDM) or authorize GM enhanced services.",
+                    stringResource(R.string.obd_can_id_limit_explanation),
                     color = TextMuted,
                     fontSize = 11.sp
                 )
             }
 
             item {
-                InfoCard(title = if (isFr) "État OBD / readiness" else "OBD readiness") {
-                    Text(report.readiness ?: if (isFr) "Donnée non disponible" else "Not available",
+                InfoCard(title = stringResource(R.string.obd_readiness)) {
+                    Text(report.readiness ?: stringResource(R.string.obd_data_unavailable),
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                 }
             }
 
             item {
-                SectionTitle(if (isFr) "Données moteur retournées" else "Returned live data")
+                SectionTitle(stringResource(R.string.obd_returned_live_data))
             }
             if (report.liveData.isEmpty()) {
-                item { Text(if (isFr) "Aucun PID de données exploitable n'a été retourné." else "No usable live-data PID was returned.", color = TextMuted) }
+                item { Text(stringResource(R.string.obd_no_live_data), color = TextMuted) }
             } else {
                 items(report.liveData, key = { it.pid }) { value ->
                     ObdValueCard(value, isFr)
@@ -131,11 +129,11 @@ fun ObdScanScreen(
             }
 
             item {
-                SectionTitle(if (isFr) "Codes défaut (DTC)" else "Diagnostic trouble codes")
+                SectionTitle(stringResource(R.string.obd_dtc_title))
             }
             val allCodes = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
             if (allCodes.isEmpty()) {
-                item { Text(if (isFr) "Aucun DTC retourné par les services standard 03/07/0A." else "No DTC returned by standard services 03/07/0A.", color = OkGreen) }
+                item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
             } else {
                 items(allCodes.distinctBy { it.code to it.status }, key = { "${it.code}-${it.status}" }) { dtc ->
                     DtcResultCard(dtc, isFr)
@@ -143,13 +141,13 @@ fun ObdScanScreen(
             }
 
             item {
-                InfoCard(title = if (isFr) "Freeze frame (Mode 02)" else "Freeze frame (Mode 02)") {
+                InfoCard(title = stringResource(R.string.obd_freeze_frame)) {
                     InfoLine(
-                        if (isFr) "DTC déclencheur" else "Trigger DTC",
+                        stringResource(R.string.obd_trigger_dtc),
                         report.freezeFrameDtc?.code ?: unavailable
                     )
                     if (report.freezeFrame.isEmpty()) {
-                        Text(if (isFr) "Aucune donnée figée exploitable." else "No usable freeze-frame data.", color = TextMuted, fontSize = 12.sp)
+                        Text(stringResource(R.string.obd_no_freeze_frame), color = TextMuted, fontSize = 12.sp)
                     } else {
                         report.freezeFrame.forEach { (pid, bytes) ->
                             InfoLine("PID %02X".format(pid), bytes.joinToString(" ") { "%02X".format(it) })
@@ -159,14 +157,14 @@ fun ObdScanScreen(
             }
 
             item {
-                InfoCard(title = if (isFr) "Résultats Mode 06" else "Mode 06 monitor results") {
+                InfoCard(title = stringResource(R.string.obd_mode06_results)) {
                     Text(report.monitorTestRaw ?: if (isFr) unavailable else "Not available",
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                 }
             }
 
             item {
-                InfoCard(title = if (isFr) "Journal brut du scan" else "Raw scan log") {
+                InfoCard(title = stringResource(R.string.obd_raw_scan_log)) {
                     report.rawLog.forEach { line ->
                         Text(line, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
                     }
@@ -176,11 +174,9 @@ fun ObdScanScreen(
             item {
                 Text(
                     if (isSimulated) {
-                        if (isFr) "Portée : données de démonstration déterministes uniquement. Aucun adaptateur, calculateur ou véhicule réel n'est interrogé."
-                        else "Scope: deterministic demonstration data only. No real adapter, ECU or vehicle is queried."
+                        stringResource(R.string.obd_simulation_scope)
                     } else {
-                        if (isFr) "Portée : les résultats proviennent uniquement des réponses réellement émises par l'ECU accessible via OBD-II. Ce scan ne balaie pas le BCM, l'IPC, l'ABS, le SDM ou les autres calculateurs GM et n'exécute aucune commande d'actionnement ou de programmation."
-                        else "Scope: results come only from responses actually returned by the OBD-II-accessible ECU. This scan does not poll BCM, IPC, ABS, SDM or other GM modules and does not execute actuator or programming commands."
+                        stringResource(R.string.obd_real_scan_scope)
                     },
                     color = TextMuted, fontSize = 11.sp
                 )
@@ -224,16 +220,16 @@ private fun ObdValueCard(value: ObdValue, isFr: Boolean) {
 @Composable
 private fun DtcResultCard(dtc: ObdDtc, isFr: Boolean) {
     val status = when (dtc.status) {
-        "pending" -> if (isFr) "En attente" else "Pending"
-        "permanent" -> if (isFr) "Permanent" else "Permanent"
-        else -> if (isFr) "Confirmé" else "Confirmed"
+        "pending" -> stringResource(R.string.obd_pending)
+        "permanent" -> stringResource(R.string.obd_permanent)
+        else -> stringResource(R.string.obd_confirmed)
     }
     val statusColor = if (dtc.status == "confirmed") WarnRed else CamaroAmber
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(dtc.code, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(if (isFr) "Groupe motopropulseur / ECM" else "Powertrain / ECM", color = TextMuted, fontSize = 10.sp)
+                Text(stringResource(R.string.obd_powertrain_ecm), color = TextMuted, fontSize = 10.sp)
             }
             Text(status, color = statusColor, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
         }

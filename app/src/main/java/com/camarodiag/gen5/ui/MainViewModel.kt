@@ -39,7 +39,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     @Volatile private var camaroSignalCatalog: CamaroSignalCatalog? = null
     private val sessionDao = DiagnosticDatabase.getInstance(application).sessionDao()
 
-    private val _language = MutableStateFlow(AppLanguage.FR)
+    private val _language = MutableStateFlow(AppLanguage.fromLocale(application.resources.configuration.locales[0]))
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
     private val _unitSystem = MutableStateFlow(UnitSystem.METRIC)
@@ -115,6 +115,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setLanguage(lang: AppLanguage) { _language.value = lang }
+
+    private fun isSystemFrench(): Boolean =
+        getApplication<Application>().resources.configuration.locales[0].language.equals("fr", ignoreCase = true)
     fun setUnitSystem(units: UnitSystem) { _unitSystem.value = units }
 
     fun updateVehicle(
@@ -149,7 +152,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = false,
                 isJ2534BridgeConnected = false,
-                j2534BridgeMessage = if (_language.value == AppLanguage.FR)
+                j2534BridgeMessage = if (isSystemFrench())
                     "Pont PC déconnecté après changement d'identité véhicule."
                 else "PC bridge disconnected after vehicle identity change."
             )
@@ -184,7 +187,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 withContext(Dispatchers.Main) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         nativeSignals = signals,
-                        nativeSignalMessage = if (_language.value == AppLanguage.FR)
+                        nativeSignalMessage = if (isSystemFrench())
                             "${signals.size} définition(s) natives Camaro pour ${_vehicle.value.modelYear}. Aucune lecture autorisée sans preuve véhicule."
                         else "${signals.size} first-party Camaro definition(s) for ${_vehicle.value.modelYear}. Live reads require vehicle evidence."
                     )
@@ -208,7 +211,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     withContext(Dispatchers.Main) {
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                             obdbSignals = signals,
-                            obdbSignalMessage = if (_language.value == AppLanguage.FR)
+                            obdbSignalMessage = if (isSystemFrench())
                                 "${signals.size} signaux communautaires disponibles pour ${_vehicle.value.modelYear}."
                             else "${signals.size} community signal definitions available for ${_vehicle.value.modelYear}."
                         )
@@ -229,7 +232,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val signals = catalog.forYear(_vehicle.value.modelYear)
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             nativeSignals = signals,
-            nativeSignalMessage = if (_language.value == AppLanguage.FR)
+            nativeSignalMessage = if (isSystemFrench())
                 "${signals.size} définition(s) natives Camaro pour ${_vehicle.value.modelYear}. Aucune lecture autorisée sans preuve véhicule."
             else "${signals.size} first-party Camaro definition(s) for ${_vehicle.value.modelYear}. Live reads require vehicle evidence."
         )
@@ -241,7 +244,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             obdbSignals = signals,
             obdbSignalValue = "",
-            obdbSignalMessage = if (_language.value == AppLanguage.FR)
+            obdbSignalMessage = if (isSystemFrench())
                 "${signals.size} signaux communautaires disponibles pour ${_vehicle.value.modelYear}."
             else "${signals.size} community signal definitions available for ${_vehicle.value.modelYear}."
         )
@@ -294,7 +297,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val raw = client.readDataByIdentifier(did)
                 val decoded = signal.decode(raw)
                 val rendered = when {
-                    decoded.unavailable -> if (_language.value == AppLanguage.FR) "Non disponible (valeur sentinelle)" else "Unavailable (sentinel value)"
+                    decoded.unavailable -> if (isSystemFrench()) "Non disponible (valeur sentinelle)" else "Unavailable (sentinel value)"
                     decoded.mappedLabel != null -> decoded.mappedLabel
                     decoded.value != null -> {
                         val number = java.text.DecimalFormat("0.###", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.ROOT))
@@ -306,7 +309,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isObdbSignalReading = false,
                     obdbSignalValue = "$rendered\nRAW_DEC=${decoded.raw} • DID=0x${signal.identifierHex}",
-                    obdbSignalMessage = if (_language.value == AppLanguage.FR)
+                    obdbSignalMessage = if (isSystemFrench())
                         "${signal.name} lu sur 0x${signal.requestHeaderHex} → 0x${signal.responseHeaderHex}."
                     else "${signal.name} read from 0x${signal.requestHeaderHex} → 0x${signal.responseHeaderHex}."
                 )
@@ -373,7 +376,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534BridgeConnecting = false,
                     isJ2534BridgeConnected = true,
-                    j2534BridgeMessage = if (_language.value == AppLanguage.FR)
+                    j2534BridgeMessage = if (isSystemFrench())
                         "Pont J2534 connecté : $result"
                     else "J2534 bridge connected: $result"
                 )
@@ -395,7 +398,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isJ2534BridgeConnecting = false,
             isJ2534BridgeConnected = false,
-            j2534BridgeMessage = if (_language.value == AppLanguage.FR) "Pont PC déconnecté." else "PC bridge disconnected."
+            j2534BridgeMessage = if (isSystemFrench()) "Pont PC déconnecté." else "PC bridge disconnected."
         )
     }
 
@@ -446,7 +449,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDidResponse = rendered,
-                    udsMessage = if (_language.value == AppLanguage.FR)
+                    udsMessage = if (isSystemFrench())
                         "Réponse UDS réelle reçue depuis CAN ID ${responseCanIdHex.uppercase()}."
                     else "Real UDS response received from CAN ID ${responseCanIdHex.uppercase()}."
                 )
@@ -501,7 +504,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val dtcs = client.readDtcByStatusMask()
                 val rendered = if (dtcs.isEmpty()) {
-                    if (_language.value == AppLanguage.FR) "Aucun DTC retourné par le calculateur." else "No DTCs returned by the ECU."
+                    if (isSystemFrench()) "Aucun DTC retourné par le calculateur." else "No DTCs returned by the ECU."
                 } else {
                     dtcs.joinToString("\\n") { record ->
                         "0x${record.dtc.toString(16).uppercase().padStart(6, '0')}  status=0x${record.status.toString(16).uppercase().padStart(2, '0')}"
@@ -510,7 +513,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = rendered,
-                    udsMessage = if (_language.value == AppLanguage.FR) "Lecture UDS 0x19 terminée."
+                    udsMessage = if (isSystemFrench()) "Lecture UDS 0x19 terminée."
                     else "UDS 0x19 read completed."
                 )
             } catch (cancelled: CancellationException) {
@@ -530,7 +533,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun readCalibrationIdentification() {
         viewModelScope.launch {
             if (!obdManager.isObdCommandChannelAvailable) {
-                val isFr = _language.value == AppLanguage.FR
+                val isFr = isSystemFrench()
                 val bridgeOnly = obdManager.isJ2534BridgeConnected()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
@@ -1467,7 +1470,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     adapterName = _adapter.value.deviceName,
                     dtcSummary = if (_dtcs.value.isEmpty()) "0 DTC" else _dtcs.value.joinToString(", ") { it.code },
                     mileageSummary = report?.let {
-                        if (_language.value == AppLanguage.FR) it.summaryFr else it.summaryEn
+                        if (isSystemFrench()) it.summaryFr else it.summaryEn
                     } ?: "Audit non exécuté",
                     hasMileageDiscrepancy = report?.hasDiscrepancy ?: false,
                     maxDeltaKm = report?.maxDeltaKm ?: 0.0
