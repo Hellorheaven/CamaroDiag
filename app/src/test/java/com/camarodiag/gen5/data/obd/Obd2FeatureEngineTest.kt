@@ -111,10 +111,10 @@ class Obd2FeatureEngineTest {
         val values = engine.readLiveData(setOf(0x24))
 
         assertEquals(2, values.size)
-        assertEquals("O2 sensor 1 equivalence ratio", values[0].name)
+        assertEquals("O2 Bank 1 sensor 1 equivalence ratio", values[0].name)
         assertEquals("1.00", values[0].value)
         assertEquals("lambda", values[0].unit)
-        assertEquals("O2 sensor 1 voltage", values[1].name)
+        assertEquals("O2 Bank 1 sensor 1 voltage", values[1].name)
         assertEquals("2.00", values[1].value)
         assertEquals("V", values[1].unit)
     }
@@ -128,11 +128,35 @@ class Obd2FeatureEngineTest {
         val values = engine.readLiveData(setOf(0x34))
 
         assertEquals(2, values.size)
-        assertEquals("O2 sensor 1 equivalence ratio", values[0].name)
+        assertEquals("O2 Bank 1 sensor 1 equivalence ratio", values[0].name)
         assertEquals("1.00", values[0].value)
-        assertEquals("O2 sensor 1 current", values[1].name)
+        assertEquals("O2 Bank 1 sensor 1 current", values[1].name)
         assertEquals("0.00", values[1].value)
         assertEquals("mA", values[1].unit)
+    }
+
+    @Test
+    fun labelsWidebandOxygenSensorsByBankAndPosition() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0128") "4128 80 00 40 00" else "NO DATA"
+        })
+
+        val values = engine.readLiveData(setOf(0x28))
+
+        assertEquals("O2 Bank 2 sensor 1 equivalence ratio", values[0].name)
+        assertEquals("O2 Bank 2 sensor 1 voltage", values[1].name)
+    }
+
+    @Test
+    fun decodesZeroEvaporativeVapourPressureAtTheStandardOffset() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0132") "4132 8000" else "NO DATA"
+        })
+
+        val value = engine.readLiveData(setOf(0x32)).single()
+
+        assertEquals("0.00", value.value)
+        assertEquals("Pa", value.unit)
     }
 
     @Test
