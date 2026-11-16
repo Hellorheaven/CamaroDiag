@@ -40,7 +40,7 @@ fun ObdScanScreen(
     isFr: Boolean,
     onRunScan: () -> Unit
 ) {
-    val unavailable = if (isFr) unavailable else "Not available"
+    val unavailable = if (isFr) "Non disponible" else "Not available"
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
