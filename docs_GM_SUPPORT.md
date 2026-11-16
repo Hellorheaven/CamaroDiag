@@ -87,6 +87,14 @@ Le démarrage à distance n'est pas une commande CAN générique. RemoteStartSaf
 
 minSdk = 29 (Android 10), compileSdk/targetSdk = 36. USB Host, réseau TCP et permissions Bluetooth doivent être validés sur les appareils réels visés. Les tests unitaires et l'assemblage APK CI ne remplacent pas les essais sur VCX/ELM, sur toutes les générations et sur chaque calculateur.
 
+## Références techniques GM
+
+- [GM MDI 2 User Guide](https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf) : décrit le MDI 2, son fonctionnement avec un hôte PC, les interfaces J2534 / ISO 22900 et les logiciels de diagnostic/reprogrammation GM.
+- [GM MDI User Guide](https://gsitlc.ext.gm.com/userguides/GM_MDI_User_Guide.pdf) : précise que les emplacements des calculateurs et les connecteurs doivent être recherchés dans le Service Information du véhicule testé.
+- [GM TIS2Web User Guide](https://gsi.ext.gm.com/userguides/GM_TIS2Web_User_Guide.pdf) : décrit le rôle du VIN dans la sélection des CAL ID/CVN et les prérequis de programmation SPS, dont l'interface J2534 et la stabilité d'alimentation.
+
+Ces guides sont des documents d'architecture et de procédure générale, pas des listes d'adresses CAN/DID pour chaque Camaro. Les données de diagnostic détaillées doivent être extraites du Service Information correspondant au VIN, à l'année, au module et à sa calibration. Le guide MDI 2 décrit un environnement logiciel hôte PC ; il ne fournit pas de SDK Android directement intégrable dans CamaroDiag.
+
 ## Conditions pour achever le flashage GM et VXDIAG
 
 Obtenir auprès de VXDIAG les SDK/API officiellement autorisés pour chaque VCX SE/NANO, les identifiants USB/réseau, versions de firmware, documentation de transport et droits de redistribution. Pour le flash GM, obtenir les définitions, licences, procédures et moyens de récupération approuvés pour chaque ECM. En leur absence, les fonctions correspondantes doivent rester explicitement indisponibles plutôt que d'exécuter des trames supposées.
