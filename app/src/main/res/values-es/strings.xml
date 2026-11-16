@@ -207,4 +207,15 @@
     <string name="vm_uds_read_complete">Lectura UDS 0x19 completada.</string>
     <string name="vm_j2534_no_elm_channel">El puente J2534 proporciona transporte UDS, no el canal ELM necesario para OBD-II Modo 09.</string>
     <string name="vm_no_obd_data_read">Modo de demostración o adaptador OBD no conectado: no se han leído datos reales de la ECU.</string>
+    <string name="update_download_failed">Descarga fallida.</string>
+    <string name="update_download_invalid_signature">Descarga o firma no válidas. Instalación bloqueada; puede ser necesaria una reinstalación manual.</string>
+    <string name="update_download_complete">Descarga completada.</string>
+    <string name="update_ready_to_install">CamaroDiag – listo para instalar</string>
+    <string name="update_downloading">Descargando</string>
+    <string name="update_available">Actualización disponible</string>
+    <string name="update_channel_only">Solo se ofrece el canal %1$s. Debug sigue siendo Debug y Release sigue siendo Release.</string>
+    <string name="update_allow_unknown_sources">Permite las instalaciones desde este origen, vuelve y pulsa Instalar.</string>
+    <string name="update_install">Instalar</string>
+    <string name="update_download">Descargar</string>
+    <string name="update_later">Más tarde</string>
 </resources>
