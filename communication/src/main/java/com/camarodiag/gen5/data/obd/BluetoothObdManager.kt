@@ -244,19 +244,19 @@ class BluetoothObdManager(context: Context) {
     )
 
     fun disconnect() {
-        try {
-            usbTransport.close(); wifiTransport.close(); bleTransport.close()
-            inputStream?.close()
-            outputStream?.close()
-            socket?.close()
-        } catch (_: Exception) {
-        } finally {
-            inputStream = null
-            outputStream = null
-            socket = null
-            activeTransport = "BLUETOOTH"
-            isDemoMode = true
-            isSimulationActive = false
-        }
+        // Close every transport independently: one failing close must not leak the others.
+        runCatching { usbTransport.close() }
+        runCatching { wifiTransport.close() }
+        runCatching { bleTransport.close() }
+        runCatching { inputStream?.close() }
+        runCatching { outputStream?.close() }
+        runCatching { socket?.close() }
+
+        inputStream = null
+        outputStream = null
+        socket = null
+        activeTransport = "BLUETOOTH"
+        isDemoMode = true
+        isSimulationActive = false
     }
 }
