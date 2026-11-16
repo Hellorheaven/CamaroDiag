@@ -590,6 +590,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun markAdapterDisconnected() {
+        _adapter.value = AdapterCapabilities(
+            deviceName = "Not connected",
+            macAddress = "",
+            tier = AdapterTier.DISCONNECTED,
+            firmwareId = "",
+            supportsLongFrames = false,
+            supportsSwCan = false,
+            supportsCanHeaders = false
+        )
+        _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
+        _livePids.value = emptyList()
+        _dtcs.value = emptyList()
+        _obdScanReport.value = null
+        _isObdScanning.value = false
+    }
+
     private fun connectWithResult(
         connect: suspend () -> Result<AdapterCapabilities>,
         fallbackMessage: String
@@ -597,6 +614,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isBusy.value = true
             _connectionMessage.value = null
+            markAdapterDisconnected()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 ecuVinResponse = "",
                 calibrationIdResponse = "",
@@ -665,6 +683,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectSimulatedAdapter(preset: String) {
         viewModelScope.launch {
             _isBusy.value = true
+            markAdapterDisconnected()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 ecuVinResponse = "",
                 calibrationIdResponse = "",
