@@ -349,6 +349,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isFr = isFr,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onReadUdsDid = { requestId, responseId, did -> viewModel.readUdsDid(requestId, responseId, did) },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
                     onImportDefinitions = {
