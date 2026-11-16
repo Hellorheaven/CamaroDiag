@@ -71,7 +71,7 @@ Les APK Debug sont publiés comme artefacts des exécutions GitHub Actions (ils 
 1. Ouvrir https://github.com/Hellorheaven/CamaroDiag/actions.
 2. Ouvrir la dernière exécution réussie de **Android CI** sur `main`.
 3. Dans **Artifacts**, télécharger `CamaroDiag-debug-<commit>`.
-4. Décompresser l'archive et installer `app-debug.apk`.
+4. Décompresser l'archive et installer `CamaroDiag-debug.apk`.
 
 Chaque artefact est conservé 30 jours. Les Releases restent réservées aux APK Release et aux installateurs du pont Windows.
 
