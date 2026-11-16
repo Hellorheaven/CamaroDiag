@@ -60,6 +60,7 @@ data class CalibrationWorkspaceState(
     val message: String = "",
     val isUdsReading: Boolean = false,
     val udsDidResponse: String = "",
+    val udsDtcResponse: String = "",
     val udsMessage: String = "",
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
@@ -102,6 +103,7 @@ fun CalibrationWorkspaceScreen(
     isFr: Boolean,
     onReadIdentification: () -> Unit,
     onReadUdsDid: (String, String, String) -> Unit,
+    onReadUdsDtcs: (String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
@@ -253,6 +255,19 @@ fun CalibrationWorkspaceScreen(
                     if (state.udsDidResponse.isNotBlank()) {
                         Text("UDS $udsDid", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.udsDidResponse, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId) },
+                        enabled = isConnected && !state.isUdsReading &&
+                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (isFr) "Lire les DTC UDS" else "Read UDS DTCs")
+                    }
+                    if (state.udsDtcResponse.isNotBlank()) {
+                        Text(if (isFr) "Défauts UDS (0x19)" else "UDS trouble codes (0x19)",
+                            color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(state.udsDtcResponse, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                     }
                     if (state.ecuVinResponse.isNotBlank() || state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank()) {
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
