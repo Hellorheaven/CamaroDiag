@@ -119,9 +119,7 @@ La lecture mémoire directe de l'ECM, l'écriture, le flashage, le recovery, les
 
 ## Origine des données et licences intégrées
 
-Le catalogue de signaux Camaro provient de https://github.com/OBDb/Chevrolet-Camaro, fichier signalsets/v3/default.json, commit source 6771593698dff29cc0c6e8d6219ff360b2891883. Licence : Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0). Les définitions originales, identifiants, filtres d'années et facteurs sont conservés. Le texte intégral de la licence reste dans third_party/obdb/. Les données ne sont pas certifiées par GM.
-
-OpenVCX (https://github.com/erik683/OpenVCX) a été consulté comme référence pour certaines variantes VCX Nano ; aucun code, binaire ou pilote n'est intégré. monitoramento_Carro (https://github.com/Carlosh007/monitoramento_Carro) a été consulté comme inspiration d'interface télémétrique ; aucun code ni actif n'est repris.
+Le catalogue de signaux communautaire est issu du projet **OBDb Chevrolet Camaro** (OBDb contributors), fichier `signalsets/v3/default.json`, dépôt https://github.com/OBDb/Chevrolet-Camaro, révision source `6771593698dff29cc0c6e8d6219ff360b2891883`. Il est distribué sous **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)** : https://creativecommons.org/licenses/by-sa/4.0/. Les définitions, identifiants, filtres d'années et facteurs provenant de cette source restent soumis à cette licence ; toute adaptation distribuée doit conserver l'attribution et être partagée sous la même licence. Le texte intégral est fourni dans `third_party/obdb/LICENSE-CC-BY-SA-4.0.txt`. Ce jeu de données communautaire n'est ni produit ni certifié par GM.
 
 Références utiles : OBDLink (https://support.obdsol.com/support/solutions/articles/43000713351-which-obdlink-adapter-is-right-for-me-), fiche MX+ (https://www.obdlink.com/products/obdlink-mxp/), guide GM MDI 2 (https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf), guide GM TIS2Web (https://gsi.ext.gm.com/userguides/GM_TIS2Web_User_Guide.pdf). Ces documents généraux ne remplacent pas les informations de service GM correspondant au VIN.
 
