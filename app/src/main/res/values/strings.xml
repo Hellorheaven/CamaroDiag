@@ -283,4 +283,25 @@
     <string name="remote_start_blocker_faults">Absence of critical faults is not confirmed.</string>
     <string name="remote_start_blocker_stationary">Vehicle stationary status is not confirmed.</string>
     <string name="remote_start_blocker_equipment">OEM remote-start equipment is not confirmed.</string>
+    <string name="units_metric">SI / Metric</string>
+    <string name="units_imperial">Imperial</string>
+    <string name="live_pause">Pause</string>
+    <string name="live_recording_status">%1$d sample(s) • %2$s</string>
+    <string name="live_recording_state_active">RECORDING</string>
+    <string name="live_recording_state_stopped">STOPPED</string>
+    <string name="live_pid_rpm">Engine speed</string>
+    <string name="live_pid_rpm_demo">Engine speed (DEMO)</string>
+    <string name="live_pid_ect">Coolant temperature</string>
+    <string name="live_pid_ect_demo">Coolant temperature (DEMO)</string>
+    <string name="live_pid_oil_demo">Oil pressure (DEMO)</string>
+    <string name="live_pid_stft">Short-term fuel trim B1</string>
+    <string name="live_pid_stft_demo">Short-term fuel trim B1 (DEMO)</string>
+    <string name="live_pid_bat">Control module voltage</string>
+    <string name="live_pid_bat_demo">Control module voltage (DEMO)</string>
+    <string name="live_pid_speed">Vehicle speed</string>
+    <string name="live_pid_throttle">Throttle position</string>
+    <string name="live_pid_load">Calculated engine load</string>
+    <string name="live_pid_map">Intake manifold pressure</string>
+    <string name="live_pid_iat">Intake air temperature</string>
+    <string name="live_pid_maf">Mass air flow</string>
 </resources>

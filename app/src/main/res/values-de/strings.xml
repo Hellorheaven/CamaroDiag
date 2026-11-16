@@ -283,4 +283,25 @@
     <string name="remote_start_blocker_faults">Das Fehlen kritischer Fehler ist nicht bestätigt.</string>
     <string name="remote_start_blocker_stationary">Stillstand des Fahrzeugs nicht bestätigt.</string>
     <string name="remote_start_blocker_equipment">OEM-Fernstartausstattung nicht bestätigt.</string>
+    <string name="units_metric">SI / Metrisch</string>
+    <string name="units_imperial">Imperial</string>
+    <string name="live_pause">Pause</string>
+    <string name="live_recording_status">%1$d Messwert(e) • %2$s</string>
+    <string name="live_recording_state_active">AUFZEICHNUNG</string>
+    <string name="live_recording_state_stopped">GESTOPPT</string>
+    <string name="live_pid_rpm">Motordrehzahl</string>
+    <string name="live_pid_rpm_demo">Motordrehzahl (DEMO)</string>
+    <string name="live_pid_ect">Kühlmitteltemperatur</string>
+    <string name="live_pid_ect_demo">Kühlmitteltemperatur (DEMO)</string>
+    <string name="live_pid_oil_demo">Öldruck (DEMO)</string>
+    <string name="live_pid_stft">Kurzzeit-Kraftstoffkorrektur B1</string>
+    <string name="live_pid_stft_demo">Kurzzeit-Kraftstoffkorrektur B1 (DEMO)</string>
+    <string name="live_pid_bat">Steuergerätespannung</string>
+    <string name="live_pid_bat_demo">Steuergerätespannung (DEMO)</string>
+    <string name="live_pid_speed">Fahrzeuggeschwindigkeit</string>
+    <string name="live_pid_throttle">Drosselklappenstellung</string>
+    <string name="live_pid_load">Berechnete Motorlast</string>
+    <string name="live_pid_map">Saugrohrdruck</string>
+    <string name="live_pid_iat">Ansauglufttemperatur</string>
+    <string name="live_pid_maf">Luftmassenstrom</string>
 </resources>

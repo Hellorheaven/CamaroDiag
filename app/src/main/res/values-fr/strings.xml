@@ -283,4 +283,25 @@
     <string name="remote_start_blocker_faults">Absence de défaut critique non confirmée.</string>
     <string name="remote_start_blocker_stationary">Immobilité du véhicule non confirmée.</string>
     <string name="remote_start_blocker_equipment">Option de démarrage à distance OEM non confirmée.</string>
+    <string name="units_metric">SI / Métrique</string>
+    <string name="units_imperial">Impérial</string>
+    <string name="live_pause">Pause</string>
+    <string name="live_recording_status">%1$d échantillon(s) • %2$s</string>
+    <string name="live_recording_state_active">ENREGISTREMENT</string>
+    <string name="live_recording_state_stopped">ARRÊTÉ</string>
+    <string name="live_pid_rpm">Régime moteur</string>
+    <string name="live_pid_rpm_demo">Régime moteur (DÉMO)</string>
+    <string name="live_pid_ect">Température liquide</string>
+    <string name="live_pid_ect_demo">Température liquide (DÉMO)</string>
+    <string name="live_pid_oil_demo">Pression huile (DÉMO)</string>
+    <string name="live_pid_stft">Correction carburant court terme B1</string>
+    <string name="live_pid_stft_demo">Correction carburant B1 (DÉMO)</string>
+    <string name="live_pid_bat">Tension calculateur</string>
+    <string name="live_pid_bat_demo">Tension calculateur (DÉMO)</string>
+    <string name="live_pid_speed">Vitesse véhicule</string>
+    <string name="live_pid_throttle">Position papillon</string>
+    <string name="live_pid_load">Charge moteur calculée</string>
+    <string name="live_pid_map">Pression collecteur admission</string>
+    <string name="live_pid_iat">Température air admission</string>
+    <string name="live_pid_maf">Débit massique d'air</string>
 </resources>
