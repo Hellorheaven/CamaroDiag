@@ -160,10 +160,17 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     }
                 },
                 actions = {
-                    if (adapter.deviceName.contains("Demo", ignoreCase = true) || adapter.deviceName.contains("Simulated", ignoreCase = true)) {
-                        Text("DEMO", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    } else {
-                        Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    when {
+                        adapter.deviceName.contains("Demo", ignoreCase = true) ||
+                            adapter.deviceName.contains("Simulated", ignoreCase = true) -> {
+                            Text("DEMO", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        adapter.tier != AdapterTier.DISCONNECTED -> {
+                            Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        else -> {
+                            Text(if (isFr) "HORS LIGNE" else "OFFLINE", color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
                     }
                     TextButton(onClick = {
                         viewModel.setLanguage(if (isFr) AppLanguage.EN else AppLanguage.FR)
