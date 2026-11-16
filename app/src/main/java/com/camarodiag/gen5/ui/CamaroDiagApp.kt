@@ -642,7 +642,7 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp
                             )
-                            remoteStartAssessment.blockersFr.forEach { blocker ->
+                            (if (isFr) remoteStartAssessment.blockersFr else remoteStartAssessment.blockersEn).forEach { blocker ->
                                 Text("• " + blocker, color = WarnRed, fontSize = 10.sp)
                             }
                         }
