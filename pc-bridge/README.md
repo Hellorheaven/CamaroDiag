@@ -47,11 +47,11 @@ Ce pont est générique J2534. Il ne fournit aucun pilote VXDIAG et ne remplace 
 
 **Important pour les PC sans droits administrateur :** l'utilisateur peut installer le pont CamaroDiag avec le Setup dans son profil Windows, mais il ne peut pas installer lui-même VX Manager ni le pilote J2534 si la politique informatique réserve ces opérations à l'administrateur. Le pilote et l'interface doivent donc être préparés par le service informatique avant l'utilisation.
 
-Les builds Debug restent réservés aux vérifications internes et ne sont pas joints aux releases publiques. Les releases publiques ne contiennent que l'APK Android de production et les deux installateurs Windows Release.
+Le contrôle de mise à jour du pont utilise l'installateur Setup Release publié dans la release GitHub ; il le lance après fermeture du pont, sans extraction manuelle de ZIP et sans élévation administrateur. Les builds Debug restent réservés aux vérifications internes et ne sont pas joints aux releases publiques. Les releases publiques ne contiennent que l'APK Android de production et les deux installateurs Windows Release.
 
 ## Sécurité réseau
 
-La liaison utilise TCP et un jeton, sans chiffrement TLS. Ne jamais exposer le port à Internet, ne pas configurer de redirection de port et ne pas utiliser le pont sur un Wi-Fi public.
+La liaison utilise TCP et un jeton, sans chiffrement TLS. Le pont refuse les adresses distantes publiques et n'accepte que les réseaux privés/locaux (RFC1918, ULA IPv6, link-local). Ne jamais exposer le port à Internet, ne pas configurer de redirection de port et ne pas utiliser le pont sur un Wi-Fi public. Le jeton reste transmis en clair sur le réseau local : utiliser uniquement un réseau de confiance.
 
 ## Fonctions et limites
 
