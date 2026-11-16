@@ -289,6 +289,11 @@ fun CalibrationWorkspaceScreen(
                                 else "Run CamaroDiag.J2534Bridge.exe on the Windows PC, then enter its IP and the token shown in the console. Both devices must be on the same local network.",
                                 color = TextMuted, fontSize = 10.sp
                             )
+                            Text(
+                                if (isFr) "Sécurité : jeton non chiffré par TLS. Utilise un réseau privé de confiance et n'expose jamais ce port à Internet."
+                                else "Security: the token is not TLS-encrypted. Use a trusted private network and never expose this port to the Internet.",
+                                color = CamaroAmber, fontSize = 10.sp
+                            )
                             OutlinedTextField(
                                 value = j2534Host,
                                 onValueChange = { j2534Host = it.trim().take(64) },
