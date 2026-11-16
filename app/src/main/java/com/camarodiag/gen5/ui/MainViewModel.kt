@@ -155,6 +155,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             if (obdManager.isDemoMode) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isReading = false,
+                    ecuVinResponse = "",
+                    calibrationIdResponse = "",
+                    cvnResponse = "",
                     message = "Mode démo ou interface non connectée : aucune donnée ECU réelle n'a été lue."
                 )
                 return@launch
