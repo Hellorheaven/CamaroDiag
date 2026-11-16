@@ -117,6 +117,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setLanguage(lang: AppLanguage) { _language.value = lang }
 
+
+    private fun localizedMileageSummaryForStorage(report: com.camarodiag.gen5.domain.model.MileageAuditReport): String {
+        val valid = report.readings.filter { reading ->
+            reading.kmValue?.let { it.isFinite() && it >= 0.0 } == true
+        }
+        val independent = valid.filter {
+            !it.profileEvidenceReference.isNullOrBlank() &&
+                it.confidence == com.camarodiag.gen5.domain.model.ConfidenceLevel.HIGH &&
+                it.moduleId.uppercase() in setOf("BCM", "IPC", "ECM_TOTAL_ODO")
+        }.distinctBy { it.moduleId.uppercase() }
+        val values = independent.mapNotNull { it.kmValue }
+        val delta = if (values.size >= 2) values.maxOrNull()!! - values.minOrNull()!! else 0.0
+        val context = getApplication<Application>()
+        return when {
+            report.hasDiscrepancy -> context.getString(R.string.mileage_summary_discrepancy, delta)
+            values.size >= 2 -> context.getString(R.string.mileage_summary_agreement, delta)
+            valid.isEmpty() -> context.getString(R.string.mileage_summary_no_data)
+            else -> context.getString(R.string.mileage_summary_insufficient, valid.size, independent.size)
+        }
+    }
+
     private fun isSystemFrench(): Boolean =
         getApplication<Application>().resources.configuration.locales[0].language.equals("fr", ignoreCase = true)
     fun setUnitSystem(units: UnitSystem) { _unitSystem.value = units }
@@ -1038,7 +1059,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: "Actualisation des interfaces impossible."
+                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_refresh_adapters_failed)
             }
         }
     }
@@ -1046,20 +1067,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun connectWifi(host: String, port: Int) {
         connectWithResult(
             connect = { obdManager.connectWifi(host.trim(), port) },
-            fallbackMessage = "Wi-Fi OBD connection failed"
+            fallbackMessage = getApplication<Application>().getString(R.string.msg_wifi_connection_failed)
         )
     }
 
     fun connectUsb(deviceLabel: String) {
         val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
         if (id == null) {
-            _connectionMessage.value = "USB device identifier unavailable"
+            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_usb_identifier_unavailable)
             return
         }
         val baudRate = if (deviceLabel.contains("OBDLink", true)) 115200 else 38400
         connectWithResult(
             connect = { obdManager.connectUsb(id, baudRate) },
-            fallbackMessage = "USB OBD connection failed"
+            fallbackMessage = getApplication<Application>().getString(R.string.msg_usb_connection_failed)
         )
     }
 
@@ -1080,7 +1101,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: "Activation du mode simulation impossible."
+                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_simulation_activation_failed)
             } finally {
                 endBusyOperation()
             }
@@ -1090,12 +1111,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun connectRealBluetooth(macAddress: String) {
         val selectedName = _pairedDevices.value.firstOrNull { it.second == macAddress }?.first.orEmpty()
         if (selectedName.contains("OBDLink CX", ignoreCase = true)) {
-            _connectionMessage.value = "OBDLink CX détecté en BLE, mais le fabricant indique qu’il n’est pas compatible avec les véhicules GM. Utilisez MX+, MX, LX ou une interface GM compatible."
+            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_obdlink_cx_not_gm_compatible)
             return
         }
         connectWithResult(
             connect = { obdManager.connectAndProbe(macAddress) },
-            fallbackMessage = "Bluetooth SPP connection failed"
+            fallbackMessage = getApplication<Application>().getString(R.string.msg_bluetooth_connection_failed)
         )
     }
 
@@ -1197,7 +1218,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         recordedLiveSamples += RecordedLiveSample(System.currentTimeMillis(), snapshot)
         _liveRecordingState.value = _liveRecordingState.value.copy(
             sampleCount = recordedLiveSamples.size,
-            message = "Enregistrement en cours : ${recordedLiveSamples.size} échantillon(s)."
+            message = getApplication<Application>().getString(R.string.msg_live_recording_started, recordedLiveSamples.size)
         )
     }
 
@@ -1209,12 +1230,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val (confirmed, pending, permanent) =
                         obdManager.createSimulatedObd2FeatureEngine().readDtcs()
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
-                    _connectionMessage.value = "DTC simulés par le profil Camaro LFX : aucune réponse ECU réelle."
+                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_simulated_lfx)
                 } else if (!obdManager.isObdCommandChannelAvailable) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
-                        "Le pont J2534 connecté ne fournit pas le canal ELM nécessaire au scan DTC OBD-II."
-                    else "Connecte une interface OBD réelle pour lire les défauts."
+                        getApplication<Application>().getString(R.string.msg_dtc_j2534_unavailable)
+                    else getApplication<Application>().getString(R.string.msg_dtc_adapter_required)
                 } else {
                     val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
                         engine.readDtcs()
@@ -1224,7 +1245,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: "Échec du scan des défauts."
+                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_dtc_scan_failed)
             } finally {
                 endBusyOperation()
             }
@@ -1305,10 +1326,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 if (obdManager.isSimulationActive) {
                     _dtcs.value = emptyList()
-                    _connectionMessage.value = "Défauts de démonstration effacés localement ; aucun ECU interrogé."
+                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_demo_cleared)
                 } else if (!obdManager.isObdCommandChannelAvailable) {
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
-                        "Effacement OBD-II indisponible via le pont J2534 : aucun canal ELM n'est connecté."
+                        getApplication<Application>().getString(R.string.msg_dtc_clear_j2534_unavailable)
                     else "Connecte une interface OBD réelle avant de demander l'effacement."
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
@@ -1316,7 +1337,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _dtcs.value = emptyList()
                         _connectionMessage.value = null
                     } else {
-                        _connectionMessage.value = "Effacement non confirmé par une réponse positive Mode 04 : $response"
+                        _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_clear_not_confirmed, response)
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -1406,7 +1427,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (!obdManager.isSimulationActive && !obdManager.isObdCommandChannelAvailable) {
                 _obdScanReport.value = null
                 _obdScanMessage.value = if (obdManager.isJ2534BridgeConnected())
-                    "Le pont J2534 est réservé au transport UDS : il ne fournit pas le canal ELM requis pour un scan OBD-II standard."
+                    getApplication<Application>().getString(R.string.msg_full_scan_j2534_only)
                 else "Aucune interface OBD réelle connectée. Sélectionne le profil de simulation pour tester l'écran hors véhicule."
                 return@launch
             }
@@ -1430,12 +1451,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _obdScanMessage.value = if (obdManager.isSimulationActive) {
                     "SIMULATION HORS VÉHICULE — ${report.supportedPids.size} PIDs et ${allDtcs.size} DTC de démonstration. Aucune donnée réelle n'a été lue."
                 } else {
-                    "Scan OBD-II terminé : ${report.supportedPids.size} PIDs supportés, ${allDtcs.size} défaut(s) retourné(s)."
+                    getApplication<Application>().getString(R.string.msg_full_scan_complete, report.supportedPids.size, allDtcs.size)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _obdScanMessage.value = error.localizedMessage ?: "Échec du scan OBD-II."
+                _obdScanMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_full_scan_failed)
             } finally {
                 _isObdScanning.value = false
             }
@@ -1454,17 +1475,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     adapterName = _adapter.value.deviceName,
                     dtcSummary = if (_dtcs.value.isEmpty()) "0 DTC" else _dtcs.value.joinToString(", ") { it.code },
                     mileageSummary = report?.let {
-                        if (isSystemFrench()) it.summaryFr else it.summaryEn
-                    } ?: "Audit non exécuté",
+                        localizedMileageSummaryForStorage(it)
+                    } ?: getApplication<Application>().getString(R.string.mileage_audit_not_run),
                     hasMileageDiscrepancy = report?.hasDiscrepancy ?: false,
                     maxDeltaKm = report?.maxDeltaKm ?: 0.0
                 )
                 sessionDao.insertSession(entity)
-                _connectionMessage.value = "Session de diagnostic sauvegardée."
+                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_session_saved)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: "Sauvegarde de la session impossible."
+                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_session_save_failed)
             }
         }
     }
@@ -1476,7 +1497,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: "Suppression de la session impossible."
+                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_session_delete_failed)
             }
         }
     }
@@ -1531,15 +1552,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     LivePidValue("STFT", "Short Term Fuel Trim B1 (DEMO)", "Correction carburant B1 (DÉMO)", stft, "%", stft, "%", -6.0, 6.0, push("STFT", stft)),
                                     LivePidValue("BAT", "Control Module Voltage (DEMO)", "Tension calculateur (DÉMO)", voltage, "V", voltage, "V", 11.5, 15.2, push("BAT", voltage))
                                 )
-                                _liveTelemetryMessage.value = "Simulation active : les valeurs affichées ne proviennent pas du véhicule."
+                                _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_simulation_active)
                             }
                             obdManager.isDemoMode -> {
                                 _livePids.value = emptyList()
-                                _liveTelemetryMessage.value = "Aucune interface connectée. Les valeurs simulées ne sont pas affichées automatiquement."
+                                _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_no_adapter)
                             }
                             !obdManager.isObdCommandChannelAvailable -> {
                                 _livePids.value = emptyList()
-                                _liveTelemetryMessage.value = "Le pont J2534 connecté fournit le transport UDS, pas le canal ELM nécessaire à la télémétrie OBD-II standard."
+                                _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_j2534_only)
                             }
                             else -> {
                                 val values = mutableListOf<LivePidValue>()
@@ -1597,11 +1618,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         throw cancelled
                     } catch (error: Exception) {
                         consecutiveFailures++
-                        _liveTelemetryMessage.value = error.localizedMessage ?: "Erreur de lecture OBD live."
+                        _liveTelemetryMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_live_read_failed)
                         if (_liveRecordingState.value.isRecording) {
                             stopLiveRecording()
                             _liveRecordingState.value = _liveRecordingState.value.copy(
-                                message = "Enregistrement arrêté : la communication OBD a échoué. Les derniers échantillons restent exportables."
+                                message = getApplication<Application>().getString(R.string.msg_live_recording_stopped)
                             )
                         }
                     }
