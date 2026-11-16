@@ -203,7 +203,7 @@
     <string name="vm_j2534_connected">J2534 bridge connected: %1$s</string>
     <string name="vm_pc_bridge_disconnected">PC bridge disconnected.</string>
     <string name="vm_uds_response_received">Real UDS response received from CAN ID %1$s.</string>
-    <string name="vm_no_dtcs_returned">No DTCs returned by the ECU.</string>
+    <string name="vm_no_dtcs_returned">No DTCs returned by the ECU at CAN ID %1$s.</string>
     <string name="vm_uds_read_complete">UDS 0x19 read completed.</string>
     <string name="vm_j2534_no_elm_channel">The J2534 bridge provides UDS transport, not the ELM channel required for OBD-II Mode 09.</string>
     <string name="vm_no_obd_data_read">Demo mode or no OBD adapter connected: no real ECU data was read.</string>

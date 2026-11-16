@@ -203,7 +203,7 @@
     <string name="vm_j2534_connected">גשר J2534 מחובר: %1$s</string>
     <string name="vm_pc_bridge_disconnected">גשר המחשב נותק.</string>
     <string name="vm_uds_response_received">התקבלה תגובת UDS אמיתית ממזהה CAN ‏%1$s.</string>
-    <string name="vm_no_dtcs_returned">מחשב הרכב לא החזיר קודי DTC.</string>
+    <string name="vm_no_dtcs_returned">מחשב הרכב לא החזיר קודי DTC במזהה CAN ‏%1$s.</string>
     <string name="vm_uds_read_complete">קריאת UDS ‏0x19 הושלמה.</string>
     <string name="vm_j2534_no_elm_channel">גשר J2534 מספק תעבורת UDS ולא את ערוץ ELM הדרוש ל-OBD-II מצב 09.</string>
     <string name="vm_no_obd_data_read">מצב הדגמה או שאין מתאם OBD מחובר: לא נקראו נתונים אמיתיים ממחשב הרכב.</string>

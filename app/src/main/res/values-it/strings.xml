@@ -203,7 +203,7 @@
     <string name="vm_j2534_connected">Bridge J2534 connesso: %1$s</string>
     <string name="vm_pc_bridge_disconnected">Bridge PC disconnesso.</string>
     <string name="vm_uds_response_received">Ricevuta risposta UDS reale dall\'ID CAN %1$s.</string>
-    <string name="vm_no_dtcs_returned">La centralina non ha restituito DTC.</string>
+    <string name="vm_no_dtcs_returned">La centralina non ha restituito DTC sull’ID CAN %1$s.</string>
     <string name="vm_uds_read_complete">Lettura UDS 0x19 completata.</string>
     <string name="vm_j2534_no_elm_channel">Il bridge J2534 fornisce il trasporto UDS, non il canale ELM necessario per OBD-II Modalità 09.</string>
     <string name="vm_no_obd_data_read">Modalità demo o adattatore OBD non collegato: non sono stati letti dati reali dalla centralina.</string>
