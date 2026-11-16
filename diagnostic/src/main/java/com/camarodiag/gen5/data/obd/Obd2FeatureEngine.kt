@@ -322,20 +322,26 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
 
         if (pid in 0x24..0x2B) {
             if (data.size < 4) return emptyList()
-            val sensor = pid - 0x23
+            val sensorIndex = pid - 0x24
+            val bank = if (sensorIndex < 4) 1 else 2
+            val sensor = sensorIndex % 4 + 1
+            val sensorLabel = "Bank $bank sensor $sensor"
             val equivalenceRatio = ((data[0] shl 8) or data[1]) * 2.0 / 65536.0
             val voltage = ((data[2] shl 8) or data[3]) * 8.0 / 65536.0
-            return value("O2 sensor $sensor equivalence ratio", equivalenceRatio, "lambda") +
-                value("O2 sensor $sensor voltage", voltage, "V")
+            return value("O2 $sensorLabel equivalence ratio", equivalenceRatio, "lambda") +
+                value("O2 $sensorLabel voltage", voltage, "V")
         }
 
         if (pid in 0x34..0x3B) {
             if (data.size < 4) return emptyList()
-            val sensor = pid - 0x33
+            val sensorIndex = pid - 0x34
+            val bank = if (sensorIndex < 4) 1 else 2
+            val sensor = sensorIndex % 4 + 1
+            val sensorLabel = "Bank $bank sensor $sensor"
             val equivalenceRatio = ((data[0] shl 8) or data[1]) * 2.0 / 65536.0
             val current = ((data[2] shl 8) or data[3]) / 256.0 - 128.0
-            return value("O2 sensor $sensor equivalence ratio", equivalenceRatio, "lambda") +
-                value("O2 sensor $sensor current", current, "mA")
+            return value("O2 $sensorLabel equivalence ratio", equivalenceRatio, "lambda") +
+                value("O2 $sensorLabel current", current, "mA")
         }
 
         val decoded: Pair<String, Pair<Double, String>> = when (pid) {
@@ -366,7 +372,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             0x2F -> "Fuel tank level" to (percent(a) to "%")
             0x30 -> "Warm-ups since DTC clear" to (a.toDouble() to "count")
             0x31 -> "Distance since DTC clear" to ((word() ?: return emptyList()).toDouble() to "km")
-            0x32 -> "Evaporative system vapour pressure" to (((word() ?: return emptyList()) - 32767) / 4.0 to "Pa")
+            0x32 -> "Evaporative system vapour pressure" to (((word() ?: return emptyList()) - 32768) / 4.0 to "Pa")
             0x33 -> "Barometric pressure" to (a.toDouble() to "kPa")
             0x3C, 0x3D, 0x3E, 0x3F -> {
                 val sensor = when (pid) {
