@@ -62,6 +62,7 @@ class Obd2FeatureEngineTest {
             commands += command
             when (command) {
                 "020200" -> "4202000171"
+                "020000" -> "42000008100000"
                 "020500" -> "4205007F"
                 "020C00" -> "420C001AF8"
                 else -> "NO DATA"
