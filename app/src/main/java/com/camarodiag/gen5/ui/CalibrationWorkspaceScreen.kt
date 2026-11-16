@@ -50,6 +50,7 @@ import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
+import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
@@ -65,6 +66,10 @@ data class CalibrationWorkspaceState(
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
     val j2534BridgeMessage: String = "",
+    val obdbSignals: List<ObdbCamaroSignal> = emptyList(),
+    val isObdbSignalReading: Boolean = false,
+    val obdbSignalValue: String = "",
+    val obdbSignalMessage: String = "",
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
