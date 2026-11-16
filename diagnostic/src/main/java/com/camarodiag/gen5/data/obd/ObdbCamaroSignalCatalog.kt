@@ -40,6 +40,9 @@ data class ObdbSignalFormat(
     val unit: String,
     val nullMinimum: Double? = null,
     val nullMaximum: Double? = null,
+    val optimalMinimum: Double? = null,
+    val optimalMaximum: Double? = null,
+    val optimalValue: Double? = null,
     val valueMap: Map<String, String> = emptyMap()
 ) {
     init {
@@ -68,11 +71,10 @@ data class ObdbSignalFormat(
             return ObdbDecodedValue(raw.toString(), null, unit, null, true)
         }
         val scaled = rawDouble * multiply / divide + add
-        if (minimum?.let { scaled < it } == true || maximum?.let { scaled > it } == true) {
-            return ObdbDecodedValue(raw.toString(), null, unit, null, true)
-        }
+        val bounded = minimum?.let { maxOf(scaled, it) } ?: scaled
+        val clamped = maximum?.let { minOf(bounded, it) } ?: bounded
         val mapped = valueMap[raw.toString()]
-        return ObdbDecodedValue(raw.toString(), scaled, unit, mapped, false)
+        return ObdbDecodedValue(raw.toString(), clamped, unit, mapped, false)
     }
 }
 
@@ -92,18 +94,30 @@ data class ObdbCamaroSignal(
     val identifierHex: String,
     val requestHeaderHex: String,
     val responseHeaderHex: String?,
+    val extendedAddressHex: String?,
+    val canPriorityHex: String?,
+    val testerAddressHex: String?,
+    val timeoutHex: String?,
+    val diagnosticLevelIn: String?,
+    val diagnosticLevelOut: String?,
+    val protocol: String?,
     val requestCanId: Int?,
     val responseCanId: Int?,
     val frequencySeconds: Double,
     val flowControlRequired: Boolean,
     val debugSignal: Boolean,
+    val hidden: Boolean,
+    val description: String?,
     val filter: ObdbYearFilter?,
     val debugFilter: ObdbYearFilter?,
     val format: ObdbSignalFormat,
     val suggestedMetric: String?
 ) {
     val hasSupportedPhysicalCanAddressing: Boolean
-        get() = requestCanId != null && responseCanId != null
+        get() = requestCanId != null && responseCanId != null &&
+            extendedAddressHex == null && canPriorityHex == null && testerAddressHex == null &&
+            diagnosticLevelIn == null && diagnosticLevelOut == null &&
+            (protocol == null || protocol in setOf("15765-4-11bit", "15765-4-29bit"))
 
     fun isAvailableForYear(modelYear: Int): Boolean =
         (filter?.matches(modelYear) != false) &&
@@ -123,7 +137,7 @@ data class ObdbCamaroSignalSet(
     val source: String = SOURCE_URL
 ) {
     fun forYear(modelYear: Int): List<ObdbCamaroSignal> =
-        signals.filter { it.isAvailableForYear(modelYear) }
+        signals.filter { !it.hidden && it.isAvailableForYear(modelYear) }
 
     fun find(id: String): ObdbCamaroSignal? =
         signals.firstOrNull { it.id.equals(id, ignoreCase = true) }
@@ -186,6 +200,9 @@ data class ObdbCamaroSignalSet(
                         unit = formatObject.optString("unit", "unknown"),
                         nullMinimum = formatObject.optNullableDouble("nullmin"),
                         nullMaximum = formatObject.optNullableDouble("nullmax"),
+                        optimalMinimum = formatObject.optNullableDouble("omin"),
+                        optimalMaximum = formatObject.optNullableDouble("omax"),
+                        optimalValue = formatObject.optNullableDouble("oval"),
                         valueMap = map
                     )
                     ObdbCamaroSignal(
@@ -196,11 +213,20 @@ data class ObdbCamaroSignalSet(
                         identifierHex = identifier,
                         requestHeaderHex = requestHeader,
                         responseHeaderHex = responseHeader,
+                        extendedAddressHex = command.optString("eax").normalizedHex().takeIf { it.isNotBlank() },
+                        canPriorityHex = command.optString("pri").normalizedHex().takeIf { it.isNotBlank() },
+                        testerAddressHex = command.optString("tst").normalizedHex().takeIf { it.isNotBlank() },
+                        timeoutHex = command.optString("tmo").normalizedHex().takeIf { it.isNotBlank() },
+                        diagnosticLevelIn = command.optString("din").normalizedHex().takeIf { it.isNotBlank() },
+                        diagnosticLevelOut = command.optString("dout").normalizedHex().takeIf { it.isNotBlank() },
+                        protocol = command.optString("proto").takeIf { it.isNotBlank() },
                         requestCanId = requestHeader.toCan11BitId(),
                         responseCanId = responseHeader?.toCan11BitId(),
                         frequencySeconds = frequency,
                         flowControlRequired = command.optBoolean("fcm1", false),
                         debugSignal = command.optBoolean("dbg", false),
+                        hidden = signal.optBoolean("hidden", false),
+                        description = signal.optString("description").takeIf { it.isNotBlank() },
                         filter = formatFilter,
                         debugFilter = debugFilter,
                         format = format,
