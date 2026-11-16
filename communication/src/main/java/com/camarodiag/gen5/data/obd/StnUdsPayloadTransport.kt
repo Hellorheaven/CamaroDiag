@@ -20,11 +20,13 @@ class StnUdsPayloadTransport(
     private var configured = false
 
     init {
-        val extended = protocolNumber == 7 || protocolNumber == 9
+        val extended = protocolNumber in setOf(34, 36, 64)
         val maxId = if (extended) 0x1FFFFFFF else 0x7FF
         require(requestCanId in 0..maxId && responseCanId in 0..maxId && requestCanId != responseCanId)
-        require(protocolNumber in 6..9) { "Only ISO 15765-4 CAN protocols 6 to 9 are supported." }
-        require((protocolNumber == 7 || protocolNumber == 9) == (requestCanId > 0x7FF || responseCanId > 0x7FF)) {
+        require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) {
+            "STN protocol must be 33/34 (HS-CAN 500 kbit/s), 35/36 (HS-CAN 250 kbit/s), or 63/64 (SW-CAN 33.3 kbit/s)."
+        }
+        require(extended == (requestCanId > 0x7FF && responseCanId > 0x7FF)) {
             "CAN identifier format does not match the selected STN protocol."
         }
     }
