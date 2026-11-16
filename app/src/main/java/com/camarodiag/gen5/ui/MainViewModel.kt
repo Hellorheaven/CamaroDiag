@@ -220,7 +220,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val did = signal.identifierHex.toInt(16)
                 val policy = UdsAccessPolicy.readOnly(setOf(did))
                 val client = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(policy = policy, timeoutMs = 5000L)
+                    obdManager.createJ2534BridgeUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        policy = policy,
+                        timeoutMs = 5000L
+                    )
                 } else {
                     obdManager.createStnUdsClient(
                         requestCanId = requestId,
@@ -353,7 +358,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val did = parseHex(didHex, 4)
                 require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
                 val client = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(timeoutMs = 5000L)
+                    obdManager.createJ2534BridgeUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        timeoutMs = 5000L
+                    )
                 } else {
                     val protocolNumber = protocolNumberText.toIntOrNull()
                         ?: error("Protocole STN invalide.")
