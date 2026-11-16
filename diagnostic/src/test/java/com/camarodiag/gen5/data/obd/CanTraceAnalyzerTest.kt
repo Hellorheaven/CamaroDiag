@@ -80,6 +80,21 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun reportsWriteDidTrafficSeparatelyFromReadDidCandidates() {
+        val trace = """
+            0.000000 1 7E0 Tx d 8 03 2E F1 90 00 00 00 00
+            0.001000 1 7E8 Rx d 8 03 6E F1 90 00 00 00 00
+        """.trimIndent()
+
+        val report = CanTraceAnalyzer.analyze(trace, "write-did.asc")
+
+        assertEquals(2, report.didObservations.size)
+        assertTrue(report.readDidCandidates.isEmpty())
+        assertEquals(0xF190, report.didObservations.last().did)
+        assertTrue(report.didObservations.last().positiveResponse)
+    }
+
+    @Test
     fun negativeResponseDoesNotBecomeAFalseDidObservation() {
         val trace = "0.000000 1 7E8 Rx d 8 03 7F 22 31 00 00 00 00"
 
