@@ -99,7 +99,10 @@ class BluetoothObdManager(context: Context) {
                 (device.name ?: "").contains("OBDLink CX", ignoreCase = true)
             if (useBle) {
                 val bleResult = bleTransport.connect(device)
-                if (bleResult.isFailure) return@withContext Result.failure(bleResult.exceptionOrNull()!!)
+                if (bleResult.isFailure) {
+                    disconnect()
+                    return@withContext Result.failure(bleResult.exceptionOrNull()!!)
+                }
                 activeTransport = "BLE"
             } else {
                 val btSocket = device.createRfcommSocketToServiceRecord(sppUuid)
@@ -120,7 +123,10 @@ class BluetoothObdManager(context: Context) {
         disconnect()
         try {
             val connected = wifiTransport.connect(host, port)
-            if (connected.isFailure) return@withContext Result.failure(connected.exceptionOrNull()!!)
+            if (connected.isFailure) {
+                disconnect()
+                return@withContext Result.failure(connected.exceptionOrNull()!!)
+            }
             activeTransport = "WIFI"
             probeConnectedAdapter("ELM327 Wi-Fi ($host:$port)", host)
         } catch (error: Exception) {
@@ -133,7 +139,10 @@ class BluetoothObdManager(context: Context) {
         disconnect()
         try {
             val connected = usbTransport.connect(deviceId, baudRate)
-            if (connected.isFailure) return@withContext Result.failure(connected.exceptionOrNull()!!)
+            if (connected.isFailure) {
+                disconnect()
+                return@withContext Result.failure(connected.exceptionOrNull()!!)
+            }
             activeTransport = "USB"
             probeConnectedAdapter("ELM327 USB #$deviceId", "USB:$deviceId")
         } catch (error: Exception) {
