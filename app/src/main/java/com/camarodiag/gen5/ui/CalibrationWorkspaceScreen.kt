@@ -102,8 +102,8 @@ fun CalibrationWorkspaceScreen(
     isConnected: Boolean,
     isFr: Boolean,
     onReadIdentification: () -> Unit,
-    onReadUdsDid: (String, String, String) -> Unit,
-    onReadUdsDtcs: (String, String) -> Unit,
+    onReadUdsDid: (String, String, String, String) -> Unit,
+    onReadUdsDtcs: (String, String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
     onImportComparisonFile: () -> Unit,
@@ -119,6 +119,7 @@ fun CalibrationWorkspaceScreen(
     var udsRequestCanId by remember { mutableStateOf("") }
     var udsResponseCanId by remember { mutableStateOf("") }
     var udsDid by remember { mutableStateOf("F190") }
+    var udsCanProtocol by remember { mutableStateOf("33") }
     val currentProfile = remember(vehicle) { CamaroCalibrationCatalog.forVehicle(vehicle) }
     val allProfiles = remember { CamaroCalibrationCatalog.profiles }
     val yearProfiles = remember(vehicle.modelYear) { CamaroCalibrationCatalog.forYear(vehicle.modelYear) }
@@ -235,6 +236,14 @@ fun CalibrationWorkspaceScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
                     )
                     OutlinedTextField(
+                        value = udsCanProtocol,
+                        onValueChange = { udsCanProtocol = it.filter(Char::isDigit).take(2) },
+                        label = { Text(if (isFr) "Protocole STN : 33 HS-CAN 500k • 63 SW-CAN" else "STN protocol: 33 HS-CAN 500k • 63 SW-CAN") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    OutlinedTextField(
                         value = udsDid,
                         onValueChange = { udsDid = it.uppercase().filter { ch -> ch.isDigit() || ch in 'A'..'F' }.take(4) },
                         label = { Text(if (isFr) "DID UDS (F190 = VIN)" else "UDS DID (F190 = VIN)") },
@@ -243,9 +252,9 @@ fun CalibrationWorkspaceScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
                     )
                     Button(
-                        onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid) },
+                        onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
                         enabled = isConnected && !state.isUdsReading &&
-                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsDid.length == 4,
+                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsDid.length == 4 && udsCanProtocol.length in 2..3,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (state.isUdsReading) CircularProgressIndicator()
@@ -257,9 +266,9 @@ fun CalibrationWorkspaceScreen(
                         Text(state.udsDidResponse, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                     }
                     OutlinedButton(
-                        onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId) },
+                        onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
                         enabled = isConnected && !state.isUdsReading &&
-                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank(),
+                            udsRequestCanId.isNotBlank() && udsResponseCanId.isNotBlank() && udsCanProtocol.length in 2..3,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (isFr) "Lire les DTC UDS" else "Read UDS DTCs")
