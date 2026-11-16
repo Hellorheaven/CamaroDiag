@@ -234,8 +234,11 @@ data class CamaroSignalCatalog(
                     require(signal.identifierHex.isNotBlank() && signal.identifierHex.isHex()) {
                         "Signal ${signal.id} has an invalid identifier."
                     }
-                    require(signal.requestAddress.isNotBlank() && signal.requestAddress.isHex()) {
-                        "Signal ${signal.id} has an invalid request address."
+                    require(signal.requestAddress.toCan11BitId() != null) {
+                        "Signal ${signal.id} must use a valid 11-bit physical request CAN address."
+                    }
+                    require(signal.responseAddress == null || signal.responseAddress.toCan11BitId() != null) {
+                        "Signal ${signal.id} has an invalid 11-bit physical response CAN address."
                     }
                     require(signal.frequencySeconds.isFinite() && signal.frequencySeconds > 0.0) {
                         "Signal ${signal.id} has an invalid polling frequency."
