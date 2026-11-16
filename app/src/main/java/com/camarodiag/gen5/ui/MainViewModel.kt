@@ -153,6 +153,77 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _calibrationWorkspace = MutableStateFlow(CalibrationWorkspaceState())
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
 
+    /** Opens the Windows J2534 PC bridge for a real VXDIAG PassThru provider. */
+    fun connectJ2534Bridge(
+        host: String,
+        portText: String,
+        pairingToken: String,
+        requestCanIdHex: String,
+        responseCanIdHex: String,
+        baudRateText: String
+    ) {
+        viewModelScope.launch {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isJ2534BridgeConnecting = true,
+                isJ2534BridgeConnected = false,
+                j2534BridgeMessage = ""
+            )
+            try {
+                fun parseCanId(value: String): Pair<Int, String> {
+                    val normalized = value.trim().removePrefix("0x").removePrefix("0X").uppercase()
+                    require(normalized.length in setOf(3, 8) &&
+                        normalized.all { it.digitToIntOrNull(16) != null }) {
+                        "CAN ID doit contenir 3 chiffres hexadécimaux (11 bits) ou 8 (29 bits)."
+                    }
+                    return normalized.toInt(16) to normalized
+                }
+                val (requestId, requestText) = parseCanId(requestCanIdHex)
+                val (responseId, responseText) = parseCanId(responseCanIdHex)
+                require(requestText.length == responseText.length) {
+                    "Les deux identifiants CAN doivent utiliser le même format 11 ou 29 bits."
+                }
+                require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
+                val can29Bit = requestText.length == 8
+                val port = portText.toIntOrNull() ?: error("Port TCP invalide.")
+                val baudRate = baudRateText.toIntOrNull() ?: error("Débit CAN invalide.")
+                val result = obdManager.connectJ2534Bridge(
+                    host = host.trim(),
+                    port = port,
+                    pairingToken = pairingToken.trim(),
+                    requestCanId = requestId,
+                    responseCanId = responseId,
+                    can29Bit = can29Bit,
+                    baudRate = baudRate
+                ).getOrThrow()
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534BridgeConnecting = false,
+                    isJ2534BridgeConnected = true,
+                    j2534BridgeMessage = if (_language.value == AppLanguage.FR)
+                        "Pont J2534 connecté : $result"
+                    else "J2534 bridge connected: $result"
+                )
+            } catch (cancelled: CancellationException) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534BridgeConnecting = false,
+                    isJ2534BridgeConnected = false,
+                    j2534BridgeMessage = error.localizedMessage ?: "Connexion au pont J2534 impossible."
+                )
+            }
+        }
+    }
+
+    fun disconnectJ2534Bridge() {
+        obdManager.disconnect()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isJ2534BridgeConnecting = false,
+            isJ2534BridgeConnected = false,
+            j2534BridgeMessage = if (_language.value == AppLanguage.FR) "Pont PC déconnecté." else "PC bridge disconnected."
+        )
+    }
+
     /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
     fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String, protocolNumberText: String) {
         viewModelScope.launch {
@@ -172,15 +243,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val responseId = parseHex(responseCanIdHex, 8)
                 val did = parseHex(didHex, 4)
                 require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
-                val protocolNumber = protocolNumberText.toIntOrNull()
-                    ?: error("Protocole STN invalide.")
-                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
-                val client = obdManager.createStnUdsClient(
-                    requestCanId = requestId,
-                    responseCanId = responseId,
-                    protocolNumber = protocolNumber,
-                    timeoutMs = 5000L
-                )
+                val client = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.createJ2534BridgeUdsClient(timeoutMs = 5000L)
+                } else {
+                    val protocolNumber = protocolNumberText.toIntOrNull()
+                        ?: error("Protocole STN invalide.")
+                    require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
+                    obdManager.createStnUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        timeoutMs = 5000L
+                    )
+                }
                 val data = client.readDataByIdentifier(did)
                 val hex = data.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
                 val isVinDid = did == 0xF190
@@ -226,15 +301,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val requestId = parseHex(requestCanIdHex)
                 val responseId = parseHex(responseCanIdHex)
                 require(requestId != responseId)
-                val protocolNumber = protocolNumberText.toIntOrNull()
-                    ?: error("Protocole STN invalide.")
-                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
-                val client = obdManager.createStnUdsClient(
-                    requestCanId = requestId,
-                    responseCanId = responseId,
-                    protocolNumber = protocolNumber,
-                    timeoutMs = 5000L
-                )
+                val client = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.createJ2534BridgeUdsClient(timeoutMs = 5000L)
+                } else {
+                    val protocolNumber = protocolNumberText.toIntOrNull()
+                        ?: error("Protocole STN invalide.")
+                    require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Protocole STN non pris en charge." }
+                    obdManager.createStnUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = protocolNumber,
+                        timeoutMs = 5000L
+                    )
+                }
                 val dtcs = client.readDtcByStatusMask()
                 val rendered = if (dtcs.isEmpty()) {
                     if (_language.value == AppLanguage.FR) "Aucun DTC retourné par le calculateur." else "No DTCs returned by the ECU."
