@@ -272,8 +272,10 @@ class BluetoothObdManager(context: Context) {
         val capabilities = activeAdapterCapabilities
             ?: error("No real adapter has been probed.")
         check(!isDemoMode && !isSimulationActive) { "UDS CAN is disabled in demo mode." }
-        check(capabilities.deviceName.contains("OBDLink MX+", ignoreCase = true)) {
-            "The STPX UDS provider is currently validated only for OBDLink MX+ hardware."
+        check(capabilities.tier == AdapterTier.PRO_STN &&
+            capabilities.supportsCanHeaders &&
+            capabilities.deviceName.contains("OBDLink MX+", ignoreCase = true)) {
+            "The STPX UDS provider is currently validated only for a connected OBDLink MX+ STN adapter with CAN headers enabled."
         }
         val transport = StnUdsPayloadTransport(
             requestCanId = requestCanId,
