@@ -35,6 +35,8 @@ class BluetoothObdManager(context: Context) {
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
     private var j2534BridgeTransport: J2534BridgeTransport? = null
+    private var j2534BridgeRequestCanId: Int? = null
+    private var j2534BridgeResponseCanId: Int? = null
     private var activeTransport: String = "BLUETOOTH"
     private var activeAdapterCapabilities: AdapterCapabilities? = null
 
@@ -277,6 +279,8 @@ class BluetoothObdManager(context: Context) {
         try {
             val info = bridge.connect(requestCanId, responseCanId, can29Bit, baudRate)
             j2534BridgeTransport = bridge
+            j2534BridgeRequestCanId = requestCanId
+            j2534BridgeResponseCanId = responseCanId
             activeTransport = "J2534_BRIDGE"
             isDemoMode = false
             isSimulationActive = false
@@ -288,11 +292,16 @@ class BluetoothObdManager(context: Context) {
     }
 
     fun createJ2534BridgeUdsClient(
+        requestCanId: Int,
+        responseCanId: Int,
         policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
         timeoutMs: Long = 5000L
     ): UdsClient {
         val transport = j2534BridgeTransport
             ?: error("The Windows J2534 bridge is not connected.")
+        require(requestCanId == j2534BridgeRequestCanId && responseCanId == j2534BridgeResponseCanId) {
+            "The J2534 bridge is configured for CAN IDs 0x${j2534BridgeRequestCanId?.toString(16)?.uppercase()} → 0x${j2534BridgeResponseCanId?.toString(16)?.uppercase()}. Disconnect and reconnect after changing the ECU CAN IDs."
+        }
         check(activeTransport == "J2534_BRIDGE" && !isDemoMode && !isSimulationActive) {
             "J2534 UDS is disabled when no real PC bridge is connected."
         }
@@ -341,6 +350,8 @@ class BluetoothObdManager(context: Context) {
         runCatching { bleTransport.close() }
         runCatching { j2534BridgeTransport?.close() }
         j2534BridgeTransport = null
+        j2534BridgeRequestCanId = null
+        j2534BridgeResponseCanId = null
         runCatching { inputStream?.close() }
         runCatching { outputStream?.close() }
         runCatching { socket?.close() }
