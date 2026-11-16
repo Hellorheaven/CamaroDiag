@@ -1,63 +1,71 @@
-# CamaroDiag J2534 PC Bridge
+# Pont J2534 Windows — Guide d'installation
 
-This Windows companion connects CamaroDiag on Android to an installed SAE J2534 PassThru driver, including the VXDIAG VCX SE and VCX Nano when their Windows J2534 driver is installed and registered.
+Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru installé sur un PC Windows. Il peut fonctionner avec des pilotes VXDIAG VCX SE ou VCX Nano lorsque le modèle exact, le pilote et le protocole sont compatibles.
 
-## Current scope
+## Fonctionnalités
 
-- Windows 10/11 x64 console application (.NET 8).
-- Discovers J2534 providers registered under `HKLM\SOFTWARE\PassThruSupport.04.04` or `PassThruSupport.05.00`.
-- Uses the provider's `FunctionLibrary` DLL through the standard J2534 API.
-- Opens ISO 15765-2 HS-CAN (11/29-bit, 250/500 kbit/s) or J2534-2 SW-ISO15765 GMLAN (11/29-bit, 62.5 kbit/s preset).
-- Creates a J2534 flow-control filter and sends/receives complete UDS payloads; the J2534 provider handles ISO-TP framing and flow control.
-- One Android client at a time, protected by a random pairing token.
-- Read-only service gate: UDS 0x22 (ReadDataByIdentifier), 0x19 (ReadDTCInformation), and 0x3E (TesterPresent) only.
+- Connexion à un fournisseur J2534 Windows enregistré.
+- ISO15765 HS-CAN, identifiants 11 ou 29 bits, 250/500 kbit/s.
+- SW-ISO15765 GMLAN à 62,5 kbit/s si le fournisseur J2534-2 l'accepte.
+- Transmission de charges UDS ; le fournisseur J2534 gère ISO-TP et le contrôle de flux.
+- Lecture UDS limitée aux services 0x22, 0x19 et 0x3E.
+- Un client Android à la fois, protégé par un jeton d'appairage.
 
-This is a generic J2534 bridge, not a VXDIAG-specific driver. The VCX hardware driver remains installed on the Windows PC. It does not replace VX Manager or the vendor J2534 DLL.
+Ce pont est générique J2534. Il ne fournit aucun pilote VXDIAG et ne remplace ni VX Manager ni le DLL PassThru du fabricant.
 
-## Build
+## Matériel requis
 
-Install the .NET 8 SDK, then run from this directory:
+- PC Windows 10 ou 11.
+- Interface J2534 avec pilote constructeur installé et enregistré.
+- CamaroDiag sur Android 10 ou supérieur.
+- PC et Android connectés au même réseau privé.
+- Architecture x86/x64 du pont identique à celle du DLL J2534.
 
-```powershell
-dotnet build .\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj -c Release
-dotnet publish .\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj -c Release -r win-x64 --self-contained false
-```
+## Compatibilité VXDIAG
 
-If the installed vendor PassThru DLL is 32-bit only, publish and run an x86 build instead:
+| Interface | HS-CAN | SW-CAN / GMLAN | Conditions |
+|---|---|---|---|
+| VCX SE | Oui si exposé par le fournisseur J2534 | Possible si le pilote expose J2534-2 SW-ISO15765 | Pilote correspondant à la référence exacte |
+| VCX Nano | Oui si exposé par le fournisseur J2534 | Dépend de la révision, du câblage et du pilote ; non garanti | Vérifier modèle et pilote |
 
-```powershell
-dotnet publish .\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj -c Release -r win-x86 --self-contained false
-```
+## Installation et connexion
 
-The process architecture must match the native J2534 DLL architecture.
+1. Installer le pilote Windows correspondant exactement au VCX ou à l'interface J2534.
+2. Pour VXDIAG, installer VX Manager et vérifier la détection de l'interface.
+3. Télécharger l'exécutable du pont depuis les releases ou artefacts CamaroDiag : https://github.com/Hellorheaven/CamaroDiag/actions.
+4. Choisir la version x64 ou x86 selon le DLL J2534.
+5. Lancer CamaroDiag.J2534Bridge.exe et sélectionner le fournisseur si plusieurs sont présents.
+6. Relever l'adresse IP du PC, le port TCP et le jeton d'appairage affichés.
+7. Connecter le PC et Android au même réseau privé.
+8. Saisir IP, port, jeton et CAN ID physiques documentés du calculateur dans CamaroDiag.
+9. Si Windows Firewall le demande, autoriser le programme uniquement sur les réseaux privés.
 
-## Run and pair
+## Sécurité réseau
 
-1. Install the correct VXDIAG Windows driver/VX Manager for the exact VCX SE or Nano variant.
-2. Connect the VCX to the PC and make sure Windows recognizes it.
-3. Run `CamaroDiag.J2534Bridge.exe` from the publish folder. Select the registered J2534 provider if more than one is listed.
-4. The console displays a random pairing token and TCP port (default `35001`).
-5. Put the PC and Android device on the same trusted private Wi-Fi/LAN. Find the PC IPv4 address with `ipconfig`.
-6. In CamaroDiag > ECU / Calibration, enter the PC IPv4 address, port and token, then enter the physical ECU CAN IDs and connect.
-7. Allow the bridge through Windows Defender Firewall on Private networks only if prompted.
+La liaison utilise TCP et un jeton, sans chiffrement TLS. Ne jamais exposer le port à Internet, ne pas configurer de redirection de port et ne pas utiliser le pont sur un Wi-Fi public.
 
-Do not expose port 35001 to the Internet or configure router port forwarding. The pairing token is sent over the local TCP connection; use a trusted private network.
+## Fonctions et limites
 
-## Hardware and protocol limitations
+| Fonction | État |
+|---|---|
+| UDS ReadDataByIdentifier (0x22) | Autorisé |
+| UDS ReadDTCInformation (0x19) | Autorisé |
+| TesterPresent (0x3E) | Autorisé |
+| Écriture DID, effacement UDS | Bloqués |
+| RoutineControl, actionneurs | Bloqués |
+| SecurityAccess, lecture/écriture mémoire, flashage | Bloqués |
+| CAN FD | Non pris en charge |
+| Découverte automatique de tous les calculateurs GM | Non fournie |
 
-- The bridge currently enables HS-CAN ISO15765 at 250/500 kbit/s and optional SW-ISO15765 at the J2534-2 62.5 kbit/s preset when the provider accepts protocol ID 0x8007. SW-CAN/GMLAN single-wire and CAN FD are not enabled by this generic J2534 path.
-- The VCX SE is the preferred VXDIAG candidate for the J2534 PC bridge; VXDIAG lists SAE-J2411 SWCAN support for VCX SE, but the installed PassThru provider must expose J2534-2 SW_ISO15765_PS for this app to use it. VCX Nano variants differ by hardware, pins and transport; SW-CAN support is not assumed and depends on the exact Nano and registered Windows driver.
-- The third-party OpenVCX project is an alternative J2534 DLL for certain USB VCX Nano units, not an Android bridge and not a universal VCX SE driver. Its maintainer documents HS-CAN/MS-CAN and ISO15765 but not SW-CAN or CAN FD. It is not bundled or redistributed here.
-- A driver registering successfully does not prove that every Camaro ECU/network is supported. Confirm ignition state, bus pins, request/response IDs, CAN bitrate and ECU response on the vehicle.
-- No OEM seed/key, memory layout, checksum, flash sequence, recovery procedure or ECU write service is included. The bridge blocks those UDS services even if the installed driver can technically transmit them.
+Les CAN ID, débits et services doivent provenir d'une documentation fiable pour le VIN et le calculateur. Le pont ne devine aucune adresse ni procédure de programmation.
 
-## Wire protocol
+## Dépannage
 
-UTF-8 JSON Lines over TCP. Every request carries the pairing token.
+- Aucun fournisseur détecté : réinstaller le pilote constructeur et vérifier l'enregistrement J2534.
+- Erreur DLL : vérifier que le pont et le DLL fournisseur sont tous deux x86 ou tous deux x64.
+- Connexion TCP impossible : vérifier IP, port, réseau et pare-feu.
+- Échec d'ouverture du protocole : le pilote peut ne pas prendre en charge le profil sélectionné.
+- Aucune réponse ECU : vérifier contact, broches DLC, débit CAN et paire d'identifiants physiques.
+- SW-CAN indisponible : le matériel ou le pilote peut ne pas exposer le protocole J2534-2 requis.
 
-- `open`: opens the selected registered provider, ISO15765 channel, and a flow-control filter for the request/response CAN ID pair.
-- `exchange`: sends one UDS payload and returns the matching ECU payload.
-- `sendOnly`: sends an allowed TesterPresent payload without waiting for a response.
-- `close`: releases the J2534 channel.
-
-The Android transport in CamaroDiag implements this protocol; no ELM command emulation is used.
+Le pont est un transport de diagnostic. Il ne certifie ni la compatibilité d'un calculateur ni l'aptitude d'une interface à programmer un véhicule.
