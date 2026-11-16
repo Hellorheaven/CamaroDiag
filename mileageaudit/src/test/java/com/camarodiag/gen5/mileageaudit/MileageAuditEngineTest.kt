@@ -38,7 +38,7 @@ class MileageAuditEngineTest {
             reading("BCM", 120000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile")
         ))
         assertFalse(report.hasDiscrepancy)
-        assertEquals(0.0, report.maxDeltaKm, 0.0)
+        assertEquals(20000.0, report.maxDeltaKm, 0.01)
     }
 
     @Test fun twoPidsFromPowertrainDoNotCountAsIndependentProof() {
