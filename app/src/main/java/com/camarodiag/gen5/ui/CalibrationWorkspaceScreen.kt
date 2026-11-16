@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -340,7 +341,7 @@ fun CalibrationWorkspaceScreen(
                                     Text(if (isFr) "Déconnecter le pont PC" else "Disconnect PC bridge")
                                 }
                             }
-                            if (state.isJ2534BridgeMessage.isNotBlank()) {
+                            if (state.j2534BridgeMessage.isNotBlank()) {
                                 Text(state.j2534BridgeMessage,
                                     color = if (state.isJ2534BridgeConnected) OkGreen else CamaroAmber,
                                     fontSize = 11.sp)
