@@ -173,6 +173,32 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun decodesDirectInjectionFuelRailAbsolutePressure() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0159") "4159 03E8" else "NO DATA"
+        })
+
+        val value = engine.readLiveData(setOf(0x59)).single()
+
+        assertEquals("Fuel rail absolute pressure", value.name)
+        assertEquals("10000.00", value.value)
+        assertEquals("kPa", value.unit)
+    }
+
+    @Test
+    fun decodesRelativeAcceleratorPedalPosition() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "015A") "415A 80" else "NO DATA"
+        })
+
+        val value = engine.readLiveData(setOf(0x5A)).single()
+
+        assertEquals("Relative accelerator pedal position", value.name)
+        assertEquals("50.20", value.value)
+        assertEquals("%", value.unit)
+    }
+
+    @Test
     fun decodesCatalystTemperature() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             if (command == "013C") "413C 0320" else "NO DATA"
