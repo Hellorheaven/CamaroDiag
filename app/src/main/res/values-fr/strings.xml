@@ -50,4 +50,5 @@
     <string name="obd_permanent">Permanent</string>
     <string name="obd_confirmed">Confirmé</string>
     <string name="obd_powertrain_ecm">Groupe motopropulseur / ECM</string>
+    <string name="status_offline">Hors ligne</string>
 </resources>

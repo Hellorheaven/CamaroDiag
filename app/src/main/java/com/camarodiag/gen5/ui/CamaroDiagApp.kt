@@ -173,7 +173,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                             Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                         else -> {
-                            Text(stringResource(R.string.obd_not_available), color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(stringResource(R.string.status_offline), color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                 }

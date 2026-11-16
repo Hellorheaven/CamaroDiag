@@ -50,4 +50,5 @@
     <string name="obd_permanent">Permanente</string>
     <string name="obd_confirmed">Confirmado</string>
     <string name="obd_powertrain_ecm">Tren motriz / ECM</string>
+    <string name="status_offline">Desconectado</string>
 </resources>

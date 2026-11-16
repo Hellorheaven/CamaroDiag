@@ -50,4 +50,5 @@
     <string name="obd_permanent">Permanent</string>
     <string name="obd_confirmed">Bestätigt</string>
     <string name="obd_powertrain_ecm">Antriebsstrang / ECM</string>
+    <string name="status_offline">Offline</string>
 </resources>

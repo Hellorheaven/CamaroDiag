@@ -50,4 +50,5 @@
     <string name="obd_permanent">קבוע</string>
     <string name="obd_confirmed">מאושר</string>
     <string name="obd_powertrain_ecm">מערכת הנעה / ECM</string>
+    <string name="status_offline">לא מקוון</string>
 </resources>
