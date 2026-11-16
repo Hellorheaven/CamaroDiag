@@ -145,12 +145,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isReading = true, message = "")
             try {
                 val engine = obdManager.createObd2FeatureEngine()
+                val ecuVin = engine.readVin()
                 val calIds = engine.readCalibrationIds()
                 val cvns = engine.readCalibrationVerificationNumbers()
                 val validCal = calIds.isNotEmpty()
                 val validCvn = cvns.isNotEmpty()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
+                    ecuVinResponse = ecuVin ?: "Non disponible",
                     calibrationIdResponse = calIds.joinToString("\n").ifBlank { "Non disponible" },
                     cvnResponse = cvns.joinToString("\n").ifBlank { "Non disponible" },
                     message = if (validCal || validCvn) {
@@ -376,6 +378,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val validationIssues = CalibrationTableCodec.validateMetadataForImage(
                     metadata = metadata,
                     selectedVin = _vehicle.value.vin,
+                    ecuVin = current.ecuVinResponse,
                     binary = binary,
                     ecuCalibrationIds = current.calibrationIdResponse.lineSequence().toList(),
                     ecuCvns = current.cvnResponse.lineSequence().toList()
