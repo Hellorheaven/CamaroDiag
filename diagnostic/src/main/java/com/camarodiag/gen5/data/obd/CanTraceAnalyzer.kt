@@ -86,7 +86,7 @@ data class CanTraceAnalysisReport(
  */
 object CanTraceAnalyzer {
     private val ascFrameRegex = Regex(
-        """^\\s*(\\d+(?:\\.\\d+)?)\\s+\\d+\\s+([0-9A-Fa-f]{3,8})\\s+(Tx|Rx)\\s+[dD]\\s+(\\d+)\\s*(.*)$""",
+        """^\s*(\d+(?:\.\d+)?)\s+\d+\s+([0-9A-Fa-f]{3,8})\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
         RegexOption.IGNORE_CASE
     )
 
