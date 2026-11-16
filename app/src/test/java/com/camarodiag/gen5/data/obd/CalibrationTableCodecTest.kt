@@ -135,6 +135,28 @@ class CalibrationTableCodecTest {
     }
 
     @Test
+    fun formattingAndReapplyingFloatCellsPreservesUneditedBinaryPrecision() {
+        val definition = CalibrationMapDefinition(
+            id = "float-precision", name = "Float precision", fileOffset = 0,
+            rows = 1, columns = 2, valueType = CalibrationValueType.F32,
+            endian = CalibrationEndian.LITTLE, scale = 1.0, bias = 0.0, unit = ""
+        )
+        val original = java.nio.ByteBuffer.allocate(8)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            .putFloat(0.1234567f)
+            .putFloat(12345.678f)
+            .array()
+        val decoded = CalibrationTableCodec.decode(original, definition)
+        val roundTrippedValues = decoded.values.map { row ->
+            row.map { CalibrationTableCodec.formatEngineeringValue(it).toDouble() }
+        }
+
+        val reapplied = CalibrationTableCodec.applyEdits(original, definition, roundTrippedValues)
+
+        assertTrue(original.contentEquals(reapplied))
+    }
+
+    @Test
     fun decodesAndEditsLittleEndianU16WithoutChangingOtherBytes() {
         val definition = CalibrationMapDefinition(
             id = "fuel", name = "Fuel", fileOffset = 2, rows = 1, columns = 2,
