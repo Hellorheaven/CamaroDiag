@@ -78,6 +78,38 @@ class CamaroSignalCatalogTest {
         assertTrue(catalog.executableFor(2012, "2012-LS3").isEmpty())
     }
 
+    @Test
+    fun decodesBitOffsetAndClampsDocumentedRange() {
+        val format = CamaroSignalFormat(
+            bitOffset = 4,
+            bitLength = 8,
+            minimum = 10.0,
+            maximum = 200.0,
+            unit = "raw"
+        )
+
+        val decoded = format.decode(byteArrayOf(0x0F, 0x00))
+
+        assertEquals(240.0, decoded.raw.toDouble(), 0.0)
+        assertEquals(200.0, decoded.value!!, 0.0)
+    }
+
+    @Test
+    fun acceptsAnEmptyFirstPartyCatalogueWithoutInventingSignals() {
+        val catalog = CamaroSignalCatalog.fromJson(
+            """{"schemaVersion":1,"signals":[]}"""
+        )
+
+        assertTrue(catalog.signals.isEmpty())
+        assertTrue(catalog.forYear(2012).isEmpty())
+        assertTrue(catalog.executableFor(2012, "2012-LFX").isEmpty())
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun rejectsCatalogueWithoutSignalsArray() {
+        CamaroSignalCatalog.fromJson("""{"schemaVersion":1}""")
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsDuplicateSignalIds() {
         val root = JSONObject(signalJson())
