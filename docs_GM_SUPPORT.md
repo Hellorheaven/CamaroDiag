@@ -161,3 +161,26 @@ Pour utiliser l'éditeur de tables, il faut extraire ou exporter depuis le logic
 - [OBDLink Family Reference and Programming Manual, révision F (2025)](https://www.scantool.net/scantool/downloads/682/obdlink_frpm_f.pdf) : commandes STPX, STCSEGR/STCSEGT, STCFCPA, prise en charge raw CAN/ISO-TP.
 - [GM MDI 2 User Guide](https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf) : interface J2534 Pass-Thru et configuration sur PC.
 - [VXDIAG VCX Nano technical features](https://vxdiag.com/pages/vcx-nano-products-features) : J2534/ISO 22900 et protocoles CAN/SW-CAN côté interface ; cela ne constitue pas un SDK Android.
+
+
+## Pont PC J2534 pour VXDIAG
+
+Le dépôt contient désormais `pc-bridge/CamaroDiag.J2534Bridge`, une application console Windows .NET 8. Elle détecte les fournisseurs enregistrés dans `HKLM\\SOFTWARE\\PassThruSupport.04.04` et `05.00`, charge leur `FunctionLibrary` J2534, ouvre ISO15765 et crée un FLOW_CONTROL_FILTER pour la paire d'identifiants CAN physiques choisie.
+
+Le protocole TCP JSON Lines est protégé par un jeton aléatoire généré au démarrage. L'application Android se connecte au PC sur le même réseau local. Le pont ne traduit pas des commandes ELM : il transmet des charges UDS complètes, la segmentation/réassemblage ISO-TP restant gérée par le fournisseur J2534.
+
+Limites actuelles :
+- HS-CAN ISO15765 250/500 kbit/s, identifiants 11 ou 29 bits.
+- UDS lecture seule : 0x22, 0x19 et TesterPresent 0x3E.
+- SW-CAN/GMLAN, CAN FD, routines, effacement, actionneurs, accès sécurité et programmation refusés.
+- Le fournisseur J2534 Windows doit être installé et enregistré pour la révision exacte du VCX. Le pont ne remplace pas VX Manager ni le pilote constructeur.
+- La connexion doit rester sur un réseau privé de confiance ; le jeton n'est pas chiffré par TLS et le port ne doit jamais être exposé sur Internet.
+
+Le VCX SE est la cible prioritaire. Les variantes VCX Nano diffèrent selon carte, broches et connexion. Le projet OpenVCX est documenté comme fournisseur J2534 alternatif pour certaines variantes USB Nano, mais il n'est pas embarqué et ne fournit pas de SW-CAN ou CAN FD sur le matériel testé.
+
+## Catalogue de signaux Camaro OBDb
+
+Le signalset communautaire `OBDb/Chevrolet-Camaro` (commit `6771593698dff29cc0c6e8d6219ff360b2891883`) est embarqué sous `diagnostic/src/main/assets/camaro-obdb-signalset-v3.json`. Le parseur conserve les filtres année, en-têtes et réponses CAN, service/DID, fréquences, flow-control et formules de décodage. Il expose 136 définitions de signaux sur 133 commandes.
+
+Le lecteur ne transmet que les définitions avec une paire CAN physique 11 bits résolue et un service UDS 0x22. Les adresses non représentables sans ambiguïté restent visibles comme données non résolues et sont bloquées. Les données sont sous CC BY-SA 4.0 ; voir `THIRD_PARTY_NOTICES.md`. Ce n'est pas une homologation GM : vérifier le VIN, le calculateur, le CAL ID/OS et la réponse réelle avant toute interprétation.
+
