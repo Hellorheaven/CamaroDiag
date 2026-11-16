@@ -52,7 +52,7 @@ class CanTraceAnalyzerTest {
         val trace = """
             timestamp,can_id,direction,data
             0.000,0x7E0,Tx,"03 22 F1 90 00 00 00 00"
-            0.010,0x7E8,Rx,"06 62 F1 90 31 47 30 31"
+            0.010,0x7E8,Rx,"07 62 F1 90 31 47 30 31"
         """.trimIndent()
 
         val report = CanTraceAnalyzer.analyze(trace, "capture.csv")
