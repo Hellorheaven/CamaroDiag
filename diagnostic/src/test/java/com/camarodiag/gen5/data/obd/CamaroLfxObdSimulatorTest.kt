@@ -12,6 +12,8 @@ class CamaroLfxObdSimulatorTest {
         val report = CamaroLfxObdSimulator.createEngine().fullReadOnlyScan()
 
         assertTrue(report.supportedPids.containsAll(setOf(0x0C, 0x22, 0x24, 0x59, 0x5A)))
+        assertTrue(0x20 !in report.supportedPids)
+        assertTrue(0x40 !in report.supportedPids)
         assertTrue(report.respondingEcuAddresses.contains("7E8"))
         assertEquals("1G1TEST0000000001", report.vin)
         assertEquals(listOf("LFX12SIM00000001"), report.calibrationIds)
