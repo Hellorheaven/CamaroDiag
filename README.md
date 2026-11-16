@@ -35,7 +35,7 @@ Le README décrit les fonctionnalités par série (`1.6.x`) plutôt que de maint
 - OBDLink EX / SX et ELM327 USB série via usb-serial-for-android, OTG Android et débit 115200 bauds pour les appareils identifiés OBDLink.
 - OBDLink MX Wi-Fi et adaptateurs ELM327 Wi-Fi via TCP (adresse IP et port configurables; ports usuels 35000 ou 23 selon l'adaptateur).
 - Détection Bluetooth des appareils appairés et scan BLE des appareils OBD à proximité. Les modèles BLE nécessitent les autorisations Android Bluetooth Scan/Connect (Android 12+) ou localisation (versions antérieures).
-- La prise en charge physique des bus reste propre au modèle : MX+ prend en charge GM SW-CAN; ne pas déduire SW-CAN du seul fait qu'un adaptateur OBDLink est détecté.
+- La prise en charge physique des bus reste propre au modèle : MX et MX+ prennent en charge GM SW-CAN; ne pas déduire SW-CAN du seul fait qu'un adaptateur OBDLink est détecté.
 - Carbyte est un produit GM dédié à certaines fonctions AFM/DFM/Stop-Start, pas un adaptateur de diagnostic OBD générique exploitable comme MX+/EX.
 - VXDIAG/J2534 : non déclaré opérationnel sur Android. Il faut le SDK Android officiel ou un protocole documenté propre au modèle exact; aucune compatibilité n'est simulée.
 
