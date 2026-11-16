@@ -70,7 +70,7 @@ class UdsClientTest {
 
         client.testerPresent(suppressPositiveResponse = true)
 
-        assertArrayEquals(byteArrayOf(0x02, 0x3E, 0x80), transport.sent.single().data.copyOf(3))
+        assertArrayEquals(byteArrayOf(0x02.toByte(), 0x3E.toByte(), 0x80.toByte()), transport.sent.single().data.copyOf(3))
     }
 
     @Test fun waitsForResponsePendingBeforeReturningFinalPositiveResponse() = runBlocking {
