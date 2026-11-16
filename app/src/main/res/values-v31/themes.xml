@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.CamaroDiagGen5" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/camarodiag_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/camarodiag_car</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/camarodiag_icon_background</item>
+    </style>
+</resources>

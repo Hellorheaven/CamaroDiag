@@ -1,0 +1,1325 @@
+package com.camarodiag.gen5.ui
+
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalConfiguration
+import com.camarodiag.gen5.R
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.camarodiag.gen5.domain.model.*
+import com.camarodiag.gen5.control.VehicleControlCatalog
+import com.camarodiag.gen5.control.ControlAvailability
+import com.camarodiag.gen5.control.RemoteStartSafetyGate
+import com.camarodiag.gen5.control.RemoteStartConditions
+import com.camarodiag.gen5.control.VehicleGear
+import com.camarodiag.gen5.control.VehicleSignal
+import com.camarodiag.gen5.control.VehicleControlId
+import com.camarodiag.gen5.data.obd.VxdiagProfiles
+import com.camarodiag.gen5.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.*
+
+enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId: Int) {
+    SETUP("Vehicle", "Véhicule", R.string.tab_vehicle),
+    ADAPTER("Adapter", "Interface", R.string.tab_connect),
+    MODULES("Modules", "Modules", R.string.tab_modules),
+    LIVE("Live", "Direct", R.string.tab_live),
+    DTCS("DTCs", "Défauts", R.string.tab_dtcs),
+    MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
+    CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
+    OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
+    GUIDE("Guide", "Guide", R.string.tab_guide),
+    CONTROL("Controls", "Pilotage", R.string.tab_controls),
+    SETTINGS("Settings", "Réglages", R.string.tab_settings)
+}
+
+
+@Composable
+private fun localizedEngineName(engine: CamaroEngine): String = when (engine) {
+    CamaroEngine.LLT -> stringResource(R.string.engine_llt)
+    CamaroEngine.LFX -> stringResource(R.string.engine_lfx)
+    CamaroEngine.LS3 -> stringResource(R.string.engine_ls3)
+    CamaroEngine.L99 -> stringResource(R.string.engine_l99)
+    CamaroEngine.LSA -> stringResource(R.string.engine_lsa)
+    CamaroEngine.LS7 -> stringResource(R.string.engine_ls7)
+    CamaroEngine.LTG -> stringResource(R.string.engine_ltg)
+    CamaroEngine.LGX -> stringResource(R.string.engine_lgx)
+    CamaroEngine.LT1 -> stringResource(R.string.engine_lt1)
+    CamaroEngine.LT4 -> stringResource(R.string.engine_lt4)
+}
+
+@Composable
+private fun localizedTransmissionName(transmission: TransmissionType): String = when (transmission) {
+    TransmissionType.MANUAL -> stringResource(R.string.transmission_manual)
+    TransmissionType.AUTOMATIC -> stringResource(R.string.transmission_automatic)
+}
+
+@Composable
+private fun localizedMarketName(market: MarketRegion): String = when (market) {
+    MarketRegion.US_CA -> stringResource(R.string.market_us_ca)
+    MarketRegion.EU_ECE -> stringResource(R.string.market_eu_ece)
+}
+
+@Composable
+private fun localizedAdapterTierName(tier: AdapterTier): String = when (tier) {
+    AdapterTier.PRO_STN -> stringResource(R.string.adapter_tier_pro_stn)
+    AdapterTier.GENUINE_ELM -> stringResource(R.string.adapter_tier_genuine_elm)
+    AdapterTier.CLONE_ELM -> stringResource(R.string.adapter_tier_clone_elm)
+    AdapterTier.DISCONNECTED -> stringResource(R.string.adapter_tier_disconnected)
+}
+
+@Composable
+private fun localizedBusName(bus: CanBusType): String = when (bus) {
+    CanBusType.HS_CAN -> stringResource(R.string.module_bus_hscan)
+    CanBusType.SW_CAN -> stringResource(R.string.module_bus_swcan)
+    CanBusType.UNKNOWN -> stringResource(R.string.module_bus_unknown)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CamaroDiagApp(viewModel: MainViewModel) {
+    val lang = AppLanguage.fromLocale(LocalConfiguration.current.locales[0])
+    val units by viewModel.unitSystem.collectAsState()
+    val vehicle by viewModel.vehicle.collectAsState()
+    val adapter by viewModel.adapter.collectAsState()
+    val pairedDevices by viewModel.pairedDevices.collectAsState()
+    val usbDevices by viewModel.usbDevices.collectAsState()
+    val connError by viewModel.connectionMessage.collectAsState()
+    val isBusy by viewModel.isBusy.collectAsState()
+    val modules by viewModel.modules.collectAsState()
+    val dtcs by viewModel.dtcs.collectAsState()
+    val livePids by viewModel.livePids.collectAsState()
+    val isStreaming by viewModel.isStreamingLive.collectAsState()
+    val liveRecording by viewModel.liveRecordingState.collectAsState()
+    val liveTelemetryMessage by viewModel.liveTelemetryMessage.collectAsState()
+    val mileageReport by viewModel.mileageReport.collectAsState()
+    val savedSessions by viewModel.savedSessions.collectAsState()
+    val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
+    val obdScanReport by viewModel.obdScanReport.collectAsState()
+    val obdScanMessage by viewModel.obdScanMessage.collectAsState()
+    val isObdScanning by viewModel.isObdScanning.collectAsState()
+
+    var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
+    var moreExpanded by remember { mutableStateOf(false) }
+    val isFr = lang == AppLanguage.FR
+    UpdateManagerDialog()
+
+    val btPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        viewModel.refreshPairedDevices()
+    }
+
+    val bleLocationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.refreshPairedDevices()
+    }
+
+    val calibrationFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importCalibrationFile(it) }
+    }
+
+    val calibrationComparisonPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importComparisonCalibrationFile(it) }
+    }
+
+    val calibrationDefinitionsPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importCalibrationDefinitions(it) }
+    }
+
+    val calibrationDefinitionsTemplateSaver = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/tab-separated-values")
+    ) { uri ->
+        uri?.let { viewModel.exportCalibrationDefinitionTemplate(it) }
+    }
+
+    val liveRecordingExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { viewModel.exportLiveRecording(it) }
+    }
+
+    val calibrationFileExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri?.let { viewModel.exportCalibrationFile(it) }
+    }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
+        } else {
+            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark),
+                title = {
+                    Column {
+                        Text(
+                            text = "CAMARODIAG",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 19.sp,
+                            color = CamaroAmber,
+                            letterSpacing = 1.6.sp
+                        )
+                        Text(
+                            text = "${vehicle.generation.label} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
+                            fontSize = 12.sp,
+                            color = TextMuted
+                        )
+                    }
+                },
+                actions = {
+                    when {
+                        adapter.deviceName.contains("Demo", ignoreCase = true) ||
+                            adapter.deviceName.contains("Simulated", ignoreCase = true) -> {
+                            Text("DEMO", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        adapter.tier != AdapterTier.DISCONNECTED -> {
+                            Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                        else -> {
+                            Text(stringResource(R.string.status_offline), color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+                }
+            )
+        },
+
+        bottomBar = {
+            NavigationBar(
+                containerColor = SurfaceDark,
+                contentColor = TextPrimary
+            ) {
+                NavigationBarItem(
+                    selected = currentTab == DiagTab.SETUP,
+                    onClick = { currentTab = DiagTab.SETUP },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tab_vehicle)) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = BgDark,
+                        selectedTextColor = CamaroAmber,
+                        indicatorColor = CamaroAmber
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = currentTab == DiagTab.ADAPTER,
+                    onClick = { currentTab = DiagTab.ADAPTER },
+                    icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tab_connect)) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = BgDark,
+                        selectedTextColor = CamaroAmber,
+                        indicatorColor = CamaroAmber
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = currentTab == DiagTab.LIVE,
+                    onClick = { currentTab = DiagTab.LIVE },
+                    icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tab_live)) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = BgDark,
+                        selectedTextColor = CamaroAmber,
+                        indicatorColor = CamaroAmber
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = currentTab == DiagTab.DTCS,
+                    onClick = { currentTab = DiagTab.DTCS },
+                    icon = { Icon(Icons.Default.Build, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tab_dtcs)) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = BgDark,
+                        selectedTextColor = CamaroAmber,
+                        indicatorColor = CamaroAmber
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = currentTab in setOf(
+                        DiagTab.MODULES,
+                        DiagTab.MILEAGE,
+                        DiagTab.CALIBRATION,
+                        DiagTab.OBD_SCAN,
+                        DiagTab.GUIDE,
+                        DiagTab.CONTROL,
+                        DiagTab.SETTINGS
+                    ),
+                    onClick = { moreExpanded = true },
+                    icon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tab_more)) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = BgDark,
+                        selectedTextColor = CamaroAmber,
+                        indicatorColor = CamaroAmber
+                    )
+                )
+
+                DropdownMenu(
+                    expanded = moreExpanded,
+                    onDismissRequest = { moreExpanded = false }
+                ) {
+                    listOf(
+                        DiagTab.MODULES,
+                        DiagTab.MILEAGE,
+                        DiagTab.CALIBRATION,
+                        DiagTab.OBD_SCAN,
+                        DiagTab.GUIDE,
+                        DiagTab.CONTROL,
+                        DiagTab.SETTINGS
+                    ).forEach { tab ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(stringResource(tab.labelResourceId))
+                            },
+                            onClick = {
+                                currentTab = tab
+                                moreExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+   
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BgDark)
+                .padding(padding)
+                .padding(14.dp)
+        ) {
+            when (currentTab) {
+                DiagTab.SETUP -> VehicleSetupScreen(
+                    vehicle = vehicle,
+                    isFr = isFr,
+                    onChange = { y, e, tr, m -> viewModel.updateVehicle(y, e, tr, m) },
+                    onVinChange = { viewModel.updateVin(it) }
+                )
+                DiagTab.ADAPTER -> AdapterScreen(
+                    adapter = adapter,
+                    isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
+                    pairedDevices = pairedDevices,
+                    errorMsg = connError,
+                    isFr = isFr,
+                    onRefreshDevices = { viewModel.refreshPairedDevices() },
+                    onConnectMac = { viewModel.connectRealBluetooth(it) },
+                    onSelectSim = { viewModel.selectSimulatedAdapter(it) },
+                    usbDevices = usbDevices,
+                    onRefreshUsb = { viewModel.refreshPairedDevices() },
+                    onConnectUsb = { viewModel.connectUsb(it) },
+                    onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
+                )
+                DiagTab.MODULES -> ModulesScreen(modules, isFr)
+                DiagTab.LIVE -> LiveDataScreen(
+                    pids = livePids,
+                    units = units,
+                    isStreaming = isStreaming,
+                    isFr = isFr,
+                    recording = liveRecording,
+                    telemetryMessage = liveTelemetryMessage,
+                    onToggleStream = { viewModel.toggleLiveStream() },
+                    onToggleUnits = {
+                        viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
+                    },
+                    onToggleRecording = { viewModel.toggleLiveRecording() },
+                    onExportRecording = {
+                        liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
+                    }
+                )
+                DiagTab.DTCS -> DtcScreen(dtcs, isFr, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
+                DiagTab.MILEAGE -> MileageScreen(mileageReport, isFr, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.OBD_SCAN -> ObdScanScreen(
+                    report = obdScanReport,
+                    isScanning = isObdScanning,
+                    message = obdScanMessage,
+                    isConnected = adapter.tier != AdapterTier.DISCONNECTED &&
+                        !adapter.deviceName.contains("Demo", ignoreCase = true),
+                    isFr = isFr,
+                    onRunScan = { viewModel.runFullObdScan() }
+                )
+                DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
+                    state = calibrationWorkspace,
+                    vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.generation.label}",
+                    ecmType = vehicle.engine.ecmType,
+                    isConnected = !adapter.deviceName.contains("Demo", ignoreCase = true) &&
+                        !adapter.deviceName.contains("Simulated", ignoreCase = true) &&
+                        adapter.tier != AdapterTier.DISCONNECTED,
+                    isFr = isFr,
+                    vehicle = vehicle,
+                    onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
+                    onReadUdsDtcs = { requestId, responseId, protocol -> viewModel.readUdsDtcs(requestId, responseId, protocol) },
+                    onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
+                        viewModel.connectJ2534Bridge(host, port, token, requestId, responseId, baud)
+                    },
+                    onDisconnectJ2534Bridge = { viewModel.disconnectJ2534Bridge() },
+                    onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
+                    onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
+                    onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
+                    onImportDefinitions = {
+                        calibrationDefinitionsPicker.launch(arrayOf("text/*", "text/csv", "text/tab-separated-values", "*/*"))
+                    },
+                    onExportDefinitionTemplate = {
+                        calibrationDefinitionsTemplateSaver.launch("camaro_calibration_tables_template.tsv")
+                    },
+                    onSelectMap = { viewModel.selectCalibrationMap(it) },
+                    onCellChange = { row, column, value -> viewModel.updateCalibrationCell(row, column, value) },
+                    onApplyMap = { viewModel.applyCalibrationTableEdits() },
+                    onDiscardMap = { viewModel.discardCalibrationTableChanges() },
+                    onExportFile = {
+                        calibrationWorkspace.importedFileName?.let { fileName ->
+                            calibrationFileExporter.launch(fileName)
+                        }
+                    },
+                    onClearFile = { viewModel.clearCalibrationFile() }
+                )
+                DiagTab.GUIDE -> HardwareGuideScreen(isFr)
+                DiagTab.CONTROL -> VehicleControlsScreen(vehicle, isFr)
+                DiagTab.SETTINGS -> SettingsScreen(lang, units, savedSessions, isFr,
+                    onLang = { viewModel.setLanguage(it) },
+                    onUnits = { viewModel.setUnitSystem(it) },
+                    onDeleteSession = { viewModel.deleteSavedSession(it) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun VehicleSetupScreen(
+    vehicle: VehicleProfile,
+    isFr: Boolean,
+    onChange: (Int, CamaroEngine, TransmissionType, MarketRegion) -> Unit,
+    onVinChange: (String) -> Unit
+) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item {
+            SectionTitle(stringResource(R.string.vehicle_setup_header))
+            Text("CHEVROLET CAMARO • ${vehicle.generation.label.uppercase()} • ${vehicle.modelYear}", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.vehicle_generation), color = TextMuted, fontSize = 13.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CamaroGeneration.entries.forEach { gen ->
+                            FilterChip(selected = vehicle.generation == gen, onClick = {
+                                val year = if (gen == CamaroGeneration.GEN5) 2015 else 2016
+                                onChange(year, vehicle.engine, vehicle.transmission, vehicle.market)
+                            }, label = { Text(stringResource(R.string.vehicle_generation_label, if (gen == CamaroGeneration.GEN5) 5 else 6)) })
+                        }
+                    }
+                    Text(stringResource(R.string.vehicle_model_year), color = TextMuted, fontSize = 13.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                        (2010..2024).forEach { yr ->
+                            FilterChip(
+                                selected = vehicle.modelYear == yr,
+                                onClick = { onChange(yr, vehicle.engine, vehicle.transmission, vehicle.market) },
+                                label = { Text("$yr") }
+                            )
+                        }
+                    }
+
+                    Text(stringResource(R.string.vehicle_engine), color = TextMuted, fontSize = 13.sp)
+                    CamaroEngine.entries.filter { vehicle.modelYear in it.years }.forEach { eng ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onChange(vehicle.modelYear, eng, vehicle.transmission, vehicle.market) }
+                                .background(if (vehicle.engine == eng) SurfaceElevated else Color.Transparent, RoundedCornerShape(8.dp))
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("${eng.rpo} — ${localizedEngineName(eng)}", fontWeight = FontWeight.SemiBold)
+                                Text(stringResource(R.string.vehicle_ecm_label, eng.ecmType), fontSize = 12.sp, color = CamaroBlue)
+                            }
+                            if (vehicle.engine == eng) Icon(Icons.Default.CheckCircle, null, tint = CamaroAmber)
+                        }
+                    }
+
+                    Text(stringResource(R.string.vehicle_transmission), color = TextMuted, fontSize = 13.sp)
+                    TransmissionType.entries.forEach { tr ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onChange(vehicle.modelYear, vehicle.engine, tr, vehicle.market) }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = vehicle.transmission == tr, onClick = { onChange(vehicle.modelYear, vehicle.engine, tr, vehicle.market) })
+                            Text(localizedTransmissionName(tr))
+                        }
+                    }
+
+                    Text(stringResource(R.string.vehicle_market_region), color = TextMuted, fontSize = 13.sp)
+                    MarketRegion.entries.forEach { mk ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onChange(vehicle.modelYear, vehicle.engine, vehicle.transmission, mk) }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = vehicle.market == mk, onClick = { onChange(vehicle.modelYear, vehicle.engine, vehicle.transmission, mk) })
+                            Text(localizedMarketName(mk))
+                        }
+                    }
+                    Text(stringResource(R.string.vehicle_vin), color = TextMuted, fontSize = 13.sp)
+                    OutlinedTextField(
+                        value = vehicle.vin,
+                        onValueChange = onVinChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.vehicle_vin_placeholder)) },
+                        supportingText = { Text(stringResource(R.string.vehicle_vin_hint)) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AdapterScreen(
+    adapter: AdapterCapabilities,
+    isBusy: Boolean,
+    pairedDevices: List<Pair<String, String>>,
+    errorMsg: String?,
+    isFr: Boolean,
+    onRefreshDevices: () -> Unit,
+    onConnectMac: (String) -> Unit,
+    onSelectSim: (String) -> Unit,
+    usbDevices: List<String>,
+    onRefreshUsb: () -> Unit,
+    onConnectUsb: (String) -> Unit,
+    onConnectWifi: (String, Int) -> Unit
+) {
+    var wifiHost by remember { mutableStateOf("192.168.0.10") }
+    var wifiPort by remember { mutableStateOf("35000") }
+    val vxdiagProfiles = remember { VxdiagProfiles.all() }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            SectionTitle(stringResource(R.string.adapter_section_title))
+            if (isBusy) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(stringResource(R.string.connection_busy), color = TextMuted, fontSize = 12.sp)
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
+                    Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
+                        BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
+                        BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
+                    }
+                    if (adapter.rawProbeLog.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        adapter.rawProbeLog.forEach { line ->
+                            Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.paired_bluetooth_devices), fontWeight = FontWeight.Bold)
+                TextButton(onClick = onRefreshDevices, enabled = !isBusy) { Text(stringResource(R.string.common_refresh)) }
+            }
+            if (pairedDevices.isEmpty()) {
+                Text(
+                    stringResource(R.string.adapter_none_detected),
+                    color = TextMuted, fontSize = 13.sp
+                )
+            } else {
+                pairedDevices.forEach { (name, mac) ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(enabled = !isBusy) { onConnectMac(mac) },
+                        colors = CardDefaults.cardColors(containerColor = SurfaceElevated)
+                    ) {
+                        Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column {
+                                Text(name, fontWeight = FontWeight.SemiBold)
+                                Text(mac, fontSize = 12.sp, color = TextMuted, fontFamily = FontFamily.Monospace)
+                            }
+                            Text(stringResource(R.string.common_connect), color = CamaroBlue, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            errorMsg?.let { Text(it, color = WarnRed, fontSize = 12.sp) }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.usb_connection_title), fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.usb_devices_detected), modifier = Modifier.weight(1f))
+                        TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(stringResource(R.string.common_refresh)) }
+                    }
+                    if (usbDevices.isEmpty()) Text(stringResource(R.string.usb_none_detected), color = TextMuted)
+                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_connect_label, label)) } }
+                    HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                    Text(stringResource(R.string.wifi_connection_title), fontWeight = FontWeight.Bold)
+                    OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(stringResource(R.string.adapter_ip_address)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text(stringResource(R.string.adapter_tcp_port)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_connect_wifi)) }
+                    Text(stringResource(R.string.adapter_vxdiag_android_limit), color = TextMuted, fontSize = 12.sp)
+                }
+            }
+        }
+        item {
+            Text(stringResource(R.string.adapter_vxdiag_profiles), fontWeight = FontWeight.Bold)
+            Text(
+                stringResource(R.string.adapter_vxdiag_profiles_hint),
+                color = TextMuted,
+                fontSize = 11.sp
+            )
+            vxdiagProfiles.forEach { profile ->
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark), modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(profile.label, color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(
+                                stringResource(R.string.adapter_discovery_only),
+                                color = WarnRed,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(profile.protocols.joinToString(" • ") { it.name }, color = TextMuted, fontSize = 10.sp)
+                        Text(
+                            stringResource(R.string.adapter_hardware_profile_only),
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            Text(stringResource(R.string.adapter_simulation_profiles), fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy) { Text("OBDLink MX+") }
+                OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy) { Text("ELM327 v1.5") }
+                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text("Clone v2.1") }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun localizedVehicleControlTitle(id: VehicleControlId): String = when (id) {
+    VehicleControlId.WINDOWS -> stringResource(R.string.control_windows_title)
+    VehicleControlId.SUNROOF -> stringResource(R.string.control_sunroof_title)
+    VehicleControlId.DOOR_LOCKS -> stringResource(R.string.control_door_locks_title)
+    VehicleControlId.LIGHTS -> stringResource(R.string.control_lights_title)
+    VehicleControlId.HORN -> stringResource(R.string.control_horn_title)
+    VehicleControlId.MIRRORS -> stringResource(R.string.control_mirrors_title)
+    VehicleControlId.TRUNK -> stringResource(R.string.control_trunk_title)
+    VehicleControlId.REMOTE_START -> stringResource(R.string.control_remote_start_title)
+}
+
+@Composable
+private fun localizedVehicleControlExplanation(id: VehicleControlId): String = when (id) {
+    VehicleControlId.WINDOWS -> stringResource(R.string.control_windows_explanation)
+    VehicleControlId.SUNROOF -> stringResource(R.string.control_sunroof_explanation)
+    VehicleControlId.DOOR_LOCKS -> stringResource(R.string.control_door_locks_explanation)
+    VehicleControlId.LIGHTS -> stringResource(R.string.control_lights_explanation)
+    VehicleControlId.HORN -> stringResource(R.string.control_horn_explanation)
+    VehicleControlId.MIRRORS -> stringResource(R.string.control_mirrors_explanation)
+    VehicleControlId.TRUNK -> stringResource(R.string.control_trunk_explanation)
+    VehicleControlId.REMOTE_START -> stringResource(R.string.control_remote_start_explanation)
+}
+
+@Composable
+private fun localizedModuleName(module: EcuModule): String = when (module.id) {
+    "ECM" -> stringResource(R.string.module_ecm_name)
+    "TCM" -> stringResource(R.string.module_tcm_name)
+    "BCM" -> stringResource(R.string.module_bcm_name)
+    "IPC" -> stringResource(R.string.module_ipc_name)
+    "EBCM" -> stringResource(R.string.module_ebcm_name)
+    "SDM" -> stringResource(R.string.module_sdm_name)
+    else -> module.nameEn
+}
+
+@Composable
+private fun localizedModuleNotes(module: EcuModule): String {
+    val notes = module.notesEn
+    return when (module.id) {
+        "ECM" -> when {
+            notes.startsWith("Observed 7E8") -> stringResource(R.string.module_note_ecm_obd_detected)
+            notes.startsWith("No standard OBD 7E8") -> stringResource(R.string.module_note_ecm_obd_missing)
+            else -> stringResource(R.string.module_note_ecm)
+        }
+        "TCM" -> if (notes.contains("not assumed from Gen 5")) stringResource(R.string.module_note_tcm_gen6) else stringResource(R.string.module_note_tcm_gen5)
+        "BCM" -> when {
+            notes.contains("020I") -> stringResource(R.string.module_note_bcm_gen5)
+            notes.contains("020M") -> stringResource(R.string.module_note_bcm_gen6_to2018)
+            else -> stringResource(R.string.module_note_bcm_2019)
+        }
+        "IPC" -> if (notes.startsWith("Secondary odometer")) stringResource(R.string.module_note_ipc_gen6) else stringResource(R.string.module_note_ipc_gen5)
+        "EBCM" -> if (notes.startsWith("Enhanced module")) stringResource(R.string.module_note_ebcm_gen6) else stringResource(R.string.module_note_ebcm_gen5)
+        "SDM" -> stringResource(R.string.module_note_sdm)
+        else -> module.notesEn
+    }
+}
+
+private fun remoteStartBlockerResourceId(index: Int): Int = when (index) {
+    0 -> R.string.remote_start_blocker_gear
+    1 -> R.string.remote_start_blocker_hood
+    2 -> R.string.remote_start_blocker_locks
+    3 -> R.string.remote_start_blocker_hazards
+    4 -> R.string.remote_start_blocker_theft
+    5 -> R.string.remote_start_blocker_faults
+    6 -> R.string.remote_start_blocker_stationary
+    7 -> R.string.remote_start_blocker_equipment
+    else -> R.string.control_blocked
+}
+
+@Composable
+fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
+    val capabilities = remember(vehicle) { VehicleControlCatalog().forVehicle(vehicle) }
+    val remoteStartAssessment = remember(vehicle) {
+        RemoteStartSafetyGate.assess(
+            RemoteStartConditions(
+                gear = VehicleGear.UNKNOWN,
+                hoodClosed = VehicleSignal.UNKNOWN,
+                doorsLocked = VehicleSignal.UNKNOWN,
+                hazardsOff = VehicleSignal.UNKNOWN,
+                theftSystemReady = VehicleSignal.UNKNOWN,
+                criticalFaultsAbsent = VehicleSignal.UNKNOWN,
+                vehicleStationary = VehicleSignal.UNKNOWN,
+                oemRemoteStartEquipped = VehicleSignal.UNKNOWN
+            )
+        )
+    }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            SectionTitle(stringResource(R.string.control_vehicle_title))
+            Text(stringResource(R.string.control_vehicle_label, vehicle.modelYear, vehicle.generation.label, vehicle.engine.rpo), color = CamaroAmber)
+            Text(stringResource(R.string.control_gm_body_notice), color = TextMuted, fontSize = 12.sp)
+        }
+        items(capabilities) { capability ->
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(localizedVehicleControlTitle(capability.id), fontWeight = FontWeight.Bold)
+                        Text(capability.vehicleContext, color = CamaroBlue, fontSize = 10.sp)
+                        Text(localizedVehicleControlExplanation(capability.id), color = TextMuted, fontSize = 12.sp)
+                        if (capability.id == VehicleControlId.REMOTE_START) {
+                            Text(
+                                stringResource(
+                                    R.string.control_interlock_assessment,
+                                    stringResource(if (remoteStartAssessment.allowedToRequestOemProcedure) R.string.control_conditions_confirmed else R.string.control_blocked)
+                                ),
+                                color = WarnRed,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                            remoteStartAssessment.blockersFr.forEachIndexed { index, _ ->
+                                Text("• " + stringResource(remoteStartBlockerResourceId(index)), color = WarnRed, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                    val availabilityLabel = when (capability.availability) {
+                        ControlAvailability.NOT_VERIFIED -> stringResource(R.string.status_not_verified)
+                        ControlAvailability.AVAILABLE -> stringResource(R.string.status_available)
+                        ControlAvailability.NOT_EQUIPPED -> stringResource(R.string.status_not_equipped)
+                    }
+                    val availabilityColor = when (capability.availability) {
+                        ControlAvailability.NOT_VERIFIED -> WarnRed
+                        ControlAvailability.AVAILABLE -> OkGreen
+                        ControlAvailability.NOT_EQUIPPED -> TextMuted
+                    }
+                    Text(availabilityLabel, color = availabilityColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        item { Text(stringResource(R.string.control_no_actuation_notice), color = TextMuted, fontSize = 12.sp) }
+    }
+}
+
+@Composable
+fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            SectionTitle(stringResource(R.string.modules_vehicle_title))
+        }
+        items(modules) { mod ->
+            val statusColor = when (mod.status) {
+                ModuleStatus.ACCESSIBLE -> OkGreen
+                ModuleStatus.REQUIRES_SWCAN -> CamaroAmber
+                ModuleStatus.UNSUPPORTED_BY_ADAPTER -> WarnRed
+                ModuleStatus.NOT_EQUIPPED -> TextMuted
+                ModuleStatus.DISCOVERY_REQUIRED -> CamaroAmber
+            }
+            val statusLabel = when (mod.status) {
+                ModuleStatus.ACCESSIBLE -> stringResource(R.string.module_accessible)
+                ModuleStatus.REQUIRES_SWCAN -> stringResource(R.string.module_requires_swcan)
+                ModuleStatus.UNSUPPORTED_BY_ADAPTER -> stringResource(R.string.module_blocked_adapter)
+                ModuleStatus.NOT_EQUIPPED -> stringResource(R.string.module_not_equipped)
+                ModuleStatus.DISCOVERY_REQUIRED -> stringResource(R.string.module_discovery_required)
+            }
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${mod.shortName} • ${localizedBusName(mod.bus)}", fontWeight = FontWeight.Bold, color = CamaroBlue)
+                        Text(statusLabel, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    Text(localizedModuleName(mod), fontWeight = FontWeight.SemiBold)
+                    if (mod.txHeader.isNotBlank() && mod.rxHeader.isNotBlank()) {
+                        Text(stringResource(R.string.module_can_headers, mod.txHeader, mod.rxHeader, mod.bus.pinout), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                    }
+                    Text(localizedModuleNotes(mod), fontSize = 12.sp, color = TextMuted)
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun localizedLivePidLabel(pid: LivePidValue): String {
+    val demo = pid.labelEn.contains("(DEMO)", ignoreCase = true)
+    return when (pid.id) {
+        "RPM" -> stringResource(if (demo) R.string.live_pid_rpm_demo else R.string.live_pid_rpm)
+        "ECT" -> stringResource(if (demo) R.string.live_pid_ect_demo else R.string.live_pid_ect)
+        "OIL" -> stringResource(R.string.live_pid_oil_demo)
+        "STFT" -> stringResource(if (demo) R.string.live_pid_stft_demo else R.string.live_pid_stft)
+        "BAT" -> stringResource(if (demo) R.string.live_pid_bat_demo else R.string.live_pid_bat)
+        "SPD" -> stringResource(R.string.live_pid_speed)
+        "TPS" -> stringResource(R.string.live_pid_throttle)
+        "LOAD" -> stringResource(R.string.live_pid_load)
+        "MAP" -> stringResource(R.string.live_pid_map)
+        "IAT" -> stringResource(R.string.live_pid_iat)
+        "MAF" -> stringResource(R.string.live_pid_maf)
+        else -> pid.labelEn
+    }
+}
+
+@Composable
+fun LiveDataScreen(
+    pids: List<LivePidValue>,
+    units: UnitSystem,
+    isStreaming: Boolean,
+    isFr: Boolean,
+    recording: LiveRecordingState,
+    telemetryMessage: String?,
+    onToggleStream: () -> Unit,
+    onToggleUnits: () -> Unit,
+    onToggleRecording: () -> Unit,
+    onExportRecording: () -> Unit
+) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    SectionTitle(stringResource(R.string.live_engine_telemetry))
+                    Row {
+                        TextButton(onClick = onToggleUnits) {
+                            Text(if (units == UnitSystem.METRIC) stringResource(R.string.units_metric) else stringResource(R.string.units_imperial), color = CamaroBlue)
+                        }
+                        TextButton(onClick = onToggleStream) {
+                            Text(if (isStreaming) stringResource(R.string.live_pause) else stringResource(R.string.live_resume), color = CamaroAmber)
+                        }
+                    }
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = onToggleRecording,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (recording.isRecording) WarnRed else CamaroAmber)
+                            ) {
+                                Text(
+                                    if (recording.isRecording) {
+                                        stringResource(R.string.live_stop_recording)
+                                    } else {
+                                        stringResource(R.string.live_record)
+                                    },
+                                    color = Color.Black
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = onExportRecording,
+                                enabled = recording.sampleCount > 0 && !recording.isRecording,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(R.string.live_export_csv))
+                            }
+                        }
+                        Text(
+                            stringResource(
+                                R.string.live_recording_status,
+                                recording.sampleCount,
+                                stringResource(if (recording.isRecording) R.string.live_recording_state_active else R.string.live_recording_state_stopped)
+                            ),
+                            color = if (recording.isRecording) CamaroAmber else TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        recording.message.takeIf { it.isNotBlank() }?.let {
+                            Text(it, color = TextMuted, fontSize = 11.sp)
+                        }
+                        telemetryMessage?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, color = WarnRed, fontSize = 11.sp)
+                        }
+                        Text(
+                            stringResource(R.string.live_recording_notice),
+                            color = TextMuted, fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+        }
+        items(pids) { pid ->
+            val displayVal = if (units == UnitSystem.METRIC) pid.metricValue else pid.imperialValue
+            val displayUnit = if (units == UnitSystem.METRIC) pid.metricUnit else pid.imperialUnit
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                        Text(localizedLivePidLabel(pid), color = TextMuted, fontSize = 13.sp)
+                        Text(
+                            text = "${String.format(Locale.getDefault(), "%.1f", displayVal)} $displayUnit",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    if (pid.history.size > 2) {
+                        Spacer(Modifier.height(8.dp))
+                        Sparkline(pid.history, pid.minMetric, pid.maxMetric)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun Sparkline(values: List<Double>, minVal: Double, maxVal: Double) {
+    Canvas(modifier = Modifier.fillMaxWidth().height(34.dp)) {
+        val span = (maxVal - minVal).coerceAtLeast(1.0)
+        val stepX = size.width / (values.size - 1).coerceAtLeast(1)
+        val path = Path()
+        values.forEachIndexed { i, v ->
+            val x = i * stepX
+            val norm = ((v - minVal) / span).coerceIn(0.0, 1.0).toFloat()
+            val y = size.height * (1f - norm)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(path, color = CamaroAmber, style = Stroke(width = 3f))
+    }
+}
+
+@Composable
+private fun localizedDtcStatus(dtc: DiagnosticDtc): String = when {
+    dtc.isPending -> stringResource(R.string.obd_pending)
+    dtc.statusEn.equals("Permanent", ignoreCase = true) -> stringResource(R.string.obd_permanent)
+    else -> stringResource(R.string.obd_confirmed)
+}
+
+@Composable
+private fun localizedDtcDescription(dtc: DiagnosticDtc): String = when (dtc.code.uppercase()) {
+    "P0101" -> stringResource(R.string.dtc_desc_p0101)
+    "P0102" -> stringResource(R.string.dtc_desc_p0102)
+    "P0103" -> stringResource(R.string.dtc_desc_p0103)
+    "P0113" -> stringResource(R.string.dtc_desc_p0113)
+    "P0128" -> stringResource(R.string.dtc_desc_p0128)
+    "P0171" -> stringResource(R.string.dtc_desc_p0171)
+    "P0172" -> stringResource(R.string.dtc_desc_p0172)
+    "P0174" -> stringResource(R.string.dtc_desc_p0174)
+    "P0175" -> stringResource(R.string.dtc_desc_p0175)
+    "P0300" -> stringResource(R.string.dtc_desc_p0300)
+    "P0301" -> stringResource(R.string.dtc_desc_p0301)
+    "P0302" -> stringResource(R.string.dtc_desc_p0302)
+    "P0303" -> stringResource(R.string.dtc_desc_p0303)
+    "P0304" -> stringResource(R.string.dtc_desc_p0304)
+    "P0305" -> stringResource(R.string.dtc_desc_p0305)
+    "P0306" -> stringResource(R.string.dtc_desc_p0306)
+    "P0307" -> stringResource(R.string.dtc_desc_p0307)
+    "P0308" -> stringResource(R.string.dtc_desc_p0308)
+    "P0420" -> stringResource(R.string.dtc_desc_p0420)
+    "P0430" -> stringResource(R.string.dtc_desc_p0430)
+    "P0442" -> stringResource(R.string.dtc_desc_p0442)
+    "P0455" -> stringResource(R.string.dtc_desc_p0455)
+    "P0496" -> stringResource(R.string.dtc_desc_p0496)
+    "P0507" -> stringResource(R.string.dtc_desc_p0507)
+    "P06DD" -> stringResource(R.string.dtc_desc_p06dd)
+    "P1101" -> stringResource(R.string.dtc_desc_p1101)
+    "P0010" -> stringResource(R.string.dtc_desc_p0010)
+    "P0011" -> stringResource(R.string.dtc_desc_p0011)
+    "P0014" -> stringResource(R.string.dtc_desc_p0014)
+    "P0087" -> stringResource(R.string.dtc_desc_p0087)
+    "P0089" -> stringResource(R.string.dtc_desc_p0089)
+    "P0191" -> stringResource(R.string.dtc_desc_p0191)
+    "P0299" -> stringResource(R.string.dtc_desc_p0299)
+    else -> stringResource(R.string.dtc_description_unavailable)
+}
+
+@Composable
+fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onClear: () -> Unit) {
+    var confirmClear by remember { mutableStateOf(false) }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                SectionTitle(stringResource(R.string.dtc_title))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onScan) { Text(stringResource(R.string.dtc_scan)) }
+                    Button(onClick = { confirmClear = true }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
+                        Text(stringResource(R.string.dtc_clear), color = Color.White)
+                    }
+                }
+            }
+        }
+        item {
+            Text(
+                stringResource(R.string.dtc_clear_warning),
+                color = TextMuted, fontSize = 11.sp
+            )
+        }
+        if (dtcs.isEmpty()) {
+            item {
+                Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
+            }
+        } else {
+            items(dtcs) { dtc ->
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("${dtc.code} (${dtc.module})", fontWeight = FontWeight.Bold, color = if (dtc.isPending) CamaroAmber else WarnRed, fontSize = 16.sp)
+                            Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
+                        }
+                        Text(localizedDtcDescription(dtc))
+                    }
+                }
+            }
+        }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text(stringResource(R.string.dtc_confirm_clear)) },
+            text = { Text(stringResource(R.string.dtc_clear_description)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmClear = false
+                        onClear()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = WarnRed)
+                ) { Text(stringResource(R.string.dtc_clear_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
+    }
+}
+
+
+@Composable
+private fun localizedMileageSummary(report: MileageAuditReport): String {
+    val valid = report.readings.filter { reading ->
+        reading.kmValue?.let { it.isFinite() && it >= 0.0 } == true
+    }
+    val independent = valid.filter {
+        !it.profileEvidenceReference.isNullOrBlank() &&
+            it.confidence == ConfidenceLevel.HIGH &&
+            it.moduleId.uppercase() in setOf("BCM", "IPC", "ECM_TOTAL_ODO")
+    }.distinctBy { it.moduleId.uppercase() }
+    val values = independent.mapNotNull { it.kmValue }
+    val delta = if (values.size >= 2) values.maxOrNull()!! - values.minOrNull()!! else 0.0
+    return when {
+        report.hasDiscrepancy -> stringResource(R.string.mileage_summary_discrepancy, delta)
+        values.size >= 2 -> stringResource(R.string.mileage_summary_agreement, delta)
+        valid.isEmpty() -> stringResource(R.string.mileage_summary_no_data)
+        else -> stringResource(R.string.mileage_summary_insufficient, valid.size, independent.size)
+    }
+}
+
+@Composable
+private fun localizedMileageSourceName(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_source_j2534)
+    "DEMO" -> stringResource(R.string.mileage_source_demo)
+    "ECM_A6" -> stringResource(R.string.mileage_source_ecm_a6)
+    "ECM_D3" -> stringResource(R.string.mileage_source_ecm_d3)
+    "BCM" -> stringResource(R.string.module_bcm_name)
+    "IPC" -> stringResource(R.string.module_ipc_name)
+    "ECM_TOTAL_ODO" -> stringResource(R.string.mileage_source_ecm_total)
+    else -> item.moduleNameEn
+}
+
+@Composable
+private fun localizedMileageDetails(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_details_j2534)
+    "DEMO" -> stringResource(R.string.mileage_details_demo)
+    "ECM_A6" -> stringResource(
+        R.string.mileage_details_pid,
+        "A6",
+        if (item.didInfo.contains("not advertised by ECU")) stringResource(R.string.mileage_pid_not_advertised) else item.didInfo.substringAfter("•", item.didInfo).trim()
+    )
+    "ECM_D3" -> stringResource(
+        R.string.mileage_details_pid,
+        "D3",
+        if (item.didInfo.contains("not advertised by ECU")) stringResource(R.string.mileage_pid_not_advertised) else item.didInfo.substringAfter("•", item.didInfo).trim()
+    )
+    "BCM", "IPC" -> stringResource(R.string.mileage_details_module_not_read)
+    else -> item.didInfo
+}
+
+@Composable
+private fun localizedMileageConfidence(confidence: ConfidenceLevel): String = when (confidence) {
+    ConfidenceLevel.HIGH -> stringResource(R.string.confidence_high)
+    ConfidenceLevel.MODERATE -> stringResource(R.string.confidence_moderate)
+    ConfidenceLevel.UNAVAILABLE -> stringResource(R.string.confidence_unavailable)
+}
+
+@Composable
+private fun localizedMileageCaveat(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_caveat_j2534)
+    "DEMO" -> stringResource(R.string.mileage_caveat_demo)
+    "ECM_A6" -> stringResource(if (item.kmValue != null) R.string.mileage_caveat_ecm_a6_valid else R.string.mileage_caveat_ecm_a6_missing)
+    "ECM_D3" -> stringResource(if (item.kmValue != null) R.string.mileage_caveat_ecm_d3_valid else R.string.mileage_caveat_ecm_d3_missing)
+    "BCM" -> stringResource(R.string.mileage_caveat_bcm)
+    "IPC" -> stringResource(R.string.mileage_caveat_ipc)
+    else -> item.caveatEn
+}
+
+@Composable
+fun MileageScreen(
+    report: MileageAuditReport?,
+    isFr: Boolean,
+    onRefreshAudit: () -> Unit,
+    onSaveReport: () -> Unit
+) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                SectionTitle(stringResource(R.string.mileage_consistency))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick = onRefreshAudit) { Text(stringResource(R.string.mileage_reread)) }
+                    Button(onClick = onSaveReport) { Text(stringResource(R.string.common_save)) }
+                }
+            }
+        }
+        report?.let { rep ->
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = if (rep.hasDiscrepancy) Color(0xFF3B1518) else SurfaceElevated)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = stringResource(R.string.mileage_engineering_summary, rep.vin),
+                            fontWeight = FontWeight.Bold,
+                            color = if (rep.hasDiscrepancy) WarnRed else OkGreen
+                        )
+                        Text(localizedMileageSummary(rep), fontSize = 13.sp)
+                    }
+                }
+            }
+            items(rep.readings) { item ->
+                val confColor = when (item.confidence) {
+                    ConfidenceLevel.HIGH -> OkGreen
+                    ConfidenceLevel.MODERATE -> CamaroAmber
+                    ConfidenceLevel.UNAVAILABLE -> TextMuted
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(localizedMileageSourceName(item), fontWeight = FontWeight.Bold)
+                            Text(
+                                text = item.kmValue?.let { "${String.format(Locale.getDefault(), "%,.1f", it)} km" } ?: stringResource(R.string.obd_not_available),
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = if (item.kmValue != null) CamaroBlue else TextMuted
+                            )
+                        }
+                        Text(localizedMileageDetails(item), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                        Text(localizedMileageConfidence(item.confidence), color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(localizedMileageCaveat(item), fontSize = 12.sp, color = TextMuted)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HardwareGuideScreen(isFr: Boolean) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            SectionTitle(stringResource(R.string.guide_title))
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.guide_recommended_mxplus),
+                        fontWeight = FontWeight.Bold, color = OkGreen
+                    )
+                    Text(
+                        stringResource(R.string.guide_mxplus_description),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.guide_hscan_alternative),
+                        fontWeight = FontWeight.Bold, color = CamaroAmber
+                    )
+                    Text(
+                        stringResource(R.string.guide_vlinker_description),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.guide_clone_limitations),
+                        fontWeight = FontWeight.Bold, color = WarnRed
+                    )
+                    Text(
+                        stringResource(R.string.guide_clone_description),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Suppress("UNUSED_PARAMETER")
+@Composable
+fun SettingsScreen(
+    lang: AppLanguage,
+    units: UnitSystem,
+    sessions: List<com.camarodiag.gen5.data.db.SavedSessionEntity>,
+    isFr: Boolean,
+    onLang: (AppLanguage) -> Unit,
+    onUnits: (UnitSystem) -> Unit,
+    onDeleteSession: (com.camarodiag.gen5.data.db.SavedSessionEntity) -> Unit
+) {
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            SectionTitle(stringResource(R.string.settings_title))
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.system_language_current, lang.label), color = CamaroAmber)
+                    Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_unit_system), fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text(stringResource(R.string.units_metric_details)) })
+                        FilterChip(selected = units == UnitSystem.IMPERIAL, onClick = { onUnits(UnitSystem.IMPERIAL) }, label = { Text(stringResource(R.string.units_imperial_details)) })
+                    }
+                }
+            }
+        }
+        item {
+            Text(stringResource(R.string.settings_saved_sessions), fontWeight = FontWeight.Bold)
+        }
+        if (sessions.isEmpty()) {
+            item {
+                Text(stringResource(R.string.settings_no_sessions), color = TextMuted, fontSize = 13.sp)
+            }
+        } else {
+            items(sessions) { s ->
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(s.vehicleLabel, fontWeight = FontWeight.Bold, color = CamaroAmber)
+                            IconButton(onClick = { onDeleteSession(s) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Delete, null, tint = WarnRed)
+                            }
+                        }
+                        Text("${sdf.format(Date(s.timestamp))} • ${stringResource(R.string.session_vin_label, s.vin)}", fontSize = 11.sp, color = TextMuted)
+                        Text(stringResource(R.string.session_dtcs_label, s.dtcSummary), fontSize = 12.sp, color = CamaroBlue)
+                        Text(s.mileageSummary, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionTitle(text: String) {
+    Text(text, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+}
+
+@Composable
+fun BadgeChip(label: String, active: Boolean) {
+    Surface(
+        color = if (active) OkGreen.copy(alpha = 0.2f) else WarnRed.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            fontSize = 11.sp,
+            color = if (active) OkGreen else WarnRed,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}

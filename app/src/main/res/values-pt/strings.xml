@@ -258,7 +258,7 @@
     <string name="control_conditions_confirmed">conditions confirmed</string>
     <string name="control_blocked">BLOCKED</string>
     <string name="control_windows_title">Windows</string>
-    <string name="control_windows_explanation">GM command must be identified and validated for this VIN\'s BCM. No universal frame is assumed.</string>
+    <string name="control_windows_explanation">GM command must be identified and validated for this VIN\\'s BCM. No universal frame is assumed.</string>
     <string name="control_sunroof_title">Sunroof</string>
     <string name="control_sunroof_explanation">Only if equipped and a validated BCM command is available.</string>
     <string name="control_door_locks_title">Door locks</string>
