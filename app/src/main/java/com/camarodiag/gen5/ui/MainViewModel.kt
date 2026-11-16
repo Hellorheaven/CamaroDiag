@@ -263,7 +263,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isObdbSignalReading = false,
-                    obdbSignalValue = "$rendered\nRAW=0x${decoded.raw} • DID=0x${signal.identifierHex}",
+                    obdbSignalValue = "$rendered\nRAW_DEC=${decoded.raw} • DID=0x${signal.identifierHex}",
                     obdbSignalMessage = if (_language.value == AppLanguage.FR)
                         "${signal.name} lu sur 0x${signal.requestHeaderHex} → 0x${signal.responseHeaderHex}."
                     else "${signal.name} read from 0x${signal.requestHeaderHex} → 0x${signal.responseHeaderHex}."
