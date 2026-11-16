@@ -238,7 +238,7 @@ fun CalibrationWorkspaceScreen(
                     OutlinedTextField(
                         value = udsCanProtocol,
                         onValueChange = { udsCanProtocol = it.filter(Char::isDigit).take(2) },
-                        label = { Text(if (isFr) "Protocole STN : 33 HS-CAN 500k • 63 SW-CAN" else "STN protocol: 33 HS-CAN 500k • 63 SW-CAN") },
+                        label = { Text(if (isFr) "Protocole STN : 33/34 HS-CAN 500k • 35/36 250k • 63/64 SW-CAN" else "STN protocol: 33/34 HS-CAN 500k • 35/36 250k • 63/64 SW-CAN") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
