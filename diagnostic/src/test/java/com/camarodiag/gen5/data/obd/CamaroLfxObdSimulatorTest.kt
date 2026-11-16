@@ -31,6 +31,27 @@ class CamaroLfxObdSimulatorTest {
     }
 
     @Test
+    fun everyAdvertisedDataPidHasAValidPositiveResponse() = runBlocking {
+        val supported = CamaroLfxObdSimulator.createEngine().discoverSupportedPids()
+        val expected = setOf(
+            0x05, 0x0C, 0x0D, 0x0F, 0x11, 0x1F,
+            0x22, 0x24, 0x2D, 0x2E, 0x2F, 0x31, 0x32, 0x33, 0x3C, 0x3E,
+            0x42, 0x44, 0x46, 0x49, 0x4A, 0x4C, 0x4D, 0x4E, 0x52, 0x59,
+            0x5A, 0x5C, 0x5E
+        )
+
+        assertEquals(expected, supported)
+        supported.forEach { pid ->
+            val marker = "41%02X".format(java.util.Locale.US, pid)
+            val response = CamaroLfxObdSimulator.response("01%02X".format(java.util.Locale.US, pid))
+            val normalized = response.uppercase().replace(Regex("[^0-9A-F]"), "")
+            assertTrue("PID %02X is advertised but has no positive response: %s".format(
+                java.util.Locale.US, pid, response
+            ), normalized.contains(marker))
+        }
+    }
+
+    @Test
     fun simulatorNeverAnswersUnknownOrWriteCommandsAsSuccessful() {
         assertEquals("NO DATA", CamaroLfxObdSimulator.response("01AA"))
         assertEquals("NO DATA", CamaroLfxObdSimulator.response("04"))
