@@ -74,6 +74,19 @@ fun ObdScanScreen(
         }
 
         if (report != null) {
+            val isSimulated = report.adapterInfo["IDENTIFICATION"].orEmpty()
+                .contains("SIMULATED", ignoreCase = true)
+            if (isSimulated) {
+                item {
+                    Text(
+                        if (isFr) "SIMULATION HORS VÉHICULE — VIN, CAL ID, CVN, DTC et mesures ci-dessous sont synthétiques et ne proviennent d'aucune Camaro réelle."
+                        else "OFFLINE SIMULATION — VIN, CAL ID, CVN, DTCs and measurements below are synthetic and do not come from a real Camaro.",
+                        color = CamaroAmber,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
             item {
                 InfoCard(title = if (isFr) "Identification véhicule / ECU" else "Vehicle / ECU identification") {
                     InfoLine(if (isFr) "VIN" else "VIN", report.vin ?: unavailable)
@@ -158,8 +171,13 @@ fun ObdScanScreen(
 
             item {
                 Text(
-                    if (isFr) "Portée : les résultats proviennent uniquement des réponses réellement émises par l'ECU accessible via OBD-II. Ce scan ne balaie pas le BCM, l'IPC, l'ABS, le SDM ou les autres calculateurs GM et n'exécute aucune commande d'actionnement ou de programmation."
-                    else "Scope: results come only from responses actually returned by the OBD-II-accessible ECU. This scan does not poll BCM, IPC, ABS, SDM or other GM modules and does not execute actuator or programming commands.",
+                    if (isSimulated) {
+                        if (isFr) "Portée : données de démonstration déterministes uniquement. Aucun adaptateur, calculateur ou véhicule réel n'est interrogé."
+                        else "Scope: deterministic demonstration data only. No real adapter, ECU or vehicle is queried."
+                    } else {
+                        if (isFr) "Portée : les résultats proviennent uniquement des réponses réellement émises par l'ECU accessible via OBD-II. Ce scan ne balaie pas le BCM, l'IPC, l'ABS, le SDM ou les autres calculateurs GM et n'exécute aucune commande d'actionnement ou de programmation."
+                        else "Scope: results come only from responses actually returned by the OBD-II-accessible ECU. This scan does not poll BCM, IPC, ABS, SDM or other GM modules and does not execute actuator or programming commands."
+                    },
                     color = TextMuted, fontSize = 11.sp
                 )
             }
