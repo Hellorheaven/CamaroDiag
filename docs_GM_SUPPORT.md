@@ -60,7 +60,7 @@ Avant d'ouvrir une session, le profil doit correspondre au véhicule sélectionn
 
 Le client UDS fonctionne aussi sur le transport CAN brut simulé/testé. Le point d'intégration VXDIAG reste un contrat sans pilote fournisseur. Le scan automatique GM de BCM, TCM, EBCM/ABS, IPC, SDM et autres calculateurs n'est pas activé : il faut encore les adresses physiques et les profils DID exacts pour chaque VIN/OS.
 
-La pile générique contient les primitives UDS de session, TesterPresent, lecture/écriture DID, DTC, SecurityAccess seed/key, routines, I/O control, accès mémoire et transferts upload/download. Les opérations mutantes restent refusées par défaut et nécessitent un grant interne lié au VIN, à la famille ECU, au numéro matériel, à l'OS, au CAL ID, au CVN, aux DID/routines/plages mémoire autorisés et à une preuve documentaire. Aucun grant GM réel, algorithme seed-key, checksum ni séquence flash/recovery n'est fourni. Le seul écran exposé actuellement lance une lecture DID sur MX+ ; aucune écriture ECU n'est autorisée depuis l'interface.
+La pile générique contient les primitives UDS de session, TesterPresent, lecture/écriture DID, DTC, SecurityAccess seed/key, routines, I/O control, accès mémoire et transferts upload/download. Les opérations mutantes restent refusées par défaut et nécessitent un grant interne lié au VIN, à la famille ECU, au numéro matériel, à l'OS, au CAL ID, au CVN, aux DID/routines/plages mémoire autorisés et à une preuve documentaire. Aucun grant GM réel, algorithme seed-key, checksum ni séquence flash/recovery n'est fourni. L'écran expose la lecture d'un DID et des DTC UDS sur MX+ ; l'utilisateur choisit le preset CAN et fournit les identifiants physiques. Aucune écriture ECU n'est autorisée depuis l'interface.
 
 ## Lecture binaire ECU, édition et flashage : limites actuelles
 
@@ -80,7 +80,7 @@ Les interfaces GM de programmation et leurs logiciels officiels ne sont pas inte
 
 ## Pile UDS ISO-TP étendue – primitives génériques, accès contrôlé
 
-Le module `diagnostic` contient désormais un client UDS générique supplémentaire au-dessus du transport CAN brut et du canal ISO-TP classique. Il couvre les services normalisés suivants, lorsque l'ECU les implémente et les autorise :
+Le module `diagnostic` contient désormais un client UDS générique supplémentaire au-dessus du transport CAN brut et du canal ISO-TP classique. Le transport STPX MX+ expose les presets STN documentés : 33/34 (HS-CAN ISO 15765 à 500 kbit/s, 11/29 bits), 35/36 (HS-CAN 250 kbit/s) et 63/64 (SW-CAN/GMLAN ISO 15765 à 33,3 kbit/s, 11/29 bits). Le preset doit correspondre au réseau réel et à la longueur des identifiants CAN. Il couvre les services normalisés suivants, lorsque l'ECU les implémente et les autorise :
 
 - Session et maintien : `0x10` DiagnosticSessionControl, `0x3E` TesterPresent (y compris suppression de réponse).
 - Identification et diagnostic : `0x22` ReadDataByIdentifier, `0x19` ReadDTCInformation, décodage des enregistrements DTC `0x02`.
@@ -96,7 +96,7 @@ Le client gère les réponses négatives UDS et attend les réponses positives a
 
 **Ce code est une pile de protocole générique, pas une validation GM.** Aucun profil de programmation GM n'est fourni : aucun DID d'écriture, aucune routine, aucune plage mémoire, aucune clé de sécurité, aucun checksum ni séquence de flashage n'est renseigné pour les Camaro. Les méthodes d'écriture existent derrière les contrôles, mais aucun véhicule ne reçoit d'autorisation d'écriture par défaut.
 
-**Matériel :** pour l'accès UDS direct Android déjà raccordé, il faut un OBDLink MX+ authentique (STN2255/STN2256) et les CAN ID request/response exacts du calculateur. La documentation STN officielle décrit STPX, STCSEGR/STCSEGT, STCFCPA et la réassemblage ISO-TP. Pour les VCX SE/NANO, il faut encore un pont PC J2534/ISO 22900 ou un SDK Android officiellement fourni. Le GM MDI2 est documenté comme interface Pass-Thru J2534 pilotée par une application PC.
+**Matériel :** pour l'accès UDS direct Android déjà raccordé, il faut un OBDLink MX+ authentique (STN2255/STN2256) et les CAN ID request/response exacts du calculateur. La documentation STN officielle décrit STPX, STCSEGR/STCSEGT, STCFCPA, les presets HS-CAN et SW-CAN, et le réassemblage ISO-TP. Pour les VCX SE/NANO, il faut encore un pont PC J2534/ISO 22900 ou un SDK Android officiellement fourni. Le GM MDI2 est documenté comme interface Pass-Thru J2534 pilotée par une application PC.
 
 ## BCM / odomètre / pilotage
 
