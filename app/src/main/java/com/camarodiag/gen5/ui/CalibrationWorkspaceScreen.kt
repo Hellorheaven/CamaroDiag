@@ -54,6 +54,7 @@ import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
+    val ecuVinResponse: String = "",
     val calibrationIdResponse: String = "",
     val cvnResponse: String = "",
     val message: String = "",
@@ -184,8 +185,8 @@ fun CalibrationWorkspaceScreen(
                             color = TextPrimary, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        if (isFr) "Lecture des identifiants OBD normalisés Mode 09 : CAL ID (PID 04) et CVN (PID 06). Ces données identifient la calibration mais ne constituent pas une lecture de la cartographie binaire."
-                        else "Read standard OBD Mode 09 identifiers: CAL ID (PID 04) and CVN (PID 06). These identify the calibration but do not read the binary calibration map.",
+                        if (isFr) "Lecture des identifiants OBD Mode 09 : VIN (PID 02), CAL ID (PID 04) et CVN (PID 06). Ces identifiants ne constituent pas une lecture de la cartographie binaire."
+                        else "Read OBD Mode 09 identifiers: VIN (PID 02), CAL ID (PID 04) and CVN (PID 06). These identifiers do not read the binary calibration map.",
                         color = TextMuted, fontSize = 12.sp
                     )
                     Button(
@@ -194,14 +195,16 @@ fun CalibrationWorkspaceScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (state.isReading) CircularProgressIndicator()
-                        else Text(if (isFr) "Lire CAL ID / CVN sur l'ECU" else "Read ECU CAL ID / CVN")
+                        else Text(if (isFr) "Lire VIN / CAL ID / CVN sur l'ECU" else "Read ECU VIN / CAL ID / CVN")
                     }
                     if (!isConnected) Text(
                         if (isFr) "Connecte une interface OBD avant la lecture réelle." else "Connect an OBD adapter before reading the real ECU.",
                         color = CamaroAmber, fontSize = 12.sp
                     )
-                    if (state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank()) {
+                    if (state.ecuVinResponse.isNotBlank() || state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank()) {
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                        Text("VIN • 09 02", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(state.ecuVinResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text("CAL ID • 09 04", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.calibrationIdResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text("CVN • 09 06", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
