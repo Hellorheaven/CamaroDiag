@@ -420,7 +420,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val responseId = parseHex(responseCanIdHex)
                 require(requestId != responseId)
                 val client = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(timeoutMs = 5000L)
+                    obdManager.createJ2534BridgeUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        timeoutMs = 5000L
+                    )
                 } else {
                     val protocolNumber = protocolNumberText.toIntOrNull()
                         ?: error("Protocole STN invalide.")
