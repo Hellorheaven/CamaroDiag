@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.json.JSONObject
 import org.junit.Test
 
 class CamaroSignalCatalogTest {
@@ -79,11 +80,10 @@ class CamaroSignalCatalogTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsDuplicateSignalIds() {
-        val one = signalJson().substringAfter("\"signals\":[")
-            .substringBeforeLast("]}")
-        CamaroSignalCatalog.fromJson(
-            "{\"schemaVersion\":1,\"signals\":[$one,$one]}"
-        )
+        val root = JSONObject(signalJson())
+        val signals = root.getJSONArray("signals")
+        signals.put(signals.getJSONObject(0))
+        CamaroSignalCatalog.fromJson(root.toString())
     }
 
     @Test(expected = IllegalArgumentException::class)
