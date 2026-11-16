@@ -66,6 +66,20 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun doesNotClaimSwCanFromProtocolCommandAcceptanceAlone() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "STN adapter",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "OBDLink",
+            stiResp = "STN2255 v5.6.5",
+            atalResp = "OK",
+            stp61Resp = "OK"
+        )
+
+        assertFalse(capabilities.supportsSwCan)
+    }
+
+    @Test
     fun adapterCapabilitiesDefaultToDisconnectedAndFailClosed() {
         val adapter = AdapterCapabilities()
         assertEquals(AdapterTier.DISCONNECTED, adapter.tier)
