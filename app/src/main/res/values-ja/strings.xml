@@ -469,15 +469,15 @@
     <string name="update_version_channel">バージョン %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
     <plurals name="vm_native_catalog_loaded">
-        <item quantity="one">First-party Camaro profile: %1$d for model year %2$d. Live reads require vehicle evidence.</item>
-        <item quantity="other">First-party Camaro profiles: %1$d for model year %2$d. Live reads require vehicle evidence.</item>
+        <item quantity="one">モデルイヤー%2$d向けにCamaroの内蔵シグナル定義を%1$d件読み込みました。ライブ読み取りには検証済みの車両情報が必要です。</item>
+        <item quantity="other">モデルイヤー%2$d向けにCamaroの内蔵シグナル定義を%1$d件読み込みました。ライブ読み取りには検証済みの車両情報が必要です。</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
-        <item quantity="one">Community signal definition available: %1$d for model year %2$d.</item>
-        <item quantity="other">Community signal definitions available: %1$d for model year %2$d.</item>
+        <item quantity="one">モデルイヤー%2$d向けにコミュニティのOBDbシグナル定義が%1$d件あります。</item>
+        <item quantity="other">モデルイヤー%2$d向けにコミュニティのOBDbシグナル定義が%1$d件あります。</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
-        <item quantity="one">%1$d byte</item>
-        <item quantity="other">%1$d bytes</item>
+        <item quantity="one">%1$dバイト</item>
+        <item quantity="other">%1$dバイト</item>
     </plurals>
 </resources>

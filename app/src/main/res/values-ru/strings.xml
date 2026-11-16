@@ -469,15 +469,21 @@
     <string name="update_version_channel">Версия %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
     <plurals name="vm_native_catalog_loaded">
-        <item quantity="one">First-party Camaro profile: %1$d for model year %2$d. Live reads require vehicle evidence.</item>
-        <item quantity="other">First-party Camaro profiles: %1$d for model year %2$d. Live reads require vehicle evidence.</item>
+        <item quantity="one">Загружено %1$d встроенное определение сигналов Camaro для модельного года %2$d. Чтение в реальном времени требует подтверждённых сведений об автомобиле.</item>
+        <item quantity="few">Загружено %1$d встроенных определения сигналов Camaro для модельного года %2$d. Чтение в реальном времени требует подтверждённых сведений об автомобиле.</item>
+        <item quantity="many">Загружено %1$d встроенных определений сигналов Camaro для модельного года %2$d. Чтение в реальном времени требует подтверждённых сведений об автомобиле.</item>
+        <item quantity="other">Загружено %1$d встроенных определений сигналов Camaro для модельного года %2$d. Чтение в реальном времени требует подтверждённых сведений об автомобиле.</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
-        <item quantity="one">Community signal definition available: %1$d for model year %2$d.</item>
-        <item quantity="other">Community signal definitions available: %1$d for model year %2$d.</item>
+        <item quantity="one">Доступно %1$d определение сигнала OBDb из сообщества для модельного года %2$d.</item>
+        <item quantity="few">Доступно %1$d определения сигналов OBDb из сообщества для модельного года %2$d.</item>
+        <item quantity="many">Доступно %1$d определений сигналов OBDb из сообщества для модельного года %2$d.</item>
+        <item quantity="other">Доступно %1$d определений сигналов OBDb из сообщества для модельного года %2$d.</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
-        <item quantity="one">%1$d byte</item>
-        <item quantity="other">%1$d bytes</item>
+        <item quantity="one">%1$d байт</item>
+        <item quantity="few">%1$d байта</item>
+        <item quantity="many">%1$d байт</item>
+        <item quantity="other">%1$d байта</item>
     </plurals>
 </resources>
