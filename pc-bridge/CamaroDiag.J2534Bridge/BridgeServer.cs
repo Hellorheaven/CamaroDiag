@@ -23,7 +23,7 @@ internal sealed class BridgeServer
     {
         var listener = new TcpListener(IPAddress.Any, _port);
         listener.Start();
-        Console.WriteLine($"Listening on 0.0.0.0:{_port}");
+        Console.WriteLine($"Listening on local network interfaces (TCP {_port}); public remote addresses are rejected.");
         Console.WriteLine("Connect the Android device to the same trusted local network.");
         Console.WriteLine("Press Ctrl+C to stop. Do not forward this port to the Internet.");
 
@@ -33,7 +33,13 @@ internal sealed class BridgeServer
             {
                 using var client = await listener.AcceptTcpClientAsync(cancellationToken);
                 client.NoDelay = true;
-                Console.WriteLine($"Client connected: {client.Client.RemoteEndPoint}");
+                var remoteAddress = (client.Client.RemoteEndPoint as IPEndPoint)?.Address;
+                if (remoteAddress is null || !IsPrivateNetworkAddress(remoteAddress))
+                {
+                    Console.WriteLine($"Rejected non-local client: {client.Client.RemoteEndPoint}");
+                    continue;
+                }
+                Console.WriteLine($"Local client connected: {client.Client.RemoteEndPoint}");
                 await HandleClientAsync(client, cancellationToken);
                 Console.WriteLine("Client disconnected; J2534 channel released.");
             }
@@ -130,6 +136,27 @@ internal sealed class BridgeServer
                 await WriteErrorAsync(writer, ex.Message);
             }
         }
+    }
+
+    private static bool IsPrivateNetworkAddress(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        if (IPAddress.IsLoopback(address)) return true;
+
+        var bytes = address.GetAddressBytes();
+        if (address.AddressFamily == AddressFamily.InterNetwork)
+        {
+            return bytes[0] == 10 ||
+                   (bytes[0] == 172 && bytes[1] is >= 16 and <= 31) ||
+                   (bytes[0] == 192 && bytes[1] == 168) ||
+                   (bytes[0] == 169 && bytes[1] == 254) ||
+                   (bytes[0] == 100 && bytes[1] is >= 64 and <= 127);
+        }
+
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+            return address.IsIPv6LinkLocal || (bytes[0] & 0xFE) == 0xFC;
+
+        return false;
     }
 
     private bool TokenMatches(string? supplied)
