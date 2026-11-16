@@ -13,6 +13,17 @@ class ObdbCamaroSignalCatalogTest {
         assertEquals(byteArrayOf(0x22, 0x11, 0xA6.toByte()).toList(), signal.requestPayload().toList())
     }
 
+    @Test fun clampsScaledValuesToTheSourceValidRange() {
+        val format = ObdbSignalFormat(bitLength = 8, minimum = 0.0, maximum = 100.0, unit = "percent")
+        assertEquals(100.0, format.decode(byteArrayOf(200.toByte())).value!!, 0.0)
+    }
+
+    @Test fun blocksCommandsWithUnimplementedExtendedAddressingAndDiagnosticLevels() {
+        val json = """{"commands":[{"hdr":"7E0","rax":"7E8","din":"03","cmd":{"22":"1234"},"freq":1,"signals":[{"id":"NEEDS_SESSION","name":"Needs session","path":"Engine","fmt":{"len":8,"max":255,"unit":"scalar"}}]}]}"""
+        val signal = ObdbCamaroSignalSet.fromJson(json).find("NEEDS_SESSION")!!
+        assertFalse(signal.hasSupportedPhysicalCanAddressing)
+    }
+
     @Test fun yearFilterCombinesInclusiveRangesAndExplicitYearExceptions() {
         val filter = ObdbYearFilter(from = 2023, to = null, years = setOf(2012, 2014, 2015))
         assertTrue(filter.matches(2014))
