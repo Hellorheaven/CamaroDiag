@@ -1,5 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
+import java.util.Locale
+
 import com.camarodiag.gen5.domain.model.*
 
 object CamaroUdsProtocol {
