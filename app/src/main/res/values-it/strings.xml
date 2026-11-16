@@ -471,13 +471,16 @@
     <plurals name="vm_native_catalog_loaded">
         <item quantity="one">Profilo Camaro proprietario: %1$d per l’anno modello %2$d. La lettura in tempo reale richiede prove specifiche del veicolo.</item>
         <item quantity="other">Profili Camaro proprietari: %1$d per l’anno modello %2$d. La lettura in tempo reale richiede prove specifiche del veicolo.</item>
+        <item quantity="many">Caricate %1$d definizioni di segnali Camaro del catalogo integrato per l’anno modello %2$d. Le letture in tempo reale richiedono prove verificate del veicolo.</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
         <item quantity="one">Definizione di segnale della community disponibile: %1$d per l’anno modello %2$d.</item>
         <item quantity="other">Definizioni di segnali della community disponibili: %1$d per l’anno modello %2$d.</item>
+        <item quantity="many">Sono disponibili %1$d definizioni di segnali OBDb della community per l’anno modello %2$d.</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
         <item quantity="one">%1$d byte</item>
         <item quantity="other">%1$d byte</item>
+        <item quantity="many">%1$d byte</item>
     </plurals>
 </resources>

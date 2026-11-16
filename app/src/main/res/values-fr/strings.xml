@@ -471,13 +471,16 @@
     <plurals name="vm_native_catalog_loaded">
         <item quantity="one">Profil Camaro natif : %1$d pour l’année modèle %2$d. La lecture en direct exige des preuves propres au véhicule.</item>
         <item quantity="other">Profils Camaro natifs : %1$d pour l’année modèle %2$d. La lecture en direct exige des preuves propres au véhicule.</item>
+        <item quantity="many">%1$d profils Camaro natifs chargés pour l’année modèle %2$d. La lecture en direct exige des preuves propres au véhicule.</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
         <item quantity="one">Définition de signal communautaire disponible : %1$d pour l’année modèle %2$d.</item>
         <item quantity="other">Définitions de signaux communautaires disponibles : %1$d pour l’année modèle %2$d.</item>
+        <item quantity="many">%1$d définitions de signaux OBDb communautaires disponibles pour l’année modèle %2$d.</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
         <item quantity="one">%1$d octet</item>
         <item quantity="other">%1$d octets</item>
+        <item quantity="many">%1$d octets</item>
     </plurals>
 </resources>

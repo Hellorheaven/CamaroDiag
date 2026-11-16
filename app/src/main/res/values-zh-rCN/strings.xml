@@ -469,15 +469,12 @@
     <string name="update_version_channel">版本 %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
     <plurals name="vm_native_catalog_loaded">
-        <item quantity="one">已为 %2$d 款车型加载 %1$d 个 Camaro 内置信号定义。实时读取需要经过验证的车辆依据。</item>
         <item quantity="other">已为 %2$d 款车型加载 %1$d 个 Camaro 内置信号定义。实时读取需要经过验证的车辆依据。</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
-        <item quantity="one">%2$d 款车型有 %1$d 个社区 OBDb 信号定义可用。</item>
         <item quantity="other">%2$d 款车型有 %1$d 个社区 OBDb 信号定义可用。</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
-        <item quantity="one">%1$d 字节</item>
         <item quantity="other">%1$d 字节</item>
     </plurals>
 </resources>

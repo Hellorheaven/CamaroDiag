@@ -469,15 +469,12 @@
     <string name="update_version_channel">バージョン %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
     <plurals name="vm_native_catalog_loaded">
-        <item quantity="one">モデルイヤー%2$d向けにCamaroの内蔵シグナル定義を%1$d件読み込みました。ライブ読み取りには検証済みの車両情報が必要です。</item>
         <item quantity="other">モデルイヤー%2$d向けにCamaroの内蔵シグナル定義を%1$d件読み込みました。ライブ読み取りには検証済みの車両情報が必要です。</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
-        <item quantity="one">モデルイヤー%2$d向けにコミュニティのOBDbシグナル定義が%1$d件あります。</item>
         <item quantity="other">モデルイヤー%2$d向けにコミュニティのOBDbシグナル定義が%1$d件あります。</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
-        <item quantity="one">%1$dバイト</item>
         <item quantity="other">%1$dバイト</item>
     </plurals>
 </resources>

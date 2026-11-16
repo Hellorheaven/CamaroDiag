@@ -469,15 +469,12 @@
     <string name="update_version_channel">버전 %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
     <plurals name="vm_native_catalog_loaded">
-        <item quantity="one">%2$d년식 Camaro 차량용 내장 신호 정의 %1$d개를 불러왔습니다. 실시간 읽기에는 검증된 차량 근거가 필요합니다.</item>
         <item quantity="other">%2$d년식 Camaro 차량용 내장 신호 정의 %1$d개를 불러왔습니다. 실시간 읽기에는 검증된 차량 근거가 필요합니다.</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
-        <item quantity="one">%2$d년식 차량용 커뮤니티 OBDb 신호 정의 %1$d개를 사용할 수 있습니다.</item>
         <item quantity="other">%2$d년식 차량용 커뮤니티 OBDb 신호 정의 %1$d개를 사용할 수 있습니다.</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
-        <item quantity="one">%1$d바이트</item>
         <item quantity="other">%1$d바이트</item>
     </plurals>
 </resources>
