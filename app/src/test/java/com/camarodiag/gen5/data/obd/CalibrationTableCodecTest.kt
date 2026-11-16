@@ -11,7 +11,7 @@ class CalibrationTableCodecTest {
     fun validatesDefinitionMetadataAgainstVehicleImageAndEcuIdentifiers() {
         val binary = byteArrayOf(0x10, 0x20, 0x30, 0x40)
         val sha256 = java.security.MessageDigest.getInstance("SHA-256").digest(binary)
-            .joinToString("") { "%02x".format(it) }
+            .joinToString("") { "%02x".format(it.toInt() and 0xFF) }
         val metadata = CalibrationDefinitionMetadata(
             vin = "1G1FA1RXXR0123456",
             calibrationId = "CAL-123",
@@ -25,6 +25,7 @@ class CalibrationTableCodecTest {
             CalibrationTableCodec.validateMetadataForImage(
                 metadata,
                 "1G1FA1RXXR0123456",
+                "1G1FA1RXXR0123456",
                 binary,
                 listOf("CAL-123"),
                 listOf("A1B2C3D4")
@@ -33,11 +34,12 @@ class CalibrationTableCodecTest {
         val issues = CalibrationTableCodec.validateMetadataForImage(
             metadata,
             "1G1FA1RXXR0123457",
+            "1G1FA1RXXR0123457",
             binary + byteArrayOf(0x50),
             listOf("CAL-OTHER"),
             listOf("00000000")
         )
-        assertEquals(4, issues.size)
+        assertEquals(5, issues.size)
     }
 
     @Test
