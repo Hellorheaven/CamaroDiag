@@ -15,7 +15,7 @@ object MileageAuditEngine {
 
     fun evaluate(vin: String, readings: List<MileageSourceReading>): MileageAuditReport {
         val valid = readings.filter { reading ->
-            reading.kmValue?.let { it >= 0.0 } == true
+            reading.kmValue?.let { it.isFinite() && it >= 0.0 } == true
         }
 
         val independent = valid.filter {
