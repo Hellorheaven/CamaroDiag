@@ -34,6 +34,7 @@ class BluetoothObdManager(context: Context) {
     private val commandSessionMutex = Mutex()
     private val supportedMode01PidsMutex = Mutex()
     @Volatile private var cachedSupportedMode01Pids: Set<Int>? = null
+    @Volatile private var cachedSupportedMode01PidsAtMillis: Long = 0L
     private val usbTransport = ElmUsbTransport(context)
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
@@ -256,11 +257,19 @@ class BluetoothObdManager(context: Context) {
             "No ELM/OBD-II command channel is available on the active transport."
         }
         val supported = supportedMode01PidsMutex.withLock {
-            cachedSupportedMode01Pids ?: withObdCommandSession { engine ->
-                engine.discoverSupportedPids()
-            }.also { discovered ->
-                // Do not permanently cache a transient empty response from a clone or a sleeping ECU.
-                if (discovered.isNotEmpty()) cachedSupportedMode01Pids = discovered
+            val cached = cachedSupportedMode01Pids
+            val cacheAgeMs = System.currentTimeMillis() - cachedSupportedMode01PidsAtMillis
+            if (cached != null && (cached.isNotEmpty() || cacheAgeMs < 10_000L)) {
+                cached
+            } else {
+                withObdCommandSession { engine ->
+                    engine.discoverSupportedPids()
+                }.also { discovered ->
+                    // Keep an empty result briefly to avoid repeating a slow bitmap timeout
+                    // for every live PID; retry after 10 seconds if the ECU/clone was not ready.
+                    cachedSupportedMode01Pids = discovered
+                    cachedSupportedMode01PidsAtMillis = System.currentTimeMillis()
+                }
             }
         }
         return withObdCommandSession { engine ->
@@ -271,6 +280,7 @@ class BluetoothObdManager(context: Context) {
     /** Invalidates ECU-specific support data after a vehicle identity/profile change. */
     fun invalidateObdPidSupportCache() {
         cachedSupportedMode01Pids = null
+        cachedSupportedMode01PidsAtMillis = 0L
     }
 
     suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String =
@@ -440,6 +450,7 @@ class BluetoothObdManager(context: Context) {
         socket = null
         activeTransport = "BLUETOOTH"
         cachedSupportedMode01Pids = null
+        cachedSupportedMode01PidsAtMillis = 0L
         isDemoMode = true
         isSimulationActive = false
         activeAdapterCapabilities = null
