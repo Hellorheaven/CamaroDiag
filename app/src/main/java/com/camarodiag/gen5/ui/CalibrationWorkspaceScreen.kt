@@ -358,7 +358,7 @@ fun CalibrationWorkspaceScreen(
                             OutlinedTextField(
                                 value = j2534Port,
                                 onValueChange = { j2534Port = it.filter(Char::isDigit).take(5) },
-                                label = { Text("Port TCP") },
+                                label = { Text(stringResource(R.string.cal_tcp_port)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -416,7 +416,7 @@ fun CalibrationWorkspaceScreen(
                     }
                     if (state.udsMessage.isNotBlank()) Text(state.udsMessage, color = CamaroAmber, fontSize = 11.sp)
                     if (state.udsDidResponse.isNotBlank()) {
-                        Text("UDS $udsDid", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(stringResource(R.string.cal_uds_did_title, udsDid), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.udsDidResponse, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                     }
                     OutlinedButton(
@@ -435,11 +435,11 @@ fun CalibrationWorkspaceScreen(
                     }
                     if (state.ecuVinResponse.isNotBlank() || state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank()) {
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
-                        Text("VIN • 09 02", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(stringResource(R.string.cal_mode09_vin_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.ecuVinResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                        Text("CAL ID • 09 04", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(stringResource(R.string.cal_mode09_calid_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.calibrationIdResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                        Text("CVN • 09 06", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(stringResource(R.string.cal_mode09_cvn_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.cvnResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                     }
                 }
@@ -603,8 +603,8 @@ fun CalibrationWorkspaceScreen(
                     state.importedFileName?.let { name ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(name, color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text("${state.importedFileSize ?: 0L} bytes", color = TextPrimary, fontSize = 12.sp)
-                        Text("SHA-256", color = TextMuted, fontSize = 11.sp)
+                        Text(stringResource(R.string.cal_file_size_bytes, state.importedFileSize ?: 0L), color = TextPrimary, fontSize = 12.sp)
+                        Text(stringResource(R.string.cal_file_hash_label), color = TextMuted, fontSize = 11.sp)
                         Text(state.importedFileSha256.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                         Text(stringResource(R.string.cal_hex_preview), color = TextMuted, fontSize = 11.sp)
                         Text(state.importedFilePreview.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)

@@ -91,6 +91,13 @@ private fun localizedAdapterTierName(tier: AdapterTier): String = when (tier) {
     AdapterTier.DISCONNECTED -> stringResource(R.string.adapter_tier_disconnected)
 }
 
+@Composable
+private fun localizedBusName(bus: CanBusType): String = when (bus) {
+    CanBusType.HS_CAN -> stringResource(R.string.module_bus_hscan)
+    CanBusType.SW_CAN -> stringResource(R.string.module_bus_swcan)
+    CanBusType.UNKNOWN -> stringResource(R.string.module_bus_unknown)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CamaroDiagApp(viewModel: MainViewModel) {
@@ -468,7 +475,7 @@ fun VehicleSetupScreen(
                         ) {
                             Column {
                                 Text("${eng.rpo} — ${localizedEngineName(eng)}", fontWeight = FontWeight.SemiBold)
-                                Text("ECM: ${eng.ecmType}", fontSize = 12.sp, color = CamaroBlue)
+                                Text(stringResource(R.string.vehicle_ecm_label, eng.ecmType), fontSize = 12.sp, color = CamaroBlue)
                             }
                             if (vehicle.engine == eng) Icon(Icons.Default.CheckCircle, null, tint = CamaroAmber)
                         }
@@ -507,7 +514,7 @@ fun VehicleSetupScreen(
                         onValueChange = onVinChange,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        placeholder = { Text("17 caractères") },
+                        placeholder = { Text(stringResource(R.string.vehicle_vin_placeholder)) },
                         supportingText = { Text(stringResource(R.string.vehicle_vin_hint)) }
                     )
                 }
@@ -807,12 +814,12 @@ fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${mod.shortName} • ${mod.bus.label}", fontWeight = FontWeight.Bold, color = CamaroBlue)
+                        Text("${mod.shortName} • ${localizedBusName(mod.bus)}", fontWeight = FontWeight.Bold, color = CamaroBlue)
                         Text(statusLabel, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     Text(localizedModuleName(mod), fontWeight = FontWeight.SemiBold)
                     if (mod.txHeader.isNotBlank() && mod.rxHeader.isNotBlank()) {
-                        Text("TX: 0x${mod.txHeader} | RX: 0x${mod.rxHeader} (${mod.bus.pinout})", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                        Text(stringResource(R.string.module_can_headers, mod.txHeader, mod.rxHeader, mod.bus.pinout), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
                     }
                     Text(localizedModuleNotes(mod), fontSize = 12.sp, color = TextMuted)
                 }
@@ -1265,8 +1272,8 @@ fun SettingsScreen(
                     Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.settings_unit_system), fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text("Metric (km, °C, kPa)") })
-                        FilterChip(selected = units == UnitSystem.IMPERIAL, onClick = { onUnits(UnitSystem.IMPERIAL) }, label = { Text("Imperial (mi, °F, PSI)") })
+                        FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text(stringResource(R.string.units_metric_details)) })
+                        FilterChip(selected = units == UnitSystem.IMPERIAL, onClick = { onUnits(UnitSystem.IMPERIAL) }, label = { Text(stringResource(R.string.units_imperial_details)) })
                     }
                 }
             }
@@ -1288,8 +1295,8 @@ fun SettingsScreen(
                                 Icon(Icons.Default.Delete, null, tint = WarnRed)
                             }
                         }
-                        Text("${sdf.format(Date(s.timestamp))} • VIN: ${s.vin}", fontSize = 11.sp, color = TextMuted)
-                        Text("DTCs: ${s.dtcSummary}", fontSize = 12.sp, color = CamaroBlue)
+                        Text("${sdf.format(Date(s.timestamp))} • ${stringResource(R.string.session_vin_label, s.vin)}", fontSize = 11.sp, color = TextMuted)
+                        Text(stringResource(R.string.session_dtcs_label, s.dtcSummary), fontSize = 12.sp, color = CamaroBlue)
                         Text(s.mileageSummary, fontSize = 12.sp)
                     }
                 }

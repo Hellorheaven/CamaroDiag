@@ -51,7 +51,7 @@ private object CamaroDiagUpdateChecker {
     }
     fun enqueue(context: Context, u: CamaroDiagUpdate): Long {
         val file = "CamaroDiag-${u.channel}-${u.version}.apk"
-        val req = DownloadManager.Request(Uri.parse(u.url)).setTitle("CamaroDiag ${u.version}").setMimeType("application/vnd.android.package-archive").setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED).setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, file)
+        val req = DownloadManager.Request(Uri.parse(u.url)).setTitle(context.getString(R.string.update_notification_title, u.version)).setMimeType("application/vnd.android.package-archive").setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED).setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, file)
         return (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
     }
     fun signatureMatches(context: Context, file: File): Boolean {
@@ -103,7 +103,7 @@ fun UpdateManagerDialog() {
         onDismissRequest = { update = null; message = null },
         title = { Text(if (apk != null) stringResource(R.string.update_ready_to_install) else if (downloading) stringResource(R.string.update_downloading) else stringResource(R.string.update_available)) },
         text = { androidx.compose.foundation.layout.Column {
-            update?.let { Text("Version ${it.version} • ${it.channel.uppercase()}"); Text(stringResource(R.string.update_channel_only, it.channel)) }
+            update?.let { Text(stringResource(R.string.update_version_channel, it.version, it.channel.uppercase())); Text(stringResource(R.string.update_channel_only, it.channel)) }
             message?.let { Text(it) }
         } },
         confirmButton = { when {

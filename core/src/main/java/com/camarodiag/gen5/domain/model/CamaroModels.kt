@@ -8,7 +8,12 @@ enum class AppLanguage(val code: String, val label: String) {
     DE("de", "Deutsch"),
     IT("it", "Italiano"),
     ES("es", "Español"),
-    HE("he", "עברית");
+    HE("he", "עברית"),
+    RU("ru", "Русский"),
+    ZH("zh", "简体中文"),
+    JA("ja", "日本語"),
+    KO("ko", "한국어"),
+    AR("ar", "العربية");
 
     companion object {
         fun fromLocale(locale: Locale): AppLanguage =
