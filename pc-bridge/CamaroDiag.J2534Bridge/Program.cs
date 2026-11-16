@@ -14,6 +14,7 @@ internal static class Program
             return 2;
         }
 
+        if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
         var adapters = J2534Registry.Discover();
         if (adapters.Count == 0)

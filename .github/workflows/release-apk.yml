@@ -104,6 +104,28 @@ jobs:
           ./gradlew testDebugUnitTest -PreleasePatch="$RELEASE_PATCH" --stacktrace
           ./gradlew app:assembleDebug -PreleasePatch="$RELEASE_PATCH" --stacktrace
           ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish J2534 bridge variants
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $variants = @(
+            @{ Configuration = "Debug"; Runtime = "win-x64"; Name = "debug-win-x64" },
+            @{ Configuration = "Debug"; Runtime = "win-x86"; Name = "debug-win-x86" },
+            @{ Configuration = "Release"; Runtime = "win-x64"; Name = "release-win-x64" },
+            @{ Configuration = "Release"; Runtime = "win-x86"; Name = "release-win-x86" }
+          )
+          foreach ($variant in $variants) {
+            $output = ".\publish\$($variant.Name)"
+            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration $variant.Configuration --runtime $variant.Runtime --self-contained true --output $output -p:Version="$env:VERSION_NAME" -p:AssemblyVersion="$($env:VERSION_NAME).0" -p:FileVersion="$($env:VERSION_NAME).0"
+            Compress-Archive -Path "$output\*" -DestinationPath ".\CamaroDiag-J2534-Bridge-$($variant.Name).zip" -Force
+          }
 
       - name: Create Git tag
         env:
@@ -124,9 +146,14 @@ jobs:
             - Version: ${{ steps.version.outputs.version_name }}
             - Android versionCode: ${{ steps.version.outputs.version_code }}
             - Signed debug and release APKs are attached.
+            - J2534 Bridge Debug and Release packages are attached for Windows x64 and x86.
           files: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
+            CamaroDiag-J2534-Bridge-debug-win-x64.zip
+            CamaroDiag-J2534-Bridge-debug-win-x86.zip
+            CamaroDiag-J2534-Bridge-release-win-x64.zip
+            CamaroDiag-J2534-Bridge-release-win-x86.zip
           draft: false
           prerelease: false
         env:

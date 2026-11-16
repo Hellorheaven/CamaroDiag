@@ -54,6 +54,9 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            if (file("release.jks").exists() && !System.getenv("SIGNING_STORE_PASSWORD").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -68,6 +71,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
