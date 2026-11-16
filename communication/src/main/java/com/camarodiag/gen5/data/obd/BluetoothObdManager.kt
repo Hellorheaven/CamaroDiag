@@ -34,6 +34,7 @@ class BluetoothObdManager(context: Context) {
     private val usbTransport = ElmUsbTransport(context)
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
+    private var j2534BridgeTransport: J2534BridgeTransport? = null
     private var activeTransport: String = "BLUETOOTH"
     private var activeAdapterCapabilities: AdapterCapabilities? = null
 
@@ -259,6 +260,49 @@ class BluetoothObdManager(context: Context) {
     }
 
     /**
+     * Connects to the Windows J2534 bridge. The selected PC driver performs ISO-TP;
+     * the Android side exchanges complete UDS payloads only.
+     */
+    suspend fun connectJ2534Bridge(
+        host: String,
+        port: Int,
+        pairingToken: String,
+        requestCanId: Int,
+        responseCanId: Int,
+        can29Bit: Boolean,
+        baudRate: Int = 500_000
+    ): Result<String> = withContext(Dispatchers.IO) {
+        disconnect()
+        val bridge = J2534BridgeTransport(host, port, pairingToken)
+        try {
+            val info = bridge.connect(requestCanId, responseCanId, can29Bit, baudRate)
+            j2534BridgeTransport = bridge
+            activeTransport = "J2534_BRIDGE"
+            isDemoMode = false
+            isSimulationActive = false
+            Result.success(info)
+        } catch (error: Exception) {
+            bridge.close()
+            Result.failure(error)
+        }
+    }
+
+    fun createJ2534BridgeUdsClient(
+        policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
+        timeoutMs: Long = 5000L
+    ): UdsClient {
+        val transport = j2534BridgeTransport
+            ?: error("The Windows J2534 bridge is not connected.")
+        check(activeTransport == "J2534_BRIDGE" && !isDemoMode && !isSimulationActive) {
+            "J2534 UDS is disabled when no real PC bridge is connected."
+        }
+        return UdsClient(transport, policy, timeoutMs)
+    }
+
+    fun isJ2534BridgeConnected(): Boolean =
+        activeTransport == "J2534_BRIDGE" && j2534BridgeTransport != null
+
+    /**
      * Creates a UDS client through the adapter's documented STPX ISO-TP implementation.
      * Only a positively identified OBDLink MX+ is enabled; generic ELM clones are rejected.
      */
@@ -295,6 +339,8 @@ class BluetoothObdManager(context: Context) {
         runCatching { usbTransport.close() }
         runCatching { wifiTransport.close() }
         runCatching { bleTransport.close() }
+        runCatching { j2534BridgeTransport?.close() }
+        j2534BridgeTransport = null
         runCatching { inputStream?.close() }
         runCatching { outputStream?.close() }
         runCatching { socket?.close() }
