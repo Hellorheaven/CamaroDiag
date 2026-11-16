@@ -2,4 +2,5 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/camarodiag_icon_background" />
     <foreground android:drawable="@drawable/camarodiag_car" />
+    <monochrome android:drawable="@drawable/ic_camarodiag" />
 </adaptive-icon>

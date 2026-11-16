@@ -1422,7 +1422,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _obdScanReport.value = null
                 _obdScanMessage.value = if (obdManager.isJ2534BridgeConnected())
                     getApplication<Application>().getString(R.string.msg_full_scan_j2534_only)
-                else "Aucune interface OBD réelle connectée. Sélectionne le profil de simulation pour tester l'écran hors véhicule."
+                else getApplication<Application>().getString(R.string.msg_full_scan_adapter_required)
                 return@launch
             }
             _isObdScanning.value = true

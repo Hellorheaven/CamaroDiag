@@ -178,10 +178,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         } else {
-            viewModel.refreshPairedDevices()
+            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -932,7 +930,7 @@ fun LiveDataScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
                         Text(localizedLivePidLabel(pid), color = TextMuted, fontSize = 13.sp)
                         Text(
-                            text = "${String.format("%.1f", displayVal)} $displayUnit",
+                            text = "${String.format(Locale.getDefault(), "%.1f", displayVal)} $displayUnit",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary,
@@ -1181,7 +1179,7 @@ fun MileageScreen(
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(localizedMileageSourceName(item), fontWeight = FontWeight.Bold)
                             Text(
-                                text = item.kmValue?.let { "${String.format("%,.1f", it)} km" } ?: stringResource(R.string.obd_not_available),
+                                text = item.kmValue?.let { "${String.format(Locale.getDefault(), "%,.1f", it)} km" } ?: stringResource(R.string.obd_not_available),
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 color = if (item.kmValue != null) CamaroBlue else TextMuted
