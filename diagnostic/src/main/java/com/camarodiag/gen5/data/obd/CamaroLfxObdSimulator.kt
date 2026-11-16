@@ -77,7 +77,7 @@ object CamaroLfxObdSimulator {
             "0906" -> "490601" + SIMULATED_CVN
             "090A" -> asciiRecord(0x0A, simulatedEcuName)
             "0600" -> "NO DATA"
-            else -> "NO DATA"
+            else -> if (normalized.startsWith("02")) "NO DATA" else "NO DATA"
         }
     }
 
