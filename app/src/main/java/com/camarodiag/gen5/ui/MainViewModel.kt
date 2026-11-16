@@ -625,11 +625,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             beginBusyOperation()
             _connectionMessage.value = null
             markAdapterDisconnected()
-            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                ecuVinResponse = "",
-                calibrationIdResponse = "",
-                cvnResponse = ""
-            )
             try {
                 connect()
                     .onSuccess { capabilities ->
