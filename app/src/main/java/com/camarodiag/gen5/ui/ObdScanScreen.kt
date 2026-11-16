@@ -158,7 +158,7 @@ fun ObdScanScreen(
 
             item {
                 InfoCard(title = stringResource(R.string.obd_mode06_results)) {
-                    Text(report.monitorTestRaw ?: stringResource(R.string.obd_not_available),
+                    Text(report.monitorTestRaw ?: if (isFr) unavailable else "Not available",
                         color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                 }
             }

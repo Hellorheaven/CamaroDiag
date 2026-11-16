@@ -394,13 +394,13 @@ fun VehicleSetupScreen(
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            SectionTitle(if (isFr) "Configuration du véhicule" else "Vehicle configuration")
+            SectionTitle(stringResource(R.string.vehicle_setup_header))
             Text("CHEVROLET CAMARO • ${vehicle.generation.label.uppercase()} • ${vehicle.modelYear}", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(if (isFr) "Génération" else "Generation", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_generation), color = TextMuted, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CamaroGeneration.entries.forEach { gen ->
                             FilterChip(selected = vehicle.generation == gen, onClick = {
@@ -409,7 +409,7 @@ fun VehicleSetupScreen(
                             }, label = { Text(if (isFr) gen.label.replace("Gen", "Génération") else gen.label) })
                         }
                     }
-                    Text(if (isFr) "Année modèle" else "Model year", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_model_year), color = TextMuted, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                         (2010..2024).forEach { yr ->
                             FilterChip(
@@ -420,7 +420,7 @@ fun VehicleSetupScreen(
                         }
                     }
 
-                    Text(if (isFr) "Motorisation (Code RPO & Calculateur)" else "Engine (RPO Code & ECM)", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_engine), color = TextMuted, fontSize = 13.sp)
                     CamaroEngine.entries.filter { vehicle.modelYear in it.years }.forEach { eng ->
                         Row(
                             modifier = Modifier
@@ -439,7 +439,7 @@ fun VehicleSetupScreen(
                         }
                     }
 
-                    Text(if (isFr) "Transmission" else "Transmission", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_transmission), color = TextMuted, fontSize = 13.sp)
                     TransmissionType.entries.forEach { tr ->
                         Row(
                             modifier = Modifier
@@ -453,7 +453,7 @@ fun VehicleSetupScreen(
                         }
                     }
 
-                    Text(if (isFr) "Marché / Homologation" else "Market Region", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_market_region), color = TextMuted, fontSize = 13.sp)
                     MarketRegion.entries.forEach { mk ->
                         Row(
                             modifier = Modifier
@@ -466,14 +466,14 @@ fun VehicleSetupScreen(
                             Text(if (isFr) mk.labelFr else mk.labelEn)
                         }
                     }
-                    Text(if (isFr) "Numéro VIN" else "Vehicle VIN", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_vin), color = TextMuted, fontSize = 13.sp)
                     OutlinedTextField(
                         value = vehicle.vin,
                         onValueChange = onVinChange,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         placeholder = { Text("17 caractères") },
-                        supportingText = { Text(if (isFr) "Saisir le VIN réel : aucun VIN fictif n'est généré." else "Enter the actual VIN; no sample VIN is generated.") }
+                        supportingText = { Text(stringResource(R.string.vehicle_vin_hint)) }
                     )
                 }
             }
@@ -501,11 +501,11 @@ fun AdapterScreen(
     val vxdiagProfiles = remember { VxdiagProfiles.all() }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            SectionTitle(if (isFr) "Interfaces OBD-II : Bluetooth, USB et Wi-Fi" else "Bluetooth OBD-II Adapter & CAN Probe")
+            SectionTitle(stringResource(R.string.adapter_section_title))
             if (isBusy) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Text(if (isFr) "Connexion ou opération en cours…" else "Connection or operation in progress…", color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.connection_busy), color = TextMuted, fontSize = 12.sp)
                 }
             }
         }
@@ -516,8 +516,8 @@ fun AdapterScreen(
                     Text(if (isFr) adapter.tier.titleFr else adapter.tier.titleEn, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
-                        BadgeChip(if (isFr) "SW-CAN câblage vérifié (Pin 1)" else "SW-CAN wiring verified (Pin 1)", adapter.supportsSwCan)
-                        BadgeChip(if (isFr) "Réponses longues (ATAL)" else "Long response mode (ATAL)", adapter.supportsLongFrames)
+                        BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
+                        BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
                     }
                     if (adapter.rawProbeLog.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
@@ -530,13 +530,12 @@ fun AdapterScreen(
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(if (isFr) "Appareils Bluetooth Appairés" else "Paired Bluetooth Devices", fontWeight = FontWeight.Bold)
-                TextButton(onClick = onRefreshDevices, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
+                Text(stringResource(R.string.paired_bluetooth_devices), fontWeight = FontWeight.Bold)
+                TextButton(onClick = onRefreshDevices, enabled = !isBusy) { Text(stringResource(R.string.common_refresh)) }
             }
             if (pairedDevices.isEmpty()) {
                 Text(
-                    if (isFr) "Aucun adaptateur détecté. Les OBDLink MX+, MX, LX et autres Bluetooth classiques doivent être appairés ; le CX est recherché en BLE à proximité."
-                    else "No adapter detected. Pair OBDLink MX+, MX, LX and other Classic Bluetooth adapters; CX is discovered nearby over BLE.",
+                    stringResource(R.string.adapter_none_detected),
                     color = TextMuted, fontSize = 13.sp
                 )
             } else {
@@ -550,7 +549,7 @@ fun AdapterScreen(
                                 Text(name, fontWeight = FontWeight.SemiBold)
                                 Text(mac, fontSize = 12.sp, color = TextMuted, fontFamily = FontFamily.Monospace)
                             }
-                            Text(if (isFr) "Connecter" else "Connect", color = CamaroBlue, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.common_connect), color = CamaroBlue, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -560,27 +559,26 @@ fun AdapterScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (isFr) "Connexion USB (OBDLink EX / SX, ELM327 et interfaces série)" else "USB connection (OBDLink EX / SX, ELM327 and serial adapters)", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.usb_connection_title), fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (isFr) "Périphériques USB détectés" else "Detected USB devices", modifier = Modifier.weight(1f))
-                        TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
+                        Text(stringResource(R.string.usb_devices_detected), modifier = Modifier.weight(1f))
+                        TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(stringResource(R.string.common_refresh)) }
                     }
-                    if (usbDevices.isEmpty()) Text(if (isFr) "Aucun adaptateur série USB détecté." else "No USB serial adapter detected.", color = TextMuted)
-                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter : $label" else "Connect: $label") } }
+                    if (usbDevices.isEmpty()) Text(stringResource(R.string.usb_none_detected), color = TextMuted)
+                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_connect_label, label)) } }
                     HorizontalDivider(color = TextMuted.copy(alpha = .25f))
-                    Text(if (isFr) "Connexion Wi-Fi ELM327" else "Wi-Fi ELM327 connection", fontWeight = FontWeight.Bold)
-                    OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(if (isFr) "Adresse IP de l'adaptateur" else "Adapter IP address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text(if (isFr) "Port TCP (souvent 35000 ou 23)" else "TCP port (often 35000 or 23)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter en Wi-Fi" else "Connect over Wi-Fi") }
-                    Text(if (isFr) "VXDIAG : architecture de transport prévue, mais les interfaces J2534 ne sont pas déclarées compatibles Android sans SDK Android officiel du modèle. Aucun accès J2534 n'est simulé." else "VXDIAG: transport architecture is prepared, but J2534 interfaces are not claimed Android-compatible without the model's official Android SDK. No J2534 access is simulated.", color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.wifi_connection_title), fontWeight = FontWeight.Bold)
+                    OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(stringResource(R.string.adapter_ip_address)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text(stringResource(R.string.adapter_tcp_port)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_connect_wifi)) }
+                    Text(stringResource(R.string.adapter_vxdiag_android_limit), color = TextMuted, fontSize = 12.sp)
                 }
             }
         }
         item {
-            Text(if (isFr) "Interfaces VXDIAG déclarées" else "Declared VXDIAG interface profiles", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.adapter_vxdiag_profiles), fontWeight = FontWeight.Bold)
             Text(
-                if (isFr) "Ces profils distinguent les modèles et liaisons physiques. Ils ne signifient pas qu'un pilote Android ou une communication véhicule est disponible."
-                else "These profiles distinguish hardware and link variants. They do not mean an Android driver or vehicle communication is available.",
+                stringResource(R.string.adapter_vxdiag_profiles_hint),
                 color = TextMuted,
                 fontSize = 11.sp
             )
@@ -590,7 +588,7 @@ fun AdapterScreen(
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(profile.label, color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Text(
-                                if (isFr) "DÉCOUVERTE SEULE" else "DISCOVERY ONLY",
+                                stringResource(R.string.adapter_discovery_only),
                                 color = WarnRed,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold
@@ -607,7 +605,7 @@ fun AdapterScreen(
             }
         }
         item {
-            Text(if (isFr) "Profils de Simulation (Test sans véhicule)" else "Simulated Hardware Profiles (Bench Test)", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.adapter_simulation_profiles), fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy) { Text("OBDLink MX+") }
                 OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy) { Text("ELM327 v1.5") }
@@ -636,9 +634,9 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            SectionTitle(if (isFr) "Pilotage des équipements" else "Vehicle controls")
-            Text(if (isFr) "Camaro ${vehicle.modelYear} • ${vehicle.generation.label} • ${vehicle.engine.rpo}" else "Camaro ${vehicle.modelYear} • ${vehicle.generation.label} • ${vehicle.engine.rpo}", color = CamaroAmber)
-            Text(if (isFr) "Les commandes carrosserie GM sont spécifiques au VIN, au BCM et à la calibration. Elles restent désactivées tant que les DID, sessions de sécurité et séquences de commande n'ont pas été vérifiés sur ce véhicule." else "GM body commands are VIN-, BCM- and calibration-specific. They remain disabled until DIDs, security sessions and command sequences are verified on this vehicle.", color = TextMuted, fontSize = 12.sp)
+            SectionTitle(stringResource(R.string.control_vehicle_title))
+            Text(stringResource(R.string.control_vehicle_label, vehicle.modelYear, vehicle.generation.label, vehicle.engine.rpo), color = CamaroAmber)
+            Text(stringResource(R.string.control_gm_body_notice), color = TextMuted, fontSize = 12.sp)
         }
         items(capabilities) { capability ->
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -661,9 +659,9 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
                         }
                     }
                     val availabilityLabel = when (capability.availability) {
-                        ControlAvailability.NOT_VERIFIED -> if (isFr) "NON VALIDÉ" else "NOT VERIFIED"
-                        ControlAvailability.AVAILABLE -> if (isFr) "DISPONIBLE" else "AVAILABLE"
-                        ControlAvailability.NOT_EQUIPPED -> if (isFr) "NON ÉQUIPÉ" else "NOT EQUIPPED"
+                        ControlAvailability.NOT_VERIFIED -> stringResource(R.string.status_not_verified)
+                        ControlAvailability.AVAILABLE -> stringResource(R.string.status_available)
+                        ControlAvailability.NOT_EQUIPPED -> stringResource(R.string.status_not_equipped)
                     }
                     val availabilityColor = when (capability.availability) {
                         ControlAvailability.NOT_VERIFIED -> WarnRed
@@ -674,7 +672,7 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
                 }
             }
         }
-        item { Text(if (isFr) "Aucune trame d'ouverture de vitre, de déverrouillage ou d'actionneur n'est envoyée par défaut. Cela évite les commandes erronées ou dangereuses." else "No window, unlock or actuator frame is sent by default. This prevents incorrect or unsafe commands.", color = TextMuted, fontSize = 12.sp) }
+        item { Text(stringResource(R.string.control_no_actuation_notice), color = TextMuted, fontSize = 12.sp) }
     }
 }
 
@@ -682,7 +680,7 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
 fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            SectionTitle(if (isFr) "Calculateurs du véhicule" else "Vehicle control modules")
+            SectionTitle(stringResource(R.string.modules_vehicle_title))
         }
         items(modules) { mod ->
             val statusColor = when (mod.status) {
@@ -693,11 +691,11 @@ fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
                 ModuleStatus.DISCOVERY_REQUIRED -> CamaroAmber
             }
             val statusLabel = when (mod.status) {
-                ModuleStatus.ACCESSIBLE -> if (isFr) "Accessible" else "Accessible"
-                ModuleStatus.REQUIRES_SWCAN -> if (isFr) "Requiert SW-CAN (Pin 1)" else "Requires SW-CAN (Pin 1)"
-                ModuleStatus.UNSUPPORTED_BY_ADAPTER -> if (isFr) "Bloqué par adaptateur" else "Blocked by adapter"
-                ModuleStatus.NOT_EQUIPPED -> if (isFr) "Non équipé" else "Not equipped"
-                ModuleStatus.DISCOVERY_REQUIRED -> if (isFr) "À identifier sur le véhicule" else "Vehicle discovery required"
+                ModuleStatus.ACCESSIBLE -> stringResource(R.string.module_accessible)
+                ModuleStatus.REQUIRES_SWCAN -> stringResource(R.string.module_requires_swcan)
+                ModuleStatus.UNSUPPORTED_BY_ADAPTER -> stringResource(R.string.module_blocked_adapter)
+                ModuleStatus.NOT_EQUIPPED -> stringResource(R.string.module_not_equipped)
+                ModuleStatus.DISCOVERY_REQUIRED -> stringResource(R.string.module_discovery_required)
             }
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -733,13 +731,13 @@ fun LiveDataScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    SectionTitle(if (isFr) "Données Moteur Temps Réel" else "Live Engine Telemetry")
+                    SectionTitle(stringResource(R.string.live_engine_telemetry))
                     Row {
                         TextButton(onClick = onToggleUnits) {
                             Text(if (units == UnitSystem.METRIC) "SI / Metric" else "Imperial", color = CamaroBlue)
                         }
                         TextButton(onClick = onToggleStream) {
-                            Text(if (isStreaming) "Pause" else if (isFr) "Reprendre" else "Resume", color = CamaroAmber)
+                            Text(if (isStreaming) "Pause" else stringResource(R.string.live_resume), color = CamaroAmber)
                         }
                     }
                 }
@@ -753,9 +751,9 @@ fun LiveDataScreen(
                             ) {
                                 Text(
                                     if (recording.isRecording) {
-                                        if (isFr) "Arrêter l'enregistrement" else "Stop recording"
+                                        stringResource(R.string.live_stop_recording)
                                     } else {
-                                        if (isFr) "Enregistrer les données" else "Record live data"
+                                        stringResource(R.string.live_record)
                                     },
                                     color = Color.Black
                                 )
@@ -765,7 +763,7 @@ fun LiveDataScreen(
                                 enabled = recording.sampleCount > 0 && !recording.isRecording,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text(if (isFr) "Exporter CSV" else "Export CSV")
+                                Text(stringResource(R.string.live_export_csv))
                             }
                         }
                         Text(
@@ -782,8 +780,7 @@ fun LiveDataScreen(
                             Text(it, color = WarnRed, fontSize = 11.sp)
                         }
                         Text(
-                            if (isFr) "Le journal enregistre les valeurs OBD affichées (métrique) avec leur horodatage. Il ne modifie pas les tables du calculateur."
-                            else "The logger records displayed OBD values (metric) with timestamps. It does not alter ECU calibration tables.",
+                            stringResource(R.string.live_recording_notice),
                             color = TextMuted, fontSize = 10.sp
                         )
                     }
@@ -837,25 +834,24 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle(if (isFr) "Codes Défaut (DTC)" else "Diagnostic Trouble Codes")
+                SectionTitle(stringResource(R.string.dtc_title))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onScan) { Text(if (isFr) "Scanner" else "Scan") }
+                    OutlinedButton(onClick = onScan) { Text(stringResource(R.string.dtc_scan)) }
                     Button(onClick = { confirmClear = true }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
-                        Text(if (isFr) "Effacer" else "Clear", color = Color.White)
+                        Text(stringResource(R.string.dtc_clear), color = Color.White)
                     }
                 }
             }
         }
         item {
             Text(
-                if (isFr) "L'effacement Mode 04 supprime les défauts d'émissions et réinitialise certains moniteurs de readiness. Enregistrer le rapport avant de continuer."
-                else "Mode 04 clearing removes emissions-related trouble codes and resets some readiness monitors. Save the report before continuing.",
+                stringResource(R.string.dtc_clear_warning),
                 color = TextMuted, fontSize = 11.sp
             )
         }
         if (dtcs.isEmpty()) {
             item {
-                Text(if (isFr) "Aucun code défaut retourné par le dernier scan." else "No trouble codes returned by the last scan.", color = OkGreen)
+                Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
             }
         } else {
             items(dtcs) { dtc ->
@@ -875,8 +871,8 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text(if (isFr) "Confirmer l'effacement des défauts ?" else "Confirm DTC clearing?") },
-            text = { Text(if (isFr) "Cette opération envoie le service OBD Mode 04 à l'ECU. Les données de readiness peuvent être réinitialisées. Elle ne répare pas la cause du défaut." else "This sends OBD Mode 04 to the ECU. Readiness data may be reset. It does not repair the cause of a fault.") },
+            title = { Text(stringResource(R.string.dtc_confirm_clear)) },
+            text = { Text(stringResource(R.string.dtc_clear_description)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -884,10 +880,10 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
                         onClear()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = WarnRed)
-                ) { Text(if (isFr) "Effacer les défauts" else "Clear codes") }
+                ) { Text(stringResource(R.string.dtc_clear_action)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text(if (isFr) "Annuler" else "Cancel") }
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -903,10 +899,10 @@ fun MileageScreen(
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle(if (isFr) "Contrôle de cohérence kilométrique" else "Mileage consistency check")
+                SectionTitle(stringResource(R.string.mileage_consistency))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(onClick = onRefreshAudit) { Text(if (isFr) "Relire" else "Re-read") }
-                    Button(onClick = onSaveReport) { Text(if (isFr) "Sauver" else "Save") }
+                    OutlinedButton(onClick = onRefreshAudit) { Text(stringResource(R.string.mileage_reread)) }
+                    Button(onClick = onSaveReport) { Text(stringResource(R.string.common_save)) }
                 }
             }
         }
@@ -915,7 +911,7 @@ fun MileageScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = if (rep.hasDiscrepancy) Color(0xFF3B1518) else SurfaceElevated)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = if (isFr) "Synthèse Technique (VIN: ${rep.vin})" else "Engineering Summary (VIN: ${rep.vin})",
+                            text = stringResource(R.string.mileage_engineering_summary, rep.vin),
                             fontWeight = FontWeight.Bold,
                             color = if (rep.hasDiscrepancy) WarnRed else OkGreen
                         )
@@ -954,18 +950,17 @@ fun MileageScreen(
 fun HardwareGuideScreen(isFr: Boolean) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            SectionTitle(if (isFr) "Guide d'Achat & Compatibilité OBD-II GM" else "OBD-II Hardware & GM GMLAN Buying Guide")
+            SectionTitle(stringResource(R.string.guide_title))
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        if (isFr) "1. Recommandé : OBDLink MX+ (Puce STN2255)" else "1. Recommended: OBDLink MX+ (STN2255 Chip)",
+                        stringResource(R.string.guide_recommended_mxplus),
                         fontWeight = FontWeight.Bold, color = OkGreen
                     )
                     Text(
-                        if (isFr) "Interface STN haut de gamme à privilégier pour les diagnostics GM avancés. La prise en charge physique SW-CAN dépend du modèle exact de l'interface et ne garantit pas à elle seule l'accès au BCM, à l'IPC ou au SDM : les protocoles et identifiants doivent être validés pour le VIN."
-                        else "A high-end STN interface is recommended for advanced GM diagnostics. Physical SW-CAN support depends on the exact adapter model and does not by itself guarantee BCM, IPC or SDM access; protocols and identifiers must be validated for the VIN.",
+                        stringResource(R.string.guide_mxplus_description),
                         fontSize = 13.sp
                     )
                 }
@@ -975,12 +970,11 @@ fun HardwareGuideScreen(isFr: Boolean) {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        if (isFr) "2. Alternative HS-CAN : vLinker MC+ / OBDLink LX" else "2. HS-CAN Alternative: vLinker MC+ / OBDLink LX",
+                        stringResource(R.string.guide_hscan_alternative),
                         fontWeight = FontWeight.Bold, color = CamaroAmber
                     )
                     Text(
-                        if (isFr) "Excellente fiabilité sur le bus moteur/boîte/ABS (HS-CAN 500 kbps). Le vLinker MC+ gère également le SW-CAN GMLAN."
-                        else "High-throughput reliability on powertrain/ABS HS-CAN (500 kbps). The vLinker MC+ also supports GMLAN SW-CAN.",
+                        stringResource(R.string.guide_vlinker_description),
                         fontSize = 13.sp
                     )
                 }
@@ -990,12 +984,11 @@ fun HardwareGuideScreen(isFr: Boolean) {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        if (isFr) "3. Limites des Clones ELM327 v2.1 Génériques" else "3. Limitations of Generic ELM327 v2.1 Clones",
+                        stringResource(R.string.guide_clone_limitations),
                         fontWeight = FontWeight.Bold, color = WarnRed
                     )
                     Text(
-                        if (isFr) "Les boîtiers bleus ou mini ELM327 à bas coût n'ont aucun circuit physique sur la broche 1 (SW-CAN), possèdent des mémoires tampon tronquées et rejettent souvent les commandes d'adressage CAN étendu. L'accès aux modules dépend toujours de l'équipement du véhicule, de la puce de l'interface et du protocole supporté."
-                        else "Low-cost blue/mini ELM327 clones lack physical transceivers on Pin 1 (SW-CAN), suffer from truncated RX buffers, and often fail extended CAN header addressing. Module access always depends on vehicle equipment, adapter hardware, and supported protocols.",
+                        stringResource(R.string.guide_clone_description),
                         fontSize = 13.sp
                     )
                 }
@@ -1018,7 +1011,7 @@ fun SettingsScreen(
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            SectionTitle(if (isFr) "Paramètres & Rapports Enregistrés" else "Settings & Saved Reports")
+            SectionTitle(stringResource(R.string.settings_title))
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -1026,7 +1019,7 @@ fun SettingsScreen(
                     Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.system_language_current, lang.label), color = CamaroAmber)
                     Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
-                    Text(if (isFr) "Système d'unités" else "Measurement Units", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_unit_system), fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text("Metric (km, °C, kPa)") })
                         FilterChip(selected = units == UnitSystem.IMPERIAL, onClick = { onUnits(UnitSystem.IMPERIAL) }, label = { Text("Imperial (mi, °F, PSI)") })
@@ -1035,11 +1028,11 @@ fun SettingsScreen(
             }
         }
         item {
-            Text(if (isFr) "Sessions Sauvegardées (Base Locale Room)" else "Saved Diagnostic Sessions (Local Room DB)", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.settings_saved_sessions), fontWeight = FontWeight.Bold)
         }
         if (sessions.isEmpty()) {
             item {
-                Text(if (isFr) "Aucune session enregistrée. Utilisez le bouton 'Sauver' dans l'onglet Odomètre." else "No saved sessions yet. Use 'Save' in the Mileage tab.", color = TextMuted, fontSize = 13.sp)
+                Text(stringResource(R.string.settings_no_sessions), color = TextMuted, fontSize = 13.sp)
             }
         } else {
             items(sessions) { s ->
