@@ -43,6 +43,18 @@ jobs:
       - name: Run Android lint
         run: ./gradlew app:lintDebug --stacktrace
 
+      - name: Upload Android lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CamaroDiag-lint-${{ github.sha }}
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.xml
+            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Build debug APK
         run: ./gradlew app:assembleDebug --stacktrace
 
