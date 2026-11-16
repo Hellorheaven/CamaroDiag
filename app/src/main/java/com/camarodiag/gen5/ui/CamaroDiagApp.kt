@@ -63,6 +63,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
     val connError by viewModel.connectionMessage.collectAsState()
+    val isBusy by viewModel.isBusy.collectAsState()
     val modules by viewModel.modules.collectAsState()
     val dtcs by viewModel.dtcs.collectAsState()
     val livePids by viewModel.livePids.collectAsState()
@@ -297,6 +298,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
                 DiagTab.ADAPTER -> AdapterScreen(
                     adapter = adapter,
+                    isBusy = isBusy,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
                     isFr = isFr,
@@ -477,6 +479,7 @@ fun VehicleSetupScreen(
 @Composable
 fun AdapterScreen(
     adapter: AdapterCapabilities,
+    isBusy: Boolean,
     pairedDevices: List<Pair<String, String>>,
     errorMsg: String?,
     isFr: Boolean,
@@ -494,6 +497,12 @@ fun AdapterScreen(
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             SectionTitle(if (isFr) "Interfaces OBD-II : Bluetooth, USB et Wi-Fi" else "Bluetooth OBD-II Adapter & CAN Probe")
+            if (isBusy) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(if (isFr) "Connexion ou opération en cours…" else "Connection or operation in progress…", color = TextMuted, fontSize = 12.sp)
+                }
+            }
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -517,7 +526,7 @@ fun AdapterScreen(
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(if (isFr) "Appareils Bluetooth Appairés" else "Paired Bluetooth Devices", fontWeight = FontWeight.Bold)
-                TextButton(onClick = onRefreshDevices) { Text(if (isFr) "Actualiser" else "Refresh") }
+                TextButton(onClick = onRefreshDevices, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
             }
             if (pairedDevices.isEmpty()) {
                 Text(
@@ -528,7 +537,7 @@ fun AdapterScreen(
             } else {
                 pairedDevices.forEach { (name, mac) ->
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onConnectMac(mac) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(enabled = !isBusy) { onConnectMac(mac) },
                         colors = CardDefaults.cardColors(containerColor = SurfaceElevated)
                     ) {
                         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -549,15 +558,15 @@ fun AdapterScreen(
                     Text(if (isFr) "Connexion USB (OBDLink EX / SX, ELM327 et interfaces série)" else "USB connection (OBDLink EX / SX, ELM327 and serial adapters)", fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(if (isFr) "Périphériques USB détectés" else "Detected USB devices", modifier = Modifier.weight(1f))
-                        TextButton(onClick = onRefreshUsb) { Text(if (isFr) "Actualiser" else "Refresh") }
+                        TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
                     }
                     if (usbDevices.isEmpty()) Text(if (isFr) "Aucun adaptateur série USB détecté." else "No USB serial adapter detected.", color = TextMuted)
-                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, modifier = Modifier.fillMaxWidth()) { Text("Connecter : $label") } }
+                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text("Connecter : $label") } }
                     HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                     Text(if (isFr) "Connexion Wi-Fi ELM327" else "Wi-Fi ELM327 connection", fontWeight = FontWeight.Bold)
                     OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(if (isFr) "Adresse IP de l'adaptateur" else "Adapter IP address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text("Port TCP (souvent 35000 ou 23)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter en Wi-Fi" else "Connect over Wi-Fi") }
+                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter en Wi-Fi" else "Connect over Wi-Fi") }
                     Text(if (isFr) "VXDIAG : architecture de transport prévue, mais les interfaces J2534 ne sont pas déclarées compatibles Android sans SDK Android officiel du modèle. Aucun accès J2534 n'est simulé." else "VXDIAG: transport architecture is prepared, but J2534 interfaces are not claimed Android-compatible without the model's official Android SDK. No J2534 access is simulated.", color = TextMuted, fontSize = 12.sp)
                 }
             }
@@ -595,9 +604,9 @@ fun AdapterScreen(
         item {
             Text(if (isFr) "Profils de Simulation (Test sans véhicule)" else "Simulated Hardware Profiles (Bench Test)", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }) { Text("OBDLink MX+") }
-                OutlinedButton(onClick = { onSelectSim("ELM_15") }) { Text("ELM327 v1.5") }
-                OutlinedButton(onClick = { onSelectSim("CLONE") }) { Text("Clone v2.1") }
+                OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy) { Text("OBDLink MX+") }
+                OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy) { Text("ELM327 v1.5") }
+                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text("Clone v2.1") }
             }
         }
     }
