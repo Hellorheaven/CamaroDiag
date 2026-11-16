@@ -1,4 +1,6 @@
-# Pont J2534 Windows — Guide d'installation
+# CamaroDiag J2534 Bridge — Guide d'installation
+
+Le pont partage désormais l'identité visuelle CamaroDiag : Camaro Synergy Green, face avant inspirée de la ZL1 2016 et nom de produit homogène avec l'application Android.
 
 Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru installé sur un PC Windows. Il peut fonctionner avec des pilotes VXDIAG VCX SE ou VCX Nano lorsque le modèle exact, le pilote et le protocole sont compatibles.
 
