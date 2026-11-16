@@ -36,7 +36,7 @@ Les PIDs hybrides ou diesel peuvent exister dans le standard sans être pertinen
 
 ## Freeze frame — Mode 02
 
-Le DTC déclencheur est lu séparément avec la requête `020200`. Une réponse Mode 02 contient le PID, le numéro de trame, puis les octets de mesure : seul le numéro de trame est retiré avant le décodage des valeurs. Les autres PIDs ne sont demandés que s'ils figurent dans la bitmap de support Mode 01. Si le DTC déclencheur vaut `0000` ou si PID 02 ne répond pas, aucune autre donnée de freeze frame n'est demandée.
+Le DTC déclencheur est lu séparément avec la requête `020200`. Si un DTC est présent, le logiciel lit ensuite la bitmap Mode 02 PID 00, distincte de la bitmap Mode 01. Une réponse Mode 02 contient le PID, le numéro de trame, puis les octets de mesure : seul le numéro de trame est retiré avant le décodage des valeurs. Les autres PIDs ne sont demandés que s'ils figurent dans cette bitmap Mode 02. Si le DTC déclencheur vaut `0000` ou si PID 02 ne répond pas, aucune autre donnée de freeze frame n'est demandée.
 
 ## Messages d'erreur ELM
 
