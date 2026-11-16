@@ -455,6 +455,15 @@ fun CalibrationWorkspaceScreen(
                             else "DID 0x${signal.identifierHex} • request ${signal.requestHeaderHex} / response ${signal.responseHeaderHex ?: "unresolved"} • interval ${signal.frequencySeconds}s",
                             color = TextMuted, fontSize = 10.sp
                         )
+                        if (signal.debugSignal) {
+                            Text(if (isFr) "Signal marqué DEBUG dans la source OBDb." else "Signal is marked DEBUG in the OBDb source.",
+                                color = CamaroAmber, fontSize = 10.sp)
+                        }
+                        if (signal.flowControlRequired) {
+                            Text(if (isFr) "Flow control requis par la définition source." else "Flow control is required by the source definition.",
+                                color = TextMuted, fontSize = 10.sp)
+                        }
+                        signal.description?.let { Text(it, color = TextMuted, fontSize = 10.sp) }
                         if (!signal.hasSupportedPhysicalCanAddressing) {
                             Text(
                                 if (isFr) "Adresse CAN non résolue : la lecture reste désactivée pour ce signal."
