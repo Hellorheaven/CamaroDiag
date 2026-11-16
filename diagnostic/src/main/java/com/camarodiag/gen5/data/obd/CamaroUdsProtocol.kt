@@ -29,9 +29,12 @@ object CamaroUdsProtocol {
             deviceName.contains("OBDLink", ignoreCase = true) ||
             deviceName.contains("vLinker", ignoreCase = true)
 
-        // STP 61 acceptance proves only protocol command support, not that the adapter is physically wired to DLC pin 1.
-        val supportsSwCan = swCanWiringVerified && isStn &&
-            (stp61Resp.contains("OK", ignoreCase = true) || stiResp.contains("STN2255") || stiResp.contains("STN1170"))
+        // STP 61 alone is not proof of DLC pin-1 wiring. MX/MX+ are explicitly listed by the adapter maker as SW-CAN capable.
+        val normalizedDeviceName = deviceName.uppercase(Locale.ROOT)
+        val verifiedObdLinkMxHardware = normalizedDeviceName.contains("OBDLINK MX+") ||
+            Regex("\\bOBDLINK MX\\b").containsMatchIn(normalizedDeviceName)
+        val supportsSwCan = (swCanWiringVerified || verifiedObdLinkMxHardware) && isStn &&
+            stp61Resp.contains("OK", ignoreCase = true)
         val supportsLong = atalResp.contains("OK", ignoreCase = true)
 
         val tier = when {
