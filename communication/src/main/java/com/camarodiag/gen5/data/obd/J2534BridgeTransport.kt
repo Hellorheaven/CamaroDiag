@@ -32,14 +32,14 @@ class J2534BridgeTransport(
         requestCanId: Int,
         responseCanId: Int,
         can29Bit: Boolean,
-        baudRate: Int = 500_000
+        protocolNumber: Int = 33
     ): String = withContext(Dispatchers.IO) {
         mutex.withLock {
             closeInternal()
             require(host.isNotBlank()) { "Adresse IP du PC manquante." }
             require(port in 1024..65535) { "Port du pont PC invalide." }
             require(pairingToken.isNotBlank()) { "Jeton d'appairage du pont PC manquant." }
-            require(baudRate == 250_000 || baudRate == 500_000) { "Débit CAN J2534 non pris en charge." }
+            require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN J2534 non pris en charge." }
             val maxId = if (can29Bit) 0x1FFFFFFF else 0x7FF
             require(requestCanId in 0..maxId && responseCanId in 0..maxId && requestCanId != responseCanId) {
                 "Identifiants CAN incompatibles avec le format sélectionné."
@@ -59,12 +59,12 @@ class J2534BridgeTransport(
                         .put("requestCanId", requestCanId.toString(if (can29Bit) "X8" else "X3"))
                         .put("responseCanId", responseCanId.toString(if (can29Bit) "X8" else "X3"))
                         .put("can29Bit", can29Bit)
-                        .put("baudRate", baudRate),
+                        .put("protocolNumber", protocolNumber),
                     10_000
                 )
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
-                "$adapter • ISO15765 • $baudRate bit/s"
+                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s"
             } catch (error: Exception) {
                 closeInternal()
                 throw error
