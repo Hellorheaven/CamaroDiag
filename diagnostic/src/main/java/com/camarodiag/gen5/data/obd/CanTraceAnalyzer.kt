@@ -26,7 +26,9 @@ data class UdsTraceMessage(
             else -> payload.firstOrNull()
         }
     val did: Int?
-        get() = if (service in setOf(0x22, 0x62, 0x2E, 0x6E) && payload.size >= 3) {
+        get() = if (responseService != 0x7F &&
+            (service == 0x22 || service == 0x2E) && payload.size >= 3
+        ) {
             (payload[1] shl 8) or payload[2]
         } else null
     val negativeResponseCode: Int?
@@ -104,7 +106,7 @@ object CanTraceAnalyzer {
                 direction = message.direction,
                 did = did,
                 responseService = response,
-                positiveResponse = response == service + 0x40,
+                positiveResponse = service != null && response == service + 0x40,
                 negativeResponseCode = message.negativeResponseCode
             )
         }
