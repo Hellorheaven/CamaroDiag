@@ -232,7 +232,7 @@ object CanTraceAnalyzer {
     private fun parseCanId(value: String): Int? {
         val normalized = value.trim().removePrefix("0x").removePrefix("0X")
         if (normalized.length !in 3..8 || normalized.any { it.digitToIntOrNull(16) == null }) return null
-        return normalized.toLongOrNull(16)?.takeIf { it in 0..0x1FFFFFFF }?.toInt()
+        return normalized.toLongOrNull(16)?.takeIf { it in 0L..0x1FFFFFFFL }?.toInt()
     }
 
     private fun parseDirection(value: String): CanTraceDirection = when (value.trim().uppercase(Locale.ROOT)) {
