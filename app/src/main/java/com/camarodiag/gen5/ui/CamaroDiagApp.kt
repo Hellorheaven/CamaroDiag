@@ -335,8 +335,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isScanning = isObdScanning,
                     message = obdScanMessage,
                     isConnected = adapter.tier != AdapterTier.DISCONNECTED &&
-                        !adapter.deviceName.contains("Demo", ignoreCase = true) &&
-                        !adapter.deviceName.contains("Simulated", ignoreCase = true),
+                        !adapter.deviceName.contains("Demo", ignoreCase = true),
                     isFr = isFr,
                     onRunScan = { viewModel.runFullObdScan() }
                 )
