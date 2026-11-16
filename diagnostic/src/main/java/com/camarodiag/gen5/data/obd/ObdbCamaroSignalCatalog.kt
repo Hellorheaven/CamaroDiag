@@ -20,10 +20,11 @@ data class ObdbYearFilter(
     val to: Int? = null,
     val years: Set<Int> = emptySet()
 ) {
-    fun matches(year: Int): Boolean =
-        (from == null || year >= from) &&
-            (to == null || year <= to) &&
-            (years.isEmpty() || year in years)
+    fun matches(year: Int): Boolean {
+        val hasRange = from != null || to != null
+        val inRange = hasRange && (from == null || year >= from) && (to == null || year <= to)
+        return if (years.isEmpty()) !hasRange || inRange else inRange || year in years
+    }
 }
 
 data class ObdbSignalFormat(
