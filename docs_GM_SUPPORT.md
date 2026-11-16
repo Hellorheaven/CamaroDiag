@@ -185,3 +185,11 @@ Le signalset communautaire `OBDb/Chevrolet-Camaro` (commit `6771593698dff29cc0c6
 
 Le lecteur ne transmet que les définitions avec une paire CAN physique 11 bits résolue et un service UDS 0x22. Les adresses non représentables sans ambiguïté restent visibles comme données non résolues et sont bloquées. Les données sont sous CC BY-SA 4.0 ; voir `THIRD_PARTY_NOTICES.md`. Ce n'est pas une homologation GM : vérifier le VIN, le calculateur, le CAL ID/OS et la réponse réelle avant toute interprétation.
 
+Paires explicites présentes dans le signalset :
+- `0x241 → 0x641` : groupe Tires, identifiants et pressions TPMS.
+- `0x760 → 0x768` : groupe Control, vitesses des quatre roues.
+- `0x7E0 → 0x7E8` : données moteur, carburant, ratés, knock retard, injection et quelques mesures de transmission.
+- `0x7E1 → 0x7E9`, `0x7E2 → 0x7EA`, `0x7E3 → 0x7EB`, `0x7E4 → 0x7EC` : autres mesures de température, rapport et vitesses de transmission.
+- `DA28`, `DA40` et `7E0` sans réponse explicite : conservés dans le catalogue, mais bloqués par le transport actuel.
+
+
