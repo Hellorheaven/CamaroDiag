@@ -20,10 +20,6 @@ import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
-import java.net.Socket
-import android.hardware.usb.UsbDevice
-import com.hoho.android.usbserial.driver.UsbSerialProber
-import com.hoho.android.usbserial.driver.UsbSerialPort
 
 class BluetoothObdManager(context: Context) {
 
