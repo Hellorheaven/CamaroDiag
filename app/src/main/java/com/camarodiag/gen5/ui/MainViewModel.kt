@@ -12,7 +12,6 @@ import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
-import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.ObdDtc
