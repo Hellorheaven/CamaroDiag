@@ -36,7 +36,30 @@ internal class IsoTpChannel(
         require(payload.isNotEmpty()) { "ISO-TP payload cannot be empty." }
         require(payload.size <= MAX_PAYLOAD_BYTES) { "ISO-TP payload exceeds the supported 12-bit length." }
         sendPayload(payload, timeoutMs)
-        return receivePayload(timeoutMs)
+        var response = receivePayload(timeoutMs)
+        if (response.size >= 3 &&
+            (response[0].toInt() and 0xFF) == 0x7F &&
+            (response[1].toInt() and 0xFF) == (payload[0].toInt() and 0xFF) &&
+            (response[2].toInt() and 0xFF) == 0x78) {
+            val pendingTimeoutMs = maxOf(timeoutMs, 10_000L)
+            val deadline = System.nanoTime() + pendingTimeoutMs * NANOS_PER_MILLISECOND
+            do {
+                val remaining = deadline - System.nanoTime()
+                if (remaining <= 0L) throw IsoTpException("Timed out waiting for UDS ResponsePending completion.")
+                val remainingMs = ((remaining + NANOS_PER_MILLISECOND - 1) / NANOS_PER_MILLISECOND).coerceAtLeast(1L)
+                response = receivePayload(remainingMs)
+            } while (response.size >= 3 &&
+                (response[0].toInt() and 0xFF) == 0x7F &&
+                (response[1].toInt() and 0xFF) == (payload[0].toInt() and 0xFF) &&
+                (response[2].toInt() and 0xFF) == 0x78)
+        }
+        return response
+    }
+
+    suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) {
+        require(payload.isNotEmpty()) { "ISO-TP payload cannot be empty." }
+        require(payload.size <= MAX_PAYLOAD_BYTES) { "ISO-TP payload exceeds the supported 12-bit length." }
+        sendPayload(payload, timeoutMs)
     }
 
     private suspend fun sendPayload(payload: ByteArray, timeoutMs: Long) {
