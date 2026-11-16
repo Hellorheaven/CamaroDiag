@@ -650,6 +650,76 @@ fun AdapterScreen(
     }
 }
 
+
+@Composable
+private fun localizedVehicleControlTitle(id: VehicleControlId): String = when (id) {
+    VehicleControlId.WINDOWS -> stringResource(R.string.control_windows_title)
+    VehicleControlId.SUNROOF -> stringResource(R.string.control_sunroof_title)
+    VehicleControlId.DOOR_LOCKS -> stringResource(R.string.control_door_locks_title)
+    VehicleControlId.LIGHTS -> stringResource(R.string.control_lights_title)
+    VehicleControlId.HORN -> stringResource(R.string.control_horn_title)
+    VehicleControlId.MIRRORS -> stringResource(R.string.control_mirrors_title)
+    VehicleControlId.TRUNK -> stringResource(R.string.control_trunk_title)
+    VehicleControlId.REMOTE_START -> stringResource(R.string.control_remote_start_title)
+}
+
+@Composable
+private fun localizedVehicleControlExplanation(id: VehicleControlId): String = when (id) {
+    VehicleControlId.WINDOWS -> stringResource(R.string.control_windows_explanation)
+    VehicleControlId.SUNROOF -> stringResource(R.string.control_sunroof_explanation)
+    VehicleControlId.DOOR_LOCKS -> stringResource(R.string.control_door_locks_explanation)
+    VehicleControlId.LIGHTS -> stringResource(R.string.control_lights_explanation)
+    VehicleControlId.HORN -> stringResource(R.string.control_horn_explanation)
+    VehicleControlId.MIRRORS -> stringResource(R.string.control_mirrors_explanation)
+    VehicleControlId.TRUNK -> stringResource(R.string.control_trunk_explanation)
+    VehicleControlId.REMOTE_START -> stringResource(R.string.control_remote_start_explanation)
+}
+
+@Composable
+private fun localizedModuleName(module: EcuModule): String = when (module.id) {
+    "ECM" -> stringResource(R.string.module_ecm_name)
+    "TCM" -> stringResource(R.string.module_tcm_name)
+    "BCM" -> stringResource(R.string.module_bcm_name)
+    "IPC" -> stringResource(R.string.module_ipc_name)
+    "EBCM" -> stringResource(R.string.module_ebcm_name)
+    "SDM" -> stringResource(R.string.module_sdm_name)
+    else -> module.nameEn
+}
+
+@Composable
+private fun localizedModuleNotes(module: EcuModule): String {
+    val notes = module.notesEn
+    return when (module.id) {
+        "ECM" -> when {
+            notes.startsWith("Observed 7E8") -> stringResource(R.string.module_note_ecm_obd_detected)
+            notes.startsWith("No standard OBD 7E8") -> stringResource(R.string.module_note_ecm_obd_missing)
+            else -> stringResource(R.string.module_note_ecm)
+        }
+        "TCM" -> if (notes.contains("not assumed from Gen 5")) stringResource(R.string.module_note_tcm_gen6) else stringResource(R.string.module_note_tcm_gen5)
+        "BCM" -> when {
+            notes.contains("020I") -> stringResource(R.string.module_note_bcm_gen5)
+            notes.contains("020M") -> stringResource(R.string.module_note_bcm_gen6_to2018)
+            else -> stringResource(R.string.module_note_bcm_2019)
+        }
+        "IPC" -> if (notes.startsWith("Secondary odometer")) stringResource(R.string.module_note_ipc_gen6) else stringResource(R.string.module_note_ipc_gen5)
+        "EBCM" -> if (notes.startsWith("Enhanced module")) stringResource(R.string.module_note_ebcm_gen6) else stringResource(R.string.module_note_ebcm_gen5)
+        "SDM" -> stringResource(R.string.module_note_sdm)
+        else -> module.notesEn
+    }
+}
+
+private fun remoteStartBlockerResourceId(index: Int): Int = when (index) {
+    0 -> R.string.remote_start_blocker_gear
+    1 -> R.string.remote_start_blocker_hood
+    2 -> R.string.remote_start_blocker_locks
+    3 -> R.string.remote_start_blocker_hazards
+    4 -> R.string.remote_start_blocker_theft
+    5 -> R.string.remote_start_blocker_faults
+    6 -> R.string.remote_start_blocker_stationary
+    7 -> R.string.remote_start_blocker_equipment
+    else -> R.string.control_blocked
+}
+
 @Composable
 fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
     val capabilities = remember(vehicle) { VehicleControlCatalog().forVehicle(vehicle) }
@@ -677,19 +747,19 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (isFr) capability.titleFr else capability.titleEn, fontWeight = FontWeight.Bold)
+                        Text(localizedVehicleControlTitle(capability.id), fontWeight = FontWeight.Bold)
                         Text(capability.vehicleContext, color = CamaroBlue, fontSize = 10.sp)
-                        Text(if (isFr) capability.explanationFr else capability.explanationEn, color = TextMuted, fontSize = 12.sp)
+                        Text(localizedVehicleControlExplanation(capability.id), color = TextMuted, fontSize = 12.sp)
                         if (capability.id == VehicleControlId.REMOTE_START) {
                             Text(
-                                if (isFr) "Évaluation des interverrouillages : " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmées" else "BLOQUÉE"
+                                stringResource(R.string.control_interlock_assessment, stringResource(if (remoteStartAssessment.allowedToRequestOemProcedure) R.string.control_conditions_confirmed else R.string.control_blocked))
                                 else "Interlock assessment: " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmed" else "BLOCKED",
                                 color = WarnRed,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp
                             )
-                            (if (isFr) remoteStartAssessment.blockersFr else remoteStartAssessment.blockersEn).forEach { blocker ->
-                                Text("• " + blocker, color = WarnRed, fontSize = 10.sp)
+                            remoteStartAssessment.blockersFr.forEachIndexed { index, _ ->
+                                Text("• " + stringResource(remoteStartBlockerResourceId(index)), color = WarnRed, fontSize = 10.sp)
                             }
                         }
                     }
@@ -738,11 +808,11 @@ fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
                         Text("${mod.shortName} • ${mod.bus.label}", fontWeight = FontWeight.Bold, color = CamaroBlue)
                         Text(statusLabel, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
-                    Text(if (isFr) mod.nameFr else mod.nameEn, fontWeight = FontWeight.SemiBold)
+                    Text(localizedModuleName(mod), fontWeight = FontWeight.SemiBold)
                     if (mod.txHeader.isNotBlank() && mod.rxHeader.isNotBlank()) {
                         Text("TX: 0x${mod.txHeader} | RX: 0x${mod.rxHeader} (${mod.bus.pinout})", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
                     }
-                    Text(if (isFr) mod.notesFr else mod.notesEn, fontSize = 12.sp, color = TextMuted)
+                    Text(localizedModuleNotes(mod), fontSize = 12.sp, color = TextMuted)
                 }
             }
         }
