@@ -17,6 +17,7 @@ import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
 import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
+import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
@@ -581,6 +582,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     message = error.localizedMessage ?: "Échec de lecture des identifiants ECU."
+                )
+            }
+        }
+    }
+
+    /** Imports and analyzes a local Vector ASC or CSV CAN trace without connecting to a vehicle. */
+    fun analyzeCanTrace(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isTraceAnalyzing = true,
+                canTraceReport = null,
+                traceMessage = ""
+            )
+            try {
+                val resolver = getApplication<Application>().contentResolver
+                val displayName = resolver.query(
+                    uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: uri.lastPathSegment ?: "can-trace.asc"
+                val bytes = resolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    var total = 0
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= 32 * 1024 * 1024) {
+                            "Trace trop volumineuse (limite locale : 32 Mio)."
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("Impossible d'ouvrir la trace sélectionnée.")
+                require(bytes.isNotEmpty()) { "La trace sélectionnée est vide." }
+                val report = CanTraceAnalyzer.analyze(bytes.toString(Charsets.UTF_8), displayName)
+                val summary = if (report.frames.isEmpty()) {
+                    if (_language.value == AppLanguage.FR)
+                        "Aucune trame CAN reconnue. Formats pris en charge : Vector ASC et CSV avec colonnes CAN ID / données."
+                    else "No CAN frames recognized. Supported formats: Vector ASC and CSV with CAN ID / data columns."
+                } else if (_language.value == AppLanguage.FR) {
+                    "${report.frames.size} trame(s), ${report.messages.size} message(s) ISO-TP/UDS, ${report.readDidCandidates.size} DID observé(s), ${report.incompleteIsoTpMessages} message(s) incomplet(s), ${report.errors.size} anomalie(s)."
+                } else {
+                    "${report.frames.size} frame(s), ${report.messages.size} ISO-TP/UDS message(s), ${report.readDidCandidates.size} observed DID(s), ${report.incompleteIsoTpMessages} incomplete message(s), ${report.errors.size} issue(s)."
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isTraceAnalyzing = false,
+                    canTraceReport = report,
+                    traceMessage = summary
+                )
+            } catch (cancelled: CancellationException) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isTraceAnalyzing = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isTraceAnalyzing = false,
+                    canTraceReport = null,
+                    traceMessage = error.localizedMessage ?: "Analyse de trace impossible."
                 )
             }
         }
