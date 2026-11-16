@@ -1015,6 +1015,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val report = obdManager.createObd2FeatureEngine().fullReadOnlyScan()
                 _obdScanReport.value = report
+                _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
+                    topology = _modules.value,
+                    respondingAddresses = report.respondingEcuAddresses
+                )
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
                 _dtcs.value = mapObdDtcs(allDtcs)
                 _obdScanMessage.value = "Scan OBD-II terminé : ${report.supportedPids.size} PIDs supportés, ${allDtcs.size} défaut(s) retourné(s)."
