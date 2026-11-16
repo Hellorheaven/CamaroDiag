@@ -171,7 +171,8 @@ data class ObdbCamaroSignalSet(
                     val divisor = formatObject.optDouble("div", 1.0)
                     if (divisor == 0.0) return@mapNotNull null
                     val mapObject = formatObject.optJSONObject("map")
-                    val map = mapObject?.keys()?.asSequence()?.associateWith { mapObject.optString(it) }.orEmpty()
+                    val map = if (mapObject == null) emptyMap() else
+                        mapObject.keys().asSequence().associateWith { key -> mapObject.optString(key) }
                     val format = ObdbSignalFormat(
                         bitIndex = formatObject.optInt("bix", 0),
                         bitLength = length,
