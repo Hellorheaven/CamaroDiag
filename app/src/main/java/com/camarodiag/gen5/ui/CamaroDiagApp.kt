@@ -752,8 +752,10 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
                         Text(localizedVehicleControlExplanation(capability.id), color = TextMuted, fontSize = 12.sp)
                         if (capability.id == VehicleControlId.REMOTE_START) {
                             Text(
-                                stringResource(R.string.control_interlock_assessment, stringResource(if (remoteStartAssessment.allowedToRequestOemProcedure) R.string.control_conditions_confirmed else R.string.control_blocked))
-                                else "Interlock assessment: " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmed" else "BLOCKED",
+                                stringResource(
+                                    R.string.control_interlock_assessment,
+                                    stringResource(if (remoteStartAssessment.allowedToRequestOemProcedure) R.string.control_conditions_confirmed else R.string.control_blocked)
+                                ),
                                 color = WarnRed,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp

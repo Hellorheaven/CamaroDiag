@@ -137,7 +137,7 @@ private fun calibrationProfileNotesResource(engine: com.camarodiag.gen5.domain.m
 }
 
 @Composable
-private fun localizedAxisDetails(offset: Int?, count: Int?, unit: String?): String =
+private fun localizedAxisDetails(offset: Long?, count: Long?, unit: String?): String =
     if (offset == null || count == null) stringResource(R.string.cal_axis_undefined)
     else stringResource(R.string.cal_axis_values, offset.toString(16).uppercase(), count, unit.orEmpty())
 

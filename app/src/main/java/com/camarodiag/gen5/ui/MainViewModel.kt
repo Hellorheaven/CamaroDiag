@@ -386,7 +386,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534BridgeConnecting = false,
                     isJ2534BridgeConnected = true,
-                    j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_j2534_connected, signal.name, signal.requestHeaderHex, signal.responseHeaderHex)
+                    j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_j2534_connected, result)
                 )
             } catch (cancelled: CancellationException) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
@@ -406,7 +406,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isJ2534BridgeConnecting = false,
             isJ2534BridgeConnected = false,
-            j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_pc_bridge_disconnected, result)
+            j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_pc_bridge_disconnected)
         )
     }
 
