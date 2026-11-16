@@ -79,7 +79,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
     val isFr = lang == AppLanguage.FR
-    fun t(en: String, fr: String) = if (isFr) fr else en
 
     val btPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
