@@ -108,6 +108,39 @@ data class CalibrationWorkspaceState(
     val mapError: String? = null
 )
 
+
+@Composable
+private fun localizedCalibrationEngineName(engine: com.camarodiag.gen5.domain.model.CamaroEngine): String = when (engine) {
+    com.camarodiag.gen5.domain.model.CamaroEngine.LLT -> stringResource(R.string.engine_llt)
+    com.camarodiag.gen5.domain.model.CamaroEngine.LFX -> stringResource(R.string.engine_lfx)
+    com.camarodiag.gen5.domain.model.CamaroEngine.LS3 -> stringResource(R.string.engine_ls3)
+    com.camarodiag.gen5.domain.model.CamaroEngine.L99 -> stringResource(R.string.engine_l99)
+    com.camarodiag.gen5.domain.model.CamaroEngine.LSA -> stringResource(R.string.engine_lsa)
+    com.camarodiag.gen5.domain.model.CamaroEngine.LS7 -> stringResource(R.string.engine_ls7)
+    com.camarodiag.gen5.domain.model.CamaroEngine.LTG -> stringResource(R.string.engine_ltg)
+    com.camarodiag.gen5.domain.model.CamaroEngine.LGX -> stringResource(R.string.engine_lgx)
+    com.camarodiag.gen5.domain.model.CamaroEngine.LT1 -> stringResource(R.string.engine_lt1)
+    com.camarodiag.gen5.domain.model.CamaroEngine.LT4 -> stringResource(R.string.engine_lt4)
+}
+
+private fun calibrationProfileNotesResource(engine: com.camarodiag.gen5.domain.model.CamaroEngine): Int = when (engine) {
+    com.camarodiag.gen5.domain.model.CamaroEngine.LLT -> R.string.cal_profile_notes_llt
+    com.camarodiag.gen5.domain.model.CamaroEngine.LFX -> R.string.cal_profile_notes_lfx
+    com.camarodiag.gen5.domain.model.CamaroEngine.LS3 -> R.string.cal_profile_notes_ls3
+    com.camarodiag.gen5.domain.model.CamaroEngine.L99 -> R.string.cal_profile_notes_l99
+    com.camarodiag.gen5.domain.model.CamaroEngine.LSA -> R.string.cal_profile_notes_lsa
+    com.camarodiag.gen5.domain.model.CamaroEngine.LS7 -> R.string.cal_profile_notes_ls7
+    com.camarodiag.gen5.domain.model.CamaroEngine.LTG -> R.string.cal_profile_notes_ltg
+    com.camarodiag.gen5.domain.model.CamaroEngine.LGX -> R.string.cal_profile_notes_lgx
+    com.camarodiag.gen5.domain.model.CamaroEngine.LT1 -> R.string.cal_profile_notes_lt1
+    com.camarodiag.gen5.domain.model.CamaroEngine.LT4 -> R.string.cal_profile_notes_lt4
+}
+
+@Composable
+private fun localizedAxisDetails(offset: Int?, count: Int?, unit: String?): String =
+    if (offset == null || count == null) stringResource(R.string.cal_axis_undefined)
+    else stringResource(R.string.cal_axis_values, offset.toString(16).uppercase(), count, unit.orEmpty())
+
 @Composable
 fun CalibrationWorkspaceScreen(
     state: CalibrationWorkspaceState,
@@ -171,8 +204,9 @@ fun CalibrationWorkspaceScreen(
                 Text(stringResource(R.string.cal_ecm_family, ecmType),
                     color = TextMuted, fontSize = 12.sp)
                 Text(
-                    if (isFr) currentProfile?.let { "Profil moteur : ${it.engine.rpo} • ${it.generation.label} • ${it.modelYears.first}–${it.modelYears.last}" } ?: "Profil moteur non répertorié pour cette année"
-                    else currentProfile?.let { "Engine profile: ${it.engine.rpo} • ${it.generation.label} • ${it.modelYears.first}–${it.modelYears.last}" } ?: "No engine profile for this model year",
+                    currentProfile?.let {
+                        stringResource(R.string.cal_engine_profile, it.engine.rpo, it.generation.label, it.modelYears.first, it.modelYears.last)
+                    } ?: stringResource(R.string.cal_engine_profile_missing),
                     color = CamaroAmber, fontSize = 12.sp
                 )
             }
@@ -187,8 +221,7 @@ fun CalibrationWorkspaceScreen(
                         color = TextMuted, fontSize = 12.sp
                     )
                     Text(
-                        if (isFr) "Motorisations répertoriées pour ${vehicle.modelYear} : " + yearProfiles.joinToString(", ") { it.engine.rpo }.ifBlank { "aucune" }
-                        else "Catalogued engines for ${vehicle.modelYear}: " + yearProfiles.joinToString(", ") { it.engine.rpo }.ifBlank { "none" },
+                        stringResource(R.string.cal_catalogued_engines, vehicle.modelYear, yearProfiles.joinToString(", ") { it.engine.rpo }.ifBlank { stringResource(R.string.common_none) }),
                         color = CamaroAmber,
                         fontSize = 11.sp
                     )
@@ -201,15 +234,20 @@ fun CalibrationWorkspaceScreen(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
-                            Text(if (isFr) profile.engine.nameFr else profile.engine.nameEn, color = TextPrimary, fontSize = 12.sp)
+                            Text(localizedCalibrationEngineName(profile.engine), color = TextPrimary, fontSize = 12.sp)
                             Text("ECM : ${profile.nominalControllerFamily}", color = TextMuted, fontSize = 11.sp)
                             Text(
-                                if (isFr) "CAL ID/CVN : lecture standard ${if (profile.supportsStandardCalIdRead && profile.supportsStandardCvnRead) "prévue" else "non validée"} • Lecture binaire : ${if (profile.supportsBinaryRead) "validée" else "non disponible"} • Tables moteur validées : ${if (profile.supportsTableEditing) "oui" else "non fournies"} • Flash ECU : ${if (profile.supportsEcuWrite) "validé" else "désactivé"}"
-                                else "CAL ID/CVN: standard read ${if (profile.supportsStandardCalIdRead && profile.supportsStandardCvnRead) "profiled" else "not verified"} • Binary read: ${if (profile.supportsBinaryRead) "validated" else "unavailable"} • Validated engine tables: ${if (profile.supportsTableEditing) "available" else "not supplied"} • ECU flash: ${if (profile.supportsEcuWrite) "validated" else "disabled"}",
+                                stringResource(
+                                    R.string.cal_profile_capabilities,
+                                    stringResource(if (profile.supportsStandardCalIdRead && profile.supportsStandardCvnRead) R.string.cal_status_profiled else R.string.cal_status_not_verified),
+                                    stringResource(if (profile.supportsBinaryRead) R.string.cal_status_validated else R.string.cal_status_unavailable),
+                                    stringResource(if (profile.supportsTableEditing) R.string.cal_status_available else R.string.cal_status_not_supplied),
+                                    stringResource(if (profile.supportsEcuWrite) R.string.cal_status_validated else R.string.cal_status_disabled)
+                                ),
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
-                            Text(if (isFr) profile.notesFr else profile.notesEn, color = TextMuted, fontSize = 10.sp)
+                            Text(stringResource(calibrationProfileNotesResource(profile.engine)), color = TextMuted, fontSize = 10.sp)
                             Text(
                                 stringResource(R.string.cal_capability_summary),
                                 color = TextMuted, fontSize = 10.sp
@@ -484,8 +522,13 @@ fun CalibrationWorkspaceScreen(
                     }
                     selectedObdbSignal?.let { signal ->
                         Text(
-                            if (isFr) "DID 0x${signal.identifierHex} • Requête ${signal.requestHeaderHex} / réponse ${signal.responseHeaderHex ?: "non résolue"} • période ${signal.frequencySeconds}s"
-                            else "DID 0x${signal.identifierHex} • request ${signal.requestHeaderHex} / response ${signal.responseHeaderHex ?: "unresolved"} • interval ${signal.frequencySeconds}s",
+                            stringResource(
+                                R.string.cal_signal_metadata,
+                                signal.identifierHex,
+                                signal.requestHeaderHex,
+                                signal.responseHeaderHex ?: stringResource(R.string.cal_status_unresolved),
+                                signal.frequencySeconds
+                            ),
                             color = TextMuted, fontSize = 10.sp
                         )
                         if (signal.debugSignal) {
@@ -633,13 +676,11 @@ fun CalibrationWorkspaceScreen(
                                 color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                if (isFr) "Axe X : ${definition.xAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " valeurs • " + it.unit } ?: "non défini"}"
-                                else "X axis: ${definition.xAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " values • " + it.unit } ?: "not defined"}",
+                                stringResource(R.string.cal_axis_summary, stringResource(R.string.cal_axis_x), localizedAxisDetails(definition.xAxis?.fileOffset, definition.xAxis?.count, definition.xAxis?.unit)),
                                 color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                if (isFr) "Axe Y : ${definition.yAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " valeurs • " + it.unit } ?: "non défini"}"
-                                else "Y axis: ${definition.yAxis?.let { "0x" + it.fileOffset.toString(16).uppercase() + " • " + it.count + " values • " + it.unit } ?: "not defined"}",
+                                stringResource(R.string.cal_axis_summary, stringResource(R.string.cal_axis_y), localizedAxisDetails(definition.yAxis?.fileOffset, definition.yAxis?.count, definition.yAxis?.unit)),
                                 color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace
                             )
                         }

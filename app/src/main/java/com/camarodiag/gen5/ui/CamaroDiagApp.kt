@@ -631,7 +631,7 @@ fun AdapterScreen(
                         }
                         Text(profile.protocols.joinToString(" • ") { it.name }, color = TextMuted, fontSize = 10.sp)
                         Text(
-                            if (isFr) profile.noteFr else "Hardware profile only; an official Android SDK/API or documented bridge is still required.",
+                            stringResource(R.string.adapter_hardware_profile_only),
                             color = TextMuted,
                             fontSize = 11.sp
                         )
