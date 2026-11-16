@@ -87,6 +87,13 @@ Le démarrage à distance n'est pas une commande CAN générique. RemoteStartSaf
 
 minSdk = 29 (Android 10), compileSdk/targetSdk = 36. USB Host, réseau TCP et permissions Bluetooth doivent être validés sur les appareils réels visés. Les tests unitaires et l'assemblage APK CI ne remplacent pas les essais sur VCX/ELM, sur toutes les générations et sur chaque calculateur.
 
+## Profils d'adaptateurs OBDLink
+
+La détection SW-CAN n'est pas déduite du seul chipset STN ni de la réponse à `STP 61`. Le profil est activé uniquement pour les modèles MX/MX+ explicitement documentés, après acceptation de la commande de protocole. Les autres interfaces restent non vérifiées tant qu'une référence matérielle et son câblage DLC pin 1 ne sont pas confirmés.
+
+- [Matrice officielle des adaptateurs OBDLink](https://support.obdsol.com/support/solutions/articles/43000713351-which-obdlink-adapter-is-right-for-me-) : matrice des protocoles SW-CAN par modèle et compatibilité GM du CX.
+- [Fiche officielle OBDLink MX+](https://www.obdlink.com/products/obdlink-mxp/) : support SW-CAN et réseaux GM avancés.
+
 ## Références techniques GM
 
 - [GM MDI 2 User Guide](https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf) : décrit le MDI 2, son fonctionnement avec un hôte PC, les interfaces J2534 / ISO 22900 et les logiciels de diagnostic/reprogrammation GM.
