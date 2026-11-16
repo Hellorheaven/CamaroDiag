@@ -258,11 +258,19 @@ class BluetoothObdManager(context: Context) {
         val supported = supportedMode01PidsMutex.withLock {
             cachedSupportedMode01Pids ?: withObdCommandSession { engine ->
                 engine.discoverSupportedPids()
-            }.also { cachedSupportedMode01Pids = it }
+            }.also { discovered ->
+                // Do not permanently cache a transient empty response from a clone or a sleeping ECU.
+                if (discovered.isNotEmpty()) cachedSupportedMode01Pids = discovered
+            }
         }
         return withObdCommandSession { engine ->
             engine.readMode01PidIfSupported(pid, supported)
         }
+    }
+
+    /** Invalidates ECU-specific support data after a vehicle identity/profile change. */
+    fun invalidateObdPidSupportCache() {
+        cachedSupportedMode01Pids = null
     }
 
     suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String =
@@ -405,7 +413,7 @@ class BluetoothObdManager(context: Context) {
             "No ELM/OBD-II command channel is available on the active transport."
         }
         return Obd2FeatureEngine(
-        ObdCommandChannel { command, timeoutMs -> sendAtCommand(command, timeoutMs) }
+            ObdCommandChannel { command, timeoutMs -> sendAtCommand(command, timeoutMs) }
         )
     }
 
