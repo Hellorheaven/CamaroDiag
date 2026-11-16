@@ -12,6 +12,9 @@ import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
+import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
+import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
+import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
@@ -32,6 +35,7 @@ import java.io.File
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val obdManager = BluetoothObdManager(application)
+    @Volatile private var obdbCamaroSignalSet: ObdbCamaroSignalSet? = null
     private val sessionDao = DiagnosticDatabase.getInstance(application).sessionDao()
 
     private val _language = MutableStateFlow(AppLanguage.FR)
@@ -104,6 +108,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshTopologyAndDefaults()
+        loadObdbSignalCatalog()
         startLiveTelemetryLoop()
     }
 
@@ -126,6 +131,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         clearVehicleEvidence()
         refreshTopologyAndDefaults()
+        refreshObdbSignalYear()
     }
 
     fun updateVin(vin: String) {
@@ -152,6 +158,110 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _calibrationWorkspace = MutableStateFlow(CalibrationWorkspaceState())
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
+
+    private fun loadObdbSignalCatalog() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { ObdbCamaroSignalSet.load(getApplication()) }
+                .onSuccess { catalog ->
+                    obdbCamaroSignalSet = catalog
+                    val signals = catalog.forYear(_vehicle.value.modelYear)
+                    withContext(Dispatchers.Main) {
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            obdbSignals = signals,
+                            obdbSignalMessage = if (_language.value == AppLanguage.FR)
+                                "${signals.size} signaux communautaires disponibles pour ${_vehicle.value.modelYear}."
+                            else "${signals.size} community signal definitions available for ${_vehicle.value.modelYear}."
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    withContext(Dispatchers.Main) {
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            obdbSignalMessage = error.localizedMessage ?: "OBDb Camaro catalog could not be loaded."
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun refreshObdbSignalYear() {
+        val catalog = obdbCamaroSignalSet ?: return
+        val signals = catalog.forYear(_vehicle.value.modelYear)
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            obdbSignals = signals,
+            obdbSignalValue = "",
+            obdbSignalMessage = if (_language.value == AppLanguage.FR)
+                "${signals.size} signaux communautaires disponibles pour ${_vehicle.value.modelYear}."
+            else "${signals.size} community signal definitions available for ${_vehicle.value.modelYear}."
+        )
+    }
+
+    /** Reads and decodes one read-only Camaro signal from the imported OBDb signalset. */
+    fun readObdbSignal(signalId: String) {
+        viewModelScope.launch {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isObdbSignalReading = true,
+                obdbSignalValue = "",
+                obdbSignalMessage = ""
+            )
+            try {
+                val catalog = obdbCamaroSignalSet ?: ObdbCamaroSignalSet.load(getApplication()).also {
+                    obdbCamaroSignalSet = it
+                }
+                val signal = catalog.find(signalId) ?: error("Signal OBDb inconnu : $signalId")
+                require(signal.isAvailableForYear(_vehicle.value.modelYear)) {
+                    "Cette définition n'est pas disponible pour l'année du véhicule sélectionné."
+                }
+                require(signal.hasSupportedPhysicalCanAddressing) {
+                    "Adresse CAN non résolue dans la source OBDb : lecture désactivée pour éviter d'inventer une adresse."
+                }
+                require(signal.service == 0x22) { "Seuls les DID UDS 0x22 de ce catalogue sont actuellement pris en charge." }
+                val requestId = signal.requestCanId!!
+                val responseId = signal.responseCanId!!
+                val did = signal.identifierHex.toInt(16)
+                val policy = UdsAccessPolicy.readOnly(setOf(did))
+                val client = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.createJ2534BridgeUdsClient(policy = policy, timeoutMs = 5000L)
+                } else {
+                    obdManager.createStnUdsClient(
+                        requestCanId = requestId,
+                        responseCanId = responseId,
+                        protocolNumber = 33,
+                        policy = policy,
+                        timeoutMs = 5000L
+                    )
+                }
+                val raw = client.readDataByIdentifier(did)
+                val decoded = signal.decode(raw)
+                val rendered = when {
+                    decoded.unavailable -> if (_language.value == AppLanguage.FR) "Non disponible (valeur sentinelle)" else "Unavailable (sentinel value)"
+                    decoded.mappedLabel != null -> decoded.mappedLabel
+                    decoded.value != null -> {
+                        val number = java.text.DecimalFormat("0.###", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.ROOT))
+                            .format(decoded.value)
+                        "$number ${decoded.unit}"
+                    }
+                    else -> decoded.raw
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isObdbSignalReading = false,
+                    obdbSignalValue = "$rendered\nRAW=0x${decoded.raw} • DID=0x${signal.identifierHex}",
+                    obdbSignalMessage = if (_language.value == AppLanguage.FR)
+                        "${signal.name} lu sur 0x${signal.requestHeaderHex} → 0x${signal.responseHeaderHex}."
+                    else "${signal.name} read from 0x${signal.requestHeaderHex} → 0x${signal.responseHeaderHex}."
+                )
+            } catch (cancelled: CancellationException) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isObdbSignalReading = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isObdbSignalReading = false,
+                    obdbSignalValue = "",
+                    obdbSignalMessage = error.localizedMessage ?: "OBDb signal read failed."
+                )
+            }
+        }
+    }
 
     /** Opens the Windows J2534 PC bridge for a real VXDIAG PassThru provider. */
     fun connectJ2534Bridge(
