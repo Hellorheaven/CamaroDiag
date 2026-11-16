@@ -26,6 +26,9 @@ class CamaroLfxObdSimulatorTest {
         assertTrue(report.liveData.any { it.pid == 0x0C && it.value == "750.00" })
         assertTrue(report.liveData.any { it.pid == 0x22 && it.value == "79.00" })
         assertTrue(report.liveData.any { it.pid == 0x24 && it.name.contains("Bank 1 sensor 1") })
+        assertEquals("P0171", report.freezeFrameDtc?.code)
+        assertEquals(listOf(0x0B, 0xB8), report.freezeFrame[0x0C])
+        assertEquals(listOf(0x7F), report.freezeFrame[0x05])
         assertEquals(setOf("P0133", "P0171"), report.confirmedDtcs.map { it.code }.toSet())
         assertTrue(report.rawLog.any { it.contains("ATZ") })
     }
