@@ -170,7 +170,9 @@ data class CamaroSignalCatalog(
                 "Unsupported Camaro signal schema version: $version"
             }
 
-            val definitions = root.optJSONArray("signals").objects().map { item ->
+            val signalArray = root.optJSONArray("signals")
+                ?: error("Native Camaro catalogue must contain a signals array.")
+            val definitions = signalArray.objects().map { item ->
                 val filter = item.optJSONObject("yearFilter")?.let {
                     SignalYearFilter(
                         from = it.optNullableInt("from"),
