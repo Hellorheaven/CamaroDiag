@@ -368,17 +368,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     result.toString()
                 } ?: error("Impossible d'ouvrir le fichier de définitions.")
                 val parsed = CalibrationTableCodec.parseDefinitions(text)
+                val metadata = parsed.metadata
+                    ?: error("Métadonnées obligatoires absentes : VIN, CAL ID, CVN, OS, matériel et SHA-256 source requis.")
                 val workingFile = File(current.activeFilePath ?: current.importedFilePath!!)
                 check(workingFile.isFile && workingFile.exists()) { "L'image BIN active est introuvable." }
+                val binary = workingFile.readBytes()
+                val validationIssues = CalibrationTableCodec.validateMetadataForImage(
+                    metadata = metadata,
+                    selectedVin = _vehicle.value.vin,
+                    binary = binary,
+                    ecuCalibrationIds = current.calibrationIdResponse.lineSequence().toList(),
+                    ecuCvns = current.cvnResponse.lineSequence().toList()
+                )
+                require(validationIssues.isEmpty()) {
+                    "Définitions refusées : " + validationIssues.joinToString(" ")
+                }
                 val first = parsed.definitions.first()
-                val decoded = CalibrationTableCodec.decode(workingFile.readBytes(), first)
+                val decoded = CalibrationTableCodec.decode(binary, first)
                 _calibrationWorkspace.value = current.copy(
                     mapDefinitions = parsed.definitions,
                     selectedMapId = first.id,
                     mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
                     mapXAxisValues = decoded.xAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
                     mapYAxisValues = decoded.yAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
-                    mapDefinitionsWarnings = parsed.warnings,
+                    mapDefinitionsWarnings = parsed.warnings + "OS et référence matérielle non lus par Mode 09 standard : vérification documentaire indépendante obligatoire.",
                     mapDirty = false,
                     mapError = null,
                     message = "${parsed.definitions.size} table(s) chargée(s). Les adresses proviennent de ton fichier de définitions et ne sont pas certifiées par CamaroDiag."
