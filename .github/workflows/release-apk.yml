@@ -163,9 +163,9 @@ jobs:
       - name: Materialize CamaroDiag installer icon
         shell: pwsh
         run: |
-          $encoded = (Get-Content ".\\pc-bridge\\installer\\assets\\CamaroDiag.ico.b64" -Raw).Trim()
+          $encoded = (Get-Content ".\pc-bridge\installer\assets\CamaroDiag.ico.b64" -Raw).Trim()
           $bytes = [Convert]::FromBase64String($encoded)
-          [System.IO.File]::WriteAllBytes(".\\pc-bridge\\installer\\assets\\CamaroDiag.ico", $bytes)
+          [System.IO.File]::WriteAllBytes(".\pc-bridge\installer\assets\CamaroDiag.ico", $bytes)
 
       - name: Build Windows release setup installers
         env:
@@ -173,23 +173,23 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $iscc = Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Inno Setup 6\\ISCC.exe"
+          $iscc = Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
 
-          New-Item -ItemType Directory -Force -Path ".\\dist" | Out-Null
+          New-Item -ItemType Directory -Force -Path ".\dist" | Out-Null
           $variants = @(
             @{ Runtime = "win-x64"; Arch = "x64"; Name = "release-win-x64" },
             @{ Runtime = "win-x86"; Arch = "x86"; Name = "release-win-x86" }
           )
 
           foreach ($variant in $variants) {
-            $output = Join-Path $PWD "publish\\$($variant.Name)"
+            $output = Join-Path $PWD "publish\$($variant.Name)"
             New-Item -ItemType Directory -Force -Path $output | Out-Null
 
-            dotnet publish .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime $variant.Runtime --self-contained true --output $output "-p:Version=$env:VERSION_NAME" "-p:AssemblyVersion=$($env:VERSION_NAME).0" "-p:FileVersion=$($env:VERSION_NAME).0"
+            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime $variant.Runtime --self-contained true --output $output "-p:Version=$env:VERSION_NAME" "-p:AssemblyVersion=$($env:VERSION_NAME).0" "-p:FileVersion=$($env:VERSION_NAME).0"
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
 
-            & $iscc "/DAppVersion=$env:VERSION_NAME" "/DBuildDir=$output" "/DChannel=release" "/DArch=$($variant.Arch)" "/DOutputName=CamaroDiag-J2534-Bridge-Setup-$($variant.Name)" ".\\pc-bridge\\installer\\CamaroDiag.J2534Bridge.iss"
+            & $iscc "/DAppVersion=$env:VERSION_NAME" "/DBuildDir=$output" "/DChannel=release" "/DArch=$($variant.Arch)" "/DOutputName=CamaroDiag-J2534-Bridge-Setup-$($variant.Name)" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss"
             if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed for $($variant.Name)" }
           }
 
