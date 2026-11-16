@@ -1062,6 +1062,75 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
     }
 }
 
+
+@Composable
+private fun localizedMileageSummary(report: MileageAuditReport): String {
+    val valid = report.readings.filter { reading ->
+        reading.kmValue?.let { it.isFinite() && it >= 0.0 } == true
+    }
+    val independent = valid.filter {
+        !it.profileEvidenceReference.isNullOrBlank() &&
+            it.confidence == ConfidenceLevel.HIGH &&
+            it.moduleId.uppercase() in setOf("BCM", "IPC", "ECM_TOTAL_ODO")
+    }.distinctBy { it.moduleId.uppercase() }
+    val values = independent.mapNotNull { it.kmValue }
+    val delta = if (values.size >= 2) values.maxOrNull()!! - values.minOrNull()!! else 0.0
+    return when {
+        report.hasDiscrepancy -> stringResource(R.string.mileage_summary_discrepancy, delta)
+        values.size >= 2 -> stringResource(R.string.mileage_summary_agreement, delta)
+        valid.isEmpty() -> stringResource(R.string.mileage_summary_no_data)
+        else -> stringResource(R.string.mileage_summary_insufficient, valid.size, independent.size)
+    }
+}
+
+@Composable
+private fun localizedMileageSourceName(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_source_j2534)
+    "DEMO" -> stringResource(R.string.mileage_source_demo)
+    "ECM_A6" -> stringResource(R.string.mileage_source_ecm_a6)
+    "ECM_D3" -> stringResource(R.string.mileage_source_ecm_d3)
+    "BCM" -> stringResource(R.string.module_bcm_name)
+    "IPC" -> stringResource(R.string.module_ipc_name)
+    "ECM_TOTAL_ODO" -> stringResource(R.string.mileage_source_ecm_total)
+    else -> item.moduleNameEn
+}
+
+@Composable
+private fun localizedMileageDetails(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_details_j2534)
+    "DEMO" -> stringResource(R.string.mileage_details_demo)
+    "ECM_A6" -> stringResource(
+        R.string.mileage_details_pid,
+        "A6",
+        if (item.didInfo.contains("not advertised by ECU")) stringResource(R.string.mileage_pid_not_advertised) else item.didInfo.substringAfter("•", item.didInfo).trim()
+    )
+    "ECM_D3" -> stringResource(
+        R.string.mileage_details_pid,
+        "D3",
+        if (item.didInfo.contains("not advertised by ECU")) stringResource(R.string.mileage_pid_not_advertised) else item.didInfo.substringAfter("•", item.didInfo).trim()
+    )
+    "BCM", "IPC" -> stringResource(R.string.mileage_details_module_not_read)
+    else -> item.didInfo
+}
+
+@Composable
+private fun localizedMileageConfidence(confidence: ConfidenceLevel): String = when (confidence) {
+    ConfidenceLevel.HIGH -> stringResource(R.string.confidence_high)
+    ConfidenceLevel.MODERATE -> stringResource(R.string.confidence_moderate)
+    ConfidenceLevel.UNAVAILABLE -> stringResource(R.string.confidence_unavailable)
+}
+
+@Composable
+private fun localizedMileageCaveat(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_caveat_j2534)
+    "DEMO" -> stringResource(R.string.mileage_caveat_demo)
+    "ECM_A6" -> stringResource(if (item.kmValue != null) R.string.mileage_caveat_ecm_a6_valid else R.string.mileage_caveat_ecm_a6_missing)
+    "ECM_D3" -> stringResource(if (item.kmValue != null) R.string.mileage_caveat_ecm_d3_valid else R.string.mileage_caveat_ecm_d3_missing)
+    "BCM" -> stringResource(R.string.mileage_caveat_bcm)
+    "IPC" -> stringResource(R.string.mileage_caveat_ipc)
+    else -> item.caveatEn
+}
+
 @Composable
 fun MileageScreen(
     report: MileageAuditReport?,
@@ -1088,7 +1157,7 @@ fun MileageScreen(
                             fontWeight = FontWeight.Bold,
                             color = if (rep.hasDiscrepancy) WarnRed else OkGreen
                         )
-                        Text(if (isFr) rep.summaryFr else rep.summaryEn, fontSize = 13.sp)
+                        Text(localizedMileageSummary(rep), fontSize = 13.sp)
                     }
                 }
             }
@@ -1101,17 +1170,17 @@ fun MileageScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(if (isFr) item.moduleNameFr else item.moduleNameEn, fontWeight = FontWeight.Bold)
+                            Text(localizedMileageSourceName(item), fontWeight = FontWeight.Bold)
                             Text(
-                                text = item.kmValue?.let { "${String.format("%,.1f", it)} km" } ?: "N/A",
+                                text = item.kmValue?.let { "${String.format("%,.1f", it)} km" } ?: stringResource(R.string.obd_not_available),
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 color = if (item.kmValue != null) CamaroBlue else TextMuted
                             )
                         }
-                        Text(item.didInfo, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
-                        Text(if (isFr) item.confidence.labelFr else item.confidence.labelEn, color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text(if (isFr) item.caveatFr else item.caveatEn, fontSize = 12.sp, color = TextMuted)
+                        Text(localizedMileageDetails(item), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                        Text(localizedMileageConfidence(item.confidence), color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(localizedMileageCaveat(item), fontSize = 12.sp, color = TextMuted)
                     }
                 }
             }
