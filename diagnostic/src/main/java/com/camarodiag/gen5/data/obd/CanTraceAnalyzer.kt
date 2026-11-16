@@ -108,7 +108,7 @@ object CanTraceAnalyzer {
                 direction = message.direction,
                 did = did,
                 responseService = response,
-                positiveResponse = service != null && response == service + 0x40,
+                positiveResponse = response == service + 0x40,
                 negativeResponseCode = message.negativeResponseCode
             )
         }
