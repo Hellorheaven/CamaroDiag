@@ -218,4 +218,23 @@
     <string name="update_install">Instalar</string>
     <string name="update_download">Descargar</string>
     <string name="update_later">Más tarde</string>
+    <string name="vehicle_generation_label">Generación %1$d</string>
+    <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
+    <string name="engine_lfx">3.6L V6 SIDI FlexFuel (2012–2015)</string>
+    <string name="engine_ls3">6.2L V8 manual (426 CV)</string>
+    <string name="engine_l99">6.2L V8 AFM automático (400 CV)</string>
+    <string name="engine_lsa">6.2L V8 sobrealimentado ZL1 (580 CV)</string>
+    <string name="engine_ls7">7.0L V8 Z/28 (505 CV)</string>
+    <string name="engine_ltg">2.0L Turbo 4 cilindros (275 CV)</string>
+    <string name="engine_lgx">3.6L V6 SIDI (335 CV)</string>
+    <string name="engine_lt1">6.2L V8 inyección directa (455 CV)</string>
+    <string name="engine_lt4">6.2L V8 sobrealimentado ZL1 (650 CV)</string>
+    <string name="transmission_manual">Manual (AY6 / TR6060 / TR3160)</string>
+    <string name="transmission_automatic">Automática (6L50 / 6L80 / 8L45 / 8L90 / 10L60 / 10L80; según el año)</string>
+    <string name="market_us_ca">Norteamérica (EE. UU. / Canadá)</string>
+    <string name="market_eu_ece">Exportación Europa (ECE / T96 / T84)</string>
+    <string name="adapter_tier_pro_stn">STN1170 / STN2255 (OBDLink MX+ / vLinker MC+)</string>
+    <string name="adapter_tier_genuine_elm">ELM327 original v1.4b/v1.5 (solo HS-CAN)</string>
+    <string name="adapter_tier_clone_elm">Clon genérico ELM327 v2.1 (limitado)</string>
+    <string name="adapter_tier_disconnected">No conectado</string>
 </resources>
