@@ -12,6 +12,17 @@ The parser accepts standard classic-CAN records with timestamp, channel, arbitra
 0.001000 1 7E8 Rx d 8 07 62 F1 90 31 47 30 31
 ```
 
+### ELM327 monitor text
+
+The analyzer accepts header-enabled ELM327 monitor output saved as a text file. Each line must contain a CAN ID, a hexadecimal DLC and the data bytes, for example:
+
+```text
+7E0 03 22 F1 90
+7E8 07 62 F1 90 31 47 30 31
+```
+
+ELM monitor output usually has no timestamp or TX/RX marker; the analyzer therefore labels its direction as unknown rather than guessing. Enable CAN headers on the adapter before capturing. Not every ELM327 clone supports monitor mode or complete CAN-frame output.
+
 ### CSV
 CSV files must include a CAN ID column and a data/payload column. Optional columns are timestamp and direction:
 
