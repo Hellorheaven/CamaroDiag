@@ -3,7 +3,7 @@
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">שפת האפליקציה</string>
     <string name="system_language_current">שפת המערכת: %1$s</string>
-    <string name="system_language_hint">يتبع CamaroDiag لغة الجهاز عندما تكون مدعومة. وتُستخدم الإنجليزية للغات الأخرى.</string>
+    <string name="system_language_hint">CamaroDiag משתמש בשפת המכשיר כאשר היא נתמכת. בשפות שאינן נתמכות, האפליקציה משתמשת באנגלית.</string>
     <string name="tab_vehicle">רכב</string>
     <string name="tab_connect">חיבור</string>
     <string name="tab_live">נתונים בזמן אמת</string>
