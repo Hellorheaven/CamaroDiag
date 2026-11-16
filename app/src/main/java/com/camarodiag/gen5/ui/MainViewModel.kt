@@ -621,8 +621,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val report = CanTraceAnalyzer.analyze(bytes.toString(Charsets.UTF_8), displayName)
                 val summary = if (report.frames.isEmpty()) {
                     if (_language.value == AppLanguage.FR)
-                        "Aucune trame CAN reconnue. Formats pris en charge : Vector ASC et CSV avec colonnes CAN ID / données."
-                    else "No CAN frames recognized. Supported formats: Vector ASC and CSV with CAN ID / data columns."
+                        "Aucune trame CAN reconnue. Formats pris en charge : Vector ASC, journal ELM327 avec en-têtes CAN, ou CSV avec colonnes CAN ID / données."
+                    else "No CAN frames recognized. Supported formats: Vector ASC, ELM327 header-enabled monitor log, or CSV with CAN ID / data columns."
                 } else if (_language.value == AppLanguage.FR) {
                     "${report.frames.size} trame(s), ${report.messages.size} message(s) ISO-TP/UDS, ${report.readDidCandidates.size} DID observé(s), ${report.incompleteIsoTpMessages} message(s) incomplet(s), ${report.errors.size} anomalie(s)."
                 } else {
