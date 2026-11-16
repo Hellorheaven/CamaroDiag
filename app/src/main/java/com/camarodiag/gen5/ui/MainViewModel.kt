@@ -323,6 +323,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonIdentical = comparison.identical,
                     message = "Comparaison locale terminée. Les écarts ne sont pas interprétés comme des tables moteur et ne valident pas la compatibilité d'un flash."
                 )
+                current.comparisonFilePath?.let { previousPath ->
+                    if (previousPath != storedFile!!.absolutePath) runCatching { File(previousPath).delete() }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
