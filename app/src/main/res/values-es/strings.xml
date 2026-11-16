@@ -237,4 +237,23 @@
     <string name="adapter_tier_genuine_elm">ELM327 original v1.4b/v1.5 (solo HS-CAN)</string>
     <string name="adapter_tier_clone_elm">Clon genérico ELM327 v2.1 (limitado)</string>
     <string name="adapter_tier_disconnected">No conectado</string>
+    <string name="module_ecm_name">Módulo de control del motor</string>
+    <string name="module_tcm_name">Módulo de control de la transmisión</string>
+    <string name="module_bcm_name">Módulo de control de la carrocería</string>
+    <string name="module_ipc_name">Cuadro de instrumentos</string>
+    <string name="module_ebcm_name">Módulo electrónico de control de frenos</string>
+    <string name="module_sdm_name">Módulo de detección y diagnóstico</string>
+    <string name="module_note_ecm">Ejemplo de solicitud/respuesta funcional OBD-II (7DF/7E8 en CAN de 11 bits). No define una dirección física de diagnóstico GM ampliada ni autoriza servicios ampliados.</string>
+    <string name="module_note_ecm_obd_detected">Se observó una respuesta 7E8 a la solicitud OBD funcional estándar 0100. Esto confirma únicamente el acceso OBD estándar al tren motriz; no autoriza servicios GM ampliados.</string>
+    <string name="module_note_ecm_obd_missing">No se observó ninguna respuesta OBD estándar 7E8. El ECM debe permanecer sin verificar hasta que lo confirme un escaneo funcional real.</string>
+    <string name="module_note_tcm_gen5">La presencia, la dirección y los datos compatibles deben descubrirse en el vehículo.</string>
+    <string name="module_note_tcm_gen6">La dirección del módulo y los servicios compatibles deben descubrirse en el vehículo; no se presuponen a partir de la topología Gen 5.</string>
+    <string name="module_note_bcm_gen5">El boletín GM 07-08-49-020I identifica el BCM como módulo de almacenamiento del odómetro del Camaro 2010–2015. No se presuponen la dirección de diagnóstico exacta ni el DID de lectura.</string>
+    <string name="module_note_bcm_gen6_to2018">El boletín GM 07-08-49-020M indica el BCM como módulo de almacenamiento del odómetro del Camaro hasta 2018. La dirección de diagnóstico y el DID de lectura siguen requiriendo una verificación específica del VIN.</string>
+    <string name="module_note_bcm_2019">Para 2019–2024, confirma la arquitectura de almacenamiento del odómetro y los identificadores de diagnóstico de este VIN antes de leer.</string>
+    <string name="module_note_ipc_gen5">La información de servicio del Camaro 2012 describe el IPC como almacenamiento secundario del odómetro. Deben verificarse los datos de lectura y la dirección exactos.</string>
+    <string name="module_note_ipc_gen6">La información de servicio del Camaro 2012 describe un almacenamiento secundario del odómetro; verifica los datos exactos del módulo y su relación con el VIN antes de comparar.</string>
+    <string name="module_note_ebcm_gen5">No se presupone el direccionamiento GM ampliado; realiza un escaneo verificado del módulo.</string>
+    <string name="module_note_ebcm_gen6">El escaneo ampliado del módulo aún no se ha confirmado para este VIN.</string>
+    <string name="module_note_sdm">El acceso al módulo de seguridad es específico del vehículo y debe permanecer en modo de solo lectura.</string>
 </resources>

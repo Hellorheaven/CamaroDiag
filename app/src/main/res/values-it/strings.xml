@@ -237,4 +237,23 @@
     <string name="adapter_tier_genuine_elm">ELM327 originale v1.4b/v1.5 (solo HS-CAN)</string>
     <string name="adapter_tier_clone_elm">Clone ELM327 v2.1 generico (limitato)</string>
     <string name="adapter_tier_disconnected">Non connesso</string>
+    <string name="module_ecm_name">Centralina motore</string>
+    <string name="module_tcm_name">Centralina del cambio</string>
+    <string name="module_bcm_name">Centralina carrozzeria</string>
+    <string name="module_ipc_name">Quadro strumenti</string>
+    <string name="module_ebcm_name">Centralina elettronica freni</string>
+    <string name="module_sdm_name">Modulo di rilevamento e diagnosi</string>
+    <string name="module_note_ecm">Esempio di richiesta/risposta funzionale OBD-II (7DF/7E8 su CAN a 11 bit). Non definisce un indirizzo diagnostico fisico GM avanzato né autorizza servizi avanzati.</string>
+    <string name="module_note_ecm_obd_detected">Risposta 7E8 osservata alla richiesta OBD funzionale standard 0100. Conferma solo l'accesso OBD standard al gruppo motopropulsore e non autorizza i servizi GM avanzati.</string>
+    <string name="module_note_ecm_obd_missing">Non è stata osservata alcuna risposta OBD standard 7E8. L'ECM resta non verificato finché una scansione funzionale reale non lo conferma.</string>
+    <string name="module_note_tcm_gen5">Presenza, indirizzo e dati supportati devono essere rilevati sul veicolo.</string>
+    <string name="module_note_tcm_gen6">L'indirizzo del modulo e i servizi supportati devono essere rilevati sul veicolo; non vengono dedotti dalla topologia Gen 5.</string>
+    <string name="module_note_bcm_gen5">Il bollettino GM 07-08-49-020I identifica il BCM come modulo di memorizzazione del chilometraggio Camaro 2010–2015. L'indirizzamento diagnostico esatto e il DID di lettura non vengono presunti.</string>
+    <string name="module_note_bcm_gen6_to2018">Il bollettino GM 07-08-49-020M indica il BCM come modulo di memorizzazione del chilometraggio Camaro fino al 2018. L'indirizzo diagnostico e il DID di lettura richiedono comunque una verifica specifica del VIN.</string>
+    <string name="module_note_bcm_2019">Per il 2019–2024, confermare l'architettura di memorizzazione del chilometraggio e gli identificativi diagnostici per questo VIN prima della lettura.</string>
+    <string name="module_note_ipc_gen5">Le informazioni di servizio Camaro 2012 descrivono l'IPC come memoria secondaria del chilometraggio. I dati di lettura esatti e l'indirizzo devono essere verificati.</string>
+    <string name="module_note_ipc_gen6">La memorizzazione secondaria del chilometraggio è descritta nelle informazioni di servizio Camaro 2012; verificare i dati esatti del modulo e la relazione con il VIN prima del confronto.</string>
+    <string name="module_note_ebcm_gen5">L'indirizzamento GM avanzato non viene presunto; eseguire una scansione del modulo verificata.</string>
+    <string name="module_note_ebcm_gen6">La scansione avanzata del modulo non è ancora confermata per questo VIN.</string>
+    <string name="module_note_sdm">L'accesso al modulo di sicurezza è specifico del veicolo e deve rimanere in sola lettura.</string>
 </resources>
