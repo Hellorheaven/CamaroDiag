@@ -50,6 +50,22 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun doesNotAssumeHeaderOrCanProtocolSupportWithoutPositiveAdapterResponses() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "Generic adapter",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "ELM327",
+            stiResp = "?",
+            atalResp = "?",
+            stp61Resp = "?",
+            headersResp = "?",
+            protocolResp = "?"
+        )
+
+        assertFalse(capabilities.supportsCanHeaders)
+    }
+
+    @Test
     fun marksStandardEcmAccessibleOnlyAfterAReal7E8Response() {
         val topology = CamaroUdsProtocol.buildTopology(
             VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1),
