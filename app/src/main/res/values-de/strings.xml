@@ -237,4 +237,23 @@
     <string name="adapter_tier_genuine_elm">Originaler ELM327 v1.4b/v1.5 (nur HS-CAN)</string>
     <string name="adapter_tier_clone_elm">Generischer ELM327-v2.1-Klon (eingeschränkt)</string>
     <string name="adapter_tier_disconnected">Nicht verbunden</string>
+    <string name="module_ecm_name">Motorsteuergerät</string>
+    <string name="module_tcm_name">Getriebesteuergerät</string>
+    <string name="module_bcm_name">Karosseriesteuergerät</string>
+    <string name="module_ipc_name">Instrumententafel</string>
+    <string name="module_ebcm_name">Elektronisches Bremssteuergerät</string>
+    <string name="module_sdm_name">Sensor- und Diagnosemodul</string>
+    <string name="module_note_ecm">Beispiel für eine funktionale OBD-II-Anfrage/-Antwort (7DF/7E8 über 11-Bit-CAN). Dies definiert keine erweiterte physische GM-Diagnoseadresse und autorisiert keine erweiterten Dienste.</string>
+    <string name="module_note_ecm_obd_detected">Antwort 7E8 auf die standardmäßige funktionale OBD-Anfrage 0100 beobachtet. Dies bestätigt nur den standardmäßigen OBD-Zugriff auf den Antriebsstrang und autorisiert keine erweiterten GM-Dienste.</string>
+    <string name="module_note_ecm_obd_missing">Es wurde keine standardmäßige OBD-7E8-Antwort beobachtet. Das ECM bleibt unbestätigt, bis ein echter Funktionstest es bestätigt.</string>
+    <string name="module_note_tcm_gen5">Vorhandensein, Adresse und unterstützte Daten müssen am Fahrzeug ermittelt werden.</string>
+    <string name="module_note_tcm_gen6">Moduladresse und unterstützte Dienste müssen am Fahrzeug ermittelt werden; sie werden nicht aus der Gen-5-Topologie abgeleitet.</string>
+    <string name="module_note_bcm_gen5">Das GM-Bulletin 07-08-49-020I bezeichnet das BCM für Camaro 2010–2015 als Speichermodul des Kilometerstands. Die genaue Diagnoseadressierung und der Lese-DID werden nicht vorausgesetzt.</string>
+    <string name="module_note_bcm_gen6_to2018">Das GM-Bulletin 07-08-49-020M führt das BCM bis 2018 als Speichermodul des Camaro-Kilometerstands auf. Diagnoseadresse und Lese-DID müssen weiterhin VIN-spezifisch überprüft werden.</string>
+    <string name="module_note_bcm_2019">Für 2019–2024 müssen die Kilometerstands-Speicherarchitektur und die Diagnosekennungen für diese VIN vor dem Auslesen bestätigt werden.</string>
+    <string name="module_note_ipc_gen5">Die Camaro-Serviceinformationen von 2012 beschreiben das IPC als sekundären Kilometerstandsspeicher. Genaue Lesedaten und Adresse müssen überprüft werden.</string>
+    <string name="module_note_ipc_gen6">Ein sekundärer Kilometerstandsspeicher wird in den Camaro-Serviceinformationen von 2012 beschrieben; vor einem Vergleich sind die genauen Moduldaten und der VIN-Bezug zu prüfen.</string>
+    <string name="module_note_ebcm_gen5">Eine erweiterte GM-Adressierung wird nicht vorausgesetzt; führe einen bestätigten Steuergeräte-Scan durch.</string>
+    <string name="module_note_ebcm_gen6">Ein erweiterter Modul-Scan wurde für diese VIN noch nicht bestätigt.</string>
+    <string name="module_note_sdm">Der Zugriff auf das Sicherheitssteuergerät ist fahrzeugspezifisch und muss schreibgeschützt bleiben.</string>
 </resources>

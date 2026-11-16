@@ -237,4 +237,23 @@
     <string name="adapter_tier_genuine_elm">ELM327 Authentique v1.4b/v1.5 (HS-CAN Seul)</string>
     <string name="adapter_tier_clone_elm">Clone ELM327 v2.1 Générique (Limité)</string>
     <string name="adapter_tier_disconnected">Non connecté</string>
+    <string name="module_ecm_name">Calculateur moteur</string>
+    <string name="module_tcm_name">Calculateur de transmission</string>
+    <string name="module_bcm_name">Calculateur habitacle</string>
+    <string name="module_ipc_name">Combiné d'instruments</string>
+    <string name="module_ebcm_name">Calculateur ABS / StabiliTrak</string>
+    <string name="module_sdm_name">Calculateur airbags</string>
+    <string name="module_note_ecm">Exemple de requête/réponse OBD-II fonctionnelle (7DF/7E8 sur CAN 11 bits). Ceci ne définit pas une adresse physique GM étendue et n'autorise pas les services constructeur.</string>
+    <string name="module_note_ecm_obd_detected">Réponse 7E8 observée à la requête OBD fonctionnelle standard 0100. Cela confirme uniquement l'accès OBD groupe motopropulseur ; aucun service GM étendu n'est autorisé.</string>
+    <string name="module_note_ecm_obd_missing">Aucune réponse OBD standard 7E8 observée. Le calculateur moteur reste non confirmé jusqu'à une réponse réelle au scan fonctionnel.</string>
+    <string name="module_note_tcm_gen5">Présence, adresse et données prises en charge à identifier sur le véhicule.</string>
+    <string name="module_note_tcm_gen6">Adresse et services à découvrir sur le véhicule ; aucune adresse Gen 5 n'est réutilisée par hypothèse.</string>
+    <string name="module_note_bcm_gen5">Le bulletin GM 07-08-49-020I identifie le BCM comme module de stockage du kilométrage Camaro 2010–2015. L'adressage de diagnostic et le DID de lecture ne sont pas supposés.</string>
+    <string name="module_note_bcm_gen6_to2018">Le bulletin GM 07-08-49-020M désigne le BCM comme module de stockage du kilométrage Camaro jusqu'en 2018. L'adresse de diagnostic et le DID de lecture restent à vérifier selon le VIN.</string>
+    <string name="module_note_bcm_2019">Pour 2019–2024, confirmer l'architecture de stockage et les identifiants de diagnostic de ce VIN avant toute lecture.</string>
+    <string name="module_note_ipc_gen5">La documentation Camaro 2012 décrit l'IPC comme stockage kilométrique secondaire. L'adresse et les données de lecture doivent être vérifiées.</string>
+    <string name="module_note_ipc_gen6">Le stockage secondaire du kilométrage est décrit dans la documentation d'atelier Camaro 2012 ; vérifier les données du module et la relation VIN avant comparaison.</string>
+    <string name="module_note_ebcm_gen5">L'adressage GM étendu n'est pas supposé ; effectuer une identification réelle du calculateur.</string>
+    <string name="module_note_ebcm_gen6">Le balayage constructeur de ce module n'est pas encore confirmé pour ce VIN.</string>
+    <string name="module_note_sdm">L'accès au calculateur de sécurité est spécifique au véhicule et doit rester en lecture seule.</string>
 </resources>

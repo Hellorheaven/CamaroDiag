@@ -237,4 +237,23 @@
     <string name="adapter_tier_genuine_elm">Genuine ELM327 v1.4b/v1.5 (HS-CAN Only)</string>
     <string name="adapter_tier_clone_elm">Generic ELM327 v2.1 Clone (Limited)</string>
     <string name="adapter_tier_disconnected">Not connected</string>
+    <string name="module_ecm_name">Engine Control Module</string>
+    <string name="module_tcm_name">Transmission Control Module</string>
+    <string name="module_bcm_name">Body Control Module</string>
+    <string name="module_ipc_name">Instrument Panel Cluster</string>
+    <string name="module_ebcm_name">Electronic Brake Control Module</string>
+    <string name="module_sdm_name">Sensing and Diagnostic Module</string>
+    <string name="module_note_ecm">Standard OBD-II functional request/response example (7DF/7E8 on 11-bit CAN). This does not define a GM enhanced physical diagnostic address or authorize enhanced services.</string>
+    <string name="module_note_ecm_obd_detected">Observed 7E8 response to standard OBD functional request 0100. This confirms standard powertrain OBD access only; it does not authorize GM enhanced services.</string>
+    <string name="module_note_ecm_obd_missing">No standard OBD 7E8 response was observed. Keep the ECM unverified until a real functional scan confirms it.</string>
+    <string name="module_note_tcm_gen5">Presence, address and supported data must be discovered on the vehicle.</string>
+    <string name="module_note_tcm_gen6">Module address and supported services must be discovered on the vehicle; not assumed from Gen 5 topology.</string>
+    <string name="module_note_bcm_gen5">GM bulletin 07-08-49-020I identifies the BCM as the Camaro odometer storage module for 2010–2015. Exact diagnostic addressing and read DID are not assumed.</string>
+    <string name="module_note_bcm_gen6_to2018">GM bulletin 07-08-49-020M lists the BCM as the Camaro odometer storage module through 2018. Diagnostic address and read DID still require VIN-specific verification.</string>
+    <string name="module_note_bcm_2019">For 2019–2024, confirm the odometer storage architecture and diagnostic identifiers for this VIN before reading.</string>
+    <string name="module_note_ipc_gen5">2012 Camaro service information describes the IPC as secondary odometer storage. Exact read data and address must be verified.</string>
+    <string name="module_note_ipc_gen6">Secondary odometer storage is described in 2012 Camaro service information; verify the exact module data and VIN relationship before comparing.</string>
+    <string name="module_note_ebcm_gen5">GM enhanced addressing is not assumed; perform a verified module scan.</string>
+    <string name="module_note_ebcm_gen6">Enhanced module scan not yet confirmed for this VIN.</string>
+    <string name="module_note_sdm">Safety module access is vehicle-specific and must remain read-only.</string>
 </resources>
