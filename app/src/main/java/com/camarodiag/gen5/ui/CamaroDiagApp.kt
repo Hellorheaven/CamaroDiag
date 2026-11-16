@@ -510,7 +510,7 @@ fun AdapterScreen(
                     Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
                     Text(if (isFr) adapter.tier.titleFr else adapter.tier.titleEn, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BadgeChip("HS-CAN 500k", true)
+                        BadgeChip("HS-CAN 500k", adapter.supportsCanHeaders)
                         BadgeChip("SW-CAN GMLAN (Pin 1)", adapter.supportsSwCan)
                         BadgeChip("ISO-TP Long Frames", adapter.supportsLongFrames)
                     }
