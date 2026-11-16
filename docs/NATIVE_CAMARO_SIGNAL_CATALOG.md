@@ -4,11 +4,12 @@
 
 The first-party catalogue is introduced separately from the imported OBDb dataset:
 
-- Runtime model: `NativeCamaroSignalCatalog.kt`
+- Canonical runtime model: `CamaroSignalCatalog.kt`
 - Asset: `camaro-native-signalset-v1.json`
-- Tests: `NativeCamaroSignalCatalogTest.kt`
+- Canonical model tests: `CamaroSignalCatalogTest.kt`
+- The earlier `NativeCamaroSignalCatalog.kt` model and its tests are retained for compatibility with the initial catalogue foundation; new definitions must use the canonical JSON schema and model.
 
-The native asset intentionally starts empty. This is deliberate: no Camaro-specific DID, ECU CAN address, scaling rule or model-year applicability is promoted to a first-party definition without evidence. An empty verified catalogue is safer than plausible-looking but unverified diagnostic data.
+The canonical native asset intentionally starts empty. This is deliberate: no Camaro-specific DID, ECU CAN address, scaling rule or model-year applicability is promoted to a first-party definition without evidence. An empty verified catalogue is safer than plausible-looking but unverified diagnostic data.
 
 ## Existing OBDb catalogue is preserved
 
@@ -27,7 +28,7 @@ A native definition may become executable only when all of the following are rec
 5. At least one traceable evidence reference and a named vehicle configuration on which the signal was verified.
 6. A test covering the raw response bytes and expected decoded value.
 
-The current native model deliberately enables only UDS ReadDataByIdentifier (0x22) definitions with valid physical addressing. Other services, 29-bit addressing, extended addressing, session/security requirements and write operations remain out of scope until separately implemented and validated.
+The canonical runtime model deliberately enables only UDS ReadDataByIdentifier (0x22) definitions with valid physical addressing. Other services, 29-bit addressing, extended addressing, session/security requirements and write operations remain out of scope until separately implemented and validated.
 
 ## Evidence hierarchy
 
