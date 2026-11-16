@@ -37,8 +37,8 @@ class ObdbCamaroSignalCatalogTest {
 
     @Test fun supportsBitOffsetsAndLeastSignificantByteFirst() {
         val format = ObdbSignalFormat(bitIndex = 4, bitLength = 8, unit = "scalar")
-        assertEquals(0x23.0, format.decode(byteArrayOf(0x12, 0x34)).value!!, 0.0)
+        assertEquals(35.0, format.decode(byteArrayOf(0x12, 0x34)).value!!, 0.0)
         val littleEndian = ObdbSignalFormat(bitLength = 16, leastSignificantByteFirst = true, unit = "scalar")
-        assertEquals(0x1234.0, littleEndian.decode(byteArrayOf(0x34, 0x12)).value!!, 0.0)
+        assertEquals(4660.0, littleEndian.decode(byteArrayOf(0x34, 0x12)).value!!, 0.0)
     }
 }
