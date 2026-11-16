@@ -196,8 +196,6 @@
     <string name="cal_ecu_write_unavailable">Écriture ECU indisponible – profil constructeur requis</string>
     <string name="cal_no_calibration_write">Aucune cartographie ne sera envoyée tant que le profil ECU, la compatibilité du fichier et la procédure de récupération ne seront pas validés.</string>
     <string name="vm_bridge_disconnected_vehicle_changed">Pont PC déconnecté après changement d\'identité véhicule.</string>
-    <string name="vm_native_catalog_loaded">Profils Camaro natifs : %1$d pour l’année modèle %2$d. La lecture en direct exige des preuves propres au véhicule.</string>
-    <string name="vm_community_catalog_loaded">Définitions de signaux communautaires disponibles : %1$d pour l’année modèle %2$d.</string>
     <string name="vm_sentinel_unavailable">Non disponible (valeur sentinelle)</string>
     <string name="vm_obdb_signal_read">%1$s lu sur 0x%2$s → 0x%3$s.</string>
     <string name="vm_j2534_connected">Pont J2534 connecté : %1$s</string>
@@ -467,8 +465,19 @@
     <string name="cal_mode09_vin_label">VIN • 09 02</string>
     <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
     <string name="cal_mode09_cvn_label">CVN • 09 06</string>
-    <string name="cal_file_size_bytes">%1$d octets</string>
     <string name="cal_file_hash_label">SHA-256</string>
     <string name="update_version_channel">Version %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
+    <plurals name="vm_native_catalog_loaded">
+        <item quantity="one">Profil Camaro natif : %1$d pour l’année modèle %2$d. La lecture en direct exige des preuves propres au véhicule.</item>
+        <item quantity="other">Profils Camaro natifs : %1$d pour l’année modèle %2$d. La lecture en direct exige des preuves propres au véhicule.</item>
+    </plurals>
+    <plurals name="vm_community_catalog_loaded">
+        <item quantity="one">Définition de signal communautaire disponible : %1$d pour l’année modèle %2$d.</item>
+        <item quantity="other">Définitions de signaux communautaires disponibles : %1$d pour l’année modèle %2$d.</item>
+    </plurals>
+    <plurals name="cal_file_size_bytes">
+        <item quantity="one">%1$d octet</item>
+        <item quantity="other">%1$d octets</item>
+    </plurals>
 </resources>

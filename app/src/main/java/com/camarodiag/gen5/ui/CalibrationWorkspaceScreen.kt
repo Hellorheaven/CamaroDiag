@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import com.camarodiag.gen5.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -603,7 +604,7 @@ fun CalibrationWorkspaceScreen(
                     state.importedFileName?.let { name ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(name, color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.cal_file_size_bytes, state.importedFileSize ?: 0L), color = TextPrimary, fontSize = 12.sp)
+                        Text(pluralStringResource(R.plurals.cal_file_size_bytes, (state.importedFileSize ?: 0L).toInt(), state.importedFileSize ?: 0L), color = TextPrimary, fontSize = 12.sp)
                         Text(stringResource(R.string.cal_file_hash_label), color = TextMuted, fontSize = 11.sp)
                         Text(state.importedFileSha256.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                         Text(stringResource(R.string.cal_hex_preview), color = TextMuted, fontSize = 11.sp)

@@ -196,8 +196,6 @@
     <string name="cal_ecu_write_unavailable">Escritura de ECU no disponible: se requiere un perfil OEM verificado</string>
     <string name="cal_no_calibration_write">No se escribirá ninguna calibración hasta que se validen el perfil de la ECU, la compatibilidad del archivo y el procedimiento de recuperación.</string>
     <string name="vm_bridge_disconnected_vehicle_changed">Puente del PC desconectado tras cambiar la identidad del vehículo.</string>
-    <string name="vm_native_catalog_loaded">Perfiles propios de Camaro: %1$d para el año de modelo %2$d. La lectura en vivo requiere evidencia del vehículo.</string>
-    <string name="vm_community_catalog_loaded">Definiciones comunitarias de señales disponibles: %1$d para el año de modelo %2$d.</string>
     <string name="vm_sentinel_unavailable">No disponible (valor centinela)</string>
     <string name="vm_obdb_signal_read">%1$s leído desde 0x%2$s → 0x%3$s.</string>
     <string name="vm_j2534_connected">Puente J2534 conectado: %1$s</string>
@@ -467,8 +465,19 @@
     <string name="cal_mode09_vin_label">VIN • 09 02</string>
     <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
     <string name="cal_mode09_cvn_label">CVN • 09 06</string>
-    <string name="cal_file_size_bytes">%1$d bytes</string>
     <string name="cal_file_hash_label">SHA-256</string>
     <string name="update_version_channel">Versión %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
+    <plurals name="vm_native_catalog_loaded">
+        <item quantity="one">Perfil propio de Camaro: %1$d para el año de modelo %2$d. La lectura en vivo requiere evidencia del vehículo.</item>
+        <item quantity="other">Perfiles propios de Camaro: %1$d para el año de modelo %2$d. La lectura en vivo requiere evidencia del vehículo.</item>
+    </plurals>
+    <plurals name="vm_community_catalog_loaded">
+        <item quantity="one">Definición comunitaria de señal disponible: %1$d para el año de modelo %2$d.</item>
+        <item quantity="other">Definiciones comunitarias de señales disponibles: %1$d para el año de modelo %2$d.</item>
+    </plurals>
+    <plurals name="cal_file_size_bytes">
+        <item quantity="one">%1$d byte</item>
+        <item quantity="other">%1$d bytes</item>
+    </plurals>
 </resources>

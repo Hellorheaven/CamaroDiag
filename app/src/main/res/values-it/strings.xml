@@ -196,8 +196,6 @@
     <string name="cal_ecu_write_unavailable">Scrittura ECU non disponibile: è richiesto un profilo OEM verificato</string>
     <string name="cal_no_calibration_write">Non verrà scritta alcuna calibrazione finché il profilo ECU, la compatibilità del file e la procedura di ripristino non saranno stati convalidati.</string>
     <string name="vm_bridge_disconnected_vehicle_changed">Bridge PC disconnesso dopo la modifica dell\'identità del veicolo.</string>
-    <string name="vm_native_catalog_loaded">Profili Camaro proprietari: %1$d per l’anno modello %2$d. La lettura in tempo reale richiede prove specifiche del veicolo.</string>
-    <string name="vm_community_catalog_loaded">Definizioni dei segnali della community disponibili: %1$d per l’anno modello %2$d.</string>
     <string name="vm_sentinel_unavailable">Non disponibile (valore sentinella)</string>
     <string name="vm_obdb_signal_read">%1$s letto da 0x%2$s → 0x%3$s.</string>
     <string name="vm_j2534_connected">Bridge J2534 connesso: %1$s</string>
@@ -467,8 +465,19 @@
     <string name="cal_mode09_vin_label">VIN • 09 02</string>
     <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
     <string name="cal_mode09_cvn_label">CVN • 09 06</string>
-    <string name="cal_file_size_bytes">%1$d byte</string>
     <string name="cal_file_hash_label">SHA-256</string>
     <string name="update_version_channel">Versione %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
+    <plurals name="vm_native_catalog_loaded">
+        <item quantity="one">Profilo Camaro proprietario: %1$d per l’anno modello %2$d. La lettura in tempo reale richiede prove specifiche del veicolo.</item>
+        <item quantity="other">Profili Camaro proprietari: %1$d per l’anno modello %2$d. La lettura in tempo reale richiede prove specifiche del veicolo.</item>
+    </plurals>
+    <plurals name="vm_community_catalog_loaded">
+        <item quantity="one">Definizione di segnale della community disponibile: %1$d per l’anno modello %2$d.</item>
+        <item quantity="other">Definizioni di segnali della community disponibili: %1$d per l’anno modello %2$d.</item>
+    </plurals>
+    <plurals name="cal_file_size_bytes">
+        <item quantity="one">%1$d byte</item>
+        <item quantity="other">%1$d byte</item>
+    </plurals>
 </resources>

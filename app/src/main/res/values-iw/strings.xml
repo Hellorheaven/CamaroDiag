@@ -196,8 +196,6 @@
     <string name="cal_ecu_write_unavailable">כתיבה למחשב הרכב אינה זמינה – נדרש פרופיל יצרן מאומת</string>
     <string name="cal_no_calibration_write">לא תיכתב כל מפת כיול עד לאימות פרופיל מחשב הרכב, תאימות הקובץ ונוהל השחזור.</string>
     <string name="vm_bridge_disconnected_vehicle_changed">גשר המחשב נותק לאחר שינוי זהות הרכב.</string>
-    <string name="vm_native_catalog_loaded">פרופילי Camaro מקוריים: %1$d לשנת דגם %2$d. קריאה חיה דורשת אימות ברכב עצמו.</string>
-    <string name="vm_community_catalog_loaded">הגדרות אותות מהקהילה זמינות: %1$d לשנת דגם %2$d.</string>
     <string name="vm_sentinel_unavailable">לא זמין (ערך sentinel)</string>
     <string name="vm_obdb_signal_read">%1$s נקרא מ-0x%2$s → 0x%3$s.</string>
     <string name="vm_j2534_connected">גשר J2534 מחובר: %1$s</string>
@@ -467,8 +465,19 @@
     <string name="cal_mode09_vin_label">VIN • 09 02</string>
     <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
     <string name="cal_mode09_cvn_label">CVN • 09 06</string>
-    <string name="cal_file_size_bytes">%1$d בתים</string>
     <string name="cal_file_hash_label">SHA-256</string>
     <string name="update_version_channel">גרסה %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
+    <plurals name="vm_native_catalog_loaded">
+        <item quantity="one">פרופיל Camaro מקורי אחד: %1$d לשנת דגם %2$d. קריאה חיה דורשת אימות ברכב עצמו.</item>
+        <item quantity="other">פרופילי Camaro מקוריים: %1$d לשנת דגם %2$d. קריאה חיה דורשת אימות ברכב עצמו.</item>
+    </plurals>
+    <plurals name="vm_community_catalog_loaded">
+        <item quantity="one">הגדרת אות אחת מהקהילה זמינה: %1$d לשנת דגם %2$d.</item>
+        <item quantity="other">הגדרות אותות מהקהילה זמינות: %1$d לשנת דגם %2$d.</item>
+    </plurals>
+    <plurals name="cal_file_size_bytes">
+        <item quantity="one">%1$d בית</item>
+        <item quantity="other">%1$d בתים</item>
+    </plurals>
 </resources>
