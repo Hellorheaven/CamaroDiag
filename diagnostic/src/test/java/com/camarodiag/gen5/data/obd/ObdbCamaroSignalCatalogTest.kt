@@ -21,7 +21,7 @@ class ObdbCamaroSignalCatalogTest {
     }
 
     @Test fun filtersCommandsByModelYearAndDoesNotInventNonStandardCanIds() {
-        val json = """{"commands":[{"hdr":"241","rax":"641","cmd":{"22":"5005"},"freq":15,"dbgfilter":{"to":2012,"from":2014},"signals":[{"id":"TP","name":"Tire pressure","path":"Tires","fmt":{"len":16,"div":16,"unit":"kilopascal"}}]},{"hdr":"DA40","rax":"40","cmd":{"22":"5005"},"freq":15,"signals":[{"id":"UNRESOLVED","name":"Unresolved addressing","path":"Body","fmt":{"len":16,"unit":"scalar","max":65535}}]}]}"""
+        val json = """{"commands":[{"hdr":"241","rax":"641","cmd":{"22":"5005"},"freq":15,"dbgfilter":{"to":2012},"signals":[{"id":"TP","name":"Tire pressure","path":"Tires","fmt":{"len":16,"div":16,"unit":"kilopascal"}}]},{"hdr":"DA40","rax":"40","cmd":{"22":"5005"},"freq":15,"signals":[{"id":"UNRESOLVED","name":"Unresolved addressing","path":"Body","fmt":{"len":16,"unit":"scalar","max":65535}}]}]}"""
         val catalog = ObdbCamaroSignalSet.fromJson(json)
         assertEquals(1, catalog.forYear(2011).size)
         assertTrue(catalog.find("TP")!!.hasSupportedPhysicalCanAddressing)
