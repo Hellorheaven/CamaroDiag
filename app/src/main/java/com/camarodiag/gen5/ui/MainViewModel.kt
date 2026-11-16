@@ -160,7 +160,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadObdbSignalCatalog() {
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching { ObdbCamaroSignalSet.load(getApplication()) }
+            runCatching { ObdbCamaroSignalSet.load(getApplication<Application>()) }
                 .onSuccess { catalog ->
                     obdbCamaroSignalSet = catalog
                     val signals = catalog.forYear(_vehicle.value.modelYear)
@@ -204,7 +204,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 obdbSignalMessage = ""
             )
             try {
-                val catalog = obdbCamaroSignalSet ?: ObdbCamaroSignalSet.load(getApplication()).also {
+                val catalog = obdbCamaroSignalSet ?: ObdbCamaroSignalSet.load(getApplication<Application>()).also {
                     obdbCamaroSignalSet = it
                 }
                 val signal = catalog.find(signalId) ?: error("Signal OBDb inconnu : $signalId")
