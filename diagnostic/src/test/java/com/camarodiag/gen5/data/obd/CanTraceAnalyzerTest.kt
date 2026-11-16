@@ -32,8 +32,8 @@ class CanTraceAnalyzerTest {
     @Test
     fun reassemblesIsoTpFirstAndConsecutiveFrames() {
         val trace = """
-            0.000000 1 7E8 Rx d 8 10 0A 62 F1 90 31 47 30 31
-            0.001000 1 7E8 Rx d 8 21 32 33 34 35 36 37 38
+            0.000000 1 7E8 Rx d 8 10 0A 62 F1 90 31 47 30
+            0.001000 1 7E8 Rx d 8 21 31 32 33 34 35 36 37
         """.trimIndent()
 
         val report = CanTraceAnalyzer.analyze(trace, "multi-frame.asc")
@@ -110,7 +110,7 @@ class CanTraceAnalyzerTest {
 
     @Test
     fun reportsUnfinishedIsoTpMessageAtEndOfTrace() {
-        val trace = "0.000000 1 7E8 Rx d 8 10 14 62 F1 90 31 47 30 31"
+        val trace = "0.000000 1 7E8 Rx d 8 10 14 62 F1 90 31 47 30"
 
         val report = CanTraceAnalyzer.analyze(trace, "incomplete.asc")
 
