@@ -278,7 +278,9 @@ class UdsClient private constructor(
         requireAllowedMemory(address, size.toLong(), policy.readableMemoryRegions)
         requireProgrammingSession()
         requireSecurityIfConfigured()
-        require(size in 1..4092) { "Memory read length exceeds the supported single UDS response limit." }
+        require(size in 1..4092 && size <= policy.maxTransferBytes) {
+            "Memory read length exceeds the verified profile limit."
+        }
         val format = addressLength shl 4 or sizeLength
         val requestData = byteArrayOf(format.toByte()) + encodeUnsigned(address, addressLength) + encodeUnsigned(size.toLong(), sizeLength)
         val response = request(0x23, requestData)
@@ -287,7 +289,8 @@ class UdsClient private constructor(
 
     suspend fun writeMemoryByAddressAndLength(address: Long, data: ByteArray, addressLength: Int = 4, sizeLength: Int = 2) {
         requireAllowedMemory(address, data.size.toLong(), policy.writableMemoryRegions)
-        require(data.isNotEmpty() && data.size + 2 + addressLength + sizeLength <= 4095)
+        require(data.isNotEmpty() && data.size <= policy.maxTransferBytes &&
+            data.size + 2 + addressLength + sizeLength <= 4095)
         requireProgrammingSession()
         requireSecurityIfConfigured()
         val format = addressLength shl 4 or sizeLength
