@@ -1,184 +1,115 @@
 # CamaroDiag
 
-Application Android native Kotlin / Jetpack Compose pour diagnostic Chevrolet Camaro Gen 5 (2010–2015) et Gen 6 (2016–2024).
+CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5 (2010–2015) et Gen 6 (2016–2024). Elle lit les informations réellement retournées par le véhicule et l'interface connectée. Elle ne remplace pas les outils officiels de programmation GM.
+
+## Fonctionnalités
+
+- Identification OBD-II : VIN, CAL ID, CVN, nom ECU, protocole et tension lorsque ces données sont disponibles.
+- Diagnostic standard en lecture : paramètres moteur Mode 01, freeze-frame Mode 02, DTC confirmés Mode 03, en attente Mode 07, permanents Mode 0A, readiness et résultats Mode 06.
+- Lecture UDS de données et de DTC (0x22 / 0x19) avec OBDLink MX+ STN ou pont PC J2534, lorsque l'adressage physique est connu.
+- Catalogue communautaire Camaro OBDb : 133 commandes et 136 définitions de signaux, filtrées par année et adressage.
+- Enregistrement télémétrique et export CSV.
+- Audit kilométrique fondé sur les sources réellement identifiées.
+- Atelier ECU hors véhicule : import et inspection BIN/ORI/MOD, Intel HEX, Motorola S-record et ZIP, empreinte SHA-256, comparaison binaire et édition de tables à partir de définitions TSV vérifiées.
+- Pont Windows J2534 facultatif pour certains adaptateurs Pass-Thru, notamment VXDIAG VCX SE et VCX Nano avec pilote compatible.
+- Les commandes carrosserie non validées et les fonctions de programmation restent verrouillées.
 
-## Architecture modulaire
+## Matrice des fonctions par interface
 
-- `:app` — interface Compose, navigation et ViewModel.
-- `:core` — modèles véhicule, générations, motorisations et types de données partagés.
-- `:diagnostic` — décodage OBD-II/UDS, DTC, profils ECU et audit kilométrique.
-- `:communication` — transport Bluetooth SPP, USB série ELM/STN et Wi-Fi TCP.
-- `:control` — catalogue des fonctions carrosserie et garde-fous de validation des commandes GM.
-- `:storage` — persistance Room des sessions de diagnostic.
-- `:mileageaudit` — comparaison des sources kilométriques, indépendance des calculateurs et niveau de confiance.
+| Interface | Liaison | OBD-II standard | UDS / signaux Camaro | SW-CAN / GMLAN | État et conditions |
+|---|---|---|---|---|---|
+| OBDLink MX+ authentique (STN) | Bluetooth SPP | Oui | Oui, lecture UDS et signaux OBDb adressables | Support matériel SW-CAN ; accès selon profil et adressage | Interface Android recommandée ; CAN ID physiques exacts requis |
+| OBDLink MX | Bluetooth SPP | Oui | Non activé pour le lecteur étendu actuel | Selon modèle et câblage | OBD standard |
+| OBDLink LX | Bluetooth SPP | Oui | Non | Non annoncé | OBD standard |
+| OBDLink EX / SX | USB série | Oui | Non activé | Selon modèle | USB Host/OTG requis |
+| OBDLink CX | Bluetooth LE | Non pour Camaro/GM dans l'application | Non | Non | Détection BLE possible, connexion GM refusée |
+| ELM327 Bluetooth SPP | Bluetooth classique | Oui, selon qualité | Non | Non garanti | OBD standard ; clones non garantis |
+| ELM/STN USB série | USB OTG | Oui, selon interface | Non, sauf profil validé | Non garanti | USB Host/OTG requis |
+| ELM/STN Wi-Fi | TCP/IP | Oui, selon interface | Non, sauf profil validé | Non garanti | IP et port adaptateur requis |
+| VXDIAG VCX SE | PC Windows + J2534 | Non via le pont UDS | Oui, lecture UDS via pont | SW-ISO15765 si le pilote J2534-2 l'expose | Pilote Windows exact requis ; pas de pilote Android natif |
+| VXDIAG VCX Nano | PC Windows + J2534 | Non via le pont UDS | Oui, lecture UDS via pont selon variante | Dépend révision, câblage et pilote | SW-CAN non présumé ; compatibilité à confirmer |
 
-## Compatibilité Android
+La connexion d'un adaptateur ne garantit pas l'accès à tous les réseaux GM. Les fonctions dépendent de la référence, révision, firmware, broches DLC, pilote et réponses du calculateur.
 
-- Android 10 à Android 16 (API 29 à 36), `minSdk = 29`, `compileSdk = 36`, `targetSdk = 36`.
-- Interface adaptative Compose.
-- Les permissions Bluetooth sont différenciées avant/après Android 12.
+## Matrice des véhicules et fonctions
 
-## Versioning et releases
+Les familles ECM sont indicatives et doivent être confirmées sur le véhicule par le numéro matériel, VIN, CAL ID, CVN et OS.
 
-Le versionnage Android et GitHub Release utilise `version.properties` comme source unique :
-- `VERSION_PREFIX=1.6` définit la série `1.6.x`.
-- `VERSION_CODE_BASE=7` définit la base du `versionCode` Android.
-- À chaque publication sur `main`, le workflow cherche le dernier tag `v1.6.N`, incrémente automatiquement `N`, puis construit `versionName=1.6.N` et `versionCode=7+N`.
-- Le workflow crée le tag et la GitHub Release et joint les APK Debug et Release signés.
+| Camaro | Années | Moteur / RPO | Famille ECM indicative | OBD-II standard | Signaux OBDb / UDS | Diagnostic exhaustif BCM/TCM/ABS/IPC/SDM |
+|---|---:|---|---|---|---|---|
+| Gen 5 | 2010–2011 | 3.6 V6 LLT | Bosch E69 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 5 | 2012–2015 | 3.6 V6 LFX | ACDelco E39 / E39A | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 5 | 2010–2015 | 6.2 V8 LS3 | ACDelco E38 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 5 | 2010–2015 | 6.2 V8 L99 | ACDelco E38 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 5 | 2012–2015 | 6.2 V8 LSA compressé | ACDelco E67 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 5 | 2014–2015 | 7.0 V8 LS7 | ACDelco E38 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 6 | 2016–2020 | 2.0 turbo LTG | GM E80 (à confirmer) | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 6 | 2016–2024 | 3.6 V6 LGX | GM E92 / E93 selon variante | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 6 | 2016–2024 | 6.2 V8 LT1 | GM E92 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 6 | 2017–2024 | 6.2 V8 LT4 compressé | GM E92 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
 
-Le README décrit les fonctionnalités par série (`1.6.x`) plutôt que de maintenir manuellement le numéro de patch. Pour passer à une nouvelle série MAJOR.MINOR, mettre à jour `VERSION_PREFIX` et choisir une `VERSION_CODE_BASE` strictement supérieure au dernier `versionCode` déjà publié. Ne pas remettre les versions en dur dans `app/build.gradle.kts`.
+### État des calculateurs
 
-## Interfaces OBD
+| Calculateur | Disponibilité |
+|---|---|
+| ECM / PCM | OBD-II standard ; UDS spécifique seulement avec interface, DID et adressage compatibles |
+| TCM | Certains signaux communautaires peuvent répondre ; pas de scan exhaustif validé |
+| BCM | Diagnostic GM étendu exhaustif non disponible |
+| EBCM / ABS | Diagnostic GM étendu exhaustif non disponible |
+| IPC | Diagnostic GM étendu exhaustif non disponible |
+| SDM / airbag | Diagnostic GM étendu exhaustif non disponible |
+| Autres calculateurs | Non garantis ; aucune adresse ou DID n'est supposé |
 
-- OBDLink MX+ / MX / LX et adaptateurs Bluetooth classiques compatibles : transport Bluetooth SPP.
-- OBDLink CX : découverte BLE (scan Android), transport GATT dédié (service FFF0, notification FFF1, écriture FFF2, négociation MTU et segmentation des écritures). Connexion volontairement refusée pour Camaro/GM : OBDLink confirme que le CX ne fonctionne pas sur les véhicules GM.
-- OBDLink EX / SX et ELM327 USB série via usb-serial-for-android, OTG Android et débit 115200 bauds pour les appareils identifiés OBDLink.
-- OBDLink MX Wi-Fi et adaptateurs ELM327 Wi-Fi via TCP (adresse IP et port configurables; ports usuels 35000 ou 23 selon l'adaptateur).
-- Détection Bluetooth des appareils appairés et scan BLE des appareils OBD à proximité. Les modèles BLE nécessitent les autorisations Android Bluetooth Scan/Connect (Android 12+) ou localisation (versions antérieures).
-- La prise en charge physique des bus reste propre au modèle : MX et MX+ prennent en charge GM SW-CAN; ne pas déduire SW-CAN du seul fait qu'un adaptateur OBDLink est détecté.
-- Carbyte est un produit GM dédié à certaines fonctions AFM/DFM/Stop-Start, pas un adaptateur de diagnostic OBD générique exploitable comme MX+/EX.
-- VXDIAG VCX SE / VCX Nano : pont PC Windows J2534 ajouté dans `pc-bridge/`. Il charge le fournisseur PassThru enregistré par le pilote VXDIAG (ou un autre fournisseur J2534 compatible), expose ISO15765 HS-CAN 250/500 kbit/s à CamaroDiag Android via TCP et applique un jeton d'appairage. Le pont est en lecture seule (UDS 0x22, 0x19 et TesterPresent 0x3E). Il prend en charge HS-CAN ISO15765 250/500 kbit/s et peut ouvrir SW-ISO15765 GMLAN via J2534-2 (protocole 0x8007, preset 62,5 kbit/s) si le pilote l'expose. CAN FD, effacement DTC, actionneurs et programmation ECU restent désactivés. Le pilote Windows correspondant au modèle/révision VCX reste obligatoire.
+Le catalogue OBDb est communautaire, non certifié par GM. Un signal répertorié n'est pas nécessairement présent sur chaque finition, marché, transmission ou calibration. Une absence de réponse n'est jamais remplacée par une valeur fictive.
 
-## Camaro Gen 5 / Gen 6 ECU calibration coverage
+## Installation Android
 
-The calibration catalogue covers all engine profiles currently represented for Camaro Gen 5 and Gen 6:
+Prérequis : Android 10 ou supérieur (API 29 à 36 déclarées), Bluetooth ou Wi-Fi selon l'adaptateur, et USB Host/OTG pour les interfaces USB.
 
-| Generation | Engine RPO | Model years | Nominal controller family in the vehicle profile |
-|---|---|---:|---|
-| Gen 5 | LLT 3.6 V6 | 2010–2011 | Bosch E69 (profile label; confirm on ECU) |
-| Gen 5 | LFX 3.6 V6 | 2012–2015 | ACDelco E39 / E39A (profile label; confirm on ECU) |
-| Gen 5 | LS3 6.2 V8 | 2010–2015 | ACDelco E38 (profile label; confirm on ECU) |
-| Gen 5 | L99 6.2 V8 | 2010–2015 | ACDelco E38 (profile label; confirm on ECU) |
-| Gen 5 | LSA 6.2 supercharged V8 | 2012–2015 | ACDelco E67 (profile label; confirm on ECU) |
-| Gen 5 | LS7 7.0 V8 | 2014–2015 | ACDelco E38 (profile label; confirm on ECU) |
-| Gen 6 | LTG 2.0 turbo I4 | 2016–2020 | GM E80 (confirm part number/CAL ID; GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG) |
-| Gen 6 | LGX 3.6 V6 | 2016–2024 | GM E92 / E93 variant-dependent (confirm on ECU) |
-| Gen 6 | LT1 6.2 V8 | 2016–2024 | GM E92 (profile label; confirm on ECU) |
-| Gen 6 | LT4 6.2 supercharged V8 | 2017–2024 | GM E92 (profile label; confirm on ECU) |
+1. Télécharger l'APK depuis https://github.com/Hellorheaven/CamaroDiag/releases.
+2. Installer l'application ; autoriser si besoin l'installation depuis la source choisie.
+3. Accorder les autorisations Bluetooth à proximité, USB ou réseau demandées par Android.
+4. Brancher l'interface sur la prise diagnostic, mettre le contact selon les instructions du fabricant et sélectionner l'adaptateur.
+5. Commencer par l'identification du véhicule et le scan OBD-II standard.
 
-La couverture de ces profils représente les motorisations et années cataloguées dans CamaroDiag. Elle ne garantit pas que chaque combinaison matérielle/logicielle soit déjà prise en charge pour la lecture mémoire ou la programmation. Les références de calculateur doivent être confirmées sur le véhicule, à partir du VIN, du CAL ID, du CVN, du numéro matériel et de l'OS.
+## Installation du pont Windows J2534
 
-The catalogue deliberately treats E-family labels as nominal profile hints. A real operation must identify the installed controller, hardware number, CAL ID, CVN and OS before selecting a binary definition. The Mode 09 CAL ID/CVN read and local file import/export are available as data-handling functions; they do not constitute a binary ECU read or flash.
+Le pont PC est facultatif et nécessaire uniquement pour utiliser un fournisseur J2534 installé sur Windows.
 
-## Signaux spécifiques Camaro issus d'OBDb
+1. Installer Windows 10/11 et le pilote constructeur correspondant exactement au VCX SE/Nano ou à l'interface J2534.
+2. Pour VXDIAG, installer VX Manager et vérifier que le fournisseur J2534 est enregistré.
+3. Télécharger l'archive Windows depuis les releases ou artefacts CamaroDiag : https://github.com/Hellorheaven/CamaroDiag/actions.
+4. Choisir x64 ou x86 selon l'architecture du DLL J2534.
+5. Décompresser et lancer CamaroDiag.J2534Bridge.exe.
+6. Sélectionner le fournisseur J2534 si plusieurs sont présents. Relever IP, port et jeton d'appairage.
+7. Connecter le PC et Android au même réseau privé de confiance.
+8. Dans l'espace ECU de CamaroDiag, saisir IP, port, jeton et CAN ID physiques documentés du calculateur.
 
-CamaroDiag embarque le fichier `signalsets/v3/default.json` du dépôt communautaire [OBDb/Chevrolet-Camaro](https://github.com/OBDb/Chevrolet-Camaro) (CC BY-SA 4.0, attribution dans `THIRD_PARTY_NOTICES.md`). Le jeu importé contient 133 commandes UDS Service 0x22 et 136 définitions de signaux : températures et pressions, ratés par cylindre, knock retard, injection, transmission, vitesses de roues, pression des pneus et autres mesures spécifiques.
+Le pont est une passerelle J2534 générique : il ne fournit pas de pilote VXDIAG et ne remplace pas VX Manager. Il autorise uniquement la lecture UDS 0x22, 0x19 et TesterPresent 0x3E. Le SW-ISO15765 dépend du support J2534-2 réel du pilote.
 
-Le catalogue est filtré par année et conserve les en-têtes CAN, réponses, DID, facteurs, unités, fréquence et indicateurs de flow control. Les signaux avec adresses physiques 11 bits explicites peuvent être lus depuis l'atelier ECU via STPX MX+ ou le pont J2534. Les définitions dont l'adresse ne peut pas être représentée sans ambiguïté ne sont pas envoyées. Les facteurs et compatibilités restent des données communautaires : elles doivent être confirmées sur le véhicule et par la réponse du calculateur. Elles ne remplacent pas les identifiants VIN/CAL ID/CVN ni un profil GM validé.
+Sécurité : le pont utilise TCP local sans TLS. Ne jamais exposer le port à Internet, configurer de redirection de port ou l'utiliser sur un Wi-Fi public. Limiter le pare-feu aux réseaux privés de confiance.
 
-## ECU / calibration workspace
+## Atelier ECU et fichiers de calibration
 
-- The app launcher icon uses a Bumblebee-inspired yellow/black Camaro treatment.
-- The new ECU workspace reads the standard OBD Mode 09 CAL ID (PID 04) and CVN (PID 06) from a connected vehicle and displays the raw ECU responses.
-- Local calibration-file import is limited to 32 MiB, stores the file in private app storage and records the file name, size, SHA-256 digest and a short hex preview. The imported file can be exported back to a user-selected location using Android Storage Access Framework.
-- These identifiers do **not** read the binary memory of the ECU. The local calibration editor requires an explicit table-definition file whose VIN, CAL ID, CVN and SHA-256 source-image hash match the selected vehicle, the VIN/CAL ID/CVN read from the connected ECU and the exact active BIN image. OS and hardware metadata are required in the definition file but are not independently read by standard Mode 09; they must be verified against controller-specific service information. It saves a new local image and does not write to the ECU.
-- ECU memory read and ECU programming are not enabled. Camaro Gen 5/Gen 6 controllers (Bosch E69, GM E38, E39/E39A, E67, E80, E92/E93 variants) require exact OS/calibration identification, a verified programming procedure, authorized security access where applicable, controller-specific checksum processing, a recovery/bench programming path and validation on matching hardware. No generic OBD command is treated as a programming protocol.
-- A future write feature must remain disabled until the exact vehicle/ECU profile and recovery method are confirmed. Never flash a calibration solely because the file extension or nominal engine family matches.
+L'atelier permet l'analyse de fichiers locaux : import BIN/ORI/MOD, Intel HEX, Motorola S-record et ZIP ; empreinte SHA-256 ; comparaison binaire ; édition de tables avec définitions TSV vérifiées ; export d'une nouvelle image locale. Le fichier original est conservé.
 
-## Pilotage carrosserie
+Aucun pack de tables Camaro validé n'est fourni. Les définitions doivent correspondre exactement au VIN, au calculateur, au CAL ID/CVN, à l'OS et à l'image concernée. Les formats XDF/A2L/XML ou conteneurs propriétaires non décodés ne sont pas automatiquement convertis.
 
-L'écran Pilotage présente les fonctions candidates (vitres, toit ouvrant, verrouillage, éclairage, klaxon, rétroviseurs, coffre). Elles restent verrouillées par défaut. Les commandes GM dépendent du VIN, du BCM, du marché, de la finition, de la calibration et des sessions de sécurité. Ne pas envoyer de trames arbitraires : une fonction ne doit être activée qu'après validation sur un véhicule réel et documentation du DID / service / paramètres.
+La lecture mémoire directe de l'ECM, l'écriture, le flashage, le recovery, les checksums GM et les procédures Seed/Key ne sont pas disponibles.
 
-## Build local
+## Fonctions non disponibles
 
-Ouvrir le projet dans Android Studio avec JDK 17 et Android SDK 36, synchroniser Gradle, puis lancer `:app:assembleDebug`.
+- Scan exhaustif garanti de BCM, TCM, EBCM/ABS, IPC, SDM et de tous les calculateurs GM.
+- Commandes carrosserie non validées pour le VIN, BCM et calibration.
+- Démarrage à distance générique, contournement antidémarrage ou dispositifs antivol.
+- Écriture UDS, actionneurs, codage, programmation, lecture mémoire ou flashage GM.
 
-## GitHub Actions
+## Origine des données et licences intégrées
 
-Le workflow `.github/workflows/release-apk.yml` est conservé et mis à jour. Il compile les APK debug et release, puis publie une GitHub Release et ses APKs lors d'un push sur `main` ou d'un lancement manuel. Les secrets de signature existants doivent être configurés dans GitHub Actions.
+Le catalogue de signaux Camaro provient de https://github.com/OBDb/Chevrolet-Camaro, fichier signalsets/v3/default.json, commit source 6771593698dff29cc0c6e8d6219ff360b2891883. Licence : Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0). Les définitions originales, identifiants, filtres d'années et facteurs sont conservés. Le texte intégral de la licence reste dans third_party/obdb/. Les données ne sont pas certifiées par GM.
 
-## Limites à valider sur véhicule
+OpenVCX (https://github.com/erik683/OpenVCX) a été consulté comme référence pour certaines variantes VCX Nano ; aucun code, binaire ou pilote n'est intégré. monitoramento_Carro (https://github.com/Carlosh007/monitoramento_Carro) a été consulté comme inspiration d'interface télémétrique ; aucun code ni actif n'est repris.
 
-- La disponibilité des PIDs OBD et l'adressage GM dépendent de l'année, du moteur, du marché et du calculateur.
-- L'ELM327 générique ne garantit pas l'accès à tous les réseaux GM (notamment SW-CAN/GMLAN).
-- La lecture intermodules du kilométrage et les commandes de carrosserie nécessitent des identifiants et procédures confirmés pour chaque famille ECU.
+Références utiles : OBDLink (https://support.obdsol.com/support/solutions/articles/43000713351-which-obdlink-adapter-is-right-for-me-), fiche MX+ (https://www.obdlink.com/products/obdlink-mxp/), guide GM MDI 2 (https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf), guide GM TIS2Web (https://gsi.ext.gm.com/userguides/GM_TIS2Web_User_Guide.pdf). Ces documents généraux ne remplacent pas les informations de service GM correspondant au VIN.
 
-## Mileage audit (v1.3.0)
-- Added the dedicated `:mileageaudit` module for source-aware mileage comparison.
-- BCM and IPC are explicitly displayed as unavailable until a VIN/year/calibration-specific GM read profile is verified. The app does not guess ECU addresses or DIDs.
-- ECM PID A6/D3 values are treated as powertrain data, not as independent BCM/IPC evidence.
-- A discrepancy is flagged only when at least two verified independent sources are available; a mismatch is an investigation lead, not proof of tampering.
-- Added unit tests for independent-source discrepancy, non-independent ECM PIDs, and missing data.
-
-## Remote start safety
-The control catalog now includes a remote-start entry, but it is intentionally non-executable through generic ELM/OBD commands. Use the vehicle's OEM remote-start system only. No immobilizer, theft-deterrent, transmission interlock, or engine-start security bypass is implemented.
-
-## v1.4.0 – VXDIAG and GM integration foundation
-
-- Added VCX SE USB-C/Wi-Fi and VCX NANO USB/Wi-Fi hardware profiles.
-- Added the `VxdiagProvider` integration boundary for a licensed/documented Android vendor SDK.
-- Added fail-closed OEM remote-start safety assessment; no direct crank, immobilizer bypass or undocumented CAN command is sent.
-- Kept Gen 5 and Gen 6 profiles separate and mileage audit read-only.
-- Android API range: minSdk 29 (Android 10), targetSdk 36 (Android 16).
-- See `docs_GM_SUPPORT.md` for limitations and the required VXDIAG SDK hand-off.
-
-**Important:** VXDIAG profiles are not equivalent to a working J2534 driver. Actual VCX communication remains disabled until a compatible vendor SDK/API is supplied and tested on hardware.
-
-## v1.5.0 – expanded standards-based OBD-II diagnostics
-
-The `:diagnostic` module now contains `Obd2FeatureEngine`, a read-only SAE J1979 engine wired to the existing Bluetooth/USB/Wi-Fi ELM command manager through `createObd2FeatureEngine()`.
-
-Implemented requests include adapter initialization/protocol/voltage, supported-PID bitmap discovery, common Mode 01 live values (RPM, speed, coolant, intake temperature, MAF, throttle, fuel pressure/level, barometric pressure, module voltage, oil temperature, fuel rate and supported monitor values), Mode 03 confirmed DTCs, Mode 07 pending DTCs, Mode 0A permanent DTCs, Mode 02 freeze-frame values, Mode 09 VIN/calibration/ECU-name records, Mode 01 readiness status and raw Mode 06 monitor-test response.
-
-All queries are read-only. Unsupported PIDs are skipped; raw responses are retained in the scan report. Mode 06 is deliberately kept raw because test-ID scaling and limits are ECU/calibration-specific. Mode 09 multi-frame responses and Mode 02 freeze-frame decoding must be validated against real adapter captures before being treated as complete. This engine does not claim access to GM enhanced modules (BCM/IPC/ABS/SDM/TCM), nor does it send actuator, coding, security-access or engine-start commands. Those require verified vehicle-specific GM service definitions and a capable CAN interface.
-
-The full scan is exposed as `BluetoothObdManager.createObd2FeatureEngine().fullReadOnlyScan()` after a real adapter connection. Demo mode must not be used to represent a vehicle scan.
-
-
-## v1.6.x – OBD scan and calibration file analysis
-
-The full OBD-II scanner is now exposed in the app navigation. It presents supported PIDs, decoded live values, confirmed/pending/permanent DTCs, freeze-frame data, VIN, CAL ID, CVN, ECU name, readiness, adapter voltage/protocol and raw Mode 06 results. The scanner sends standardized read-only OBD services; a missing ECU response remains missing and is never replaced with sample data. Mode 04 clearing requires a separate user confirmation and is accepted only on a positive response.
-
-The ECU workspace imports raw BIN/ORI/MOD, Intel HEX, Motorola S-record, ZIP archives, external table definitions and external calibration-project packages. Intel HEX and S-record records are checked for structure and format checksums. ZIP archives are inspected within bounded limits and retained byte-for-byte; opaque project packages are also retained byte-for-byte and can be exported. Two raw BIN images can be compared byte-for-byte, with differing offsets, changed-byte count and file-size differences.
-
-The offline table editor works on raw binary images when the user supplies explicit, verified table definitions (offset, dimensions, data type, byte order, scaling and bias). External XDF/A2L/XML-style definitions are preserved as attachments but are not automatically converted into table definitions. Unknown or proprietary project packages are not decoded. These operations are not an ECU memory read or ECU flash. A file hash, Intel HEX checksum or S-record checksum is not a GM calibration checksum. ECU binary read/write remains disabled until the relevant GM controller/OS-specific protocol, authorized security procedures, calibration definitions, checksum routines, power and recovery process are supplied and validated. See `docs_GM_SUPPORT.md`.
-
-
-## Fondation UDS GM en lecture seule
-
-Le module diagnostic contient désormais une base UDS/ISO-TP sur CAN classique pour les services de lecture 0x22 et 0x19/0x02, avec contrôle strict d'un profil lié au VIN et à l'identité exacte du calculateur. Cette base n'est pas encore reliée à un fournisseur CAN/J2534 réel ni à un écran de diagnostic GM étendu. Les adresses/DID GM non vérifiés restent absents ; les essais actuels utilisent un transport simulé.
-
-## Calibration table editor
-
-The ECU workspace supports offline editing only after the definition metadata matches the selected VIN, ECU VIN, CAL ID, CVN and active BIN SHA-256. Use the **Export TSV definition template** action, replace every example metadata value with the exact values, then provide one row per table with these fields:
-
-`id;name;offset;rows;columns;type;endian;scale;bias;unit;minimum;maximum`
-
-Supported storage types are U8, S8, U16, S16, U32, S32 and F32. Endianness is LE or BE. The editor validates image bounds, dimensions, numeric type and optional engineering limits. Applying edits creates a separate local BIN image; the originally imported file is kept as the reference. The active image can then be exported or compared.
-
-No Camaro table addresses, offsets or scaling factors are guessed or bundled. A table definition must be verified against the exact controller hardware, OS and calibration before use. The current editor does not modify the running ECU. The live-data screen remains a diagnostic data stream; ECU programming requires a separate, validated GM programming transport and recovery process.
-
-
-## Live telemetry recording
-
-The Live screen records values returned by the connected OBD adapter and exports them as CSV. Each captured value includes a timestamp, VIN, vehicle profile, PID, label, numeric value and unit. Recording is limited to 10,000 polling samples per session and stops if the real adapter disconnects; demonstration values are excluded.
-
-## Calibration editing and live data
-
-CamaroDiag includes an offline table editor for an imported raw BIN image when the user supplies a verified table-definition file for the exact image. The definition specifies each table's byte offset, dimensions, data type, byte order, scaling, bias and optional limits. The original file is preserved and edits create a separate local image.
-
-Live sensor acquisition while the engine is running is separate from editing a calibration file. CamaroDiag does not currently change calibration tables inside the running ECM or live-write calibration changes. No verified Gen 5/Gen 6 table-definition packs are bundled yet, and direct ECM binary read/programming remains unavailable pending exact controller/OS procedures and recovery validation.
-
-
-## Import de cartographies et formats externes
-
-L'import local accepte les fichiers sélectionnés via Android, même lorsque leur conteneur n'est pas décodé. Les formats inspectés sont BIN brut, Intel HEX et Motorola S-record. Les archives ZIP sont reconnues et leurs entrées sont listées dans des limites de sécurité ; elles sont conservées sans extraction automatique. Les fichiers de définition externes (XDF/A2L/XML) et les projets propriétaires non reconnus sont également conservés et peuvent être réexportés tels quels.
-
-L'éditeur de tables ne décode pas encore automatiquement les projets/archives propriétaires ni les définitions XDF/A2L. Pour éditer une cartographie, il faut fournir l'image BIN brute et une définition TSV correspondante (offset, dimensions, type, endian, échelle, biais et limites). Aucun nom de logiciel tiers n'est utilisé comme preuve de compatibilité.
-
-## Version Android et publication
-
-Le fichier racine `version.properties` est l'unique source de vérité :
-- `VERSION_PREFIX=1.6` définit la branche majeure/mineure.
-- `VERSION_CODE_BASE=7` définit la base du numéro Android.
-
-Les builds locaux utilisent `1.6.0` / versionCode `7`. Le workflow de release recherche le plus grand tag `v1.6.N`, calcule le patch suivant, puis injecte ce même patch dans Gradle. Le nom de version de l'APK, le versionCode, le tag Git et le titre de la release sont ainsi cohérents. Les déclenchements manuels utilisent la même règle.
-
-Lors d'un changement de version majeure/mineure, modifier `VERSION_PREFIX` et choisir un `VERSION_CODE_BASE` strictement supérieur au dernier versionCode publié. Ajouter ensuite une entrée de notes de version correspondante dans ce README.
-
-
-### UDS CAN / ISO-TP
-
-The diagnostic module includes a policy-gated UDS client. The OBDLink MX+ path uses documented STPX ISO-TP payload transport. A Windows companion in `pc-bridge/` now connects Android to an installed J2534 PassThru DLL for VXDIAG VCX SE/Nano and other registered J2534 providers. The bridge currently enables ISO15765 HS-CAN at 250/500 kbit/s with 11/29-bit identifiers and read-only UDS services 0x22, 0x19 and 0x3E. SW-CAN/GMLAN, CAN FD and ECU-mutating services remain disabled on this PC path.
-
-The generic UDS client contains policy-gated primitives for other services, memory access and transfer control, but the PC bridge rejects write/programming services and no GM programming profile, seed-key algorithm, memory map, checksum, flash sequence or recovery procedure is bundled. See [PC bridge setup](pc-bridge/README.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+CamaroDiag est un outil indépendant d'aide au diagnostic, sans certification GM. Ne pas effectuer de diagnostic ou d'opération lorsque le véhicule est en mouvement.
