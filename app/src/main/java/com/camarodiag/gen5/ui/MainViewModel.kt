@@ -599,7 +599,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         _livePids.value = emptyList()
         _dtcs.value = emptyList()
+        _mileageReport.value = null
         _obdScanReport.value = null
+        _obdScanMessage.value = null
+        _liveTelemetryMessage.value = null
         _isObdScanning.value = false
     }
 
