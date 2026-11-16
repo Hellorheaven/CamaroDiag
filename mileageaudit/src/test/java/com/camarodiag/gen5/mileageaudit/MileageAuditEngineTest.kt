@@ -18,7 +18,7 @@ class MileageAuditEngineTest {
     @Test fun twoVerifiedIndependentModulesFlagLargeDifference() {
         val report = MileageAuditEngine.evaluate("VIN", listOf(
             reading("BCM", 100000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile"),
-            reading("IPC", 120000.0, ConfidenceLevel.HIGH, profileVerified = true)
+            reading("IPC", 120000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile")
         ))
         assertTrue(report.hasDiscrepancy)
         assertEquals(20000.0, report.maxDeltaKm, 0.01)
@@ -42,8 +42,8 @@ class MileageAuditEngineTest {
 
     @Test fun nonFiniteOdometerValuesAreIgnored() {
         val report = MileageAuditEngine.evaluate("VIN", listOf(
-            reading("BCM", Double.POSITIVE_INFINITY, ConfidenceLevel.HIGH, profileVerified = true),
-            reading("IPC", 120000.0, ConfidenceLevel.HIGH, profileVerified = true)
+            reading("BCM", Double.POSITIVE_INFINITY, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile"),
+            reading("IPC", 120000.0, ConfidenceLevel.HIGH, profileEvidenceReference = "GM-SI-verified-profile")
         ))
         assertFalse(report.hasDiscrepancy)
         assertEquals(0.0, report.maxDeltaKm, 0.0)
