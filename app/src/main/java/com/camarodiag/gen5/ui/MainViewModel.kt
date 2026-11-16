@@ -574,11 +574,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
                     calibrationIdResponse = calIds.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
                     cvnResponse = cvns.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
-                    message = if (validCal || validCvn) {
-                        "VIN / CAL ID / CVN lus depuis Mode 09. Ces identifiants ne constituent pas une lecture de cartographie binaire."
-                    } else {
-                        "Aucun CAL ID/CVN exploitable retourné. Le calculateur ou l'interface peut ne pas prendre ces informations en charge."
-                    }
+                    message = getApplication<Application>().getString(
+                        if (validCal || validCvn) R.string.msg_cal_identifiers_read
+                        else R.string.msg_cal_identifiers_unavailable
+                    )
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
