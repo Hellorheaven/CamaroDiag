@@ -39,8 +39,6 @@ data class UdsAccessPolicy internal constructor(
             allowedEcuResetTypes = emptySet(),
             memoryRegions = emptyList(),
             maxTransferBytes = 0,
-            allowClearDtc = false,
-            allowEcuReset = false,
             requireSecurityAccess = true,
             evidenceReference = "Built-in read-only policy"
         )
@@ -66,8 +64,6 @@ data class UdsAccessPolicy internal constructor(
             allowedEcuResetTypes: Set<Int> = emptySet(),
             memoryRegions: List<UdsMemoryRegion>,
             maxTransferBytes: Int,
-            allowClearDtc: Boolean,
-            allowEcuReset: Boolean,
             requireSecurityAccess: Boolean,
             evidenceReference: String
         ): UdsAccessPolicy {
