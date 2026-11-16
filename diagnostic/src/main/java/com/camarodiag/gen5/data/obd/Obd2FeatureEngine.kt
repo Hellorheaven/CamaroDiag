@@ -32,7 +32,8 @@ data class ObdScanReport(
     val monitorTestRaw: String?,
     val adapterInfo: Map<String, String>,
     val respondingEcuAddresses: List<String>,
-    val rawLog: List<String>
+    val rawLog: List<String>,
+    val freezeFrameDtc: ObdDtc? = null
 )
 
 /**
@@ -154,13 +155,34 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         decodeDtcResponse(ask("0A"), 0x4A, "permanent")
     )
 
-    suspend fun readFreezeFrame(): Map<Int, List<Int>> {
+    /** Reads the DTC that caused freeze-frame storage (Mode 02, PID 02, frame 00). */
+    suspend fun readFreezeFrameDtc(): ObdDtc? {
+        val data = payload(ask("020200"), 0x42, 0x02) ?: return null
+        // Mode 02 payload begins with the frame number, followed by the two DTC bytes.
+        if (data.size < 3 || data[0] != 0x00) return null
+        val raw = (data[1] shl 8) or data[2]
+        if (raw == 0) return null
+        val prefix = "PCBU"[(raw shr 14) and 0x03]
+        val digit = (raw shr 12) and 0x03
+        val code = "$prefix$digit%X%02X".format(
+            Locale.US, (raw shr 8) and 0x0F, raw and 0xFF
+        )
+        return ObdDtc(code, "freeze-frame")
+    }
+
+    /**
+     * Reads freeze-frame values only for PIDs advertised by the Mode 01 support bitmap.
+     * Each Mode 02 response contains the frame number before the actual PID data.
+     */
+    suspend fun readFreezeFrame(supportedPids: Set<Int>? = null): Map<Int, List<Int>> {
         val result = linkedMapOf<Int, List<Int>>()
-        val pids = listOf(0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42)
+        val pids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42)
         for (pid in pids) {
+            if (supportedPids != null && pid !in supportedPids) continue
             val data = payload(ask("02%02X00".format(Locale.US, pid)), 0x42, pid) ?: continue
-            // The first two bytes after the PID are the DTC associated with the freeze frame.
-            if (data.size >= 2) result[pid] = data.drop(2)
+            if (data.isEmpty() || data[0] != 0x00) continue
+            val valueBytes = data.drop(1) // Drop only the echoed frame number.
+            if (valueBytes.isNotEmpty()) result[pid] = valueBytes
         }
         return result
     }
@@ -197,7 +219,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         val supported = discoverSupportedPids()
         val live = readLiveData(supported)
         val (confirmed, pending, permanent) = readDtcs()
-        val freeze = readFreezeFrame()
+        val freezeFrameDtc = readFreezeFrameDtc()
+        val freeze = if (freezeFrameDtc != null) readFreezeFrame(supported) else emptyMap()
         val vin = readVin()
         val calIds = readCalibrationIds()
         val cvns = readCalibrationVerificationNumbers()
@@ -219,7 +242,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             monitorTestRaw = mode06,
             adapterInfo = adapter,
             respondingEcuAddresses = respondingEcus,
-            rawLog = log.toList()
+            rawLog = log.toList(),
+            freezeFrameDtc = freezeFrameDtc
         )
     }
 
