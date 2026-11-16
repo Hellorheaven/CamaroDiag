@@ -60,8 +60,7 @@ data class CanTraceDidObservation(
     val direction: CanTraceDirection,
     val did: Int,
     val responseService: Int,
-    val positiveResponse: Boolean,
-    val negativeResponseCode: Int?
+    val positiveResponse: Boolean
 )
 
 data class CanTraceAnalysisReport(
@@ -108,8 +107,7 @@ object CanTraceAnalyzer {
                 direction = message.direction,
                 did = did,
                 responseService = response,
-                positiveResponse = response == service + 0x40,
-                negativeResponseCode = message.negativeResponseCode
+                positiveResponse = response == service + 0x40
             )
         }
         return CanTraceAnalysisReport(
