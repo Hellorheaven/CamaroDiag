@@ -239,6 +239,7 @@ class UdsClient(
 
     suspend fun readMemoryByAddressAndLength(address: Long, size: Int, addressLength: Int = 4, sizeLength: Int = 2): ByteArray {
         requireAllowedMemory(address, size.toLong())
+        require(size in 1..4092) { "Memory read length exceeds the supported single UDS response limit." }
         val format = addressLength shl 4 or sizeLength
         val requestData = byteArrayOf(format.toByte()) + encodeUnsigned(address, addressLength) + encodeUnsigned(size.toLong(), sizeLength)
         val response = request(0x23, requestData)
@@ -247,7 +248,7 @@ class UdsClient(
 
     suspend fun writeMemoryByAddressAndLength(address: Long, data: ByteArray, addressLength: Int = 4, sizeLength: Int = 2) {
         requireAllowedMemory(address, data.size.toLong())
-        require(data.isNotEmpty())
+        require(data.isNotEmpty() && data.size <= 4090)
         requireProgrammingSession()
         requireSecurityIfConfigured()
         val format = addressLength shl 4 or sizeLength
@@ -298,6 +299,7 @@ class UdsClient(
         require(!downloadActive && !uploadActive) { "A data transfer is already active." }
         requireAllowedMemory(address, size)
         require(size <= policy.maxTransferBytes.toLong()) { "Transfer exceeds the verified profile limit." }
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         require(dataFormatIdentifier in 0..0xFF)
         val format = addressLength shl 4 or sizeLength
@@ -342,6 +344,7 @@ class UdsClient(
 
     suspend fun communicationControl(controlType: Int, communicationType: Int) {
         require(controlType in 0..3 && communicationType in 0..0xFF)
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x28, byteArrayOf(controlType.toByte(), communicationType.toByte()))
         require(response.size >= 3 && (response[1].toInt() and 0x7F) == controlType &&
@@ -350,6 +353,7 @@ class UdsClient(
 
     suspend fun controlDtcSetting(settingType: Int, record: ByteArray = byteArrayOf()) {
         require(settingType in 1..2)
+        requireProgrammingSession()
         requireSecurityIfConfigured()
         val response = request(0x85, byteArrayOf(settingType.toByte()) + record)
         require(response.size >= 2 && (response[1].toInt() and 0x7F) == settingType)
