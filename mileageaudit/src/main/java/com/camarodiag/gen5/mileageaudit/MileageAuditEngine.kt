@@ -19,7 +19,7 @@ object MileageAuditEngine {
         }
 
         val independent = valid.filter {
-            it.profileVerified &&
+            !it.profileEvidenceReference.isNullOrBlank() &&
                 it.confidence == ConfidenceLevel.HIGH &&
                 it.moduleId.uppercase() in independentModuleIds
         }
