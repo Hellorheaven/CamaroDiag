@@ -170,8 +170,31 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return ObdDtc(code, "freeze-frame")
     }
 
+    /** Discovers Mode 02 PIDs using the independent freeze-frame support bitmap (PID 00). */
+    suspend fun discoverFreezeFrameSupportedPids(): Set<Int> {
+        val supported = linkedSetOf<Int>()
+        var basePid = 0x00
+        repeat(8) {
+            val response = ask("02%02X00".format(Locale.US, basePid))
+            val data = payload(response, 0x42, basePid) ?: return supported
+            // Mode 02 echoes the requested frame number before the four bitmap bytes.
+            if (data.size < 5 || data[0] != 0x00) return supported
+            val bitmap = data.drop(1).take(4)
+            for (bit in 0 until 32) {
+                val mask = 1 shl (7 - (bit % 8))
+                if ((bitmap[bit / 8] and mask) != 0 && bit != 31) {
+                    supported += basePid + bit + 1
+                }
+            }
+            val hasNextPage = (bitmap[3] and 0x01) != 0
+            if (!hasNextPage) return supported
+            basePid += 0x20
+        }
+        return supported
+    }
+
     /**
-     * Reads freeze-frame values only for PIDs advertised by the Mode 01 support bitmap.
+     * Reads freeze-frame values only for PIDs advertised by the Mode 02 support bitmap.
      * Each Mode 02 response contains the frame number before the actual PID data.
      */
     suspend fun readFreezeFrame(supportedPids: Set<Int>? = null): Map<Int, List<Int>> {
@@ -220,7 +243,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         val live = readLiveData(supported)
         val (confirmed, pending, permanent) = readDtcs()
         val freezeFrameDtc = readFreezeFrameDtc()
-        val freeze = if (freezeFrameDtc != null) readFreezeFrame(supported) else emptyMap()
+        val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
+        val freeze = if (freezeFrameDtc != null) readFreezeFrame(freezeFrameSupported) else emptyMap()
         val vin = readVin()
         val calIds = readCalibrationIds()
         val cvns = readCalibrationVerificationNumbers()
