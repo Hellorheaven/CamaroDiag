@@ -274,7 +274,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         pairingToken: String,
         requestCanIdHex: String,
         responseCanIdHex: String,
-        baudRateText: String
+        protocolNumberText: String
     ) {
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -298,8 +298,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
                 val can29Bit = requestText.length == 8
+                val protocolNumber = protocolNumberText.toIntOrNull()
+                    ?: error("Profil CAN invalide.")
+                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
+                require(can29Bit == (protocolNumber in setOf(34, 36, 64))) {
+                    "Le profil CAN sélectionné ne correspond pas à la longueur des identifiants CAN."
+                }
                 val port = portText.toIntOrNull() ?: error("Port TCP invalide.")
-                val baudRate = baudRateText.toIntOrNull() ?: error("Débit CAN invalide.")
                 val result = obdManager.connectJ2534Bridge(
                     host = host.trim(),
                     port = port,
@@ -307,7 +312,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     requestCanId = requestId,
                     responseCanId = responseId,
                     can29Bit = can29Bit,
-                    baudRate = baudRate
+                    protocolNumber = protocolNumber
                 ).getOrThrow()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534BridgeConnecting = false,
