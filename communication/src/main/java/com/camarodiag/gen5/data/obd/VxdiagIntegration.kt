@@ -4,7 +4,7 @@ package com.camarodiag.gen5.data.obd
 enum class VxdiagModel { VCX_SE, VCX_NANO }
 enum class VxdiagLink { USB, WIFI }
 enum class VxdiagProtocol { J2534, ISO22900_PDU, VENDOR_NATIVE }
-enum class VxdiagReadiness { READY_WITH_VENDOR_PROVIDER, DEVICE_DISCOVERY_ONLY, UNSUPPORTED_LINK }
+enum class VxdiagReadiness { READY_WITH_VENDOR_PROVIDER, PC_BRIDGE_IMPLEMENTED_REQUIRES_VENDOR_DRIVER, DEVICE_DISCOVERY_ONLY, UNSUPPORTED_LINK }
 
 data class VxdiagDeviceProfile(
     val model: VxdiagModel,
@@ -18,14 +18,14 @@ data class VxdiagDeviceProfile(
 /**
  * Capability matrix based on published VXDIAG product specifications.
  * VCX-NANO USB and Wi-Fi are separate hardware variants. VCX-SE supports USB-C and Wi-Fi.
- * This matrix does not claim that a J2534 Android driver is installed.
+ * The Windows PC bridge is implemented; a registered vendor J2534 provider is still required.
  */
 object VxdiagProfiles {
     fun all(): List<VxdiagDeviceProfile> = listOf(
-        VxdiagDeviceProfile(VxdiagModel.VCX_SE, VxdiagLink.USB, "VCX SE USB-C", setOf(VxdiagProtocol.J2534, VxdiagProtocol.ISO22900_PDU), VxdiagReadiness.DEVICE_DISCOVERY_ONLY, "Détection USB possible ; échange véhicule via SDK/pilote Android VXDIAG requis."),
-        VxdiagDeviceProfile(VxdiagModel.VCX_SE, VxdiagLink.WIFI, "VCX SE Wi-Fi", setOf(VxdiagProtocol.J2534, VxdiagProtocol.ISO22900_PDU), VxdiagReadiness.DEVICE_DISCOVERY_ONLY, "Détection réseau possible ; protocole VXDIAG/SDK requis, pas de socket ELM supposé."),
-        VxdiagDeviceProfile(VxdiagModel.VCX_NANO, VxdiagLink.USB, "VCX NANO USB", setOf(VxdiagProtocol.J2534, VxdiagProtocol.ISO22900_PDU), VxdiagReadiness.DEVICE_DISCOVERY_ONLY, "Variante USB ; pilote/SDK Android VXDIAG requis."),
-        VxdiagDeviceProfile(VxdiagModel.VCX_NANO, VxdiagLink.WIFI, "VCX NANO Wi-Fi", setOf(VxdiagProtocol.J2534, VxdiagProtocol.ISO22900_PDU), VxdiagReadiness.DEVICE_DISCOVERY_ONLY, "Variante Wi-Fi ; protocole VXDIAG/SDK requis, pas de socket ELM supposé.")
+        VxdiagDeviceProfile(VxdiagModel.VCX_SE, VxdiagLink.USB, "VCX SE USB-C", setOf(VxdiagProtocol.J2534, VxdiagProtocol.ISO22900_PDU), VxdiagReadiness.PC_BRIDGE_IMPLEMENTED_REQUIRES_VENDOR_DRIVER, "Pont PC J2534 disponible ; pilote VXDIAG Windows enregistré requis. HS-CAN 250/500 kbit/s uniquement."),
+        VxdiagDeviceProfile(VxdiagModel.VCX_SE, VxdiagLink.WIFI, "VCX SE Wi-Fi", setOf(VxdiagProtocol.J2534, VxdiagProtocol.ISO22900_PDU), VxdiagReadiness.PC_BRIDGE_IMPLEMENTED_REQUIRES_VENDOR_DRIVER, "Pont PC J2534 disponible ; pilote VXDIAG Windows et accès réseau du modèle exact requis."),
+        VxdiagDeviceProfile(VxdiagModel.VCX_NANO, VxdiagLink.USB, "VCX NANO USB", setOf(VxdiagProtocol.J2534, VxdiagProtocol.ISO22900_PDU), VxdiagReadiness.PC_BRIDGE_IMPLEMENTED_REQUIRES_VENDOR_DRIVER, "Pont PC J2534 disponible ; pilote Windows VXDIAG ou fournisseur J2534 compatible requis pour cette révision Nano USB."),
+        VxdiagDeviceProfile(VxdiagModel.VCX_NANO, VxdiagLink.WIFI, "VCX NANO Wi-Fi", setOf(VxdiagProtocol.J2534, VxdiagProtocol.ISO22900_PDU), VxdiagReadiness.PC_BRIDGE_IMPLEMENTED_REQUIRES_VENDOR_DRIVER, "Pont PC J2534 disponible si le pilote Windows de cette variante Wi-Fi enregistre un fournisseur PassThru.")
     )
 }
 
