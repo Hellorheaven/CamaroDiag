@@ -25,8 +25,8 @@ jobs:
         with:
           dotnet-version: "8.0.x"
       - name: Build J2534 bridge
-        run: dotnet build .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Release
+        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release
       - name: Publish self-contained x64 bridge
-        run: dotnet publish .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime win-x64 --self-contained true --output .\\publish\\win-x64
+        run: dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime win-x64 --self-contained true --output .\publish\win-x64
       - name: Publish self-contained x86 bridge
-        run: dotnet publish .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime win-x86 --self-contained true --output .\\publish\\win-x86
+        run: dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime win-x86 --self-contained true --output .\publish\win-x86
