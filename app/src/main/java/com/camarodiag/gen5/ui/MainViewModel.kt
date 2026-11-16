@@ -633,7 +633,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 connect()
                     .onSuccess { capabilities ->
                         _adapter.value = capabilities
-                        refreshTopologyAndDefaults()
+                        refreshTopologyAndDefaults(runInitialScans = true)
                     }
                     .onFailure { error ->
                         _connectionMessage.value = error.localizedMessage ?: fallbackMessage
@@ -1080,9 +1080,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun refreshTopologyAndDefaults() {
+    private fun refreshTopologyAndDefaults(runInitialScans: Boolean = false) {
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
-        viewModelScope.launch {
+        if (runInitialScans && !obdManager.isDemoMode) {
             scanDtcs()
             runMileageAudit()
         }
