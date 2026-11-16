@@ -8,6 +8,32 @@ import org.junit.Test
 class Obd2FeatureEngineTest {
 
     @Test
+    fun doesNotQueryMode01PidThatTheEcuDidNotAdvertise() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            "NO DATA"
+        })
+
+        assertEquals(null, engine.readMode01PidIfSupported(0xA6, setOf(0x0C)))
+        assertTrue(commands.isEmpty())
+    }
+
+    @Test
+    fun readsMode01PidOnlyAfterSupportBitmapConfirmsIt() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            if (command == "01A6") "41A6000012D687" else "NO DATA"
+        })
+
+        val response = engine.readMode01PidIfSupported(0xA6, setOf(0xA6))
+
+        assertEquals("41A6000012D687", response)
+        assertEquals(listOf("01A6"), commands)
+    }
+
+    @Test
     fun decodesMode09CalibrationIdAndCvnRecords() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
