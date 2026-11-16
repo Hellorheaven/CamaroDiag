@@ -94,8 +94,9 @@ internal sealed class J2534Device : IDisposable
             _ => throw new ArgumentOutOfRangeException(nameof(protocolNumber), "Supported profiles: 33-36 HS-CAN, 63-64 SW-CAN.")
         };
         _protocolId = isSwCan ? ProtocolSwIso15765 : ProtocolIso15765;
-        if (isSwCan && can29Bit != (protocolNumber == 64))
-            throw new ArgumentException("SW-CAN protocol 63 requires 11-bit IDs and protocol 64 requires 29-bit IDs.");
+        var expects29Bit = protocolNumber is 34 or 36 or 64;
+        if (can29Bit != expects29Bit)
+            throw new ArgumentException("CAN profile 33/35/63 requires 11-bit IDs; profile 34/36/64 requires 29-bit IDs.");
         if (requestCanId < 0 || responseCanId < 0 || requestCanId > maxId || responseCanId > maxId ||
             requestCanId == responseCanId)
             throw new ArgumentOutOfRangeException(nameof(requestCanId), "CAN identifiers do not match the selected 11/29-bit format.");
