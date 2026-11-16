@@ -66,6 +66,15 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun adapterCapabilitiesDefaultToDisconnectedAndFailClosed() {
+        val adapter = AdapterCapabilities()
+        assertEquals(AdapterTier.DISCONNECTED, adapter.tier)
+        assertFalse(adapter.supportsCanHeaders)
+        assertFalse(adapter.supportsLongFrames)
+        assertFalse(adapter.supportsSwCan)
+    }
+
+    @Test
     fun marksStandardEcmAccessibleOnlyAfterAReal7E8Response() {
         val topology = CamaroUdsProtocol.buildTopology(
             VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1),
