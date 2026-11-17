@@ -117,3 +117,26 @@ Ce décodage de transport est indépendant du calculateur et peut donc être app
 ### Familles de calculateurs à découvrir
 
 La topologie Gen 5 et Gen 6 recense désormais, en plus des calculateurs principaux, les candidats optionnels suivants : HVAC, PSCM, RCDLR, RADIO/HMI, AMP, DDM, PDM, FPCM et Park Assist. Ils sont explicitement marqués `DISCOVERY_REQUIRED`, sans adresse TX/RX ni réseau présumé. Cette liste sert à structurer l'inventaire et les futurs scans ; elle ne prétend pas que tous ces modules sont montés sur chaque finition ou chaque année. La présence doit être confirmée par une réponse réelle et le VIN/RPO.
+
+
+## Catalogue DTC multi-moteurs et multi-calculateurs
+
+Le registre commun `DtcCatalogRegistry` couvre les RPO moteur déclarés dans le modèle véhicule : LLT, LFX, LS3, L99, LSA, LS7, LTG, LGX, LT1 et LT4. Il fournit les libellés SAE génériques disponibles et inventorie ECM, PCM, TCM, EBCM, BCM, IPC, SDM, HVAC, PSCM, RCDLR, RADIO, AMP, DDM, PDM, FPCM, Park Assist et HMI.
+
+Le registre sépare explicitement :
+- `SAE_J2012_GENERIC` : libellé normalisé du code, sans prétendre décrire la stratégie GM ;
+- `GM_SERVICE_INFORMATION` / `GM_BULLETIN` : définition constructeur avec référence documentaire ;
+- `VEHICLE_VALIDATED_CAPTURE` : résultat confirmé sur un véhicule identifié ;
+- `UNVERIFIED` : donnée non exploitable pour une interprétation technique.
+
+Une définition OEM ne peut être considérée comme exploitable qu'avec l'identification exacte du véhicule et du calculateur : VIN, année, RPO moteur, transmission, module répondant, référence matériel, OS, CAL ID, CVN et source technique traçable. Les profils UDS avancés existants appliquent également une validation d'identité et de preuve.
+
+À ce stade, les interprétations détaillées moteur présentes dans `CamaroDtcCatalog` restent limitées au LFX Gen 5 2012–2015. Les autres moteurs disposent des libellés SAE génériques, pas de causes/procédures GM extrapolées depuis le LFX. Les calculateurs hors ECM restent au niveau catalogue de découverte tant que leurs DTC et procédures OEM n'ont pas de source vérifiable.
+
+### Intégration des réponses UDS dans l'écran DTC
+
+L'action de lecture UDS 0x19/0x02 utilise désormais le `DTCFormatIdentifier` avant de décoder les enregistrements. Les résultats sont convertis en `DiagnosticDtc` et ajoutés à la liste de diagnostic avec l'adresse de réponse affichée comme identité provisoire (par exemple `ECU 7E8`). Cette identité d'adresse n'est pas transformée en nom de calculateur sans découverte/validation séparée.
+
+Les codes SAE reçoivent le libellé localisé déjà disponible dans les ressources Android. Les codes OEM inconnus restent affichés en hexadécimal avec leurs octets bruts et sans définition inventée. Le suffixe Failure Type Byte est conservé dans le code affiché ; la recherche du catalogue SAE utilise le code de base.
+
+Les avertissements d'applicabilité moteur couvrent notamment les DTC cylindre 7/8 sur moteurs six cylindres et le code de sous-pression P0299 sur les configurations atmosphériques d'origine. Ces avertissements vérifient la cohérence de la configuration ; ils ne remplacent pas une définition de service GM.
