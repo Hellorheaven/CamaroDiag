@@ -243,7 +243,12 @@ object DtcCatalogRegistry {
     fun catalogueFor(moduleId: String, vehicle: VehicleProfile): DtcModuleCatalogue {
         val id = moduleId.trim().uppercase(Locale.ROOT)
         val known = moduleFamilies.any { it.id == id }
-        val detailed = id == "ECM" && CamaroDtcCatalog.isKnownLfxProfile(vehicle)
+        val detailed = id == "ECM" && (
+            CamaroDtcCatalog.isKnownLfxProfile(vehicle) ||
+                CamaroDtcCatalog.isKnownLltProfile(vehicle) ||
+                CamaroDtcCatalog.isKnownV8Profile(vehicle) ||
+                (vehicle.modelYear == 2019 && vehicle.engine == CamaroEngine.LT4)
+            )
         return DtcModuleCatalogue(
             moduleId = id,
             evidenceStatus = when {
@@ -254,12 +259,12 @@ object DtcCatalogRegistry {
             hasVehicleSpecificDefinitions = detailed,
             noteEn = when {
                 !known -> "Unknown ECU identity: retain raw DTC only until the responding module is identified."
-                detailed -> "Vehicle-specific ECM explanations are available for the documented LFX model-year range."
+                detailed -> "Vehicle-specific ECM explanations or GM monitor evidence are available for this documented engine/model-year profile."
                 else -> "Only normalized SAE descriptions are available for this ECU/vehicle combination; no GM module-specific definition is loaded."
             },
             noteFr = when {
                 !known -> "Calculateur non identifié : conserver uniquement le DTC brut jusqu'à identification du module répondant."
-                detailed -> "Les interprétations moteur spécifiques sont disponibles pour la plage d'années LFX documentée."
+                detailed -> "Des interprétations moteur ou des données de surveillance GM sont disponibles pour ce profil moteur/millésime documenté."
                 else -> "Seuls les libellés SAE normalisés sont disponibles pour cette combinaison calculateur/véhicule ; aucune définition GM propre au module n'est chargée."
             }
         )
