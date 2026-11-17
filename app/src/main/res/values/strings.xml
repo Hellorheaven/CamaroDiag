@@ -565,4 +565,10 @@
     <string name="dtc_desc_p0018">Crankshaft Position - Intake Camshaft Position Not Plausible (Bank 2)</string>
     <string name="dtc_desc_p0019">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 2)</string>
     <string name="dtc_gm_calibration_not_validated">The explanations and thresholds below are reference data for the selected engine and model year. ECU identity (VIN, CAL ID, CVN, software ID and hardware part number) has not yet been verified; these data are not validated for the connected ECU.</string>
+    <string name="dtc_gm_monitor_title">GM engine monitor – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Setting criteria: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Enable conditions: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Failure counter / validation rate: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL classification: %1$s</string>
+    <string name="dtc_gm_monitor_source">Source: GM %1$s, page %2$d</string>
 </resources>
