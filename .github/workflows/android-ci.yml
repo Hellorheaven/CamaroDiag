@@ -132,7 +132,7 @@ jobs:
         run: gradle wrapper --gradle-version 8.11.1
 
       - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
 
       - name: Upload Android unit-test reports
         if: always()
@@ -145,8 +145,31 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Run Android lint
-        run: ./gradlew app:lintDebug --stacktrace
+      - name: Run Android lint (Gradle warnings are errors)
+        run: ./gradlew app:lintDebug --stacktrace --warning-mode=fail
+
+      - name: Reject Android lint warnings
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import sys
+          import xml.etree.ElementTree as ET
+
+          report = pathlib.Path("app/build/reports/lint-results-debug.xml")
+          if not report.is_file():
+              print(f"Android lint report missing: {report}", file=sys.stderr)
+              sys.exit(1)
+          root = ET.parse(report).getroot()
+          findings = [issue for issue in root.findall("issue")
+                      if issue.get("severity", "").lower() in {"warning", "error"}]
+          if findings:
+              for issue in findings:
+                  print(f"{issue.get('severity')}: {issue.get('id')}: {issue.get('message')}")
+              print(f"Build rejected: {len(findings)} Android lint warning/error(s).", file=sys.stderr)
+              sys.exit(1)
+          print("Android lint clean: zero warnings and zero errors.")
+          PY
 
       - name: Upload Android lint report
         if: always()
@@ -161,7 +184,7 @@ jobs:
           retention-days: 7
 
       - name: Build debug APK
-        run: ./gradlew app:assembleDebug --stacktrace
+        run: ./gradlew app:assembleDebug --stacktrace --warning-mode=fail
 
       - name: Upload debug APK for this PR commit
         uses: actions/upload-artifact@v7
