@@ -104,6 +104,36 @@ class UdsDtcDecoderTest {
     }
 
     @Test
+    fun mapsAllEightUdsStatusBitsIntoTheHumanReadableSummary() {
+        val record = UdsDtcDecoder.decodeReadDtcInformation(
+            byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x23, 0x45, 0xFF.toByte())
+        ).records.single()
+
+        val diagnostic = record.toDiagnosticDtc("ECM")
+
+        listOf(
+            "failed",
+            "failed this operation cycle",
+            "pending",
+            "confirmed",
+            "test not completed since last clear",
+            "failed since last clear",
+            "test not completed this operation cycle",
+            "warning indicator requested"
+        ).forEach { state -> assertTrue("Missing English UDS state: $state", diagnostic.statusEn.contains(state)) }
+        listOf(
+            "défaut présent",
+            "défaut présent pendant ce cycle de fonctionnement",
+            "en attente",
+            "confirmé",
+            "test non terminé depuis le dernier effacement",
+            "défaut détecté depuis le dernier effacement",
+            "test non terminé pendant ce cycle de fonctionnement",
+            "voyant demandé"
+        ).forEach { state -> assertTrue("État UDS français absent : $state", diagnostic.statusFr.contains(state)) }
+    }
+
+    @Test
     fun unsetStatusFlagsRemainFalse() {
         val record = UdsDtcDecoder.decodeReadDtcInformation(
             byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x01, 0x01, 0x00)
