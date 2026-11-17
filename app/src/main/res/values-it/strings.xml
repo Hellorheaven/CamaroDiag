@@ -558,4 +558,9 @@
     <string name="trace_error_csv_empty">La traccia CSV è vuota.</string>
     <string name="trace_error_csv_columns">Il CSV deve contenere una colonna CAN ID e una colonna dati/payload oppure le colonne data0…data15.</string>
     <string name="trace_error_generic">La traccia contiene un record non valido o non supportato.</string>
+    <string name="dtc_vehicle_interpretation">Interpretazione specifica del veicolo</string>
+    <string name="dtc_severity">Gravità</string>
+    <string name="dtc_possible_causes">Possibili cause (non confermate)</string>
+    <string name="dtc_recommended_checks">Controlli consigliati</string>
+    <string name="dtc_vehicle_specific_not_documented">Non è ancora documentata una procedura specifica per questo codice e questa configurazione. Sopra è mostrata la descrizione OEM/SAE; verificare VIN e centralina nelle informazioni di servizio GM.</string>
 </resources>
