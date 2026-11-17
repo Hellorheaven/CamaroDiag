@@ -1,5 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
+import com.camarodiag.gen5.domain.model.DiagnosticDtc
+
 /**
  * DTC format identifiers returned by UDS ReadDTCInformation (ISO 14229).
  * Unknown identifiers are preserved as raw 24-bit values, never guessed.
@@ -33,6 +35,34 @@ data class UdsDtcStatus(
     val testNotCompletedThisOperationCycle: Boolean,
     val warningIndicatorRequested: Boolean
 )
+
+/** Maps a decoded UDS record into the application's shared DTC presentation model. */
+fun UdsDtcRecord.toDiagnosticDtc(moduleId: String): DiagnosticDtc {
+    require(moduleId.isNotBlank()) { "The responding ECU module ID is required." }
+    val stateEn = buildList {
+        if (status.testFailed) add("failed")
+        if (status.pending) add("pending")
+        if (status.confirmed) add("confirmed")
+        if (status.warningIndicatorRequested) add("warning indicator requested")
+    }.ifEmpty { listOf("status not asserted") }.joinToString(", ")
+    val stateFr = buildList {
+        if (status.testFailed) add("défaut présent")
+        if (status.pending) add("en attente")
+        if (status.confirmed) add("confirmé")
+        if (status.warningIndicatorRequested) add("voyant demandé")
+    }.ifEmpty { listOf("aucun état de défaut actif") }.joinToString(", ")
+    return DiagnosticDtc(
+        code = code,
+        module = moduleId,
+        statusEn = stateEn,
+        statusFr = stateFr,
+        descEn = "Raw UDS DTC 0x" + rawDtc.toString(16).uppercase().padStart(6, '0') +
+            ". A verified OEM definition for module $moduleId and this ECU calibration is not loaded.",
+        descFr = "DTC UDS brut 0x" + rawDtc.toString(16).uppercase().padStart(6, '0') +
+            ". Aucune définition constructeur vérifiée n'est chargée pour le calculateur $moduleId et cette calibration.",
+        isPending = status.pending
+    )
+}
 
 data class UdsDtcReport(
     val statusAvailabilityMask: Int,
