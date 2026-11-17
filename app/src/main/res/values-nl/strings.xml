@@ -487,4 +487,9 @@
     <string name="msg_j2534_bridge_connect_failed">Kan geen verbinding maken met de J2534-brug.</string>
     <string name="live_pid_fuel_system_status">Brandstofsysteemstatus</string>
     <string name="live_pid_ltft">Langetermijn-brandstofcorrectie B1</string>
+    <string name="cal_warning_metadata_missing">Kalibratiemetadata ontbreken: de import kan niet worden gekoppeld aan een exact VIN, CAL ID, CVN, OS, hardware en bronbestand.</string>
+    <string name="cal_warning_os_hardware_metadata">OS- en hardwareverwijzing zijn in de metadata ingevoerd: controleer deze onafhankelijk aan de hand van de servicedocumentatie van de controller.</string>
+    <string name="cal_warning_overlapping_regions">Tabel- of asgebieden overlappen; controleer of deze overlap bedoeld is.</string>
+    <string name="cal_warning_import_review">Controleer de waarschuwingen bij de geïmporteerde definities voordat u een tabel gebruikt.</string>
+    <string name="cal_warning_os_hardware_not_read">OS en hardwareverwijzing zijn niet uitgelezen via standaardmodus 09: onafhankelijke documentatiecontrole is vereist.</string>
 </resources>

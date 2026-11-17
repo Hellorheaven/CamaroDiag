@@ -487,4 +487,9 @@
     <string name="msg_j2534_bridge_connect_failed">Δεν ήταν δυνατή η σύνδεση με τη γέφυρα J2534.</string>
     <string name="live_pid_fuel_system_status">Κατάσταση συστήματος καυσίμου</string>
     <string name="live_pid_ltft">Μακροπρόθεσμη διόρθωση καυσίμου B1</string>
+    <string name="cal_warning_metadata_missing">Λείπουν μεταδεδομένα βαθμονόμησης: η εισαγωγή δεν μπορεί να συνδεθεί με ακριβές VIN, CAL ID, CVN, λειτουργικό σύστημα, υλικό και αρχικό δυαδικό αρχείο.</string>
+    <string name="cal_warning_os_hardware_metadata">Το λειτουργικό σύστημα και η αναφορά υλικού καταχωρίστηκαν στα μεταδεδομένα: επαληθεύστε τα ανεξάρτητα από την τεκμηρίωση σέρβις του ελεγκτή.</string>
+    <string name="cal_warning_overlapping_regions">Οι περιοχές πινάκων ή αξόνων επικαλύπτονται· επιβεβαιώστε ότι η επικάλυψη είναι σκόπιμη.</string>
+    <string name="cal_warning_import_review">Ελέγξτε τις προειδοποιήσεις των εισαγόμενων ορισμών πριν χρησιμοποιήσετε οποιονδήποτε πίνακα.</string>
+    <string name="cal_warning_os_hardware_not_read">Το λειτουργικό σύστημα και η αναφορά υλικού δεν διαβάστηκαν μέσω της τυπικής λειτουργίας 09: απαιτείται ανεξάρτητη τεκμηριωμένη επαλήθευση.</string>
 </resources>
