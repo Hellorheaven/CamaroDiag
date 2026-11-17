@@ -196,6 +196,13 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark),
+                navigationIcon = {
+                    if (currentTab == DiagTab.SETUP || currentTab == DiagTab.ADAPTER) {
+                        IconButton(onClick = { currentTab = DiagTab.SETTINGS }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.tab_settings), tint = CamaroAmber)
+                        }
+                    }
+                },
                 title = {
                     Column {
                         Text(
@@ -235,30 +242,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 contentColor = TextPrimary
             ) {
                 NavigationBarItem(
-                    selected = currentTab == DiagTab.SETUP,
-                    onClick = { currentTab = DiagTab.SETUP },
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text(stringResource(R.string.tab_vehicle)) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = BgDark,
-                        selectedTextColor = CamaroAmber,
-                        indicatorColor = CamaroAmber
-                    )
-                )
-
-                NavigationBarItem(
-                    selected = currentTab == DiagTab.ADAPTER,
-                    onClick = { currentTab = DiagTab.ADAPTER },
-                    icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) },
-                    label = { Text(stringResource(R.string.tab_connect)) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = BgDark,
-                        selectedTextColor = CamaroAmber,
-                        indicatorColor = CamaroAmber
-                    )
-                )
-
-                NavigationBarItem(
                     selected = currentTab == DiagTab.LIVE,
                     onClick = { currentTab = DiagTab.LIVE },
                     icon = { Icon(Icons.Default.Info, contentDescription = null) },
@@ -290,7 +273,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
-                        DiagTab.SETTINGS
+                        DiagTab.SETTINGS,
+                        DiagTab.SETUP,
+                        DiagTab.ADAPTER
                     ),
                     onClick = { moreExpanded = true },
                     icon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
