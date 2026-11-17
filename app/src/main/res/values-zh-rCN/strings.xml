@@ -552,4 +552,9 @@
     <string name="trace_error_csv_empty">CSV 跟踪文件为空。</string>
     <string name="trace_error_csv_columns">CSV 必须包含 CAN ID 列和数据/payload 列，或 data0…data15 列。</string>
     <string name="trace_error_generic">跟踪文件包含无效或不支持的记录。</string>
+    <string name="dtc_vehicle_interpretation">针对该车辆的解释</string>
+    <string name="dtc_severity">严重程度</string>
+    <string name="dtc_possible_causes">可能原因（尚未确认）</string>
+    <string name="dtc_recommended_checks">建议检查项目</string>
+    <string name="dtc_vehicle_specific_not_documented">尚无针对该代码和所选车辆配置的专用诊断流程。上方显示的是 OEM/SAE 描述；请根据 GM 维修资料核对 VIN 和控制模块。</string>
 </resources>
