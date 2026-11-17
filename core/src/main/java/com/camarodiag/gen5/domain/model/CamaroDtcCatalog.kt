@@ -1,5 +1,7 @@
 package com.camarodiag.gen5.domain.model
 
+import java.util.Locale
+
 /**
  * Vehicle-specific interpretation of a diagnostic trouble code.
  *
