@@ -22,6 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalConfiguration
+import com.camarodiag.gen5.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,24 +42,70 @@ import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class DiagTab(val labelEn: String, val labelFr: String) {
-    SETUP("Vehicle", "Véhicule"),
-    ADAPTER("Adapter", "Interface"),
-    MODULES("Modules", "Modules"),
-    LIVE("Live", "Direct"),
-    DTCS("DTCs", "Défauts"),
-    MILEAGE("Mileage", "Odomètre"),
-    CALIBRATION("ECU / Maps", "ECU / Cartographie"),
-    OBD_SCAN("Full OBD Scan", "Scan OBD complet"),
-    GUIDE("Guide", "Guide"),
-    CONTROL("Controls", "Pilotage"),
-    SETTINGS("Settings", "Réglages")
+enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId: Int) {
+    SETUP("Vehicle", "Véhicule", R.string.tab_vehicle),
+    ADAPTER("Adapter", "Interface", R.string.tab_connect),
+    MODULES("Modules", "Modules", R.string.tab_modules),
+    LIVE("Live", "Direct", R.string.tab_live),
+    DTCS("DTCs", "Défauts", R.string.tab_dtcs),
+    MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
+    CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
+    OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
+    GUIDE("Guide", "Guide", R.string.tab_guide),
+    CONTROL("Controls", "Pilotage", R.string.tab_controls),
+    SETTINGS("Settings", "Réglages", R.string.tab_settings)
+}
+
+
+@Composable
+internal fun localizedGenerationName(generation: CamaroGeneration): String =
+    stringResource(R.string.vehicle_generation_label, if (generation == CamaroGeneration.GEN5) 5 else 6)
+
+@Composable
+private fun localizedEngineName(engine: CamaroEngine): String = when (engine) {
+    CamaroEngine.LLT -> stringResource(R.string.engine_llt)
+    CamaroEngine.LFX -> stringResource(R.string.engine_lfx)
+    CamaroEngine.LS3 -> stringResource(R.string.engine_ls3)
+    CamaroEngine.L99 -> stringResource(R.string.engine_l99)
+    CamaroEngine.LSA -> stringResource(R.string.engine_lsa)
+    CamaroEngine.LS7 -> stringResource(R.string.engine_ls7)
+    CamaroEngine.LTG -> stringResource(R.string.engine_ltg)
+    CamaroEngine.LGX -> stringResource(R.string.engine_lgx)
+    CamaroEngine.LT1 -> stringResource(R.string.engine_lt1)
+    CamaroEngine.LT4 -> stringResource(R.string.engine_lt4)
+}
+
+@Composable
+private fun localizedTransmissionName(transmission: TransmissionType): String = when (transmission) {
+    TransmissionType.MANUAL -> stringResource(R.string.transmission_manual)
+    TransmissionType.AUTOMATIC -> stringResource(R.string.transmission_automatic)
+}
+
+@Composable
+private fun localizedMarketName(market: MarketRegion): String = when (market) {
+    MarketRegion.US_CA -> stringResource(R.string.market_us_ca)
+    MarketRegion.EU_ECE -> stringResource(R.string.market_eu_ece)
+}
+
+@Composable
+private fun localizedAdapterTierName(tier: AdapterTier): String = when (tier) {
+    AdapterTier.PRO_STN -> stringResource(R.string.adapter_tier_pro_stn)
+    AdapterTier.GENUINE_ELM -> stringResource(R.string.adapter_tier_genuine_elm)
+    AdapterTier.CLONE_ELM -> stringResource(R.string.adapter_tier_clone_elm)
+    AdapterTier.DISCONNECTED -> stringResource(R.string.adapter_tier_disconnected)
+}
+
+@Composable
+private fun localizedBusName(bus: CanBusType): String = when (bus) {
+    CanBusType.HS_CAN -> stringResource(R.string.module_bus_hscan)
+    CanBusType.SW_CAN -> stringResource(R.string.module_bus_swcan)
+    CanBusType.UNKNOWN -> stringResource(R.string.module_bus_unknown)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CamaroDiagApp(viewModel: MainViewModel) {
-    val lang by viewModel.language.collectAsState()
+    val lang = AppLanguage.fromLocale(LocalConfiguration.current.locales[0])
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
@@ -79,8 +128,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
-    val isFr = lang == AppLanguage.FR
-    UpdateManagerDialog(isFr)
+    UpdateManagerDialog()
 
     val btPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -139,10 +187,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         } else {
-            viewModel.refreshPairedDevices()
+            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -160,7 +206,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                             letterSpacing = 1.6.sp
                         )
                         Text(
-                            text = "${vehicle.generation.label} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
+                            text = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
                             fontSize = 12.sp,
                             color = TextMuted
                         )
@@ -176,13 +222,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                             Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                         else -> {
-                            Text(if (isFr) "HORS LIGNE" else "OFFLINE", color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(stringResource(R.string.status_offline), color = TextMuted, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
-                    }
-                    TextButton(onClick = {
-                        viewModel.setLanguage(if (isFr) AppLanguage.EN else AppLanguage.FR)
-                    }) {
-                        Text(if (isFr) "FR 🇫🇷" else "EN 🇺🇸", color = CamaroBlue, fontWeight = FontWeight.Bold)
                     }
                 }
             )
@@ -197,7 +238,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab == DiagTab.SETUP,
                     onClick = { currentTab = DiagTab.SETUP },
                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text(if (isFr) "Véhicule" else "Vehicle") },
+                    label = { Text(stringResource(R.string.tab_vehicle)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -209,7 +250,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab == DiagTab.ADAPTER,
                     onClick = { currentTab = DiagTab.ADAPTER },
                     icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) },
-                    label = { Text(if (isFr) "Connexion" else "Connect") },
+                    label = { Text(stringResource(R.string.tab_connect)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -221,7 +262,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab == DiagTab.LIVE,
                     onClick = { currentTab = DiagTab.LIVE },
                     icon = { Icon(Icons.Default.Info, contentDescription = null) },
-                    label = { Text(if (isFr) "Données" else "Live") },
+                    label = { Text(stringResource(R.string.tab_live)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -233,7 +274,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab == DiagTab.DTCS,
                     onClick = { currentTab = DiagTab.DTCS },
                     icon = { Icon(Icons.Default.Build, contentDescription = null) },
-                    label = { Text(if (isFr) "Diagnostic" else "DTCs") },
+                    label = { Text(stringResource(R.string.tab_dtcs)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -253,7 +294,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     ),
                     onClick = { moreExpanded = true },
                     icon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
-                    label = { Text(if (isFr) "Plus" else "More") },
+                    label = { Text(stringResource(R.string.tab_more)) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = BgDark,
                         selectedTextColor = CamaroAmber,
@@ -276,7 +317,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     ).forEach { tab ->
                         DropdownMenuItem(
                             text = {
-                                Text(if (isFr) tab.labelFr else tab.labelEn)
+                                Text(stringResource(tab.labelResourceId))
                             },
                             onClick = {
                                 currentTab = tab
@@ -299,7 +340,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
             when (currentTab) {
                 DiagTab.SETUP -> VehicleSetupScreen(
                     vehicle = vehicle,
-                    isFr = isFr,
                     onChange = { y, e, tr, m -> viewModel.updateVehicle(y, e, tr, m) },
                     onVinChange = { viewModel.updateVin(it) }
                 )
@@ -308,7 +348,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
-                    isFr = isFr,
                     onRefreshDevices = { viewModel.refreshPairedDevices() },
                     onConnectMac = { viewModel.connectRealBluetooth(it) },
                     onSelectSim = { viewModel.selectSimulatedAdapter(it) },
@@ -317,12 +356,11 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onConnectUsb = { viewModel.connectUsb(it) },
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
-                DiagTab.MODULES -> ModulesScreen(modules, isFr)
+                DiagTab.MODULES -> ModulesScreen(modules)
                 DiagTab.LIVE -> LiveDataScreen(
                     pids = livePids,
                     units = units,
                     isStreaming = isStreaming,
-                    isFr = isFr,
                     recording = liveRecording,
                     telemetryMessage = liveTelemetryMessage,
                     onToggleStream = { viewModel.toggleLiveStream() },
@@ -334,25 +372,23 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
                     }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, isFr, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
-                DiagTab.MILEAGE -> MileageScreen(mileageReport, isFr, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.DTCS -> DtcScreen(dtcs, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
+                DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
                 DiagTab.OBD_SCAN -> ObdScanScreen(
                     report = obdScanReport,
                     isScanning = isObdScanning,
                     message = obdScanMessage,
                     isConnected = adapter.tier != AdapterTier.DISCONNECTED &&
                         !adapter.deviceName.contains("Demo", ignoreCase = true),
-                    isFr = isFr,
                     onRunScan = { viewModel.runFullObdScan() }
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
-                    vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.generation.label}",
+                    vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${localizedGenerationName(vehicle.generation)}",
                     ecmType = vehicle.engine.ecmType,
                     isConnected = !adapter.deviceName.contains("Demo", ignoreCase = true) &&
                         !adapter.deviceName.contains("Simulated", ignoreCase = true) &&
                         adapter.tier != AdapterTier.DISCONNECTED,
-                    isFr = isFr,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
@@ -382,9 +418,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     },
                     onClearFile = { viewModel.clearCalibrationFile() }
                 )
-                DiagTab.GUIDE -> HardwareGuideScreen(isFr)
-                DiagTab.CONTROL -> VehicleControlsScreen(vehicle, isFr)
-                DiagTab.SETTINGS -> SettingsScreen(lang, units, savedSessions, isFr,
+                DiagTab.GUIDE -> HardwareGuideScreen()
+                DiagTab.CONTROL -> VehicleControlsScreen(vehicle)
+                DiagTab.SETTINGS -> SettingsScreen(lang, units, savedSessions,
                     onLang = { viewModel.setLanguage(it) },
                     onUnits = { viewModel.setUnitSystem(it) },
                     onDeleteSession = { viewModel.deleteSavedSession(it) }
@@ -397,28 +433,27 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
 @Composable
 fun VehicleSetupScreen(
     vehicle: VehicleProfile,
-    isFr: Boolean,
     onChange: (Int, CamaroEngine, TransmissionType, MarketRegion) -> Unit,
     onVinChange: (String) -> Unit
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            SectionTitle(if (isFr) "Configuration du véhicule" else "Vehicle configuration")
-            Text("CHEVROLET CAMARO • ${vehicle.generation.label.uppercase()} • ${vehicle.modelYear}", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            SectionTitle(stringResource(R.string.vehicle_setup_header))
+            Text("CHEVROLET CAMARO • ${localizedGenerationName(vehicle.generation).uppercase()} • ${vehicle.modelYear}", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(if (isFr) "Génération" else "Generation", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_generation), color = TextMuted, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CamaroGeneration.entries.forEach { gen ->
                             FilterChip(selected = vehicle.generation == gen, onClick = {
                                 val year = if (gen == CamaroGeneration.GEN5) 2015 else 2016
                                 onChange(year, vehicle.engine, vehicle.transmission, vehicle.market)
-                            }, label = { Text(if (isFr) gen.label.replace("Gen", "Génération") else gen.label) })
+                            }, label = { Text(stringResource(R.string.vehicle_generation_label, if (gen == CamaroGeneration.GEN5) 5 else 6)) })
                         }
                     }
-                    Text(if (isFr) "Année modèle" else "Model year", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_model_year), color = TextMuted, fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                         (2010..2024).forEach { yr ->
                             FilterChip(
@@ -429,7 +464,7 @@ fun VehicleSetupScreen(
                         }
                     }
 
-                    Text(if (isFr) "Motorisation (Code RPO & Calculateur)" else "Engine (RPO Code & ECM)", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_engine), color = TextMuted, fontSize = 13.sp)
                     CamaroEngine.entries.filter { vehicle.modelYear in it.years }.forEach { eng ->
                         Row(
                             modifier = Modifier
@@ -441,14 +476,14 @@ fun VehicleSetupScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("${eng.rpo} — ${if (isFr) eng.nameFr else eng.nameEn}", fontWeight = FontWeight.SemiBold)
-                                Text("ECM: ${eng.ecmType}", fontSize = 12.sp, color = CamaroBlue)
+                                Text("${eng.rpo} — ${localizedEngineName(eng)}", fontWeight = FontWeight.SemiBold)
+                                Text(stringResource(R.string.vehicle_ecm_label, eng.ecmType), fontSize = 12.sp, color = CamaroBlue)
                             }
                             if (vehicle.engine == eng) Icon(Icons.Default.CheckCircle, null, tint = CamaroAmber)
                         }
                     }
 
-                    Text(if (isFr) "Transmission" else "Transmission", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_transmission), color = TextMuted, fontSize = 13.sp)
                     TransmissionType.entries.forEach { tr ->
                         Row(
                             modifier = Modifier
@@ -458,11 +493,11 @@ fun VehicleSetupScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(selected = vehicle.transmission == tr, onClick = { onChange(vehicle.modelYear, vehicle.engine, tr, vehicle.market) })
-                            Text(if (isFr) tr.labelFr else tr.labelEn)
+                            Text(localizedTransmissionName(tr))
                         }
                     }
 
-                    Text(if (isFr) "Marché / Homologation" else "Market Region", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_market_region), color = TextMuted, fontSize = 13.sp)
                     MarketRegion.entries.forEach { mk ->
                         Row(
                             modifier = Modifier
@@ -472,17 +507,17 @@ fun VehicleSetupScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(selected = vehicle.market == mk, onClick = { onChange(vehicle.modelYear, vehicle.engine, vehicle.transmission, mk) })
-                            Text(if (isFr) mk.labelFr else mk.labelEn)
+                            Text(localizedMarketName(mk))
                         }
                     }
-                    Text(if (isFr) "Numéro VIN" else "Vehicle VIN", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.vehicle_vin), color = TextMuted, fontSize = 13.sp)
                     OutlinedTextField(
                         value = vehicle.vin,
                         onValueChange = onVinChange,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        placeholder = { Text("17 caractères") },
-                        supportingText = { Text(if (isFr) "Saisir le VIN réel : aucun VIN fictif n'est généré." else "Enter the actual VIN; no sample VIN is generated.") }
+                        placeholder = { Text(stringResource(R.string.vehicle_vin_placeholder)) },
+                        supportingText = { Text(stringResource(R.string.vehicle_vin_hint)) }
                     )
                 }
             }
@@ -496,7 +531,6 @@ fun AdapterScreen(
     isBusy: Boolean,
     pairedDevices: List<Pair<String, String>>,
     errorMsg: String?,
-    isFr: Boolean,
     onRefreshDevices: () -> Unit,
     onConnectMac: (String) -> Unit,
     onSelectSim: (String) -> Unit,
@@ -510,11 +544,11 @@ fun AdapterScreen(
     val vxdiagProfiles = remember { VxdiagProfiles.all() }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            SectionTitle(if (isFr) "Interfaces OBD-II : Bluetooth, USB et Wi-Fi" else "Bluetooth OBD-II Adapter & CAN Probe")
+            SectionTitle(stringResource(R.string.adapter_section_title))
             if (isBusy) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Text(if (isFr) "Connexion ou opération en cours…" else "Connection or operation in progress…", color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.connection_busy), color = TextMuted, fontSize = 12.sp)
                 }
             }
         }
@@ -522,11 +556,11 @@ fun AdapterScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
-                    Text(if (isFr) adapter.tier.titleFr else adapter.tier.titleEn, fontSize = 13.sp)
+                    Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
-                        BadgeChip(if (isFr) "SW-CAN câblage vérifié (Pin 1)" else "SW-CAN wiring verified (Pin 1)", adapter.supportsSwCan)
-                        BadgeChip(if (isFr) "Réponses longues (ATAL)" else "Long response mode (ATAL)", adapter.supportsLongFrames)
+                        BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
+                        BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
                     }
                     if (adapter.rawProbeLog.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
@@ -539,13 +573,12 @@ fun AdapterScreen(
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(if (isFr) "Appareils Bluetooth Appairés" else "Paired Bluetooth Devices", fontWeight = FontWeight.Bold)
-                TextButton(onClick = onRefreshDevices, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
+                Text(stringResource(R.string.paired_bluetooth_devices), fontWeight = FontWeight.Bold)
+                TextButton(onClick = onRefreshDevices, enabled = !isBusy) { Text(stringResource(R.string.common_refresh)) }
             }
             if (pairedDevices.isEmpty()) {
                 Text(
-                    if (isFr) "Aucun adaptateur détecté. Les OBDLink MX+, MX, LX et autres Bluetooth classiques doivent être appairés ; le CX est recherché en BLE à proximité."
-                    else "No adapter detected. Pair OBDLink MX+, MX, LX and other Classic Bluetooth adapters; CX is discovered nearby over BLE.",
+                    stringResource(R.string.adapter_none_detected),
                     color = TextMuted, fontSize = 13.sp
                 )
             } else {
@@ -559,7 +592,7 @@ fun AdapterScreen(
                                 Text(name, fontWeight = FontWeight.SemiBold)
                                 Text(mac, fontSize = 12.sp, color = TextMuted, fontFamily = FontFamily.Monospace)
                             }
-                            Text(if (isFr) "Connecter" else "Connect", color = CamaroBlue, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.common_connect), color = CamaroBlue, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -569,27 +602,26 @@ fun AdapterScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (isFr) "Connexion USB (OBDLink EX / SX, ELM327 et interfaces série)" else "USB connection (OBDLink EX / SX, ELM327 and serial adapters)", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.usb_connection_title), fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (isFr) "Périphériques USB détectés" else "Detected USB devices", modifier = Modifier.weight(1f))
-                        TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(if (isFr) "Actualiser" else "Refresh") }
+                        Text(stringResource(R.string.usb_devices_detected), modifier = Modifier.weight(1f))
+                        TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(stringResource(R.string.common_refresh)) }
                     }
-                    if (usbDevices.isEmpty()) Text(if (isFr) "Aucun adaptateur série USB détecté." else "No USB serial adapter detected.", color = TextMuted)
-                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter : $label" else "Connect: $label") } }
+                    if (usbDevices.isEmpty()) Text(stringResource(R.string.usb_none_detected), color = TextMuted)
+                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_connect_label, label)) } }
                     HorizontalDivider(color = TextMuted.copy(alpha = .25f))
-                    Text(if (isFr) "Connexion Wi-Fi ELM327" else "Wi-Fi ELM327 connection", fontWeight = FontWeight.Bold)
-                    OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(if (isFr) "Adresse IP de l'adaptateur" else "Adapter IP address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text(if (isFr) "Port TCP (souvent 35000 ou 23)" else "TCP port (often 35000 or 23)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(if (isFr) "Connecter en Wi-Fi" else "Connect over Wi-Fi") }
-                    Text(if (isFr) "VXDIAG : architecture de transport prévue, mais les interfaces J2534 ne sont pas déclarées compatibles Android sans SDK Android officiel du modèle. Aucun accès J2534 n'est simulé." else "VXDIAG: transport architecture is prepared, but J2534 interfaces are not claimed Android-compatible without the model's official Android SDK. No J2534 access is simulated.", color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.wifi_connection_title), fontWeight = FontWeight.Bold)
+                    OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(stringResource(R.string.adapter_ip_address)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = wifiPort, onValueChange = { wifiPort = it.filter(Char::isDigit).take(5) }, label = { Text(stringResource(R.string.adapter_tcp_port)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Button(onClick = { onConnectWifi(wifiHost, wifiPort.toIntOrNull() ?: 35000) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_connect_wifi)) }
+                    Text(stringResource(R.string.adapter_vxdiag_android_limit), color = TextMuted, fontSize = 12.sp)
                 }
             }
         }
         item {
-            Text(if (isFr) "Interfaces VXDIAG déclarées" else "Declared VXDIAG interface profiles", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.adapter_vxdiag_profiles), fontWeight = FontWeight.Bold)
             Text(
-                if (isFr) "Ces profils distinguent les modèles et liaisons physiques. Ils ne signifient pas qu'un pilote Android ou une communication véhicule est disponible."
-                else "These profiles distinguish hardware and link variants. They do not mean an Android driver or vehicle communication is available.",
+                stringResource(R.string.adapter_vxdiag_profiles_hint),
                 color = TextMuted,
                 fontSize = 11.sp
             )
@@ -599,7 +631,7 @@ fun AdapterScreen(
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(profile.label, color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Text(
-                                if (isFr) "DÉCOUVERTE SEULE" else "DISCOVERY ONLY",
+                                stringResource(R.string.adapter_discovery_only),
                                 color = WarnRed,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold
@@ -607,7 +639,7 @@ fun AdapterScreen(
                         }
                         Text(profile.protocols.joinToString(" • ") { it.name }, color = TextMuted, fontSize = 10.sp)
                         Text(
-                            if (isFr) profile.noteFr else "Hardware profile only; an official Android SDK/API or documented bridge is still required.",
+                            stringResource(R.string.adapter_hardware_profile_only),
                             color = TextMuted,
                             fontSize = 11.sp
                         )
@@ -616,18 +648,88 @@ fun AdapterScreen(
             }
         }
         item {
-            Text(if (isFr) "Profils de Simulation (Test sans véhicule)" else "Simulated Hardware Profiles (Bench Test)", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.adapter_simulation_profiles), fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy) { Text("OBDLink MX+") }
                 OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy) { Text("ELM327 v1.5") }
-                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text("Clone v2.1") }
+                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text(stringResource(R.string.adapter_tier_clone_elm)) }
             }
         }
     }
 }
 
+
 @Composable
-fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
+private fun localizedVehicleControlTitle(id: VehicleControlId): String = when (id) {
+    VehicleControlId.WINDOWS -> stringResource(R.string.control_windows_title)
+    VehicleControlId.SUNROOF -> stringResource(R.string.control_sunroof_title)
+    VehicleControlId.DOOR_LOCKS -> stringResource(R.string.control_door_locks_title)
+    VehicleControlId.LIGHTS -> stringResource(R.string.control_lights_title)
+    VehicleControlId.HORN -> stringResource(R.string.control_horn_title)
+    VehicleControlId.MIRRORS -> stringResource(R.string.control_mirrors_title)
+    VehicleControlId.TRUNK -> stringResource(R.string.control_trunk_title)
+    VehicleControlId.REMOTE_START -> stringResource(R.string.control_remote_start_title)
+}
+
+@Composable
+private fun localizedVehicleControlExplanation(id: VehicleControlId): String = when (id) {
+    VehicleControlId.WINDOWS -> stringResource(R.string.control_windows_explanation)
+    VehicleControlId.SUNROOF -> stringResource(R.string.control_sunroof_explanation)
+    VehicleControlId.DOOR_LOCKS -> stringResource(R.string.control_door_locks_explanation)
+    VehicleControlId.LIGHTS -> stringResource(R.string.control_lights_explanation)
+    VehicleControlId.HORN -> stringResource(R.string.control_horn_explanation)
+    VehicleControlId.MIRRORS -> stringResource(R.string.control_mirrors_explanation)
+    VehicleControlId.TRUNK -> stringResource(R.string.control_trunk_explanation)
+    VehicleControlId.REMOTE_START -> stringResource(R.string.control_remote_start_explanation)
+}
+
+@Composable
+private fun localizedModuleName(module: EcuModule): String = when (module.id) {
+    "ECM" -> stringResource(R.string.module_ecm_name)
+    "TCM" -> stringResource(R.string.module_tcm_name)
+    "BCM" -> stringResource(R.string.module_bcm_name)
+    "IPC" -> stringResource(R.string.module_ipc_name)
+    "EBCM" -> stringResource(R.string.module_ebcm_name)
+    "SDM" -> stringResource(R.string.module_sdm_name)
+    else -> module.shortName
+}
+
+@Composable
+private fun localizedModuleNotes(module: EcuModule): String {
+    val notes = module.notesEn
+    return when (module.id) {
+        "ECM" -> when {
+            notes.startsWith("Observed 7E8") -> stringResource(R.string.module_note_ecm_obd_detected)
+            notes.startsWith("No standard OBD 7E8") -> stringResource(R.string.module_note_ecm_obd_missing)
+            else -> stringResource(R.string.module_note_ecm)
+        }
+        "TCM" -> if (notes.contains("not assumed from Gen 5")) stringResource(R.string.module_note_tcm_gen6) else stringResource(R.string.module_note_tcm_gen5)
+        "BCM" -> when {
+            notes.contains("020I") -> stringResource(R.string.module_note_bcm_gen5)
+            notes.contains("020M") -> stringResource(R.string.module_note_bcm_gen6_to2018)
+            else -> stringResource(R.string.module_note_bcm_2019)
+        }
+        "IPC" -> if (notes.startsWith("Secondary odometer")) stringResource(R.string.module_note_ipc_gen6) else stringResource(R.string.module_note_ipc_gen5)
+        "EBCM" -> if (notes.startsWith("Enhanced module")) stringResource(R.string.module_note_ebcm_gen6) else stringResource(R.string.module_note_ebcm_gen5)
+        "SDM" -> stringResource(R.string.module_note_sdm)
+        else -> stringResource(R.string.module_note_unavailable)
+    }
+}
+
+private fun remoteStartBlockerResourceId(index: Int): Int = when (index) {
+    0 -> R.string.remote_start_blocker_gear
+    1 -> R.string.remote_start_blocker_hood
+    2 -> R.string.remote_start_blocker_locks
+    3 -> R.string.remote_start_blocker_hazards
+    4 -> R.string.remote_start_blocker_theft
+    5 -> R.string.remote_start_blocker_faults
+    6 -> R.string.remote_start_blocker_stationary
+    7 -> R.string.remote_start_blocker_equipment
+    else -> R.string.control_blocked
+}
+
+@Composable
+fun VehicleControlsScreen(vehicle: VehicleProfile) {
     val capabilities = remember(vehicle) { VehicleControlCatalog().forVehicle(vehicle) }
     val remoteStartAssessment = remember(vehicle) {
         RemoteStartSafetyGate.assess(
@@ -645,34 +747,36 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            SectionTitle(if (isFr) "Pilotage des équipements" else "Vehicle controls")
-            Text(if (isFr) "Camaro ${vehicle.modelYear} • ${vehicle.generation.label} • ${vehicle.engine.rpo}" else "Camaro ${vehicle.modelYear} • ${vehicle.generation.label} • ${vehicle.engine.rpo}", color = CamaroAmber)
-            Text(if (isFr) "Les commandes carrosserie GM sont spécifiques au VIN, au BCM et à la calibration. Elles restent désactivées tant que les DID, sessions de sécurité et séquences de commande n'ont pas été vérifiés sur ce véhicule." else "GM body commands are VIN-, BCM- and calibration-specific. They remain disabled until DIDs, security sessions and command sequences are verified on this vehicle.", color = TextMuted, fontSize = 12.sp)
+            SectionTitle(stringResource(R.string.control_vehicle_title))
+            Text(stringResource(R.string.control_vehicle_label, vehicle.modelYear, localizedGenerationName(vehicle.generation), vehicle.engine.rpo), color = CamaroAmber)
+            Text(stringResource(R.string.control_gm_body_notice), color = TextMuted, fontSize = 12.sp)
         }
         items(capabilities) { capability ->
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (isFr) capability.titleFr else capability.titleEn, fontWeight = FontWeight.Bold)
+                        Text(localizedVehicleControlTitle(capability.id), fontWeight = FontWeight.Bold)
                         Text(capability.vehicleContext, color = CamaroBlue, fontSize = 10.sp)
-                        Text(if (isFr) capability.explanationFr else capability.explanationEn, color = TextMuted, fontSize = 12.sp)
+                        Text(localizedVehicleControlExplanation(capability.id), color = TextMuted, fontSize = 12.sp)
                         if (capability.id == VehicleControlId.REMOTE_START) {
                             Text(
-                                if (isFr) "Évaluation des interverrouillages : " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmées" else "BLOQUÉE"
-                                else "Interlock assessment: " + if (remoteStartAssessment.allowedToRequestOemProcedure) "conditions confirmed" else "BLOCKED",
+                                stringResource(
+                                    R.string.control_interlock_assessment,
+                                    stringResource(if (remoteStartAssessment.allowedToRequestOemProcedure) R.string.control_conditions_confirmed else R.string.control_blocked)
+                                ),
                                 color = WarnRed,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp
                             )
-                            (if (isFr) remoteStartAssessment.blockersFr else remoteStartAssessment.blockersEn).forEach { blocker ->
-                                Text("• " + blocker, color = WarnRed, fontSize = 10.sp)
+                            remoteStartAssessment.blockersFr.forEachIndexed { index, _ ->
+                                Text("• " + stringResource(remoteStartBlockerResourceId(index)), color = WarnRed, fontSize = 10.sp)
                             }
                         }
                     }
                     val availabilityLabel = when (capability.availability) {
-                        ControlAvailability.NOT_VERIFIED -> if (isFr) "NON VALIDÉ" else "NOT VERIFIED"
-                        ControlAvailability.AVAILABLE -> if (isFr) "DISPONIBLE" else "AVAILABLE"
-                        ControlAvailability.NOT_EQUIPPED -> if (isFr) "NON ÉQUIPÉ" else "NOT EQUIPPED"
+                        ControlAvailability.NOT_VERIFIED -> stringResource(R.string.status_not_verified)
+                        ControlAvailability.AVAILABLE -> stringResource(R.string.status_available)
+                        ControlAvailability.NOT_EQUIPPED -> stringResource(R.string.status_not_equipped)
                     }
                     val availabilityColor = when (capability.availability) {
                         ControlAvailability.NOT_VERIFIED -> WarnRed
@@ -683,15 +787,15 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
                 }
             }
         }
-        item { Text(if (isFr) "Aucune trame d'ouverture de vitre, de déverrouillage ou d'actionneur n'est envoyée par défaut. Cela évite les commandes erronées ou dangereuses." else "No window, unlock or actuator frame is sent by default. This prevents incorrect or unsafe commands.", color = TextMuted, fontSize = 12.sp) }
+        item { Text(stringResource(R.string.control_no_actuation_notice), color = TextMuted, fontSize = 12.sp) }
     }
 }
 
 @Composable
-fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
+fun ModulesScreen(modules: List<EcuModule>) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            SectionTitle(if (isFr) "Calculateurs du véhicule" else "Vehicle control modules")
+            SectionTitle(stringResource(R.string.modules_vehicle_title))
         }
         items(modules) { mod ->
             val statusColor = when (mod.status) {
@@ -702,26 +806,46 @@ fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
                 ModuleStatus.DISCOVERY_REQUIRED -> CamaroAmber
             }
             val statusLabel = when (mod.status) {
-                ModuleStatus.ACCESSIBLE -> if (isFr) "Accessible" else "Accessible"
-                ModuleStatus.REQUIRES_SWCAN -> if (isFr) "Requiert SW-CAN (Pin 1)" else "Requires SW-CAN (Pin 1)"
-                ModuleStatus.UNSUPPORTED_BY_ADAPTER -> if (isFr) "Bloqué par adaptateur" else "Blocked by adapter"
-                ModuleStatus.NOT_EQUIPPED -> if (isFr) "Non équipé" else "Not equipped"
-                ModuleStatus.DISCOVERY_REQUIRED -> if (isFr) "À identifier sur le véhicule" else "Vehicle discovery required"
+                ModuleStatus.ACCESSIBLE -> stringResource(R.string.module_accessible)
+                ModuleStatus.REQUIRES_SWCAN -> stringResource(R.string.module_requires_swcan)
+                ModuleStatus.UNSUPPORTED_BY_ADAPTER -> stringResource(R.string.module_blocked_adapter)
+                ModuleStatus.NOT_EQUIPPED -> stringResource(R.string.module_not_equipped)
+                ModuleStatus.DISCOVERY_REQUIRED -> stringResource(R.string.module_discovery_required)
             }
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${mod.shortName} • ${mod.bus.label}", fontWeight = FontWeight.Bold, color = CamaroBlue)
+                        Text("${mod.shortName} • ${localizedBusName(mod.bus)}", fontWeight = FontWeight.Bold, color = CamaroBlue)
                         Text(statusLabel, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
-                    Text(if (isFr) mod.nameFr else mod.nameEn, fontWeight = FontWeight.SemiBold)
+                    Text(localizedModuleName(mod), fontWeight = FontWeight.SemiBold)
                     if (mod.txHeader.isNotBlank() && mod.rxHeader.isNotBlank()) {
-                        Text("TX: 0x${mod.txHeader} | RX: 0x${mod.rxHeader} (${mod.bus.pinout})", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                        Text(stringResource(R.string.module_can_headers, mod.txHeader, mod.rxHeader, mod.bus.pinout), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
                     }
-                    Text(if (isFr) mod.notesFr else mod.notesEn, fontSize = 12.sp, color = TextMuted)
+                    Text(localizedModuleNotes(mod), fontSize = 12.sp, color = TextMuted)
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun localizedLivePidLabel(pid: LivePidValue): String {
+    val demo = pid.labelEn.contains("(DEMO)", ignoreCase = true)
+    return when (pid.id) {
+        "RPM" -> stringResource(if (demo) R.string.live_pid_rpm_demo else R.string.live_pid_rpm)
+        "ECT" -> stringResource(if (demo) R.string.live_pid_ect_demo else R.string.live_pid_ect)
+        "OIL" -> stringResource(R.string.live_pid_oil_demo)
+        "STFT" -> stringResource(if (demo) R.string.live_pid_stft_demo else R.string.live_pid_stft)
+        "BAT" -> stringResource(if (demo) R.string.live_pid_bat_demo else R.string.live_pid_bat)
+        "SPD" -> stringResource(R.string.live_pid_speed)
+        "TPS" -> stringResource(R.string.live_pid_throttle)
+        "LOAD" -> stringResource(R.string.live_pid_load)
+        "MAP" -> stringResource(R.string.live_pid_map)
+        "IAT" -> stringResource(R.string.live_pid_iat)
+        "MAF" -> stringResource(R.string.live_pid_maf)
+        else -> stringResource(R.string.live_pid_generic, pid.id)
     }
 }
 
@@ -730,7 +854,6 @@ fun LiveDataScreen(
     pids: List<LivePidValue>,
     units: UnitSystem,
     isStreaming: Boolean,
-    isFr: Boolean,
     recording: LiveRecordingState,
     telemetryMessage: String?,
     onToggleStream: () -> Unit,
@@ -742,13 +865,13 @@ fun LiveDataScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    SectionTitle(if (isFr) "Données Moteur Temps Réel" else "Live Engine Telemetry")
+                    SectionTitle(stringResource(R.string.live_engine_telemetry))
                     Row {
                         TextButton(onClick = onToggleUnits) {
-                            Text(if (units == UnitSystem.METRIC) "SI / Metric" else "Imperial", color = CamaroBlue)
+                            Text(if (units == UnitSystem.METRIC) stringResource(R.string.units_metric) else stringResource(R.string.units_imperial), color = CamaroBlue)
                         }
                         TextButton(onClick = onToggleStream) {
-                            Text(if (isStreaming) "Pause" else if (isFr) "Reprendre" else "Resume", color = CamaroAmber)
+                            Text(if (isStreaming) stringResource(R.string.live_pause) else stringResource(R.string.live_resume), color = CamaroAmber)
                         }
                     }
                 }
@@ -762,9 +885,9 @@ fun LiveDataScreen(
                             ) {
                                 Text(
                                     if (recording.isRecording) {
-                                        if (isFr) "Arrêter l'enregistrement" else "Stop recording"
+                                        stringResource(R.string.live_stop_recording)
                                     } else {
-                                        if (isFr) "Enregistrer les données" else "Record live data"
+                                        stringResource(R.string.live_record)
                                     },
                                     color = Color.Black
                                 )
@@ -774,12 +897,15 @@ fun LiveDataScreen(
                                 enabled = recording.sampleCount > 0 && !recording.isRecording,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text(if (isFr) "Exporter CSV" else "Export CSV")
+                                Text(stringResource(R.string.live_export_csv))
                             }
                         }
                         Text(
-                            if (isFr) "${recording.sampleCount} échantillon(s) • ${if (recording.isRecording) "ENREGISTREMENT" else "ARRÊTÉ"}"
-                            else "${recording.sampleCount} sample(s) • ${if (recording.isRecording) "RECORDING" else "STOPPED"}",
+                            stringResource(
+                                R.string.live_recording_status,
+                                recording.sampleCount,
+                                stringResource(if (recording.isRecording) R.string.live_recording_state_active else R.string.live_recording_state_stopped)
+                            ),
                             color = if (recording.isRecording) CamaroAmber else TextMuted,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -791,8 +917,7 @@ fun LiveDataScreen(
                             Text(it, color = WarnRed, fontSize = 11.sp)
                         }
                         Text(
-                            if (isFr) "Le journal enregistre les valeurs OBD affichées (métrique) avec leur horodatage. Il ne modifie pas les tables du calculateur."
-                            else "The logger records displayed OBD values (metric) with timestamps. It does not alter ECU calibration tables.",
+                            stringResource(R.string.live_recording_notice),
                             color = TextMuted, fontSize = 10.sp
                         )
                     }
@@ -805,9 +930,9 @@ fun LiveDataScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                        Text(if (isFr) pid.labelFr else pid.labelEn, color = TextMuted, fontSize = 13.sp)
+                        Text(localizedLivePidLabel(pid), color = TextMuted, fontSize = 13.sp)
                         Text(
-                            text = "${String.format("%.1f", displayVal)} $displayUnit",
+                            text = "${String.format(Locale.getDefault(), "%.1f", displayVal)} $displayUnit",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary,
@@ -841,30 +966,74 @@ fun Sparkline(values: List<Double>, minVal: Double, maxVal: Double) {
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onClear: () -> Unit) {
+private fun localizedDtcStatus(dtc: DiagnosticDtc): String = when {
+    dtc.isPending -> stringResource(R.string.obd_pending)
+    dtc.statusEn.equals("Permanent", ignoreCase = true) -> stringResource(R.string.obd_permanent)
+    else -> stringResource(R.string.obd_confirmed)
+}
+
+@Composable
+private fun localizedDtcDescription(dtc: DiagnosticDtc): String = when (dtc.code.uppercase()) {
+    "P0101" -> stringResource(R.string.dtc_desc_p0101)
+    "P0102" -> stringResource(R.string.dtc_desc_p0102)
+    "P0103" -> stringResource(R.string.dtc_desc_p0103)
+    "P0113" -> stringResource(R.string.dtc_desc_p0113)
+    "P0128" -> stringResource(R.string.dtc_desc_p0128)
+    "P0171" -> stringResource(R.string.dtc_desc_p0171)
+    "P0172" -> stringResource(R.string.dtc_desc_p0172)
+    "P0174" -> stringResource(R.string.dtc_desc_p0174)
+    "P0175" -> stringResource(R.string.dtc_desc_p0175)
+    "P0300" -> stringResource(R.string.dtc_desc_p0300)
+    "P0301" -> stringResource(R.string.dtc_desc_p0301)
+    "P0302" -> stringResource(R.string.dtc_desc_p0302)
+    "P0303" -> stringResource(R.string.dtc_desc_p0303)
+    "P0304" -> stringResource(R.string.dtc_desc_p0304)
+    "P0305" -> stringResource(R.string.dtc_desc_p0305)
+    "P0306" -> stringResource(R.string.dtc_desc_p0306)
+    "P0307" -> stringResource(R.string.dtc_desc_p0307)
+    "P0308" -> stringResource(R.string.dtc_desc_p0308)
+    "P0420" -> stringResource(R.string.dtc_desc_p0420)
+    "P0430" -> stringResource(R.string.dtc_desc_p0430)
+    "P0442" -> stringResource(R.string.dtc_desc_p0442)
+    "P0455" -> stringResource(R.string.dtc_desc_p0455)
+    "P0496" -> stringResource(R.string.dtc_desc_p0496)
+    "P0507" -> stringResource(R.string.dtc_desc_p0507)
+    "P06DD" -> stringResource(R.string.dtc_desc_p06dd)
+    "P1101" -> stringResource(R.string.dtc_desc_p1101)
+    "P0010" -> stringResource(R.string.dtc_desc_p0010)
+    "P0011" -> stringResource(R.string.dtc_desc_p0011)
+    "P0014" -> stringResource(R.string.dtc_desc_p0014)
+    "P0087" -> stringResource(R.string.dtc_desc_p0087)
+    "P0089" -> stringResource(R.string.dtc_desc_p0089)
+    "P0191" -> stringResource(R.string.dtc_desc_p0191)
+    "P0299" -> stringResource(R.string.dtc_desc_p0299)
+    else -> stringResource(R.string.dtc_description_unavailable)
+}
+
+@Composable
+fun DtcScreen(dtcs: List<DiagnosticDtc>, onScan: () -> Unit, onClear: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle(if (isFr) "Codes Défaut (DTC)" else "Diagnostic Trouble Codes")
+                SectionTitle(stringResource(R.string.dtc_title))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onScan) { Text(if (isFr) "Scanner" else "Scan") }
+                    OutlinedButton(onClick = onScan) { Text(stringResource(R.string.dtc_scan)) }
                     Button(onClick = { confirmClear = true }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
-                        Text(if (isFr) "Effacer" else "Clear", color = Color.White)
+                        Text(stringResource(R.string.dtc_clear), color = Color.White)
                     }
                 }
             }
         }
         item {
             Text(
-                if (isFr) "L'effacement Mode 04 supprime les défauts d'émissions et réinitialise certains moniteurs de readiness. Enregistrer le rapport avant de continuer."
-                else "Mode 04 clearing removes emissions-related trouble codes and resets some readiness monitors. Save the report before continuing.",
+                stringResource(R.string.dtc_clear_warning),
                 color = TextMuted, fontSize = 11.sp
             )
         }
         if (dtcs.isEmpty()) {
             item {
-                Text(if (isFr) "Aucun code défaut retourné par le dernier scan." else "No trouble codes returned by the last scan.", color = OkGreen)
+                Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
             }
         } else {
             items(dtcs) { dtc ->
@@ -872,9 +1041,9 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("${dtc.code} (${dtc.module})", fontWeight = FontWeight.Bold, color = if (dtc.isPending) CamaroAmber else WarnRed, fontSize = 16.sp)
-                            Text(if (isFr) dtc.statusFr else dtc.statusEn, fontSize = 12.sp, color = TextMuted)
+                            Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
                         }
-                        Text(if (isFr) dtc.descFr else dtc.descEn)
+                        Text(localizedDtcDescription(dtc))
                     }
                 }
             }
@@ -884,8 +1053,8 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text(if (isFr) "Confirmer l'effacement des défauts ?" else "Confirm DTC clearing?") },
-            text = { Text(if (isFr) "Cette opération envoie le service OBD Mode 04 à l'ECU. Les données de readiness peuvent être réinitialisées. Elle ne répare pas la cause du défaut." else "This sends OBD Mode 04 to the ECU. Readiness data may be reset. It does not repair the cause of a fault.") },
+            title = { Text(stringResource(R.string.dtc_confirm_clear)) },
+            text = { Text(stringResource(R.string.dtc_clear_description)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -893,29 +1062,97 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onCl
                         onClear()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = WarnRed)
-                ) { Text(if (isFr) "Effacer les défauts" else "Clear codes") }
+                ) { Text(stringResource(R.string.dtc_clear_action)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text(if (isFr) "Annuler" else "Cancel") }
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
 }
 
+
+@Composable
+private fun localizedMileageSummary(report: MileageAuditReport): String {
+    val valid = report.readings.filter { reading ->
+        reading.kmValue?.let { it.isFinite() && it >= 0.0 } == true
+    }
+    val independent = valid.filter {
+        !it.profileEvidenceReference.isNullOrBlank() &&
+            it.confidence == ConfidenceLevel.HIGH &&
+            it.moduleId.uppercase() in setOf("BCM", "IPC", "ECM_TOTAL_ODO")
+    }.distinctBy { it.moduleId.uppercase() }
+    val values = independent.mapNotNull { it.kmValue }
+    val delta = if (values.size >= 2) values.maxOrNull()!! - values.minOrNull()!! else 0.0
+    return when {
+        report.hasDiscrepancy -> stringResource(R.string.mileage_summary_discrepancy, delta)
+        values.size >= 2 -> stringResource(R.string.mileage_summary_agreement, delta)
+        valid.isEmpty() -> stringResource(R.string.mileage_summary_no_data)
+        else -> stringResource(R.string.mileage_summary_insufficient, valid.size, independent.size)
+    }
+}
+
+@Composable
+private fun localizedMileageSourceName(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_source_j2534)
+    "DEMO" -> stringResource(R.string.mileage_source_demo)
+    "ECM_A6" -> stringResource(R.string.mileage_source_ecm_a6)
+    "ECM_D3" -> stringResource(R.string.mileage_source_ecm_d3)
+    "BCM" -> stringResource(R.string.module_bcm_name)
+    "IPC" -> stringResource(R.string.module_ipc_name)
+    "ECM_TOTAL_ODO" -> stringResource(R.string.mileage_source_ecm_total)
+    else -> stringResource(R.string.mileage_source_generic, item.moduleId)
+}
+
+@Composable
+private fun localizedMileageDetails(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_details_j2534)
+    "DEMO" -> stringResource(R.string.mileage_details_demo)
+    "ECM_A6" -> stringResource(
+        R.string.mileage_details_pid,
+        "A6",
+        if (item.didInfo.contains("not advertised by ECU")) stringResource(R.string.mileage_pid_not_advertised) else item.didInfo.substringAfter("•", item.didInfo).trim()
+    )
+    "ECM_D3" -> stringResource(
+        R.string.mileage_details_pid,
+        "D3",
+        if (item.didInfo.contains("not advertised by ECU")) stringResource(R.string.mileage_pid_not_advertised) else item.didInfo.substringAfter("•", item.didInfo).trim()
+    )
+    "BCM", "IPC" -> stringResource(R.string.mileage_details_module_not_read)
+    else -> stringResource(R.string.mileage_details_unavailable)
+}
+
+@Composable
+private fun localizedMileageConfidence(confidence: ConfidenceLevel): String = when (confidence) {
+    ConfidenceLevel.HIGH -> stringResource(R.string.confidence_high)
+    ConfidenceLevel.MODERATE -> stringResource(R.string.confidence_moderate)
+    ConfidenceLevel.UNAVAILABLE -> stringResource(R.string.confidence_unavailable)
+}
+
+@Composable
+private fun localizedMileageCaveat(item: MileageSourceReading): String = when (item.moduleId) {
+    "J2534" -> stringResource(R.string.mileage_caveat_j2534)
+    "DEMO" -> stringResource(R.string.mileage_caveat_demo)
+    "ECM_A6" -> stringResource(if (item.kmValue != null) R.string.mileage_caveat_ecm_a6_valid else R.string.mileage_caveat_ecm_a6_missing)
+    "ECM_D3" -> stringResource(if (item.kmValue != null) R.string.mileage_caveat_ecm_d3_valid else R.string.mileage_caveat_ecm_d3_missing)
+    "BCM" -> stringResource(R.string.mileage_caveat_bcm)
+    "IPC" -> stringResource(R.string.mileage_caveat_ipc)
+    else -> stringResource(R.string.mileage_caveat_unavailable)
+}
+
 @Composable
 fun MileageScreen(
     report: MileageAuditReport?,
-    isFr: Boolean,
     onRefreshAudit: () -> Unit,
     onSaveReport: () -> Unit
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle(if (isFr) "Contrôle de cohérence kilométrique" else "Mileage consistency check")
+                SectionTitle(stringResource(R.string.mileage_consistency))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(onClick = onRefreshAudit) { Text(if (isFr) "Relire" else "Re-read") }
-                    Button(onClick = onSaveReport) { Text(if (isFr) "Sauver" else "Save") }
+                    OutlinedButton(onClick = onRefreshAudit) { Text(stringResource(R.string.mileage_reread)) }
+                    Button(onClick = onSaveReport) { Text(stringResource(R.string.common_save)) }
                 }
             }
         }
@@ -924,11 +1161,11 @@ fun MileageScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = if (rep.hasDiscrepancy) Color(0xFF3B1518) else SurfaceElevated)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = if (isFr) "Synthèse Technique (VIN: ${rep.vin})" else "Engineering Summary (VIN: ${rep.vin})",
+                            text = stringResource(R.string.mileage_engineering_summary, rep.vin),
                             fontWeight = FontWeight.Bold,
                             color = if (rep.hasDiscrepancy) WarnRed else OkGreen
                         )
-                        Text(if (isFr) rep.summaryFr else rep.summaryEn, fontSize = 13.sp)
+                        Text(localizedMileageSummary(rep), fontSize = 13.sp)
                     }
                 }
             }
@@ -941,17 +1178,17 @@ fun MileageScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(if (isFr) item.moduleNameFr else item.moduleNameEn, fontWeight = FontWeight.Bold)
+                            Text(localizedMileageSourceName(item), fontWeight = FontWeight.Bold)
                             Text(
-                                text = item.kmValue?.let { "${String.format("%,.1f", it)} km" } ?: "N/A",
+                                text = item.kmValue?.let { "${String.format(Locale.getDefault(), "%,.1f", it)} km" } ?: stringResource(R.string.obd_not_available),
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 color = if (item.kmValue != null) CamaroBlue else TextMuted
                             )
                         }
-                        Text(item.didInfo, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
-                        Text(if (isFr) item.confidence.labelFr else item.confidence.labelEn, color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text(if (isFr) item.caveatFr else item.caveatEn, fontSize = 12.sp, color = TextMuted)
+                        Text(localizedMileageDetails(item), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted)
+                        Text(localizedMileageConfidence(item.confidence), color = confColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(localizedMileageCaveat(item), fontSize = 12.sp, color = TextMuted)
                     }
                 }
             }
@@ -960,21 +1197,20 @@ fun MileageScreen(
 }
 
 @Composable
-fun HardwareGuideScreen(isFr: Boolean) {
+fun HardwareGuideScreen() {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            SectionTitle(if (isFr) "Guide d'Achat & Compatibilité OBD-II GM" else "OBD-II Hardware & GM GMLAN Buying Guide")
+            SectionTitle(stringResource(R.string.guide_title))
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        if (isFr) "1. Recommandé : OBDLink MX+ (Puce STN2255)" else "1. Recommended: OBDLink MX+ (STN2255 Chip)",
+                        stringResource(R.string.guide_recommended_mxplus),
                         fontWeight = FontWeight.Bold, color = OkGreen
                     )
                     Text(
-                        if (isFr) "Interface STN haut de gamme à privilégier pour les diagnostics GM avancés. La prise en charge physique SW-CAN dépend du modèle exact de l'interface et ne garantit pas à elle seule l'accès au BCM, à l'IPC ou au SDM : les protocoles et identifiants doivent être validés pour le VIN."
-                        else "A high-end STN interface is recommended for advanced GM diagnostics. Physical SW-CAN support depends on the exact adapter model and does not by itself guarantee BCM, IPC or SDM access; protocols and identifiers must be validated for the VIN.",
+                        stringResource(R.string.guide_mxplus_description),
                         fontSize = 13.sp
                     )
                 }
@@ -984,12 +1220,11 @@ fun HardwareGuideScreen(isFr: Boolean) {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        if (isFr) "2. Alternative HS-CAN : vLinker MC+ / OBDLink LX" else "2. HS-CAN Alternative: vLinker MC+ / OBDLink LX",
+                        stringResource(R.string.guide_hscan_alternative),
                         fontWeight = FontWeight.Bold, color = CamaroAmber
                     )
                     Text(
-                        if (isFr) "Excellente fiabilité sur le bus moteur/boîte/ABS (HS-CAN 500 kbps). Le vLinker MC+ gère également le SW-CAN GMLAN."
-                        else "High-throughput reliability on powertrain/ABS HS-CAN (500 kbps). The vLinker MC+ also supports GMLAN SW-CAN.",
+                        stringResource(R.string.guide_vlinker_description),
                         fontSize = 13.sp
                     )
                 }
@@ -999,12 +1234,11 @@ fun HardwareGuideScreen(isFr: Boolean) {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        if (isFr) "3. Limites des Clones ELM327 v2.1 Génériques" else "3. Limitations of Generic ELM327 v2.1 Clones",
+                        stringResource(R.string.guide_clone_limitations),
                         fontWeight = FontWeight.Bold, color = WarnRed
                     )
                     Text(
-                        if (isFr) "Les boîtiers bleus ou mini ELM327 à bas coût n'ont aucun circuit physique sur la broche 1 (SW-CAN), possèdent des mémoires tampon tronquées et rejettent souvent les commandes d'adressage CAN étendu. L'accès aux modules dépend toujours de l'équipement du véhicule, de la puce de l'interface et du protocole supporté."
-                        else "Low-cost blue/mini ELM327 clones lack physical transceivers on Pin 1 (SW-CAN), suffer from truncated RX buffers, and often fail extended CAN header addressing. Module access always depends on vehicle equipment, adapter hardware, and supported protocols.",
+                        stringResource(R.string.guide_clone_description),
                         fontSize = 13.sp
                     )
                 }
@@ -1013,12 +1247,12 @@ fun HardwareGuideScreen(isFr: Boolean) {
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun SettingsScreen(
     lang: AppLanguage,
     units: UnitSystem,
     sessions: List<com.camarodiag.gen5.data.db.SavedSessionEntity>,
-    isFr: Boolean,
     onLang: (AppLanguage) -> Unit,
     onUnits: (UnitSystem) -> Unit,
     onDeleteSession: (com.camarodiag.gen5.data.db.SavedSessionEntity) -> Unit
@@ -1026,31 +1260,28 @@ fun SettingsScreen(
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            SectionTitle(if (isFr) "Paramètres & Rapports Enregistrés" else "Settings & Saved Reports")
+            SectionTitle(stringResource(R.string.settings_title))
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(if (isFr) "Langue de l'application" else "Application Language", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.system_language_current, lang.label), color = CamaroAmber)
+                    Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_unit_system), fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppLanguage.entries.forEach { l ->
-                            FilterChip(selected = lang == l, onClick = { onLang(l) }, label = { Text(l.label) })
-                        }
-                    }
-                    Text(if (isFr) "Système d'unités" else "Measurement Units", fontWeight = FontWeight.Bold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text("Metric (km, °C, kPa)") })
-                        FilterChip(selected = units == UnitSystem.IMPERIAL, onClick = { onUnits(UnitSystem.IMPERIAL) }, label = { Text("Imperial (mi, °F, PSI)") })
+                        FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text(stringResource(R.string.units_metric_details)) })
+                        FilterChip(selected = units == UnitSystem.IMPERIAL, onClick = { onUnits(UnitSystem.IMPERIAL) }, label = { Text(stringResource(R.string.units_imperial_details)) })
                     }
                 }
             }
         }
         item {
-            Text(if (isFr) "Sessions Sauvegardées (Base Locale Room)" else "Saved Diagnostic Sessions (Local Room DB)", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.settings_saved_sessions), fontWeight = FontWeight.Bold)
         }
         if (sessions.isEmpty()) {
             item {
-                Text(if (isFr) "Aucune session enregistrée. Utilisez le bouton 'Sauver' dans l'onglet Odomètre." else "No saved sessions yet. Use 'Save' in the Mileage tab.", color = TextMuted, fontSize = 13.sp)
+                Text(stringResource(R.string.settings_no_sessions), color = TextMuted, fontSize = 13.sp)
             }
         } else {
             items(sessions) { s ->
@@ -1062,8 +1293,8 @@ fun SettingsScreen(
                                 Icon(Icons.Default.Delete, null, tint = WarnRed)
                             }
                         }
-                        Text("${sdf.format(Date(s.timestamp))} • VIN: ${s.vin}", fontSize = 11.sp, color = TextMuted)
-                        Text("DTCs: ${s.dtcSummary}", fontSize = 12.sp, color = CamaroBlue)
+                        Text("${sdf.format(Date(s.timestamp))} • ${stringResource(R.string.session_vin_label, s.vin)}", fontSize = 11.sp, color = TextMuted)
+                        Text(stringResource(R.string.session_dtcs_label, s.dtcSummary), fontSize = 12.sp, color = CamaroBlue)
                         Text(s.mileageSummary, fontSize = 12.sp)
                     }
                 }

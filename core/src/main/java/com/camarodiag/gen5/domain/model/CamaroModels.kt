@@ -1,8 +1,31 @@
 package com.camarodiag.gen5.domain.model
 
+import java.util.Locale
+
 enum class AppLanguage(val code: String, val label: String) {
     EN("en", "English"),
-    FR("fr", "Français")
+    FR("fr", "Français"),
+    DE("de", "Deutsch"),
+    IT("it", "Italiano"),
+    ES("es", "Español"),
+    HE("he", "עברית"),
+    RU("ru", "Русский"),
+    ZH("zh", "简体中文"),
+    JA("ja", "日本語"),
+    KO("ko", "한국어"),
+    AR("ar", "العربية"),
+    PT("pt", "Português"),
+    NL("nl", "Nederlands"),
+    EL("el", "Ελληνικά");
+
+    companion object {
+        fun fromLocale(locale: Locale): AppLanguage {
+            val language = locale.language.lowercase(Locale.ROOT)
+            // Only Simplified Chinese (zh-CN) has a bundled translation.
+            if (language == "zh" && !locale.country.equals("CN", ignoreCase = true)) return EN
+            return entries.firstOrNull { it.code == language } ?: EN
+        }
+    }
 }
 
 enum class UnitSystem { METRIC, IMPERIAL }

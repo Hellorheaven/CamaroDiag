@@ -1,21 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:fillColor="#090B0F" android:pathData="M0,0h108v108h-108z" />
-    <path android:fillColor="#FFC400" android:pathData="M8,8h92v92h-92z" />
-    <path android:fillColor="#101318" android:pathData="M13,13h82v82h-82z" />
-    <path android:fillColor="#FFC400" android:pathData="M17,17h74v74h-74z" />
-    <path android:fillColor="#11151B" android:pathData="M22,22h64v64h-64z" />
-    <path android:fillColor="#FFD21A" android:pathData="M13,64 L18,52 L31,47 L42,34 Q45,30 52,30 H68 Q73,30 77,36 L86,48 L94,53 L97,65 L93,77 H16 Z" />
-    <path android:fillColor="#11151B" android:pathData="M35,48 L45,36 H67 L77,48 Z" />
-    <path android:fillColor="#9CB4C7" android:pathData="M40,45 L47,38 H65 L72,45 Z" />
-    <path android:fillColor="#11151B" android:pathData="M47,34 L53,30 H60 L66,34 L63,48 H50 Z" />
-    <path android:fillColor="#11151B" android:pathData="M17,55 L32,49 L34,55 L18,62 Z M75,49 L92,55 L94,62 L77,56 Z" />
-    <path android:fillColor="#11151B" android:pathData="M24,64 H87 L83,72 H28 Z" />
-    <path android:fillColor="#FFC400" android:pathData="M31,75 H77 V79 H31 Z" />
-    <path android:fillColor="#11151B" android:pathData="M26,80 Q27,74 34,74 H43 Q49,74 50,81 H58 Q59,74 66,74 H75 Q82,74 83,81 L79,87 H30 Z" />
-    <path android:fillColor="#FFC400" android:pathData="M37,82a5,5 0,1 0,10 0a5,5 0,1 0,-10 0 M62,82a5,5 0,1 0,10 0a5,5 0,1 0,-10 0" />
-    <path android:fillColor="#11151B" android:pathData="M17,90 L91,90 L91,95 L17,95 Z" />
+    <path
+        android:fillColor="@color/camarodiag_synergy_green"
+        android:pathData="M13,64 L18,52 L31,47 L42,34 Q45,30 52,30 H68 Q73,30 77,36 L86,48 L94,53 L97,65 L93,77 H16 Z" />
+    <path
+        android:fillColor="@color/camarodiag_synergy_green"
+        android:pathData="M35,48 L45,36 H67 L77,48 Z" />
+    <path
+        android:fillColor="@color/camarodiag_synergy_green"
+        android:pathData="M26,80 Q27,74 34,74 H43 Q49,74 50,81 H58 Q59,74 66,74 H75 Q82,74 83,81 L79,87 H30 Z" />
 </vector>

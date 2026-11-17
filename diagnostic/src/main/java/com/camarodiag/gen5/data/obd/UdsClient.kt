@@ -9,6 +9,7 @@ import java.util.Locale
  * vehicle VIN, ECU identity, CAL ID/CVN and documentary evidence have been checked.
  * No GM write profile is bundled until those values and procedures are documented.
  */
+@ConsistentCopyVisibility
 data class UdsAccessPolicy internal constructor(
     val readDids: Set<Int>,
     val writeDids: Set<Int>,
