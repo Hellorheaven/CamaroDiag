@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8 με AFM και αυτόματο κιβώτιο. Μην επαναχρησιμοποιείτε βαθμονόμηση LS3· επαληθεύστε RPO, κιβώτιο και αναγνωριστικά ECU.</string>
     <string name="cal_profile_notes_lsa">Camaro Gen 5 ZL1 με υπερτροφοδοτούμενο LSA V8. Επαληθεύστε τη βαθμονόμηση για τον υπερσυμπιεστή, το καύσιμο, την αγορά και την έκδοση λογισμικού.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8. Ξεχωριστό προφίλ από τα LS3/L99 παρά την ονομαστική οικογένεια ελεγκτή· η ταυτοποίηση λογισμικού είναι υποχρεωτική.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 LTG 2.0 Turbo (εύρος κάλυψης 2016–2020). Το δελτίο GM PIP5313B προσδιορίζει E80 στο Camaro LTG 2016–2017· επαληθεύστε τα επόμενα έτη με αριθμό ανταλλακτικού και CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (εύρος κάλυψης 2016–2023). Το δελτίο GM PIP5313B προσδιορίζει E80 στο Camaro LTG 2016–2017· επαληθεύστε τα επόμενα έτη με αριθμό ανταλλακτικού και CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6. Το προφίλ μπορεί να διαφέρει ανά έτος, αγορά και αναθεώρηση· επιβεβαιώστε τον πραγματικό ελεγκτή και το CVN πριν φορτώσετε ορισμό πίνακα.</string>
     <string name="cal_profile_notes_lt1">Camaro Gen 6 LT1 V8 ατμοσφαιρικός. Διακρίνετε τις αναθεωρήσεις βαθμονόμησης με βάση CAL ID/CVN, έτος, αγορά, κιβώτιο και αριθμούς υλικού.</string>
     <string name="cal_profile_notes_lt4">Camaro Gen 6 ZL1 με υπερτροφοδοτούμενο LT4 V8. Μην το συγχέετε με το LT1· επικυρώστε τους αριθμούς ανταλλακτικών και τα δεδομένα πίεσης υπερπλήρωσης της συγκεκριμένης βαθμονόμησης.</string>
