@@ -146,6 +146,12 @@ object DtcCatalogRegistry {
      * never be displayed as proof of a GM-specific failure mechanism.
      */
     val saeGenericDescriptions: Map<String, Pair<String, String>> = mapOf(
+        "P0008" to ("Engine position system performance (Bank 1)" to "Performance du système de position moteur (banc 1)"),
+        "P0009" to ("Engine position system performance (Bank 2)" to "Performance du système de position moteur (banc 2)"),
+        "P000A" to ("A Camshaft Position Slow Response (Bank 1)" to "Réponse lente de l'arbre à cames d'admission (banc 1)"),
+        "P000B" to ("B Camshaft Position Slow Response (Bank 1)" to "Réponse lente de l'arbre à cames d'échappement (banc 1)"),
+        "P000C" to ("A Camshaft Position Slow Response (Bank 2)" to "Réponse lente de l'arbre à cames d'admission (banc 2)"),
+        "P000D" to ("B Camshaft Position Slow Response (Bank 2)" to "Réponse lente de l'arbre à cames d'échappement (banc 2)"),
         "P0010" to ("Intake camshaft actuator control circuit (Bank 1)" to "Circuit de commande de l'actionneur d'arbre à cames d'admission (banc 1)"),
         "P0011" to ("Intake camshaft timing over-advanced / system performance (Bank 1)" to "Calage d'admission trop avancé / performance du système (banc 1)"),
         "P0013" to ("Exhaust Camshaft Position Actuator Circuit (Bank 1)" to "Circuit de commande de l'actionneur d'arbre à cames d'échappement (banc 1)"),

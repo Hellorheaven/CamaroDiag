@@ -73,7 +73,7 @@ class DtcCatalogRegistryTest {
     @Test
     fun genericSaeDescriptionsAreAvailableWithoutClaimingOemSpecificity() {
         assertNotNull(DtcCatalogRegistry.genericDescription("P0101"))
-        listOf("P0013", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024", "P0030", "P0036", "P0050", "P0053", "P0054", "P0059", "P0060").forEach { code ->
+        listOf("P0008", "P0009", "P000A", "P000B", "P000C", "P000D", "P0013", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024", "P0030", "P0036", "P0050", "P0053", "P0054", "P0059", "P0060").forEach { code ->
             assertNotNull("Missing generic SAE description for $code", DtcCatalogRegistry.genericDescription(code))
         }
         assertNotNull(DtcCatalogRegistry.genericDescription("P0308"))
@@ -90,6 +90,25 @@ class DtcCatalogRegistryTest {
         assertEquals(null, CamaroDtcCatalog.applicabilityNotice("P0308", lt1))
         assertNotNull(CamaroDtcCatalog.applicabilityNotice("P0299", lfx))
         assertEquals(null, CamaroDtcCatalog.applicabilityNotice("P0299", ltg))
+    }
+
+    @Test
+    fun gm2010And2011LltMonitorsUseYearSpecificCalibrationEvidence() {
+        val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
+        val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)
+        val llt2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LLT)
+
+        assertTrue(GmEngineMonitorCatalog.find("P0011", llt2010)?.malfunctionCriteriaEn?.contains("7.0–8.0") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0011", llt2011)?.malfunctionCriteriaEn?.contains("6.0–11.0") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P000A", llt2010)?.malfunctionCriteriaEn?.contains("1.5") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P000A", llt2011)?.malfunctionCriteriaEn?.contains("2.5") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0016", llt2010)?.malfunctionCriteriaEn?.contains("9.9") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0016", llt2011)?.malfunctionCriteriaEn?.contains("11.7") == true)
+        assertEquals("10OBDG02", GmEngineMonitorCatalog.sourceLabel(llt2010))
+        assertEquals("11OBDG06", GmEngineMonitorCatalog.sourceLabel(llt2011))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", llt2012))
+        assertEquals(18, Gm2010LltMonitorCatalog.supportedCodes().size)
+        assertEquals(18, Gm2011LltMonitorCatalog.supportedCodes().size)
     }
 
     @Test

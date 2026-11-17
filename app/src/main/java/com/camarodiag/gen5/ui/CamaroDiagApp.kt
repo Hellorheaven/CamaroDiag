@@ -1096,8 +1096,8 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 Text(applicability, color = WarnRed)
                             }
                         }
-                        val gmMonitor = GmLfxMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
-                        val gmSourceLabel = GmLfxMonitorCatalog.sourceLabel(vehicle) ?: "GM"
+                        val gmMonitor = GmEngineMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        val gmSourceLabel = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
                         if (gmMonitor != null) {
                             Divider(color = TextMuted.copy(alpha = 0.25f))
                             Text(

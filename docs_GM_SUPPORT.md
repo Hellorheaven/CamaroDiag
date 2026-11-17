@@ -188,3 +188,22 @@ Références primaires :
 - GM, 14OBDG06A Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/14OBDG06A%20Engine%20Diagnostics.pdf
 
 Ces données restent limitées aux profils LFX 2013 et 2014. Aucun seuil n'est extrapolé au LFX 2015 tant que son dossier 150BDG06 n'a pas été vérifié.
+
+
+## Données de surveillance GM – Camaro LLT 2010 et 2011
+
+Les profils LLT sont désormais associés à leurs propres dossiers de certification, sans reprendre les seuils LFX :
+- 2010 Camaro 3.6L LLT : groupe OBD 2, dossier 10OBDG02 Engine Diagnostics.
+- 2011 Camaro 3.6L LLT : groupe OBD 6 SIDI, dossier 11OBDG06 Engine Diagnostics.
+
+Pour chaque année, 18 moniteurs moteur sont disponibles : P0008/P0009 (pignons intermédiaires), P000A–P000D (réponse lente des arbres à cames), P0010/P0013/P0020/P0023 (circuits d'actionneurs), P0011/P0014/P0021/P0024 (cohérence du déphasage) et P0016–P0019 (alignement vilebrequin/arbre à cames).
+
+Les paramètres restent strictement annuels : par exemple, le seuil de réponse lente et les critères de cohérence des arbres à cames ne sont pas identiques entre 2010 et 2011. L'application affiche le dossier GM correspondant au millésime.
+
+Références primaires :
+- GM, 2010 OBD Grouping Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2010/2010%20OBD%20Grouping%20Summary.pdf
+- GM, 10OBDG02 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2010/10OBDG02%20Engine%20Diagnostics.pdf
+- GM, 2011 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/2011%20OBD%20GROUP%20SUMMARY.pdf
+- GM, 11OBDG06 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/11OBDG06%20Engine%20Diagnostics.pdf
+
+Les paramètres ci-dessus décrivent les moniteurs de certification OBD. Ils ne remplacent pas les arbres de diagnostic de réparation SI ni la validation par VIN/CAL ID.
