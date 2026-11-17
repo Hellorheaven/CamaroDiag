@@ -561,4 +561,8 @@
     <string name="dtc_possible_causes">Causas possíveis (não confirmadas)</string>
     <string name="dtc_recommended_checks">Verificações recomendadas</string>
     <string name="dtc_vehicle_specific_not_documented">Ainda não existe um procedimento específico documentado para este código e configuração. A descrição OEM/SAE é apresentada acima; confirme o VIN e o módulo nas informações de serviço GM.</string>
+    <string name="dtc_desc_p0016">Correlação cambota / árvore de cames de admissão não plausível (banco 1)</string>
+    <string name="dtc_desc_p0017">Correlação cambota / árvore de cames de escape não plausível (banco 1)</string>
+    <string name="dtc_desc_p0018">Correlação cambota / árvore de cames de admissão não plausível (banco 2)</string>
+    <string name="dtc_desc_p0019">Correlação cambota / árvore de cames de escape não plausível (banco 2)</string>
 </resources>
