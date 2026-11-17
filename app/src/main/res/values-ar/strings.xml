@@ -492,4 +492,8 @@
         <item quantity="many">%1$d بايتًا</item>
         <item quantity="other">%1$d بايت</item>
     </plurals>
+    <string name="msg_native_catalog_load_failed">تعذر تحميل كتالوج إشارات Camaro الأصلي.</string>
+    <string name="msg_obdb_catalog_load_failed">تعذر تحميل كتالوج OBDb الخاص بـ Camaro.</string>
+    <string name="msg_obdb_signal_read_failed">تعذرت قراءة إشارة OBDb.</string>
+    <string name="msg_j2534_bridge_connect_failed">تعذر الاتصال بجسر J2534.</string>
 </resources>

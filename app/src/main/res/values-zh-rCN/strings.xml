@@ -477,4 +477,8 @@
     <plurals name="cal_file_size_bytes">
         <item quantity="other">%1$d 字节</item>
     </plurals>
+    <string name="msg_native_catalog_load_failed">无法加载 Camaro 原生信号目录。</string>
+    <string name="msg_obdb_catalog_load_failed">无法加载 OBDb Camaro 目录。</string>
+    <string name="msg_obdb_signal_read_failed">读取 OBDb 信号失败。</string>
+    <string name="msg_j2534_bridge_connect_failed">无法连接到 J2534 网桥。</string>
 </resources>

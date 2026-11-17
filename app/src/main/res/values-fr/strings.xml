@@ -483,4 +483,8 @@
         <item quantity="other">%1$d octets</item>
         <item quantity="many">%1$d octets</item>
     </plurals>
+    <string name="msg_native_catalog_load_failed">Impossible de charger le catalogue natif des signaux Camaro.</string>
+    <string name="msg_obdb_catalog_load_failed">Impossible de charger le catalogue OBDb Camaro.</string>
+    <string name="msg_obdb_signal_read_failed">Échec de la lecture du signal OBDb.</string>
+    <string name="msg_j2534_bridge_connect_failed">Impossible de se connecter au pont J2534.</string>
 </resources>

@@ -213,7 +213,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { error ->
                 withContext(Dispatchers.Main) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        nativeSignalMessage = error.localizedMessage ?: "Native Camaro signal catalogue could not be loaded."
+                        nativeSignalMessage = getApplication<Application>().getString(R.string.msg_native_catalog_load_failed)
                     )
                 }
             }
@@ -236,7 +236,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .onFailure { error ->
                     withContext(Dispatchers.Main) {
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                            obdbSignalMessage = error.localizedMessage ?: "OBDb Camaro catalog could not be loaded."
+                            obdbSignalMessage = getApplication<Application>().getString(R.string.msg_obdb_catalog_load_failed)
                         )
                     }
                 }
@@ -340,7 +340,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isObdbSignalReading = false,
                     obdbSignalValue = "",
-                    obdbSignalMessage = error.localizedMessage ?: "OBDb signal read failed."
+                    obdbSignalMessage = getApplication<Application>().getString(R.string.msg_obdb_signal_read_failed)
                 )
             }
         }
@@ -405,7 +405,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534BridgeConnecting = false,
                     isJ2534BridgeConnected = false,
-                    j2534BridgeMessage = error.localizedMessage ?: "Connexion au pont J2534 impossible."
+                    j2534BridgeMessage = getApplication<Application>().getString(R.string.msg_j2534_bridge_connect_failed)
                 )
             }
         }
@@ -476,7 +476,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDidResponse = "",
-                    udsMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_uds_read_failed)
+                    udsMessage = getApplication<Application>().getString(R.string.msg_uds_read_failed)
                 )
             }
         }
@@ -538,7 +538,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = "",
-                    udsMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_uds_dtc_read_failed)
+                    udsMessage = getApplication<Application>().getString(R.string.msg_uds_dtc_read_failed)
                 )
             }
         }
@@ -594,7 +594,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
-                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_identifiers_failed)
+                    message = getApplication<Application>().getString(R.string.msg_cal_identifiers_failed)
                 )
             }
         }
@@ -679,7 +679,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_file_import_failed)
+                    message = getApplication<Application>().getString(R.string.msg_cal_file_import_failed)
                 )
             }
         }
@@ -753,7 +753,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 storedFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_comparison_failed)
+                    message = getApplication<Application>().getString(R.string.msg_cal_comparison_failed)
                 )
             }
         }
@@ -772,7 +772,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_template_export_failed)
+                    mapError = getApplication<Application>().getString(R.string.msg_cal_template_export_failed)
                 )
             }
         }
@@ -834,8 +834,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_definitions_import_failed),
-                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_definitions_import_failed)
+                    mapError = getApplication<Application>().getString(R.string.msg_cal_definitions_import_failed),
+                    message = getApplication<Application>().getString(R.string.msg_cal_definitions_import_failed)
                 )
             }
         }
@@ -864,7 +864,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = current.copy(
-                    mapError = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_map_read_failed)
+                    mapError = getApplication<Application>().getString(R.string.msg_cal_map_read_failed)
                 )
             }
         }
@@ -940,8 +940,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 createdFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_table_edit_failed),
-                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_table_edit_failed)
+                    mapError = getApplication<Application>().getString(R.string.msg_cal_table_edit_failed),
+                    message = getApplication<Application>().getString(R.string.msg_cal_table_edit_failed)
                 )
             }
         }
@@ -1009,7 +1009,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_cal_file_export_failed)
+                    message = getApplication<Application>().getString(R.string.msg_cal_file_export_failed)
                 )
             }
         }
@@ -1037,12 +1037,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         refreshTopologyAndDefaults(runInitialScans = true)
                     }
                     .onFailure { error ->
-                        _connectionMessage.value = error.localizedMessage ?: fallbackMessage
+                        _connectionMessage.value = fallbackMessage
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: fallbackMessage
+                _connectionMessage.value = fallbackMessage
             } finally {
                 endBusyOperation()
             }
@@ -1065,7 +1065,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_refresh_adapters_failed)
+                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_refresh_adapters_failed)
             }
         }
     }
@@ -1107,7 +1107,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_simulation_activation_failed)
+                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_simulation_activation_failed)
             } finally {
                 endBusyOperation()
             }
@@ -1186,7 +1186,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _liveRecordingState.value = _liveRecordingState.value.copy(
-                    message = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_live_csv_export_failed)
+                    message = getApplication<Application>().getString(R.string.msg_live_csv_export_failed)
                 )
             }
         }
@@ -1249,7 +1249,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_dtc_scan_failed)
+                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_scan_failed)
             } finally {
                 endBusyOperation()
             }
@@ -1347,7 +1347,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_dtc_clear_failed)
+                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_clear_failed)
             } finally {
                 endBusyOperation()
             }
@@ -1418,7 +1418,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
-                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_mileage_audit_failed)
+                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_mileage_audit_failed)
             } finally {
                 endBusyOperation()
             }
@@ -1460,7 +1460,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _obdScanMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_full_scan_failed)
+                _obdScanMessage.value = getApplication<Application>().getString(R.string.msg_full_scan_failed)
             } finally {
                 _isObdScanning.value = false
             }
@@ -1489,7 +1489,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_session_save_failed)
+                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_session_save_failed)
             }
         }
     }
@@ -1501,7 +1501,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_session_delete_failed)
+                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_session_delete_failed)
             }
         }
     }
@@ -1622,7 +1622,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         throw cancelled
                     } catch (error: Exception) {
                         consecutiveFailures++
-                        _liveTelemetryMessage.value = error.localizedMessage ?: getApplication<Application>().getString(R.string.msg_live_read_failed)
+                        _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_read_failed)
                         if (_liveRecordingState.value.isRecording) {
                             stopLiveRecording()
                             _liveRecordingState.value = _liveRecordingState.value.copy(

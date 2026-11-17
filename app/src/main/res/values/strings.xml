@@ -480,4 +480,8 @@
         <item quantity="one">%1$d byte</item>
         <item quantity="other">%1$d bytes</item>
     </plurals>
+    <string name="msg_native_catalog_load_failed">Native Camaro signal catalogue could not be loaded.</string>
+    <string name="msg_obdb_catalog_load_failed">OBDb Camaro catalog could not be loaded.</string>
+    <string name="msg_obdb_signal_read_failed">OBDb signal read failed.</string>
+    <string name="msg_j2534_bridge_connect_failed">Unable to connect to the J2534 bridge.</string>
 </resources>

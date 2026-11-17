@@ -480,4 +480,8 @@
         <item quantity="one">%1$d Byte</item>
         <item quantity="other">%1$d Bytes</item>
     </plurals>
+    <string name="msg_native_catalog_load_failed">Der native Camaro-Signalkatalog konnte nicht geladen werden.</string>
+    <string name="msg_obdb_catalog_load_failed">Der OBDb-Camaro-Katalog konnte nicht geladen werden.</string>
+    <string name="msg_obdb_signal_read_failed">OBDb-Signal konnte nicht gelesen werden.</string>
+    <string name="msg_j2534_bridge_connect_failed">Verbindung zur J2534-Brücke nicht möglich.</string>
 </resources>

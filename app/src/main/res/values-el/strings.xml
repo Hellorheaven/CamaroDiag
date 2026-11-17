@@ -481,4 +481,8 @@
         <item quantity="one">%1$d byte</item>
         <item quantity="other">%1$d bytes</item>
     </plurals>
+    <string name="msg_native_catalog_load_failed">Δεν ήταν δυνατή η φόρτωση του εγγενούς καταλόγου σημάτων Camaro.</string>
+    <string name="msg_obdb_catalog_load_failed">Δεν ήταν δυνατή η φόρτωση του καταλόγου OBDb Camaro.</string>
+    <string name="msg_obdb_signal_read_failed">Απέτυχε η ανάγνωση του σήματος OBDb.</string>
+    <string name="msg_j2534_bridge_connect_failed">Δεν ήταν δυνατή η σύνδεση με τη γέφυρα J2534.</string>
 </resources>

@@ -477,4 +477,8 @@
     <plurals name="cal_file_size_bytes">
         <item quantity="other">%1$dバイト</item>
     </plurals>
+    <string name="msg_native_catalog_load_failed">Camaro の標準信号カタログを読み込めませんでした。</string>
+    <string name="msg_obdb_catalog_load_failed">OBDb Camaro カタログを読み込めませんでした。</string>
+    <string name="msg_obdb_signal_read_failed">OBDb 信号の読み取りに失敗しました。</string>
+    <string name="msg_j2534_bridge_connect_failed">J2534 ブリッジに接続できません。</string>
 </resources>

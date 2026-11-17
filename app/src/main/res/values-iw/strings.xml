@@ -483,4 +483,8 @@
         <item quantity="other">%1$d בתים</item>
         <item quantity="two">%1$d בתים</item>
     </plurals>
+    <string name="msg_native_catalog_load_failed">לא ניתן לטעון את קטלוג האותות המקורי של Camaro.</string>
+    <string name="msg_obdb_catalog_load_failed">לא ניתן לטעון את קטלוג Camaro של OBDb.</string>
+    <string name="msg_obdb_signal_read_failed">קריאת אות OBDb נכשלה.</string>
+    <string name="msg_j2534_bridge_connect_failed">לא ניתן להתחבר לגשר J2534.</string>
 </resources>
