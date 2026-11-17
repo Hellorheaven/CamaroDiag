@@ -222,9 +222,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KEEP_TAG: ${{ needs.release.outputs.release_tag }}
         run: |
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      KEEP_TAG: ${{ needs.release.outputs.release_tag }}
-        run: |
           set -euo pipefail
 
           echo "Keeping ${KEEP_TAG}; removing all previous GitHub Releases."
