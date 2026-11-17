@@ -489,4 +489,9 @@
     <string name="msg_j2534_bridge_connect_failed">לא ניתן להתחבר לגשר J2534.</string>
     <string name="live_pid_fuel_system_status">מצב מערכת הדלק</string>
     <string name="live_pid_ltft">תיקון דלק לטווח ארוך B1</string>
+    <string name="cal_warning_metadata_missing">חסרים מטא־נתונים של כיול: לא ניתן לקשר את הייבוא ל־VIN, CAL ID, CVN, מערכת הפעלה, חומרה וקובץ בינארי מקוריים מדויקים.</string>
+    <string name="cal_warning_os_hardware_metadata">מערכת ההפעלה והפניה לחומרה הוזנו במטא־נתונים: יש לאמת אותם בנפרד מול תיעוד השירות של יחידת הבקרה.</string>
+    <string name="cal_warning_overlapping_regions">אזורי טבלאות או צירים חופפים; יש לוודא שהחפיפה מכוונת.</string>
+    <string name="cal_warning_import_review">יש לבדוק את אזהרות ההגדרות שיובאו לפני שימוש בטבלה כלשהי.</string>
+    <string name="cal_warning_os_hardware_not_read">מערכת ההפעלה והפניה לחומרה לא נקראו באמצעות מצב 09 התקני: נדרש אימות עצמאי מול התיעוד.</string>
 </resources>
