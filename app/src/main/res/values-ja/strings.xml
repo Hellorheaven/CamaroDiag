@@ -562,4 +562,10 @@
     <string name="dtc_desc_p0018">クランクシャフト位置と吸気カムシャフト位置の相関異常（バンク2）</string>
     <string name="dtc_desc_p0019">クランクシャフト位置と排気カムシャフト位置の相関異常（バンク2）</string>
     <string name="dtc_gm_calibration_not_validated">以下の解釈としきい値は、選択されたエンジンとモデル年式に対する参考データです。ECUの識別情報（VIN、CAL ID、CVN、ソフトウェアID、ハードウェア部品番号）は未確認です。これらのデータは接続中のECUについて検証されていません。</string>
+    <string name="dtc_gm_monitor_title">GMエンジンモニター – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">故障判定基準: %1$s</string>
+    <string name="dtc_gm_monitor_enable">作動条件: %1$s</string>
+    <string name="dtc_gm_monitor_failure">故障カウンター／判定頻度: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL分類: %1$s</string>
+    <string name="dtc_gm_monitor_source">出典: GM %1$s、%2$dページ</string>
 </resources>
