@@ -278,7 +278,7 @@ Les résumés GM permettent d'associer les premières motorisations Gen 6 à leu
 - 2023 : LTG → `23OBDG03A Part2` ; LGX, LT1 et LT4 → `23OBDG03B`.
 - 2024 : LGX, LT1 et LT4 → `24OBDG03B Part 2` ; le LTG n'est pas présent dans la matrice Camaro consultée.
 
-`GmGen6MonitorCatalog` expose ces références dans le registre commun. Le LT4 n'est pas associé à une Camaro 2016 dans le résumé GM consulté ; son premier groupe Camaro est documenté ici en 2017. Ces libellés sont des références de certification uniquement : aucune définition détaillée, aucun seuil de surveillance ni procédure de réparation Gen 6 n'est activé par leur seule présence. Les associations sont propres à chaque millésime et moteur ; aucune référence n'est extrapolée aux configurations non listées.
+`GmGen6MonitorCatalog` expose ces références dans le registre commun. Le LT4 n'est pas associé à une Camaro 2016 dans le résumé GM consulté ; son premier groupe Camaro est documenté ici en 2017. Ces libellés sont des références de certification uniquement : leur seule présence n'active aucune définition détaillée, aucun seuil de surveillance ni procédure de réparation Gen 6. Exception strictement limitée au LT4 Camaro 2019 : `Gm2019Lt4MonitorCatalog` intègre P0197 et P0198 à partir de la section GM « ECM Unique (LT4 Camaro) » (pages documentaires 607–608), avec seuils de résistance respectifs < 25 Ω et > 450 000 Ω. Ces critères restent des moniteurs de certification, pas des arbres de réparation SI. Les associations sont propres à chaque millésime et moteur ; aucune référence n'est extrapolée aux configurations non listées.
 
 Références GM primaires :
 - 2016 OBD Group Summary, pages 2–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2016/2016_OBD_GROUP_SUMMARY.pdf
