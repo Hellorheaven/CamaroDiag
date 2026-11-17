@@ -329,3 +329,16 @@ Les sources sont enregistrées avec leur URL ou leur référence précise, leur 
 Les sources de code sont représentées dans `DtcDefinitionSource` par des catégories distinctes : `INDEPENDENT_TECHNICAL_PUBLICATION`, `SPECIALIST_REPAIR_DATABASE`, `COMMUNITY_DATABASE`, `TECHNICAL_FORUM`, `OWNER_REPAIR_REPORT` et `VEHICLE_VALIDATED_CAPTURE`. Les catégories `GM_SERVICE_INFORMATION` et `GM_BULLETIN` restent possibles si une référence publique apparaît, mais ne sont plus des conditions de progression ou de complétude.
 
 **Critère d'acceptation :** chaque explication spécifique à un véhicule doit exposer son niveau de confiance et ses sources. Les données non corroborées restent identifiées comme hypothèses ; aucune cause, compatibilité ou réparation ne doit être présentée comme certaine sur la seule base du code DTC.
+
+
+### Qualification technique des sources indépendantes (implémentation)
+
+Le registre distingue désormais l'évaluation des sources indépendantes de la qualification OEM :
+- seules les références HTTP(S) traçables, avec éditeur, groupe d'indépendance, millésimes, RPO et calculateur explicitement renseignés, sont retenues ;
+- plusieurs reprises d'une même publication partageant le même groupe d'indépendance ne comptent que pour une seule source ;
+- une source applicable donne le niveau « source indépendante unique » ; au moins deux groupes indépendants donnent « sources indépendantes corroborées » ;
+- une capture/réparation associée à un VIN valide identique au véhicule courant peut être signalée « validée sur ce véhicule » ;
+- les références hors périmètre, sans URL, sans éditeur ou sans groupe d'indépendance sont exclues de l'évaluation ;
+- même corroborées, ces sources ne peuvent jamais être qualifiées de définition OEM : elles restent affichables uniquement avec leur niveau de confiance communautaire.
+
+Cette évaluation est ajoutée au modèle métier et couverte par des tests unitaires. Son raccordement à l'écran de détail DTC et à l'alimentation réelle des catalogues reste un travail distinct.
