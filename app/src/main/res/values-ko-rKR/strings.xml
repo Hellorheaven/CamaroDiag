@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8, AFM 및 자동 변속기 사양입니다. LS3 보정을 재사용하지 말고 RPO, 변속기 및 ECU 식별자를 확인하세요.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 슈퍼차저 LSA V8입니다. 슈퍼차저, 연료, 시장 및 소프트웨어 개정에 맞는 보정을 확인하세요.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8입니다. 표시된 제어기 계열이 같더라도 LS3/L99와 별도의 프로필이며 소프트웨어 식별이 필수입니다.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG(지원 범위 2016–2020년). GM 공지 PIP5313B는 2016–2017 Camaro LTG에 E80을 명시합니다. 이후 연식은 부품 번호와 CAL ID로 확인하세요.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG(지원 범위 2016–2023년). GM 공지 PIP5313B는 2016–2017 Camaro LTG에 E80을 명시합니다. 이후 연식은 부품 번호와 CAL ID로 확인하세요.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6입니다. 연식, 시장 및 개정에 따라 프로필이 다를 수 있으므로 테이블 정의를 불러오기 전에 실제 제어기와 CVN을 확인하세요.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 자연흡기 LT1 V8입니다. CAL ID/CVN, 연식, 시장, 변속기 및 하드웨어 번호로 보정 개정을 구분하세요.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 슈퍼차저 LT4 V8입니다. LT1과 혼용하지 말고 부품 번호와 보정별 부스트 데이터를 검증하세요.</string>
