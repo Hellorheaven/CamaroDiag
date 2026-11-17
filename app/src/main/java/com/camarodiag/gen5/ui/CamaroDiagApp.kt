@@ -1026,6 +1026,14 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                 color = TextMuted, fontSize = 11.sp
             )
         }
+        item {
+            val coverage = CamaroDtcCatalog.coverageNotice(vehicle)
+            Text(
+                if (isFrench) coverage.first else coverage.second,
+                color = CamaroAmber,
+                fontSize = 11.sp
+            )
+        }
         if (dtcs.isEmpty()) {
             item {
                 Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
@@ -1039,6 +1047,26 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
                         }
                         Text(localizedDtcDescription(dtc))
+                        val applicabilityNotice = CamaroDtcCatalog.applicabilityNotice(dtc.code, vehicle)
+                        if (applicabilityNotice != null) {
+                            Text(
+                                if (isFrench) applicabilityNotice.first else applicabilityNotice.second,
+                                color = WarnRed,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        if (!dtc.module.equals("ECM", ignoreCase = true) &&
+                            !dtc.module.equals("PCM", ignoreCase = true)) {
+                            Text(
+                                if (isFrench)
+                                    "Code reçu du calculateur ${dtc.module} : le libellé SAE ne constitue pas une définition GM propre à ce module."
+                                else
+                                    "Code reported by ${dtc.module}: the SAE label is not an OEM definition specific to this module.",
+                                color = TextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
                         val vehicleExplanation = CamaroDtcCatalog.find(dtc.code, vehicle)
                         if (vehicleExplanation != null) {
                             Divider(color = TextMuted.copy(alpha = 0.25f))
@@ -1061,9 +1089,12 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             if (!applicability.isNullOrBlank()) {
                                 Text(applicability, color = WarnRed)
                             }
-                        } else if (CamaroDtcCatalog.isKnownLfxProfile(vehicle)) {
+                        } else {
                             Text(
-                                stringResource(R.string.dtc_vehicle_specific_not_documented),
+                                if (isFrench)
+                                    "Interprétation constructeur détaillée non disponible pour cette combinaison moteur / année / calculateur. Les causes LFX ne sont pas réutilisées."
+                                else
+                                    "Detailed OEM interpretation is not available for this engine / year / ECU combination. LFX causes are not reused.",
                                 color = TextMuted,
                                 fontSize = 12.sp
                             )
