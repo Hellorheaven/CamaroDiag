@@ -492,4 +492,10 @@
     <string name="cal_warning_overlapping_regions">Οι περιοχές πινάκων ή αξόνων επικαλύπτονται· επιβεβαιώστε ότι η επικάλυψη είναι σκόπιμη.</string>
     <string name="cal_warning_import_review">Ελέγξτε τις προειδοποιήσεις των εισαγόμενων ορισμών πριν χρησιμοποιήσετε οποιονδήποτε πίνακα.</string>
     <string name="cal_warning_os_hardware_not_read">Το λειτουργικό σύστημα και η αναφορά υλικού δεν διαβάστηκαν μέσω της τυπικής λειτουργίας 09: απαιτείται ανεξάρτητη τεκμηριωμένη επαλήθευση.</string>
+    <string name="module_note_unavailable">Δεν υπάρχουν μεταφρασμένες λεπτομέρειες για αυτή τη μονάδα ελέγχου.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">Πηγή %1$s</string>
+    <string name="mileage_details_unavailable">Δεν υπάρχουν διαθέσιμες τεχνικές λεπτομέρειες για αυτή την πηγή.</string>
+    <string name="mileage_caveat_unavailable">Δεν υπάρχουν πρόσθετες μεταφρασμένες πληροφορίες για αυτή την πηγή.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>

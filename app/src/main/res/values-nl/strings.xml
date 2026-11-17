@@ -492,4 +492,10 @@
     <string name="cal_warning_overlapping_regions">Tabel- of asgebieden overlappen; controleer of deze overlap bedoeld is.</string>
     <string name="cal_warning_import_review">Controleer de waarschuwingen bij de geïmporteerde definities voordat u een tabel gebruikt.</string>
     <string name="cal_warning_os_hardware_not_read">OS en hardwareverwijzing zijn niet uitgelezen via standaardmodus 09: onafhankelijke documentatiecontrole is vereist.</string>
+    <string name="module_note_unavailable">Er zijn geen vertaalde details beschikbaar voor deze regeleenheid.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">Bron %1$s</string>
+    <string name="mileage_details_unavailable">Er zijn geen technische details beschikbaar voor deze bron.</string>
+    <string name="mileage_caveat_unavailable">Er is geen aanvullende vertaalde informatie beschikbaar voor deze bron.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>
