@@ -1096,11 +1096,12 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 Text(applicability, color = WarnRed)
                             }
                         }
-                        val gmMonitor = Gm2012LfxMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        val gmMonitor = GmLfxMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        val gmSourceLabel = GmLfxMonitorCatalog.sourceLabel(vehicle) ?: "GM"
                         if (gmMonitor != null) {
                             Divider(color = TextMuted.copy(alpha = 0.25f))
                             Text(
-                                if (isFrench) "Surveillance moteur GM – OBD groupe 5B (2012)" else "GM engine monitor – OBD group 5B (2012)",
+                                if (isFrench) "Surveillance moteur GM – " + gmSourceLabel else "GM engine monitor – " + gmSourceLabel,
                                 fontWeight = FontWeight.Bold,
                                 color = CamaroAmber
                             )
@@ -1111,8 +1112,8 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             Text(if (isFrench) "Compteur / fréquence de validation : " + gmMonitor.failureCriteriaFr else "Failure counter / validation rate: " + gmMonitor.failureCriteriaEn)
                             Text(if (isFrench) "Classe MIL : " + gmMonitor.milClassification else "MIL class: " + gmMonitor.milClassification)
                             Text(
-                                if (isFrench) "Source : GM 12OBDG05B, page " + gmMonitor.sourcePage
-                                else "Source: GM 12OBDG05B, page " + gmMonitor.sourcePage,
+                                if (isFrench) "Source : GM " + gmSourceLabel + ", page " + gmMonitor.sourcePage
+                                else "Source: GM " + gmSourceLabel + ", page " + gmMonitor.sourcePage,
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )

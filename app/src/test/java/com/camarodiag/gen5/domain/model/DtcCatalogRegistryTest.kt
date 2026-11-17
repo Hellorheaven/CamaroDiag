@@ -93,6 +93,23 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun gm2013And2014LfxCamshaftMonitorsUseTheirOwnCertificationThresholds() {
+        val lfx2013 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX)
+        val lfx2014 = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LFX)
+        val lfx2015 = VehicleProfile(modelYear = 2015, engine = CamaroEngine.LFX)
+
+        val intake2013 = GmLfxMonitorCatalog.find("P0011", lfx2013)
+        assertNotNull(intake2013)
+        assertTrue(intake2013?.failureCriteriaEn?.contains("50 failures in 150 samples") == true)
+        assertTrue(GmLfxMonitorCatalog.find("P0014", lfx2014)?.failureCriteriaEn?.contains("100 failures in 300 samples") == true)
+        assertTrue(GmLfxMonitorCatalog.find("P0016", lfx2013)?.malfunctionCriteriaEn?.contains("6.0 crank degrees") == true)
+        assertEquals("13OBDG05A", GmLfxMonitorCatalog.sourceLabel(lfx2013))
+        assertEquals("14OBDG06A", GmLfxMonitorCatalog.sourceLabel(lfx2014))
+        assertEquals(null, GmLfxMonitorCatalog.find("P0011", lfx2015))
+        assertEquals(12, Gm2013And2014LfxMonitorCatalog.supportedCodes().size)
+    }
+
+    @Test
     fun detailedLfxCamshaftInterpretationsCoverAllFourActuatorCircuitsAndBothPerformanceBanks() {
         val lfx = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
         listOf("P0010", "P0011", "P0013", "P0014", "P0020", "P0021", "P0023", "P0024").forEach { code ->

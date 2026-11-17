@@ -171,3 +171,20 @@ Les critères GM 2012 du chauffage des sondes à oxygène ont aussi été intég
 La couverture de surveillance GM a été étendue aux mesures d'air et aux corrections carburant : P0101, P0102, P0103, P0128, P0171, P0172, P0174 et P0175. Les critères distinguent les fréquences MAF, les conditions de montée en température, les corrections LTFT/STFT et les tests EVAP intrusifs de purge associés aux défauts de richesse. Les seuils de correction sont conservés sous leur forme de métriques calibrées GM et ne sont pas convertis abusivement en pourcentages génériques.
 
 La surveillance de l'injection directe est maintenant documentée pour P0089 (limites d'autorité de commande de pompe haute pression), P0191 (cohérence du capteur de pression de rampe) et P00C6 (montée en pression pendant le démarrage). P00C6 est volontairement limité au millésime 2012 dans le catalogue détaillé tant que les groupes de certification des années suivantes n'ont pas été vérifiés.
+
+
+## Données de surveillance GM – Camaro LFX 2013 et 2014
+
+La couverture LFX ne réutilise plus les seuils 2012 pour les années suivantes. Deux documents GM distincts ont été vérifiés :
+- 2013 : groupe OBD 5A, RPO LFX, Camaro, dossier 13OBDG05A Engine Diagnostics.
+- 2014 : groupe OBD 6A, RPO LFX, Camaro, dossier 14OBDG06A Engine Diagnostics.
+
+Le catalogue Gm2013And2014LfxMonitorCatalog ajoute 12 moniteurs de distribution (P0010, P0011, P0013, P0014, P0016, P0017, P0018, P0019, P0020, P0021, P0023, P0024). Les seuils de performance des arbres à cames sont de 50/150 échantillons pour P0011/P0021 et de 100/300 pour P0014/P0024 ; ils sont distincts de ceux du dossier 2012. Les seuils de corrélation P0016–P0019 sont également ceux du groupe 2013/2014, avec les conditions du diagnostic de pignon intermédiaire.
+
+Références primaires :
+- GM, 2013 OBD Group Summary : https://gsi.ext.gm.com/gmspo/mode6/pdf/2013/2013%20OBD%20GROUP%20SUMMARY.pdf
+- GM, 13OBDG05A Engine Diagnostics : https://gsi.ext.gm.com/gmspo/mode6/pdf/2013/13OBDG05A%20Engine%20Diagnostics.pdf
+- GM, 2014 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/2014%20OBD%20GROUP%20SUMMARY.pdf
+- GM, 14OBDG06A Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/14OBDG06A%20Engine%20Diagnostics.pdf
+
+Ces données restent limitées aux profils LFX 2013 et 2014. Aucun seuil n'est extrapolé au LFX 2015 tant que son dossier 150BDG06 n'a pas été vérifié.
