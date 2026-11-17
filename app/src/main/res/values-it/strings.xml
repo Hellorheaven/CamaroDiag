@@ -563,4 +563,8 @@
     <string name="dtc_possible_causes">Possibili cause (non confermate)</string>
     <string name="dtc_recommended_checks">Controlli consigliati</string>
     <string name="dtc_vehicle_specific_not_documented">Non è ancora documentata una procedura specifica per questo codice e questa configurazione. Sopra è mostrata la descrizione OEM/SAE; verificare VIN e centralina nelle informazioni di servizio GM.</string>
+    <string name="dtc_desc_p0016">Correlazione albero motore / albero a camme di aspirazione non plausibile (banco 1)</string>
+    <string name="dtc_desc_p0017">Correlazione albero motore / albero a camme di scarico non plausibile (banco 1)</string>
+    <string name="dtc_desc_p0018">Correlazione albero motore / albero a camme di aspirazione non plausibile (banco 2)</string>
+    <string name="dtc_desc_p0019">Correlazione albero motore / albero a camme di scarico non plausibile (banco 2)</string>
 </resources>
