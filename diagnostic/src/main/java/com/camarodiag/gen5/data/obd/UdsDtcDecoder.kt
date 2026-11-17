@@ -101,20 +101,23 @@ object UdsDtcDecoder {
             val b1 = bytes[1].toInt() and 0xFF
             val b2 = bytes[2].toInt() and 0xFF
             val status = bytes[3].toInt() and 0xFF
+            // Only status bits advertised by DTCStatusAvailabilityMask are meaningful.
+            // Keep the raw byte intact in statusByte for diagnostics and evidence.
+            val availableStatus = status and availability
             val raw = (b0 shl 16) or (b1 shl 8) or b2
             DecodedUdsDtcRecord(
                 rawDtc = raw,
                 code = formatDisplayCode(format, b0, b1, b2),
                 statusByte = status,
                 status = UdsDtcStatus(
-                    testFailed = status and 0x01 != 0,
-                    testFailedThisOperationCycle = status and 0x02 != 0,
-                    pending = status and 0x04 != 0,
-                    confirmed = status and 0x08 != 0,
-                    testNotCompletedSinceLastClear = status and 0x10 != 0,
-                    testFailedSinceLastClear = status and 0x20 != 0,
-                    testNotCompletedThisOperationCycle = status and 0x40 != 0,
-                    warningIndicatorRequested = status and 0x80 != 0
+                    testFailed = availableStatus and 0x01 != 0,
+                    testFailedThisOperationCycle = availableStatus and 0x02 != 0,
+                    pending = availableStatus and 0x04 != 0,
+                    confirmed = availableStatus and 0x08 != 0,
+                    testNotCompletedSinceLastClear = availableStatus and 0x10 != 0,
+                    testFailedSinceLastClear = availableStatus and 0x20 != 0,
+                    testNotCompletedThisOperationCycle = availableStatus and 0x40 != 0,
+                    warningIndicatorRequested = availableStatus and 0x80 != 0
                 )
             )
         }
