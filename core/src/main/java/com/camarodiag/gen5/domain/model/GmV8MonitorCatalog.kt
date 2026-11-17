@@ -246,17 +246,21 @@ object Gm2012LsaMonitorCatalog {
 object Gm2013V8MonitorCatalog {
     private val naturallyAspiratedEvidence = v8MafMonitor(supercharged = false, modelYear = 2013)
     private val superchargedEvidence = v8MafMonitor(supercharged = true, modelYear = 2013)
+    private val oxygenEvidence = v8O2Evidence(modelYear = 2013).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
         if (vehicle.modelYear != 2013) return null
         if (vehicle.engine !in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA)) return null
-        if (!code.trim().equals("P0101", ignoreCase = true)) return null
-        return if (vehicle.engine == CamaroEngine.LSA) superchargedEvidence else naturallyAspiratedEvidence
+        val normalizedCode = code.trim().uppercase(java.util.Locale.ROOT)
+        return when (normalizedCode) {
+            "P0101" -> if (vehicle.engine == CamaroEngine.LSA) superchargedEvidence else naturallyAspiratedEvidence
+            else -> oxygenEvidence[normalizedCode]
+        }
     }
 
     fun supportedCodes(vehicle: VehicleProfile): Set<String> =
         if (vehicle.modelYear == 2013 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA)) {
-            setOf("P0101")
+            oxygenEvidence.keys + "P0101"
         } else {
             emptySet()
         }
