@@ -556,4 +556,9 @@
     <string name="trace_error_csv_empty">De CSV-trace is leeg.</string>
     <string name="trace_error_csv_columns">De CSV heeft een CAN ID-kolom en een data-/payloadkolom nodig, of kolommen data0…data15.</string>
     <string name="trace_error_generic">De trace bevat een ongeldig of niet-ondersteund record.</string>
+    <string name="dtc_vehicle_interpretation">Voertuigspecifieke interpretatie</string>
+    <string name="dtc_severity">Ernst</string>
+    <string name="dtc_possible_causes">Mogelijke oorzaken (niet bevestigd)</string>
+    <string name="dtc_recommended_checks">Aanbevolen controles</string>
+    <string name="dtc_vehicle_specific_not_documented">Voor deze code en voertuigconfiguratie is nog geen voertuigspecifieke procedure gedocumenteerd. De OEM/SAE-beschrijving staat hierboven; controleer het VIN en de regeleenheid in de GM-servicegegevens.</string>
 </resources>
