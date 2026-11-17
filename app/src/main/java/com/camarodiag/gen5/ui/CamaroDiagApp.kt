@@ -1065,13 +1065,10 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 fontSize = 12.sp
                             )
                         }
-                        if (!dtc.module.equals("ECM", ignoreCase = true) &&
-                            !dtc.module.equals("PCM", ignoreCase = true)) {
+                        val moduleCatalogue = DtcCatalogRegistry.catalogueFor(dtc.module, vehicle)
+                        if (!moduleCatalogue.hasVehicleSpecificDefinitions) {
                             Text(
-                                if (isFrench)
-                                    "Code reçu du calculateur ${dtc.module} : le libellé SAE ne constitue pas une définition GM propre à ce module."
-                                else
-                                    "Code reported by ${dtc.module}: the SAE label is not an OEM definition specific to this module.",
+                                if (isFrench) moduleCatalogue.noteFr else moduleCatalogue.noteEn,
                                 color = TextMuted,
                                 fontSize = 11.sp
                             )
@@ -1098,15 +1095,6 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             if (!applicability.isNullOrBlank()) {
                                 Text(applicability, color = WarnRed)
                             }
-                        } else {
-                            Text(
-                                if (isFrench)
-                                    "Interprétation constructeur détaillée non disponible pour cette combinaison moteur / année / calculateur. Les causes LFX ne sont pas réutilisées."
-                                else
-                                    "Detailed OEM interpretation is not available for this engine / year / ECU combination. LFX causes are not reused.",
-                                color = TextMuted,
-                                fontSize = 12.sp
-                            )
                         }
                     }
                 }
