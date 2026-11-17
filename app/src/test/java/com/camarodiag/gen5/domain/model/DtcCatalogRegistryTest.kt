@@ -542,4 +542,109 @@ class DtcCatalogRegistryTest {
         assertEquals(DtcEvidenceStatus.GENERIC_ONLY, DtcCatalogRegistry.evidenceStatus(genericProfile, "EBCM"))
         assertEquals(DtcEvidenceStatus.DISCOVERY_REQUIRED, DtcCatalogRegistry.evidenceStatus(genericProfile, "ECU 7E8"))
     }
+
+    @Test
+    fun independentCommunityEvidenceRequiresTwoDistinctApplicablePublishers() {
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val first = DtcCommunityEvidenceReference(
+            source = DtcDefinitionSource.TECHNICAL_FORUM,
+            reference = "https://forum.example/threads/dtc-investigation",
+            publisher = "Forum A",
+            independenceGroup = "forum-a-original-thread",
+            modelYears = 2012..2015,
+            engineRpos = setOf("LFX"),
+            moduleId = "ECM"
+        )
+        val repost = first.copy(
+            reference = "https://archive.example/repost",
+            publisher = "Archive",
+            independenceGroup = "forum-a-original-thread"
+        )
+        val independent = first.copy(
+            source = DtcDefinitionSource.SPECIALIST_REPAIR_DATABASE,
+            reference = "https://repair.example/dtc",
+            publisher = "Repair database",
+            independenceGroup = "repair-database-entry"
+        )
+
+        val single = DtcCatalogRegistry.assessCommunityEvidence(
+            listOf(first, repost),
+            vehicle,
+            "ECM"
+        )
+        assertEquals(DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE, single.confidence)
+        assertEquals(1, single.independentPublisherCount)
+        assertTrue(single.mayShowCommunityExplanation)
+
+        val corroborated = DtcCatalogRegistry.assessCommunityEvidence(
+            listOf(first, repost, independent),
+            vehicle,
+            "ECM"
+        )
+        assertEquals(DtcCommunityConfidence.CORROBORATED_INDEPENDENT_SOURCES, corroborated.confidence)
+        assertEquals(2, corroborated.independentPublisherCount)
+        assertEquals(3, corroborated.applicableReferences.size)
+    }
+
+    @Test
+    fun communityEvidenceRejectsOutOfScopeAndUntraceableReferences() {
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val base = DtcCommunityEvidenceReference(
+            source = DtcDefinitionSource.COMMUNITY_DATABASE,
+            reference = "https://community.example/dtc",
+            publisher = "Community",
+            independenceGroup = "community-original",
+            modelYears = 2012..2015,
+            engineRpos = setOf("LFX"),
+            moduleId = "ECM"
+        )
+        val rejected = listOf(
+            base.copy(reference = "not-a-url"),
+            base.copy(modelYears = 2010..2011),
+            base.copy(engineRpos = setOf("LLT")),
+            base.copy(moduleId = "TCM"),
+            base.copy(publisher = ""),
+            base.copy(independenceGroup = ""),
+            base.copy(source = DtcDefinitionSource.SAE_J2012_GENERIC)
+        )
+
+        rejected.forEach { reference ->
+            val assessment = DtcCatalogRegistry.assessCommunityEvidence(
+                listOf(reference),
+                vehicle,
+                "ECM"
+            )
+            assertEquals(DtcCommunityConfidence.INSUFFICIENT, assessment.confidence)
+            assertFalse(assessment.mayShowCommunityExplanation)
+            assertTrue(assessment.applicableReferences.isEmpty())
+        }
+    }
+
+    @Test
+    fun communityEvidenceIsMarkedVehicleValidatedOnlyForTheMatchingVin() {
+        val vin = "1G1FB1E30C9123456"
+        val vehicle = VehicleProfile(
+            modelYear = 2012,
+            engine = CamaroEngine.LFX,
+            vin = vin
+        )
+        val reference = DtcCommunityEvidenceReference(
+            source = DtcDefinitionSource.OWNER_REPAIR_REPORT,
+            reference = "https://owners.example/report",
+            publisher = "Vehicle owner",
+            independenceGroup = "owner-report-2012-lfx",
+            modelYears = 2012..2012,
+            engineRpos = setOf("LFX"),
+            moduleId = "ECM",
+            validatedVin = vin
+        )
+
+        val matching = DtcCatalogRegistry.assessCommunityEvidence(listOf(reference), vehicle, "ECM")
+        assertEquals(DtcCommunityConfidence.VALIDATED_ON_THIS_VEHICLE, matching.confidence)
+
+        val otherVehicle = vehicle.copy(vin = "1G1FB1E30C9123457")
+        val notMatching = DtcCatalogRegistry.assessCommunityEvidence(listOf(reference), otherVehicle, "ECM")
+        assertEquals(DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE, notMatching.confidence)
+    }
+
 }
