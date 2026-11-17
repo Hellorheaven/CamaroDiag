@@ -503,4 +503,10 @@
     <string name="cal_warning_overlapping_regions">تتداخل مناطق الجداول أو المحاور؛ تحقق من أن هذا التداخل مقصود.</string>
     <string name="cal_warning_import_review">راجع تحذيرات التعريفات المستوردة قبل استخدام أي جدول.</string>
     <string name="cal_warning_os_hardware_not_read">لم تتم قراءة نظام التشغيل ومرجع الأجهزة عبر الوضع القياسي 09: يلزم تحقق مستقل من الوثائق.</string>
+    <string name="module_note_unavailable">لا تتوفر تفاصيل مترجمة لوحدة التحكم هذه.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">المصدر %1$s</string>
+    <string name="mileage_details_unavailable">التفاصيل التقنية غير متاحة لهذا المصدر.</string>
+    <string name="mileage_caveat_unavailable">لا تتوفر معلومات مترجمة إضافية لهذا المصدر.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>

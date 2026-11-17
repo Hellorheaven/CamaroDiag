@@ -488,4 +488,10 @@
     <string name="cal_warning_overlapping_regions">테이블 또는 축 영역이 겹칩니다. 이 겹침이 의도된 것인지 확인하십시오.</string>
     <string name="cal_warning_import_review">테이블을 사용하기 전에 가져온 정의의 경고를 검토하십시오.</string>
     <string name="cal_warning_os_hardware_not_read">표준 모드 09에서는 OS 및 하드웨어 참조를 읽지 않았습니다. 문서를 통한 독립적인 확인이 필요합니다.</string>
+    <string name="module_note_unavailable">이 제어 모듈에 대한 번역된 세부 정보가 없습니다.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">소스 %1$s</string>
+    <string name="mileage_details_unavailable">이 소스에 대한 기술 세부 정보가 없습니다.</string>
+    <string name="mileage_caveat_unavailable">이 소스에 대한 추가 번역 정보가 없습니다.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>

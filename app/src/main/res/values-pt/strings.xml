@@ -492,4 +492,10 @@
     <string name="cal_warning_overlapping_regions">As regiões das tabelas ou dos eixos sobrepõem-se; confirme que essa sobreposição é intencional.</string>
     <string name="cal_warning_import_review">Reveja os avisos das definições importadas antes de utilizar qualquer tabela.</string>
     <string name="cal_warning_os_hardware_not_read">O SO e a referência de hardware não foram lidos através do Modo 09 padrão: é necessária uma verificação documental independente.</string>
+    <string name="module_note_unavailable">Não existem detalhes localizados disponíveis para este módulo.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">Origem %1$s</string>
+    <string name="mileage_details_unavailable">Os detalhes técnicos não estão disponíveis para esta origem.</string>
+    <string name="mileage_caveat_unavailable">Não existem informações localizadas adicionais disponíveis para esta origem.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>
