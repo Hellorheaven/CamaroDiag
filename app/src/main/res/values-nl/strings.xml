@@ -566,4 +566,10 @@
     <string name="dtc_desc_p0018">Krukaspositie – inlaatnokkenaspositie niet plausibel (bank 2)</string>
     <string name="dtc_desc_p0019">Krukaspositie – uitlaatnokkenaspositie niet plausibel (bank 2)</string>
     <string name="dtc_gm_calibration_not_validated">De onderstaande interpretaties en grenswaarden zijn referentiegegevens voor de geselecteerde motor en het modeljaar. De identiteit van de regeleenheid (VIN, CAL ID, CVN, software-ID en hardwareonderdeelnummer) is nog niet gecontroleerd; deze gegevens zijn niet gevalideerd voor de aangesloten regeleenheid.</string>
+    <string name="dtc_gm_monitor_title">GM-motormonitor – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Activeringscriterium: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Inschakelvoorwaarden: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Foutenteller / validatiefrequentie: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL-classificatie: %1$s</string>
+    <string name="dtc_gm_monitor_source">Bron: GM %1$s, pagina %2$d</string>
 </resources>
