@@ -484,4 +484,6 @@
     <string name="msg_obdb_catalog_load_failed">Der OBDb-Camaro-Katalog konnte nicht geladen werden.</string>
     <string name="msg_obdb_signal_read_failed">OBDb-Signal konnte nicht gelesen werden.</string>
     <string name="msg_j2534_bridge_connect_failed">Verbindung zur J2534-Brücke nicht möglich.</string>
+    <string name="live_pid_fuel_system_status">Kraftstoffsystemstatus</string>
+    <string name="live_pid_ltft">Langzeit-Kraftstoffkorrektur Bank 1</string>
 </resources>
