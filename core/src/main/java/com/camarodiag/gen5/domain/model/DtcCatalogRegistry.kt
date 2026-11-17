@@ -78,6 +78,14 @@ data class DtcModuleFamily(
     val discoveryRequired: Boolean = true
 )
 
+data class DtcModuleCatalogue(
+    val moduleId: String,
+    val evidenceStatus: DtcEvidenceStatus,
+    val hasVehicleSpecificDefinitions: Boolean,
+    val noteEn: String,
+    val noteFr: String
+)
+
 object DtcCatalogRegistry {
     val supportedEngineRpos: Set<String> = CamaroEngine.entries.map { it.rpo }.toSet()
 
@@ -154,4 +162,29 @@ object DtcCatalogRegistry {
         } else {
             DtcEvidenceStatus.GENERIC_ONLY
         }
+
+    fun catalogueFor(moduleId: String, vehicle: VehicleProfile): DtcModuleCatalogue {
+        val id = moduleId.trim().uppercase(Locale.ROOT)
+        val known = moduleFamilies.any { it.id == id }
+        val detailed = id == "ECM" && CamaroDtcCatalog.isKnownLfxProfile(vehicle)
+        return DtcModuleCatalogue(
+            moduleId = id,
+            evidenceStatus = when {
+                !known -> DtcEvidenceStatus.DISCOVERY_REQUIRED
+                detailed -> DtcEvidenceStatus.DOCUMENTED
+                else -> DtcEvidenceStatus.GENERIC_ONLY
+            },
+            hasVehicleSpecificDefinitions = detailed,
+            noteEn = when {
+                !known -> "Unknown ECU identity: retain raw DTC only until the responding module is identified."
+                detailed -> "Vehicle-specific ECM explanations are available for the documented LFX model-year range."
+                else -> "Only normalized SAE descriptions are available for this ECU/vehicle combination; no GM module-specific definition is loaded."
+            },
+            noteFr = when {
+                !known -> "Calculateur non identifié : conserver uniquement le DTC brut jusqu'à identification du module répondant."
+                detailed -> "Les interprétations moteur spécifiques sont disponibles pour la plage d'années LFX documentée."
+                else -> "Seuls les libellés SAE normalisés sont disponibles pour cette combinaison calculateur/véhicule ; aucune définition GM propre au module n'est chargée."
+            }
+        )
+    }
 }
