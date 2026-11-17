@@ -261,12 +261,12 @@ object DtcCatalogRegistry {
             hasVehicleSpecificDefinitions = detailed,
             noteEn = when {
                 !known -> "Unknown ECU identity: show the raw DTC and generic SAE description only until the responding module is identified."
-                detailed -> "Vehicle-specific ECM explanations or GM monitor evidence are available for this documented engine/model-year profile."
+                detailed -> "Partial vehicle-specific ECM explanations or GM monitor evidence are available for this documented engine/model-year profile; unlisted DTCs remain generic."
                 else -> "Only normalized SAE descriptions are available for this ECU/vehicle combination; no GM module-specific definition is loaded."
             },
             noteFr = when {
                 !known -> "Calculateur non identifié : afficher uniquement le DTC brut et sa description SAE générique jusqu'à identification du module répondant."
-                detailed -> "Des interprétations moteur ou des données de surveillance GM sont disponibles pour ce profil moteur/millésime documenté."
+                detailed -> "Des interprétations ECM spécifiques ou des données de surveillance GM partielles sont disponibles pour ce profil moteur/millésime ; les DTC non répertoriés restent génériques."
                 else -> "Seuls les libellés SAE normalisés sont disponibles pour cette combinaison calculateur/véhicule ; aucune définition GM propre au module n'est chargée."
             }
         )
