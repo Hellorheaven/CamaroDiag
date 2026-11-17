@@ -486,4 +486,9 @@
     <string name="msg_j2534_bridge_connect_failed">Verbindung zur J2534-Brücke nicht möglich.</string>
     <string name="live_pid_fuel_system_status">Kraftstoffsystemstatus</string>
     <string name="live_pid_ltft">Langzeit-Kraftstoffkorrektur Bank 1</string>
+    <string name="cal_warning_metadata_missing">Kalibrierungsmetadaten fehlen: Der Import kann keiner exakten VIN-, CAL-ID-, CVN-, OS-, Hardware- und Quelldatei zugeordnet werden.</string>
+    <string name="cal_warning_os_hardware_metadata">OS- und Hardware-Referenz wurden in den Metadaten angegeben: Prüfen Sie diese unabhängig anhand der Serviceunterlagen des Steuergeräts.</string>
+    <string name="cal_warning_overlapping_regions">Tabellen- oder Achsenbereiche überschneiden sich; prüfen Sie, ob diese Überlappung beabsichtigt ist.</string>
+    <string name="cal_warning_import_review">Prüfen Sie die Warnungen der importierten Definitionen, bevor Sie eine Tabelle verwenden.</string>
+    <string name="cal_warning_os_hardware_not_read">OS und Hardware-Referenz wurden nicht über den Standardmodus 09 ausgelesen: Eine unabhängige Prüfung anhand der Dokumentation ist erforderlich.</string>
 </resources>

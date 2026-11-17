@@ -489,4 +489,9 @@
     <string name="msg_j2534_bridge_connect_failed">Impossible de se connecter au pont J2534.</string>
     <string name="live_pid_fuel_system_status">État du système d’alimentation</string>
     <string name="live_pid_ltft">Correction de carburant à long terme B1</string>
+    <string name="cal_warning_metadata_missing">Métadonnées de calibration absentes : l’import ne peut pas être associé à un VIN, un CAL ID, un CVN, un OS, un matériel et un binaire source précis.</string>
+    <string name="cal_warning_os_hardware_metadata">OS et référence matérielle saisis dans les métadonnées : ils doivent être vérifiés indépendamment dans la documentation de service du calculateur.</string>
+    <string name="cal_warning_overlapping_regions">Des zones de tables ou d’axes se chevauchent ; vérifiez que ce chevauchement est volontaire.</string>
+    <string name="cal_warning_import_review">Examinez les avertissements des définitions importées avant d’utiliser une table.</string>
+    <string name="cal_warning_os_hardware_not_read">L’OS et la référence matérielle n’ont pas été lus via le Mode 09 standard : une vérification documentaire indépendante est obligatoire.</string>
 </resources>

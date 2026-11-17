@@ -486,4 +486,9 @@
     <string name="msg_j2534_bridge_connect_failed">Unable to connect to the J2534 bridge.</string>
     <string name="live_pid_fuel_system_status">Fuel system status</string>
     <string name="live_pid_ltft">Long-term fuel trim B1</string>
+    <string name="cal_warning_metadata_missing">Calibration metadata is missing: the import cannot be linked to an exact VIN, CAL ID, CVN, OS, hardware and source binary.</string>
+    <string name="cal_warning_os_hardware_metadata">OS and hardware reference entered in metadata: verify them independently against the controller service documentation.</string>
+    <string name="cal_warning_overlapping_regions">Table or axis regions overlap; verify that this overlap is intentional.</string>
+    <string name="cal_warning_import_review">Review the imported definition warnings before using any table.</string>
+    <string name="cal_warning_os_hardware_not_read">OS and hardware reference were not read through standard Mode 09: independent documentary verification is required.</string>
 </resources>
