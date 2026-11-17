@@ -63,13 +63,18 @@ jobs:
 
             let commitsSinceBuild = pr.commits;
             if (previous) {
-              const comparison = await github.rest.repos.compareCommits({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                base: previous.head_sha,
-                head: pr.head.sha
-              });
-              commitsSinceBuild = comparison.data.ahead_by;
+              try {
+                const comparison = await github.rest.repos.compareCommits({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  base: previous.head_sha,
+                  head: pr.head.sha
+                });
+                commitsSinceBuild = comparison.data.ahead_by;
+              } catch (error) {
+                core.warning(`Unable to compare against the last successful build (${error.message}); falling back to the PR commit count.`);
+                commitsSinceBuild = pr.commits;
+              }
             }
 
             const required = commitsSinceBuild >= interval;
