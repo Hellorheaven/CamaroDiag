@@ -2,24 +2,30 @@ package com.camarodiag.gen5.data.obd
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UdsDtcDecoderTest {
     @Test
-    fun decodesPowertrainChassisBodyAndNetworkDtcFamilies() {
+    fun decodesJ2012Format00AcrossPowertrainChassisBodyAndNetworkFamilies() {
         val payload = byteArrayOf(
-            0xFF.toByte(),
-            0x01, 0x01, 0x01, 0x08, // P010101, confirmed
-            0x41, 0x23, 0x45, 0x04, // C012345, pending
-            0x80.toByte(), 0x12, 0x34, 0x01, // B001234, failed
-            0xC0.toByte(), 0x00, 0x01, 0x80.toByte() // U000001, warning requested
+            0xFF.toByte(), 0x00,
+            0x01, 0x01, 0x01, 0x08, // P0101-01, confirmed
+            0x52, 0x34, 0x11, 0x04, // B1234-11, pending
+            0x41, 0x23, 0x45, 0x01, // C0123-45, failed
+            0xC0.toByte(), 0x00, 0x01, 0x80.toByte() // U0000-01, warning requested
         )
 
         val report = UdsDtcDecoder.decodeReadDtcInformation(payload)
 
         assertEquals(0xFF, report.statusAvailabilityMask)
-        assertEquals(listOf("P010101", "C012345", "B001234", "U000001"), report.records.map { it.code })
+        assertEquals(0x00, report.formatIdentifier)
+        assertEquals(UdsDtcFormat.SAE_J2012_DA_FORMAT_00, report.format)
+        assertEquals(
+            listOf("P0101-01", "B1234-11", "C0123-45", "U0000-01"),
+            report.records.map { it.code }
+        )
         assertTrue(report.records[0].status.confirmed)
         assertTrue(report.records[1].status.pending)
         assertTrue(report.records[2].status.testFailed)
@@ -27,14 +33,15 @@ class UdsDtcDecoderTest {
     }
 
     @Test
-    fun preservesRawCodeAndAllStatusBits() {
+    fun keepsIso14229ManufacturerSpecificDtcOpaque() {
         val report = UdsDtcDecoder.decodeReadDtcInformation(
-            byteArrayOf(0xFF.toByte(), 0x01, 0x23, 0x45, 0xFF.toByte())
+            byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x23, 0x45, 0xFF.toByte())
         )
         val record = report.records.single()
 
+        assertEquals(UdsDtcFormat.ISO_14229_1, report.format)
         assertEquals(0x012345, record.rawDtc)
-        assertEquals("P012345", record.code)
+        assertEquals("0x012345", record.code)
         assertEquals(0xFF, record.statusByte)
         assertTrue(record.status.testFailed)
         assertTrue(record.status.testFailedThisOperationCycle)
@@ -47,24 +54,35 @@ class UdsDtcDecoderTest {
     }
 
     @Test
-    fun acceptsEmptyDtcListWhenAvailabilityMaskIsPresent() {
-        val report = UdsDtcDecoder.decodeReadDtcInformation(byteArrayOf(0x7F))
+    fun keepsUnknownDtcFormatOpaqueInsteadOfGuessing() {
+        val report = UdsDtcDecoder.decodeReadDtcInformation(
+            byteArrayOf(0xFF.toByte(), 0x7F, 0x01, 0x02, 0x03, 0x00)
+        )
+        assertNull(report.format)
+        assertEquals("0x010203", report.records.single().code)
+    }
+
+    @Test
+    fun acceptsEmptyDtcListWhenBothHeaderBytesArePresent() {
+        val report = UdsDtcDecoder.decodeReadDtcInformation(byteArrayOf(0x7F, 0x01))
         assertEquals(0x7F, report.statusAvailabilityMask)
+        assertEquals(0x01, report.formatIdentifier)
         assertTrue(report.records.isEmpty())
     }
 
     @Test
-    fun rejectsMissingAvailabilityMaskAndTruncatedRecords() {
+    fun rejectsMissingHeaderBytesAndTruncatedRecords() {
         assertTrue(runCatching { UdsDtcDecoder.decodeReadDtcInformation(byteArrayOf()) }.isFailure)
+        assertTrue(runCatching { UdsDtcDecoder.decodeReadDtcInformation(byteArrayOf(0xFF.toByte())) }.isFailure)
         assertTrue(runCatching {
-            UdsDtcDecoder.decodeReadDtcInformation(byteArrayOf(0xFF.toByte(), 0x01, 0x02))
+            UdsDtcDecoder.decodeReadDtcInformation(byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x02))
         }.isFailure)
     }
 
     @Test
     fun unsetStatusFlagsRemainFalse() {
         val record = UdsDtcDecoder.decodeReadDtcInformation(
-            byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x01, 0x00)
+            byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x01, 0x01, 0x00)
         ).records.single()
         assertFalse(record.status.testFailed)
         assertFalse(record.status.pending)
