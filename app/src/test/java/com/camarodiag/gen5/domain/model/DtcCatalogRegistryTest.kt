@@ -178,6 +178,19 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun gen5V8CertificationProvenanceIsVisibleWithoutInventingMonitorDefinitions() {
+        val ls7 = VehicleProfile(modelYear = 2015, engine = CamaroEngine.LS7)
+        val lsa = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LSA)
+
+        assertEquals("15OBDG07", GmEngineMonitorCatalog.sourceLabel(ls7))
+        assertEquals("14OBDG07", GmEngineMonitorCatalog.sourceLabel(lsa))
+        assertTrue(CamaroDtcCatalog.coverageNotice(ls7).first.contains("15OBDG07"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("14OBDG07"))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0016", ls7))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0016", lsa))
+    }
+
+    @Test
     fun gen6CertificationSourcesAreYearAndEngineSpecific() {
         assertEquals(
             "16OBDG03",
