@@ -131,19 +131,23 @@ internal class IsoTpChannel(
 
     private suspend fun awaitFlowControl(timeoutMs: Long): Pair<Int, Long> {
         var waits = 0
-        while (waits <= MAX_FLOW_CONTROL_WAIT_FRAMES) {
+        while (true) {
             val frame = awaitFrame(timeoutMs)
             requireFrameLength(frame, 3, "Flow-control frame")
             if ((frame.data[0].toInt() and 0xF0) != 0x30) continue
 
             when (frame.data[0].toInt() and 0x0F) {
                 0x00 -> return (frame.data[1].toInt() and 0xFF) to decodeSeparationTime(frame.data[2].toInt() and 0xFF)
-                0x01 -> waits++
+                0x01 -> {
+                    waits++
+                    if (waits > MAX_FLOW_CONTROL_WAIT_FRAMES) {
+                        throw IsoTpException("ISO-TP flow-control wait limit exceeded.")
+                    }
+                }
                 0x02 -> throw IsoTpException("Remote ECU reported ISO-TP flow-control overflow.")
                 else -> throw IsoTpException("Remote ECU returned an invalid ISO-TP flow-control status.")
             }
         }
-        throw IsoTpException("ISO-TP flow-control wait limit exceeded.")
     }
 
     private suspend fun receivePayload(timeoutMs: Long): ByteArray {
