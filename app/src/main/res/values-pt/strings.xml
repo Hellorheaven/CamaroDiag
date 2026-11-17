@@ -565,4 +565,5 @@
     <string name="dtc_desc_p0017">Correlação cambota / árvore de cames de escape não plausível (banco 1)</string>
     <string name="dtc_desc_p0018">Correlação cambota / árvore de cames de admissão não plausível (banco 2)</string>
     <string name="dtc_desc_p0019">Correlação cambota / árvore de cames de escape não plausível (banco 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Apenas referência de certificação GM: a identidade do módulo (VIN, CAL ID, CVN, identificador do software e número da peça de hardware) ainda não foi comparada. Estes limites não estão validados para este módulo.</string>
 </resources>
