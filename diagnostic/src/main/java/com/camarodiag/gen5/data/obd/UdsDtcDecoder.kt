@@ -115,8 +115,9 @@ object UdsDtcDecoder {
 
     private fun formatDisplayCode(format: UdsDtcFormat?, b0: Int, b1: Int, b2: Int): String =
         when (format) {
-            UdsDtcFormat.SAE_J2012_DA_FORMAT_00,
-            UdsDtcFormat.SAE_J2012_DA_FORMAT_04 -> formatJ2012Dtc(b0, b1, b2)
+            UdsDtcFormat.SAE_J2012_DA_FORMAT_00 -> formatJ2012Dtc(b0, b1, b2)
+            // Format 0x04 uses a distinct SAE J2012-DA base-code list (ISO 27145).
+            // Keep it raw until that separate table is implemented; never decode it as format 0x00.
             else -> "0x" + ((b0 shl 16) or (b1 shl 8) or b2)
                 .toString(16).uppercase().padStart(6, '0')
         }
