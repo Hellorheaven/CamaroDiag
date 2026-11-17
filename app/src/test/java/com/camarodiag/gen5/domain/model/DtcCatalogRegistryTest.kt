@@ -283,6 +283,18 @@ class DtcCatalogRegistryTest {
         )
         assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LTG)))
         assertTrue(
+            CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2019, engine = CamaroEngine.LTG))
+                .first.contains("19OBDG03B")
+        )
+        assertTrue(
+            CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT1))
+                .first.contains("19OBDG03A")
+        )
+        assertTrue(
+            CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2023, engine = CamaroEngine.LTG))
+                .first.contains("23OBDG03A Part2")
+        )
+        assertTrue(
             CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LT1))
                 .first.contains("24OBDG03B Part 2")
         )
