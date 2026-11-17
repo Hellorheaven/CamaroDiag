@@ -244,3 +244,16 @@ Références primaires :
 - GM Service Information, Camaro V8 2011 P0011 (L99 VVT) : https://charm.li/Chevrolet/2011/Camaro%20V8-6.2L/Repair%20and%20Diagnosis/A%20L%20L%20%20Diagnostic%20Trouble%20Codes%20%28%20DTC%20%29/Testing%20and%20Inspection/P%20Code%20Charts/P0011/
 
 Les codes P0017 et autres défauts de VVT ne sont pas proposés aux V8 à arbre à cames unique sans preuve d'applicabilité.
+
+
+## Groupes de certification V8 Camaro 2014–2015 – association documentaire
+
+Les résumés GM des groupes OBD confirment les associations suivantes pour le groupe 7 :
+- 2014 : L99 Camaro, LSA Camaro, LS3 Camaro et LS7 Camaro → `14OBDG07`.
+- 2015 : L99 Camaro, LSA Camaro, LS3 Camaro et LS7 Camaro → `15OBDG07`.
+
+Ces associations sont enregistrées dans `GmV8MonitorCatalog.sourceLabel`, y compris pour le LS7. Elles attestent uniquement du dossier de certification à consulter : elles ne constituent pas des définitions DTC. Aucun moniteur LS7 2014–2015 n'est exposé tant que les critères du dossier moteur correspondant n'ont pas été extraits et vérifiés. Les résultats de groupe ne sont pas extrapolés aux années 2010–2013.
+
+Références GM primaires :
+- 2014 OBD Group Summary, groupe 7 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/2014%20OBD%20GROUP%20SUMMARY.pdf
+- 2015 OBD Group Summary, groupe 7 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2015/2015_OBD_GROUP_SUMMARY.pdf
