@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 بمحرك L99 V8 ونظام AFM وناقل حركة أوتوماتيكي. لا تستخدم معايرة LS3؛ تحقق من RPO وناقل الحركة ومعرّفات ECU.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 بمحرك LSA V8 فائق الشحن. تحقق من المعايرة المرتبطة بالشاحن الفائق والوقود والسوق وإصدار البرنامج.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 بمحرك LS7 V8. إنه ملف منفصل عن LS3/L99 رغم عائلة وحدة التحكم الاسمية؛ ويجب تحديد البرنامج.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 بمحرك 2.0 Turbo LTG (نطاق التغطية 2016–2020). يشير نشرة GM ‏PIP5313B إلى E80 في Camaro LTG لعامي 2016–2017؛ تحقق من السنوات اللاحقة باستخدام رقم القطعة وCAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 بمحرك 2.0 Turbo LTG (نطاق التغطية 2016–2023). تشير نشرة GM ‏PIP5313B إلى E80 في Camaro LTG لعامي 2016–2017؛ تحقق من السنوات اللاحقة باستخدام رقم القطعة وCAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 بمحرك LGX V6. قد يختلف الملف حسب السنة والسوق والإصدار؛ تحقق من وحدة التحكم الفعلية وCVN قبل تحميل تعريف الجدول.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 بمحرك LT1 V8 طبيعي السحب. ميّز إصدارات المعايرة حسب CAL ID/CVN والسنة والسوق وناقل الحركة وأرقام العتاد.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 بمحرك LT4 V8 فائق الشحن. لا تخلطه مع LT1؛ تحقق من أرقام القطع وبيانات الشحن الخاصة بالمعايرة.</string>
