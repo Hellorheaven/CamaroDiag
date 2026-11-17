@@ -564,5 +564,5 @@
     <string name="dtc_desc_p0017">Kurbelwellenposition – Auslassnockenwellenposition unplausibel (Bank 1)</string>
     <string name="dtc_desc_p0018">Kurbelwellenposition – Einlassnockenwellenposition unplausibel (Bank 2)</string>
     <string name="dtc_desc_p0019">Kurbelwellenposition – Auslassnockenwellenposition unplausibel (Bank 2)</string>
-    <string name="dtc_gm_calibration_not_validated">Nur GM-Zertifizierungsreferenz: Die Identität des Steuergeräts (VIN, CAL ID, CVN, Softwarekennung und Hardware-Teilenummer) wurde noch nicht abgeglichen. Diese Schwellenwerte sind für dieses Steuergerät nicht als validiert anzusehen.</string>
+    <string name="dtc_gm_calibration_not_validated">Die folgenden Interpretationen und Schwellenwerte sind Referenzdaten für den ausgewählten Motor und Modelljahrgang. Die Identität des Steuergeräts (VIN, CAL ID, CVN, Softwarekennung und Hardware-Teilenummer) wurde noch nicht geprüft; diese Daten sind für das angeschlossene Steuergerät nicht validiert.</string>
 </resources>
