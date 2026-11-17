@@ -254,6 +254,7 @@ object GmV8MonitorCatalog {
             vehicle.modelYear == 2012 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA) -> "12OBDG07"
             vehicle.modelYear in 2010..2011 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3) ->
                 if (vehicle.modelYear == 2010) "10OBDG12" else "11OBDG07"
+            vehicle.modelYear == 2013 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA) -> "13OBDG07"
             vehicle.modelYear == 2014 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA, CamaroEngine.LS7) -> "14OBDG07"
             vehicle.modelYear == 2015 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA, CamaroEngine.LS7) -> "15OBDG07"
             else -> null
