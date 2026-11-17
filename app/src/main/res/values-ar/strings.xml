@@ -572,11 +572,6 @@
     <string name="dtc_possible_causes">الأسباب المحتملة (غير مؤكدة)</string>
     <string name="dtc_recommended_checks">الفحوصات الموصى بها</string>
     <string name="dtc_vehicle_specific_not_documented">لا توجد بعد إجراءات تشخيص موثقة خاصة بهذا الرمز وهذه المواصفات. يظهر وصف OEM/SAE أعلاه؛ تحقق من رقم VIN ووحدة التحكم في معلومات خدمة GM.</string>
-    <string name="dtc_vehicle_interpretation">تفسير خاص بهذه السيارة</string>
-    <string name="dtc_severity">درجة الخطورة</string>
-    <string name="dtc_possible_causes">الأسباب المحتملة (غير مؤكدة)</string>
-    <string name="dtc_recommended_checks">الفحوصات الموصى بها</string>
-    <string name="dtc_vehicle_specific_not_documented">لا توجد بعد إجراءات تشخيص موثقة خاصة بهذا الرمز وهذه المواصفات. يظهر وصف OEM/SAE أعلاه؛ تحقق من رقم VIN ووحدة التحكم في معلومات خدمة GM.</string>
     <string name="dtc_desc_p0016">عدم تطابق موضع عمود المرفق مع عمود كامات السحب (المصرف 1)</string>
     <string name="dtc_desc_p0017">عدم تطابق موضع عمود المرفق مع عمود كامات العادم (المصرف 1)</string>
     <string name="dtc_desc_p0018">عدم تطابق موضع عمود المرفق مع عمود كامات السحب (المصرف 2)</string>
