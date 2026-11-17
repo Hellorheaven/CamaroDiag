@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
 import com.camarodiag.gen5.domain.model.CamaroGeneration
+import com.camarodiag.gen5.domain.model.DiagnosticDtc
 import com.camarodiag.gen5.domain.model.VehicleProfile
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -434,6 +435,10 @@ class ProfiledUdsReadSession private constructor(
 
     suspend fun readDtcReport(statusMask: Int = 0xFF): UdsDtcReport =
         client.readDtcReport(statusMask)
+
+    /** Returns ECU-tagged records compatible with the shared diagnostics presentation model. */
+    suspend fun readDiagnosticDtcs(statusMask: Int = 0xFF): List<DiagnosticDtc> =
+        readDtcReport(statusMask).records.map { it.toDiagnosticDtc(profile.moduleId) }
 
     companion object {
         suspend fun open(
