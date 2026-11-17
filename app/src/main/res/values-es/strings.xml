@@ -536,4 +536,26 @@
     <string name="cal_comparison_different_ranges">%1$d bytes diferentes distribuidos en %2$d rangos.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d bytes)</string>
     <string name="cal_comparison_more_ranges">No se muestran %1$d rangos adicionales.</string>
+    <string name="cal_trace_title">Analizador de trazas CAN / UDS sin conexión</string>
+    <string name="cal_trace_description">Importa una captura Vector ASC, un registro de monitor ELM327 con encabezados CAN o un CSV CAN. CamaroDiag reconstruye los mensajes ISO-TP y enumera los servicios UDS y DID observados sin enviar comandos al vehículo.</string>
+    <string name="cal_trace_import">Importar traza CAN (.asc / .csv / registro ELM)</string>
+    <string name="cal_trace_can_ids">ID CAN: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">DID candidatos: %1$s</string>
+    <string name="cal_trace_more_observations">… y %1$d observación(es) más.</string>
+    <string name="cal_trace_observations_only">Los DID detectados son solo observaciones de la traza. No se decodifican ni se promocionan como señales verificadas.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">No se reconocieron tramas CAN. Formatos compatibles: Vector ASC, registro ELM327 con encabezados CAN o CSV con columnas CAN ID / datos.</string>
+    <string name="vm_trace_summary">%1$d trama(s), %2$d mensaje(s) ISO-TP/UDS, %3$d DID observado(s), %4$d mensaje(s) incompleto(s), %5$d incidencia(s).</string>
+    <string name="msg_trace_analysis_failed">No se pudo analizar la traza CAN seleccionada.</string>
+    <string name="msg_trace_too_large">La traza es demasiado grande. El límite local es de 32 MiB.</string>
+    <string name="msg_trace_open_failed">No se pudo abrir la traza seleccionada.</string>
+    <string name="msg_trace_empty">La traza seleccionada está vacía.</string>
+    <string name="trace_error_invalid_line">Línea %1$d: trama CAN/ISO-TP no válida o incompleta.</string>
+    <string name="trace_error_sequence">Línea %1$d: secuencia ISO-TP incorrecta (se esperaba %2$d, se recibió %3$d).</string>
+    <string name="trace_error_pci">Línea %1$d: tipo PCI ISO-TP 0x%2$s no compatible.</string>
+    <string name="trace_error_elm_no_records">No se encontraron registros ELM327 con encabezados. Activa los encabezados CAN y guarda la salida del monitor.</string>
+    <string name="trace_error_csv_empty">La traza CSV está vacía.</string>
+    <string name="trace_error_csv_columns">El CSV necesita una columna CAN ID y una columna de datos/payload, o columnas data0…data15.</string>
+    <string name="trace_error_generic">La traza contiene un registro no válido o no compatible.</string>
 </resources>

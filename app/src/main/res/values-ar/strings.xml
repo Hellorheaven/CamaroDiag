@@ -545,4 +545,26 @@
     <string name="cal_comparison_different_ranges">تختلف %1$d بايت موزعة على %2$d نطاقات.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d بايت)</string>
     <string name="cal_comparison_more_ranges">لم يتم عرض %1$d نطاقات إضافية.</string>
+    <string name="cal_trace_title">محلل تتبّع CAN / UDS دون اتصال</string>
+    <string name="cal_trace_description">استورد تسجيل Vector ASC أو سجل مراقبة ELM327 مع ترويسات CAN أو ملف CAN CSV. يعيد CamaroDiag تجميع رسائل ISO-TP ويعرض خدمات UDS ومعرّفات DID المرصودة دون إرسال أوامر إلى السيارة.</string>
+    <string name="cal_trace_import">استيراد تتبّع CAN ‏(.asc / .csv / سجل ELM)</string>
+    <string name="cal_trace_can_ids">معرّفات CAN: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">معرّفات DID المرشحة: %1$s</string>
+    <string name="cal_trace_more_observations">… و%1$d ملاحظة إضافية.</string>
+    <string name="cal_trace_observations_only">معرّفات DID المكتشفة هي ملاحظات من التتبّع فقط. لا يتم فك ترميزها أو اعتمادها كإشارات موثّقة.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">لم يتم التعرف على إطارات CAN. التنسيقات المدعومة: Vector ASC أو سجل مراقبة ELM327 مع ترويسات CAN أو CSV بأعمدة CAN ID / البيانات.</string>
+    <string name="vm_trace_summary">%1$d إطار، %2$d رسالة ISO-TP/UDS، %3$d معرّف DID مرصود، %4$d رسالة غير مكتملة، %5$d مشكلة.</string>
+    <string name="msg_trace_analysis_failed">تعذّر تحليل تتبّع CAN المحدد.</string>
+    <string name="msg_trace_too_large">ملف التتبّع كبير جدًا. الحد المحلي 32 MiB.</string>
+    <string name="msg_trace_open_failed">تعذّر فتح التتبّع المحدد.</string>
+    <string name="msg_trace_empty">التتبّع المحدد فارغ.</string>
+    <string name="trace_error_invalid_line">السطر %1$d: إطار CAN/ISO-TP غير صالح أو غير مكتمل.</string>
+    <string name="trace_error_sequence">السطر %1$d: عدم تطابق تسلسل ISO-TP (المتوقع %2$d، المستلم %3$d).</string>
+    <string name="trace_error_pci">السطر %1$d: نوع PCI ‏0x%2$s غير مدعوم في ISO-TP.</string>
+    <string name="trace_error_elm_no_records">لم يتم العثور على سجلات ELM327 ذات ترويسات. فعّل ترويسات CAN واحفظ مخرجات المراقبة.</string>
+    <string name="trace_error_csv_empty">تتبّع CSV فارغ.</string>
+    <string name="trace_error_csv_columns">يجب أن يحتوي CSV على عمود CAN ID وعمود بيانات/payload أو أعمدة data0…data15.</string>
+    <string name="trace_error_generic">يحتوي التتبّع على سجل غير صالح أو غير مدعوم.</string>
 </resources>

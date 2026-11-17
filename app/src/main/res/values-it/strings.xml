@@ -536,4 +536,26 @@
     <string name="cal_comparison_different_ranges">%1$d byte differenti distribuiti in %2$d intervalli.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d byte)</string>
     <string name="cal_comparison_more_ranges">Altri %1$d intervalli non visualizzati.</string>
+    <string name="cal_trace_title">Analizzatore offline di tracce CAN / UDS</string>
+    <string name="cal_trace_description">Importa una cattura Vector ASC, un registro monitor ELM327 con intestazioni CAN o un file CSV CAN. CamaroDiag ricompone i messaggi ISO-TP ed elenca i servizi UDS e i DID osservati senza inviare comandi al veicolo.</string>
+    <string name="cal_trace_import">Importa traccia CAN (.asc / .csv / registro ELM)</string>
+    <string name="cal_trace_can_ids">ID CAN: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">DID candidati: %1$s</string>
+    <string name="cal_trace_more_observations">… e altre %1$d osservazione/i.</string>
+    <string name="cal_trace_observations_only">I DID rilevati sono solo osservazioni della traccia. Non vengono decodificati né promossi a segnali verificati.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">Nessun frame CAN riconosciuto. Formati supportati: Vector ASC, registro ELM327 con intestazioni CAN o CSV con colonne CAN ID / dati.</string>
+    <string name="vm_trace_summary">%1$d frame, %2$d messaggi ISO-TP/UDS, %3$d DID osservati, %4$d messaggi incompleti, %5$d anomalie.</string>
+    <string name="msg_trace_analysis_failed">Impossibile analizzare la traccia CAN selezionata.</string>
+    <string name="msg_trace_too_large">La traccia è troppo grande. Il limite locale è 32 MiB.</string>
+    <string name="msg_trace_open_failed">Impossibile aprire la traccia selezionata.</string>
+    <string name="msg_trace_empty">La traccia selezionata è vuota.</string>
+    <string name="trace_error_invalid_line">Riga %1$d: frame CAN/ISO-TP non valido o incompleto.</string>
+    <string name="trace_error_sequence">Riga %1$d: sequenza ISO-TP non corrispondente (previsto %2$d, ricevuto %3$d).</string>
+    <string name="trace_error_pci">Riga %1$d: tipo PCI ISO-TP 0x%2$s non supportato.</string>
+    <string name="trace_error_elm_no_records">Nessun record ELM327 con intestazioni trovato. Attiva le intestazioni CAN e salva l’output del monitor.</string>
+    <string name="trace_error_csv_empty">La traccia CSV è vuota.</string>
+    <string name="trace_error_csv_columns">Il CSV deve contenere una colonna CAN ID e una colonna dati/payload oppure le colonne data0…data15.</string>
+    <string name="trace_error_generic">La traccia contiene un record non valido o non supportato.</string>
 </resources>

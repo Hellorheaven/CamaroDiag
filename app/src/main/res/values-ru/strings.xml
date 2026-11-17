@@ -539,4 +539,26 @@
     <string name="cal_comparison_different_ranges">Различаются %1$d байт в %2$d диапазонах.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d байт)</string>
     <string name="cal_comparison_more_ranges">Не показано дополнительных диапазонов: %1$d.</string>
+    <string name="cal_trace_title">Автономный анализатор трасс CAN / UDS</string>
+    <string name="cal_trace_description">Импортируйте запись Vector ASC, журнал монитора ELM327 с заголовками CAN или файл CAN CSV. CamaroDiag собирает сообщения ISO-TP и перечисляет обнаруженные службы UDS и DID, не отправляя команды автомобилю.</string>
+    <string name="cal_trace_import">Импорт трассы CAN (.asc / .csv / журнал ELM)</string>
+    <string name="cal_trace_can_ids">Идентификаторы CAN: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">Кандидаты DID: %1$s</string>
+    <string name="cal_trace_more_observations">… и ещё наблюдений: %1$d.</string>
+    <string name="cal_trace_observations_only">Обнаруженные DID являются только наблюдениями из трассы. Они не декодируются и не считаются проверенными сигналами.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">Кадры CAN не распознаны. Поддерживаются Vector ASC, журнал ELM327 с заголовками CAN или CSV со столбцами CAN ID / данные.</string>
+    <string name="vm_trace_summary">Кадров: %1$d, сообщений ISO-TP/UDS: %2$d, обнаруженных DID: %3$d, неполных сообщений: %4$d, проблем: %5$d.</string>
+    <string name="msg_trace_analysis_failed">Не удалось проанализировать выбранную трассу CAN.</string>
+    <string name="msg_trace_too_large">Трасса слишком велика. Локальный предел — 32 МиБ.</string>
+    <string name="msg_trace_open_failed">Не удалось открыть выбранную трассу.</string>
+    <string name="msg_trace_empty">Выбранная трасса пуста.</string>
+    <string name="trace_error_invalid_line">Строка %1$d: недопустимый или неполный кадр CAN/ISO-TP.</string>
+    <string name="trace_error_sequence">Строка %1$d: несоответствие последовательности ISO-TP (ожидалось %2$d, получено %3$d).</string>
+    <string name="trace_error_pci">Строка %1$d: неподдерживаемый тип PCI ISO-TP 0x%2$s.</string>
+    <string name="trace_error_elm_no_records">Записи ELM327 с заголовками не найдены. Включите заголовки CAN и сохраните журнал монитора.</string>
+    <string name="trace_error_csv_empty">Трасса CSV пуста.</string>
+    <string name="trace_error_csv_columns">В CSV нужен столбец CAN ID и столбец данных/payload либо столбцы data0…data15.</string>
+    <string name="trace_error_generic">Трасса содержит недопустимую или неподдерживаемую запись.</string>
 </resources>

@@ -530,4 +530,26 @@
     <string name="cal_comparison_different_ranges">%1$d 个字节不同，分布在 %2$d 个范围内。</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s（%3$d 字节）</string>
     <string name="cal_comparison_more_ranges">另有 %1$d 个范围未显示。</string>
+    <string name="cal_trace_title">离线 CAN / UDS 跟踪分析器</string>
+    <string name="cal_trace_description">导入 Vector ASC 捕获文件、带 CAN 标头的 ELM327 监视日志或 CAN CSV 文件。CamaroDiag 会重组 ISO-TP 消息并列出观察到的 UDS 服务和 DID，不会向车辆发送命令。</string>
+    <string name="cal_trace_import">导入 CAN 跟踪（.asc / .csv / ELM 日志）</string>
+    <string name="cal_trace_can_ids">CAN ID：%1$s</string>
+    <string name="cal_trace_uds_services">UDS：%1$s</string>
+    <string name="cal_trace_candidate_dids">候选 DID：%1$s</string>
+    <string name="cal_trace_more_observations">… 另有 %1$d 条观察记录。</string>
+    <string name="cal_trace_observations_only">检测到的 DID 仅是跟踪记录中的观察结果，不会被解码或标记为已验证信号。</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">未识别到 CAN 帧。支持的格式：Vector ASC、带 CAN 标头的 ELM327 监视日志，或包含 CAN ID / 数据列的 CSV。</string>
+    <string name="vm_trace_summary">%1$d 个帧，%2$d 条 ISO-TP/UDS 消息，%3$d 个观察到的 DID，%4$d 条不完整消息，%5$d 个问题。</string>
+    <string name="msg_trace_analysis_failed">无法分析所选 CAN 跟踪文件。</string>
+    <string name="msg_trace_too_large">跟踪文件过大。本地上限为 32 MiB。</string>
+    <string name="msg_trace_open_failed">无法打开所选跟踪文件。</string>
+    <string name="msg_trace_empty">所选跟踪文件为空。</string>
+    <string name="trace_error_invalid_line">第 %1$d 行：CAN/ISO-TP 帧无效或不完整。</string>
+    <string name="trace_error_sequence">第 %1$d 行：ISO-TP 序列不匹配（预期 %2$d，实际 %3$d）。</string>
+    <string name="trace_error_pci">第 %1$d 行：不支持的 ISO-TP PCI 类型 0x%2$s。</string>
+    <string name="trace_error_elm_no_records">未找到带标头的 ELM327 记录。请启用 CAN 标头并保存监视输出。</string>
+    <string name="trace_error_csv_empty">CSV 跟踪文件为空。</string>
+    <string name="trace_error_csv_columns">CSV 必须包含 CAN ID 列和数据/payload 列，或 data0…data15 列。</string>
+    <string name="trace_error_generic">跟踪文件包含无效或不支持的记录。</string>
 </resources>

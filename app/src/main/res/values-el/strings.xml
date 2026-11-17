@@ -534,4 +534,26 @@
     <string name="cal_comparison_different_ranges">%1$d byte διαφέρουν σε %2$d περιοχές.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d byte)</string>
     <string name="cal_comparison_more_ranges">Δεν εμφανίζονται %1$d επιπλέον περιοχές.</string>
+    <string name="cal_trace_title">Αναλυτής ιχνών CAN / UDS εκτός σύνδεσης</string>
+    <string name="cal_trace_description">Εισαγάγετε καταγραφή Vector ASC, αρχείο παρακολούθησης ELM327 με κεφαλίδες CAN ή αρχείο CAN CSV. Το CamaroDiag ανασυνθέτει μηνύματα ISO-TP και παραθέτει τις υπηρεσίες UDS και τα DID που παρατηρήθηκαν, χωρίς να στέλνει εντολές στο όχημα.</string>
+    <string name="cal_trace_import">Εισαγωγή ίχνους CAN (.asc / .csv / αρχείο ELM)</string>
+    <string name="cal_trace_can_ids">Αναγνωριστικά CAN: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">Υποψήφια DID: %1$s</string>
+    <string name="cal_trace_more_observations">… και %1$d ακόμη παρατήρηση(εις).</string>
+    <string name="cal_trace_observations_only">Τα DID που εντοπίστηκαν είναι μόνο παρατηρήσεις από το ίχνος. Δεν αποκωδικοποιούνται ούτε προωθούνται ως επαληθευμένα σήματα.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">Δεν αναγνωρίστηκαν πλαίσια CAN. Υποστηριζόμενες μορφές: Vector ASC, αρχείο παρακολούθησης ELM327 με κεφαλίδες CAN ή CSV με στήλες CAN ID / δεδομένων.</string>
+    <string name="vm_trace_summary">%1$d πλαίσια, %2$d μηνύματα ISO-TP/UDS, %3$d DID που παρατηρήθηκαν, %4$d ημιτελή μηνύματα, %5$d ζητήματα.</string>
+    <string name="msg_trace_analysis_failed">Δεν ήταν δυνατή η ανάλυση του επιλεγμένου ίχνους CAN.</string>
+    <string name="msg_trace_too_large">Το ίχνος είναι πολύ μεγάλο. Το τοπικό όριο είναι 32 MiB.</string>
+    <string name="msg_trace_open_failed">Δεν ήταν δυνατό το άνοιγμα του επιλεγμένου ίχνους.</string>
+    <string name="msg_trace_empty">Το επιλεγμένο ίχνος είναι κενό.</string>
+    <string name="trace_error_invalid_line">Γραμμή %1$d: μη έγκυρο ή ημιτελές πλαίσιο CAN/ISO-TP.</string>
+    <string name="trace_error_sequence">Γραμμή %1$d: ασυμφωνία ακολουθίας ISO-TP (αναμενόταν %2$d, ελήφθη %3$d).</string>
+    <string name="trace_error_pci">Γραμμή %1$d: μη υποστηριζόμενος τύπος PCI ISO-TP 0x%2$s.</string>
+    <string name="trace_error_elm_no_records">Δεν βρέθηκαν εγγραφές ELM327 με κεφαλίδες. Ενεργοποιήστε τις κεφαλίδες CAN και αποθηκεύστε την έξοδο παρακολούθησης.</string>
+    <string name="trace_error_csv_empty">Το ίχνος CSV είναι κενό.</string>
+    <string name="trace_error_csv_columns">Το CSV χρειάζεται στήλη CAN ID και στήλη δεδομένων/payload ή στήλες data0…data15.</string>
+    <string name="trace_error_generic">Το ίχνος περιέχει μη έγκυρη ή μη υποστηριζόμενη εγγραφή.</string>
 </resources>

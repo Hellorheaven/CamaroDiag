@@ -530,4 +530,26 @@
     <string name="cal_comparison_different_ranges">%2$d개 범위에서 %1$d바이트가 다릅니다.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d바이트)</string>
     <string name="cal_comparison_more_ranges">추가 범위 %1$d개는 표시되지 않았습니다.</string>
+    <string name="cal_trace_title">오프라인 CAN / UDS 트레이스 분석기</string>
+    <string name="cal_trace_description">Vector ASC 캡처, CAN 헤더가 포함된 ELM327 모니터 로그 또는 CAN CSV 파일을 가져옵니다. CamaroDiag는 차량에 명령을 보내지 않고 ISO-TP 메시지를 재구성하고 관찰된 UDS 서비스와 DID를 나열합니다.</string>
+    <string name="cal_trace_import">CAN 트레이스 가져오기 (.asc / .csv / ELM 로그)</string>
+    <string name="cal_trace_can_ids">CAN ID: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">후보 DID: %1$s</string>
+    <string name="cal_trace_more_observations">… 추가 관찰 항목 %1$d개.</string>
+    <string name="cal_trace_observations_only">감지된 DID는 트레이스에서 관찰된 항목일 뿐입니다. 디코딩하거나 검증된 신호로 등록하지 않습니다.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">인식된 CAN 프레임이 없습니다. 지원 형식: Vector ASC, CAN 헤더가 활성화된 ELM327 모니터 로그 또는 CAN ID / 데이터 열이 있는 CSV.</string>
+    <string name="vm_trace_summary">프레임 %1$d개, ISO-TP/UDS 메시지 %2$d개, 관찰된 DID %3$d개, 불완전 메시지 %4$d개, 문제 %5$d개.</string>
+    <string name="msg_trace_analysis_failed">선택한 CAN 트레이스를 분석할 수 없습니다.</string>
+    <string name="msg_trace_too_large">트레이스 파일이 너무 큽니다. 로컬 제한은 32 MiB입니다.</string>
+    <string name="msg_trace_open_failed">선택한 트레이스를 열 수 없습니다.</string>
+    <string name="msg_trace_empty">선택한 트레이스가 비어 있습니다.</string>
+    <string name="trace_error_invalid_line">%1$d행: 잘못되었거나 불완전한 CAN/ISO-TP 프레임입니다.</string>
+    <string name="trace_error_sequence">%1$d행: ISO-TP 시퀀스 불일치 (예상 %2$d, 수신 %3$d).</string>
+    <string name="trace_error_pci">%1$d행: 지원되지 않는 ISO-TP PCI 유형 0x%2$s.</string>
+    <string name="trace_error_elm_no_records">헤더가 포함된 ELM327 레코드가 없습니다. CAN 헤더를 활성화하고 모니터 출력을 저장하세요.</string>
+    <string name="trace_error_csv_empty">CSV 트레이스가 비어 있습니다.</string>
+    <string name="trace_error_csv_columns">CSV에는 CAN ID 열과 데이터/payload 열 또는 data0…data15 열이 필요합니다.</string>
+    <string name="trace_error_generic">트레이스에 잘못되었거나 지원되지 않는 레코드가 있습니다.</string>
 </resources>

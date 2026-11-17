@@ -536,4 +536,26 @@
     <string name="cal_comparison_different_ranges">%1$d בתים שונים הפרוסים על פני %2$d טווחים.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d בתים)</string>
     <string name="cal_comparison_more_ranges">%1$d טווחים נוספים אינם מוצגים.</string>
+    <string name="cal_trace_title">מנתח עקבות CAN / UDS לא מקוון</string>
+    <string name="cal_trace_description">ייבא לכידת Vector ASC, יומן ניטור ELM327 עם כותרות CAN או קובץ CSV של CAN. CamaroDiag מרכיב מחדש הודעות ISO-TP ומציג שירותי UDS ומזהי DID שנצפו, בלי לשלוח פקודות לרכב.</string>
+    <string name="cal_trace_import">ייבוא עקבת CAN (.asc / .csv / יומן ELM)</string>
+    <string name="cal_trace_can_ids">מזהי CAN: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">מזהי DID מועמדים: %1$s</string>
+    <string name="cal_trace_more_observations">… ועוד %1$d תצפיות.</string>
+    <string name="cal_trace_observations_only">מזהי DID שזוהו הם תצפיות מהעקבה בלבד. הם אינם מפוענחים ואינם מקודמים לאותות מאומתים.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">לא זוהו מסגרות CAN. פורמטים נתמכים: Vector ASC, יומן ELM327 עם כותרות CAN או CSV עם עמודות CAN ID / נתונים.</string>
+    <string name="vm_trace_summary">%1$d מסגרות, %2$d הודעות ISO-TP/UDS, %3$d מזהי DID שנצפו, %4$d הודעות לא שלמות, %5$d בעיות.</string>
+    <string name="msg_trace_analysis_failed">לא ניתן לנתח את עקבת ה-CAN שנבחרה.</string>
+    <string name="msg_trace_too_large">העקבה גדולה מדי. המגבלה המקומית היא 32 MiB.</string>
+    <string name="msg_trace_open_failed">לא ניתן לפתוח את העקבה שנבחרה.</string>
+    <string name="msg_trace_empty">העקבה שנבחרה ריקה.</string>
+    <string name="trace_error_invalid_line">שורה %1$d: מסגרת CAN/ISO-TP לא תקינה או לא שלמה.</string>
+    <string name="trace_error_sequence">שורה %1$d: אי-התאמה ברצף ISO-TP (צפוי %2$d, התקבל %3$d).</string>
+    <string name="trace_error_pci">שורה %1$d: סוג PCI של ISO-TP ‏0x%2$s אינו נתמך.</string>
+    <string name="trace_error_elm_no_records">לא נמצאו רשומות ELM327 עם כותרות. הפעל כותרות CAN ושמור את פלט הניטור.</string>
+    <string name="trace_error_csv_empty">עקבת ה-CSV ריקה.</string>
+    <string name="trace_error_csv_columns">קובץ CSV חייב לכלול עמודת CAN ID ועמודת נתונים/payload, או עמודות data0…data15.</string>
+    <string name="trace_error_generic">העקבה מכילה רשומה לא תקינה או לא נתמכת.</string>
 </resources>

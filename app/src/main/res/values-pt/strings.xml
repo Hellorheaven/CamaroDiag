@@ -534,4 +534,26 @@
     <string name="cal_comparison_different_ranges">%1$d bytes diferentes distribuídos por %2$d intervalos.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d bytes)</string>
     <string name="cal_comparison_more_ranges">%1$d intervalos adicionais não apresentados.</string>
+    <string name="cal_trace_title">Analisador offline de rastros CAN / UDS</string>
+    <string name="cal_trace_description">Importe uma captura Vector ASC, um registo de monitor ELM327 com cabeçalhos CAN ou um ficheiro CSV CAN. O CamaroDiag recompõe mensagens ISO-TP e lista serviços UDS e DID observados sem enviar comandos ao veículo.</string>
+    <string name="cal_trace_import">Importar rastro CAN (.asc / .csv / registo ELM)</string>
+    <string name="cal_trace_can_ids">IDs CAN: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">DID candidatos: %1$s</string>
+    <string name="cal_trace_more_observations">… e mais %1$d observação(ões).</string>
+    <string name="cal_trace_observations_only">Os DID detetados são apenas observações do rastro. Não são descodificados nem promovidos a sinais verificados.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">Não foram reconhecidas tramas CAN. Formatos suportados: Vector ASC, registo ELM327 com cabeçalhos CAN ou CSV com colunas CAN ID / dados.</string>
+    <string name="vm_trace_summary">%1$d trama(s), %2$d mensagem(ns) ISO-TP/UDS, %3$d DID observado(s), %4$d mensagem(ns) incompleta(s), %5$d problema(s).</string>
+    <string name="msg_trace_analysis_failed">Não foi possível analisar o rastro CAN selecionado.</string>
+    <string name="msg_trace_too_large">O rastro é demasiado grande. O limite local é 32 MiB.</string>
+    <string name="msg_trace_open_failed">Não foi possível abrir o rastro selecionado.</string>
+    <string name="msg_trace_empty">O rastro selecionado está vazio.</string>
+    <string name="trace_error_invalid_line">Linha %1$d: trama CAN/ISO-TP inválida ou incompleta.</string>
+    <string name="trace_error_sequence">Linha %1$d: sequência ISO-TP incompatível (esperado %2$d, recebido %3$d).</string>
+    <string name="trace_error_pci">Linha %1$d: tipo PCI ISO-TP 0x%2$s não suportado.</string>
+    <string name="trace_error_elm_no_records">Não foram encontrados registos ELM327 com cabeçalhos. Ative os cabeçalhos CAN e guarde a saída do monitor.</string>
+    <string name="trace_error_csv_empty">O rastro CSV está vazio.</string>
+    <string name="trace_error_csv_columns">O CSV precisa de uma coluna CAN ID e uma coluna de dados/payload, ou colunas data0…data15.</string>
+    <string name="trace_error_generic">O rastro contém um registo inválido ou não suportado.</string>
 </resources>

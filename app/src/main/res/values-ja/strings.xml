@@ -530,4 +530,26 @@
     <string name="cal_comparison_different_ranges">%2$d 個の範囲にわたり %1$d バイトが異なります。</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s（%3$d バイト）</string>
     <string name="cal_comparison_more_ranges">追加の %1$d 範囲は表示されていません。</string>
+    <string name="cal_trace_title">オフライン CAN / UDS トレース解析</string>
+    <string name="cal_trace_description">Vector ASC キャプチャ、CAN ヘッダー付き ELM327 モニターログ、または CAN CSV ファイルを読み込みます。CamaroDiag は ISO-TP メッセージを再構成し、車両へコマンドを送信せずに観測された UDS サービスと DID を一覧表示します。</string>
+    <string name="cal_trace_import">CAN トレースをインポート（.asc / .csv / ELM ログ）</string>
+    <string name="cal_trace_can_ids">CAN ID：%1$s</string>
+    <string name="cal_trace_uds_services">UDS：%1$s</string>
+    <string name="cal_trace_candidate_dids">候補 DID：%1$s</string>
+    <string name="cal_trace_more_observations">… ほか %1$d 件の観測。</string>
+    <string name="cal_trace_observations_only">検出された DID はトレース上の観測結果にすぎません。デコードや検証済み信号への登録は行いません。</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">CAN フレームを認識できませんでした。対応形式：Vector ASC、CAN ヘッダー付き ELM327 モニターログ、または CAN ID / data 列を含む CSV。</string>
+    <string name="vm_trace_summary">フレーム %1$d 件、ISO-TP/UDS メッセージ %2$d 件、観測 DID %3$d 件、不完全メッセージ %4$d 件、問題 %5$d 件。</string>
+    <string name="msg_trace_analysis_failed">選択した CAN トレースを解析できません。</string>
+    <string name="msg_trace_too_large">トレースのサイズが大きすぎます。ローカル上限は 32 MiB です。</string>
+    <string name="msg_trace_open_failed">選択したトレースを開けません。</string>
+    <string name="msg_trace_empty">選択したトレースは空です。</string>
+    <string name="trace_error_invalid_line">%1$d 行目：CAN/ISO-TP フレームが無効または不完全です。</string>
+    <string name="trace_error_sequence">%1$d 行目：ISO-TP シーケンスが一致しません（期待値 %2$d、受信値 %3$d）。</string>
+    <string name="trace_error_pci">%1$d 行目：未対応の ISO-TP PCI タイプ 0x%2$s。</string>
+    <string name="trace_error_elm_no_records">ヘッダー付き ELM327 レコードがありません。CAN ヘッダーを有効にしてモニター出力を保存してください。</string>
+    <string name="trace_error_csv_empty">CSV トレースが空です。</string>
+    <string name="trace_error_csv_columns">CSV には CAN ID 列と data/payload 列、または data0…data15 列が必要です。</string>
+    <string name="trace_error_generic">トレースに無効または未対応のレコードが含まれています。</string>
 </resources>

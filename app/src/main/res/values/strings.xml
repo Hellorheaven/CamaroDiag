@@ -533,4 +533,26 @@
     <string name="cal_comparison_different_ranges">%1$d bytes differ across %2$d range(s).</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d bytes)</string>
     <string name="cal_comparison_more_ranges">%1$d additional range(s) not displayed.</string>
+    <string name="cal_trace_title">Offline CAN / UDS trace analyzer</string>
+    <string name="cal_trace_description">Import a Vector ASC capture, an ELM327 monitor log with CAN headers, or a CAN CSV file. CamaroDiag reassembles ISO-TP messages and lists observed UDS services and DIDs without sending commands to a vehicle.</string>
+    <string name="cal_trace_import">Import CAN trace (.asc / .csv / ELM log)</string>
+    <string name="cal_trace_can_ids">CAN IDs: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">Candidate DIDs: %1$s</string>
+    <string name="cal_trace_more_observations">… and %1$d more observation(s).</string>
+    <string name="cal_trace_observations_only">Detected DIDs are trace observations only. They are not decoded or promoted as verified signals.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">No CAN frames recognized. Supported formats: Vector ASC, ELM327 header-enabled monitor log, or CSV with CAN ID / data columns.</string>
+    <string name="vm_trace_summary">%1$d frame(s), %2$d ISO-TP/UDS message(s), %3$d observed DID(s), %4$d incomplete message(s), %5$d issue(s).</string>
+    <string name="msg_trace_analysis_failed">Unable to analyze the selected CAN trace.</string>
+    <string name="msg_trace_too_large">The trace is too large. The local limit is 32 MiB.</string>
+    <string name="msg_trace_open_failed">Unable to open the selected trace.</string>
+    <string name="msg_trace_empty">The selected trace is empty.</string>
+    <string name="trace_error_invalid_line">Line %1$d: invalid or incomplete CAN/ISO-TP frame.</string>
+    <string name="trace_error_sequence">Line %1$d: ISO-TP sequence mismatch (expected %2$d, got %3$d).</string>
+    <string name="trace_error_pci">Line %1$d: unsupported ISO-TP PCI type 0x%2$s.</string>
+    <string name="trace_error_elm_no_records">No ELM327 header records found. Enable CAN headers and save the monitor output.</string>
+    <string name="trace_error_csv_empty">The CSV trace is empty.</string>
+    <string name="trace_error_csv_columns">The CSV needs a CAN ID column and a data/payload column, or data0…data15 columns.</string>
+    <string name="trace_error_generic">The trace contains an unsupported or invalid record.</string>
 </resources>

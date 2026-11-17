@@ -534,4 +534,26 @@
     <string name="cal_comparison_different_ranges">%1$d bytes verschillen verdeeld over %2$d bereiken.</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d bytes)</string>
     <string name="cal_comparison_more_ranges">%1$d extra bereiken worden niet weergegeven.</string>
+    <string name="cal_trace_title">Offline CAN / UDS-traceanalyse</string>
+    <string name="cal_trace_description">Importeer een Vector ASC-opname, een ELM327-monitorlog met CAN-headers of een CAN-CSV-bestand. CamaroDiag reconstrueert ISO-TP-berichten en toont waargenomen UDS-services en DID’s zonder opdrachten naar het voertuig te sturen.</string>
+    <string name="cal_trace_import">CAN-trace importeren (.asc / .csv / ELM-log)</string>
+    <string name="cal_trace_can_ids">CAN-ID’s: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">Kandidaat-DID’s: %1$s</string>
+    <string name="cal_trace_more_observations">… en nog %1$d waarneming(en).</string>
+    <string name="cal_trace_observations_only">Gedetecteerde DID’s zijn alleen waarnemingen uit de trace. Ze worden niet gedecodeerd of als geverifieerde signalen aangemerkt.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">Geen CAN-frames herkend. Ondersteunde formaten: Vector ASC, ELM327-monitorlog met CAN-headers of CSV met CAN ID- / gegevenskolommen.</string>
+    <string name="vm_trace_summary">%1$d frame(s), %2$d ISO-TP/UDS-bericht(en), %3$d waargenomen DID’s, %4$d onvolledige bericht(en), %5$d probleem(en).</string>
+    <string name="msg_trace_analysis_failed">De geselecteerde CAN-trace kon niet worden geanalyseerd.</string>
+    <string name="msg_trace_too_large">De trace is te groot. De lokale limiet is 32 MiB.</string>
+    <string name="msg_trace_open_failed">De geselecteerde trace kon niet worden geopend.</string>
+    <string name="msg_trace_empty">De geselecteerde trace is leeg.</string>
+    <string name="trace_error_invalid_line">Regel %1$d: ongeldig of onvolledig CAN/ISO-TP-frame.</string>
+    <string name="trace_error_sequence">Regel %1$d: ISO-TP-volgorde komt niet overeen (verwacht %2$d, ontvangen %3$d).</string>
+    <string name="trace_error_pci">Regel %1$d: niet-ondersteund ISO-TP-PCI-type 0x%2$s.</string>
+    <string name="trace_error_elm_no_records">Geen ELM327-records met headers gevonden. Schakel CAN-headers in en sla de monitoruitvoer op.</string>
+    <string name="trace_error_csv_empty">De CSV-trace is leeg.</string>
+    <string name="trace_error_csv_columns">De CSV heeft een CAN ID-kolom en een data-/payloadkolom nodig, of kolommen data0…data15.</string>
+    <string name="trace_error_generic">De trace bevat een ongeldig of niet-ondersteund record.</string>
 </resources>

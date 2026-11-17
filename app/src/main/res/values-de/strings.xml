@@ -533,4 +533,26 @@
     <string name="cal_comparison_different_ranges">%1$d Bytes unterscheiden sich in %2$d Bereich(en).</string>
     <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d Bytes)</string>
     <string name="cal_comparison_more_ranges">%1$d weitere Bereiche werden nicht angezeigt.</string>
+    <string name="cal_trace_title">Offline-CAN-/UDS-Trace-Analyzer</string>
+    <string name="cal_trace_description">Importiere eine Vector-ASC-Aufzeichnung, ein ELM327-Monitorprotokoll mit CAN-Headern oder eine CAN-CSV-Datei. CamaroDiag setzt ISO-TP-Nachrichten zusammen und listet beobachtete UDS-Dienste und DIDs auf, ohne Befehle an ein Fahrzeug zu senden.</string>
+    <string name="cal_trace_import">CAN-Trace importieren (.asc / .csv / ELM-Protokoll)</string>
+    <string name="cal_trace_can_ids">CAN-IDs: %1$s</string>
+    <string name="cal_trace_uds_services">UDS: %1$s</string>
+    <string name="cal_trace_candidate_dids">Mögliche DIDs: %1$s</string>
+    <string name="cal_trace_more_observations">… und %1$d weitere Beobachtung(en).</string>
+    <string name="cal_trace_observations_only">Erkannte DIDs sind nur Beobachtungen aus dem Trace. Sie werden weder dekodiert noch als verifizierte Signale übernommen.</string>
+    <string name="cal_trace_nrc_label">NRC • CAN %1$s • SVC %2$s • NRC %3$s</string>
+    <string name="vm_trace_no_frames">Keine CAN-Frames erkannt. Unterstützte Formate: Vector ASC, ELM327-Monitorprotokoll mit Headern oder CSV mit CAN-ID-/Daten-Spalten.</string>
+    <string name="vm_trace_summary">%1$d Frame(s), %2$d ISO-TP-/UDS-Nachricht(en), %3$d beobachtete DID(s), %4$d unvollständige Nachricht(en), %5$d Problem(e).</string>
+    <string name="msg_trace_analysis_failed">Die ausgewählte CAN-Aufzeichnung konnte nicht analysiert werden.</string>
+    <string name="msg_trace_too_large">Die Aufzeichnung ist zu groß. Das lokale Limit beträgt 32 MiB.</string>
+    <string name="msg_trace_open_failed">Die ausgewählte Aufzeichnung konnte nicht geöffnet werden.</string>
+    <string name="msg_trace_empty">Die ausgewählte Aufzeichnung ist leer.</string>
+    <string name="trace_error_invalid_line">Zeile %1$d: ungültiger oder unvollständiger CAN-/ISO-TP-Frame.</string>
+    <string name="trace_error_sequence">Zeile %1$d: ISO-TP-Sequenzfehler (erwartet %2$d, erhalten %3$d).</string>
+    <string name="trace_error_pci">Zeile %1$d: nicht unterstützter ISO-TP-PCI-Typ 0x%2$s.</string>
+    <string name="trace_error_elm_no_records">Keine ELM327-Headerdatensätze gefunden. Aktiviere CAN-Header und speichere die Monitor-Ausgabe.</string>
+    <string name="trace_error_csv_empty">Der CSV-Trace ist leer.</string>
+    <string name="trace_error_csv_columns">Die CSV-Datei benötigt eine CAN-ID- und eine Daten-/Payload-Spalte oder data0…data15-Spalten.</string>
+    <string name="trace_error_generic">Der Trace enthält einen ungültigen oder nicht unterstützten Datensatz.</string>
 </resources>
