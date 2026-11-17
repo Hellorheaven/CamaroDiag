@@ -1462,7 +1462,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
                         engine.readDtcs()
                     }
-                    _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
+                    _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } +
+                        mapObdDtcs(confirmed + pending + permanent)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -1520,7 +1521,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
                     if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
-                        _dtcs.value = emptyList()
+                        // SAE Mode 04 clears standardized emissions DTCs only.
+                        // Preserve enhanced UDS records from other ECUs: no GM UDS clear is issued here.
+                        _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
                         _connectionMessage.value = null
                     } else {
                         _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_clear_not_confirmed, response)
@@ -1633,7 +1636,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     respondingAddresses = report.respondingEcuAddresses
                 )
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
-                _dtcs.value = mapObdDtcs(allDtcs)
+                _dtcs.value = if (obdManager.isSimulationActive) {
+                    mapObdDtcs(allDtcs)
+                } else {
+                    _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } + mapObdDtcs(allDtcs)
+                }
                 _obdScanMessage.value = if (obdManager.isSimulationActive) {
                     getApplication<Application>().getString(R.string.msg_full_scan_simulation_complete, report.supportedPids.size, allDtcs.size)
                 } else {
