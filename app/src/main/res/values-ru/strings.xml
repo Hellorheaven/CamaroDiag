@@ -534,4 +534,9 @@
     <string name="cal_warning_address_span_large">Диапазон адресов очень велик; плотный образ памяти не создаётся.</string>
     <string name="cal_warning_invalid_file">Структурная проверка не пройдена. Не используйте этот файл для редактирования калибровки.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d байт)</string>
+    <string name="cal_comparison_identical">Два BIN-образа полностью идентичны побайтно.</string>
+    <string name="cal_comparison_size_diff">Сравнено общих байтов: %1$d; размеры файлов различаются.</string>
+    <string name="cal_comparison_different_ranges">Различаются %1$d байт в %2$d диапазонах.</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d байт)</string>
+    <string name="cal_comparison_more_ranges">Не показано дополнительных диапазонов: %1$d.</string>
 </resources>

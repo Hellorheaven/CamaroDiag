@@ -525,4 +525,9 @@
     <string name="cal_warning_address_span_large">地址范围非常大；不会构建稠密内存映像。</string>
     <string name="cal_warning_invalid_file">结构验证失败。请勿使用此文件编辑标定数据。</string>
     <string name="cal_address_range">0x%1$s–0x%2$s（%3$d 字节）</string>
+    <string name="cal_comparison_identical">两个 BIN 映像逐字节完全相同。</string>
+    <string name="cal_comparison_size_diff">已比较 %1$d 个共同字节；文件大小不同。</string>
+    <string name="cal_comparison_different_ranges">%1$d 个字节不同，分布在 %2$d 个范围内。</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s（%3$d 字节）</string>
+    <string name="cal_comparison_more_ranges">另有 %1$d 个范围未显示。</string>
 </resources>

@@ -525,4 +525,9 @@
     <string name="cal_warning_address_span_large">アドレス範囲が非常に大きいため、密なメモリイメージは作成されません。</string>
     <string name="cal_warning_invalid_file">構造検証に失敗しました。このファイルをキャリブレーション編集に使用しないでください。</string>
     <string name="cal_address_range">0x%1$s–0x%2$s（%3$d バイト）</string>
+    <string name="cal_comparison_identical">2つのBINイメージはバイト単位で完全に同一です。</string>
+    <string name="cal_comparison_size_diff">共通する %1$d バイトを比較しました。ファイルサイズが異なります。</string>
+    <string name="cal_comparison_different_ranges">%2$d 個の範囲にわたり %1$d バイトが異なります。</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s（%3$d バイト）</string>
+    <string name="cal_comparison_more_ranges">追加の %1$d 範囲は表示されていません。</string>
 </resources>
