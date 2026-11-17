@@ -175,6 +175,37 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun gen6CertificationSourcesAreYearAndEngineSpecific() {
+        assertEquals(
+            "16OBDG03",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2016, engine = CamaroEngine.LTG))
+        )
+        assertEquals(
+            "16OBDG05",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2016, engine = CamaroEngine.LGX))
+        )
+        assertEquals(
+            "16OBDG07A",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2016, engine = CamaroEngine.LT1))
+        )
+        assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2016, engine = CamaroEngine.LT4)))
+
+        listOf(CamaroEngine.LTG, CamaroEngine.LGX, CamaroEngine.LT1, CamaroEngine.LT4).forEach { engine ->
+            assertEquals(
+                "17OBDG03",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2017, engine = engine))
+            )
+        }
+
+        // Group provenance is available; detailed Gen6 monitor evidence is not
+        // yet integrated and must not be inferred from a certification label.
+        assertEquals(
+            null,
+            GmEngineMonitorCatalog.find("P0011", VehicleProfile(modelYear = 2017, engine = CamaroEngine.LTG))
+        )
+    }
+
+    @Test
     fun lltDtcCatalogProvidesBilingualVehicleSpecificInterpretations() {
         val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
         val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)
