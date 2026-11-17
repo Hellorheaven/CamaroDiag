@@ -483,4 +483,9 @@
     <string name="msg_j2534_bridge_connect_failed">J2534 브리지에 연결할 수 없습니다.</string>
     <string name="live_pid_fuel_system_status">연료 시스템 상태</string>
     <string name="live_pid_ltft">장기 연료 보정 B1</string>
+    <string name="cal_warning_metadata_missing">보정 메타데이터가 없습니다. 가져온 항목을 정확한 VIN, CAL ID, CVN, OS, 하드웨어 및 원본 바이너리와 연결할 수 없습니다.</string>
+    <string name="cal_warning_os_hardware_metadata">메타데이터에 입력된 OS 및 하드웨어 참조를 제어 모듈 서비스 문서와 대조하여 별도로 확인하십시오.</string>
+    <string name="cal_warning_overlapping_regions">테이블 또는 축 영역이 겹칩니다. 이 겹침이 의도된 것인지 확인하십시오.</string>
+    <string name="cal_warning_import_review">테이블을 사용하기 전에 가져온 정의의 경고를 검토하십시오.</string>
+    <string name="cal_warning_os_hardware_not_read">표준 모드 09에서는 OS 및 하드웨어 참조를 읽지 않았습니다. 문서를 통한 독립적인 확인이 필요합니다.</string>
 </resources>

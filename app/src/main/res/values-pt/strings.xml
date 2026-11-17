@@ -487,4 +487,9 @@
     <string name="msg_j2534_bridge_connect_failed">Não foi possível conectar à ponte J2534.</string>
     <string name="live_pid_fuel_system_status">Estado do sistema de combustível</string>
     <string name="live_pid_ltft">Correção de combustível de longo prazo B1</string>
+    <string name="cal_warning_metadata_missing">Faltam metadados de calibração: a importação não pode ser associada a um VIN, CAL ID, CVN, SO, hardware e binário de origem exatos.</string>
+    <string name="cal_warning_os_hardware_metadata">O SO e a referência de hardware foram introduzidos nos metadados: verifique-os de forma independente na documentação de serviço do controlador.</string>
+    <string name="cal_warning_overlapping_regions">As regiões das tabelas ou dos eixos sobrepõem-se; confirme que essa sobreposição é intencional.</string>
+    <string name="cal_warning_import_review">Reveja os avisos das definições importadas antes de utilizar qualquer tabela.</string>
+    <string name="cal_warning_os_hardware_not_read">O SO e a referência de hardware não foram lidos através do Modo 09 padrão: é necessária uma verificação documental independente.</string>
 </resources>

@@ -498,4 +498,9 @@
     <string name="msg_j2534_bridge_connect_failed">تعذر الاتصال بجسر J2534.</string>
     <string name="live_pid_fuel_system_status">حالة نظام الوقود</string>
     <string name="live_pid_ltft">تصحيح الوقود طويل الأمد B1</string>
+    <string name="cal_warning_metadata_missing">بيانات المعايرة الوصفية مفقودة: لا يمكن ربط الاستيراد برقم VIN وCAL ID وCVN ونظام التشغيل والأجهزة والملف الثنائي المصدر بدقة.</string>
+    <string name="cal_warning_os_hardware_metadata">تم إدخال نظام التشغيل ومرجع الأجهزة في البيانات الوصفية: تحقق منهما بشكل مستقل بالرجوع إلى وثائق خدمة وحدة التحكم.</string>
+    <string name="cal_warning_overlapping_regions">تتداخل مناطق الجداول أو المحاور؛ تحقق من أن هذا التداخل مقصود.</string>
+    <string name="cal_warning_import_review">راجع تحذيرات التعريفات المستوردة قبل استخدام أي جدول.</string>
+    <string name="cal_warning_os_hardware_not_read">لم تتم قراءة نظام التشغيل ومرجع الأجهزة عبر الوضع القياسي 09: يلزم تحقق مستقل من الوثائق.</string>
 </resources>
