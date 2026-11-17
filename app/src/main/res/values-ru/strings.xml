@@ -497,4 +497,10 @@
     <string name="cal_warning_overlapping_regions">Области таблиц или осей перекрываются; убедитесь, что это перекрытие предусмотрено.</string>
     <string name="cal_warning_import_review">Проверьте предупреждения импортированных определений перед использованием любой таблицы.</string>
     <string name="cal_warning_os_hardware_not_read">ОС и аппаратная ссылка не считывались стандартным режимом 09: требуется независимая проверка по документации.</string>
+    <string name="module_note_unavailable">Для этого блока управления нет локализованных сведений.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">Источник %1$s</string>
+    <string name="mileage_details_unavailable">Технические сведения для этого источника недоступны.</string>
+    <string name="mileage_caveat_unavailable">Для этого источника нет дополнительной локализованной информации.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>

@@ -488,4 +488,10 @@
     <string name="cal_warning_overlapping_regions">テーブル領域または軸領域が重複しています。この重複が意図したものか確認してください。</string>
     <string name="cal_warning_import_review">テーブルを使用する前に、インポートした定義の警告を確認してください。</string>
     <string name="cal_warning_os_hardware_not_read">標準Mode 09ではOSとハードウェア参照情報を読み取っていません。資料による独立した確認が必要です。</string>
+    <string name="module_note_unavailable">このコントロールモジュールの翻訳済み詳細情報はありません。</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">ソース %1$s</string>
+    <string name="mileage_details_unavailable">このソースの技術的な詳細情報はありません。</string>
+    <string name="mileage_caveat_unavailable">このソースに関する追加の翻訳済み情報はありません。</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>

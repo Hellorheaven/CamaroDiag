@@ -488,4 +488,10 @@
     <string name="cal_warning_overlapping_regions">表格区域或坐标轴区域存在重叠；请确认这是有意设置的。</string>
     <string name="cal_warning_import_review">使用任何表格前，请检查导入定义中的警告。</string>
     <string name="cal_warning_os_hardware_not_read">标准模式 09 未读取操作系统和硬件参考信息：必须通过文档进行独立核实。</string>
+    <string name="module_note_unavailable">此控制模块没有可用的本地化详细信息。</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">来源 %1$s</string>
+    <string name="mileage_details_unavailable">此来源没有可用的技术详细信息。</string>
+    <string name="mileage_caveat_unavailable">此来源没有其他本地化信息。</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>
