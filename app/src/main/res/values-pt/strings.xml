@@ -529,4 +529,9 @@
     <string name="cal_warning_address_span_large">O intervalo de endereços é muito amplo; não é criada uma imagem de memória densa.</string>
     <string name="cal_warning_invalid_file">A validação estrutural falhou. Não utilize este ficheiro para editar a calibração.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d bytes)</string>
+    <string name="cal_comparison_identical">As duas imagens BIN são idênticas byte a byte.</string>
+    <string name="cal_comparison_size_diff">Foram comparados %1$d bytes comuns; os tamanhos dos ficheiros são diferentes.</string>
+    <string name="cal_comparison_different_ranges">%1$d bytes diferentes distribuídos por %2$d intervalos.</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d bytes)</string>
+    <string name="cal_comparison_more_ranges">%1$d intervalos adicionais não apresentados.</string>
 </resources>

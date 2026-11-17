@@ -540,4 +540,9 @@
     <string name="cal_warning_address_span_large">نطاق العناوين كبير جدًا؛ لا يتم إنشاء صورة ذاكرة كثيفة.</string>
     <string name="cal_warning_invalid_file">فشل التحقق البنيوي. لا تستخدم هذا الملف لتحرير المعايرة.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d بايت)</string>
+    <string name="cal_comparison_identical">صورتا BIN متطابقتان بايتًا ببايت.</string>
+    <string name="cal_comparison_size_diff">تمت مقارنة %1$d بايت مشتركة؛ أحجام الملفات مختلفة.</string>
+    <string name="cal_comparison_different_ranges">تختلف %1$d بايت موزعة على %2$d نطاقات.</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d بايت)</string>
+    <string name="cal_comparison_more_ranges">لم يتم عرض %1$d نطاقات إضافية.</string>
 </resources>

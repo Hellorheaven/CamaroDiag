@@ -525,4 +525,9 @@
     <string name="cal_warning_address_span_large">주소 범위가 매우 큽니다. 밀집 메모리 이미지를 만들지 않습니다.</string>
     <string name="cal_warning_invalid_file">구조 검증에 실패했습니다. 이 파일을 보정 편집에 사용하지 마십시오.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d바이트)</string>
+    <string name="cal_comparison_identical">두 BIN 이미지가 바이트 단위로 완전히 동일합니다.</string>
+    <string name="cal_comparison_size_diff">공통 바이트 %1$d개를 비교했습니다. 파일 크기가 다릅니다.</string>
+    <string name="cal_comparison_different_ranges">%2$d개 범위에서 %1$d바이트가 다릅니다.</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d바이트)</string>
+    <string name="cal_comparison_more_ranges">추가 범위 %1$d개는 표시되지 않았습니다.</string>
 </resources>
