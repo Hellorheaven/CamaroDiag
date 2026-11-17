@@ -560,4 +560,8 @@
     <string name="dtc_possible_causes">Mögliche Ursachen (nicht bestätigt)</string>
     <string name="dtc_recommended_checks">Empfohlene Prüfungen</string>
     <string name="dtc_vehicle_specific_not_documented">Für diesen Code und diese Fahrzeugkonfiguration ist noch keine fahrzeugspezifische Diagnose dokumentiert. Die OEM/SAE-Beschreibung steht oben; VIN und Steuergerät anhand der GM-Serviceinformationen prüfen.</string>
+    <string name="dtc_desc_p0016">Kurbelwellenposition – Einlassnockenwellenposition unplausibel (Bank 1)</string>
+    <string name="dtc_desc_p0017">Kurbelwellenposition – Auslassnockenwellenposition unplausibel (Bank 1)</string>
+    <string name="dtc_desc_p0018">Kurbelwellenposition – Einlassnockenwellenposition unplausibel (Bank 2)</string>
+    <string name="dtc_desc_p0019">Kurbelwellenposition – Auslassnockenwellenposition unplausibel (Bank 2)</string>
 </resources>
