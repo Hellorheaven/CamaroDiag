@@ -216,6 +216,7 @@ class DtcCatalogRegistryTest {
         assertTrue(GmLfxMonitorCatalog.find("P0016", lfx2013)?.malfunctionCriteriaEn?.contains("6.0 crank degrees") == true)
         assertEquals("13OBDG05A", GmLfxMonitorCatalog.sourceLabel(lfx2013))
         assertEquals("14OBDG06A", GmLfxMonitorCatalog.sourceLabel(lfx2014))
+        assertEquals("15OBDG06", GmLfxMonitorCatalog.sourceLabel(lfx2015))
         assertEquals(null, GmLfxMonitorCatalog.find("P0011", lfx2015))
         assertEquals(12, Gm2013And2014LfxMonitorCatalog.supportedCodes().size)
     }
