@@ -112,7 +112,7 @@ object DtcCatalogRegistry {
         CamaroEngineDtcProfile("L99", 8, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION, "ACDelco E38", 2010..2015),
         CamaroEngineDtcProfile("LSA", 8, 2, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.PORT_INJECTION, "ACDelco E67", 2012..2015),
         CamaroEngineDtcProfile("LS7", 8, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION, "ACDelco E38", 2014..2015),
-        CamaroEngineDtcProfile("LTG", 4, 1, EngineInductionType.TURBOCHARGED, EngineFuelSystemType.DIRECT_INJECTION, "GM E80", 2016..2020),
+        CamaroEngineDtcProfile("LTG", 4, 1, EngineInductionType.TURBOCHARGED, EngineFuelSystemType.DIRECT_INJECTION, "GM E80", 2016..2023),
         CamaroEngineDtcProfile("LGX", 6, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION, "GM E92/E93", 2016..2024),
         CamaroEngineDtcProfile("LT1", 8, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION, "GM E92", 2016..2024),
         CamaroEngineDtcProfile("LT4", 8, 2, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.DIRECT_INJECTION, "GM E92", 2017..2024)
