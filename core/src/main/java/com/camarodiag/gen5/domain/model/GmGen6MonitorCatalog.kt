@@ -62,4 +62,11 @@ object GmGen6MonitorCatalog {
             ) -> "24OBDG03B Part 2"
             else -> null
         }
+
+    fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? =
+        when {
+            vehicle.modelYear == 2019 && vehicle.engine == CamaroEngine.LT4 ->
+                Gm2019Lt4MonitorCatalog.find(code, vehicle)
+            else -> null
+        }
 }
