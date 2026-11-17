@@ -170,6 +170,7 @@ private fun localizedInspectionFormat(format: String): String = stringResource(
     }
 )
 
+// Keep static UI copy in Android resources so this screen follows the active system locale.
 @Composable
 fun CalibrationWorkspaceScreen(
     state: CalibrationWorkspaceState,
