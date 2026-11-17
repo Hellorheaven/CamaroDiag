@@ -224,7 +224,7 @@ object GmEngineMonitorCatalog {
         when (vehicle.engine) {
             CamaroEngine.LLT -> GmLltMonitorCatalog.sourceLabel(vehicle)
             CamaroEngine.LFX -> GmLfxMonitorCatalog.sourceLabel(vehicle)
-            CamaroEngine.L99, CamaroEngine.LS3 -> GmV8MonitorCatalog.sourceLabel(vehicle)
+            CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA -> GmV8MonitorCatalog.sourceLabel(vehicle)
             else -> null
         }
 }
