@@ -1056,7 +1056,12 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
                         }
                         Text(localizedDtcDescription(dtc))
-                        val applicabilityNotice = CamaroDtcCatalog.applicabilityNotice(dtc.code.substringBefore('-'), vehicle)
+                        val moduleCatalogue = DtcCatalogRegistry.catalogueFor(dtc.module, vehicle)
+                        val applicabilityNotice = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            CamaroDtcCatalog.applicabilityNotice(dtc.code.substringBefore('-'), vehicle)
+                        } else {
+                            null
+                        }
                         if (applicabilityNotice != null) {
                             Text(
                                 if (isFrench) applicabilityNotice.first else applicabilityNotice.second,
@@ -1065,7 +1070,6 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 fontSize = 12.sp
                             )
                         }
-                        val moduleCatalogue = DtcCatalogRegistry.catalogueFor(dtc.module, vehicle)
                         if (!moduleCatalogue.hasVehicleSpecificDefinitions) {
                             Text(
                                 if (isFrench) moduleCatalogue.noteFr else moduleCatalogue.noteEn,
@@ -1073,7 +1077,11 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 fontSize = 11.sp
                             )
                         }
-                        val vehicleExplanation = CamaroDtcCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        val vehicleExplanation = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            CamaroDtcCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        } else {
+                            null
+                        }
                         if (vehicleExplanation != null) {
                             Divider(color = TextMuted.copy(alpha = 0.25f))
                             Text(stringResource(R.string.dtc_vehicle_interpretation), fontWeight = FontWeight.Bold, color = CamaroAmber)
@@ -1096,7 +1104,11 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 Text(applicability, color = WarnRed)
                             }
                         }
-                        val gmMonitor = GmEngineMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        val gmMonitor = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            GmEngineMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        } else {
+                            null
+                        }
                         val gmSourceLabel = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
                         if (gmMonitor != null) {
                             Divider(color = TextMuted.copy(alpha = 0.25f))
