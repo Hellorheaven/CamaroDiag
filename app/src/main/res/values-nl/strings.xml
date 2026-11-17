@@ -561,4 +561,8 @@
     <string name="dtc_possible_causes">Mogelijke oorzaken (niet bevestigd)</string>
     <string name="dtc_recommended_checks">Aanbevolen controles</string>
     <string name="dtc_vehicle_specific_not_documented">Voor deze code en voertuigconfiguratie is nog geen voertuigspecifieke procedure gedocumenteerd. De OEM/SAE-beschrijving staat hierboven; controleer het VIN en de regeleenheid in de GM-servicegegevens.</string>
+    <string name="dtc_desc_p0016">Krukaspositie – inlaatnokkenaspositie niet plausibel (bank 1)</string>
+    <string name="dtc_desc_p0017">Krukaspositie – uitlaatnokkenaspositie niet plausibel (bank 1)</string>
+    <string name="dtc_desc_p0018">Krukaspositie – inlaatnokkenaspositie niet plausibel (bank 2)</string>
+    <string name="dtc_desc_p0019">Krukaspositie – uitlaatnokkenaspositie niet plausibel (bank 2)</string>
 </resources>
