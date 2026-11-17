@@ -555,4 +555,9 @@
     <string name="trace_error_csv_empty">The CSV trace is empty.</string>
     <string name="trace_error_csv_columns">The CSV needs a CAN ID column and a data/payload column, or data0…data15 columns.</string>
     <string name="trace_error_generic">The trace contains an unsupported or invalid record.</string>
+    <string name="dtc_vehicle_interpretation">Vehicle-specific interpretation</string>
+    <string name="dtc_severity">Severity</string>
+    <string name="dtc_possible_causes">Possible causes (not confirmed)</string>
+    <string name="dtc_recommended_checks">Recommended checks</string>
+    <string name="dtc_vehicle_specific_not_documented">No vehicle-specific procedure is documented for this code and selected configuration. The OEM/SAE description is shown above; verify the exact VIN and control module in GM service information.</string>
 </resources>
