@@ -136,7 +136,7 @@ class DtcCatalogRegistryTest {
         }
         assertEquals("10OBDG12", GmEngineMonitorCatalog.sourceLabel(l99_2010))
         assertEquals("11OBDG07", GmEngineMonitorCatalog.sourceLabel(ls3_2011))
-        assertEquals(null, GmEngineMonitorCatalog.find("P0011", l99_2012))
+        assertNotNull("2012 L99 retains its VVT monitor", GmEngineMonitorCatalog.find("P0011", l99_2012))
         assertEquals(5, GmL99MonitorCatalog.supportedCodes().size)
         assertEquals(1, GmLs3MonitorCatalog.supportedCodes().size)
     }
