@@ -201,7 +201,7 @@
     <string name="vm_j2534_connected">J2534-bridge verbonden: %1$s</string>
     <string name="vm_pc_bridge_disconnected">PC-bridge verbroken.</string>
     <string name="vm_uds_response_received">Echt UDS-antwoord ontvangen van CAN-ID %1$s.</string>
-    <string name="vm_no_dtcs_returned">De ECU heeft geen DTC's teruggegeven op CAN-ID %1$s.</string>
+    <string name="vm_no_dtcs_returned">De ECU heeft geen DTC’s teruggegeven op CAN-ID %1$s.</string>
     <string name="vm_uds_read_complete">UDS 0x19-uitlezing voltooid.</string>
     <string name="vm_j2534_no_elm_channel">De J2534-bridge biedt UDS-transport, niet het ELM-kanaal dat nodig is voor OBD-II-modus 09.</string>
     <string name="vm_no_obd_data_read">Demomodus of geen OBD-adapter aangesloten: er zijn geen echte ECU-gegevens uitgelezen.</string>
@@ -339,7 +339,7 @@
     <string name="mileage_summary_discrepancy">Geverifieerde onafhankelijke bronnen verschillen %1$.1f km. Controleer modulevervanging/herprogrammering en onderhoudsgeschiedenis. Dit is een aanwijzing voor onderzoek, geen bewijs van manipulatie.</string>
     <string name="mileage_summary_agreement">Geverifieerde onafhankelijke bronnen komen binnen %1$.1f km overeen. Dit garandeert geen authentieke kilometerhistorie.</string>
     <string name="mileage_summary_no_data">Er is geen betrouwbare totale kilometertellerwaarde uitgelezen. BCM en IPC blijven ongeverifieerd; er wordt geen waarde gesimuleerd.</string>
-    <string name="mileage_summary_insufficient">Bruikbare kilometerstanden: %1$d; onafhankelijk geverifieerde ECU's met hoge betrouwbaarheid: %2$d. Er is onvoldoende bewijs voor een vergelijking.</string>
+    <string name="mileage_summary_insufficient">Bruikbare kilometerstanden: %1$d; onafhankelijk geverifieerde ECU’s met hoge betrouwbaarheid: %2$d. Er is onvoldoende bewijs voor een vergelijking.</string>
     <string name="mileage_source_j2534">J2534-bridge (alleen UDS)</string>
     <string name="mileage_source_demo">Alleen demogegevens</string>
     <string name="mileage_source_ecm_a6">OBD-kilometerteller (PID A6)</string>
@@ -395,7 +395,7 @@
     <string name="msg_usb_identifier_unavailable">USB-apparaat-ID niet beschikbaar</string>
     <string name="msg_simulation_activation_failed">Simulatiemodus activeren is mislukt.</string>
     <string name="msg_obdlink_cx_not_gm_compatible">OBDLink CX gedetecteerd via BLE, maar volgens de fabrikant is deze niet compatibel met GM-voertuigen. Gebruik MX+, MX, LX of een GM-compatibele adapter.</string>
-    <string name="msg_dtc_simulated_lfx">DTC's gesimuleerd door het Camaro LFX-profiel; er is geen echt ECU-antwoord ontvangen.</string>
+    <string name="msg_dtc_simulated_lfx">DTC’s gesimuleerd door het Camaro LFX-profiel; er is geen echt ECU-antwoord ontvangen.</string>
     <string name="msg_dtc_j2534_unavailable">De verbonden J2534-bridge biedt niet het ELM-kanaal dat nodig is voor een OBD-II-DTC-scan.</string>
     <string name="msg_dtc_adapter_required">Sluit een echte OBD-adapter aan om foutcodes uit te lezen.</string>
     <string name="msg_dtc_scan_failed">DTC-scan mislukt.</string>
@@ -407,8 +407,8 @@
     <string name="msg_mileage_audit_failed">Uitlezen van kilometerstandcontrole mislukt.</string>
     <string name="msg_full_scan_j2534_only">De J2534-bridge biedt alleen UDS-transport; niet het ELM-kanaal dat nodig is voor een standaard OBD-II-scan.</string>
     <string name="msg_full_scan_adapter_required">Er is geen echte OBD-adapter aangesloten. Selecteer het simulatieprofiel om het scherm zonder voertuig te testen.</string>
-    <string name="msg_full_scan_simulation_complete">OFFLINESIMULATIE — aantal PID's: %1$d; demo-DTC's: %2$d. Er zijn geen echte gegevens uitgelezen.</string>
-    <string name="msg_full_scan_complete">OBD-II-scan voltooid: %1$d ondersteunde PID's; %2$d geretourneerde DTC's.</string>
+    <string name="msg_full_scan_simulation_complete">OFFLINESIMULATIE — aantal PID’s: %1$d; demo-DTC’s: %2$d. Er zijn geen echte gegevens uitgelezen.</string>
+    <string name="msg_full_scan_complete">OBD-II-scan voltooid: %1$d ondersteunde PID’s; %2$d geretourneerde DTC’s.</string>
     <string name="msg_full_scan_failed">OBD-II-scan mislukt.</string>
     <string name="msg_session_saved">Diagnosesessie opgeslagen.</string>
     <string name="msg_session_save_failed">Diagnosesessie opslaan is mislukt.</string>
@@ -416,7 +416,7 @@
     <string name="msg_live_simulation_active">Simulatie actief: weergegeven waarden zijn niet afkomstig van het voertuig.</string>
     <string name="msg_live_no_adapter">Geen adapter aangesloten. Gesimuleerde waarden worden niet automatisch weergegeven.</string>
     <string name="msg_live_j2534_only">De verbonden J2534-bridge biedt UDS-transport, niet het ELM-kanaal dat nodig is voor standaard OBD-II-telemetrie.</string>
-    <string name="msg_live_no_pid_response">Er is geen bruikbaar antwoord ontvangen voor de aangevraagde PID's. Controleer het protocol en de compatibiliteit van de adapter.</string>
+    <string name="msg_live_no_pid_response">Er is geen bruikbaar antwoord ontvangen voor de aangevraagde PID’s. Controleer het protocol en de compatibiliteit van de adapter.</string>
     <string name="msg_live_read_failed">Live OBD-uitlezing mislukt.</string>
     <string name="msg_live_recording_stopped">De opname is gestopt door een OBD-communicatiefout. Recente meetgegevens kunnen nog worden geëxporteerd.</string>
     <string name="msg_live_recording_started">Opname bezig. Aantal meetpunten: %1$d.</string>
@@ -459,7 +459,7 @@
     <string name="units_metric_details">Metrisch (km, °C, kPa)</string>
     <string name="units_imperial_details">Imperiaal (mi, °F, PSI)</string>
     <string name="session_vin_label">VIN: %1$s</string>
-    <string name="session_dtcs_label">DTC's: %1$s</string>
+    <string name="session_dtcs_label">DTC’s: %1$s</string>
     <string name="cal_tcp_port">TCP-poort</string>
     <string name="cal_uds_did_title">UDS %1$s</string>
     <string name="cal_mode09_vin_label">VIN • 09 02</string>
