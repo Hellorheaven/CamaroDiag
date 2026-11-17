@@ -140,3 +140,8 @@ L'action de lecture UDS 0x19/0x02 utilise désormais le `DTCFormatIdentifier` av
 Les codes SAE reçoivent le libellé localisé déjà disponible dans les ressources Android. Les codes OEM inconnus restent affichés en hexadécimal avec leurs octets bruts et sans définition inventée. Le suffixe Failure Type Byte est conservé dans le code affiché ; la recherche du catalogue SAE utilise le code de base.
 
 Les avertissements d'applicabilité moteur couvrent notamment les DTC cylindre 7/8 sur moteurs six cylindres et le code de sous-pression P0299 sur les configurations atmosphériques d'origine. Ces avertissements vérifient la cohérence de la configuration ; ils ne remplacent pas une définition de service GM.
+
+
+Le registre contient également un profil d'architecture par RPO (nombre de cylindres, nombre de bancs, suralimentation, type d'injection et famille ECM). Ces données servent uniquement aux contrôles de cohérence et au routage du catalogue ; elles ne remplacent pas les identifiants matériel/OS/CAL ID/CVN réellement lus sur le calculateur.
+
+L'effacement SAE Mode 04 est strictement séparé des résultats UDS améliorés : après confirmation du Mode 04, seuls les DTC standard ECM sont retirés de la liste. Les défauts UDS associés à d'autres calculateurs sont conservés, car aucune commande UDS d'effacement n'est envoyée. L'avertissement utilisateur sur cette portée est traduit dans les 14 langues de l'application.
