@@ -562,7 +562,7 @@
     <string name="dtc_severity">Gravité</string>
     <string name="dtc_possible_causes">Causes possibles (non confirmées)</string>
     <string name="dtc_recommended_checks">Contrôles recommandés</string>
-    <string name="dtc_vehicle_specific_not_documented">Aucune procédure spécifique à cette configuration n\\'est encore documentée pour ce code. Le libellé OEM/SAE est affiché ci-dessus ; vérifier le VIN exact et le calculateur dans la documentation GM.</string>
+    <string name="dtc_vehicle_specific_not_documented">Aucune procédure spécifique à cette configuration n\'est encore documentée pour ce code. Le libellé OEM/SAE est affiché ci-dessus ; vérifier le VIN exact et le calculateur dans la documentation GM.</string>
     <string name="dtc_desc_p0016">Corrélation vilebrequin / arbre à cames d'admission non plausible (banc 1)</string>
     <string name="dtc_desc_p0017">Corrélation vilebrequin / arbre à cames d'échappement non plausible (banc 1)</string>
     <string name="dtc_desc_p0018">Corrélation vilebrequin / arbre à cames d'admission non plausible (banc 2)</string>
