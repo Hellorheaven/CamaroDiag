@@ -357,7 +357,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
                     }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
+                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
                 DiagTab.OBD_SCAN -> ObdScanScreen(
                     report = obdScanReport,
@@ -1001,8 +1001,9 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String = when (dtc.code
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, onScan: () -> Unit, onClear: () -> Unit) {
+fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> Unit, onClear: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
+    val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -1034,6 +1035,35 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, onScan: () -> Unit, onClear: () -> Unit
                             Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
                         }
                         Text(localizedDtcDescription(dtc))
+                        val vehicleExplanation = CamaroDtcCatalog.find(dtc.code, vehicle)
+                        if (vehicleExplanation != null) {
+                            Divider(color = TextMuted.copy(alpha = 0.25f))
+                            Text(stringResource(R.string.dtc_vehicle_interpretation), fontWeight = FontWeight.Bold, color = CamaroAmber)
+                            Text(if (isFrench) vehicleExplanation.meaningFr else vehicleExplanation.meaningEn)
+                            Text(
+                                stringResource(R.string.dtc_severity) + ": " +
+                                    if (isFrench) vehicleExplanation.severityFr else vehicleExplanation.severityEn,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(stringResource(R.string.dtc_possible_causes), fontWeight = FontWeight.Bold)
+                            (if (isFrench) vehicleExplanation.causesFr else vehicleExplanation.causesEn).forEach { cause ->
+                                Text("• $cause")
+                            }
+                            Text(stringResource(R.string.dtc_recommended_checks), fontWeight = FontWeight.Bold)
+                            (if (isFrench) vehicleExplanation.checksFr else vehicleExplanation.checksEn).forEachIndexed { index, check ->
+                                Text("${index + 1}. $check")
+                            }
+                            val applicability = if (isFrench) vehicleExplanation.applicabilityFr else vehicleExplanation.applicabilityEn
+                            if (!applicability.isNullOrBlank()) {
+                                Text(applicability, color = WarnRed)
+                            }
+                        } else if (CamaroDtcCatalog.isKnownLfxProfile(vehicle)) {
+                            Text(
+                                stringResource(R.string.dtc_vehicle_specific_not_documented),
+                                color = TextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }
