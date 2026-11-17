@@ -558,4 +558,9 @@
     <string name="trace_error_csv_empty">La trace CSV est vide.</string>
     <string name="trace_error_csv_columns">Le CSV doit contenir une colonne CAN ID et une colonne données/payload, ou des colonnes data0…data15.</string>
     <string name="trace_error_generic">La trace contient un enregistrement invalide ou non pris en charge.</string>
+    <string name="dtc_vehicle_interpretation">Interprétation pour ce véhicule</string>
+    <string name="dtc_severity">Gravité</string>
+    <string name="dtc_possible_causes">Causes possibles (non confirmées)</string>
+    <string name="dtc_recommended_checks">Contrôles recommandés</string>
+    <string name="dtc_vehicle_specific_not_documented">Aucune procédure spécifique à cette configuration n\\'est encore documentée pour ce code. Le libellé OEM/SAE est affiché ci-dessus ; vérifier le VIN exact et le calculateur dans la documentation GM.</string>
 </resources>
