@@ -102,7 +102,7 @@
     <string name="dtc_title">Códigos de avería</string>
     <string name="dtc_scan">Escanear</string>
     <string name="dtc_clear">Borrar</string>
-    <string name="dtc_clear_warning">El borrado mediante el Modo 04 elimina los códigos de avería relacionados con las emisiones y restablece algunos monitores de preparación. Guarda el informe antes de continuar.</string>
+    <string name="dtc_clear_warning">El borrado mediante el Modo 04 elimina los códigos de avería relacionados con las emisiones y restablece algunos monitores de preparación. Guarda el informe antes de continuar. El Modo 04 no borra los DTC ampliados almacenados por otros módulos del vehículo.</string>
     <string name="dtc_none_returned">El último escaneo no devolvió códigos de avería.</string>
     <string name="dtc_confirm_clear">¿Confirmar el borrado de los DTC?</string>
     <string name="dtc_clear_description">Esto envía el servicio OBD Modo 04 a la ECU. Los datos de preparación pueden restablecerse. No repara la causa del fallo.</string>
