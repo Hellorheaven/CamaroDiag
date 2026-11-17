@@ -107,7 +107,7 @@ CamaroDiag est un outil indépendant d'aide au diagnostic et ne constitue pas un
 
 Le décodeur commun `UdsDtcDecoder` interprète la réponse positive UDS `0x59 0x02` après retrait de l'en-tête de service par le client :
 - conservation du DTC brut sur 24 bits, du masque de disponibilité et du `DTCFormatIdentifier` ;
-- affichage SAE J2012-DA (format 0x00/0x04) sous la forme `P/C/B/Uxxxx-FTB` ; format ISO 14229 constructeur (0x01) et formats non pris en charge conservés en hexadécimal sans conversion supposée ;
+- affichage SAE J2012-DA format 0x00 sous la forme `P/C/B/Uxxxx-FTB` ; format 0x04 conservé en hexadécimal tant que sa table de base distincte n'est pas intégrée ; format ISO 14229 constructeur (0x01) et autres formats non décodés conservés en hexadécimal sans conversion supposée ;
 - décodage individuel des huit bits d'état (défaut présent, cycle courant, pending, confirmé, tests non terminés/échoués et demande de voyant) ;
 - rejet explicite des réponses tronquées ou mal alignées.
 
@@ -145,3 +145,6 @@ Les avertissements d'applicabilité moteur couvrent notamment les DTC cylindre 7
 Le registre contient également un profil d'architecture par RPO (nombre de cylindres, nombre de bancs, suralimentation, type d'injection et famille ECM). Ces données servent uniquement aux contrôles de cohérence et au routage du catalogue ; elles ne remplacent pas les identifiants matériel/OS/CAL ID/CVN réellement lus sur le calculateur.
 
 L'effacement SAE Mode 04 est strictement séparé des résultats UDS améliorés : après confirmation du Mode 04, seuls les DTC standard ECM sont retirés de la liste. Les défauts UDS associés à d'autres calculateurs sont conservés, car aucune commande UDS d'effacement n'est envoyée. L'avertissement utilisateur sur cette portée est traduit dans les 14 langues de l'application.
+
+
+Le format SAE J2012-DA 0x04 n'est pas interchangeable avec le format 0x00 : les deux octets de base utilisent des listes de décodage distinctes. Le décodeur garde donc le 0x04 brut plutôt que de produire un faux code P/C/B/U. Références : SAE J2012 (https://saemobilus.sae.org/standards/j2012_201612-diagnostic-trouble-code-definitions) et ISO 27145-2 (https://www.iteh.fr/catalog/standards/iso/16cfed3f-fea5-4b18-9193-e58f635fd493/iso-27145-2-2012).
