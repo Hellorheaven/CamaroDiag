@@ -561,5 +561,5 @@
     <string name="dtc_desc_p0017">曲轴位置与排气凸轮轴位置相关性异常（组1）</string>
     <string name="dtc_desc_p0018">曲轴位置与进气凸轮轴位置相关性异常（组2）</string>
     <string name="dtc_desc_p0019">曲轴位置与排气凸轮轴位置相关性异常（组2）</string>
-    <string name="dtc_gm_calibration_not_validated">仅为 GM 认证资料参考：尚未核对控制模块身份信息（VIN、CAL ID、CVN、软件标识和硬件零件号）。这些阈值尚未针对该控制模块验证。</string>
+    <string name="dtc_gm_calibration_not_validated">以下解释和阈值是针对所选发动机和车型年份的参考数据。尚未核实 ECU 身份信息（VIN、CAL ID、CVN、软件标识和硬件零件号）；这些数据尚未针对已连接的 ECU 验证。</string>
 </resources>
