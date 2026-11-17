@@ -568,4 +568,10 @@
     <string name="dtc_desc_p0018">Correlazione albero motore / albero a camme di aspirazione non plausibile (banco 2)</string>
     <string name="dtc_desc_p0019">Correlazione albero motore / albero a camme di scarico non plausibile (banco 2)</string>
     <string name="dtc_gm_calibration_not_validated">Le interpretazioni e le soglie seguenti sono dati di riferimento per il motore e l'anno modello selezionati. L'identità della centralina (VIN, CAL ID, CVN, identificativo software e codice hardware) non è ancora stata verificata; questi dati non sono validati per la centralina collegata.</string>
+    <string name="dtc_gm_monitor_title">Monitor motore GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Criterio di attivazione: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Condizioni di abilitazione: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Contatore errori / frequenza di convalida: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Classificazione MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Fonte: GM %1$s, pagina %2$d</string>
 </resources>
