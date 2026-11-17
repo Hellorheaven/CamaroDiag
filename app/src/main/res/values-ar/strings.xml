@@ -567,4 +567,9 @@
     <string name="trace_error_csv_empty">تتبّع CSV فارغ.</string>
     <string name="trace_error_csv_columns">يجب أن يحتوي CSV على عمود CAN ID وعمود بيانات/payload أو أعمدة data0…data15.</string>
     <string name="trace_error_generic">يحتوي التتبّع على سجل غير صالح أو غير مدعوم.</string>
+    <string name="dtc_vehicle_interpretation">تفسير خاص بهذه السيارة</string>
+    <string name="dtc_severity">درجة الخطورة</string>
+    <string name="dtc_possible_causes">الأسباب المحتملة (غير مؤكدة)</string>
+    <string name="dtc_recommended_checks">الفحوصات الموصى بها</string>
+    <string name="dtc_vehicle_specific_not_documented">لا توجد بعد إجراءات تشخيص موثقة خاصة بهذا الرمز وهذه المواصفات. يظهر وصف OEM/SAE أعلاه؛ تحقق من رقم VIN ووحدة التحكم في معلومات خدمة GM.</string>
 </resources>
