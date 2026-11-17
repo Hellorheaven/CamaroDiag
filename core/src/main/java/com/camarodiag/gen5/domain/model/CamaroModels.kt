@@ -19,8 +19,12 @@ enum class AppLanguage(val code: String, val label: String) {
     EL("el", "Ελληνικά");
 
     companion object {
-        fun fromLocale(locale: Locale): AppLanguage =
-            entries.firstOrNull { it.code == locale.language.lowercase(Locale.ROOT) } ?: EN
+        fun fromLocale(locale: Locale): AppLanguage {
+            val language = locale.language.lowercase(Locale.ROOT)
+            // Only Simplified Chinese (zh-CN) has a bundled translation.
+            if (language == "zh" && !locale.country.equals("CN", ignoreCase = true)) return EN
+            return entries.firstOrNull { it.code == language } ?: EN
+        }
     }
 }
 
