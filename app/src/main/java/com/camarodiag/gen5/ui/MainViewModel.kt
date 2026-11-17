@@ -527,7 +527,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val mappedDtcs = report.records.map { record ->
                     val baseCode = record.code.substringBefore('-')
                     val standard = DtcCatalogRegistry.genericDescription(baseCode)
-                    val vehicleSpecific = CamaroDtcCatalog.find(baseCode, _vehicle.value)
+                    // A raw CAN response address is not an identified ECU family.
+                    // Keep UDS results generic until module discovery confirms ECM identity.
+                    val vehicleSpecific = if (moduleId == "ECM") {
+                        CamaroDtcCatalog.find(baseCode, _vehicle.value)
+                    } else {
+                        null
+                    }
                     val rawCode = "0x${record.rawDtc.toString(16).uppercase().padStart(6, '0')}"
                     record.toDiagnosticDtc(moduleId).copy(
                         descEn = vehicleSpecific?.meaningEn ?: standard?.first
