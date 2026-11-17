@@ -57,6 +57,7 @@ import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
 import com.camarodiag.gen5.data.obd.CamaroSignalDefinition
+import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.domain.model.VehicleProfile
 
 data class CalibrationWorkspaceState(
@@ -78,6 +79,9 @@ data class CalibrationWorkspaceState(
     val isObdbSignalReading: Boolean = false,
     val obdbSignalValue: String = "",
     val obdbSignalMessage: String = "",
+    val isTraceAnalyzing: Boolean = false,
+    val traceMessage: String = "",
+    val canTraceReport: CanTraceAnalysisReport? = null,
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -185,6 +189,7 @@ fun CalibrationWorkspaceScreen(
     onReadObdbSignal: (String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
+    onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onImportDefinitions: () -> Unit,
     onExportDefinitionTemplate: () -> Unit,
@@ -590,6 +595,79 @@ fun CalibrationWorkspaceScreen(
                     }
                     if (state.obdbSignalValue.isNotBlank()) {
                         Text(state.obdbSignalValue, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(R.string.cal_trace_title),
+                        color = TextPrimary, fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        stringResource(R.string.cal_trace_description),
+                        color = TextMuted, fontSize = 12.sp
+                    )
+                    OutlinedButton(
+                        onClick = onImportTrace,
+                        enabled = !state.isTraceAnalyzing,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (state.isTraceAnalyzing) CircularProgressIndicator(modifier = Modifier.width(18.dp).height(18.dp))
+                        else androidx.compose.material3.Icon(Icons.Default.FolderOpen, contentDescription = null)
+                        Text(stringResource(R.string.cal_trace_import))
+                    }
+                    if (state.traceMessage.isNotBlank()) {
+                        Text(state.traceMessage, color = CamaroAmber, fontSize = 12.sp)
+                    }
+                    state.canTraceReport?.let { report ->
+                        HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                        Text(report.sourceName, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            stringResource(R.string.cal_trace_can_ids, report.observedCanIds.joinToString { "0x" + it.toString(16).uppercase() }),
+                            color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                        )
+                        Text(
+                            stringResource(R.string.cal_trace_uds_services, report.udsServices.joinToString { "0x" + it.toString(16).uppercase().padStart(2, '0') }),
+                            color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                        )
+                        Text(
+                            stringResource(R.string.cal_trace_candidate_dids, report.readDidCandidates.joinToString { "0x" + it.toString(16).uppercase().padStart(4, '0') }.ifBlank { stringResource(R.string.common_none) }),
+                            color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp
+                        )
+                        report.didObservations.take(20).forEach { observation ->
+                            val direction = when (observation.direction) {
+                                com.camarodiag.gen5.data.obd.CanTraceDirection.TX -> "TX"
+                                com.camarodiag.gen5.data.obd.CanTraceDirection.RX -> "RX"
+                                com.camarodiag.gen5.data.obd.CanTraceDirection.UNKNOWN -> "?"
+                            }
+                            val result = if (observation.positiveResponse) "POS" else "REQ/OBS"
+                            Text(
+                                "$direction • CAN ${observation.canId.toString(16).uppercase()} • SVC ${observation.responseService.toString(16).uppercase()} • DID ${observation.did.toString(16).uppercase().padStart(4, '0')} • ${result}",
+                                color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                            )
+                        }
+                        if (report.didObservations.size > 20) {
+                            Text(
+                                stringResource(R.string.cal_trace_more_observations, report.didObservations.size - 20),
+                                color = TextMuted, fontSize = 10.sp
+                            )
+                        }
+                        report.messages.filter { it.negativeResponseCode != null }.take(20).forEach { message ->
+                            Text(
+                                stringResource(R.string.cal_trace_nrc_label, message.canId.toString(16).uppercase(), message.service?.toString(16)?.uppercase().orEmpty(), message.negativeResponseCode?.toString(16)?.uppercase()?.padStart(2, '0').orEmpty()),
+                                color = CamaroAmber, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                            )
+                        }
+                        report.errors.take(10).forEach { error ->
+                            Text(error, color = CamaroAmber, fontSize = 10.sp)
+                        }
+                        Text(
+                            stringResource(R.string.cal_trace_observations_only),
+                            color = CamaroAmber, fontSize = 11.sp
+                        )
                     }
                 }
             }

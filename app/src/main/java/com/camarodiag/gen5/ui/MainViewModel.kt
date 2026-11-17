@@ -20,6 +20,7 @@ import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
 import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
+import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
@@ -599,6 +600,99 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     message = getApplication<Application>().getString(R.string.msg_cal_identifiers_failed)
                 )
             }
+        }
+    }
+
+    /** Imports and analyzes a local Vector ASC or CSV CAN trace without connecting to a vehicle. */
+    fun analyzeCanTrace(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isTraceAnalyzing = true,
+                canTraceReport = null,
+                traceMessage = ""
+            )
+            try {
+                val resolver = getApplication<Application>().contentResolver
+                val displayName = resolver.query(
+                    uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: uri.lastPathSegment ?: "can-trace.asc"
+                val bytes = resolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    var total = 0
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= 32 * 1024 * 1024) {
+                            getApplication<Application>().getString(R.string.msg_trace_too_large)
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error(getApplication<Application>().getString(R.string.msg_trace_open_failed))
+                require(bytes.isNotEmpty()) { getApplication<Application>().getString(R.string.msg_trace_empty) }
+                val report = CanTraceAnalyzer.analyze(bytes.toString(Charsets.UTF_8), displayName)
+                val localizedErrors = report.errors.map(::localizedCanTraceError)
+                val localizedReport = report.copy(errors = localizedErrors)
+                val summary = if (report.frames.isEmpty()) {
+                    getApplication<Application>().getString(R.string.vm_trace_no_frames)
+                } else {
+                    getApplication<Application>().getString(
+                        R.string.vm_trace_summary,
+                        report.frames.size,
+                        report.messages.size,
+                        report.readDidCandidates.size,
+                        report.incompleteIsoTpMessages,
+                        report.errors.size
+                    )
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isTraceAnalyzing = false,
+                    canTraceReport = localizedReport,
+                    traceMessage = summary
+                )
+            } catch (cancelled: CancellationException) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isTraceAnalyzing = false)
+                throw cancelled
+            } catch (error: Exception) {
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isTraceAnalyzing = false,
+                    canTraceReport = null,
+                    traceMessage = getApplication<Application>().getString(R.string.msg_trace_analysis_failed)
+                )
+            }
+        }
+    }
+
+    private fun localizedCanTraceError(message: String): String {
+        val app = getApplication<Application>()
+        val lineMatch = Regex("^Line (\\d+): (.*)$").matchEntire(message)
+        val line = lineMatch?.groupValues?.get(1)?.toIntOrNull()
+        val detail = lineMatch?.groupValues?.get(2)
+        if (line != null && detail != null) {
+            if (detail.startsWith("ISO-TP sequence mismatch")) {
+                val values = Regex("expected (\\d+), got (\\d+)").find(detail)
+                if (values != null) return app.getString(
+                    R.string.trace_error_sequence,
+                    line,
+                    values.groupValues[1].toInt(),
+                    values.groupValues[2].toInt()
+                )
+            }
+            if (detail.startsWith("unsupported ISO-TP PCI type 0x")) {
+                val value = Regex("0x([0-9A-Fa-f]+)").find(detail)?.groupValues?.get(1).orEmpty()
+                return app.getString(R.string.trace_error_pci, line, value)
+            }
+            return app.getString(R.string.trace_error_invalid_line, line)
+        }
+        return when {
+            message.startsWith("No ELM327 header records") -> app.getString(R.string.trace_error_elm_no_records)
+            message == "CSV trace is empty." -> app.getString(R.string.trace_error_csv_empty)
+            message.startsWith("CSV needs a CAN ID column") -> app.getString(R.string.trace_error_csv_columns)
+            else -> app.getString(R.string.trace_error_generic)
         }
     }
 
