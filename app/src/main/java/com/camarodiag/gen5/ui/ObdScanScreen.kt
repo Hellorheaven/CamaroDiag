@@ -224,7 +224,7 @@ private fun ObdValueCard(value: ObdValue) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("PID %02X".format(value.pid), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text(stringResource(R.string.obd_pid_generic, value.pid), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 Text(localizedObdPidName(value), color = TextMuted, fontSize = 12.sp)
             }
             Text("${value.value} ${value.unit}", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
