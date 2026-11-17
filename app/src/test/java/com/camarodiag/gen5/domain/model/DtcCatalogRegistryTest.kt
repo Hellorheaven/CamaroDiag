@@ -205,6 +205,22 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun gm2013V8MafMonitorUsesSeparateNaturallyAspiratedAndSuperchargedThresholds() {
+        val l99 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.L99)
+        val ls3 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LS3)
+        val lsa = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LSA)
+        val ls7 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LS7)
+
+        assertTrue(GmEngineMonitorCatalog.find("P0101", l99)?.malfunctionCriteriaEn?.contains("16 g/s") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0101", ls3)?.malfunctionCriteriaEn?.contains("16 g/s") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0101", lsa)?.malfunctionCriteriaEn?.contains("21 g/s") == true)
+        assertEquals(9, GmEngineMonitorCatalog.find("P0101", l99)?.sourcePage)
+        assertEquals(10, GmEngineMonitorCatalog.find("P0101", lsa)?.sourcePage)
+        assertEquals(null, GmEngineMonitorCatalog.find("P0101", ls7))
+        assertTrue(DtcCatalogRegistry.catalogueFor("ECM", l99).hasVehicleSpecificDefinitions)
+    }
+
+    @Test
     fun gen5V8CertificationProvenanceIsVisibleWithoutInventingMonitorDefinitions() {
         val ls7 = VehicleProfile(modelYear = 2015, engine = CamaroEngine.LS7)
         val lsa = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LSA)
