@@ -491,4 +491,10 @@
     <string name="cal_warning_overlapping_regions">Table or axis regions overlap; verify that this overlap is intentional.</string>
     <string name="cal_warning_import_review">Review the imported definition warnings before using any table.</string>
     <string name="cal_warning_os_hardware_not_read">OS and hardware reference were not read through standard Mode 09: independent documentary verification is required.</string>
+    <string name="module_note_unavailable">No localized details are available for this module.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">Source %1$s</string>
+    <string name="mileage_details_unavailable">Technical details are unavailable for this source.</string>
+    <string name="mileage_caveat_unavailable">No additional localized information is available for this source.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>

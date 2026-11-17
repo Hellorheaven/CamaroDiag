@@ -494,4 +494,10 @@
     <string name="cal_warning_overlapping_regions">Des zones de tables ou d’axes se chevauchent ; vérifiez que ce chevauchement est volontaire.</string>
     <string name="cal_warning_import_review">Examinez les avertissements des définitions importées avant d’utiliser une table.</string>
     <string name="cal_warning_os_hardware_not_read">L’OS et la référence matérielle n’ont pas été lus via le Mode 09 standard : une vérification documentaire indépendante est obligatoire.</string>
+    <string name="module_note_unavailable">Aucun détail localisé n’est disponible pour ce calculateur.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">Source %1$s</string>
+    <string name="mileage_details_unavailable">Les détails techniques ne sont pas disponibles pour cette source.</string>
+    <string name="mileage_caveat_unavailable">Aucune information localisée supplémentaire n’est disponible pour cette source.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>

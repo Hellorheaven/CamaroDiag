@@ -491,4 +491,10 @@
     <string name="cal_warning_overlapping_regions">Tabellen- oder Achsenbereiche überschneiden sich; prüfen Sie, ob diese Überlappung beabsichtigt ist.</string>
     <string name="cal_warning_import_review">Prüfen Sie die Warnungen der importierten Definitionen, bevor Sie eine Tabelle verwenden.</string>
     <string name="cal_warning_os_hardware_not_read">OS und Hardware-Referenz wurden nicht über den Standardmodus 09 ausgelesen: Eine unabhängige Prüfung anhand der Dokumentation ist erforderlich.</string>
+    <string name="module_note_unavailable">Für dieses Steuergerät sind keine lokalisierten Details verfügbar.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">Quelle %1$s</string>
+    <string name="mileage_details_unavailable">Für diese Quelle sind keine technischen Details verfügbar.</string>
+    <string name="mileage_caveat_unavailable">Für diese Quelle sind keine weiteren lokalisierten Informationen verfügbar.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>
