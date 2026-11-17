@@ -37,6 +37,12 @@ object GmGen6MonitorCatalog {
                 CamaroEngine.LT1,
                 CamaroEngine.LT4
             ) -> "20OBDG03A"
+            vehicle.modelYear == 2021 && vehicle.engine == CamaroEngine.LTG -> "21OBDG03A"
+            vehicle.modelYear == 2021 && vehicle.engine in setOf(
+                CamaroEngine.LGX,
+                CamaroEngine.LT1,
+                CamaroEngine.LT4
+            ) -> "21OBDG03B"
             vehicle.modelYear == 2022 && vehicle.engine == CamaroEngine.LTG -> "22OBDG03A"
             vehicle.modelYear == 2022 && vehicle.engine in setOf(
                 CamaroEngine.LGX,
