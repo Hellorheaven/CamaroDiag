@@ -102,7 +102,7 @@
     <string name="dtc_title">Códigos de avaria de diagnóstico</string>
     <string name="dtc_scan">Diagnosticar</string>
     <string name="dtc_clear">Apagar</string>
-    <string name="dtc_clear_warning">A limpeza do Modo 04 remove códigos de avaria relacionados com emissões e reinicia alguns monitores de prontidão. Guarde o relatório antes de continuar.</string>
+    <string name="dtc_clear_warning">A limpeza do Modo 04 remove códigos de avaria relacionados com emissões e reinicia alguns monitores de prontidão. Guarde o relatório antes de continuar. O Modo 04 não apaga DTC avançados armazenados por outros módulos do veículo.</string>
     <string name="dtc_none_returned">O último diagnóstico não devolveu códigos de avaria.</string>
     <string name="dtc_confirm_clear">Confirmar a limpeza dos DTC?</string>
     <string name="dtc_clear_description">Isto envia o Modo OBD 04 à ECU. Os dados de prontidão podem ser reiniciados. Não repara a causa da avaria.</string>
