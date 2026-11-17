@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8、AFM搭載、オートマチックトランスミッション仕様です。LS3のキャリブレーションを流用せず、RPO、トランスミッション、ECU識別子を確認してください。</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1のスーパーチャージャー付きLSA V8です。スーパーチャージャー、燃料、市場、ソフトウェアリビジョンに対応したキャリブレーションを確認してください。</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28のLS7 V8です。コントローラー系統が同じでもLS3/L99とは別プロファイルであり、ソフトウェア識別が必須です。</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG（対応範囲：2016～2020年）。GM資料PIP5313Bは2016～2017年のCamaro LTGでE80を示しています。それ以降の年式は部品番号とCAL IDで確認してください。</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG（対応範囲：2016～2023年）。GM資料PIP5313Bは2016～2017年のCamaro LTGでE80を示しています。それ以降の年式は部品番号とCAL IDで確認してください。</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6です。年式、市場、リビジョンによってプロファイルが異なる場合があります。テーブル定義を読み込む前に実際のコントローラーとCVNを確認してください。</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6の自然吸気LT1 V8です。CAL ID/CVN、年式、市場、トランスミッション、ハードウェア番号でキャリブレーションの改訂を区別してください。</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1のスーパーチャージャー付きLT4 V8です。LT1と混同せず、部品番号とキャリブレーション固有の過給データを検証してください。</string>
