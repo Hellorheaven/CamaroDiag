@@ -142,7 +142,7 @@ jobs:
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
-          if-no-files-found: warn
+          if-no-files-found: ignore
           retention-days: 14
 
       - name: Run Android lint (Gradle warnings are errors)
@@ -180,7 +180,7 @@ jobs:
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.xml
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
-          if-no-files-found: warn
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Build debug APK
