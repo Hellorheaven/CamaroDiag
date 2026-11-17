@@ -247,6 +247,7 @@ object DtcCatalogRegistry {
             CamaroDtcCatalog.isKnownLfxProfile(vehicle) ||
                 CamaroDtcCatalog.isKnownLltProfile(vehicle) ||
                 CamaroDtcCatalog.isKnownV8Profile(vehicle) ||
+                Gm2013V8MonitorCatalog.supportedCodes(vehicle).isNotEmpty() ||
                 (vehicle.modelYear == 2019 && vehicle.engine == CamaroEngine.LT4)
             )
         return DtcModuleCatalogue(
