@@ -101,6 +101,8 @@ class DtcCatalogRegistryTest {
         assertEquals(DtcEvidenceStatus.GENERIC_ONLY, lfxAbs.evidenceStatus)
         assertFalse(unknown.hasVehicleSpecificDefinitions)
         assertEquals(DtcEvidenceStatus.DISCOVERY_REQUIRED, unknown.evidenceStatus)
+        assertTrue(unknown.noteEn.contains("generic SAE description"))
+        assertTrue(unknown.noteFr.contains("SAE générique"))
     }
 
     @Test
