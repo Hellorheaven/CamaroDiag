@@ -107,3 +107,19 @@ Principe obligatoire pour toutes les prochaines versions et toutes les évolutio
 - Les critères de livraison doivent vérifier la parité sur l'ensemble des profils compatibles, et pas uniquement sur le véhicule de référence. Les essais simulés, les tests sur traces et les validations physiques doivent rester distingués.
 
 Critère d'acceptation : pour chaque fonctionnalité, démontrer qu'elle fonctionne sur chaque configuration déclarée compatible ; lorsqu'une configuration ne la supporte pas, démontrer que seule cette fonction est indisponible et que le reste de l'application continue de fonctionner normalement.
+
+## 8. Règle de construction périodique pendant le développement
+
+Objectif : détecter les régressions de compilation régulièrement sans imposer un build sur chaque commit intermédiaire potentiellement incomplet.
+
+- Intervalle nominal : **50 commits de la PR depuis le dernier build complet réussi**.
+- L'intervalle doit être configurable (valeur par défaut 50), sans nécessiter de modifier le code applicatif.
+- Le seuil est un déclencheur minimal, pas une obligation de construire un commit manifestement intermédiaire. Si le cinquantième commit laisse volontairement un travail incomplet ou un état non constructible, le build est différé jusqu'au premier commit cohérent suivant.
+- Après le seuil, le contrôle de seuil est réévalué à chaque nouveau commit. Tant qu'aucun build complet ne réussit, le besoin de build reste en attente ; il ne repart pas à zéro et ne disparaît pas.
+- Dès qu'un build complet réussit, ce commit devient le nouveau point de départ du compteur.
+- Un build périodique de PR Draft doit au minimum exécuter les tests unitaires, lint et compilation/package Debug Android ainsi que compilation et packages Debug Windows x64/x86. Les artefacts et journaux doivent être conservés et rattachés au SHA exact.
+- Les builds périodiques Draft ne constituent pas une validation de livraison : le passage en Ready for review conserve une validation complète obligatoire, et chaque commit ultérieur en Ready relance cette validation.
+- Les workflows de release restent exclusivement liés à la branche principale et ne doivent jamais être déclenchés par ces builds de PR.
+- Afficher explicitement les états « en attente du seuil », « différé car commit intermédiaire », « build en cours », « réussi » et « échoué ». Un job ignoré/skipped ne vaut jamais build réussi.
+
+Critère d'acceptation : aucun dépassement du seuil nominal ne doit être oublié ; un build échoué ou différé reste dû jusqu'à un build réussi sur un commit cohérent. L'intervalle nominal peut être augmenté ou réduit par configuration selon la durée des builds et la taille du chantier.
