@@ -567,4 +567,5 @@
     <string name="dtc_desc_p0017">Corrélation vilebrequin / arbre à cames d\'échappement non plausible (banc 1)</string>
     <string name="dtc_desc_p0018">Corrélation vilebrequin / arbre à cames d\'admission non plausible (banc 2)</string>
     <string name="dtc_desc_p0019">Corrélation vilebrequin / arbre à cames d\'échappement non plausible (banc 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Référence GM de certification uniquement : l'identité du calculateur (VIN, CAL ID, CVN, identifiant logiciel et référence matérielle) n'a pas encore été comparée. Ces seuils ne sont pas validés pour ce calculateur.</string>
 </resources>
