@@ -283,6 +283,10 @@ class UdsReadOnlyClient(
         return response.copyOfRange(2, response.size)
     }
 
+    /** Reads and decodes the ECU's declared DTC format without guessing OEM definitions. */
+    suspend fun readDtcReport(statusMask: Int = 0xFF): UdsDtcReport =
+        UdsDtcDecoder.decodeReadDtcInformation(readDtcInformation(statusMask))
+
     private fun verifyPositiveResponse(response: ByteArray, requestedService: Int) {
         require(response.isNotEmpty()) { "ECU returned an empty UDS response." }
         val service = response[0].toInt() and 0xFF
@@ -427,6 +431,9 @@ class ProfiledUdsReadSession private constructor(
 
     suspend fun readDtcInformation(statusMask: Int = 0xFF): ByteArray =
         client.readDtcInformation(statusMask)
+
+    suspend fun readDtcReport(statusMask: Int = 0xFF): UdsDtcReport =
+        client.readDtcReport(statusMask)
 
     companion object {
         suspend fun open(
