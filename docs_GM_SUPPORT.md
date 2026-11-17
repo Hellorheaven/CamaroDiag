@@ -106,9 +106,14 @@ CamaroDiag est un outil indépendant d'aide au diagnostic et ne constitue pas un
 ## Décodage DTC UDS multi-calculateurs
 
 Le décodeur commun `UdsDtcDecoder` interprète la réponse positive UDS `0x59 0x02` après retrait de l'en-tête de service par le client :
-- conservation du DTC brut sur 24 bits et conversion selon le format J2012 encodé dans le DTC ;
-- conservation du masque de disponibilité des états ;
+- conservation du DTC brut sur 24 bits, du masque de disponibilité et du `DTCFormatIdentifier` ;
+- affichage SAE J2012-DA (format 0x00/0x04) sous la forme `P/C/B/Uxxxx-FTB` ; format ISO 14229 constructeur (0x01) et formats non pris en charge conservés en hexadécimal sans conversion supposée ;
 - décodage individuel des huit bits d'état (défaut présent, cycle courant, pending, confirmé, tests non terminés/échoués et demande de voyant) ;
 - rejet explicite des réponses tronquées ou mal alignées.
 
 Ce décodage de transport est indépendant du calculateur et peut donc être appliqué aux réponses ECM/PCM, TCM, BCM, EBCM, IPC, SDM et autres calculateurs qui répondent réellement au service. Il ne fournit volontairement aucune définition de panne OEM : le libellé et la procédure de réparation nécessitent toujours un catalogue documenté pour le calculateur, le VIN, l'année, le moteur, la transmission et l'identité logicielle correspondants. Un DTC brut décodé n'est pas une preuve qu'un module ou une adresse présumée est présent.
+
+
+### Familles de calculateurs à découvrir
+
+La topologie Gen 5 et Gen 6 recense désormais, en plus des calculateurs principaux, les candidats optionnels suivants : HVAC, PSCM, RCDLR, RADIO/HMI, AMP, DDM, PDM, FPCM et Park Assist. Ils sont explicitement marqués `DISCOVERY_REQUIRED`, sans adresse TX/RX ni réseau présumé. Cette liste sert à structurer l'inventaire et les futurs scans ; elle ne prétend pas que tous ces modules sont montés sur chaque finition ou chaque année. La présence doit être confirmée par une réponse réelle et le VIN/RPO.
