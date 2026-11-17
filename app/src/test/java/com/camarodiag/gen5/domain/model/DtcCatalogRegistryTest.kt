@@ -107,7 +107,7 @@ class DtcCatalogRegistryTest {
         )
         val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX, vin = "1G1FB1E30C9123456")
 
-        assertFalse(evidence.isUsableForOemInterpretation)
+        assertFalse(evidence.isUsableForOemInterpretation(vehicle, "ECM"))
         assertTrue(evidence.validationIssues(vehicle, "ECM").size >= 6)
     }
 }
