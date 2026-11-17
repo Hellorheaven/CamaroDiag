@@ -560,4 +560,8 @@
     <string name="dtc_possible_causes">Possible causes (not confirmed)</string>
     <string name="dtc_recommended_checks">Recommended checks</string>
     <string name="dtc_vehicle_specific_not_documented">No vehicle-specific procedure is documented for this code and selected configuration. The OEM/SAE description is shown above; verify the exact VIN and control module in GM service information.</string>
+    <string name="dtc_desc_p0016">Crankshaft Position - Intake Camshaft Position Not Plausible (Bank 1)</string>
+    <string name="dtc_desc_p0017">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 1)</string>
+    <string name="dtc_desc_p0018">Crankshaft Position - Intake Camshaft Position Not Plausible (Bank 2)</string>
+    <string name="dtc_desc_p0019">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 2)</string>
 </resources>
