@@ -521,12 +521,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         timeoutMs = 5000L
                     )
                 }
-                val dtcs = client.readDtcByStatusMask()
-                val rendered = if (dtcs.isEmpty()) {
+                val report = client.readDtcReport()
+                val moduleId = "ECU ${responseCanIdHex.uppercase()}"
+                val mappedDtcs = report.records.map { record ->
+                    val baseCode = record.code.substringBefore('-')
+                    val standard = DtcCatalogRegistry.genericDescription(baseCode)
+                    val vehicleSpecific = CamaroDtcCatalog.find(baseCode, _vehicle.value)
+                    val status = buildList {
+                        if (record.status.testFailed) add("failed")
+                        if (record.status.pending) add("pending")
+                        if (record.status.confirmed) add("confirmed")
+                        if (record.status.warningIndicatorRequested) add("warning indicator requested")
+                    }.ifEmpty { listOf("status not asserted") }.joinToString(", ")
+                    DiagnosticDtc(
+                        code = record.code,
+                        module = moduleId,
+                        statusEn = status,
+                        statusFr = status,
+                        descEn = vehicleSpecific?.meaningEn ?: standard?.first
+                            ?: "Raw OEM DTC 0x${record.rawDtc.toString(16).uppercase().padStart(6, '0')}; no verified definition is loaded for this ECU.",
+                        descFr = vehicleSpecific?.meaningFr ?: standard?.second
+                            ?: "DTC constructeur brut 0x${record.rawDtc.toString(16).uppercase().padStart(6, '0')} ; aucune définition vérifiée n'est chargée pour ce calculateur.",
+                        isPending = record.status.pending
+                    )
+                }
+                _dtcs.value = _dtcs.value.filterNot { it.module == moduleId } + mappedDtcs
+                val rendered = if (report.records.isEmpty()) {
                     getApplication<Application>().getString(R.string.vm_no_dtcs_returned, responseCanIdHex.uppercase())
                 } else {
-                    dtcs.joinToString("\\n") { record ->
-                        "0x${record.dtc.toString(16).uppercase().padStart(6, '0')}  status=0x${record.status.toString(16).uppercase().padStart(2, '0')}"
+                    report.records.joinToString("\\n") { record ->
+                        "${record.code}  status=0x${record.statusByte.toString(16).uppercase().padStart(2, '0')}"
                     }
                 }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
