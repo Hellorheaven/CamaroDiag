@@ -556,4 +556,9 @@
     <string name="trace_error_csv_empty">Το ίχνος CSV είναι κενό.</string>
     <string name="trace_error_csv_columns">Το CSV χρειάζεται στήλη CAN ID και στήλη δεδομένων/payload ή στήλες data0…data15.</string>
     <string name="trace_error_generic">Το ίχνος περιέχει μη έγκυρη ή μη υποστηριζόμενη εγγραφή.</string>
+    <string name="dtc_vehicle_interpretation">Ερμηνεία ειδικά για το όχημα</string>
+    <string name="dtc_severity">Σοβαρότητα</string>
+    <string name="dtc_possible_causes">Πιθανές αιτίες (μη επιβεβαιωμένες)</string>
+    <string name="dtc_recommended_checks">Συνιστώμενοι έλεγχοι</string>
+    <string name="dtc_vehicle_specific_not_documented">Δεν έχει τεκμηριωθεί ακόμη ειδική διαδικασία για αυτόν τον κωδικό και τη συγκεκριμένη διαμόρφωση. Η περιγραφή OEM/SAE εμφανίζεται παραπάνω· επαληθεύστε το VIN και τη μονάδα ελέγχου στις πληροφορίες σέρβις της GM.</string>
 </resources>
