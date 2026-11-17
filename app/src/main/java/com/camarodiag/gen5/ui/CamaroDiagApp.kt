@@ -1117,6 +1117,11 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
+                            Text(
+                                stringResource(R.string.dtc_gm_calibration_not_validated),
+                                color = CamaroAmber,
+                                fontSize = 11.sp
+                            )
                         } else if (vehicleExplanation == null && moduleCatalogue.hasVehicleSpecificDefinitions) {
                             Text(
                                 stringResource(R.string.dtc_vehicle_specific_not_documented),
