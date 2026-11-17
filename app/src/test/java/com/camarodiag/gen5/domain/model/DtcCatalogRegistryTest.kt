@@ -257,13 +257,11 @@ class DtcCatalogRegistryTest {
         val lt1_2019 = VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT1)
         val lt4_2020 = VehicleProfile(modelYear = 2020, engine = CamaroEngine.LT4)
 
-        val low = GmEngineMonitorCatalog.find("P0197", lt4_2019)
-        val high = GmEngineMonitorCatalog.find("P0198", lt4_2019)
+        val low = assertNotNull(GmEngineMonitorCatalog.find("P0197", lt4_2019))
+        val high = assertNotNull(GmEngineMonitorCatalog.find("P0198", lt4_2019))
 
-        assertNotNull(low)
-        assertNotNull(high)
-        assertTrue(low!!.malfunctionCriteriaEn.contains("below 25"))
-        assertTrue(high!!.malfunctionCriteriaEn.contains("above 450,000"))
+        assertTrue(low.malfunctionCriteriaEn.contains("below 25"))
+        assertTrue(high.malfunctionCriteriaEn.contains("above 450,000"))
         assertTrue(low.failureCriteriaEn.contains("20 failures out of 50"))
         assertTrue(high.enableConditionsEn.contains("above 20.0 seconds"))
         assertEquals(607, low.sourcePage)
