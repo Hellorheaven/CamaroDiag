@@ -93,6 +93,22 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun lltDtcCatalogProvidesBilingualVehicleSpecificInterpretations() {
+        val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
+        val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)
+        val lfx2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val codes = listOf("P0008", "P0009", "P000A", "P000B", "P000C", "P000D", "P0010", "P0011", "P0013", "P0014", "P0016", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024")
+
+        codes.forEach { code ->
+            assertNotNull("Missing LLT explanation for $code", CamaroDtcCatalog.find(code, llt2010))
+            assertNotNull("Missing LLT explanation for $code", CamaroDtcCatalog.find(code, llt2011))
+        }
+        assertEquals(18, CamaroLltDtcCatalog.supportedCodes().size)
+        assertTrue(CamaroDtcCatalog.coverageNotice(llt2010).first.contains("LLT"))
+        assertNotNull(CamaroDtcCatalog.find("P0010", lfx2012))
+    }
+
+    @Test
     fun gm2010And2011LltMonitorsUseYearSpecificCalibrationEvidence() {
         val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
         val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)

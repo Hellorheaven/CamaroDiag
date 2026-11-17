@@ -207,3 +207,5 @@ Références primaires :
 - GM, 11OBDG06 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/11OBDG06%20Engine%20Diagnostics.pdf
 
 Les paramètres ci-dessus décrivent les moniteurs de certification OBD. Ils ne remplacent pas les arbres de diagnostic de réparation SI ni la validation par VIN/CAL ID.
+
+Le catalogue d'interprétations FR/EN LLT 2010–2011 couvre maintenant les 18 codes moteur de surveillance de distribution listés dans les dossiers GM 10OBDG02 et 11OBDG06 : P0008/P0009, P000A–P000D, P0010/P0011/P0013/P0014, P0016–P0019 et P0020/P0021/P0023/P0024. Les causes sont des pistes de diagnostic, pas une condamnation automatique d'une pièce.

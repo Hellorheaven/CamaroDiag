@@ -540,6 +540,7 @@ object CamaroDtcCatalog {
     )
 
     fun find(code: String, vehicle: VehicleProfile): DtcVehicleExplanation? {
+        if (vehicle.engine == CamaroEngine.LLT) return CamaroLltDtcCatalog.find(code, vehicle)
         if (vehicle.engine != CamaroEngine.LFX || vehicle.modelYear !in 2012..2015) return null
         val normalizedCode = code.trim().uppercase(Locale.ROOT)
         if (normalizedCode == "P00C6" && vehicle.modelYear != 2012) return null
@@ -548,6 +549,9 @@ object CamaroDtcCatalog {
 
     fun isKnownLfxProfile(vehicle: VehicleProfile): Boolean =
         vehicle.engine == CamaroEngine.LFX && vehicle.modelYear in 2012..2015
+
+    fun isKnownLltProfile(vehicle: VehicleProfile): Boolean =
+        vehicle.engine == CamaroEngine.LLT && vehicle.modelYear in 2010..2011
 
     /**
      * Returns a configuration sanity warning only where the engine architecture
@@ -575,10 +579,14 @@ object CamaroDtcCatalog {
 
     /** Explicitly states the evidence level available for the selected engine. */
     fun coverageNotice(vehicle: VehicleProfile): Pair<String, String> =
-        if (isKnownLfxProfile(vehicle)) {
-            "Catalogue d'interprétations détaillées disponible pour LFX Gen 5 (2012–2015), en français et anglais. Les autres calculateurs et codes non répertoriés restent à documenter." to
-                "Detailed interpretation catalogue available for Gen 5 LFX (2012–2015), in French and English. Other ECUs and unlisted codes remain to be documented."
-        } else {
+        when {
+            isKnownLfxProfile(vehicle) ->
+                "Catalogue d'interprétations détaillées disponible pour LFX Gen 5 (2012–2015), en français et anglais. Les autres calculateurs et codes non répertoriés restent à documenter." to
+                    "Detailed interpretation catalogue available for Gen 5 LFX (2012–2015), in French and English. Other ECUs and unlisted codes remain to be documented."
+            isKnownLltProfile(vehicle) ->
+                "Catalogue d'interprétations détaillées disponible pour LLT Gen 5 (2010–2011), en français et anglais, avec moniteurs GM propres à chaque millésime." to
+                    "Detailed interpretation catalogue available for Gen 5 LLT (2010–2011), in French and English, with year-specific GM monitor evidence."
+            else ->
             "Pour ${vehicle.engine.rpo} (${vehicle.modelYear}), les libellés SAE génériques sont disponibles, mais aucune interprétation GM détaillée validée par calibration n'est encore chargée. Ne pas transposer les causes du LFX." to
                 "For ${vehicle.engine.rpo} (${vehicle.modelYear}), generic SAE descriptions are available, but no calibration-validated detailed GM interpretation is loaded yet. Do not reuse LFX causes."
         }
