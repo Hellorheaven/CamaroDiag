@@ -557,4 +557,8 @@
     <string name="dtc_possible_causes">可能原因（尚未确认）</string>
     <string name="dtc_recommended_checks">建议检查项目</string>
     <string name="dtc_vehicle_specific_not_documented">尚无针对该代码和所选车辆配置的专用诊断流程。上方显示的是 OEM/SAE 描述；请根据 GM 维修资料核对 VIN 和控制模块。</string>
+    <string name="dtc_desc_p0016">曲轴位置与进气凸轮轴位置相关性异常（组1）</string>
+    <string name="dtc_desc_p0017">曲轴位置与排气凸轮轴位置相关性异常（组1）</string>
+    <string name="dtc_desc_p0018">曲轴位置与进气凸轮轴位置相关性异常（组2）</string>
+    <string name="dtc_desc_p0019">曲轴位置与排气凸轮轴位置相关性异常（组2）</string>
 </resources>
