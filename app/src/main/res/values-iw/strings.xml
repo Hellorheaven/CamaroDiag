@@ -531,4 +531,9 @@
     <string name="cal_warning_address_span_large">טווח הכתובות גדול מאוד; לא נבנית תמונת זיכרון צפופה.</string>
     <string name="cal_warning_invalid_file">האימות המבני נכשל. אין להשתמש בקובץ זה לעריכת כיול.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d בתים)</string>
+    <string name="cal_comparison_identical">שתי תמונות ה-BIN זהות בית אחר בית.</string>
+    <string name="cal_comparison_size_diff">הושוו %1$d בתים משותפים; גדלי הקבצים שונים.</string>
+    <string name="cal_comparison_different_ranges">%1$d בתים שונים הפרוסים על פני %2$d טווחים.</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d בתים)</string>
+    <string name="cal_comparison_more_ranges">%1$d טווחים נוספים אינם מוצגים.</string>
 </resources>
