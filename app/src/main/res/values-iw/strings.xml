@@ -563,4 +563,8 @@
     <string name="dtc_possible_causes">סיבות אפשריות (לא מאומתות)</string>
     <string name="dtc_recommended_checks">בדיקות מומלצות</string>
     <string name="dtc_vehicle_specific_not_documented">עדיין לא תועד נוהל אבחון ייחודי לקוד ולתצורת הרכב האלה. תיאור OEM/SAE מופיע למעלה; יש לאמת את מספר ה‑VIN ואת יחידת הבקרה במידע השירות של GM.</string>
+    <string name="dtc_desc_p0016">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של היניקה (בנק 1)</string>
+    <string name="dtc_desc_p0017">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של הפליטה (בנק 1)</string>
+    <string name="dtc_desc_p0018">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של היניקה (בנק 2)</string>
+    <string name="dtc_desc_p0019">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של הפליטה (בנק 2)</string>
 </resources>
