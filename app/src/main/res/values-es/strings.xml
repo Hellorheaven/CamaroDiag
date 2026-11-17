@@ -563,4 +563,8 @@
     <string name="dtc_possible_causes">Posibles causas (no confirmadas)</string>
     <string name="dtc_recommended_checks">Comprobaciones recomendadas</string>
     <string name="dtc_vehicle_specific_not_documented">Aún no hay un procedimiento específico documentado para este código y esta configuración. Arriba se muestra la descripción OEM/SAE; verifica el VIN y la unidad de control en la información de servicio GM.</string>
+    <string name="dtc_desc_p0016">Correlación cigüeñal / árbol de levas de admisión no plausible (banco 1)</string>
+    <string name="dtc_desc_p0017">Correlación cigüeñal / árbol de levas de escape no plausible (banco 1)</string>
+    <string name="dtc_desc_p0018">Correlación cigüeñal / árbol de levas de admisión no plausible (banco 2)</string>
+    <string name="dtc_desc_p0019">Correlación cigüeñal / árbol de levas de escape no plausible (banco 2)</string>
 </resources>
