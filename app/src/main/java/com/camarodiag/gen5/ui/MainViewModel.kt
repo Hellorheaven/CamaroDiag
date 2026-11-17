@@ -825,7 +825,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
                     mapXAxisValues = decoded.xAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
                     mapYAxisValues = decoded.yAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
-                    mapDefinitionsWarnings = parsed.warnings + "OS et référence matérielle non lus par Mode 09 standard : vérification documentaire indépendante obligatoire.",
+                    mapDefinitionsWarnings = parsed.warnings.map { warning ->
+                        when {
+                            warning.startsWith("Métadonnées de calibration absentes") ->
+                                getApplication<Application>().getString(R.string.cal_warning_metadata_missing)
+                            warning.startsWith("OS et référence matérielle saisis") ->
+                                getApplication<Application>().getString(R.string.cal_warning_os_hardware_metadata)
+                            warning.startsWith("Des zones de tables ou d'axes") ->
+                                getApplication<Application>().getString(R.string.cal_warning_overlapping_regions)
+                            else -> getApplication<Application>().getString(R.string.cal_warning_import_review)
+                        }
+                    } + getApplication<Application>().getString(R.string.cal_warning_os_hardware_not_read),
                     mapDirty = false,
                     mapError = null,
                     message = getApplication<Application>().getString(R.string.msg_cal_definitions_loaded, parsed.definitions.size)
