@@ -2,6 +2,12 @@ name: PC J2534 Bridge CI
 
 on:
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - converted_to_draft
     branches:
       - main
 
@@ -14,7 +20,7 @@ concurrency:
 
 jobs:
   build-windows-debug:
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && !github.event.pull_request.draft
     runs-on: windows-latest
     steps:
       - name: Checkout pull request commit
