@@ -1095,7 +1095,28 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             if (!applicability.isNullOrBlank()) {
                                 Text(applicability, color = WarnRed)
                             }
-                        } else if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                        }
+                        val gmMonitor = Gm2012LfxMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        if (gmMonitor != null) {
+                            Divider(color = TextMuted.copy(alpha = 0.25f))
+                            Text(
+                                if (isFrench) "Surveillance moteur GM – OBD groupe 5B (2012)" else "GM engine monitor – OBD group 5B (2012)",
+                                fontWeight = FontWeight.Bold,
+                                color = CamaroAmber
+                            )
+                            Text(if (isFrench) gmMonitor.componentFr else gmMonitor.componentEn, fontWeight = FontWeight.SemiBold)
+                            Text(if (isFrench) gmMonitor.strategyFr else gmMonitor.strategyEn)
+                            Text(if (isFrench) "Critère de déclenchement : " + gmMonitor.malfunctionCriteriaFr else "Setting criteria: " + gmMonitor.malfunctionCriteriaEn)
+                            Text(if (isFrench) "Conditions d'activation : " + gmMonitor.enableConditionsFr else "Enable conditions: " + gmMonitor.enableConditionsEn)
+                            Text(if (isFrench) "Seuil de surveillance : " + gmMonitor.failureCriteriaFr else "Monitor threshold: " + gmMonitor.failureCriteriaEn)
+                            Text(if (isFrench) "Classe MIL : " + gmMonitor.milClassification else "MIL class: " + gmMonitor.milClassification)
+                            Text(
+                                if (isFrench) "Source : GM 12OBDG05B, page " + gmMonitor.sourcePage
+                                else "Source: GM 12OBDG05B, page " + gmMonitor.sourcePage,
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        } else if (vehicleExplanation == null && moduleCatalogue.hasVehicleSpecificDefinitions) {
                             Text(
                                 stringResource(R.string.dtc_vehicle_specific_not_documented),
                                 color = TextMuted,

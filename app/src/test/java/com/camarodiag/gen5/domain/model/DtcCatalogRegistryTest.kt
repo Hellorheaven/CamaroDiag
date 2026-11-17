@@ -90,6 +90,22 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun gm2012LfxMonitorEvidenceIsRestrictedToItsDocumentedVehicleGroup() {
+        val lfx2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val lfx2013 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX)
+        val lt1 = VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)
+
+        val p0011 = Gm2012LfxMonitorCatalog.find("p0011", lfx2012)
+        assertNotNull(p0011)
+        assertEquals("P0011", p0011?.code)
+        assertTrue(p0011?.malfunctionCriteriaEn?.contains("5.00 cam degrees") == true)
+        assertEquals(null, Gm2012LfxMonitorCatalog.find("P0011", lfx2013))
+        assertEquals(null, Gm2012LfxMonitorCatalog.find("P0011", lt1))
+        assertEquals(12, Gm2012LfxMonitorCatalog.supportedCodes().size)
+        assertTrue(Gm2012LfxMonitorCatalog.SOURCE_DOCUMENT.contains("12OBDG05B"))
+    }
+
+    @Test
     fun oemEvidenceCannotBeUsedWithoutExactVehicleAndCalibrationIdentity() {
         val evidence = DtcDefinitionEvidence(
             source = DtcDefinitionSource.GM_SERVICE_INFORMATION,
