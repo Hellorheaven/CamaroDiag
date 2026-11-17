@@ -144,6 +144,12 @@ class DtcCatalogRegistryTest {
     @Test
     fun gm2014And2015V8SourceGroupsIncludeLs7WithoutInventingMonitorData() {
         val v8Engines = listOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA, CamaroEngine.LS7)
+        listOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA).forEach { engine ->
+            assertEquals(
+                "13OBDG07",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2013, engine = engine))
+            )
+        }
 
         v8Engines.forEach { engine ->
             assertEquals(
