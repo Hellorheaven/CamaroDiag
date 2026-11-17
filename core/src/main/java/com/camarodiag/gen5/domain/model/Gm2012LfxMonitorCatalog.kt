@@ -52,7 +52,7 @@ object Gm2012LfxMonitorCatalog {
             "The ECM compares desired and measured camshaft positions while VVT is active.",
             "Le calculateur compare les positions d'arbre à cames demandée et mesurée lorsque le VVT est actif.",
             "Absolute desired-to-measured cam position error exceeds 5.00 cam degrees.",
-            "L'écart absolu entre position d'arbre à cames demandée et mesurée dépasse 5,00 degrés vilebrequin/came selon l'unité de calibration (cam degrees).",
+            "L'écart absolu entre position d'arbre à cames demandée et mesurée dépasse 5,00 degrés de came.",
             "Engine running; VVT enabled; desired cam position above 0; PTO inactive; system voltage above 11 V; position stability and travel-window conditions must also be met.",
             "Moteur en marche ; VVT activé ; position demandée supérieure à 0 ; PTO inactif ; tension supérieure à 11 V ; les conditions de stabilité et de plage de déplacement doivent aussi être satisfaites.",
             "75 failures in 225 samples; 100 ms per sample; Type B, 2 trips.",
@@ -188,8 +188,7 @@ object Gm2012LfxMonitorCatalog {
             "100 failures in 300 samples; 100 ms per sample; Type B, 2 trips.",
             "100 échecs sur 300 échantillons ; 100 ms par échantillon ; Type B, 2 trajets.",
             "Type B – 2 trips", 14
-        )
-        ,
+        ),
         GmDtcMonitorEvidence(
             "P0300", "Random / multiple-cylinder misfire monitor",
             "Surveillance des ratés aléatoires / sur plusieurs cylindres",

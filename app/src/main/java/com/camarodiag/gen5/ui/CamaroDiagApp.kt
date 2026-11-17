@@ -1108,7 +1108,7 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             Text(if (isFrench) gmMonitor.strategyFr else gmMonitor.strategyEn)
                             Text(if (isFrench) "Critère de déclenchement : " + gmMonitor.malfunctionCriteriaFr else "Setting criteria: " + gmMonitor.malfunctionCriteriaEn)
                             Text(if (isFrench) "Conditions d'activation : " + gmMonitor.enableConditionsFr else "Enable conditions: " + gmMonitor.enableConditionsEn)
-                            Text(if (isFrench) "Seuil de surveillance : " + gmMonitor.failureCriteriaFr else "Monitor threshold: " + gmMonitor.failureCriteriaEn)
+                            Text(if (isFrench) "Compteur / fréquence de validation : " + gmMonitor.failureCriteriaFr else "Failure counter / validation rate: " + gmMonitor.failureCriteriaEn)
                             Text(if (isFrench) "Classe MIL : " + gmMonitor.milClassification else "MIL class: " + gmMonitor.milClassification)
                             Text(
                                 if (isFrench) "Source : GM 12OBDG05B, page " + gmMonitor.sourcePage
