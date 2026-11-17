@@ -39,9 +39,12 @@ data class DtcDefinitionEvidence(
         if (moduleId.isBlank() || !moduleId.equals(respondingModuleId, ignoreCase = true)) {
             add("The reporting ECU does not match the DTC definition.")
         }
-        if (modelYears != null && vehicle.modelYear !in modelYears) add("Model year is outside the documented range.")
-        if (engineRpos.isNotEmpty() && vehicle.engine.rpo !in engineRpos) add("Engine RPO is not covered.")
-        if (transmission != null && vehicle.transmission != transmission) add("Transmission does not match.")
+        if (modelYears == null) add("A documented model-year range is missing.")
+        else if (vehicle.modelYear !in modelYears) add("Model year is outside the documented range.")
+        if (engineRpos.isEmpty()) add("Documented engine RPO coverage is missing.")
+        else if (vehicle.engine.rpo !in engineRpos) add("Engine RPO is not covered.")
+        if (transmission == null) add("A validated transmission applicability is missing.")
+        else if (vehicle.transmission != transmission) add("Transmission does not match.")
         if (hardwarePartNumber.isNullOrBlank()) add("ECU hardware part number is missing.")
         if (operatingSystemId.isNullOrBlank()) add("ECU operating-system identifier is missing.")
         if (calibrationId.isNullOrBlank()) add("ECU calibration ID is missing.")
@@ -56,17 +59,17 @@ data class DtcDefinitionEvidence(
         if (status == DtcEvidenceStatus.DISCOVERY_REQUIRED) add("This definition is not approved for diagnostic interpretation.")
     }
 
-    val isUsableForOemInterpretation: Boolean
-        get() = source in setOf(
+    fun isUsableForOemInterpretation(
+        vehicle: VehicleProfile,
+        respondingModuleId: String
+    ): Boolean =
+        source in setOf(
             DtcDefinitionSource.GM_SERVICE_INFORMATION,
             DtcDefinitionSource.GM_BULLETIN,
             DtcDefinitionSource.VEHICLE_VALIDATED_CAPTURE
-        ) && status in setOf(DtcEvidenceStatus.DOCUMENTED, DtcEvidenceStatus.VALIDATED_ON_VEHICLE) &&
-            hardwarePartNumber.isNullOrBlank().not() &&
-            operatingSystemId.isNullOrBlank().not() &&
-            calibrationId.isNullOrBlank().not() &&
-            calibrationVerificationNumber.isNullOrBlank().not() &&
-            !vin.isNullOrBlank() && reference.isNotBlank()
+        ) &&
+            status in setOf(DtcEvidenceStatus.DOCUMENTED, DtcEvidenceStatus.VALIDATED_ON_VEHICLE) &&
+            validationIssues(vehicle, respondingModuleId).isEmpty()
 }
 
 /** Module inventory is a discovery plan, never a claim that every trim has every ECU. */
