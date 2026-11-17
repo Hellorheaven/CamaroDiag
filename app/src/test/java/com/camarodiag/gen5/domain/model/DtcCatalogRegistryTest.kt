@@ -142,6 +142,22 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun gm2014And2015V8SourceGroupsIncludeLs7WithoutInventingMonitorData() {
+        val ls7_2014 = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LS7)
+        val ls7_2015 = VehicleProfile(modelYear = 2015, engine = CamaroEngine.LS7)
+        val lsa_2014 = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LSA)
+
+        assertEquals("14OBDG07", GmEngineMonitorCatalog.sourceLabel(ls7_2014))
+        assertEquals("15OBDG07", GmEngineMonitorCatalog.sourceLabel(ls7_2015))
+        assertEquals("14OBDG07", GmEngineMonitorCatalog.sourceLabel(lsa_2014))
+
+        // The group summary establishes the certification file association,
+        // but no LS7-specific monitor evidence has been integrated yet.
+        assertEquals(null, GmEngineMonitorCatalog.find("P0016", ls7_2014))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0016", ls7_2015))
+    }
+
+    @Test
     fun lltDtcCatalogProvidesBilingualVehicleSpecificInterpretations() {
         val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
         val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)
