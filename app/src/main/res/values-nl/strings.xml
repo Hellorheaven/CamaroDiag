@@ -102,7 +102,7 @@
     <string name="dtc_title">Diagnostische foutcodes</string>
     <string name="dtc_scan">Scannen</string>
     <string name="dtc_clear">Wissen</string>
-    <string name="dtc_clear_warning">Wissen via modus 04 verwijdert emissiegerelateerde foutcodes en reset sommige gereedheidsmonitors. Sla het rapport op voordat u doorgaat. Modus 04 wist geen uitgebreide DTC's die in andere voertuigmodules zijn opgeslagen.</string>
+    <string name="dtc_clear_warning">Wissen via modus 04 verwijdert emissiegerelateerde foutcodes en reset sommige gereedheidsmonitors. Sla het rapport op voordat u doorgaat. Modus 04 wist geen uitgebreide DTC-codes die in andere voertuigmodules zijn opgeslagen.</string>
     <string name="dtc_none_returned">De laatste scan heeft geen foutcodes geretourneerd.</string>
     <string name="dtc_confirm_clear">DTC’s wissen bevestigen?</string>
     <string name="dtc_clear_description">Dit verzendt OBD-modus 04 naar de ECU. Gereedheidsgegevens kunnen worden gereset. De oorzaak van een storing wordt hiermee niet hersteld.</string>
