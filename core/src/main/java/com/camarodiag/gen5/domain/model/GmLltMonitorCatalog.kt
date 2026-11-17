@@ -217,6 +217,8 @@ object GmEngineMonitorCatalog {
             CamaroEngine.LLT -> GmLltMonitorCatalog.find(code, vehicle)
             CamaroEngine.LFX -> GmLfxMonitorCatalog.find(code, vehicle)
             CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA -> GmV8MonitorCatalog.find(code, vehicle)
+            CamaroEngine.LTG, CamaroEngine.LGX, CamaroEngine.LT1, CamaroEngine.LT4 ->
+                GmGen6MonitorCatalog.find(code, vehicle)
             else -> null
         }
 
