@@ -555,4 +555,9 @@
     <string name="trace_error_csv_empty">Der CSV-Trace ist leer.</string>
     <string name="trace_error_csv_columns">Die CSV-Datei benötigt eine CAN-ID- und eine Daten-/Payload-Spalte oder data0…data15-Spalten.</string>
     <string name="trace_error_generic">Der Trace enthält einen ungültigen oder nicht unterstützten Datensatz.</string>
+    <string name="dtc_vehicle_interpretation">Fahrzeugspezifische Interpretation</string>
+    <string name="dtc_severity">Schweregrad</string>
+    <string name="dtc_possible_causes">Mögliche Ursachen (nicht bestätigt)</string>
+    <string name="dtc_recommended_checks">Empfohlene Prüfungen</string>
+    <string name="dtc_vehicle_specific_not_documented">Für diesen Code und diese Fahrzeugkonfiguration ist noch keine fahrzeugspezifische Diagnose dokumentiert. Die OEM/SAE-Beschreibung steht oben; VIN und Steuergerät anhand der GM-Serviceinformationen prüfen.</string>
 </resources>
