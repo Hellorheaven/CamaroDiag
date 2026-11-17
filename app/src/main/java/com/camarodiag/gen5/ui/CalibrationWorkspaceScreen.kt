@@ -163,7 +163,6 @@ fun CalibrationWorkspaceScreen(
     vehicleLabel: String,
     ecmType: String,
     isConnected: Boolean,
-    isFr: Boolean,
     onReadIdentification: () -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,

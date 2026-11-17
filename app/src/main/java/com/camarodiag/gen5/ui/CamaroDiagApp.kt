@@ -128,7 +128,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
-    val isFr = lang == AppLanguage.FR
     UpdateManagerDialog()
 
     val btPermLauncher = rememberLauncherForActivityResult(
@@ -335,7 +334,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
             when (currentTab) {
                 DiagTab.SETUP -> VehicleSetupScreen(
                     vehicle = vehicle,
-                    isFr = isFr,
                     onChange = { y, e, tr, m -> viewModel.updateVehicle(y, e, tr, m) },
                     onVinChange = { viewModel.updateVin(it) }
                 )
@@ -344,7 +342,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
-                    isFr = isFr,
                     onRefreshDevices = { viewModel.refreshPairedDevices() },
                     onConnectMac = { viewModel.connectRealBluetooth(it) },
                     onSelectSim = { viewModel.selectSimulatedAdapter(it) },
@@ -353,12 +350,11 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onConnectUsb = { viewModel.connectUsb(it) },
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
-                DiagTab.MODULES -> ModulesScreen(modules, isFr)
+                DiagTab.MODULES -> ModulesScreen(modules)
                 DiagTab.LIVE -> LiveDataScreen(
                     pids = livePids,
                     units = units,
                     isStreaming = isStreaming,
-                    isFr = isFr,
                     recording = liveRecording,
                     telemetryMessage = liveTelemetryMessage,
                     onToggleStream = { viewModel.toggleLiveStream() },
@@ -370,8 +366,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
                     }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, isFr, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
-                DiagTab.MILEAGE -> MileageScreen(mileageReport, isFr, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.DTCS -> DtcScreen(dtcs, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
+                DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
                 DiagTab.OBD_SCAN -> ObdScanScreen(
                     report = obdScanReport,
                     isScanning = isObdScanning,
@@ -387,7 +383,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isConnected = !adapter.deviceName.contains("Demo", ignoreCase = true) &&
                         !adapter.deviceName.contains("Simulated", ignoreCase = true) &&
                         adapter.tier != AdapterTier.DISCONNECTED,
-                    isFr = isFr,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
@@ -416,9 +411,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     },
                     onClearFile = { viewModel.clearCalibrationFile() }
                 )
-                DiagTab.GUIDE -> HardwareGuideScreen(isFr)
-                DiagTab.CONTROL -> VehicleControlsScreen(vehicle, isFr)
-                DiagTab.SETTINGS -> SettingsScreen(lang, units, savedSessions, isFr,
+                DiagTab.GUIDE -> HardwareGuideScreen()
+                DiagTab.CONTROL -> VehicleControlsScreen(vehicle)
+                DiagTab.SETTINGS -> SettingsScreen(lang, units, savedSessions,
                     onLang = { viewModel.setLanguage(it) },
                     onUnits = { viewModel.setUnitSystem(it) },
                     onDeleteSession = { viewModel.deleteSavedSession(it) }
@@ -431,7 +426,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
 @Composable
 fun VehicleSetupScreen(
     vehicle: VehicleProfile,
-    isFr: Boolean,
     onChange: (Int, CamaroEngine, TransmissionType, MarketRegion) -> Unit,
     onVinChange: (String) -> Unit
 ) {
@@ -530,7 +524,6 @@ fun AdapterScreen(
     isBusy: Boolean,
     pairedDevices: List<Pair<String, String>>,
     errorMsg: String?,
-    isFr: Boolean,
     onRefreshDevices: () -> Unit,
     onConnectMac: (String) -> Unit,
     onSelectSim: (String) -> Unit,
@@ -652,7 +645,7 @@ fun AdapterScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onSelectSim("MX_PLUS") }, enabled = !isBusy) { Text("OBDLink MX+") }
                 OutlinedButton(onClick = { onSelectSim("ELM_15") }, enabled = !isBusy) { Text("ELM327 v1.5") }
-                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text("Clone v2.1") }
+                OutlinedButton(onClick = { onSelectSim("CLONE") }, enabled = !isBusy) { Text(stringResource(R.string.adapter_tier_clone_elm)) }
             }
         }
     }
@@ -729,7 +722,7 @@ private fun remoteStartBlockerResourceId(index: Int): Int = when (index) {
 }
 
 @Composable
-fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
+fun VehicleControlsScreen(vehicle: VehicleProfile) {
     val capabilities = remember(vehicle) { VehicleControlCatalog().forVehicle(vehicle) }
     val remoteStartAssessment = remember(vehicle) {
         RemoteStartSafetyGate.assess(
@@ -792,7 +785,7 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
 }
 
 @Composable
-fun ModulesScreen(modules: List<EcuModule>, isFr: Boolean) {
+fun ModulesScreen(modules: List<EcuModule>) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             SectionTitle(stringResource(R.string.modules_vehicle_title))
@@ -854,7 +847,6 @@ fun LiveDataScreen(
     pids: List<LivePidValue>,
     units: UnitSystem,
     isStreaming: Boolean,
-    isFr: Boolean,
     recording: LiveRecordingState,
     telemetryMessage: String?,
     onToggleStream: () -> Unit,
@@ -1012,7 +1004,7 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String = when (dtc.code
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, isFr: Boolean, onScan: () -> Unit, onClear: () -> Unit) {
+fun DtcScreen(dtcs: List<DiagnosticDtc>, onScan: () -> Unit, onClear: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -1144,7 +1136,6 @@ private fun localizedMileageCaveat(item: MileageSourceReading): String = when (i
 @Composable
 fun MileageScreen(
     report: MileageAuditReport?,
-    isFr: Boolean,
     onRefreshAudit: () -> Unit,
     onSaveReport: () -> Unit
 ) {
@@ -1199,7 +1190,7 @@ fun MileageScreen(
 }
 
 @Composable
-fun HardwareGuideScreen(isFr: Boolean) {
+fun HardwareGuideScreen() {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             SectionTitle(stringResource(R.string.guide_title))
@@ -1255,7 +1246,6 @@ fun SettingsScreen(
     lang: AppLanguage,
     units: UnitSystem,
     sessions: List<com.camarodiag.gen5.data.db.SavedSessionEntity>,
-    isFr: Boolean,
     onLang: (AppLanguage) -> Unit,
     onUnits: (UnitSystem) -> Unit,
     onDeleteSession: (com.camarodiag.gen5.data.db.SavedSessionEntity) -> Unit
