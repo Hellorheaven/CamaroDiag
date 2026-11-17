@@ -236,7 +236,7 @@ class DtcCatalogRegistryTest {
         assertEquals(null, GmEngineMonitorCatalog.find("P006D", ls3))
         assertEquals(null, GmEngineMonitorCatalog.find("P0097", l99))
         assertEquals(null, GmEngineMonitorCatalog.find("P0098", ls3))
-        assertTrue(CamaroDtcCatalog.coverageNotice(l99).first.contains("P0101"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(l99).first.contains("P0101/P0103"))
         assertTrue(CamaroDtcCatalog.coverageNotice(l99).first.contains("O2"))
         assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("P0033"))
         assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("P006D"))
