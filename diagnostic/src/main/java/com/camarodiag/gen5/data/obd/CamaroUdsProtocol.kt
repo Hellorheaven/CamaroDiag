@@ -79,7 +79,7 @@ object CamaroUdsProtocol {
                 EcuModule("IPC", "IPC", "Instrument Panel Cluster", "Combiné d'instruments", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "Secondary odometer storage is described in 2012 Camaro service information; verify the exact module data and VIN relationship before comparing.", notesFr = "Le stockage secondaire du kilométrage est décrit dans la documentation d'atelier Camaro 2012 ; vérifier les données du module et la relation VIN avant comparaison."),
                 EcuModule("EBCM", "ABS", "Electronic Brake Control Module", "Calculateur ABS / StabiliTrak", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "Enhanced module scan not yet confirmed for this VIN.", notesFr = "Le balayage constructeur de ce module n'est pas encore confirmé pour ce VIN."),
                 EcuModule("SDM", "SDM", "Sensing and Diagnostic Module", "Calculateur airbags", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "Safety module access is read-only and vehicle-specific.", notesFr = "L'accès au calculateur de sécurité est spécifique au véhicule et en lecture seule.")
-            )
+            ) + optionalModules()
         }
         val tcmStatus = if (vehicle.transmission == TransmissionType.AUTOMATIC) ModuleStatus.DISCOVERY_REQUIRED else ModuleStatus.NOT_EQUIPPED
         return listOf(
@@ -89,6 +89,27 @@ object CamaroUdsProtocol {
             EcuModule("BCM", "BCM", "Body Control Module", "Calculateur habitacle", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "GM bulletin 07-08-49-020I identifies the BCM as the Camaro odometer storage module for 2010–2015. Exact diagnostic addressing and read DID are not assumed.", notesFr = "Le bulletin GM 07-08-49-020I identifie le BCM comme module de stockage du kilométrage Camaro 2010–2015. L'adressage de diagnostic et le DID de lecture ne sont pas supposés."),
             EcuModule("IPC", "IPC", "Instrument Panel Cluster", "Combiné d'instruments", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "2012 Camaro service information describes the IPC as secondary odometer storage. Exact read data and address must be verified.", notesFr = "La documentation Camaro 2012 décrit l'IPC comme stockage kilométrique secondaire. L'adresse et les données de lecture doivent être vérifiées."),
             EcuModule("SDM", "SDM", "Sensing and Diagnostic Module", "Calculateur airbags", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = "Safety module access is vehicle-specific and must remain read-only.", notesFr = "L'accès au calculateur de sécurité est spécifique au véhicule et doit rester en lecture seule.")
+        ) + optionalModules()
+    }
+
+    /**
+     * Optional equipment candidates are listed for discovery only. Their presence,
+     * network, physical CAN identifiers and diagnostic services are never assumed.
+     */
+    private fun optionalModules(): List<EcuModule> {
+        val discoveryNoteEn = "Optional equipment candidate only. Presence, network, physical address and supported services must be confirmed from a real vehicle scan and VIN-specific service information."
+        val discoveryNoteFr = "Candidat d'équipement optionnel uniquement. Présence, réseau, adresse physique et services doivent être confirmés par un scan réel et la documentation correspondant au VIN."
+        return listOf(
+            EcuModule("HVAC", "HVAC", "Heating, Ventilation and Air Conditioning Control Module", "Calculateur de climatisation", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("PSCM", "PSCM", "Power Steering Control Module", "Calculateur de direction assistée", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("RCDLR", "RCDLR", "Remote Control Door Lock Receiver", "Récepteur de télécommande / accès mains libres", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("RADIO", "RADIO", "Radio / Infotainment Control Module", "Calculateur radio / multimédia", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("AMP", "AMP", "Audio Amplifier Control Module", "Calculateur amplificateur audio", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("DDM", "DDM", "Driver Door Module", "Calculateur de porte conducteur", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("PDM", "PDM", "Passenger Door Module", "Calculateur de porte passager", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("FPCM", "FPCM", "Fuel Pump Control Module", "Calculateur de commande de pompe à carburant", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("PARK_ASSIST", "PARK", "Park Assist Control Module", "Calculateur d'aide au stationnement", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr),
+            EcuModule("HMI", "HMI", "Human Machine Interface Module", "Calculateur d'interface multimédia", "", "", CanBusType.UNKNOWN, ModuleStatus.DISCOVERY_REQUIRED, notesEn = discoveryNoteEn, notesFr = discoveryNoteFr)
         )
     }
 
