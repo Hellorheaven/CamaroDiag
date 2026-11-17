@@ -606,11 +606,11 @@ object CamaroDtcCatalog {
                     "GM monitor evidence is available for the 2019 LT4 for P0196, P0197 and P0198 only. It describes OBD certification criteria and is not a complete service repair diagnostic tree."
             vehicle.modelYear == 2013 && vehicle.engine == CamaroEngine.LSA &&
                 GmEngineMonitorCatalog.find("P0033", vehicle) != null ->
-                "Référence GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée ; P0101/P0103, les moniteurs de chauffage O2, le circuit de dérivation du compresseur P0033, la corrélation de pression P006D et les circuits IAT2 P0097/P0098 sont documentés pour le LSA. Les autres moniteurs restent à extraire et vérifier." to
+                "Référence GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée ; P0101/P0102/P0103, les moniteurs de chauffage O2, le circuit de dérivation du compresseur P0033, la corrélation de pression P006D et les circuits IAT2 P0097/P0098 sont documentés pour le LSA. Les autres moniteurs restent à extraire et vérifier." to
                     "GM reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified; P0101/P0103, oxygen-sensor heater monitors, the LSA supercharger bypass circuit P0033, supercharger pressure correlation P006D and IAT2 circuits P0097/P0098 are documented. Other monitors still need extraction and verification."
             GmEngineMonitorCatalog.find("P0101", vehicle) != null ->
                 "Référence GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée ; P0101/P0103 et les moniteurs de chauffage O2 sont documentés pour cette motorisation. Les autres moniteurs restent à extraire et vérifier." to
-                    "GM reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified; P0101/P0103 and oxygen-sensor heater monitors are documented for this engine. Other monitors still need extraction and verification."
+                    "GM reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified; P0101/P0102/P0103 and oxygen-sensor heater monitors are documented for this engine. Other monitors still need extraction and verification."
             GmEngineMonitorCatalog.sourceLabel(vehicle) != null ->
                 "Référence de certification GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée pour ce profil. Les définitions et seuils de surveillance détaillés restent à extraire et valider pour cette calibration." to
                     "GM certification reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified for this profile. Detailed monitor definitions and thresholds still need extraction and validation for this calibration."
