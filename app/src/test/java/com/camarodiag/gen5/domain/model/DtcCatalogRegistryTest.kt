@@ -29,6 +29,25 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun perModuleCatalogueNeverClaimsUnsupportedOemCoverage() {
+        val lfx = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val lt1 = VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)
+
+        val lfxEcm = DtcCatalogRegistry.catalogueFor("ECM", lfx)
+        val lt1Ecm = DtcCatalogRegistry.catalogueFor("ECM", lt1)
+        val lfxAbs = DtcCatalogRegistry.catalogueFor("EBCM", lfx)
+        val unknown = DtcCatalogRegistry.catalogueFor("ECU-7E9", lfx)
+
+        assertTrue(lfxEcm.hasVehicleSpecificDefinitions)
+        assertEquals(DtcEvidenceStatus.DOCUMENTED, lfxEcm.evidenceStatus)
+        assertFalse(lt1Ecm.hasVehicleSpecificDefinitions)
+        assertEquals(DtcEvidenceStatus.GENERIC_ONLY, lt1Ecm.evidenceStatus)
+        assertFalse(lfxAbs.hasVehicleSpecificDefinitions)
+        assertEquals(DtcEvidenceStatus.GENERIC_ONLY, lfxAbs.evidenceStatus)
+        assertEquals(DtcEvidenceStatus.DISCOVERY_REQUIRED, unknown.evidenceStatus)
+    }
+
+    @Test
     fun genericSaeDescriptionsAreAvailableWithoutClaimingOemSpecificity() {
         assertNotNull(DtcCatalogRegistry.genericDescription("P0101"))
         assertNotNull(DtcCatalogRegistry.genericDescription("P0308"))
