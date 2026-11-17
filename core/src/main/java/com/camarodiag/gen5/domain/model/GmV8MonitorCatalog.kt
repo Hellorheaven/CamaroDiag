@@ -277,11 +277,30 @@ private fun v8SuperchargerBaroCorrelationMonitor2013(): GmDtcMonitorEvidence =
         5
     )
 
+private fun v8Iat2CircuitMonitor2013(code: String, highTemperature: Boolean): GmDtcMonitorEvidence =
+    GmDtcMonitorEvidence(
+        code,
+        if (highTemperature) "Intake air temperature sensor 2 circuit low (high temperature)" else "Intake air temperature sensor 2 circuit high (low temperature)",
+        if (highTemperature) "Circuit bas du capteur 2 de température d'air d'admission (température élevée)" else "Circuit haut du capteur 2 de température d'air d'admission (température basse)",
+        if (highTemperature) "The ECM detects a continuous short to ground in the IAT2 signal circuit or the IAT2 sensor." else "The ECM detects a continuous open circuit in the IAT2 signal circuit or the IAT2 sensor.",
+        if (highTemperature) "Le calculateur détecte un court-circuit permanent à la masse dans le circuit de signal IAT2 ou dans le capteur IAT2." else "Le calculateur détecte un circuit ouvert permanent dans le circuit de signal IAT2 ou dans le capteur IAT2.",
+        if (highTemperature) "IAT2 sensor resistance below 45 ohms (approximately 150 °C)." else "IAT2 sensor resistance above 420,000 ohms (approximately −60 °C).",
+        if (highTemperature) "Résistance du capteur IAT2 inférieure à 45 ohms (environ 150 °C)." else "Résistance du capteur IAT2 supérieure à 420 000 ohms (environ −60 °C).",
+        "Engine run time above 0.0 seconds.",
+        "Temps de fonctionnement moteur supérieur à 0,0 seconde.",
+        "50 failures out of 63 samples; one sample every 100 ms; Type B, 2 trips.",
+        "50 échecs sur 63 échantillons ; un échantillon toutes les 100 ms ; Type B, 2 trajets.",
+        "Type B – 2 trips",
+        5
+    )
+
 object Gm2013V8MonitorCatalog {
     private val naturallyAspiratedEvidence = v8MafMonitor(supercharged = false, modelYear = 2013)
     private val superchargedEvidence = v8MafMonitor(supercharged = true, modelYear = 2013)
     private val superchargerBypassEvidence = v8SuperchargerBypassMonitor2013()
     private val superchargerBaroEvidence = v8SuperchargerBaroCorrelationMonitor2013()
+    private val iat2LowEvidence = v8Iat2CircuitMonitor2013("P0097", highTemperature = true)
+    private val iat2HighEvidence = v8Iat2CircuitMonitor2013("P0098", highTemperature = false)
     private val oxygenEvidence = v8O2Evidence(modelYear = 2013).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
@@ -292,13 +311,15 @@ object Gm2013V8MonitorCatalog {
             "P0101" -> if (vehicle.engine == CamaroEngine.LSA) superchargedEvidence else naturallyAspiratedEvidence
             "P0033" -> if (vehicle.engine == CamaroEngine.LSA) superchargerBypassEvidence else null
             "P006D" -> if (vehicle.engine == CamaroEngine.LSA) superchargerBaroEvidence else null
+            "P0097" -> if (vehicle.engine == CamaroEngine.LSA) iat2LowEvidence else null
+            "P0098" -> if (vehicle.engine == CamaroEngine.LSA) iat2HighEvidence else null
             else -> oxygenEvidence[normalizedCode]
         }
     }
 
     fun supportedCodes(vehicle: VehicleProfile): Set<String> =
         if (vehicle.modelYear == 2013 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA)) {
-            oxygenEvidence.keys + "P0101" + (if (vehicle.engine == CamaroEngine.LSA) setOf("P0033", "P006D") else emptySet())
+            oxygenEvidence.keys + "P0101" + (if (vehicle.engine == CamaroEngine.LSA) setOf("P0033", "P006D", "P0097", "P0098") else emptySet())
         } else {
             emptySet()
         }
