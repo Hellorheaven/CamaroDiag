@@ -216,6 +216,7 @@ class DtcCatalogRegistryTest {
         assertTrue(GmEngineMonitorCatalog.find("P0101", lsa)?.malfunctionCriteriaEn?.contains("21 g/s") == true)
         assertEquals(9, GmEngineMonitorCatalog.find("P0101", l99)?.sourcePage)
         assertEquals(10, GmEngineMonitorCatalog.find("P0101", lsa)?.sourcePage)
+        assertTrue(CamaroDtcCatalog.coverageNotice(l99).first.contains("P0101"))
         assertEquals(null, GmEngineMonitorCatalog.find("P0101", ls7))
         assertTrue(DtcCatalogRegistry.catalogueFor("ECM", l99).hasVehicleSpecificDefinitions)
     }
