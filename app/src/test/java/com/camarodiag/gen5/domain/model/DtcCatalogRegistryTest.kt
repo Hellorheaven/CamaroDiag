@@ -506,4 +506,30 @@ class DtcCatalogRegistryTest {
         assertFalse(evidence.isUsableForOemInterpretation(vehicle, "ECM"))
         assertTrue(evidence.validationIssues(vehicle, "ECM").size >= 6)
     }
+
+    @Test
+    fun evidenceStatusMatchesTheActualPerModuleCatalogueCoverage() {
+        val coveredProfiles = listOf(
+            VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT),
+            VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX),
+            VehicleProfile(modelYear = 2012, engine = CamaroEngine.L99),
+            VehicleProfile(modelYear = 2013, engine = CamaroEngine.LS3),
+            VehicleProfile(modelYear = 2013, engine = CamaroEngine.LSA),
+            VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT4)
+        )
+
+        coveredProfiles.forEach { vehicle ->
+            assertEquals(
+                "Evidence status must agree with catalogue routing for ${vehicle.modelYear} ${vehicle.engine.rpo}",
+                DtcCatalogRegistry.catalogueFor("ECM", vehicle).evidenceStatus,
+                DtcCatalogRegistry.evidenceStatus(vehicle, "ECM")
+            )
+            assertEquals(DtcEvidenceStatus.DOCUMENTED, DtcCatalogRegistry.evidenceStatus(vehicle, "ECM"))
+        }
+
+        val genericProfile = VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)
+        assertEquals(DtcEvidenceStatus.GENERIC_ONLY, DtcCatalogRegistry.evidenceStatus(genericProfile, "ECM"))
+        assertEquals(DtcEvidenceStatus.GENERIC_ONLY, DtcCatalogRegistry.evidenceStatus(genericProfile, "EBCM"))
+        assertEquals(DtcEvidenceStatus.DISCOVERY_REQUIRED, DtcCatalogRegistry.evidenceStatus(genericProfile, "ECU 7E8"))
+    }
 }
