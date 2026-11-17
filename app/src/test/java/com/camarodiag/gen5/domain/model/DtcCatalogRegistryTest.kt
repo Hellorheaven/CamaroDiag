@@ -200,7 +200,7 @@ class DtcCatalogRegistryTest {
                 GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2018, engine = engine))
             )
             assertEquals(
-                "19OBDG03A",
+                if (engine == CamaroEngine.LTG || engine == CamaroEngine.LGX) "19OBDG03B" else "19OBDG03A",
                 GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2019, engine = engine))
             )
             assertEquals(
