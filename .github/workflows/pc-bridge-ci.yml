@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - "pc-bridge/**"
-      - ".github/workflows/pc-bridge-ci.yml"
 
 permissions:
   contents: read
