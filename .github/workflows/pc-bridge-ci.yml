@@ -157,8 +157,13 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
 
             $outputName = "CamaroDiag-J2534-Bridge-Setup-debug-pr$env:PR_NUMBER-$($variant.Arch)"
-            & $iscc "/DAppVersion=0.0.0" "/DBuildDir=$output" "/DChannel=debug" "/DArch=$($variant.Arch)" "/DOutputName=$outputName" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss"
+            $installerLog = Join-Path $PWD "dist\$($variant.Name)-installer.log"
+            $installerOutput = & $iscc "/DAppVersion=0.0.0" "/DBuildDir=$output" "/DChannel=debug" "/DArch=$($variant.Arch)" "/DOutputName=$outputName" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss" 2>&1
+            $installerOutput | Tee-Object -FilePath $installerLog
             if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed for $($variant.Name)" }
+            if (($installerOutput | Out-String) -match '(?i)\bwarning\b') {
+              throw "Inno Setup emitted a warning for $($variant.Name); warning-free Debug builds are mandatory. See $installerLog"
+            }
           }
 
       - name: Upload Windows Debug installers for this PR commit
