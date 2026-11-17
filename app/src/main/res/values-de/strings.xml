@@ -565,4 +565,10 @@
     <string name="dtc_desc_p0018">Kurbelwellenposition – Einlassnockenwellenposition unplausibel (Bank 2)</string>
     <string name="dtc_desc_p0019">Kurbelwellenposition – Auslassnockenwellenposition unplausibel (Bank 2)</string>
     <string name="dtc_gm_calibration_not_validated">Die folgenden Interpretationen und Schwellenwerte sind Referenzdaten für den ausgewählten Motor und Modelljahrgang. Die Identität des Steuergeräts (VIN, CAL ID, CVN, Softwarekennung und Hardware-Teilenummer) wurde noch nicht geprüft; diese Daten sind für das angeschlossene Steuergerät nicht validiert.</string>
+    <string name="dtc_gm_monitor_title">GM-Motorüberwachung – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Auslösekriterium: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Aktivierungsbedingungen: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Fehlerzähler / Validierungsrate: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL-Klassifizierung: %1$s</string>
+    <string name="dtc_gm_monitor_source">Quelle: GM %1$s, Seite %2$d</string>
 </resources>
