@@ -163,3 +163,5 @@ Références primaires :
 - GM, *2012 OBD Group Summary*, tableau groupe 5B : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/2012_OBD_GROUP_SUMMARY.pdf
 
 Le catalogue générique SAE a également été complété pour les codes d'actionnement et de corrélation d'arbres à cames manquants (P0013, P0017–P0019, P0020–P0021, P0023–P0024) ainsi que les circuits de chauffage de sondes P0030, P0036 et P0050. Ces libellés sont normalisés SAE ; les critères GM détaillés ne sont affichés que lorsqu'une entrée d'évidence dédiée existe.
+
+Le catalogue d'interprétations LFX FR/EN couvre désormais également les quatre circuits d'actionneurs P0010/P0013/P0020/P0023 et les quatre défauts de performance de déphasage P0011/P0014/P0021/P0024. Les causes restent présentées comme pistes à vérifier ; aucun de ces codes ne déclenche un remplacement automatique de pièce.

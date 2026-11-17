@@ -93,6 +93,15 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun detailedLfxCamshaftInterpretationsCoverAllFourActuatorCircuitsAndBothPerformanceBanks() {
+        val lfx = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        listOf("P0010", "P0011", "P0013", "P0014", "P0020", "P0021", "P0023", "P0024").forEach { code ->
+            assertNotNull("Missing LFX explanation for $code", CamaroDtcCatalog.find(code, lfx))
+        }
+        assertEquals(null, CamaroDtcCatalog.find("P0021", VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)))
+    }
+
+    @Test
     fun gm2012LfxMonitorEvidenceIsRestrictedToItsDocumentedVehicleGroup() {
         val lfx2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
         val lfx2013 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX)

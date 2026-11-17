@@ -99,6 +99,56 @@ object CamaroDtcCatalog {
             "Critique si accompagné de bruit ou de ratés",
             "Critical if accompanied by noise or misfire"
         ),
+        "P0013" to DtcVehicleExplanation(
+            "Le calculateur détecte un défaut électrique dans le circuit de commande de l'actionneur de déphasage de l'arbre à cames d'échappement du banc 1. Il surveille la cohérence entre la commande électrique et l'état du circuit ; cela ne condamne pas automatiquement l'électrovanne.",
+            "The ECM detects an electrical fault in the Bank 1 exhaust camshaft actuator control circuit. It monitors agreement between the electrical command and circuit state; this does not automatically condemn the solenoid.",
+            listOf("Circuit ouvert ou résistance élevée dans le faisceau", "Court-circuit à la masse ou à l'alimentation", "Connecteur ou broche détérioré", "Électrovanne d'échappement ou driver ECM défectueux"),
+            listOf("Open circuit or high resistance in the harness", "Short to ground or voltage", "Damaged connector or terminal", "Faulty exhaust actuator solenoid or ECM driver"),
+            listOf("Inspecter connecteur et faisceau de l'actionneur d'échappement banc 1", "Contrôler continuité et absence de court-circuit selon le schéma GM", "Vérifier alimentation et commande avant de remplacer l'électrovanne"),
+            listOf("Inspect Bank 1 exhaust actuator connector and harness", "Check continuity and shorts using GM wiring information", "Verify power and driver command before replacing the solenoid"),
+            "Modérée à élevée — défaut de commande du déphasage",
+            "Moderate to high — cam phasing control fault"
+        ),
+        "P0020" to DtcVehicleExplanation(
+            "Le calculateur détecte un défaut électrique dans le circuit de commande de l'actionneur de déphasage de l'arbre à cames d'admission du banc 2. Le code concerne le circuit, pas nécessairement l'actionneur lui-même.",
+            "The ECM detects an electrical fault in the Bank 2 intake camshaft actuator control circuit. The code concerns the circuit, not necessarily the actuator itself.",
+            listOf("Faisceau coupé, en court-circuit ou résistance excessive", "Connecteur oxydé ou broche reculée", "Électrovanne d'admission banc 2 défectueuse", "Alimentation ou driver ECM en défaut"),
+            listOf("Open, shorted or high-resistance wiring", "Corroded connector or backed-out terminal", "Faulty Bank 2 intake actuator solenoid", "Power supply or ECM driver fault"),
+            listOf("Contrôler connecteur et faisceau de l'actionneur d'admission banc 2", "Vérifier alimentation, masse et continuité avec la procédure GM", "Tester la commande électrique avant toute dépose mécanique"),
+            listOf("Inspect Bank 2 intake actuator connector and harness", "Check power, ground and continuity using GM procedure", "Test electrical command before mechanical disassembly"),
+            "Modérée à élevée",
+            "Moderate to high"
+        ),
+        "P0021" to DtcVehicleExplanation(
+            "Le calculateur détecte que le calage de l'arbre à cames d'admission du banc 2 ne suit pas correctement la position demandée. Le défaut porte sur la performance du déphasage ; il ne désigne pas automatiquement le capteur d'arbre à cames.",
+            "The ECM detects that Bank 2 intake camshaft timing is not following the commanded position. This is a cam-phasing performance fault; it does not automatically identify the camshaft sensor as faulty.",
+            listOf("Niveau, viscosité ou état d'huile inadapté", "Pression ou débit d'huile insuffisant vers le déphaseur", "Électrovanne d'admission banc 2 grippée ou obstruée", "Déphaseur ou distribution mécanique défectueux"),
+            listOf("Incorrect oil level, viscosity or condition", "Insufficient oil pressure or flow to the phaser", "Sticking or restricted Bank 2 intake actuator solenoid", "Faulty phaser or mechanical timing issue"),
+            listOf("Vérifier niveau, spécification et état de l'huile", "Comparer angle demandé et angle réel du banc 2", "Contrôler le circuit électrique P0020 et l'actionneur avant d'ouvrir la distribution"),
+            listOf("Verify oil level, specification and condition", "Compare commanded and actual Bank 2 cam angle", "Check the P0020 electrical circuit and actuator before opening the timing system"),
+            "Élevée — contrôler rapidement, surtout en présence de bruit moteur",
+            "High — inspect promptly, especially if engine noise is present"
+        ),
+        "P0023" to DtcVehicleExplanation(
+            "Le calculateur détecte un défaut électrique dans le circuit de commande de l'actionneur de déphasage de l'arbre à cames d'échappement du banc 2. Le défaut peut se situer dans le faisceau, le connecteur, l'électrovanne ou le driver.",
+            "The ECM detects an electrical fault in the Bank 2 exhaust camshaft actuator control circuit. The fault may be in the harness, connector, solenoid or driver.",
+            listOf("Circuit ouvert ou court-circuit", "Connecteur ou broche oxydé(e)", "Électrovanne d'échappement banc 2 défectueuse", "Alimentation ou étage de commande ECM en défaut"),
+            listOf("Open or shorted circuit", "Corroded connector or terminal", "Faulty Bank 2 exhaust actuator solenoid", "Power supply or ECM driver fault"),
+            listOf("Inspecter connecteur et faisceau de l'actionneur d'échappement banc 2", "Contrôler continuité, alimentation et absence de court-circuit", "Confirmer la commande avec l'outil de diagnostic"),
+            listOf("Inspect Bank 2 exhaust actuator connector and harness", "Check continuity, power and short circuits", "Confirm the command with a scan tool"),
+            "Modérée à élevée",
+            "Moderate to high"
+        ),
+        "P0024" to DtcVehicleExplanation(
+            "Le calculateur détecte que le calage de l'arbre à cames d'échappement du banc 2 est trop avancé ou ne suit pas la consigne. Le code indique une anomalie de performance du déphasage, pas une pièce précise à remplacer.",
+            "The ECM detects that Bank 2 exhaust camshaft timing is over-advanced or does not follow the commanded position. The code indicates cam-phasing performance, not a specific part to replace.",
+            listOf("Huile moteur incorrecte, dégradée ou niveau insuffisant", "Pression d'huile insuffisante", "Électrovanne ou déphaseur d'échappement banc 2 grippé", "Calage mécanique ou chaîne de distribution incorrect"),
+            listOf("Incorrect, degraded or low engine oil", "Insufficient oil pressure", "Sticking Bank 2 exhaust actuator solenoid or phaser", "Mechanical timing or timing-chain error"),
+            listOf("Contrôler huile et pression avant toute réparation", "Comparer angle demandé/réel de l'arbre à cames d'échappement banc 2", "Vérifier circuit P0023, électrovanne et déphaseur avant contrôle mécanique"),
+            listOf("Check oil and pressure before repairs", "Compare commanded/actual Bank 2 exhaust cam angle", "Check P0023 circuit, solenoid and phaser before mechanical inspection"),
+            "Élevée — diagnostic rapide recommandé",
+            "High — prompt diagnosis recommended"
+        ),
         "P0101" to DtcVehicleExplanation(
             "Le débit d'air mesuré par le débitmètre MAF ne correspond pas à la plage attendue par le calculateur pour les conditions moteur. Cela ne signifie pas automatiquement que le débitmètre est HS.",
             "Measured MAF airflow is outside the range expected by the ECM for the current engine conditions. This does not automatically mean the MAF sensor has failed.",
