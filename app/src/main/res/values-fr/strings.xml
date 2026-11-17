@@ -531,4 +531,9 @@
     <string name="cal_warning_address_span_large">La plage d’adresses est très étendue ; aucune image mémoire dense n’est construite.</string>
     <string name="cal_warning_invalid_file">La validation structurelle a échoué. N’utilisez pas ce fichier pour éditer une calibration.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d octets)</string>
+    <string name="cal_comparison_identical">Les deux images BIN sont identiques octet par octet.</string>
+    <string name="cal_comparison_size_diff">%1$d octets communs comparés ; les tailles des fichiers diffèrent.</string>
+    <string name="cal_comparison_different_ranges">%1$d octets différents répartis dans %2$d zone(s).</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d octets)</string>
+    <string name="cal_comparison_more_ranges">%1$d zone(s) supplémentaire(s) non affichée(s).</string>
 </resources>

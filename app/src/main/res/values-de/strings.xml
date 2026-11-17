@@ -528,4 +528,9 @@
     <string name="cal_warning_address_span_large">Der Adressbereich ist sehr groß; es wird kein dichtes Speicherabbild erstellt.</string>
     <string name="cal_warning_invalid_file">Strukturprüfung fehlgeschlagen. Diese Datei nicht zur Kalibrierungsbearbeitung verwenden.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d Bytes)</string>
+    <string name="cal_comparison_identical">Die beiden BIN-Abbilder sind bytegenau identisch.</string>
+    <string name="cal_comparison_size_diff">%1$d gemeinsame Bytes verglichen; die Dateigrößen unterscheiden sich.</string>
+    <string name="cal_comparison_different_ranges">%1$d Bytes unterscheiden sich in %2$d Bereich(en).</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d Bytes)</string>
+    <string name="cal_comparison_more_ranges">%1$d weitere Bereiche werden nicht angezeigt.</string>
 </resources>

@@ -528,4 +528,9 @@
     <string name="cal_warning_address_span_large">Address range is very large; no dense memory image is constructed.</string>
     <string name="cal_warning_invalid_file">Structural validation failed. Do not use this file for calibration editing.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d bytes)</string>
+    <string name="cal_comparison_identical">The two BIN images are byte-for-byte identical.</string>
+    <string name="cal_comparison_size_diff">Compared %1$d common bytes; file sizes differ.</string>
+    <string name="cal_comparison_different_ranges">%1$d bytes differ across %2$d range(s).</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d bytes)</string>
+    <string name="cal_comparison_more_ranges">%1$d additional range(s) not displayed.</string>
 </resources>
