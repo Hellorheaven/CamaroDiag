@@ -79,6 +79,7 @@ class DtcCatalogRegistryTest {
         assertEquals(DtcEvidenceStatus.GENERIC_ONLY, lt1Ecm.evidenceStatus)
         assertFalse(lfxAbs.hasVehicleSpecificDefinitions)
         assertEquals(DtcEvidenceStatus.GENERIC_ONLY, lfxAbs.evidenceStatus)
+        assertFalse(unknown.hasVehicleSpecificDefinitions)
         assertEquals(DtcEvidenceStatus.DISCOVERY_REQUIRED, unknown.evidenceStatus)
     }
 
