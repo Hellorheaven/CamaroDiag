@@ -41,14 +41,22 @@ fun DecodedUdsDtcRecord.toDiagnosticDtc(moduleId: String): DiagnosticDtc {
     require(moduleId.isNotBlank()) { "The responding ECU module ID is required." }
     val stateEn = buildList {
         if (status.testFailed) add("failed")
+        if (status.testFailedThisOperationCycle) add("failed this operation cycle")
         if (status.pending) add("pending")
         if (status.confirmed) add("confirmed")
+        if (status.testNotCompletedSinceLastClear) add("test not completed since last clear")
+        if (status.testFailedSinceLastClear) add("failed since last clear")
+        if (status.testNotCompletedThisOperationCycle) add("test not completed this operation cycle")
         if (status.warningIndicatorRequested) add("warning indicator requested")
     }.ifEmpty { listOf("status not asserted") }.joinToString(", ")
     val stateFr = buildList {
         if (status.testFailed) add("défaut présent")
+        if (status.testFailedThisOperationCycle) add("défaut présent pendant ce cycle de fonctionnement")
         if (status.pending) add("en attente")
         if (status.confirmed) add("confirmé")
+        if (status.testNotCompletedSinceLastClear) add("test non terminé depuis le dernier effacement")
+        if (status.testFailedSinceLastClear) add("défaut détecté depuis le dernier effacement")
+        if (status.testNotCompletedThisOperationCycle) add("test non terminé pendant ce cycle de fonctionnement")
         if (status.warningIndicatorRequested) add("voyant demandé")
     }.ifEmpty { listOf("aucun état de défaut actif") }.joinToString(", ")
     return DiagnosticDtc(
