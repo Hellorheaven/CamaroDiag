@@ -561,4 +561,9 @@
     <string name="trace_error_csv_empty">Трасса CSV пуста.</string>
     <string name="trace_error_csv_columns">В CSV нужен столбец CAN ID и столбец данных/payload либо столбцы data0…data15.</string>
     <string name="trace_error_generic">Трасса содержит недопустимую или неподдерживаемую запись.</string>
+    <string name="dtc_vehicle_interpretation">Интерпретация для данного автомобиля</string>
+    <string name="dtc_severity">Серьёзность</string>
+    <string name="dtc_possible_causes">Возможные причины (не подтверждены)</string>
+    <string name="dtc_recommended_checks">Рекомендуемые проверки</string>
+    <string name="dtc_vehicle_specific_not_documented">Для этого кода и выбранной конфигурации ещё не документирована специальная процедура. Выше приведено описание OEM/SAE; проверьте VIN и блок управления по сервисной документации GM.</string>
 </resources>
