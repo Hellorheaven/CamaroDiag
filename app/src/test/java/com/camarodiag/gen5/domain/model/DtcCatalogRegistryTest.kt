@@ -143,18 +143,29 @@ class DtcCatalogRegistryTest {
 
     @Test
     fun gm2014And2015V8SourceGroupsIncludeLs7WithoutInventingMonitorData() {
-        val ls7_2014 = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LS7)
-        val ls7_2015 = VehicleProfile(modelYear = 2015, engine = CamaroEngine.LS7)
-        val lsa_2014 = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LSA)
+        val v8Engines = listOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA, CamaroEngine.LS7)
 
-        assertEquals("14OBDG07", GmEngineMonitorCatalog.sourceLabel(ls7_2014))
-        assertEquals("15OBDG07", GmEngineMonitorCatalog.sourceLabel(ls7_2015))
-        assertEquals("14OBDG07", GmEngineMonitorCatalog.sourceLabel(lsa_2014))
+        v8Engines.forEach { engine ->
+            assertEquals(
+                "14OBDG07",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2014, engine = engine))
+            )
+            assertEquals(
+                "15OBDG07",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2015, engine = engine))
+            )
+        }
 
         // The group summary establishes the certification file association,
         // but no LS7-specific monitor evidence has been integrated yet.
-        assertEquals(null, GmEngineMonitorCatalog.find("P0016", ls7_2014))
-        assertEquals(null, GmEngineMonitorCatalog.find("P0016", ls7_2015))
+        assertEquals(
+            null,
+            GmEngineMonitorCatalog.find("P0016", VehicleProfile(modelYear = 2014, engine = CamaroEngine.LS7))
+        )
+        assertEquals(
+            null,
+            GmEngineMonitorCatalog.find("P0016", VehicleProfile(modelYear = 2015, engine = CamaroEngine.LS7))
+        )
     }
 
     @Test
