@@ -409,7 +409,7 @@ object CamaroDtcCatalog {
 
     fun find(code: String, vehicle: VehicleProfile): DtcVehicleExplanation? {
         if (vehicle.engine != CamaroEngine.LFX || vehicle.modelYear !in 2012..2015) return null
-        return lfxGen5[code.trim().uppercase()]
+        return lfxGen5[code.trim().uppercase(Locale.ROOT)]
     }
 
     fun isKnownLfxProfile(vehicle: VehicleProfile): Boolean =
