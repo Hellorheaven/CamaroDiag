@@ -565,4 +565,5 @@
     <string name="dtc_desc_p0017">Krukaspositie – uitlaatnokkenaspositie niet plausibel (bank 1)</string>
     <string name="dtc_desc_p0018">Krukaspositie – inlaatnokkenaspositie niet plausibel (bank 2)</string>
     <string name="dtc_desc_p0019">Krukaspositie – uitlaatnokkenaspositie niet plausibel (bank 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Alleen GM-certificeringsreferentie: de identiteit van de regeleenheid (VIN, CAL ID, CVN, software-ID en hardwareonderdeelnummer) is nog niet vergeleken. Deze grenswaarden zijn niet gevalideerd voor deze regeleenheid.</string>
 </resources>
