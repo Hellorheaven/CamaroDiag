@@ -102,7 +102,7 @@
     <string name="dtc_title">診断トラブルコード</string>
     <string name="dtc_scan">スキャン</string>
     <string name="dtc_clear">消去</string>
-    <string name="dtc_clear_warning">Mode 04 の消去では排出ガス関連の故障コードが削除され、一部のレディネスモニターがリセットされます。続行する前にレポートを保存してください。 Mode 04 では、車両の他の制御モジュールに保存された拡張 DTC は消去されません。</string>
+    <string name="dtc_clear_warning">Mode 04 の消去では排出ガス関連の故障コードが削除され、一部のレディネスモニターがリセットされます。続行する前にレポートを保存してください。 Mode 04 では、車両の他の制御モジュールに保存された拡張 DTC は消去されません。 Mode 04 では、車両の他の制御モジュールに保存された拡張 DTC は消去されません。</string>
     <string name="dtc_none_returned">前回のスキャンでは故障コードが返されませんでした。</string>
     <string name="dtc_confirm_clear">DTC を消去しますか？</string>
     <string name="dtc_clear_description">ECU に OBD Mode 04 を送信します。レディネスデータがリセットされる場合がありますが、故障原因が修復されるわけではありません。</string>
