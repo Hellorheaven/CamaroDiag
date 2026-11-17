@@ -102,7 +102,7 @@
     <string name="dtc_title">Diagnosefehlercodes</string>
     <string name="dtc_scan">Scannen</string>
     <string name="dtc_clear">Löschen</string>
-    <string name="dtc_clear_warning">Das Löschen mit Modus 04 entfernt emissionsbezogene Fehlercodes und setzt einige Bereitschaftsmonitore zurück. Speichere den Bericht, bevor du fortfährst.</string>
+    <string name="dtc_clear_warning">Das Löschen mit Modus 04 entfernt emissionsbezogene Fehlercodes und setzt einige Bereitschaftsmonitore zurück. Speichere den Bericht, bevor du fortfährst. Modus 04 löscht keine erweiterten Fehlercodes, die in anderen Fahrzeugsteuergeräten gespeichert sind.</string>
     <string name="dtc_none_returned">Der letzte Scan hat keine Fehlercodes zurückgegeben.</string>
     <string name="dtc_confirm_clear">Löschen der Fehlercodes bestätigen?</string>
     <string name="dtc_clear_description">Dadurch wird OBD-Modus 04 an das Steuergerät gesendet. Bereitschaftsdaten können zurückgesetzt werden. Die Fehlerursache wird dadurch nicht behoben.</string>
