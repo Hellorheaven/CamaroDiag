@@ -149,18 +149,22 @@ private fun v8O2ResistanceMonitor(
     "Type B – 2 trips", page
 )
 
-private fun v8MafMonitor(supercharged: Boolean): GmDtcMonitorEvidence {
-    val page = if (supercharged) 11 else 10
-    val rpmMaximum = if (supercharged) "6,200" else "6,700"
+private fun v8MafMonitor(supercharged: Boolean, modelYear: Int = 2012): GmDtcMonitorEvidence {
+    val page = when (modelYear) {
+        2013 -> if (supercharged) 10 else 9
+        else -> if (supercharged) 11 else 10
+    }
+    val rpmMaximum = if (supercharged) "6,200" else if (modelYear == 2013) "5,750" else "6,700"
+    val naturallyAspiratedThreshold = if (modelYear == 2013) "16" else "12"
     val criteriaEn = if (supercharged) {
         "MAF residual above 21 g/s, MAP1/MAP2 residual above 22.0 kPa, throttle-model residual above 400 kPa*(g/s), and supporting SCIAP residual above 14.0 kPa."
     } else {
-        "MAF residual above 12 g/s, MAP2 residual above 15.0 kPa, throttle-model error threshold 250 kPa*(g/s), and minimum combined weighting factor at least 0.00."
+        "MAF residual above $naturallyAspiratedThreshold g/s, MAP2 residual above 15.0 kPa, throttle-model error threshold 250 kPa*(g/s), and minimum combined weighting factor at least 0.00."
     }
     val criteriaFr = if (supercharged) {
         "Résidu MAF supérieur à 21 g/s, résidu MAP1/MAP2 supérieur à 22,0 kPa, résidu du modèle papillon supérieur à 400 kPa*(g/s), et résidu SCIAP de support supérieur à 14,0 kPa."
     } else {
-        "Résidu MAF supérieur à 12 g/s, résidu MAP2 supérieur à 15,0 kPa, seuil d'erreur du modèle papillon de 250 kPa*(g/s), et facteur de pondération combiné minimal d'au moins 0,00."
+        "Résidu MAF supérieur à $naturallyAspiratedThreshold g/s, résidu MAP2 supérieur à 15,0 kPa, seuil d'erreur du modèle papillon de 250 kPa*(g/s), et facteur de pondération combiné minimal d'au moins 0,00."
     }
     return GmDtcMonitorEvidence(
         "P0101",
