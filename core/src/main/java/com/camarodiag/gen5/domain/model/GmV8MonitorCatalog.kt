@@ -243,9 +243,27 @@ object Gm2012LsaMonitorCatalog {
     fun supportedCodes(): Set<String> = evidence.keys
 }
 
+private fun v8SuperchargerBypassMonitor2013(): GmDtcMonitorEvidence =
+    GmDtcMonitorEvidence(
+        "P0033",
+        "Supercharger bypass valve control circuit",
+        "Circuit de commande de la soupape de dérivation du compresseur",
+        "The ECM monitors electrical integrity of the supercharger bypass-valve output circuit.",
+        "Le calculateur surveille l'intégrité électrique du circuit de sortie de la soupape de dérivation du compresseur.",
+        "The commanded state of the output driver does not match the actual control-circuit state.",
+        "L'état commandé du driver de sortie ne correspond pas à l'état réel du circuit de commande.",
+        "System supply voltage above 11 V and below 32 V; ignition switch in CRANK or RUN; output driver commanded ON.",
+        "Tension d'alimentation supérieure à 11 V et inférieure à 32 V ; contact en CRANK ou RUN ; driver de sortie commandé actif.",
+        "20 failures out of 25 samples; one sample every 250 ms; Type B, 2 trips.",
+        "20 échecs sur 25 échantillons ; un échantillon toutes les 250 ms ; Type B, 2 trajets.",
+        "Type B – 2 trips",
+        2
+    )
+
 object Gm2013V8MonitorCatalog {
     private val naturallyAspiratedEvidence = v8MafMonitor(supercharged = false, modelYear = 2013)
     private val superchargedEvidence = v8MafMonitor(supercharged = true, modelYear = 2013)
+    private val superchargerBypassEvidence = v8SuperchargerBypassMonitor2013()
     private val oxygenEvidence = v8O2Evidence(modelYear = 2013).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
@@ -254,13 +272,14 @@ object Gm2013V8MonitorCatalog {
         val normalizedCode = code.trim().uppercase(java.util.Locale.ROOT)
         return when (normalizedCode) {
             "P0101" -> if (vehicle.engine == CamaroEngine.LSA) superchargedEvidence else naturallyAspiratedEvidence
+            "P0033" -> if (vehicle.engine == CamaroEngine.LSA) superchargerBypassEvidence else null
             else -> oxygenEvidence[normalizedCode]
         }
     }
 
     fun supportedCodes(vehicle: VehicleProfile): Set<String> =
         if (vehicle.modelYear == 2013 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA)) {
-            oxygenEvidence.keys + "P0101"
+            oxygenEvidence.keys + "P0101" + if (vehicle.engine == CamaroEngine.LSA) setOf("P0033") else emptySet()
         } else {
             emptySet()
         }
