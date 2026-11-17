@@ -494,4 +494,10 @@
     <string name="cal_warning_overlapping_regions">אזורי טבלאות או צירים חופפים; יש לוודא שהחפיפה מכוונת.</string>
     <string name="cal_warning_import_review">יש לבדוק את אזהרות ההגדרות שיובאו לפני שימוש בטבלה כלשהי.</string>
     <string name="cal_warning_os_hardware_not_read">מערכת ההפעלה והפניה לחומרה לא נקראו באמצעות מצב 09 התקני: נדרש אימות עצמאי מול התיעוד.</string>
+    <string name="module_note_unavailable">אין פרטים מתורגמים זמינים עבור יחידת בקרה זו.</string>
+    <string name="live_pid_generic">PID %1$s</string>
+    <string name="mileage_source_generic">מקור %1$s</string>
+    <string name="mileage_details_unavailable">פרטים טכניים אינם זמינים עבור מקור זה.</string>
+    <string name="mileage_caveat_unavailable">אין מידע מתורגם נוסף זמין עבור מקור זה.</string>
+    <string name="obd_pid_generic">PID %1$02X</string>
 </resources>
