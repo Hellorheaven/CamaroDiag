@@ -566,4 +566,10 @@
     <string name="dtc_desc_p0018">Correlação cambota / árvore de cames de admissão não plausível (banco 2)</string>
     <string name="dtc_desc_p0019">Correlação cambota / árvore de cames de escape não plausível (banco 2)</string>
     <string name="dtc_gm_calibration_not_validated">As interpretações e os limites abaixo são dados de referência para o motor e o ano-modelo selecionados. A identidade do módulo (VIN, CAL ID, CVN, identificador do software e número da peça de hardware) ainda não foi verificada; estes dados não estão validados para o módulo ligado.</string>
+    <string name="dtc_gm_monitor_title">Monitor do motor GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Critério de acionamento: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Condições de ativação: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Contador de falhas / frequência de validação: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Classificação MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Fonte: GM %1$s, página %2$d</string>
 </resources>
