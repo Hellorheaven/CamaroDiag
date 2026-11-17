@@ -558,4 +558,9 @@
     <string name="trace_error_csv_empty">La traza CSV está vacía.</string>
     <string name="trace_error_csv_columns">El CSV necesita una columna CAN ID y una columna de datos/payload, o columnas data0…data15.</string>
     <string name="trace_error_generic">La traza contiene un registro no válido o no compatible.</string>
+    <string name="dtc_vehicle_interpretation">Interpretación específica del vehículo</string>
+    <string name="dtc_severity">Gravedad</string>
+    <string name="dtc_possible_causes">Posibles causas (no confirmadas)</string>
+    <string name="dtc_recommended_checks">Comprobaciones recomendadas</string>
+    <string name="dtc_vehicle_specific_not_documented">Aún no hay un procedimiento específico documentado para este código y esta configuración. Arriba se muestra la descripción OEM/SAE; verifica el VIN y la unidad de control en la información de servicio GM.</string>
 </resources>
