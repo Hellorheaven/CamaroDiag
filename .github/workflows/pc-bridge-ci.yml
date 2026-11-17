@@ -31,7 +31,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Build J2534 bridge in Debug configuration
-        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --no-restore
+        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug
         continue-on-error: false
 
       - name: Install Inno Setup
@@ -50,7 +50,6 @@ jobs:
       - name: Publish and package Windows Debug installers
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
