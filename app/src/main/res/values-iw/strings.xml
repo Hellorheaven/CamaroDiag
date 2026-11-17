@@ -568,4 +568,10 @@
     <string name="dtc_desc_p0018">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של היניקה (בנק 2)</string>
     <string name="dtc_desc_p0019">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של הפליטה (בנק 2)</string>
     <string name="dtc_gm_calibration_not_validated">הפרשנויות והספים שלהלן הם נתוני ייחוס למנוע ולשנת הדגם שנבחרו. זהות יחידת הבקרה (VIN, CAL ID, CVN, מזהה תוכנה ומספר חלק חומרה) טרם אומתה; הנתונים אינם מאומתים עבור היחידה המחוברת.</string>
+    <string name="dtc_gm_monitor_title">ניטור מנוע GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">קריטריון להפעלת התקלה: %1$s</string>
+    <string name="dtc_gm_monitor_enable">תנאי הפעלה: %1$s</string>
+    <string name="dtc_gm_monitor_failure">מונה כשלים / קצב אימות: %1$s</string>
+    <string name="dtc_gm_monitor_mil">סיווג MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">מקור: GM %1$s, עמוד %2$d</string>
 </resources>
