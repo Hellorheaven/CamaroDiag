@@ -102,7 +102,7 @@
     <string name="dtc_title">Codes Défaut (DTC)</string>
     <string name="dtc_scan">Scanner</string>
     <string name="dtc_clear">Effacer</string>
-    <string name="dtc_clear_warning">L\'effacement Mode 04 supprime les défauts d\'émissions et réinitialise certains moniteurs de readiness. Enregistrer le rapport avant de continuer. Le Mode 04 n\\'efface pas les DTC constructeur mémorisés par les autres calculateurs.</string>
+    <string name="dtc_clear_warning">L\'effacement Mode 04 supprime les défauts d\'émissions et réinitialise certains moniteurs de readiness. Enregistrer le rapport avant de continuer. Le Mode 04 n\'efface pas les DTC constructeur mémorisés par les autres calculateurs.</string>
     <string name="dtc_none_returned">Aucun code défaut retourné par le dernier scan.</string>
     <string name="dtc_confirm_clear">Confirmer l\'effacement des défauts ?</string>
     <string name="dtc_clear_description">Cette opération envoie le service OBD Mode 04 à l\'ECU. Les données de readiness peuvent être réinitialisées. Elle ne répare pas la cause du défaut.</string>
