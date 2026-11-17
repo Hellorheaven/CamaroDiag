@@ -282,7 +282,7 @@
     <string name="remote_start_blocker_stationary">Δεν έχει επιβεβαιωθεί ότι το όχημα είναι ακίνητο.</string>
     <string name="remote_start_blocker_equipment">Δεν έχει επιβεβαιωθεί ο εργοστασιακός εξοπλισμός απομακρυσμένης εκκίνησης.</string>
     <string name="units_metric">SI / Μετρικό</string>
-    <string name="units_imperial">Αυτοκρατορικό σύστημα μονάδων</string>
+    <string name="units_imperial">Αγγλοσαξονικό σύστημα μονάδων</string>
     <string name="live_pause">Παύση</string>
     <string name="live_recording_status">Δείγματα: %1$d • %2$s</string>
     <string name="live_recording_state_active">ΚΑΤΑΓΡΑΦΗ</string>
@@ -457,7 +457,7 @@
     <string name="module_bus_unknown">Δίαυλος προς αναγνώριση</string>
     <string name="module_can_headers">TX: 0x%1$s | RX: 0x%2$s (%3$s)</string>
     <string name="units_metric_details">Μετρικό (km, °C, kPa)</string>
-    <string name="units_imperial_details">Αυτοκρατορικό (mi, °F, PSI)</string>
+    <string name="units_imperial_details">Αγγλοσαξονικό (mi, °F, PSI)</string>
     <string name="session_vin_label">VIN: %1$s</string>
     <string name="session_dtcs_label">DTC: %1$s</string>
     <string name="cal_tcp_port">Θύρα TCP</string>
