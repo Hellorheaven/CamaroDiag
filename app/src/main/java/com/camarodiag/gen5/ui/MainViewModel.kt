@@ -11,6 +11,8 @@ import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
+import com.camarodiag.gen5.data.obd.CalibrationFileFormat
+import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
@@ -601,6 +603,78 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Imports a local calibration file for inventory and integrity checks only. */
+    private fun localizedInspectionFormat(format: CalibrationFileFormat): String {
+        val resource = when (format) {
+            CalibrationFileFormat.RAW_BINARY -> R.string.cal_format_raw_binary
+            CalibrationFileFormat.INTEL_HEX -> R.string.cal_format_intel_hex
+            CalibrationFileFormat.MOTOROLA_S_RECORD -> R.string.cal_format_motorola_srecord
+            CalibrationFileFormat.ZIP_ARCHIVE -> R.string.cal_format_zip_archive
+            CalibrationFileFormat.EXTERNAL_DEFINITION -> R.string.cal_format_external_definition
+            CalibrationFileFormat.EXTERNAL_TUNE_PROJECT -> R.string.cal_format_external_tune_project
+            CalibrationFileFormat.UNKNOWN -> R.string.cal_format_unknown
+        }
+        return getApplication<Application>().getString(resource)
+    }
+
+    private fun localizedInspectionSummary(inspection: CalibrationFileInspection, fileName: String): String {
+        val context = getApplication<Application>()
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        if (!inspection.valid && inspection.format !in setOf(
+                CalibrationFileFormat.EXTERNAL_TUNE_PROJECT,
+                CalibrationFileFormat.EXTERNAL_DEFINITION,
+                CalibrationFileFormat.UNKNOWN
+            )
+        ) return context.getString(R.string.cal_summary_invalid)
+        return when (inspection.format) {
+            CalibrationFileFormat.RAW_BINARY -> context.getString(R.string.cal_summary_raw_binary)
+            CalibrationFileFormat.INTEL_HEX -> context.getString(R.string.cal_summary_intel_hex, inspection.recordCount, inspection.payloadBytes)
+            CalibrationFileFormat.MOTOROLA_S_RECORD -> context.getString(R.string.cal_summary_motorola_srecord, inspection.recordCount, inspection.payloadBytes)
+            CalibrationFileFormat.ZIP_ARCHIVE -> context.getString(R.string.cal_summary_zip_archive, inspection.recordCount, inspection.payloadBytes)
+            CalibrationFileFormat.EXTERNAL_DEFINITION -> context.getString(R.string.cal_summary_external_definition, extension)
+            CalibrationFileFormat.EXTERNAL_TUNE_PROJECT -> context.getString(R.string.cal_summary_external_tune, extension)
+            CalibrationFileFormat.UNKNOWN -> context.getString(R.string.cal_summary_unknown)
+        }
+    }
+
+    private fun localizedInspectionChecksum(inspection: CalibrationFileInspection): String {
+        val resource = when {
+            inspection.format == CalibrationFileFormat.RAW_BINARY -> R.string.cal_checksum_none
+            inspection.format == CalibrationFileFormat.ZIP_ARCHIVE && inspection.valid -> R.string.cal_checksum_zip_readable
+            inspection.valid && inspection.format in setOf(CalibrationFileFormat.INTEL_HEX, CalibrationFileFormat.MOTOROLA_S_RECORD) -> R.string.cal_checksum_records_valid
+            inspection.format == CalibrationFileFormat.ZIP_ARCHIVE -> R.string.cal_checksum_interrupted
+            else -> R.string.cal_checksum_not_verified
+        }
+        return getApplication<Application>().getString(resource)
+    }
+
+    private fun localizedInspectionWarnings(inspection: CalibrationFileInspection): List<String> {
+        val context = getApplication<Application>()
+        return when (inspection.format) {
+            CalibrationFileFormat.RAW_BINARY -> listOf(context.getString(R.string.cal_warning_binary_integrity))
+            CalibrationFileFormat.UNKNOWN -> listOf(context.getString(R.string.cal_warning_unknown_format))
+            CalibrationFileFormat.ZIP_ARCHIVE -> {
+                if (!inspection.valid) {
+                    val warning = inspection.warnings.firstOrNull().orEmpty()
+                    listOf(context.getString(
+                        if (warning.contains("limite", ignoreCase = true)) R.string.cal_warning_archive_limit
+                        else R.string.cal_warning_original_file_preserved
+                    ))
+                } else {
+                    buildList {
+                        add(context.getString(R.string.cal_warning_archive_preserved))
+                        inspection.warnings.firstOrNull { it.startsWith("Fichiers détectés :") }?.let {
+                            add(context.getString(R.string.cal_warning_archive_files, it.substringAfter(':').trim()))
+                        }
+                    }
+                }
+            }
+            CalibrationFileFormat.EXTERNAL_TUNE_PROJECT -> listOf(context.getString(R.string.cal_warning_external_project))
+            CalibrationFileFormat.EXTERNAL_DEFINITION -> listOf(context.getString(R.string.cal_warning_external_definition))
+            CalibrationFileFormat.INTEL_HEX -> if (inspection.warnings.isNotEmpty()) listOf(context.getString(R.string.cal_warning_address_span_large)) else emptyList()
+            CalibrationFileFormat.MOTOROLA_S_RECORD -> emptyList()
+        }
+    }
+
     fun importCalibrationFile(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -657,13 +731,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapDefinitionsWarnings = emptyList(),
                     mapDirty = false,
                     mapError = null,
-                    inspectionFormat = inspection.format.label,
-                    inspectionSummary = inspection.summary,
+                    inspectionFormat = inspection.format.name,
+                    inspectionSummary = localizedInspectionSummary(inspection, displayName),
                     inspectionPayloadBytes = inspection.payloadBytes,
                     inspectionRecordCount = inspection.recordCount,
-                    inspectionChecksumStatus = inspection.checksumValidation,
-                    inspectionAddressRanges = inspection.addressRanges.map { "0x${it.start.toString(16).uppercase()}–0x${it.endInclusive.toString(16).uppercase()} (${it.length} octets)" },
-                    inspectionWarnings = inspection.warnings,
+                    inspectionChecksumStatus = localizedInspectionChecksum(inspection),
+                    inspectionAddressRanges = inspection.addressRanges.map { getApplication<Application>().getString(R.string.cal_address_range, it.start.toString(16).uppercase(), it.endInclusive.toString(16).uppercase(), it.length) },
+                    inspectionWarnings = localizedInspectionWarnings(inspection),
                     comparisonFileName = null,
                     comparisonFilePath = null,
                     comparisonFileSize = null,
@@ -691,7 +765,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var storedFile: File? = null
             try {
                 val current = _calibrationWorkspace.value
-                require(current.importedFilePath != null && current.inspectionFormat == "BIN / raw binary") {
+                require(current.importedFilePath != null && current.inspectionFormat == "RAW_BINARY") {
                     "Charge d'abord une image de référence BIN brute."
                 }
                 val resolver = getApplication<Application>().contentResolver

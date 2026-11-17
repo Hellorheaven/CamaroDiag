@@ -158,6 +158,19 @@ private fun localizedAxisSummary(
 }
 
 @Composable
+private fun localizedInspectionFormat(format: String): String = stringResource(
+    when (format) {
+        "RAW_BINARY" -> R.string.cal_format_raw_binary
+        "INTEL_HEX" -> R.string.cal_format_intel_hex
+        "MOTOROLA_S_RECORD" -> R.string.cal_format_motorola_srecord
+        "ZIP_ARCHIVE" -> R.string.cal_format_zip_archive
+        "EXTERNAL_DEFINITION" -> R.string.cal_format_external_definition
+        "EXTERNAL_TUNE_PROJECT" -> R.string.cal_format_external_tune_project
+        else -> R.string.cal_format_unknown
+    }
+)
+
+@Composable
 fun CalibrationWorkspaceScreen(
     state: CalibrationWorkspaceState,
     vehicleLabel: String,
@@ -610,7 +623,7 @@ fun CalibrationWorkspaceScreen(
                         Text(state.importedFilePreview.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                         state.inspectionFormat?.let { format ->
                             HorizontalDivider(color = TextMuted.copy(alpha = .25f))
-                            Text(stringResource(R.string.cal_file_inspection, format), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(stringResource(R.string.cal_file_inspection, localizedInspectionFormat(format)), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Text(state.inspectionSummary.orEmpty(), color = TextPrimary, fontSize = 12.sp)
                             state.inspectionPayloadBytes?.let { Text(stringResource(R.string.cal_payload_size, it), color = TextMuted, fontSize = 11.sp) }
                             state.inspectionRecordCount?.takeIf { it > 0 }?.let { Text(stringResource(R.string.cal_record_count, it), color = TextMuted, fontSize = 11.sp) }
@@ -622,7 +635,7 @@ fun CalibrationWorkspaceScreen(
                             androidx.compose.material3.Icon(Icons.Default.CloudUpload, contentDescription = null)
                             Text(stringResource(R.string.cal_export_file))
                         }
-                        if (state.inspectionFormat == "BIN / raw binary") {
+                        if (state.inspectionFormat == "RAW_BINARY") {
                             OutlinedButton(onClick = onImportComparisonFile, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.cal_import_second_bin))
                             }
