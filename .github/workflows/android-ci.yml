@@ -55,11 +55,28 @@ jobs:
               status: 'completed',
               per_page: 100
             });
-            const previous = runs
+            const candidates = runs
               .filter(run => run.conclusion === 'success' &&
                 run.head_sha !== pr.head.sha &&
                 (run.pull_requests || []).some(item => item.number === pr.number))
-              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            let previous = null;
+            for (const candidate of candidates) {
+              const jobs = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: candidate.id,
+                per_page: 100
+              });
+              // A successful checkpoint means the actual platform build job passed.
+              // The lightweight evaluator succeeding while the build job is skipped
+              // must never reset the commit counter.
+              if (jobs.data.jobs.some(job =>
+                job.name === 'test-and-build' && job.conclusion === 'success')) {
+                previous = candidate;
+                break;
+              }
+            }
 
             let commitsSinceBuild = pr.commits;
             if (previous) {
