@@ -143,7 +143,6 @@ class UdsClientTest {
     }
 
     @Test
-    @Test
     fun exposesDtcFormatIdentifierAndSaEFormattedCode() = runBlocking {
         val transport = FakeTransport(
             listOf(
