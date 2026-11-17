@@ -22,6 +22,29 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun engineProfilesExposeRpoSpecificArchitectureWithoutCrossEngineAssumptions() {
+        val expected = mapOf(
+            "LLT" to Triple(6, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LFX" to Triple(6, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LS3" to Triple(8, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION),
+            "L99" to Triple(8, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION),
+            "LSA" to Triple(8, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.PORT_INJECTION),
+            "LS7" to Triple(8, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION),
+            "LTG" to Triple(4, EngineInductionType.TURBOCHARGED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LGX" to Triple(6, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LT1" to Triple(8, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LT4" to Triple(8, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.DIRECT_INJECTION)
+        )
+        assertEquals(expected.keys, DtcCatalogRegistry.engineProfiles.keys)
+        expected.forEach { (rpo, architecture) ->
+            val profile = DtcCatalogRegistry.engineProfiles.getValue(rpo)
+            assertEquals(architecture.first, profile.cylinderCount)
+            assertEquals(architecture.second, profile.induction)
+            assertEquals(architecture.third, profile.fuelSystem)
+        }
+    }
+
+    @Test
     fun moduleInventoryIncludesCoreAndOptionalVehicleSystems() {
         val ids = DtcCatalogRegistry.moduleFamilies.map { it.id }.toSet()
         assertTrue(ids.containsAll(setOf("ECM", "PCM", "TCM", "EBCM", "BCM", "IPC", "SDM")))
