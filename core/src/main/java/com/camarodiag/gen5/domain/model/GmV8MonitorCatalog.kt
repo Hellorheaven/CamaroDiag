@@ -277,6 +277,23 @@ private fun v8SuperchargerBaroCorrelationMonitor2013(): GmDtcMonitorEvidence =
         5
     )
 
+private fun v8MafLowFrequencyMonitor2013(): GmDtcMonitorEvidence =
+    GmDtcMonitorEvidence(
+        "P0102",
+        "Mass air flow sensor circuit low",
+        "Circuit du débitmètre d'air massique à signal bas",
+        "The ECM detects a continuous short to low or an open circuit in the MAF signal circuit or sensor.",
+        "Le calculateur détecte un court-circuit permanent au bas niveau ou un circuit ouvert dans le circuit de signal MAF ou le capteur.",
+        "MAF output frequency at or below 1,400 Hz (approximately 0.90 g/s).",
+        "Fréquence de sortie MAF inférieure ou égale à 1 400 Hz (environ 0,90 g/s).",
+        "Engine run time above 1.0 second.",
+        "Temps de fonctionnement moteur supérieur à 1,0 seconde.",
+        "400 failures out of 500 samples; one sample per cylinder-firing event; Type B, 2 trips.",
+        "400 échecs sur 500 échantillons ; un échantillon par événement d'allumage cylindre ; Type B, 2 trajets.",
+        "Type B – 2 trips",
+        10
+    )
+
 private fun v8MafHighFrequencyMonitor2013(): GmDtcMonitorEvidence =
     GmDtcMonitorEvidence(
         "P0103",
@@ -318,6 +335,7 @@ object Gm2013V8MonitorCatalog {
     private val superchargerBaroEvidence = v8SuperchargerBaroCorrelationMonitor2013()
     private val iat2LowEvidence = v8Iat2CircuitMonitor2013("P0097", highTemperature = true)
     private val iat2HighEvidence = v8Iat2CircuitMonitor2013("P0098", highTemperature = false)
+    private val mafLowFrequencyEvidence = v8MafLowFrequencyMonitor2013()
     private val mafHighFrequencyEvidence = v8MafHighFrequencyMonitor2013()
     private val oxygenEvidence = v8O2Evidence(modelYear = 2013).associateBy { it.code }
 
@@ -331,6 +349,7 @@ object Gm2013V8MonitorCatalog {
             "P006D" -> if (vehicle.engine == CamaroEngine.LSA) superchargerBaroEvidence else null
             "P0097" -> if (vehicle.engine == CamaroEngine.LSA) iat2LowEvidence else null
             "P0098" -> if (vehicle.engine == CamaroEngine.LSA) iat2HighEvidence else null
+            "P0102" -> mafLowFrequencyEvidence
             "P0103" -> mafHighFrequencyEvidence
             else -> oxygenEvidence[normalizedCode]
         }
@@ -338,7 +357,7 @@ object Gm2013V8MonitorCatalog {
 
     fun supportedCodes(vehicle: VehicleProfile): Set<String> =
         if (vehicle.modelYear == 2013 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA)) {
-            oxygenEvidence.keys + setOf("P0101", "P0103") + (if (vehicle.engine == CamaroEngine.LSA) setOf("P0033", "P006D", "P0097", "P0098") else emptySet())
+            oxygenEvidence.keys + setOf("P0101", "P0102", "P0103") + (if (vehicle.engine == CamaroEngine.LSA) setOf("P0033", "P006D", "P0097", "P0098") else emptySet())
         } else {
             emptySet()
         }
