@@ -187,7 +187,7 @@ Références primaires :
 - GM, 2014 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/2014%20OBD%20GROUP%20SUMMARY.pdf
 - GM, 14OBDG06A Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/14OBDG06A%20Engine%20Diagnostics.pdf
 
-Ces données restent limitées aux profils LFX 2013 et 2014. Aucun seuil n'est extrapolé au LFX 2015 tant que son dossier 150BDG06 n'a pas été vérifié.
+Ces données restent limitées aux profils LFX 2013 et 2014. Le résumé GM 2015 confirme désormais l'association du Camaro LFX (transmissions MYB/MV5) au groupe 6 et au dossier moteur 15OBDG06 ; le registre expose cette provenance. Les critères de surveillance 2015 ne sont toutefois pas intégrés : aucun seuil 2013/2014 n'est extrapolé au LFX 2015 tant que le dossier moteur 15OBDG06 n'a pas été extrait et vérifié. Référence primaire : GM, 2015 OBD Group Summary, page 2 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2015/2015_OBD_GROUP_SUMMARY.pdf.
 
 
 ## Données de surveillance GM – Camaro LLT 2010 et 2011
