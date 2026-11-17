@@ -1445,7 +1445,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                     _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_simulated_lfx)
                 } else if (!obdManager.isObdCommandChannelAvailable) {
-                    _dtcs.value = emptyList()
+                    // No SAE OBD channel is available; keep independently read UDS ECU records.
+                    _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
                         getApplication<Application>().getString(R.string.msg_dtc_j2534_unavailable)
                     else getApplication<Application>().getString(R.string.msg_dtc_adapter_required)
