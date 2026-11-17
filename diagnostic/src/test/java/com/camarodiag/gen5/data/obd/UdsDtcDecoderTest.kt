@@ -134,6 +134,23 @@ class UdsDtcDecoderTest {
     }
 
     @Test
+    fun ignoresStatusBitsNotAdvertisedByTheAvailabilityMask() {
+        val record = UdsDtcDecoder.decodeReadDtcInformation(
+            byteArrayOf(0x09, 0x01, 0x01, 0x23, 0x45, 0xFF.toByte())
+        ).records.single()
+
+        assertEquals(0xFF, record.statusByte)
+        assertTrue(record.status.testFailed)
+        assertTrue(record.status.confirmed)
+        assertFalse(record.status.testFailedThisOperationCycle)
+        assertFalse(record.status.pending)
+        assertFalse(record.status.testNotCompletedSinceLastClear)
+        assertFalse(record.status.testFailedSinceLastClear)
+        assertFalse(record.status.testNotCompletedThisOperationCycle)
+        assertFalse(record.status.warningIndicatorRequested)
+    }
+
+    @Test
     fun unsetStatusFlagsRemainFalse() {
         val record = UdsDtcDecoder.decodeReadDtcInformation(
             byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x01, 0x01, 0x00)
