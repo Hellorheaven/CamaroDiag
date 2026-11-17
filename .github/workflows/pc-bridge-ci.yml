@@ -12,15 +12,77 @@ on:
       - main
 
 permissions:
+  actions: read
   contents: read
+  pull-requests: read
 
 concurrency:
   group: pc-bridge-debug-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
+  evaluate-build-checkpoint:
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      build_required: ${{ steps.checkpoint.outputs.build_required }}
+      commits_since_build: ${{ steps.checkpoint.outputs.commits_since_build }}
+      interval: ${{ steps.checkpoint.outputs.interval }}
+    steps:
+      - name: Evaluate flexible periodic build checkpoint
+        id: checkpoint
+        uses: actions/github-script@v8
+        env:
+          BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
+        with:
+          script: |
+            const configured = Number(process.env.BUILD_INTERVAL);
+            const interval = Number.isInteger(configured) && configured > 0 ? configured : 50;
+            const pr = context.payload.pull_request;
+            if (!pr.draft) {
+              core.setOutput('build_required', 'true');
+              core.setOutput('commits_since_build', 'ready-for-review');
+              core.setOutput('interval', String(interval));
+              return;
+            }
+
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pc-bridge-ci.yml',
+              branch: pr.head.ref,
+              event: 'pull_request',
+              status: 'completed',
+              per_page: 100
+            });
+            const previous = runs
+              .filter(run => run.conclusion === 'success' &&
+                run.head_sha !== pr.head.sha &&
+                (run.pull_requests || []).some(item => item.number === pr.number))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+            let commitsSinceBuild = pr.commits;
+            if (previous) {
+              const comparison = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: previous.head_sha,
+                head: pr.head.sha
+              });
+              commitsSinceBuild = comparison.data.ahead_by;
+            }
+
+            const required = commitsSinceBuild >= interval;
+            core.setOutput('build_required', String(required));
+            core.setOutput('commits_since_build', String(commitsSinceBuild));
+            core.setOutput('interval', String(interval));
+            core.info(required
+              ? `Periodic build due: ${commitsSinceBuild} commits since last successful build (interval ${interval}).`
+              : `No periodic build due: ${commitsSinceBuild}/${interval} commits since last successful build.`);
+
   build-windows-debug:
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && !github.event.pull_request.draft
+    needs: evaluate-build-checkpoint
+    if: needs.evaluate-build-checkpoint.outputs.build_required == 'true'
     runs-on: windows-latest
     steps:
       - name: Checkout pull request commit
