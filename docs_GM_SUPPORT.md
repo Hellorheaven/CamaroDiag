@@ -59,7 +59,7 @@ Le lecteur UDS direct Android est actuellement destiné à l'OBDLink MX+ authent
 | Readiness | Mode 01 |
 | Tests embarqués | Mode 06 ; données brutes conservées lorsque le décodage dépend du véhicule |
 | Signaux Camaro | Catalogue OBDb : 133 commandes et 136 définitions, filtrées par année et adressage |
-| UDS | MX+ ou pont J2534, DID et CAN ID compatibles |
+| UDS | MX+ ou pont J2534, DID et CAN ID compatibles ; décodage générique des enregistrements DTC 24 bits et des 8 bits d'état UDS (0x19/0x02) |
 | Audit kilométrique | Comparaison de sources vérifiées ; pas de valeur inventée |
 | Télémétrie | Enregistrement et export CSV |
 
@@ -101,3 +101,14 @@ Le catalogue de signaux communautaire est issu du projet **OBDb Chevrolet Camaro
 Références générales : documentation OBDLink (https://support.obdsol.com/support/solutions/articles/43000713351-which-obdlink-adapter-is-right-for-me-), fiche MX+ (https://www.obdlink.com/products/obdlink-mxp/), GM MDI 2 (https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf), GM TIS2Web (https://gsi.ext.gm.com/userguides/GM_TIS2Web_User_Guide.pdf). Les adresses et procédures détaillées doivent provenir des informations de service GM du VIN concerné.
 
 CamaroDiag est un outil indépendant d'aide au diagnostic et ne constitue pas une certification GM.
+
+
+## Décodage DTC UDS multi-calculateurs
+
+Le décodeur commun `UdsDtcDecoder` interprète la réponse positive UDS `0x59 0x02` après retrait de l'en-tête de service par le client :
+- conservation du DTC brut sur 24 bits et conversion selon le format J2012 encodé dans le DTC ;
+- conservation du masque de disponibilité des états ;
+- décodage individuel des huit bits d'état (défaut présent, cycle courant, pending, confirmé, tests non terminés/échoués et demande de voyant) ;
+- rejet explicite des réponses tronquées ou mal alignées.
+
+Ce décodage de transport est indépendant du calculateur et peut donc être appliqué aux réponses ECM/PCM, TCM, BCM, EBCM, IPC, SDM et autres calculateurs qui répondent réellement au service. Il ne fournit volontairement aucune définition de panne OEM : le libellé et la procédure de réparation nécessitent toujours un catalogue documenté pour le calculateur, le VIN, l'année, le moteur, la transmission et l'identité logicielle correspondants. Un DTC brut décodé n'est pas une preuve qu'un module ou une adresse présumée est présent.
