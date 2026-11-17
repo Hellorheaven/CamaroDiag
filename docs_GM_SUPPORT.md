@@ -263,3 +263,16 @@ Ces associations sont enregistrées dans `GmV8MonitorCatalog.sourceLabel`, y com
 Références GM primaires :
 - 2014 OBD Group Summary, groupe 7 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/2014%20OBD%20GROUP%20SUMMARY.pdf
 - 2015 OBD Group Summary, groupe 7 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2015/2015_OBD_GROUP_SUMMARY.pdf
+
+
+## Groupes de certification Gen 6 – Camaro 2016 et 2017
+
+Les résumés GM permettent d'associer les premières motorisations Gen 6 à leurs dossiers de certification :
+- 2016 : LTG Camaro → `16OBDG03` ; LGX Camaro → `16OBDG05` ; LT1 Camaro → `16OBDG07A`.
+- 2017 : LTG, LGX, LT1 et LT4 Camaro → `17OBDG03`.
+
+`GmGen6MonitorCatalog` expose ces références dans le registre commun. Le LT4 n'est pas associé à une Camaro 2016 dans le résumé GM consulté ; son premier groupe Camaro est documenté ici en 2017. Ces libellés sont des références de certification uniquement : aucune définition détaillée, aucun seuil de surveillance ni procédure de réparation Gen 6 n'est activé par leur seule présence. Les millésimes 2018–2024 restent à documenter séparément.
+
+Références GM primaires :
+- 2016 OBD Group Summary, pages 2–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2016/2016_OBD_GROUP_SUMMARY.pdf
+- 2017 OBD Group Summary, pages 2–5 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2017/2017_OBD_GROUP_SUMMARY.pdf
