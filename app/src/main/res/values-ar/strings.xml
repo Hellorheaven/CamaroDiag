@@ -577,4 +577,10 @@
     <string name="dtc_desc_p0018">عدم تطابق موضع عمود المرفق مع عمود كامات السحب (المصرف 2)</string>
     <string name="dtc_desc_p0019">عدم تطابق موضع عمود المرفق مع عمود كامات العادم (المصرف 2)</string>
     <string name="dtc_gm_calibration_not_validated">التفسيرات والحدود أدناه هي بيانات مرجعية للمحرك وسنة الطراز المحددين. لم يتم التحقق بعد من هوية وحدة التحكم (VIN وCAL ID وCVN ومعرّف البرنامج ورقم قطعة الأجهزة)؛ لذلك لم يتم اعتماد هذه البيانات للوحدة المتصلة.</string>
+    <string name="dtc_gm_monitor_title">مراقبة محرك GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">معيار تسجيل العطل: %1$s</string>
+    <string name="dtc_gm_monitor_enable">شروط التفعيل: %1$s</string>
+    <string name="dtc_gm_monitor_failure">عداد الإخفاق / معدل التحقق: %1$s</string>
+    <string name="dtc_gm_monitor_mil">تصنيف MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">المصدر: GM %1$s، الصفحة %2$d</string>
 </resources>
