@@ -102,7 +102,7 @@
     <string name="dtc_title">رموز الأعطال التشخيصية</string>
     <string name="dtc_scan">فحص</string>
     <string name="dtc_clear">مسح</string>
-    <string name="dtc_clear_warning">يؤدي المسح عبر Mode 04 إلى حذف رموز الأعطال المتعلقة بالانبعاثات وإعادة ضبط بعض شاشات الجاهزية. احفظ التقرير قبل المتابعة.</string>
+    <string name="dtc_clear_warning">يؤدي المسح عبر Mode 04 إلى حذف رموز الأعطال المتعلقة بالانبعاثات وإعادة ضبط بعض شاشات الجاهزية. احفظ التقرير قبل المتابعة. لا يؤدي Mode 04 إلى مسح رموز DTC المحسّنة المخزنة في وحدات التحكم الأخرى بالمركبة.</string>
     <string name="dtc_none_returned">لم يُرجع الفحص الأخير أي رموز أعطال.</string>
     <string name="dtc_confirm_clear">هل تريد تأكيد مسح رموز DTC؟</string>
     <string name="dtc_clear_description">يرسل هذا الأمر OBD Mode 04 إلى وحدة التحكم. قد تتم إعادة ضبط بيانات الجاهزية، لكنه لا يصلح سبب العطل.</string>
