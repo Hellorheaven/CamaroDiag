@@ -21,14 +21,14 @@
     <string name="obd_scan_description">Alleen-lezen inspectie volgens SAE J1979: aandrijflijngegevens, foutcodes, freeze-frame en ECU-identificatie.</string>
     <string name="obd_run_full_scan">Volledige scan uitvoeren</string>
     <string name="obd_connect_adapter_notice">Sluit vóór het scannen een echte OBD-adapter aan. De demomodus verzint geen scanresultaten.</string>
-    <string name="obd_offline_simulation_notice">OFFLINESIMULATIE — het VIN, CAL ID, CVN, de DTC\'s en onderstaande metingen zijn synthetisch en komen niet van een echte Camaro.</string>
+    <string name="obd_offline_simulation_notice">OFFLINESIMULATIE — het VIN, CAL ID, CVN, de DTC’s en onderstaande metingen zijn synthetisch en komen niet van een echte Camaro.</string>
     <string name="obd_vehicle_ecu_identification">Voertuig- / ECU-identificatie</string>
     <string name="obd_vin">VIN</string>
     <string name="obd_cal_id">CAL ID</string>
     <string name="obd_cvn">CVN</string>
     <string name="obd_ecu_name">ECU-naam</string>
-    <string name="obd_supported_pids">Ondersteunde PID\'s</string>
-    <string name="obd_responding_can_ids">Reagerende CAN-ID\'s</string>
+    <string name="obd_supported_pids">Ondersteunde PID’s</string>
+    <string name="obd_responding_can_ids">Reagerende CAN-ID’s</string>
     <string name="obd_none_identified">Geen geïdentificeerd</string>
     <string name="obd_adapter_voltage">Adapters-panning</string>
     <string name="obd_protocol">Protocol</string>
@@ -82,7 +82,7 @@
     <string name="adapter_simulation_profiles">Gesimuleerde hardwareprofielen (testbank)</string>
     <string name="control_vehicle_title">Voertuigbediening</string>
     <string name="control_vehicle_label">Camaro %1$s • %2$s • %3$s</string>
-    <string name="control_gm_body_notice">GM-carrosserieopdrachten zijn specifiek voor VIN, BCM en kalibratie. Ze blijven uitgeschakeld totdat DID\'s, beveiligingssessies en opdrachtreeksen voor dit voertuig zijn geverifieerd.</string>
+    <string name="control_gm_body_notice">GM-carrosserieopdrachten zijn specifiek voor VIN, BCM en kalibratie. Ze blijven uitgeschakeld totdat DID’s, beveiligingssessies en opdrachtreeksen voor dit voertuig zijn geverifieerd.</string>
     <string name="status_not_verified">NIET GEVERIFIEERD</string>
     <string name="status_available">BESCHIKBAAR</string>
     <string name="status_not_equipped">NIET UITGERUST</string>
@@ -104,7 +104,7 @@
     <string name="dtc_clear">Wissen</string>
     <string name="dtc_clear_warning">Wissen via modus 04 verwijdert emissiegerelateerde foutcodes en reset sommige gereedheidsmonitors. Sla het rapport op voordat u doorgaat.</string>
     <string name="dtc_none_returned">De laatste scan heeft geen foutcodes geretourneerd.</string>
-    <string name="dtc_confirm_clear">DTC\'s wissen bevestigen?</string>
+    <string name="dtc_confirm_clear">DTC’s wissen bevestigen?</string>
     <string name="dtc_clear_description">Dit verzendt OBD-modus 04 naar de ECU. Gereedheidsgegevens kunnen worden gereset. De oorzaak van een storing wordt hiermee niet hersteld.</string>
     <string name="dtc_clear_action">Codes wissen</string>
     <string name="common_cancel">Annuleren</string>
@@ -133,7 +133,7 @@
     <string name="cal_read_ecu_ids">ECU-VIN / CAL ID / CVN lezen</string>
     <string name="cal_connect_obd_required">Sluit een OBD-adapter aan voordat u de echte ECU uitleest.</string>
     <string name="cal_uds_can_title">UDS via CAN</string>
-    <string name="cal_uds_transport_hint">STPX-transport voor OBDLink MX+ of een pc-J2534-bridge voor VXDIAG. Voer bevestigde fysieke CAN-ID\'s in: er wordt geen GM-adres verondersteld.</string>
+    <string name="cal_uds_transport_hint">STPX-transport voor OBDLink MX+ of een pc-J2534-bridge voor VXDIAG. Voer bevestigde fysieke CAN-ID’s in: er wordt geen GM-adres verondersteld.</string>
     <string name="cal_can_request_id">CAN-verzoek-ID (bijv. 7E0)</string>
     <string name="cal_can_response_id">CAN-antwoord-ID (bijv. 7E8)</string>
     <string name="cal_can_profile">CAN-profiel: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
@@ -147,7 +147,7 @@
     <string name="cal_disconnect_pc_bridge">Pc-bridge verbreken</string>
     <string name="cal_bridge_capabilities">Bridge: HS-CAN ISO15765 250/500 kbit/s en J2534-2 SW-ISO15765 indien ondersteund door de driver. CAN FD blijft uitgeschakeld.</string>
     <string name="cal_read_uds_did">UDS DID lezen</string>
-    <string name="cal_read_uds_dtcs">UDS-DTC\'s lezen</string>
+    <string name="cal_read_uds_dtcs">UDS-DTC’s lezen</string>
     <string name="cal_uds_trouble_codes">UDS-foutcodes (0x19)</string>
     <string name="cal_native_catalog_title">EIGEN CAMARODIAG-CATALOGUS</string>
     <string name="cal_native_catalog_explanation">Definities die door CamaroDiag worden onderhouden, onafhankelijk van communitycatalogi. Voorgestelde of gedocumenteerde definities worden nooit naar een ECU verzonden.</string>
@@ -155,7 +155,7 @@
     <string name="cal_native_catalog_empty">Er is momenteel geen eigen Camaro-DID als bruikbaar verklaard. Onbekende adressen en schaalfactoren worden niet verzonnen.</string>
     <string name="cal_native_catalog_read_disabled">Voertuiguitlezing is uitgeschakeld totdat adressering en decodering voor een identieke configuratie zijn geverifieerd.</string>
     <string name="cal_obdb_catalog_title">CAMARO-SPECIFIEKE SIGNALEN • OBDb</string>
-    <string name="cal_obdb_catalog_explanation">Geïmporteerde communitycatalogus met DID\'s, CAN-adressen, schaalfactoren en filters voor modeljaren. Deze definities zijn geen GM-validatie; controleer altijd de ECU-reactie.</string>
+    <string name="cal_obdb_catalog_explanation">Geïmporteerde communitycatalogus met DID’s, CAN-adressen, schaalfactoren en filters voor modeljaren. Deze definities zijn geen GM-validatie; controleer altijd de ECU-reactie.</string>
     <string name="cal_obdb_catalog_loading">Camaro-signaalcatalogus laden…</string>
     <string name="cal_search_signal">Signaal zoeken (naam, DID, systeem)</string>
     <string name="cal_no_signal">Geen signaal beschikbaar</string>
