@@ -102,7 +102,7 @@
     <string name="dtc_title">Diagnostic Trouble Codes</string>
     <string name="dtc_scan">Scan</string>
     <string name="dtc_clear">Clear</string>
-    <string name="dtc_clear_warning">Mode 04 clearing removes emissions-related trouble codes and resets some readiness monitors. Save the report before continuing.</string>
+    <string name="dtc_clear_warning">Mode 04 clearing removes emissions-related trouble codes and resets some readiness monitors. Save the report before continuing. Mode 04 does not clear enhanced DTCs stored by other vehicle modules.</string>
     <string name="dtc_none_returned">No trouble codes returned by the last scan.</string>
     <string name="dtc_confirm_clear">Confirm DTC clearing?</string>
     <string name="dtc_clear_description">This sends OBD Mode 04 to the ECU. Readiness data may be reset. It does not repair the cause of a fault.</string>
