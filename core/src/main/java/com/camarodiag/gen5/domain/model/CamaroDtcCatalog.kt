@@ -601,9 +601,9 @@ object CamaroDtcCatalog {
             vehicle.engine == CamaroEngine.LT4 && vehicle.modelYear == 2019 ->
                 "Données de surveillance GM disponibles pour le LT4 2019 sur P0196, P0197 et P0198 uniquement. Elles décrivent les critères OBD de certification et ne constituent pas un arbre de réparation complet." to
                     "GM monitor evidence is available for the 2019 LT4 for P0196, P0197 and P0198 only. It describes OBD certification criteria and is not a complete service repair diagnostic tree."
-            GmGen6MonitorCatalog.sourceLabel(vehicle) != null ->
-                "Référence de certification GM ${GmGen6MonitorCatalog.sourceLabel(vehicle)} identifiée pour ce profil. Les définitions et seuils de surveillance détaillés restent à extraire et valider pour cette calibration." to
-                    "GM certification reference ${GmGen6MonitorCatalog.sourceLabel(vehicle)} identified for this profile. Detailed monitor definitions and thresholds still need extraction and validation for this calibration."
+            GmEngineMonitorCatalog.sourceLabel(vehicle) != null ->
+                "Référence de certification GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée pour ce profil. Les définitions et seuils de surveillance détaillés restent à extraire et valider pour cette calibration." to
+                    "GM certification reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified for this profile. Detailed monitor definitions and thresholds still need extraction and validation for this calibration."
             else ->
             "Pour ${vehicle.engine.rpo} (${vehicle.modelYear}), les libellés SAE génériques sont disponibles, mais aucune interprétation GM détaillée validée par calibration n'est encore chargée. Ne pas transposer les causes d'une autre motorisation." to
                 "For ${vehicle.engine.rpo} (${vehicle.modelYear}), generic SAE descriptions are available, but no calibration-validated detailed GM interpretation is loaded yet. Do not reuse another engine's causes."
