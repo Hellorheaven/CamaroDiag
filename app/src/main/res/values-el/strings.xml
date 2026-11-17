@@ -529,4 +529,9 @@
     <string name="cal_warning_address_span_large">Το εύρος διευθύνσεων είναι πολύ μεγάλο· δεν δημιουργείται πυκνή εικόνα μνήμης.</string>
     <string name="cal_warning_invalid_file">Η δομική επικύρωση απέτυχε. Μην χρησιμοποιείτε αυτό το αρχείο για επεξεργασία βαθμονόμησης.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d byte)</string>
+    <string name="cal_comparison_identical">Οι δύο εικόνες BIN είναι πανομοιότυπες byte προς byte.</string>
+    <string name="cal_comparison_size_diff">Συγκρίθηκαν %1$d κοινά byte· τα μεγέθη των αρχείων διαφέρουν.</string>
+    <string name="cal_comparison_different_ranges">%1$d byte διαφέρουν σε %2$d περιοχές.</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d byte)</string>
+    <string name="cal_comparison_more_ranges">Δεν εμφανίζονται %1$d επιπλέον περιοχές.</string>
 </resources>

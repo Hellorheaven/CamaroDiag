@@ -529,4 +529,9 @@
     <string name="cal_warning_address_span_large">Het adresbereik is zeer groot; er wordt geen dicht geheugenbeeld opgebouwd.</string>
     <string name="cal_warning_invalid_file">Structurele validatie mislukt. Gebruik dit bestand niet voor kalibratiebewerking.</string>
     <string name="cal_address_range">0x%1$s–0x%2$s (%3$d bytes)</string>
+    <string name="cal_comparison_identical">De twee BIN-afbeeldingen zijn byte voor byte identiek.</string>
+    <string name="cal_comparison_size_diff">%1$d gemeenschappelijke bytes vergeleken; de bestandsgroottes verschillen.</string>
+    <string name="cal_comparison_different_ranges">%1$d bytes verschillen verdeeld over %2$d bereiken.</string>
+    <string name="cal_comparison_range">0x%1$s–0x%2$s (%3$d bytes)</string>
+    <string name="cal_comparison_more_ranges">%1$d extra bereiken worden niet weergegeven.</string>
 </resources>
