@@ -92,3 +92,18 @@ Comportement :
 Ces fonctions sont **planifiées et non implémentées** tant qu'elles ne sont pas présentes dans l'application, couvertes par des tests et validées sur les interfaces concernées.
 
 Une fonctionnalité de capture ou d'émission ne peut être déclarée « validée sur véhicule » qu'après un essai réel documenté avec véhicule, année/RPO, calculateur, interface, réseau, firmware et résultat. Les tests simulés et les traces importées doivent être identifiés comme tels.
+
+## 7. Exigence transverse : parité fonctionnelle sur tous les modèles compatibles
+
+Principe obligatoire pour toutes les prochaines versions et toutes les évolutions de CamaroDiag, y compris les fonctions déjà présentes dans l'application :
+
+- Une fonctionnalité doit être disponible et opérationnelle sur **tous les modèles Camaro, millésimes, motorisations/RPO, transmissions, calculateurs et marchés** pour lesquels les capacités techniques nécessaires existent et sont documentées.
+- Ne jamais limiter une fonction au seul véhicule de développement ou de validation (notamment une Camaro 2012 LFX), ni coder en dur un millésime ou un RPO lorsque la fonction peut être généralisée.
+- Déterminer la disponibilité à partir d'une matrice de capacités explicite : génération, année, RPO, transmission, équipement réellement installé, calculateur identifié, protocole, réseau, interface/firmware et version logicielle/calibration lorsque ces éléments sont requis.
+- Séparer la disponibilité de la fonction de la disponibilité de ses données : une fonction générique (par exemple lecture, capture, export ou affichage) doit rester utilisable sur les véhicules compatibles même si certaines interprétations GM spécifiques ne sont pas encore documentées. Dans ce cas, afficher les données brutes ou génériques et signaler précisément ce qui manque.
+- Adapter automatiquement le parcours et les commandes aux calculateurs et équipements présents. Un équipement optionnel absent ne doit pas bloquer les fonctions utilisables sur les autres calculateurs.
+- Si une limitation matérielle, protocolaire, logicielle, de sécurité ou de documentation est réelle, désactiver uniquement l'opération concernée, expliquer la raison et conserver accessibles les fonctions compatibles. Ne jamais afficher une fonction comme opérationnelle si l'interface ne sait pas l'exécuter.
+- Toute nouvelle fonction doit être accompagnée d'une matrice de compatibilité et de tests couvrant les profils concernés, y compris les frontières de millésime et les variantes moteur/transmission. Les profils non couverts doivent être explicitement identifiés, sans extrapolation.
+- Les critères de livraison doivent vérifier la parité sur l'ensemble des profils compatibles, et pas uniquement sur le véhicule de référence. Les essais simulés, les tests sur traces et les validations physiques doivent rester distingués.
+
+Critère d'acceptation : pour chaque fonctionnalité, démontrer qu'elle fonctionne sur chaque configuration déclarée compatible ; lorsqu'une configuration ne la supporte pas, démontrer que seule cette fonction est indisponible et que le reste de l'application continue de fonctionner normalement.
