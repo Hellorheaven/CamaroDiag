@@ -558,4 +558,9 @@
     <string name="trace_error_csv_empty">עקבת ה-CSV ריקה.</string>
     <string name="trace_error_csv_columns">קובץ CSV חייב לכלול עמודת CAN ID ועמודת נתונים/payload, או עמודות data0…data15.</string>
     <string name="trace_error_generic">העקבה מכילה רשומה לא תקינה או לא נתמכת.</string>
+    <string name="dtc_vehicle_interpretation">פירוש ייחודי לרכב</string>
+    <string name="dtc_severity">חומרה</string>
+    <string name="dtc_possible_causes">סיבות אפשריות (לא מאומתות)</string>
+    <string name="dtc_recommended_checks">בדיקות מומלצות</string>
+    <string name="dtc_vehicle_specific_not_documented">עדיין לא תועד נוהל אבחון ייחודי לקוד ולתצורת הרכב האלה. תיאור OEM/SAE מופיע למעלה; יש לאמת את מספר ה‑VIN ואת יחידת הבקרה במידע השירות של GM.</string>
 </resources>
