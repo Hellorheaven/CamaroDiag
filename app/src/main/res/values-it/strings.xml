@@ -102,7 +102,7 @@
     <string name="dtc_title">Codici guasto</string>
     <string name="dtc_scan">Scansiona</string>
     <string name="dtc_clear">Cancella</string>
-    <string name="dtc_clear_warning">La cancellazione con Modalità 04 rimuove i codici guasto relativi alle emissioni e azzera alcuni monitor di readiness. Salva il rapporto prima di continuare.</string>
+    <string name="dtc_clear_warning">La cancellazione con Modalità 04 rimuove i codici guasto relativi alle emissioni e azzera alcuni monitor di readiness. Salva il rapporto prima di continuare. La Modalità 04 non cancella i DTC avanzati memorizzati dalle altre centraline del veicolo.</string>
     <string name="dtc_none_returned">L\'ultima scansione non ha restituito codici guasto.</string>
     <string name="dtc_confirm_clear">Confermare la cancellazione dei DTC?</string>
     <string name="dtc_clear_description">Questa operazione invia il servizio OBD Modalità 04 alla centralina. I dati di readiness potrebbero essere azzerati. Non risolve la causa del guasto.</string>
