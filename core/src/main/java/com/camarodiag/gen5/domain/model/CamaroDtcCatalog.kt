@@ -593,6 +593,9 @@ object CamaroDtcCatalog {
             isKnownV8Profile(vehicle) ->
                 "Catalogue d'interprétations détaillées disponible pour L99/LS3 Gen 5 (2010–2011). Les défauts VVT sont réservés au L99 ; le LS3 d'origine n'a pas de VVT." to
                     "Detailed interpretation catalogue available for Gen 5 L99/LS3 (2010–2011). VVT faults apply to L99 only; the factory LS3 has no VVT."
+            vehicle.engine == CamaroEngine.LT4 && vehicle.modelYear == 2019 ->
+                "Données de surveillance GM disponibles pour le LT4 2019 sur P0197 et P0198 uniquement. Elles décrivent les critères OBD de certification et ne constituent pas un arbre de réparation complet." to
+                    "GM monitor evidence is available for the 2019 LT4 for P0197 and P0198 only. It describes OBD certification criteria and is not a complete service repair diagnostic tree."
             else ->
             "Pour ${vehicle.engine.rpo} (${vehicle.modelYear}), les libellés SAE génériques sont disponibles, mais aucune interprétation GM détaillée validée par calibration n'est encore chargée. Ne pas transposer les causes d'une autre motorisation." to
                 "For ${vehicle.engine.rpo} (${vehicle.modelYear}), generic SAE descriptions are available, but no calibration-validated detailed GM interpretation is loaded yet. Do not reuse another engine's causes."
