@@ -481,4 +481,6 @@
     <string name="msg_obdb_catalog_load_failed">无法加载 OBDb Camaro 目录。</string>
     <string name="msg_obdb_signal_read_failed">读取 OBDb 信号失败。</string>
     <string name="msg_j2534_bridge_connect_failed">无法连接到 J2534 网桥。</string>
+    <string name="live_pid_fuel_system_status">燃油系统状态</string>
+    <string name="live_pid_ltft">长期燃油修正 B1</string>
 </resources>

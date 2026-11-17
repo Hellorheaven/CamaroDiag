@@ -490,4 +490,6 @@
     <string name="msg_obdb_catalog_load_failed">Не удалось загрузить каталог Camaro из OBDb.</string>
     <string name="msg_obdb_signal_read_failed">Не удалось прочитать сигнал OBDb.</string>
     <string name="msg_j2534_bridge_connect_failed">Не удалось подключиться к мосту J2534.</string>
+    <string name="live_pid_fuel_system_status">Состояние топливной системы</string>
+    <string name="live_pid_ltft">Долгосрочная коррекция топлива, банк 1</string>
 </resources>
