@@ -584,6 +584,9 @@ object CamaroDtcCatalog {
     /** Explicitly states the evidence level available for the selected engine. */
     fun coverageNotice(vehicle: VehicleProfile): Pair<String, String> =
         when {
+            vehicle.engine == CamaroEngine.LFX && vehicle.modelYear == 2015 ->
+                "Catalogue d'interprétations détaillées disponible pour LFX Gen 5 (2012–2015), en français et anglais. Le groupe de certification GM 15OBDG06 est identifié pour 2015, mais ses critères de surveillance détaillés ne sont pas encore extraits." to
+                    "Detailed interpretation catalogue available for Gen 5 LFX (2012–2015), in French and English. GM certification group 15OBDG06 is identified for 2015, but its detailed monitor criteria have not yet been extracted."
             isKnownLfxProfile(vehicle) ->
                 "Catalogue d'interprétations détaillées disponible pour LFX Gen 5 (2012–2015), en français et anglais. Les autres calculateurs et codes non répertoriés restent à documenter." to
                     "Detailed interpretation catalogue available for Gen 5 LFX (2012–2015), in French and English. Other ECUs and unlisted codes remain to be documented."
