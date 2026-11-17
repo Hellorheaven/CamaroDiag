@@ -557,4 +557,8 @@
     <string name="dtc_possible_causes">가능한 원인(미확인)</string>
     <string name="dtc_recommended_checks">권장 점검 항목</string>
     <string name="dtc_vehicle_specific_not_documented">이 코드와 선택한 차량 구성에 대한 전용 진단 절차가 아직 문서화되지 않았습니다. 위의 OEM/SAE 설명을 확인하고 GM 정비 정보에서 VIN과 제어 모듈을 검증하세요.</string>
+    <string name="dtc_desc_p0016">크랭크축 위치와 흡기 캠축 위치 상관관계 이상(뱅크 1)</string>
+    <string name="dtc_desc_p0017">크랭크축 위치와 배기 캠축 위치 상관관계 이상(뱅크 1)</string>
+    <string name="dtc_desc_p0018">크랭크축 위치와 흡기 캠축 위치 상관관계 이상(뱅크 2)</string>
+    <string name="dtc_desc_p0019">크랭크축 위치와 배기 캠축 위치 상관관계 이상(뱅크 2)</string>
 </resources>
