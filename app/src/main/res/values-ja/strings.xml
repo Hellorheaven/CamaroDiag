@@ -557,4 +557,9 @@
     <string name="dtc_possible_causes">考えられる原因（未確認）</string>
     <string name="dtc_recommended_checks">推奨点検項目</string>
     <string name="dtc_vehicle_specific_not_documented">このコードと選択された車両構成に固有の診断手順はまだ登録されていません。上記のOEM/SAE説明を確認し、GM整備情報でVINと制御モジュールを照合してください。</string>
+    <string name="dtc_vehicle_interpretation">車両固有の解釈</string>
+    <string name="dtc_severity">重大度</string>
+    <string name="dtc_possible_causes">考えられる原因（未確認）</string>
+    <string name="dtc_recommended_checks">推奨点検項目</string>
+    <string name="dtc_vehicle_specific_not_documented">このコードと選択された車両構成に固有の診断手順はまだ登録されていません。上記のOEM/SAE説明を確認し、GM整備情報でVINと制御モジュールを照合してください。</string>
 </resources>
