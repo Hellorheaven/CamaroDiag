@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Gen 5 L99 V8 with AFM and automatic transmission. Do not reuse an LS3 calibration; verify RPO, transmission and ECU identifiers.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Gen 5 ZL1 supercharged LSA V8. Verify calibration for supercharger, fuel, market and software revision.</string>
     <string name="cal_profile_notes_ls7">Gen 5 Z/28 LS7 V8. Separate profile from LS3/L99 despite the nominal controller family; software identification is mandatory.</string>
-    <string name="cal_profile_notes_ltg">Gen 6 2.0 Turbo LTG Camaro (2016–2020 coverage range). GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG; verify later years by part number and CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Gen 6 2.0 Turbo LTG Camaro (2016–2023 coverage range). GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG; verify later years by part number and CAL ID.</string>
     <string name="cal_profile_notes_lgx">Gen 6 LGX V6 Camaro. Profile may vary by year, market and revision; confirm the actual controller and CVN before loading a table definition.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Gen 6 naturally aspirated LT1 V8 Camaro. Distinguish calibration revisions by CAL ID/CVN, year, market, transmission and hardware numbers.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Gen 6 ZL1 supercharged LT4 V8 Camaro. Do not mix with LT1; validate part numbers and calibration-specific boost data.</string>
