@@ -80,6 +80,21 @@ class UdsDtcDecoderTest {
     }
 
     @Test
+    fun mapsUdsDtcToSharedModelWithoutInventingOemMeaning() {
+        val record = UdsDtcDecoder.decodeReadDtcInformation(
+            byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x23, 0x45, 0x04)
+        ).records.single()
+
+        val diagnostic = record.toDiagnosticDtc("BCM")
+
+        assertEquals("BCM", diagnostic.module)
+        assertEquals("0x012345", diagnostic.code)
+        assertTrue(diagnostic.isPending)
+        assertTrue(diagnostic.descEn.contains("verified OEM definition"))
+        assertTrue(diagnostic.descFr.contains("Aucune définition constructeur vérifiée"))
+    }
+
+    @Test
     fun unsetStatusFlagsRemainFalse() {
         val record = UdsDtcDecoder.decodeReadDtcInformation(
             byteArrayOf(0xFF.toByte(), 0x01, 0x01, 0x01, 0x01, 0x00)
