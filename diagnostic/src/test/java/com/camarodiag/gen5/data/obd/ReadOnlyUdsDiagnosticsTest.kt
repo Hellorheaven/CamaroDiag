@@ -99,7 +99,7 @@ class ReadOnlyUdsDiagnosticsTest {
         val report = client.readDtcReport()
 
         assertEquals(UdsDtcFormat.SAE_J2012_DA_FORMAT_00, report.format)
-        assertEquals("P0101-08", report.records.single().code)
+        assertEquals("P0101-01", report.records.single().code)
         assertTrue(report.records.single().status.confirmed)
         assertTrue(transport.sent.any { (it.data[0].toInt() and 0xF0) == 0x30 })
     }
