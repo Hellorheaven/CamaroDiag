@@ -403,7 +403,6 @@ object CamaroDtcCatalog {
             "Un cylindre 8 n'existe pas sur le LFX.",
             "Cylinder 8 does not exist on the LFX."
         )
-        )
     )
 
     fun find(code: String, vehicle: VehicleProfile): DtcVehicleExplanation? {
