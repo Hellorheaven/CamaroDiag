@@ -568,4 +568,10 @@
     <string name="dtc_desc_p0018">Correlación cigüeñal / árbol de levas de admisión no plausible (banco 2)</string>
     <string name="dtc_desc_p0019">Correlación cigüeñal / árbol de levas de escape no plausible (banco 2)</string>
     <string name="dtc_gm_calibration_not_validated">Las interpretaciones y los umbrales siguientes son datos de referencia para el motor y el año del modelo seleccionados. La identidad de la ECU (VIN, CAL ID, CVN, identificador de software y número de pieza de hardware) aún no se ha verificado; estos datos no están validados para la ECU conectada.</string>
+    <string name="dtc_gm_monitor_title">Monitor del motor GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Criterio de activación: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Condiciones de habilitación: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Contador de fallos / frecuencia de validación: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Clasificación MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Fuente: GM %1$s, página %2$d</string>
 </resources>
