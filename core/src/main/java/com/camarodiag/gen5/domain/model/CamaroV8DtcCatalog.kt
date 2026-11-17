@@ -105,5 +105,7 @@ object CamaroV8DtcCatalog {
     }
 
     fun isKnownProfile(vehicle: VehicleProfile): Boolean =
-        vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA) && vehicle.modelYear in 2010..2012
+        vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA) &&
+            vehicle.modelYear in 2010..2012 &&
+            vehicle.modelYear in vehicle.engine.years
 }
