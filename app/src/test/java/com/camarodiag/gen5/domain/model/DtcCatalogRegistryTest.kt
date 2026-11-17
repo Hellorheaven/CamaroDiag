@@ -647,4 +647,33 @@ class DtcCatalogRegistryTest {
         assertEquals(DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE, notMatching.confidence)
     }
 
+
+    @Test
+    fun corroboratedCommunityEvidenceNeverQualifiesAsOemInterpretation() {
+        val vin = "1G1FB1E30C9123456"
+        val vehicle = VehicleProfile(
+            modelYear = 2012,
+            engine = CamaroEngine.LFX,
+            transmission = TransmissionType.MANUAL,
+            vin = vin
+        )
+        val communityEvidence = DtcDefinitionEvidence(
+            source = DtcDefinitionSource.COMMUNITY_DATABASE,
+            status = DtcEvidenceStatus.DOCUMENTED,
+            modelYears = 2012..2015,
+            engineRpos = setOf("LFX"),
+            transmission = TransmissionType.MANUAL,
+            moduleId = "ECM",
+            hardwarePartNumber = "HW-123",
+            operatingSystemId = "OS-123",
+            calibrationId = "CAL-123",
+            calibrationVerificationNumber = "CVN-123",
+            vin = vin,
+            reference = "https://community.example/dtc"
+        )
+
+        assertTrue(communityEvidence.validationIssues(vehicle, "ECM").isEmpty())
+        assertFalse(communityEvidence.isUsableForOemInterpretation(vehicle, "ECM"))
+    }
+
 }
