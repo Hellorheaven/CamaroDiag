@@ -195,6 +195,7 @@ object GmLfxMonitorCatalog {
             2012 -> "12OBDG05B"
             2013 -> "13OBDG05A"
             2014 -> "14OBDG06A"
+            2015 -> "15OBDG06"
             else -> null
         }
 }
