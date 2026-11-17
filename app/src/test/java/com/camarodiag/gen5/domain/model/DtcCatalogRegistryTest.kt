@@ -200,11 +200,14 @@ class DtcCatalogRegistryTest {
                 GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2018, engine = engine))
             )
             assertEquals(
+                "19OBDG03A",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2019, engine = engine))
+            )
+            assertEquals(
                 "20OBDG03A",
                 GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2020, engine = engine))
             )
         }
-        assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT1)))
         assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2021, engine = CamaroEngine.LT1)))
         assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LT4)))
 
