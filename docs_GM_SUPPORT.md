@@ -273,11 +273,12 @@ Les résumés GM permettent d'associer les premières motorisations Gen 6 à leu
 - 2018 : LTG, LGX, LT1 et LT4 Camaro → `18OBDG03A`.
 - 2019 : dossier `19OBDG03A`, avec tables ECM communes et section ECM dédiée LT4 Camaro.
 - 2020 : LTG, LGX, LT1 et LT4 Camaro → `20OBDG03A`.
+- 2021 : LTG → `21OBDG03A` ; LGX, LT1 et LT4 → `21OBDG03B`.
 - 2022 : LTG → `22OBDG03A` ; LGX, LT1 et LT4 → `22OBDG03B`.
 - 2023 : LTG → `23OBDG03A Part2` ; LGX, LT1 et LT4 → `23OBDG03B`.
 - 2024 : LGX, LT1 et LT4 → `24OBDG03B Part 2` ; le LTG n'est pas présent dans la matrice Camaro consultée.
 
-`GmGen6MonitorCatalog` expose ces références dans le registre commun. Le LT4 n'est pas associé à une Camaro 2016 dans le résumé GM consulté ; son premier groupe Camaro est documenté ici en 2017. Ces libellés sont des références de certification uniquement : aucune définition détaillée, aucun seuil de surveillance ni procédure de réparation Gen 6 n'est activé par leur seule présence. L'année 2021 reste à vérifier ; aucune référence n'y est extrapolée.
+`GmGen6MonitorCatalog` expose ces références dans le registre commun. Le LT4 n'est pas associé à une Camaro 2016 dans le résumé GM consulté ; son premier groupe Camaro est documenté ici en 2017. Ces libellés sont des références de certification uniquement : aucune définition détaillée, aucun seuil de surveillance ni procédure de réparation Gen 6 n'est activé par leur seule présence. Les associations sont propres à chaque millésime et moteur ; aucune référence n'est extrapolée aux configurations non listées.
 
 Références GM primaires :
 - 2016 OBD Group Summary, pages 2–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2016/2016_OBD_GROUP_SUMMARY.pdf
@@ -285,6 +286,7 @@ Références GM primaires :
 - 2018 OBD Group Summary, pages 1–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2018/2018_OBD_GROUP_SUMMARY.pdf
 - 2019 19OBDG03A Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03A%20Diagnostics.pdf
 - 2020 OBD Group Summary, pages 1–2 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2020/2020_OBD_GROUP_SUMMARY.pdf
+- 2021 OBD Group Summary, pages 1–3 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2021/2021_OBD_GROUP_SUMMARY.pdf
 - 2022 OBD Group Summary, pages 1–2 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2022/2022_OBD_GROUP_SUMMARY.pdf
 - 2023 OBD Group Summary, pages 1–2 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2023/2023_OBD_GROUP_SUMMARY.pdf
 - 2024 Engine & Transmission Diagnostic Parameter File Matrix, pages 1–2 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2024/2024%20Engine%20%26%20Transmission%20Diagnostic%20Parameter%20File%20Matrix.pdf
