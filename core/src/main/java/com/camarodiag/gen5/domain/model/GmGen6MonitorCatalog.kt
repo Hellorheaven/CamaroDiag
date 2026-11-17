@@ -37,6 +37,23 @@ object GmGen6MonitorCatalog {
                 CamaroEngine.LT1,
                 CamaroEngine.LT4
             ) -> "20OBDG03A"
+            vehicle.modelYear == 2022 && vehicle.engine == CamaroEngine.LTG -> "22OBDG03A"
+            vehicle.modelYear == 2022 && vehicle.engine in setOf(
+                CamaroEngine.LGX,
+                CamaroEngine.LT1,
+                CamaroEngine.LT4
+            ) -> "22OBDG03B"
+            vehicle.modelYear == 2023 && vehicle.engine == CamaroEngine.LTG -> "23OBDG03A Part2"
+            vehicle.modelYear == 2023 && vehicle.engine in setOf(
+                CamaroEngine.LGX,
+                CamaroEngine.LT1,
+                CamaroEngine.LT4
+            ) -> "23OBDG03B"
+            vehicle.modelYear == 2024 && vehicle.engine in setOf(
+                CamaroEngine.LGX,
+                CamaroEngine.LT1,
+                CamaroEngine.LT4
+            ) -> "24OBDG03B Part 2"
             else -> null
         }
 }
