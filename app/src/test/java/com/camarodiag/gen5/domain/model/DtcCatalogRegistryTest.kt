@@ -39,6 +39,9 @@ class DtcCatalogRegistryTest {
         assertEquals(2016..2023, CamaroEngine.LTG.years)
         assertEquals(2016..2023, DtcCatalogRegistry.engineProfiles.getValue("LTG").modelYears)
         assertEquals(CamaroEngine.LTG.years, DtcCatalogRegistry.engineProfile(CamaroEngine.LTG)?.modelYears)
+        CamaroEngine.entries.forEach { engine ->
+            assertEquals(engine.years, DtcCatalogRegistry.engineProfile(engine)?.modelYears)
+        }
         expected.forEach { (rpo, architecture) ->
             val profile = DtcCatalogRegistry.engineProfiles.getValue(rpo)
             assertEquals(architecture.first, profile.cylinderCount)
