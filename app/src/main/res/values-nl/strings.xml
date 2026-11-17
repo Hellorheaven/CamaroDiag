@@ -381,16 +381,16 @@
     <string name="cal_axis_undefined">niet gedefinieerd</string>
     <string name="cal_axis_values">0x%1$s • aantal=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Hardware profile only; an official Android SDK/API or documented bridge is still required.</string>
-    <string name="cal_profile_notes_llt">Gen 5 Camaro LLT V6. Nominal vehicle-profile family; read the actual CAL ID, CVN and hardware/software identifiers before any binary operation.</string>
-    <string name="cal_profile_notes_lfx">Gen 5 Camaro LFX V6. E39/E39A is a profile hint; distinguish OS and calibration using identifiers read from the ECU.</string>
-    <string name="cal_profile_notes_ls3">Gen 5 naturally aspirated LS3 V8, generally paired with the manual transmission. Confirm installed ECU hardware number, OS and CAL ID.</string>
-    <string name="cal_profile_notes_l99">Gen 5 L99 V8 with AFM and automatic transmission. Do not reuse an LS3 calibration; verify RPO, transmission and ECU identifiers.</string>
-    <string name="cal_profile_notes_lsa">Gen 5 ZL1 supercharged LSA V8. Verify calibration for supercharger, fuel, market and software revision.</string>
-    <string name="cal_profile_notes_ls7">Gen 5 Z/28 LS7 V8. Separate profile from LS3/L99 despite the nominal controller family; software identification is mandatory.</string>
-    <string name="cal_profile_notes_ltg">Gen 6 2.0 Turbo LTG Camaro (2016–2020 coverage range). GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG; verify later years by part number and CAL ID.</string>
-    <string name="cal_profile_notes_lgx">Gen 6 LGX V6 Camaro. Profile may vary by year, market and revision; confirm the actual controller and CVN before loading a table definition.</string>
-    <string name="cal_profile_notes_lt1">Gen 6 naturally aspirated LT1 V8 Camaro. Distinguish calibration revisions by CAL ID/CVN, year, market, transmission and hardware numbers.</string>
-    <string name="cal_profile_notes_lt4">Gen 6 ZL1 supercharged LT4 V8 Camaro. Do not mix with LT1; validate part numbers and calibration-specific boost data.</string>
+    <string name="cal_profile_notes_llt">Camaro Gen 5 LLT V6. Nominale voertuigprofielfamilie; lees vóór elke binaire bewerking de werkelijke CAL ID-, CVN- en hardware-/software-identificaties uit.</string>
+    <string name="cal_profile_notes_lfx">Camaro Gen 5 LFX V6. E39/E39A is een profielindicatie; maak onderscheid tussen OS en kalibratie met identificaties die uit de ECU zijn gelezen.</string>
+    <string name="cal_profile_notes_ls3">Camaro Gen 5 LS3 V8 zonder drukvulling, doorgaans gekoppeld aan een handgeschakelde transmissie. Controleer het hardwareonderdeelnummer, OS en CAL ID van de gemonteerde ECU.</string>
+    <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8 met AFM en automatische transmissie. Hergebruik geen LS3-kalibratie; controleer RPO, transmissie en ECU-identificaties.</string>
+    <string name="cal_profile_notes_lsa">Camaro Gen 5 ZL1 met supercharged LSA V8. Controleer de kalibratie voor compressor, brandstof, markt en softwareversie.</string>
+    <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8. Afzonderlijk profiel van LS3/L99 ondanks de nominale controllerfamilie; software-identificatie is verplicht.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 LTG 2.0 Turbo (dekkingsperiode 2016–2020). GM-bulletin PIP5313B noemt E80 voor de Camaro LTG 2016–2017; controleer latere bouwjaren aan de hand van onderdeelnummer en CAL ID.</string>
+    <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6. Het profiel kan per bouwjaar, markt en revisie verschillen; bevestig de werkelijke controller en CVN voordat een tabeldefinitie wordt geladen.</string>
+    <string name="cal_profile_notes_lt1">Camaro Gen 6 LT1 V8 zonder drukvulling. Onderscheid kalibratierevisies aan de hand van CAL ID/CVN, bouwjaar, markt, transmissie en hardwarenummers.</string>
+    <string name="cal_profile_notes_lt4">Camaro Gen 6 ZL1 met supercharged LT4 V8. Niet verwarren met LT1; valideer onderdeelnummers en kalibratiespecifieke laaddrukgegevens.</string>
     <string name="msg_refresh_adapters_failed">Could not refresh adapters.</string>
     <string name="msg_usb_identifier_unavailable">USB device identifier unavailable</string>
     <string name="msg_simulation_activation_failed">Could not activate simulation mode.</string>
