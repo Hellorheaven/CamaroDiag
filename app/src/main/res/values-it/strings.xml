@@ -567,4 +567,5 @@
     <string name="dtc_desc_p0017">Correlazione albero motore / albero a camme di scarico non plausibile (banco 1)</string>
     <string name="dtc_desc_p0018">Correlazione albero motore / albero a camme di aspirazione non plausibile (banco 2)</string>
     <string name="dtc_desc_p0019">Correlazione albero motore / albero a camme di scarico non plausibile (banco 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Solo riferimento di certificazione GM: l'identità della centralina (VIN, CAL ID, CVN, identificativo software e codice hardware) non è ancora stata confrontata. Queste soglie non sono validate per questa centralina.</string>
 </resources>
