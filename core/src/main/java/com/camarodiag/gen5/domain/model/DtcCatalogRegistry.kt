@@ -166,6 +166,7 @@ object DtcCatalogRegistry {
         "P0036" to ("O2 Sensor Heater Control Circuit (Bank 1, Sensor 2)" to "Circuit de commande du chauffage de sonde à oxygène (banc 1, sonde 2)"),
         "P0050" to ("O2 Sensor Heater Control Circuit (Bank 2, Sensor 1)" to "Circuit de commande du chauffage de sonde à oxygène (banc 2, sonde 1)"),
         "P0053" to ("O2 Sensor Heater Resistance (Bank 1, Sensor 1)" to "Résistance du chauffage de sonde à oxygène (banc 1, sonde 1)"),
+        "P0056" to ("O2 Sensor Heater Control Circuit (Bank 2, Sensor 2)" to "Circuit de commande du chauffage de sonde à oxygène (banc 2, sonde 2)"),
         "P0054" to ("O2 Sensor Heater Resistance (Bank 1, Sensor 2)" to "Résistance du chauffage de sonde à oxygène (banc 1, sonde 2)"),
         "P0059" to ("O2 Sensor Heater Resistance (Bank 2, Sensor 1)" to "Résistance du chauffage de sonde à oxygène (banc 2, sonde 1)"),
         "P0060" to ("O2 Sensor Heater Resistance (Bank 2, Sensor 2)" to "Résistance du chauffage de sonde à oxygène (banc 2, sonde 2)"),

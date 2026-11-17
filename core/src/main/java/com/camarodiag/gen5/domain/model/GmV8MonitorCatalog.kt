@@ -89,7 +89,6 @@ object GmL99MonitorCatalog {
         v8ElectricalMonitor("P0013", "Exhaust", "échappement", year),
         v8PerformanceMonitor("P0014", "Exhaust", "échappement", year),
         v8CorrelationMonitor("P0016", "A", "Intake", "admission", year),
-        v8CorrelationMonitor("P0017", "B", "Exhaust", "échappement", year)
     ).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
@@ -105,23 +104,156 @@ object GmLs3MonitorCatalog {
         if (vehicle.engine != CamaroEngine.LS3 || vehicle.modelYear !in 2010..2011) return null
         return listOf(
             v8CorrelationMonitor("P0016", "A", "Intake", "admission", vehicle.modelYear),
-            v8CorrelationMonitor("P0017", "B", "Exhaust", "échappement", vehicle.modelYear)
         ).associateBy { it.code }[code.trim().uppercase(java.util.Locale.ROOT)]
     }
 
-    fun supportedCodes(): Set<String> = setOf("P0016", "P0017")
+    fun supportedCodes(): Set<String> = setOf("P0016")
+}
+
+
+private fun v8O2CircuitMonitor(code: String, bank: Int, sensor: Int, page: Int) =
+    GmDtcMonitorEvidence(
+        code,
+        "Oxygen sensor heater control circuit – Bank $bank Sensor $sensor",
+        "Circuit de commande du chauffage de sonde à oxygène – banc $bank, sonde $sensor",
+        "The ECM checks the oxygen-sensor heater output-driver circuit for electrical integrity.",
+        "Le calculateur contrôle l'intégrité électrique du circuit driver du chauffage de la sonde à oxygène.",
+        "Voltage is low while the driver is open (short to ground or open circuit), or high while the driver is closed (short to voltage).",
+        "La tension est basse lorsque le driver est ouvert (court-circuit à la masse ou circuit ouvert), ou élevée lorsque le driver est fermé (court-circuit au positif).",
+        "Ignition in CRANK or RUN; ignition voltage 11–32 V; engine speed above 400 RPM.",
+        "Contact en CRANK ou RUN ; tension d'allumage de 11 à 32 V ; régime moteur supérieur à 400 tr/min.",
+        "20 failures in 25 samples; 250 ms per sample; continuous monitor; Type B, 2 trips.",
+        "20 échecs sur 25 échantillons ; 250 ms par échantillon ; surveillance continue ; Type B, 2 trajets.",
+        "Type B – 2 trips", page
+    )
+
+private fun v8O2ResistanceMonitor(
+    code: String,
+    bank: Int,
+    sensor: Int,
+    minimumOhms: String,
+    maximumOhms: String,
+    page: Int
+) = GmDtcMonitorEvidence(
+    code,
+    "Oxygen sensor heater resistance – Bank $bank Sensor $sensor",
+    "Résistance du chauffage de sonde à oxygène – banc $bank, sonde $sensor",
+    "The ECM evaluates learned heater resistance during a valid cold start.",
+    "Le calculateur évalue la résistance apprise du chauffage pendant un démarrage à froid valide.",
+    "Calculated heater resistance is below $minimumOhms Ω or above $maximumOhms Ω.",
+    "La résistance calculée du chauffage est inférieure à $minimumOhms Ω ou supérieure à $maximumOhms Ω.",
+    "No active ECT/IAT sensor faults; coolant-to-IAT difference below 8 °C; coolant temperature −30 to 45 °C; ignition voltage below 32 V; engine soak above 28,800 s; engine run time below 3 s.",
+    "Aucun défaut actif des capteurs ECT/IAT ; écart liquide-air inférieur à 8 °C ; liquide de −30 à 45 °C ; tension d'allumage inférieure à 32 V ; immobilisation supérieure à 28 800 s ; temps moteur inférieur à 3 s.",
+    "Once per valid cold start; Type B, 2 trips.",
+    "Une fois par démarrage à froid valide ; Type B, 2 trajets.",
+    "Type B – 2 trips", page
+)
+
+private fun v8MafMonitor(supercharged: Boolean): GmDtcMonitorEvidence {
+    val page = if (supercharged) 11 else 10
+    val rpmMaximum = if (supercharged) "6,200" else "6,700"
+    val criteriaEn = if (supercharged) {
+        "MAF residual above 21 g/s, MAP1/MAP2 residual above 22.0 kPa, throttle-model residual above 400 kPa*(g/s), and supporting SCIAP residual above 14.0 kPa."
+    } else {
+        "MAF residual above 12 g/s, MAP2 residual above 15.0 kPa, throttle-model error threshold 250 kPa*(g/s), and minimum combined weighting factor at least 0.00."
+    }
+    val criteriaFr = if (supercharged) {
+        "Résidu MAF supérieur à 21 g/s, résidu MAP1/MAP2 supérieur à 22,0 kPa, résidu du modèle papillon supérieur à 400 kPa*(g/s), et résidu SCIAP de support supérieur à 14,0 kPa."
+    } else {
+        "Résidu MAF supérieur à 12 g/s, résidu MAP2 supérieur à 15,0 kPa, seuil d'erreur du modèle papillon de 250 kPa*(g/s), et facteur de pondération combiné minimal d'au moins 0,00."
+    }
+    return GmDtcMonitorEvidence(
+        "P0101",
+        if (supercharged) "Mass airflow system performance (supercharged)" else "Mass airflow system performance (naturally aspirated)",
+        if (supercharged) "Performance du système de débit d'air (moteur suralimenté)" else "Performance du système de débit d'air (moteur atmosphérique)",
+        "The ECM checks whether measured MAF and MAP values are plausible against the throttle-based airflow model.",
+        "Le calculateur vérifie la cohérence des valeurs MAF et MAP mesurées par rapport au modèle de débit d'air basé sur le papillon.",
+        criteriaEn,
+        criteriaFr,
+        "Engine speed 450–$rpmMaximum RPM; coolant temperature above −7 °C and below 125 °C; intake-air temperature above −20 °C and below 125 °C; relevant MAF/MAP/throttle faults must not be active.",
+        "Régime moteur de 450 à $rpmMaximum tr/min ; liquide entre −7 et 125 °C ; air d'admission entre −20 et 125 °C ; aucun défaut inhibiteur MAF/MAP/papillon actif.",
+        "Continuous monitor; calculations every 12.5 ms; Type B, 2 trips.",
+        "Surveillance continue ; calculs toutes les 12,5 ms ; Type B, 2 trajets.",
+        "Type B – 2 trips", page
+    )
+}
+
+private fun v8O2Evidence(): List<GmDtcMonitorEvidence> = listOf(
+    v8O2CircuitMonitor("P0030", 1, 1, 3),
+    v8O2CircuitMonitor("P0036", 1, 2, 4),
+    v8O2CircuitMonitor("P0050", 2, 1, 3),
+    v8O2CircuitMonitor("P0056", 2, 2, 4),
+    v8O2ResistanceMonitor("P0053", 1, 1, "2.8", "9.5", 3),
+    v8O2ResistanceMonitor("P0054", 1, 2, "4.1", "10.8", 3),
+    v8O2ResistanceMonitor("P0059", 2, 1, "2.8", "9.5", 4),
+    v8O2ResistanceMonitor("P0060", 2, 2, "4.1", "10.8", 4)
+)
+
+private fun v8L99VvtEvidence(): List<GmDtcMonitorEvidence> = listOf(
+    v8ElectricalMonitor("P0010", "Intake", "admission", 2012),
+    v8PerformanceMonitor("P0011", "Intake", "admission", 2012),
+    v8ElectricalMonitor("P0013", "Exhaust", "échappement", 2012),
+    v8PerformanceMonitor("P0014", "Exhaust", "échappement", 2012)
+)
+
+object Gm2012L99MonitorCatalog {
+    private val evidence = (v8L99VvtEvidence() +
+        v8CorrelationMonitor("P0016", "A", "Intake", "admission", 2012) +
+        v8O2Evidence() + v8MafMonitor(false)).associateBy { it.code }
+
+    fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
+        if (vehicle.engine != CamaroEngine.L99 || vehicle.modelYear != 2012) return null
+        return evidence[code.trim().uppercase(java.util.Locale.ROOT)]
+    }
+
+    fun supportedCodes(): Set<String> = evidence.keys
+}
+
+object Gm2012Ls3MonitorCatalog {
+    private val evidence = (listOf(v8CorrelationMonitor("P0016", "A", "Intake", "admission", 2012)) +
+        v8O2Evidence() + v8MafMonitor(false)).associateBy { it.code }
+
+    fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
+        if (vehicle.engine != CamaroEngine.LS3 || vehicle.modelYear != 2012) return null
+        return evidence[code.trim().uppercase(java.util.Locale.ROOT)]
+    }
+
+    fun supportedCodes(): Set<String> = evidence.keys
+}
+
+object Gm2012LsaMonitorCatalog {
+    private val evidence = (listOf(v8CorrelationMonitor("P0016", "A", "Intake", "admission", 2012)) +
+        v8O2Evidence() + v8MafMonitor(true)).associateBy { it.code }
+
+    fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
+        if (vehicle.engine != CamaroEngine.LSA || vehicle.modelYear != 2012) return null
+        return evidence[code.trim().uppercase(java.util.Locale.ROOT)]
+    }
+
+    fun supportedCodes(): Set<String> = evidence.keys
 }
 
 object GmV8MonitorCatalog {
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? =
-        when (vehicle.engine) {
-            CamaroEngine.L99 -> GmL99MonitorCatalog.find(code, vehicle)
-            CamaroEngine.LS3 -> GmLs3MonitorCatalog.find(code, vehicle)
-            else -> null
+        when {
+            vehicle.modelYear == 2012 -> when (vehicle.engine) {
+                CamaroEngine.L99 -> Gm2012L99MonitorCatalog.find(code, vehicle)
+                CamaroEngine.LS3 -> Gm2012Ls3MonitorCatalog.find(code, vehicle)
+                CamaroEngine.LSA -> Gm2012LsaMonitorCatalog.find(code, vehicle)
+                else -> null
+            }
+            else -> when (vehicle.engine) {
+                CamaroEngine.L99 -> GmL99MonitorCatalog.find(code, vehicle)
+                CamaroEngine.LS3 -> GmLs3MonitorCatalog.find(code, vehicle)
+                else -> null
+            }
         }
 
     fun sourceLabel(vehicle: VehicleProfile): String? =
-        if (vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3) && vehicle.modelYear in 2010..2011) {
-            if (vehicle.modelYear == 2010) "10OBDG12" else "11OBDG07"
-        } else null
+        when {
+            vehicle.modelYear == 2012 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA) -> "12OBDG07"
+            vehicle.modelYear in 2010..2011 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3) ->
+                if (vehicle.modelYear == 2010) "10OBDG12" else "11OBDG07"
+            else -> null
+        }
 }

@@ -73,7 +73,7 @@ class DtcCatalogRegistryTest {
     @Test
     fun genericSaeDescriptionsAreAvailableWithoutClaimingOemSpecificity() {
         assertNotNull(DtcCatalogRegistry.genericDescription("P0101"))
-        listOf("P0008", "P0009", "P000A", "P000B", "P000C", "P000D", "P0013", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024", "P0030", "P0036", "P0050", "P0053", "P0054", "P0059", "P0060").forEach { code ->
+        listOf("P0008", "P0009", "P000A", "P000B", "P000C", "P000D", "P0013", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024", "P0030", "P0036", "P0050", "P0053", "P0054", "P0056", "P0059", "P0060").forEach { code ->
             assertNotNull("Missing generic SAE description for $code", DtcCatalogRegistry.genericDescription(code))
         }
         assertNotNull(DtcCatalogRegistry.genericDescription("P0308"))
@@ -93,6 +93,28 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun gm2012V8MonitorDataSeparatesL99Ls3AndLsaHardware() {
+        val l99 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.L99)
+        val ls3 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LS3)
+        val lsa = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LSA)
+
+        assertNotNull(GmEngineMonitorCatalog.find("P0011", l99))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", ls3))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", lsa))
+        assertNotNull(GmEngineMonitorCatalog.find("P0016", ls3))
+        assertTrue(GmEngineMonitorCatalog.find("P0053", l99)?.malfunctionCriteriaEn?.contains("2.8") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0054", l99)?.malfunctionCriteriaEn?.contains("4.1") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0101", ls3)?.malfunctionCriteriaEn?.contains("12 g/s") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0101", lsa)?.malfunctionCriteriaEn?.contains("21 g/s") == true)
+        assertEquals("12OBDG07", GmEngineMonitorCatalog.sourceLabel(lsa))
+        assertEquals(14, Gm2012L99MonitorCatalog.supportedCodes().size)
+        assertEquals(10, Gm2012Ls3MonitorCatalog.supportedCodes().size)
+        assertEquals(10, Gm2012LsaMonitorCatalog.supportedCodes().size)
+        assertNotNull(CamaroDtcCatalog.find("P0056", l99))
+        assertEquals(null, CamaroDtcCatalog.find("P0017", ls3))
+    }
+
+    @Test
     fun v8DtcAndMonitorCatalogsRespectL99VvtVersusLs3NonVvtArchitecture() {
         val l99_2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.L99)
         val l99_2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.L99)
@@ -100,11 +122,11 @@ class DtcCatalogRegistryTest {
         val ls3_2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LS3)
         val l99_2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.L99)
 
-        listOf("P0010", "P0011", "P0013", "P0014", "P0016", "P0017").forEach { code ->
+        listOf("P0010", "P0011", "P0013", "P0014", "P0016").forEach { code ->
             assertNotNull("Missing L99 interpretation for $code", CamaroDtcCatalog.find(code, l99_2010))
             assertNotNull("Missing L99 monitor for $code", GmEngineMonitorCatalog.find(code, l99_2010))
         }
-        listOf("P0016", "P0017").forEach { code ->
+        listOf("P0016").forEach { code ->
             assertNotNull("Missing LS3 correlation interpretation for $code", CamaroDtcCatalog.find(code, ls3_2010))
             assertNotNull("Missing LS3 correlation monitor for $code", GmEngineMonitorCatalog.find(code, ls3_2011))
         }
@@ -115,8 +137,8 @@ class DtcCatalogRegistryTest {
         assertEquals("10OBDG12", GmEngineMonitorCatalog.sourceLabel(l99_2010))
         assertEquals("11OBDG07", GmEngineMonitorCatalog.sourceLabel(ls3_2011))
         assertEquals(null, GmEngineMonitorCatalog.find("P0011", l99_2012))
-        assertEquals(6, GmL99MonitorCatalog.supportedCodes().size)
-        assertEquals(2, GmLs3MonitorCatalog.supportedCodes().size)
+        assertEquals(5, GmL99MonitorCatalog.supportedCodes().size)
+        assertEquals(1, GmLs3MonitorCatalog.supportedCodes().size)
     }
 
     @Test

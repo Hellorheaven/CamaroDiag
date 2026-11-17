@@ -226,3 +226,21 @@ Références primaires :
 - GM, 11OBDG07 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/11OBDG07%20Engine%20Diagnostics.pdf
 
 Le LS3 et le L99 partagent une base mécanique mais pas l'équipement VVT/AFM. Le catalogue n'affiche donc pas P0010/P0011/P0013/P0014 sur un LS3 d'origine.
+
+
+## Données GM 2012 – V8 L99, LS3 et LSA
+
+Le dossier de certification 12OBDG07 couvre les Camaro 2012 équipées des RPO L99, LS3 et LSA. Les catalogues distinguent les équipements :
+- L99 automatique : VVT ; P0010/P0011/P0013/P0014 et P0016.
+- LS3 manuel : pas de VVT ; P0016 uniquement parmi les moniteurs de distribution.
+- LSA suralimenté : pas de VVT d'origine ; P0016 et modèle MAF suralimenté.
+
+Les trois profils utilisent les moniteurs de chauffage des sondes à oxygène du groupe 12OBDG07. Les plages de résistance sont propres à la position : 2,8–9,5 Ω pour les sondes 1 et 4,1–10,8 Ω pour les sondes 2. Le seuil MAF est également distinct : atmosphérique (12 g/s et 15 kPa) contre LSA suralimenté (21 g/s et 22 kPa, avec critères MAP/SCIAP supplémentaires).
+
+Références primaires :
+- GM, 2012 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/2012%20OBD_GROUP_SUMMARY.pdf
+- GM, 12OBDG07 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/12OBDG07%20Engine%20Diagnostics.pdf
+- GM Service Information, Camaro V8 2012 P0016 : https://charm.li/Chevrolet/2012/Camaro%20V8-6.2L/Repair%20and%20Diagnosis/A%20L%20L%20%20Diagnostic%20Trouble%20Codes%20%28%20DTC%20%29/Testing%20and%20Inspection/P%20Code%20Charts/P0016/
+- GM Service Information, Camaro V8 2011 P0011 (L99 VVT) : https://charm.li/Chevrolet/2011/Camaro%20V8-6.2L/Repair%20and%20Diagnosis/A%20L%20L%20%20Diagnostic%20Trouble%20Codes%20%28%20DTC%20%29/Testing%20and%20Inspection/P%20Code%20Charts/P0011/
+
+Les codes P0017 et autres défauts de VVT ne sont pas proposés aux V8 à arbre à cames unique sans preuve d'applicabilité.
