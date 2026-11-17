@@ -252,6 +252,26 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun gm2019Lt4MonitorEvidenceIsRestrictedToTheDocumentedCamaroProfile() {
+        val lt4_2019 = VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT4)
+        val lt1_2019 = VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT1)
+        val lt4_2020 = VehicleProfile(modelYear = 2020, engine = CamaroEngine.LT4)
+
+        val low = GmEngineMonitorCatalog.find("P0197", lt4_2019)
+        val high = GmEngineMonitorCatalog.find("P0198", lt4_2019)
+
+        assertNotNull(low)
+        assertNotNull(high)
+        assertTrue(low!!.malfunctionCriteriaEn.contains("below 25"))
+        assertTrue(high!!.malfunctionCriteriaEn.contains("above 450,000"))
+        assertEquals("Type B – 2 trips", low.milClassification)
+        assertEquals("Type B – 2 trips", high.milClassification)
+        assertEquals(2, Gm2019Lt4MonitorCatalog.supportedCodes().size)
+        assertEquals(null, GmEngineMonitorCatalog.find("P0197", lt1_2019))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0197", lt4_2020))
+    }
+
+    @Test
     fun lltDtcCatalogProvidesBilingualVehicleSpecificInterpretations() {
         val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
         val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)
