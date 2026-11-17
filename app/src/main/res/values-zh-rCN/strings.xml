@@ -483,4 +483,9 @@
     <string name="msg_j2534_bridge_connect_failed">无法连接到 J2534 网桥。</string>
     <string name="live_pid_fuel_system_status">燃油系统状态</string>
     <string name="live_pid_ltft">长期燃油修正 B1</string>
+    <string name="cal_warning_metadata_missing">缺少标定元数据：无法将导入内容关联到准确的 VIN、CAL ID、CVN、操作系统、硬件和源二进制文件。</string>
+    <string name="cal_warning_os_hardware_metadata">元数据中填写了操作系统和硬件参考信息：请根据控制模块维修文档独立核实。</string>
+    <string name="cal_warning_overlapping_regions">表格区域或坐标轴区域存在重叠；请确认这是有意设置的。</string>
+    <string name="cal_warning_import_review">使用任何表格前，请检查导入定义中的警告。</string>
+    <string name="cal_warning_os_hardware_not_read">标准模式 09 未读取操作系统和硬件参考信息：必须通过文档进行独立核实。</string>
 </resources>

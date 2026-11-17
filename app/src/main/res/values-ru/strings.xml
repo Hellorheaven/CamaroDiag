@@ -492,4 +492,9 @@
     <string name="msg_j2534_bridge_connect_failed">Не удалось подключиться к мосту J2534.</string>
     <string name="live_pid_fuel_system_status">Состояние топливной системы</string>
     <string name="live_pid_ltft">Долгосрочная коррекция топлива, банк 1</string>
+    <string name="cal_warning_metadata_missing">Отсутствуют метаданные калибровки: импорт нельзя связать с точными VIN, CAL ID, CVN, ОС, аппаратной частью и исходным бинарным файлом.</string>
+    <string name="cal_warning_os_hardware_metadata">ОС и аппаратная ссылка указаны в метаданных: проверьте их независимо по сервисной документации блока управления.</string>
+    <string name="cal_warning_overlapping_regions">Области таблиц или осей перекрываются; убедитесь, что это перекрытие предусмотрено.</string>
+    <string name="cal_warning_import_review">Проверьте предупреждения импортированных определений перед использованием любой таблицы.</string>
+    <string name="cal_warning_os_hardware_not_read">ОС и аппаратная ссылка не считывались стандартным режимом 09: требуется независимая проверка по документации.</string>
 </resources>
