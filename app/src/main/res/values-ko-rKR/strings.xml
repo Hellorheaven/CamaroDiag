@@ -552,4 +552,9 @@
     <string name="trace_error_csv_empty">CSV 트레이스가 비어 있습니다.</string>
     <string name="trace_error_csv_columns">CSV에는 CAN ID 열과 데이터/payload 열 또는 data0…data15 열이 필요합니다.</string>
     <string name="trace_error_generic">트레이스에 잘못되었거나 지원되지 않는 레코드가 있습니다.</string>
+    <string name="dtc_vehicle_interpretation">차량별 해석</string>
+    <string name="dtc_severity">심각도</string>
+    <string name="dtc_possible_causes">가능한 원인(미확인)</string>
+    <string name="dtc_recommended_checks">권장 점검 항목</string>
+    <string name="dtc_vehicle_specific_not_documented">이 코드와 선택한 차량 구성에 대한 전용 진단 절차가 아직 문서화되지 않았습니다. 위의 OEM/SAE 설명을 확인하고 GM 정비 정보에서 VIN과 제어 모듈을 검증하세요.</string>
 </resources>
