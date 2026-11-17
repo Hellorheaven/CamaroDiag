@@ -182,16 +182,22 @@ private fun v8MafMonitor(supercharged: Boolean, modelYear: Int = 2012): GmDtcMon
     )
 }
 
-private fun v8O2Evidence(): List<GmDtcMonitorEvidence> = listOf(
-    v8O2CircuitMonitor("P0030", 1, 1, 3),
-    v8O2CircuitMonitor("P0036", 1, 2, 4),
-    v8O2CircuitMonitor("P0050", 2, 1, 3),
-    v8O2CircuitMonitor("P0056", 2, 2, 4),
-    v8O2ResistanceMonitor("P0053", 1, 1, "2.8", "9.5", 3),
-    v8O2ResistanceMonitor("P0054", 1, 2, "4.1", "10.8", 3),
-    v8O2ResistanceMonitor("P0059", 2, 1, "2.8", "9.5", 4),
-    v8O2ResistanceMonitor("P0060", 2, 2, "4.1", "10.8", 4)
-)
+private fun v8O2Evidence(modelYear: Int = 2012): List<GmDtcMonitorEvidence> {
+    val circuitPageBank1 = if (modelYear == 2013) 2 else 3
+    val circuitPageBank2 = if (modelYear == 2013) 2 else 4
+    val resistancePageBank1 = 3
+    val resistancePageBank2 = 4
+    return listOf(
+        v8O2CircuitMonitor("P0030", 1, 1, circuitPageBank1),
+        v8O2CircuitMonitor("P0036", 1, 2, circuitPageBank2),
+        v8O2CircuitMonitor("P0050", 2, 1, circuitPageBank1),
+        v8O2CircuitMonitor("P0056", 2, 2, circuitPageBank2),
+        v8O2ResistanceMonitor("P0053", 1, 1, "2.8", "9.5", resistancePageBank1),
+        v8O2ResistanceMonitor("P0054", 1, 2, "4.1", "10.8", resistancePageBank1),
+        v8O2ResistanceMonitor("P0059", 2, 1, "2.8", "9.5", resistancePageBank2),
+        v8O2ResistanceMonitor("P0060", 2, 2, "4.1", "10.8", resistancePageBank2)
+    )
+}
 
 private fun v8L99VvtEvidence(): List<GmDtcMonitorEvidence> = listOf(
     v8ElectricalMonitor("P0010", "Intake", "admission", 2012),
