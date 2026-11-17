@@ -112,6 +112,9 @@ class DtcCatalogRegistryTest {
         assertEquals(10, Gm2012LsaMonitorCatalog.supportedCodes().size)
         assertNotNull(CamaroDtcCatalog.find("P0056", l99))
         assertEquals(null, CamaroDtcCatalog.find("P0017", ls3))
+        listOf(l99, ls3, lsa).forEach { profile ->
+            assertTrue(CamaroDtcCatalog.coverageNotice(profile).first.contains("V8 Gen 5 2012"))
+        }
     }
 
     @Test
