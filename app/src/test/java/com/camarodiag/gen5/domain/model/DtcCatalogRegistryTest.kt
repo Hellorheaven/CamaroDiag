@@ -238,6 +238,7 @@ class DtcCatalogRegistryTest {
         assertTrue(CamaroDtcCatalog.coverageNotice(l99).first.contains("O2"))
         assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("P0033"))
         assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("P006D"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("P0097/P0098"))
         assertEquals(null, GmEngineMonitorCatalog.find("P0101", ls7))
         assertEquals(null, GmEngineMonitorCatalog.find("P0030", ls7))
         assertTrue(DtcCatalogRegistry.catalogueFor("ECM", l99).hasVehicleSpecificDefinitions)
