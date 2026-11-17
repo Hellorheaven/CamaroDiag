@@ -803,13 +803,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 storedFile = File(storageDir, "comparison_${System.currentTimeMillis()}_${safeName}")
                 storedFile!!.writeBytes(bytes)
                 val summary = when {
-                    comparison.identical -> "Les deux images BIN sont identiques octet par octet."
-                    comparison.referenceSize != comparison.modifiedSize -> "Comparaison de ${comparison.comparedBytes} octets communs ; les tailles des fichiers diffèrent."
-                    else -> "${comparison.changedBytes} octets différents répartis dans ${comparison.changedRanges.size + comparison.omittedRangeCount} zone(s)."
+                    comparison.identical -> getApplication<Application>().getString(R.string.cal_comparison_identical)
+                    comparison.referenceSize != comparison.modifiedSize -> getApplication<Application>().getString(
+                        R.string.cal_comparison_size_diff, comparison.comparedBytes
+                    )
+                    else -> getApplication<Application>().getString(
+                        R.string.cal_comparison_different_ranges,
+                        comparison.changedBytes,
+                        comparison.changedRanges.size + comparison.omittedRangeCount
+                    )
                 }
                 val ranges = comparison.changedRanges.take(25).map {
-                    "0x${it.startOffset.toString(16).uppercase().padStart(8, '0')}–0x${it.endOffsetInclusive.toString(16).uppercase().padStart(8, '0')} (${it.changedBytes} octets)"
-                } + if (comparison.omittedRangeCount > 0) listOf("${comparison.omittedRangeCount} zone(s) supplémentaire(s) non affichées") else emptyList()
+                    getApplication<Application>().getString(
+                        R.string.cal_comparison_range,
+                        it.startOffset.toString(16).uppercase().padStart(8, '0'),
+                        it.endOffsetInclusive.toString(16).uppercase().padStart(8, '0'),
+                        it.changedBytes
+                    )
+                } + if (comparison.omittedRangeCount > 0) listOf(
+                    getApplication<Application>().getString(R.string.cal_comparison_more_ranges, comparison.omittedRangeCount)
+                ) else emptyList()
                 _calibrationWorkspace.value = current.copy(
                     comparisonFileName = displayName,
                     comparisonFilePath = storedFile!!.absolutePath,
