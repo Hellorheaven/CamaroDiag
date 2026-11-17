@@ -58,6 +58,10 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
 
 
 @Composable
+internal fun localizedGenerationName(generation: CamaroGeneration): String =
+    stringResource(R.string.vehicle_generation_label, if (generation == CamaroGeneration.GEN5) 5 else 6)
+
+@Composable
 private fun localizedEngineName(engine: CamaroEngine): String = when (engine) {
     CamaroEngine.LLT -> stringResource(R.string.engine_llt)
     CamaroEngine.LFX -> stringResource(R.string.engine_lfx)
@@ -197,7 +201,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                             letterSpacing = 1.6.sp
                         )
                         Text(
-                            text = "${vehicle.generation.label} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
+                            text = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} • ${vehicle.engine.rpo} • ${vehicle.market.code}",
                             fontSize = 12.sp,
                             color = TextMuted
                         )
@@ -379,7 +383,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
-                    vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.generation.label}",
+                    vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${localizedGenerationName(vehicle.generation)}",
                     ecmType = vehicle.engine.ecmType,
                     isConnected = !adapter.deviceName.contains("Demo", ignoreCase = true) &&
                         !adapter.deviceName.contains("Simulated", ignoreCase = true) &&
@@ -435,7 +439,7 @@ fun VehicleSetupScreen(
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             SectionTitle(stringResource(R.string.vehicle_setup_header))
-            Text("CHEVROLET CAMARO • ${vehicle.generation.label.uppercase()} • ${vehicle.modelYear}", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("CHEVROLET CAMARO • ${localizedGenerationName(vehicle.generation).uppercase()} • ${vehicle.modelYear}", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -745,7 +749,7 @@ fun VehicleControlsScreen(vehicle: VehicleProfile, isFr: Boolean) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             SectionTitle(stringResource(R.string.control_vehicle_title))
-            Text(stringResource(R.string.control_vehicle_label, vehicle.modelYear, vehicle.generation.label, vehicle.engine.rpo), color = CamaroAmber)
+            Text(stringResource(R.string.control_vehicle_label, vehicle.modelYear, localizedGenerationName(vehicle.generation), vehicle.engine.rpo), color = CamaroAmber)
             Text(stringResource(R.string.control_gm_body_notice), color = TextMuted, fontSize = 12.sp)
         }
         items(capabilities) { capability ->

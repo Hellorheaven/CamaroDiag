@@ -245,7 +245,7 @@ fun CalibrationWorkspaceScreen(
                         HorizontalDivider(color = TextMuted.copy(alpha = .18f))
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                "${profile.engine.rpo} • ${profile.generation.label} • ${profile.modelYears.first}–${profile.modelYears.last}",
+                                "${profile.engine.rpo} • ${localizedGenerationName(profile.generation)} • ${profile.modelYears.first}–${profile.modelYears.last}",
                                 color = if (profile.engine == vehicle.engine) CamaroAmber else TextPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
