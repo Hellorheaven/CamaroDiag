@@ -77,6 +77,72 @@ data class DtcDefinitionEvidence(
             validationIssues(vehicle, respondingModuleId).isEmpty()
 }
 
+/**
+ * Confidence assigned to independent/community evidence. These levels are deliberately
+ * separate from OEM evidence and must never be rendered as GM-confirmed information.
+ */
+enum class DtcCommunityConfidence {
+    INSUFFICIENT,
+    SINGLE_INDEPENDENT_SOURCE,
+    CORROBORATED_INDEPENDENT_SOURCES,
+    VALIDATED_ON_THIS_VEHICLE
+}
+
+/**
+ * A traceable public Internet reference for a community-derived DTC explanation.
+ * independenceGroup identifies the publisher/original investigation, so reposts of
+ * the same material cannot be counted as independent corroboration.
+ */
+data class DtcCommunityEvidenceReference(
+    val source: DtcDefinitionSource,
+    val reference: String,
+    val publisher: String,
+    val independenceGroup: String,
+    val modelYears: IntRange?,
+    val engineRpos: Set<String>,
+    val moduleId: String,
+    val validatedVin: String? = null
+) {
+    fun isApplicableTo(vehicle: VehicleProfile, respondingModuleId: String): Boolean {
+        val isIndependentSource = source in setOf(
+            DtcDefinitionSource.INDEPENDENT_TECHNICAL_PUBLICATION,
+            DtcDefinitionSource.SPECIALIST_REPAIR_DATABASE,
+            DtcDefinitionSource.COMMUNITY_DATABASE,
+            DtcDefinitionSource.TECHNICAL_FORUM,
+            DtcDefinitionSource.OWNER_REPAIR_REPORT
+        )
+        val hasTraceableWebReference = reference.startsWith("https://", ignoreCase = true) ||
+            reference.startsWith("http://", ignoreCase = true)
+        return isIndependentSource &&
+            hasTraceableWebReference &&
+            publisher.isNotBlank() &&
+            independenceGroup.isNotBlank() &&
+            modelYears != null &&
+            vehicle.modelYear in modelYears &&
+            engineRpos.isNotEmpty() &&
+            vehicle.engine.rpo in engineRpos &&
+            moduleId.isNotBlank() &&
+            moduleId.equals(respondingModuleId, ignoreCase = true)
+    }
+
+    fun validatesCurrentVehicle(vehicle: VehicleProfile): Boolean {
+        val vinPattern = Regex("[A-HJ-NPR-Z0-9]{17}")
+        return !validatedVin.isNullOrBlank() &&
+            validatedVin.uppercase(Locale.ROOT).matches(vinPattern) &&
+            vehicle.vin.uppercase(Locale.ROOT) == validatedVin.uppercase(Locale.ROOT)
+    }
+}
+
+data class DtcCommunityEvidenceAssessment(
+    val confidence: DtcCommunityConfidence,
+    val applicableReferences: List<DtcCommunityEvidenceReference>,
+    val independentPublisherCount: Int
+) {
+    /** Community evidence may be shown with its confidence label, never as OEM confirmation. */
+    val mayShowCommunityExplanation: Boolean
+        get() = confidence != DtcCommunityConfidence.INSUFFICIENT
+}
+
 /** Module inventory is a discovery plan, never a claim that every trim has every ECU. */
 data class DtcModuleFamily(
     val id: String,
