@@ -223,6 +223,7 @@ class DtcCatalogRegistryTest {
         assertEquals(15, Gm2013V8MonitorCatalog.supportedCodes(lsa).size)
         assertEquals(10, GmEngineMonitorCatalog.find("P0102", l99)?.sourcePage)
         assertTrue(GmEngineMonitorCatalog.find("P0102", ls3)?.malfunctionCriteriaEn?.contains("1,400 Hz") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0102", lsa)?.malfunctionCriteriaEn?.contains("1,400 Hz") == true)
         assertEquals(11, GmEngineMonitorCatalog.find("P0103", l99)?.sourcePage)
         assertTrue(GmEngineMonitorCatalog.find("P0103", ls3)?.malfunctionCriteriaEn?.contains("14,500 Hz") == true)
         assertEquals(2, GmEngineMonitorCatalog.find("P0033", lsa)?.sourcePage)
