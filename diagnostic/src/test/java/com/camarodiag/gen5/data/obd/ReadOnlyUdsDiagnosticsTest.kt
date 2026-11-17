@@ -200,6 +200,45 @@ class ReadOnlyUdsDiagnosticsTest {
         assertTrue(runCatching { CanFrame(0x1FFFFFFF, byteArrayOf(1), extendedId = true) }.isSuccess)
     }
 
+    @Test
+    fun ignoresUnrelatedCanTrafficUntilTheConfiguredResponseIdentifierArrives() = runBlocking {
+        val transport = FakeCanTransport(
+            listOf(
+                CanFrame(0x7E9, byteArrayOf(0x05, 0x62, 0x12, 0x34, 0x11, 0x22)),
+                CanFrame(0x7E8, byteArrayOf(0x05, 0x62, 0x12, 0x34, 0x33, 0x44))
+            )
+        )
+        val client = UdsReadOnlyClient(transport, 0x7E0, 0x7E8)
+
+        assertArrayEquals(byteArrayOf(0x33, 0x44), client.readDataByIdentifier(0x1234))
+    }
+
+    @Test
+    fun rejectsPositiveReadDataResponseWhenTheEcuEchoesAnotherDid() = runBlocking {
+        val transport = FakeCanTransport(
+            listOf(CanFrame(0x7E8, byteArrayOf(0x05, 0x62, 0x12, 0x35, 0x55, 0x66)))
+        )
+        val client = UdsReadOnlyClient(transport, 0x7E0, 0x7E8)
+
+        val error = runCatching { client.readDataByIdentifier(0x1234) }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error?.message?.contains("instead of 0x1234") == true)
+    }
+
+    @Test
+    fun rejectsUnexpectedPositiveUdsServiceInsteadOfTreatingItAsDidData() = runBlocking {
+        val transport = FakeCanTransport(
+            listOf(CanFrame(0x7E8, byteArrayOf(0x03, 0x59, 0x02, 0xFF.toByte())))
+        )
+        val client = UdsReadOnlyClient(transport, 0x7E0, 0x7E8)
+
+        val error = runCatching { client.readDataByIdentifier(0x1234) }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error?.message?.contains("Unexpected UDS positive service") == true)
+    }
+
     private fun singleFrameResponse(did: Int, value: ByteArray): CanFrame {
         val payload = byteArrayOf(0x62, (did shr 8).toByte(), did.toByte()) + value
         require(payload.size <= 7)
