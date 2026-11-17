@@ -571,4 +571,10 @@
     <string name="dtc_desc_p0018">Несоответствие положения коленчатого вала и впускного распредвала (банк 2)</string>
     <string name="dtc_desc_p0019">Несоответствие положения коленчатого вала и выпускного распредвала (банк 2)</string>
     <string name="dtc_gm_calibration_not_validated">Приведённые ниже интерпретации и пороговые значения являются справочными данными для выбранного двигателя и модельного года. Идентификаторы ЭБУ (VIN, CAL ID, CVN, идентификатор ПО и номер аппаратной детали) ещё не проверены; эти данные не подтверждены для подключённого ЭБУ.</string>
+    <string name="dtc_gm_monitor_title">Монитор двигателя GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Критерий срабатывания: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Условия активации: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Счётчик отказов / частота подтверждения: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Классификация MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Источник: GM %1$s, страница %2$d</string>
 </resources>
