@@ -154,10 +154,12 @@ Le format SAE J2012-DA 0x04 n'est pas interchangeable avec le format 0x00 : les 
 
 Le catalogue d'évidence `Gm2012LfxMonitorCatalog` ajoute les stratégies de surveillance moteur documentées dans le dossier GM **12OBDG05B Engine Diagnostics** pour le groupe OBD 5B. Le résumé officiel 2012 associe explicitement le groupe 5B au moteur 3.6L RPO LFX et aux Camaro (coupé et cabriolet), avec les RPO de transmission MV5/MYB.
 
-Codes couverts par cette première extraction : P0010, P0011, P0013, P0014, P0016, P0017, P0018, P0019, P0020, P0021, P0023 et P0024. Pour chaque code, l'application affiche la stratégie de surveillance, le critère de déclenchement, les conditions d'activation, le compteur d'échecs et la classification MIL tels que synthétisés depuis le dossier GM.
+Codes couverts par cette première extraction : P0010, P0011, P0013, P0014, P0016, P0017, P0018, P0019, P0020, P0021, P0023, P0024, P0300 et P0420. Pour chaque code, l'application affiche la stratégie de surveillance, le critère de déclenchement, les conditions d'activation, le compteur d'échecs et la classification MIL tels que synthétisés depuis le dossier GM.
 
 **Limite importante :** ces données sont des critères de surveillance OBD de certification 2012, pas l'intégralité des arbres de diagnostic de réparation SI. Elles ne remplacent pas la vérification VIN, RPO de transmission, CAL ID, CVN, OS et matériel. Elles ne sont affichées que pour un profil LFX de l'année modèle 2012 ; elles ne sont pas extrapolées aux LFX 2013–2015 ni aux autres motorisations.
 
 Références primaires :
 - GM, *12 OBDG05B Engine Diagnostics*, notamment pages 1–16 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/12OBDG05B%20Engine%20Diagnostics.pdf
 - GM, *2012 OBD Group Summary*, tableau groupe 5B : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/2012_OBD_GROUP_SUMMARY.pdf
+
+Le catalogue générique SAE a également été complété pour les codes d'actionnement et de corrélation d'arbres à cames manquants (P0013, P0017–P0019, P0020–P0021, P0023–P0024) ainsi que les circuits de chauffage de sondes P0030, P0036 et P0050. Ces libellés sont normalisés SAE ; les critères GM détaillés ne sont affichés que lorsqu'une entrée d'évidence dédiée existe.

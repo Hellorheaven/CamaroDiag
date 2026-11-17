@@ -189,6 +189,33 @@ object Gm2012LfxMonitorCatalog {
             "100 échecs sur 300 échantillons ; 100 ms par échantillon ; Type B, 2 trajets.",
             "Type B – 2 trips", 14
         )
+        ,
+        GmDtcMonitorEvidence(
+            "P0300", "Random / multiple-cylinder misfire monitor",
+            "Surveillance des ratés aléatoires / sur plusieurs cylindres",
+            "The ECM evaluates crankshaft-velocity-derived terms over operating intervals and compares the misfire rate with emissions and catalyst-damage thresholds. It also checks acceleration patterns to distinguish combustion misfire from crankshaft noise.",
+            "Le calculateur analyse des paramètres dérivés de la vitesse du vilebrequin sur des intervalles de fonctionnement et compare le taux de ratés aux seuils d'émissions et de protection du catalyseur. Il examine aussi les profils d'accélération pour distinguer un raté réel d'un bruit de vilebrequin.",
+            "Calibration tables combine engine speed, load and deceleration metrics; the applicable thresholds are calibration-dependent and are not represented by one universal percentage.",
+            "Les tables de calibration combinent régime, charge et mesures de décélération ; les seuils applicables dépendent de la calibration et ne se résument pas à un pourcentage universel.",
+            "More than two crankshaft revolutions; coolant-temperature, system-voltage and throttle-rate conditions must be satisfied; a cold-start temperature inhibit may apply.",
+            "Plus de deux révolutions vilebrequin ; les conditions de température de liquide, de tension système et de variation du papillon doivent être satisfaites ; une inhibition à froid peut s'appliquer.",
+            "Any five failed 200-revolution blocks in a set of 16; reporting logic includes early-termination conditions. Type B, 2 trips; MIL flashes when catalyst-damaging misfire is detected.",
+            "Cinq blocs de 200 révolutions échoués dans une série de 16 ; la logique de déclaration comporte aussi des conditions d'arrêt anticipé. Type B, 2 trajets ; le voyant clignote en cas de ratés susceptibles d'endommager le catalyseur.",
+            "Type B – 2 trips; MIL may flash", 145
+        ),
+        GmDtcMonitorEvidence(
+            "P0420", "Catalyst system low efficiency – Bank 1 (idle catalyst monitor applications)",
+            "Faible efficacité du catalyseur – banc 1 (applications utilisant le moniteur au ralenti)",
+            "The ECM estimates catalyst oxygen-storage capacity using forced lean/rich air-fuel excursions and upstream/downstream oxygen-sensor response.",
+            "Le calculateur estime la capacité de stockage d'oxygène du catalyseur à partir de variations forcées pauvre/riche et de la réponse des sondes à oxygène amont et aval.",
+            "The exponentially weighted normalized oxygen-storage-capacity ratio falls below 0.34.",
+            "Le rapport normalisé de capacité de stockage d'oxygène, filtré par moyenne exponentielle, passe sous 0,34.",
+            "A valid idle period is required: accelerator released, idle-speed control active, vehicle speed below 1.24 mph, and the documented engine-speed / run-time conditions satisfied.",
+            "Une période de ralenti valide est nécessaire : accélérateur relâché, régulation de ralenti active, vitesse véhicule inférieure à 1,24 mph, et conditions documentées de régime et de temps de fonctionnement satisfaites.",
+            "One test per valid idle period; at least one and up to eight attempts per trip. Type A, 1 trip.",
+            "Un test par période de ralenti valide ; au moins une et jusqu'à huit tentatives par trajet. Type A, 1 trajet.",
+            "Type A – 1 trip", 182
+        )
     ).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {

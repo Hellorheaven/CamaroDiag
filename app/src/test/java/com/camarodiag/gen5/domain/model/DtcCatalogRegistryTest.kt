@@ -73,6 +73,9 @@ class DtcCatalogRegistryTest {
     @Test
     fun genericSaeDescriptionsAreAvailableWithoutClaimingOemSpecificity() {
         assertNotNull(DtcCatalogRegistry.genericDescription("P0101"))
+        listOf("P0013", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024", "P0030", "P0036", "P0050").forEach { code ->
+            assertNotNull("Missing generic SAE description for $code", DtcCatalogRegistry.genericDescription(code))
+        }
         assertNotNull(DtcCatalogRegistry.genericDescription("P0308"))
         assertEquals(null, DtcCatalogRegistry.genericDescription("B1234"))
     }
@@ -101,7 +104,9 @@ class DtcCatalogRegistryTest {
         assertTrue(p0011?.malfunctionCriteriaEn?.contains("5.00 cam degrees") == true)
         assertEquals(null, Gm2012LfxMonitorCatalog.find("P0011", lfx2013))
         assertEquals(null, Gm2012LfxMonitorCatalog.find("P0011", lt1))
-        assertEquals(12, Gm2012LfxMonitorCatalog.supportedCodes().size)
+        assertEquals(14, Gm2012LfxMonitorCatalog.supportedCodes().size)
+        assertNotNull(Gm2012LfxMonitorCatalog.find("P0300", lfx2012))
+        assertNotNull(Gm2012LfxMonitorCatalog.find("P0420", lfx2012))
         assertTrue(Gm2012LfxMonitorCatalog.SOURCE_DOCUMENT.contains("12OBDG05B"))
     }
 
