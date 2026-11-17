@@ -279,7 +279,7 @@ object Gm2013V8MonitorCatalog {
 
     fun supportedCodes(vehicle: VehicleProfile): Set<String> =
         if (vehicle.modelYear == 2013 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA)) {
-            oxygenEvidence.keys + "P0101" + if (vehicle.engine == CamaroEngine.LSA) setOf("P0033") else emptySet()
+            oxygenEvidence.keys + "P0101" + (if (vehicle.engine == CamaroEngine.LSA) setOf("P0033") else emptySet())
         } else {
             emptySet()
         }
