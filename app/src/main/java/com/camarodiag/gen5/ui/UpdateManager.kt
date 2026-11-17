@@ -101,7 +101,7 @@ fun UpdateManagerDialog() {
         onDismissRequest = { update = null; message = null },
         title = { Text(if (apk != null) stringResource(R.string.update_ready_to_install) else if (downloading) stringResource(R.string.update_downloading) else stringResource(R.string.update_available)) },
         text = { androidx.compose.foundation.layout.Column {
-            update?.let { Text(stringResource(R.string.update_version_channel, it.version, it.channel.uppercase())); Text(stringResource(R.string.update_channel_only, it.channel)) }
+            update?.let { Text(stringResource(R.string.update_version_channel, it.version, it.channel.uppercase())) }
             message?.let { Text(it) }
         } },
         confirmButton = { when {
