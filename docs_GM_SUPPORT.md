@@ -271,12 +271,17 @@ Les résumés GM permettent d'associer les premières motorisations Gen 6 à leu
 - 2016 : LTG Camaro → `16OBDG03` ; LGX Camaro → `16OBDG05` ; LT1 Camaro → `16OBDG07A`.
 - 2017 : LTG, LGX, LT1 et LT4 Camaro → `17OBDG03`.
 - 2018 : LTG, LGX, LT1 et LT4 Camaro → `18OBDG03A`.
+- 2019 : dossier `19OBDG03A`, avec tables ECM communes et section ECM dédiée LT4 Camaro.
 - 2020 : LTG, LGX, LT1 et LT4 Camaro → `20OBDG03A`.
 
-`GmGen6MonitorCatalog` expose ces références dans le registre commun. Le LT4 n'est pas associé à une Camaro 2016 dans le résumé GM consulté ; son premier groupe Camaro est documenté ici en 2017. Ces libellés sont des références de certification uniquement : aucune définition détaillée, aucun seuil de surveillance ni procédure de réparation Gen 6 n'est activé par leur seule présence. Les résumés consultés ne couvrent pas ici les années 2019 et 2021–2024 ; aucune référence n'est extrapolée pour ces millésimes.
+`GmGen6MonitorCatalog` expose ces références dans le registre commun. Le LT4 n'est pas associé à une Camaro 2016 dans le résumé GM consulté ; son premier groupe Camaro est documenté ici en 2017. Ces libellés sont des références de certification uniquement : aucune définition détaillée, aucun seuil de surveillance ni procédure de réparation Gen 6 n'est activé par leur seule présence. Les résumés consultés ne couvrent pas ici les années 2021–2024 ; aucune référence n'est extrapolée pour ces millésimes.
 
 Références GM primaires :
 - 2016 OBD Group Summary, pages 2–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2016/2016_OBD_GROUP_SUMMARY.pdf
 - 2017 OBD Group Summary, pages 2–5 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2017/2017_OBD_GROUP_SUMMARY.pdf
 - 2018 OBD Group Summary, pages 1–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2018/2018_OBD_GROUP_SUMMARY.pdf
 - 2020 OBD Group Summary, pages 1–2 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2020/2020_OBD_GROUP_SUMMARY.pdf
+
+
+Référence primaire 2019 :
+- GM, 19OBDG03A Diagnostics, tables ECM communes et section « ECM Unique (LT4 Camaro) », notamment pages documentaires 1–10 et 603–608 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03A%20Diagnostics.pdf
