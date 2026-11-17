@@ -102,7 +102,7 @@
     <string name="dtc_title">קודי תקלה</string>
     <string name="dtc_scan">סרוק</string>
     <string name="dtc_clear">נקה</string>
-    <string name="dtc_clear_warning">מחיקה באמצעות מצב 04 מסירה קודי תקלה הקשורים לפליטות ומאפסת חלק ממוני המוכנות. שמור את הדוח לפני ההמשך.</string>
+    <string name="dtc_clear_warning">מחיקה באמצעות מצב 04 מסירה קודי תקלה הקשורים לפליטות ומאפסת חלק ממוני המוכנות. שמור את הדוח לפני ההמשך. מצב 04 אינו מוחק קודי DTC מורחבים השמורים במחשבי רכב אחרים.</string>
     <string name="dtc_none_returned">הסריקה האחרונה לא החזירה קודי תקלה.</string>
     <string name="dtc_confirm_clear">לאשר מחיקת קודי DTC?</string>
     <string name="dtc_clear_description">פעולה זו שולחת למחשב הרכב את שירות OBD במצב 04. נתוני המוכנות עשויים להתאפס. הפעולה אינה מתקנת את סיבת התקלה.</string>
