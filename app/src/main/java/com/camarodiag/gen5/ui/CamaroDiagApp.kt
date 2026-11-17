@@ -196,13 +196,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark),
-                navigationIcon = {
-                    if (currentTab == DiagTab.SETUP || currentTab == DiagTab.ADAPTER) {
-                        IconButton(onClick = { currentTab = DiagTab.SETTINGS }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.tab_settings), tint = CamaroAmber)
-                        }
-                    }
-                },
                 title = {
                     Column {
                         Text(
@@ -266,6 +259,18 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
 
                 NavigationBarItem(
+                    selected = currentTab == DiagTab.SETTINGS,
+                    onClick = { currentTab = DiagTab.SETTINGS },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tab_settings)) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = BgDark,
+                        selectedTextColor = CamaroAmber,
+                        indicatorColor = CamaroAmber
+                    )
+                )
+
+                NavigationBarItem(
                     selected = currentTab in setOf(
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
@@ -273,7 +278,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
-                        DiagTab.SETTINGS,
                         DiagTab.SETUP,
                         DiagTab.ADAPTER
                     ),
@@ -297,8 +301,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
-                        DiagTab.CONTROL,
-                        DiagTab.SETTINGS
+                        DiagTab.CONTROL
                     ).forEach { tab ->
                         DropdownMenuItem(
                             text = {
