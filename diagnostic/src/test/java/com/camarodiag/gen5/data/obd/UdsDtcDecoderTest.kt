@@ -10,16 +10,16 @@ class UdsDtcDecoderTest {
     fun decodesPowertrainChassisBodyAndNetworkDtcFamilies() {
         val payload = byteArrayOf(
             0xFF.toByte(),
-            0x01, 0x01, 0x01, 0x08, // P0101, confirmed
-            0x41, 0x23, 0x45, 0x04, // C1234, pending
-            0x80.toByte(), 0x12, 0x34, 0x01, // B0012, failed
-            0xC0.toByte(), 0x00, 0x01, 0x80.toByte() // U0001, warning requested
+            0x01, 0x01, 0x01, 0x08, // P010101, confirmed
+            0x41, 0x23, 0x45, 0x04, // C012345, pending
+            0x80.toByte(), 0x12, 0x34, 0x01, // B001234, failed
+            0xC0.toByte(), 0x00, 0x01, 0x80.toByte() // U000001, warning requested
         )
 
         val report = UdsDtcDecoder.decodeReadDtcInformation(payload)
 
         assertEquals(0xFF, report.statusAvailabilityMask)
-        assertEquals(listOf("P0101", "C1234", "B0012", "U0001"), report.records.map { it.code })
+        assertEquals(listOf("P010101", "C012345", "B001234", "U000001"), report.records.map { it.code })
         assertTrue(report.records[0].status.confirmed)
         assertTrue(report.records[1].status.pending)
         assertTrue(report.records[2].status.testFailed)
@@ -34,7 +34,7 @@ class UdsDtcDecoderTest {
         val record = report.records.single()
 
         assertEquals(0x012345, record.rawDtc)
-        assertEquals("P0123", record.code)
+        assertEquals("P012345", record.code)
         assertEquals(0xFF, record.statusByte)
         assertTrue(record.status.testFailed)
         assertTrue(record.status.testFailedThisOperationCycle)
