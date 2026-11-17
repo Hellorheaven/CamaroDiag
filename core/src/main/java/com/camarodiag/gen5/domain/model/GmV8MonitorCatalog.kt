@@ -260,10 +260,28 @@ private fun v8SuperchargerBypassMonitor2013(): GmDtcMonitorEvidence =
         2
     )
 
+private fun v8SuperchargerBaroCorrelationMonitor2013(): GmDtcMonitorEvidence =
+    GmDtcMonitorEvidence(
+        "P006D",
+        "Barometric pressure – supercharger inlet pressure correlation",
+        "Corrélation pression barométrique – pression à l'entrée du compresseur",
+        "The ECM compares the BARO sensor with a calculated barometric estimate from the part-throttle calculation or unthrottled supercharger inlet pressure.",
+        "Le calculateur compare le capteur BARO à une estimation barométrique calculée à partir du calcul à papillon partiellement ouvert ou de la pression d'entrée du compresseur sans étranglement.",
+        "When distance since the last estimated BARO update is at most 0.01 miles, the difference exceeds 25.0 kPa; when it is greater than 0.01 miles, the difference exceeds 15.0 kPa.",
+        "Lorsque la distance depuis la dernière mise à jour estimée du BARO est inférieure ou égale à 0,01 mile, l'écart dépasse 25,0 kPa ; au-delà de 0,01 mile, l'écart dépasse 15,0 kPa.",
+        "Supercharged LSA application; BARO and supercharger inlet-pressure estimate must be available and no inhibiting pressure-sensor faults may be active.",
+        "Application LSA suralimentée ; l'estimation BARO et de pression d'entrée du compresseur doit être disponible et aucun défaut inhibiteur des capteurs de pression ne doit être actif.",
+        "20 failures out of 25 samples; one sample every 250 ms at distance <= 0.01 miles and every 100 ms above 0.01 miles; Type B, 2 trips.",
+        "20 échecs sur 25 échantillons ; un échantillon toutes les 250 ms à une distance <= 0,01 mile et toutes les 100 ms au-delà ; Type B, 2 trajets.",
+        "Type B – 2 trips",
+        5
+    )
+
 object Gm2013V8MonitorCatalog {
     private val naturallyAspiratedEvidence = v8MafMonitor(supercharged = false, modelYear = 2013)
     private val superchargedEvidence = v8MafMonitor(supercharged = true, modelYear = 2013)
     private val superchargerBypassEvidence = v8SuperchargerBypassMonitor2013()
+    private val superchargerBaroEvidence = v8SuperchargerBaroCorrelationMonitor2013()
     private val oxygenEvidence = v8O2Evidence(modelYear = 2013).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
@@ -273,13 +291,14 @@ object Gm2013V8MonitorCatalog {
         return when (normalizedCode) {
             "P0101" -> if (vehicle.engine == CamaroEngine.LSA) superchargedEvidence else naturallyAspiratedEvidence
             "P0033" -> if (vehicle.engine == CamaroEngine.LSA) superchargerBypassEvidence else null
+            "P006D" -> if (vehicle.engine == CamaroEngine.LSA) superchargerBaroEvidence else null
             else -> oxygenEvidence[normalizedCode]
         }
     }
 
     fun supportedCodes(vehicle: VehicleProfile): Set<String> =
         if (vehicle.modelYear == 2013 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA)) {
-            oxygenEvidence.keys + "P0101" + (if (vehicle.engine == CamaroEngine.LSA) setOf("P0033") else emptySet())
+            oxygenEvidence.keys + "P0101" + (if (vehicle.engine == CamaroEngine.LSA) setOf("P0033", "P006D") else emptySet())
         } else {
             emptySet()
         }
