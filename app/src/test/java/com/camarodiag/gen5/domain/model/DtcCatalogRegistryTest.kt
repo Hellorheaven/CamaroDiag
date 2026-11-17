@@ -260,6 +260,8 @@ class DtcCatalogRegistryTest {
         val lt4_2019 = VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT4)
         val lt1_2019 = VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT1)
         val lt4_2020 = VehicleProfile(modelYear = 2020, engine = CamaroEngine.LT4)
+        val lt1_2016 = VehicleProfile(modelYear = 2016, engine = CamaroEngine.LT1)
+        val lt4_2024 = VehicleProfile(modelYear = 2024, engine = CamaroEngine.LT4)
 
         val performance = assertNotNull(GmEngineMonitorCatalog.find("P0196", lt4_2019))
         val low = assertNotNull(GmEngineMonitorCatalog.find("P0197", lt4_2019))
@@ -281,6 +283,9 @@ class DtcCatalogRegistryTest {
         assertTrue(CamaroDtcCatalog.coverageNotice(lt4_2019).second.contains("P0198"))
         assertEquals(null, GmEngineMonitorCatalog.find("P0197", lt1_2019))
         assertEquals(null, GmEngineMonitorCatalog.find("P0197", lt4_2020))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0196", lt1_2016))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0196", lt4_2024))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", lt4_2019))
     }
 
     @Test
