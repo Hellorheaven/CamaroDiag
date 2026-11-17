@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8 met AFM en automatische transmissie. Gebruik geen LS3-kalibratie opnieuw; controleer RPO, transmissie en ECU-identificaties.</string>
     <string name="cal_profile_notes_lsa">Camaro Gen 5 ZL1 com LSA V8 sobrealimentado. Verifique a calibração para o compressor, combustível, mercado e revisão de software.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8. Perfil separado de LS3/L99 apesar da família nominal do controlador; a identificação do software é obrigatória.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 LTG 2.0 Turbo (intervalo de cobertura 2016–2020). O boletim GM PIP5313B identifica E80 no Camaro LTG 2016–2017; verifique os anos seguintes pelo número da peça e CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (cobertura de 2016 a 2023). O boletim GM PIP5313B identifica E80 no Camaro LTG 2016–2017; confirme os anos posteriores pelo número da peça e CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6. O perfil pode variar conforme o ano, mercado e revisão; confirme o controlador real e o CVN antes de carregar uma definição de tabela.</string>
     <string name="cal_profile_notes_lt1">Camaro Gen 6 LT1 V8 atmosférico. Distinga as revisões de calibração pelo CAL ID/CVN, ano, mercado, transmissão e números de hardware.</string>
     <string name="cal_profile_notes_lt4">Camaro Gen 6 ZL1 com LT4 V8 sobrealimentado. Não misture com LT1; valide os números de peça e os dados de pressão específicos da calibração.</string>
