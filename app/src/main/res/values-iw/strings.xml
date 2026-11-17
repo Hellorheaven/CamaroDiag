@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro דור 5 V8 L99 עם AFM ותיבת הילוכים אוטומטית. אין להשתמש בכיול LS3; יש לאמת RPO, תיבת הילוכים ומזהי מחשב הרכב.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro דור 5 ZL1 V8 LSA מוגדש. יש לבדוק את הכיול בהתאם למגדש, לדלק, לשוק ולגרסת התוכנה.</string>
     <string name="cal_profile_notes_ls7">Camaro דור 5 Z/28 V8 LS7. פרופיל נפרד מ-LS3/L99 למרות משפחת מחשב הרכב הנומינלית; זיהוי התוכנה חובה.</string>
-    <string name="cal_profile_notes_ltg">Camaro דור 6 2.0 Turbo LTG (טווח הכיסוי 2016–2020). עלון GM ‏PIP5313B מציין E80 ב-Camaro LTG ‏2016–2017; יש לאמת שנים מאוחרות יותר לפי מספר חלק ו-CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro דור 6 2.0 Turbo LTG (טווח הכיסוי 2016–2023). עלון GM ‏PIP5313B מציין E80 ב-Camaro LTG ‏2016–2017; יש לאמת שנים מאוחרות יותר לפי מספר חלק ו-CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro דור 6 V6 LGX. הפרופיל עשוי להשתנות לפי שנה, שוק וגרסה; יש לאשר את מחשב הרכב בפועל ואת ה-CVN לפני טעינת הגדרת טבלאות.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro דור 6 V8 LT1 אטמוספרי. יש להבחין בין גרסאות כיול לפי CAL ID/CVN, שנה, שוק, תיבת הילוכים ומספרי חומרה.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro דור 6 ZL1 V8 LT4 מוגדש. אין לערבב עם LT1; יש לאמת מספרי חלק ונתוני גדישה הייחודיים לכיול.</string>
