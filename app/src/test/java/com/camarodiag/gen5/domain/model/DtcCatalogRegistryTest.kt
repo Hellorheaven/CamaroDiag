@@ -242,6 +242,10 @@ class DtcCatalogRegistryTest {
             GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2023, engine = CamaroEngine.LTG))
         )
         assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LTG)))
+        assertTrue(
+            CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LT1))
+                .first.contains("24OBDG03B Part 2")
+        )
 
         // Group provenance is available; detailed Gen6 monitor evidence is not
         // yet integrated and must not be inferred from a certification label.
