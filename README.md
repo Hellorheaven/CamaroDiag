@@ -45,7 +45,7 @@ Les familles ECM sont indicatives et doivent être confirmées sur le véhicule 
 | Gen 5 | 2010–2015 | 6.2 V8 L99 | ACDelco E38 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
 | Gen 5 | 2012–2015 | 6.2 V8 LSA compressé | ACDelco E67 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
 | Gen 5 | 2014–2015 | 7.0 V8 LS7 | ACDelco E38 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
-| Gen 6 | 2016–2020 | 2.0 turbo LTG | GM E80 (à confirmer) | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
+| Gen 6 | 2016–2023 | 2.0 turbo LTG | GM E80 (à confirmer par référence matérielle et CAL ID) | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
 | Gen 6 | 2016–2024 | 3.6 V6 LGX | GM E92 / E93 selon variante | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
 | Gen 6 | 2016–2024 | 6.2 V8 LT1 | GM E92 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
 | Gen 6 | 2017–2024 | 6.2 V8 LT4 compressé | GM E92 | Oui, selon PIDs | Conditionnel à l'année, DID, CAN ID et interface | Non |
