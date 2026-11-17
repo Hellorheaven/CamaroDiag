@@ -225,6 +225,7 @@ object GmEngineMonitorCatalog {
             CamaroEngine.LLT -> GmLltMonitorCatalog.sourceLabel(vehicle)
             CamaroEngine.LFX -> GmLfxMonitorCatalog.sourceLabel(vehicle)
             CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA, CamaroEngine.LS7 -> GmV8MonitorCatalog.sourceLabel(vehicle)
+            CamaroEngine.LTG, CamaroEngine.LGX, CamaroEngine.LT1, CamaroEngine.LT4 -> GmGen6MonitorCatalog.sourceLabel(vehicle)
             else -> null
         }
 }
