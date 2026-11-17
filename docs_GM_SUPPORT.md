@@ -246,6 +246,12 @@ Références primaires :
 Les codes P0017 et autres défauts de VVT ne sont pas proposés aux V8 à arbre à cames unique sans preuve d'applicabilité.
 
 
+## Groupe de certification V8 Camaro 2013 – association documentaire
+
+Le résumé GM 2013 associe les Camaro L99, LS3 et LSA au groupe 7 et au dossier moteur identifié `13OBDG07`. Cette provenance est exposée par `GmV8MonitorCatalog.sourceLabel` sans réutiliser les seuils 2012. Les critères de surveillance 2013 ne sont pas encore intégrés à un catalogue moteur dédié ; les définitions détaillées restent donc indisponibles pour ces profils.
+
+Référence GM primaire : 2013 OBD Group Summary, page 2 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2013/2013%20OBD%20GROUP%20SUMMARY.pdf.
+
 ## Groupes de certification V8 Camaro 2014–2015 – association documentaire
 
 Les résumés GM des groupes OBD confirment les associations suivantes pour le groupe 7 :
