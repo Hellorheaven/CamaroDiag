@@ -267,6 +267,8 @@ class DtcCatalogRegistryTest {
         assertEquals("Type B – 2 trips", low.milClassification)
         assertEquals("Type B – 2 trips", high.milClassification)
         assertEquals(2, Gm2019Lt4MonitorCatalog.supportedCodes().size)
+        assertTrue(CamaroDtcCatalog.coverageNotice(lt4_2019).first.contains("P0197"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lt4_2019).second.contains("P0198"))
         assertEquals(null, GmEngineMonitorCatalog.find("P0197", lt1_2019))
         assertEquals(null, GmEngineMonitorCatalog.find("P0197", lt4_2020))
     }
