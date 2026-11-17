@@ -216,9 +216,15 @@ object GmEngineMonitorCatalog {
         when (vehicle.engine) {
             CamaroEngine.LLT -> GmLltMonitorCatalog.find(code, vehicle)
             CamaroEngine.LFX -> GmLfxMonitorCatalog.find(code, vehicle)
+            CamaroEngine.L99, CamaroEngine.LS3 -> GmV8MonitorCatalog.find(code, vehicle)
             else -> null
         }
 
     fun sourceLabel(vehicle: VehicleProfile): String? =
-        GmLltMonitorCatalog.sourceLabel(vehicle) ?: GmLfxMonitorCatalog.sourceLabel(vehicle)
+        when (vehicle.engine) {
+            CamaroEngine.LLT -> GmLltMonitorCatalog.sourceLabel(vehicle)
+            CamaroEngine.LFX -> GmLfxMonitorCatalog.sourceLabel(vehicle)
+            CamaroEngine.L99, CamaroEngine.LS3 -> GmV8MonitorCatalog.sourceLabel(vehicle)
+            else -> null
+        }
 }

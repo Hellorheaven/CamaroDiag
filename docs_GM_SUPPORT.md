@@ -209,3 +209,20 @@ Références primaires :
 Les paramètres ci-dessus décrivent les moniteurs de certification OBD. Ils ne remplacent pas les arbres de diagnostic de réparation SI ni la validation par VIN/CAL ID.
 
 Le catalogue d'interprétations FR/EN LLT 2010–2011 couvre maintenant les 18 codes moteur de surveillance de distribution listés dans les dossiers GM 10OBDG02 et 11OBDG06 : P0008/P0009, P000A–P000D, P0010/P0011/P0013/P0014, P0016–P0019 et P0020/P0021/P0023/P0024. Les causes sont des pistes de diagnostic, pas une condamnation automatique d'une pièce.
+
+
+## Données de surveillance GM – V8 Camaro 2010 et 2011
+
+Les moteurs V8 sont maintenant séparés par RPO et architecture :
+- L99 6.2L automatique : VVT et AFM ; moniteurs VVT P0010, P0011, P0013, P0014 et corrélation P0016/P0017.
+- LS3 6.2L manuel : pas de VVT d'origine ; seuls les moniteurs de corrélation P0016/P0017 sont exposés dans cette première extraction.
+
+Les groupes GM sont 10OBDG12 pour 2010 et 11OBDG07 pour 2011. Les critères de surveillance et seuils d'alimentation sont propres à chaque année ; les seuils de position d'arbre à cames issus des tables de calibration ne sont pas remplacés par une valeur inventée.
+
+Références primaires :
+- GM, 2010 OBD Grouping Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2010/2010%20OBD%20Grouping%20Summary.pdf
+- GM, 10OBDG12 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2010/10OBDG12%20Engine%20Diagnostics.pdf
+- GM, 2011 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/2011%20OBD%20GROUP%20SUMMARY.pdf
+- GM, 11OBDG07 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/11OBDG07%20Engine%20Diagnostics.pdf
+
+Le LS3 et le L99 partagent une base mécanique mais pas l'équipement VVT/AFM. Le catalogue n'affiche donc pas P0010/P0011/P0013/P0014 sur un LS3 d'origine.

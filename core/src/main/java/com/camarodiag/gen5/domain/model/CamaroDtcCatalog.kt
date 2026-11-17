@@ -541,6 +541,7 @@ object CamaroDtcCatalog {
 
     fun find(code: String, vehicle: VehicleProfile): DtcVehicleExplanation? {
         if (vehicle.engine == CamaroEngine.LLT) return CamaroLltDtcCatalog.find(code, vehicle)
+        if (vehicle.engine == CamaroEngine.L99 || vehicle.engine == CamaroEngine.LS3) return CamaroV8DtcCatalog.find(code, vehicle)
         if (vehicle.engine != CamaroEngine.LFX || vehicle.modelYear !in 2012..2015) return null
         val normalizedCode = code.trim().uppercase(Locale.ROOT)
         if (normalizedCode == "P00C6" && vehicle.modelYear != 2012) return null
@@ -552,6 +553,9 @@ object CamaroDtcCatalog {
 
     fun isKnownLltProfile(vehicle: VehicleProfile): Boolean =
         vehicle.engine == CamaroEngine.LLT && vehicle.modelYear in 2010..2011
+
+    fun isKnownV8Profile(vehicle: VehicleProfile): Boolean =
+        CamaroV8DtcCatalog.isKnownProfile(vehicle)
 
     /**
      * Returns a configuration sanity warning only where the engine architecture
@@ -586,8 +590,11 @@ object CamaroDtcCatalog {
             isKnownLltProfile(vehicle) ->
                 "Catalogue d'interprétations détaillées disponible pour LLT Gen 5 (2010–2011), en français et anglais, avec moniteurs GM propres à chaque millésime." to
                     "Detailed interpretation catalogue available for Gen 5 LLT (2010–2011), in French and English, with year-specific GM monitor evidence."
+            isKnownV8Profile(vehicle) ->
+                "Catalogue d'interprétations détaillées disponible pour L99/LS3 Gen 5 (2010–2011). Les défauts VVT sont réservés au L99 ; le LS3 d'origine n'a pas de VVT." to
+                    "Detailed interpretation catalogue available for Gen 5 L99/LS3 (2010–2011). VVT faults apply to L99 only; the factory LS3 has no VVT."
             else ->
-            "Pour ${vehicle.engine.rpo} (${vehicle.modelYear}), les libellés SAE génériques sont disponibles, mais aucune interprétation GM détaillée validée par calibration n'est encore chargée. Ne pas transposer les causes du LFX." to
-                "For ${vehicle.engine.rpo} (${vehicle.modelYear}), generic SAE descriptions are available, but no calibration-validated detailed GM interpretation is loaded yet. Do not reuse LFX causes."
+            "Pour ${vehicle.engine.rpo} (${vehicle.modelYear}), les libellés SAE génériques sont disponibles, mais aucune interprétation GM détaillée validée par calibration n'est encore chargée. Ne pas transposer les causes d'une autre motorisation." to
+                "For ${vehicle.engine.rpo} (${vehicle.modelYear}), generic SAE descriptions are available, but no calibration-validated detailed GM interpretation is loaded yet. Do not reuse another engine's causes."
         }
 }

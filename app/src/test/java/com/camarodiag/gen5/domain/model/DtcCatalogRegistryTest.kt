@@ -93,6 +93,33 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun v8DtcAndMonitorCatalogsRespectL99VvtVersusLs3NonVvtArchitecture() {
+        val l99_2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.L99)
+        val l99_2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.L99)
+        val ls3_2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LS3)
+        val ls3_2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LS3)
+        val l99_2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.L99)
+
+        listOf("P0010", "P0011", "P0013", "P0014", "P0016", "P0017").forEach { code ->
+            assertNotNull("Missing L99 interpretation for $code", CamaroDtcCatalog.find(code, l99_2010))
+            assertNotNull("Missing L99 monitor for $code", GmEngineMonitorCatalog.find(code, l99_2010))
+        }
+        listOf("P0016", "P0017").forEach { code ->
+            assertNotNull("Missing LS3 correlation interpretation for $code", CamaroDtcCatalog.find(code, ls3_2010))
+            assertNotNull("Missing LS3 correlation monitor for $code", GmEngineMonitorCatalog.find(code, ls3_2011))
+        }
+        listOf("P0010", "P0011", "P0013", "P0014").forEach { code ->
+            assertEquals(null, CamaroDtcCatalog.find(code, ls3_2010))
+            assertEquals(null, GmEngineMonitorCatalog.find(code, ls3_2011))
+        }
+        assertEquals("10OBDG12", GmEngineMonitorCatalog.sourceLabel(l99_2010))
+        assertEquals("11OBDG07", GmEngineMonitorCatalog.sourceLabel(ls3_2011))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", l99_2012))
+        assertEquals(6, GmL99MonitorCatalog.supportedCodes().size)
+        assertEquals(2, GmLs3MonitorCatalog.supportedCodes().size)
+    }
+
+    @Test
     fun lltDtcCatalogProvidesBilingualVehicleSpecificInterpretations() {
         val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
         val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)
