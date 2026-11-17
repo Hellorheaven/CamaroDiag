@@ -18,7 +18,7 @@ enum class UdsDtcFormat(val identifier: Int) {
     }
 }
 
-data class UdsDtcRecord(
+data class DecodedUdsDtcRecord(
     val rawDtc: Int,
     val code: String,
     val statusByte: Int,
@@ -37,7 +37,7 @@ data class UdsDtcStatus(
 )
 
 /** Maps a decoded UDS record into the application's shared DTC presentation model. */
-fun UdsDtcRecord.toDiagnosticDtc(moduleId: String): DiagnosticDtc {
+fun DecodedUdsDtcRecord.toDiagnosticDtc(moduleId: String): DiagnosticDtc {
     require(moduleId.isNotBlank()) { "The responding ECU module ID is required." }
     val stateEn = buildList {
         if (status.testFailed) add("failed")
@@ -68,7 +68,7 @@ data class UdsDtcReport(
     val statusAvailabilityMask: Int,
     val formatIdentifier: Int,
     val format: UdsDtcFormat?,
-    val records: List<UdsDtcRecord>
+    val records: List<DecodedUdsDtcRecord>
 )
 
 object UdsDtcDecoder {
@@ -94,7 +94,7 @@ object UdsDtcDecoder {
             val b2 = bytes[2].toInt() and 0xFF
             val status = bytes[3].toInt() and 0xFF
             val raw = (b0 shl 16) or (b1 shl 8) or b2
-            UdsDtcRecord(
+            DecodedUdsDtcRecord(
                 rawDtc = raw,
                 code = formatDisplayCode(format, b0, b1, b2),
                 statusByte = status,
