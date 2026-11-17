@@ -594,8 +594,8 @@ object CamaroDtcCatalog {
                 "Catalogue d'interprétations détaillées disponible pour L99/LS3 Gen 5 (2010–2011). Les défauts VVT sont réservés au L99 ; le LS3 d'origine n'a pas de VVT." to
                     "Detailed interpretation catalogue available for Gen 5 L99/LS3 (2010–2011). VVT faults apply to L99 only; the factory LS3 has no VVT."
             vehicle.engine == CamaroEngine.LT4 && vehicle.modelYear == 2019 ->
-                "Données de surveillance GM disponibles pour le LT4 2019 sur P0197 et P0198 uniquement. Elles décrivent les critères OBD de certification et ne constituent pas un arbre de réparation complet." to
-                    "GM monitor evidence is available for the 2019 LT4 for P0197 and P0198 only. It describes OBD certification criteria and is not a complete service repair diagnostic tree."
+                "Données de surveillance GM disponibles pour le LT4 2019 sur P0196, P0197 et P0198 uniquement. Elles décrivent les critères OBD de certification et ne constituent pas un arbre de réparation complet." to
+                    "GM monitor evidence is available for the 2019 LT4 for P0196, P0197 and P0198 only. It describes OBD certification criteria and is not a complete service repair diagnostic tree."
             GmGen6MonitorCatalog.sourceLabel(vehicle) != null ->
                 "Référence de certification GM ${GmGen6MonitorCatalog.sourceLabel(vehicle)} identifiée pour ce profil. Les définitions et seuils de surveillance détaillés restent à extraire et valider pour cette calibration." to
                     "GM certification reference ${GmGen6MonitorCatalog.sourceLabel(vehicle)} identified for this profile. Detailed monitor definitions and thresholds still need extraction and validation for this calibration."
