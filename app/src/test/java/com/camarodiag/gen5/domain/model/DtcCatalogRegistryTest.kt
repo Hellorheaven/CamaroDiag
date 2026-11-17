@@ -113,7 +113,12 @@ class DtcCatalogRegistryTest {
         assertTrue(p0011?.malfunctionCriteriaEn?.contains("5.00 cam degrees") == true)
         assertEquals(null, Gm2012LfxMonitorCatalog.find("P0011", lfx2013))
         assertEquals(null, Gm2012LfxMonitorCatalog.find("P0011", lt1))
-        assertEquals(29, Gm2012LfxMonitorCatalog.supportedCodes().size)
+        assertEquals(32, Gm2012LfxMonitorCatalog.supportedCodes().size)
+        listOf("P0089", "P0191", "P00C6").forEach { code ->
+            assertNotNull("Missing GM monitor evidence for $code", Gm2012LfxMonitorCatalog.find(code, lfx2012))
+        }
+        assertNotNull(CamaroDtcCatalog.find("P00C6", lfx2012))
+        assertEquals(null, CamaroDtcCatalog.find("P00C6", lfx2013))
         listOf("P0101", "P0102", "P0103", "P0128", "P0171", "P0172", "P0174", "P0175").forEach { code ->
             assertNotNull("Missing GM monitor evidence for $code", Gm2012LfxMonitorCatalog.find(code, lfx2012))
             assertNotNull("Missing LFX explanation for $code", CamaroDtcCatalog.find(code, lfx2012))

@@ -449,6 +449,18 @@ object CamaroDtcCatalog {
             "Critique si pression d'huile basse ou voyant allumé",
             "Critical if oil pressure is low or warning lamp is on"
         ),
+        "P00C6" to DtcVehicleExplanation(
+            "Pendant le lancement du moteur, le calculateur constate que la pression de carburant haute pression ne monte pas ou chute au-delà de la plage autorisée. Sur le LFX à injection directe, le diagnostic concerne la montée en pression de la rampe et son alimentation ; il ne désigne pas automatiquement la pompe haute pression.",
+            "During engine cranking, the ECM detects that high-side fuel pressure does not rise or falls beyond the permitted range. On the direct-injection LFX, this concerns rail-pressure build-up and its supply; it does not automatically identify the high-pressure pump as failed.",
+            listOf("Alimentation carburant basse pression insuffisante", "Pompe haute pression, actionneur ou entraînement mécanique défectueux", "Capteur de pression de rampe ou circuit électrique incohérent", "Fuite ou injecteur non étanche dans le circuit haute pression", "Tension batterie insuffisante pendant le démarrage"),
+            listOf("Insufficient low-side fuel supply", "Faulty high-pressure pump, actuator or mechanical drive", "Implausible rail-pressure sensor or electrical circuit", "Leak or leaking injector in the high-pressure circuit", "Insufficient battery voltage during cranking"),
+            listOf("Enregistrer pression basse et haute pendant le lancement", "Comparer pression de rampe mesurée et demandée sans supposer une valeur universelle hors table de calibration", "Contrôler alimentation basse pression, tension batterie, capteur et faisceau", "Ne contrôler la pompe haute pression et les injecteurs qu'après validation des mesures et des circuits"),
+            listOf("Record low- and high-side pressure during cranking", "Compare measured and desired rail pressure without assuming a universal value outside the calibration tables", "Check low-side supply, battery voltage, sensor and wiring", "Test the high-pressure pump and injectors only after validating measurements and circuits"),
+            "Élevée — défaut pouvant empêcher le démarrage",
+            "High — may prevent engine starting",
+            "Évidence de surveillance disponible pour le groupe GM OBD 5B 2012 ; vérifier VIN et calibration avant d'appliquer des seuils de réparation.",
+            "Monitor evidence is available for 2012 GM OBD group 5B; verify VIN and calibration before applying repair thresholds."
+        ),
         "P0087" to DtcVehicleExplanation(
             "La pression de carburant mesurée dans la rampe est inférieure à la pression attendue. Le LFX utilise l'injection directe : la pression haute pression doit être contrôlée avec les valeurs et procédures GM.",
             "Fuel-rail pressure is below the expected value. The LFX uses direct injection; high-pressure fuel must be checked using GM specifications and procedures.",
@@ -529,7 +541,9 @@ object CamaroDtcCatalog {
 
     fun find(code: String, vehicle: VehicleProfile): DtcVehicleExplanation? {
         if (vehicle.engine != CamaroEngine.LFX || vehicle.modelYear !in 2012..2015) return null
-        return lfxGen5[code.trim().uppercase(Locale.ROOT)]
+        val normalizedCode = code.trim().uppercase(Locale.ROOT)
+        if (normalizedCode == "P00C6" && vehicle.modelYear != 2012) return null
+        return lfxGen5[normalizedCode]
     }
 
     fun isKnownLfxProfile(vehicle: VehicleProfile): Boolean =

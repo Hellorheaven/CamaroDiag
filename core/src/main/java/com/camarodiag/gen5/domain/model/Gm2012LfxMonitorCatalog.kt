@@ -412,6 +412,46 @@ object Gm2012LfxMonitorCatalog {
             "Boucle continue de 100 ms ; Type B, 2 trajets ; les tests intrusifs sont limités en fréquence pour préserver le diagnostic EVAP.",
             "Type B – 2 trips", 117
         )
+        ,
+        GmDtcMonitorEvidence(
+            "P0089", "SIDI high-pressure fuel-pump control authority",
+            "Autorité de commande de la pompe à carburant haute pression SIDI",
+            "The ECM monitors whether the high-pressure pump actuator is being driven to its minimum or maximum control authority while regulating direct-injection rail pressure.",
+            "Le calculateur surveille si l'actionneur de la pompe haute pression atteint ses limites minimale ou maximale de commande pendant la régulation de la pression de rampe d'injection directe.",
+            "High-pressure pump delivery angle reaches 240 degrees or more, or 0 degrees or less.",
+            "L'angle de commande de la pompe haute pression atteint 240 degrés ou plus, ou 0 degré ou moins.",
+            "Pump enabled; battery voltage at least 11 V; low-side fuel pressure above 0.275 MPa; engine running and not cranking; BARO at least 70 kPa; IAT above −10 °C; fuel temperature between −10 and 100 °C; relevant pressure and pump circuits valid.",
+            "Pompe activée ; tension batterie d'au moins 11 V ; pression carburant basse pression supérieure à 0,275 MPa ; moteur en marche et non en phase de démarrage ; BARO d'au moins 70 kPa ; IAT supérieure à −10 °C ; carburant entre −10 et 100 °C ; circuits de pression et de pompe valides.",
+            "750 failures in 938 samples for either high- or low-authority windup; Type B, 2 trips.",
+            "750 échecs sur 938 échantillons pour une saturation haute ou basse ; Type B, 2 trajets.",
+            "Type B – 2 trips", 24
+        ),
+        GmDtcMonitorEvidence(
+            "P0191", "SIDI high-pressure fuel-rail sensor performance",
+            "Performance du capteur de pression de rampe haute pression SIDI",
+            "The ECM checks for a biased fuel-rail pressure signal by comparing measured high-side pressure with low-side pressure at idle and with commanded/modelled pressure during a high-drive test.",
+            "Le calculateur recherche un biais du signal de pression de rampe en comparant la pression haute mesurée à la basse pression au ralenti, puis à la pression demandée/modélisée lors d'un test en charge.",
+            "Idle comparison difference is at or below −0.650 MPa or at or above +0.600 MPa; the high-drive comparison also evaluates commanded versus measured pressure against a 3.000 MPa criterion.",
+            "À l'essai au ralenti, l'écart est inférieur ou égal à −0,650 MPa ou supérieur ou égal à +0,600 MPa ; le test en charge compare aussi pression demandée et mesurée avec un critère de 3,000 MPa.",
+            "Idle test: engine not cranking, vehicle speed at or below 0.62 mph, battery at least 11 V and low-side pressure at least 0.275 MPa. High-drive test: 1,200–2,400 RPM, desired pressure 5–7 MPa, vehicle speed at least 37.28 mph and battery at least 11 V.",
+            "Test au ralenti : moteur hors démarrage, vitesse véhicule inférieure ou égale à 0,62 mph, batterie d'au moins 11 V et basse pression d'au moins 0,275 MPa. Test en charge : 1 200–2 400 tr/min, pression demandée de 5 à 7 MPa, vitesse d'au moins 37,28 mph et batterie d'au moins 11 V.",
+            "Idle test requires at least 240 counts at 12.5 ms per count; Type A, 1 trip.",
+            "Le test au ralenti nécessite au moins 240 comptes de 12,5 ms ; Type A, 1 trajet.",
+            "Type A – 1 trip", 119
+        ),
+        GmDtcMonitorEvidence(
+            "P00C6", "High-pressure fuel-rail pressure during engine cranking",
+            "Pression de rampe haute pression pendant le lancement du moteur",
+            "The ECM checks whether high-side fuel pressure rises or remains within its permitted range during cranking.",
+            "Le calculateur vérifie que la pression carburant haute pression monte ou reste dans la plage autorisée pendant le lancement du moteur.",
+            "Fuel pressure fails to rise or falls beyond the permitted calibration limits while the starter is engaged; the precise pressure limits are defined in GM supporting calibration tables.",
+            "La pression carburant ne monte pas ou chute au-delà des limites de calibration autorisées pendant l'action du démarreur ; les limites précises sont définies dans les tables de calibration GM.",
+            "Engine not running and starter engaged; high-pressure pump enabled; low-side fuel supply and high-pressure sensor/pump circuits must be valid; temperature, voltage and barometric conditions must be met.",
+            "Moteur non démarré et démarreur actif ; pompe haute pression activée ; alimentation basse pression et circuits du capteur/pompe haute pression valides ; conditions de température, tension et pression barométrique à respecter.",
+            "One diagnostic per engine start; Type B, 2 trips.",
+            "Un diagnostic par démarrage moteur ; Type B, 2 trajets.",
+            "Type B – 2 trips", 33
+        )
     ).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
