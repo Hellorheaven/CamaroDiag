@@ -561,4 +561,5 @@
     <string name="dtc_desc_p0017">クランクシャフト位置と排気カムシャフト位置の相関異常（バンク1）</string>
     <string name="dtc_desc_p0018">クランクシャフト位置と吸気カムシャフト位置の相関異常（バンク2）</string>
     <string name="dtc_desc_p0019">クランクシャフト位置と排気カムシャフト位置の相関異常（バンク2）</string>
+    <string name="dtc_gm_calibration_not_validated">GM認証資料の参照情報のみです。ECUの識別情報（VIN、CAL ID、CVN、ソフトウェアID、ハードウェア部品番号）はまだ照合されていません。これらのしきい値は、このECUについて検証済みではありません。</string>
 </resources>
