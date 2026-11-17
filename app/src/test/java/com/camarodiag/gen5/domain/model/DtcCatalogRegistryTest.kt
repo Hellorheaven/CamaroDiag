@@ -90,6 +90,8 @@ class DtcCatalogRegistryTest {
 
         assertTrue(lfxEcm.hasVehicleSpecificDefinitions)
         assertEquals(DtcEvidenceStatus.DOCUMENTED, lfxEcm.evidenceStatus)
+        assertTrue(lfxEcm.noteEn.contains("Partial"))
+        assertTrue(lfxEcm.noteFr.contains("partielles"))
         assertTrue(l99_2012Ecm.hasVehicleSpecificDefinitions)
         assertTrue(llt2010Ecm.hasVehicleSpecificDefinitions)
         assertTrue(lt4_2019Ecm.hasVehicleSpecificDefinitions)
