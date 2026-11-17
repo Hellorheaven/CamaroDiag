@@ -564,4 +564,5 @@
     <string name="dtc_desc_p0017">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 1)</string>
     <string name="dtc_desc_p0018">Crankshaft Position - Intake Camshaft Position Not Plausible (Bank 2)</string>
     <string name="dtc_desc_p0019">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 2)</string>
+    <string name="dtc_gm_calibration_not_validated">GM certification reference only: ECU identity (VIN, CAL ID, CVN, operating-system ID and hardware part number) has not yet been matched. Do not treat these thresholds as validated for this ECU.</string>
 </resources>
