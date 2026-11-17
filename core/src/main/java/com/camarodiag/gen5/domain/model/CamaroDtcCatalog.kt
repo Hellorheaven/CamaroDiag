@@ -601,6 +601,10 @@ object CamaroDtcCatalog {
             isKnownV8Profile(vehicle) ->
                 "Catalogue d'interprétations détaillées disponible pour L99/LS3 Gen 5 (2010–2011). Les défauts VVT sont réservés au L99 ; le LS3 d'origine n'a pas de VVT." to
                     "Detailed interpretation catalogue available for Gen 5 L99/LS3 (2010–2011). VVT faults apply to L99 only; the factory LS3 has no VVT."
+            vehicle.modelYear == 2013 && vehicle.engine in setOf(CamaroEngine.L99, CamaroEngine.LS3) &&
+                Gm2013V8MonitorCatalog.find("P0101", vehicle) != null ->
+                "Référence GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée ; P0101/P0102/P0103 et les moniteurs de chauffage O2 sont documentés pour les V8 atmosphériques L99/LS3 2013. Les moniteurs propres au compresseur et à l'IAT2 ne s'appliquent pas à ces moteurs. Les autres moniteurs restent à extraire et vérifier." to
+                    "GM reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified; P0101/P0102/P0103 and oxygen-sensor heater monitors are documented for the 2013 naturally aspirated L99/LS3 V8 engines. Supercharger- and IAT2-specific monitors do not apply to these engines. Other monitors still need extraction and verification."
             vehicle.engine == CamaroEngine.LT4 && vehicle.modelYear == 2019 ->
                 "Données de surveillance GM disponibles pour le LT4 2019 sur P0196, P0197 et P0198 uniquement. Elles décrivent les critères OBD de certification et ne constituent pas un arbre de réparation complet." to
                     "GM monitor evidence is available for the 2019 LT4 for P0196, P0197 and P0198 only. It describes OBD certification criteria and is not a complete service repair diagnostic tree."
