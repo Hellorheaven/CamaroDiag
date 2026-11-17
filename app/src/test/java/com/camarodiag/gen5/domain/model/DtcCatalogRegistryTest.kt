@@ -36,6 +36,9 @@ class DtcCatalogRegistryTest {
             "LT4" to Triple(8, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.DIRECT_INJECTION)
         )
         assertEquals(expected.keys, DtcCatalogRegistry.engineProfiles.keys)
+        assertEquals(2016..2023, CamaroEngine.LTG.years)
+        assertEquals(2016..2023, DtcCatalogRegistry.engineProfiles.getValue("LTG").modelYears)
+        assertEquals(CamaroEngine.LTG.years, DtcCatalogRegistry.engineProfile(CamaroEngine.LTG)?.modelYears)
         expected.forEach { (rpo, architecture) ->
             val profile = DtcCatalogRegistry.engineProfiles.getValue(rpo)
             assertEquals(architecture.first, profile.cylinderCount)
