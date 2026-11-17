@@ -561,5 +561,5 @@
     <string name="dtc_desc_p0017">크랭크축 위치와 배기 캠축 위치 상관관계 이상(뱅크 1)</string>
     <string name="dtc_desc_p0018">크랭크축 위치와 흡기 캠축 위치 상관관계 이상(뱅크 2)</string>
     <string name="dtc_desc_p0019">크랭크축 위치와 배기 캠축 위치 상관관계 이상(뱅크 2)</string>
-    <string name="dtc_gm_calibration_not_validated">GM 인증 자료 참조일 뿐입니다. ECU 식별 정보(VIN, CAL ID, CVN, 소프트웨어 ID 및 하드웨어 부품 번호)는 아직 대조되지 않았습니다. 이 임계값은 해당 ECU에 대해 검증된 값이 아닙니다.</string>
+    <string name="dtc_gm_calibration_not_validated">아래 해석과 임계값은 선택한 엔진 및 연식에 대한 참고 자료입니다. ECU 식별 정보(VIN, CAL ID, CVN, 소프트웨어 ID 및 하드웨어 부품 번호)는 아직 확인되지 않았으며, 이 데이터는 연결된 ECU에 대해 검증되지 않았습니다.</string>
 </resources>
