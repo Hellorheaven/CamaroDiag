@@ -57,14 +57,19 @@ class CamaroCalibrationCatalogTest {
         val valid2022 = CamaroCalibrationCatalog.forVehicle(
             VehicleProfile(modelYear = 2022, engine = CamaroEngine.LTG)
         )
+        val valid2023 = CamaroCalibrationCatalog.forVehicle(
+            VehicleProfile(modelYear = 2023, engine = CamaroEngine.LTG)
+        )
         val invalid = CamaroCalibrationCatalog.forVehicle(
             VehicleProfile(modelYear = 2024, engine = CamaroEngine.LTG)
         )
 
         assertNotNull(valid)
         assertNotNull(valid2022)
+        assertNotNull(valid2023)
         assertEquals("GM E80 (RPO LTG)", valid?.nominalControllerFamily)
         assertEquals("GM E80 (RPO LTG)", valid2022?.nominalControllerFamily)
+        assertEquals("GM E80 (RPO LTG)", valid2023?.nominalControllerFamily)
         assertNull(invalid)
     }
 
