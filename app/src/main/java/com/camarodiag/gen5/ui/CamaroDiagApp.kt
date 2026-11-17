@@ -1095,6 +1095,12 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             if (!applicability.isNullOrBlank()) {
                                 Text(applicability, color = WarnRed)
                             }
+                        } else if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            Text(
+                                stringResource(R.string.dtc_vehicle_specific_not_documented),
+                                color = TextMuted,
+                                fontSize = 12.sp
+                            )
                         }
                     }
                 }
