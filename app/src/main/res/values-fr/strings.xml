@@ -568,4 +568,10 @@
     <string name="dtc_desc_p0018">Corrélation vilebrequin / arbre à cames d\'admission non plausible (banc 2)</string>
     <string name="dtc_desc_p0019">Corrélation vilebrequin / arbre à cames d\'échappement non plausible (banc 2)</string>
     <string name="dtc_gm_calibration_not_validated">Les interprétations et seuils ci-dessous sont des références pour le moteur et le millésime sélectionnés. L'identité du calculateur (VIN, CAL ID, CVN, identifiant logiciel et référence matérielle) n'est pas encore vérifiée : ces données ne sont pas validées pour l'ECU connecté.</string>
+    <string name="dtc_gm_monitor_title">Surveillance moteur GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Critère de déclenchement : %1$s</string>
+    <string name="dtc_gm_monitor_enable">Conditions d\'activation : %1$s</string>
+    <string name="dtc_gm_monitor_failure">Compteur / fréquence de validation : %1$s</string>
+    <string name="dtc_gm_monitor_mil">Classe MIL : %1$s</string>
+    <string name="dtc_gm_monitor_source">Source : GM %1$s, page %2$d</string>
 </resources>
