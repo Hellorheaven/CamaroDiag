@@ -959,10 +959,23 @@ fun Sparkline(values: List<Double>, minVal: Double, maxVal: Double) {
 }
 
 @Composable
-private fun localizedDtcStatus(dtc: DiagnosticDtc): String = when {
-    dtc.isPending -> stringResource(R.string.obd_pending)
-    dtc.statusEn.equals("Permanent", ignoreCase = true) -> stringResource(R.string.obd_permanent)
-    else -> stringResource(R.string.obd_confirmed)
+private fun localizedDtcStatus(dtc: DiagnosticDtc): String {
+    val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+    val rawStatus = dtc.statusEn.trim()
+    // UDS ReadDTCInformation carries eight independent status bits. Preserve their
+    // complete decoded summary instead of collapsing it to a single pending/confirmed badge.
+    if (rawStatus.isNotBlank() &&
+        !rawStatus.equals("Pending", ignoreCase = true) &&
+        !rawStatus.equals("Confirmed", ignoreCase = true) &&
+        !rawStatus.equals("Permanent", ignoreCase = true)
+    ) {
+        return (if (isFrench) dtc.statusFr else dtc.statusEn).ifBlank { rawStatus }
+    }
+    return when {
+        dtc.isPending -> stringResource(R.string.obd_pending)
+        dtc.statusEn.equals("Permanent", ignoreCase = true) -> stringResource(R.string.obd_permanent)
+        else -> stringResource(R.string.obd_confirmed)
+    }
 }
 
 @Composable
