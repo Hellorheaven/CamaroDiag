@@ -271,7 +271,7 @@ Les résumés GM permettent d'associer les premières motorisations Gen 6 à leu
 - 2016 : LTG Camaro → `16OBDG03` ; LGX Camaro → `16OBDG05` ; LT1 Camaro → `16OBDG07A`.
 - 2017 : LTG, LGX, LT1 et LT4 Camaro → `17OBDG03`.
 - 2018 : LTG, LGX, LT1 et LT4 Camaro → `18OBDG03A`.
-- 2019 : dossier `19OBDG03A`, avec tables ECM communes et section ECM dédiée LT4 Camaro.
+- 2019 : LT1 et LT4 Camaro → `19OBDG03A` (le dossier LT4 contient la section ECM dédiée Camaro) ; LTG et LGX Camaro → `19OBDG03B`.
 - 2020 : LTG, LGX, LT1 et LT4 Camaro → `20OBDG03A`.
 - 2021 : LTG → `21OBDG03A` ; LGX, LT1 et LT4 → `21OBDG03B`.
 - 2022 : LTG → `22OBDG03A` ; LGX, LT1 et LT4 → `22OBDG03B`.
