@@ -216,7 +216,7 @@ private fun localizedObdPidName(value: ObdValue): String = when (value.pid) {
     0x10 -> stringResource(R.string.live_pid_maf)
     0x11 -> stringResource(R.string.live_pid_throttle)
     0x42 -> stringResource(R.string.live_pid_bat)
-    else -> value.name
+    else -> stringResource(R.string.obd_pid_generic, value.pid)
 }
 
 @Composable

@@ -684,7 +684,7 @@ private fun localizedModuleName(module: EcuModule): String = when (module.id) {
     "IPC" -> stringResource(R.string.module_ipc_name)
     "EBCM" -> stringResource(R.string.module_ebcm_name)
     "SDM" -> stringResource(R.string.module_sdm_name)
-    else -> module.nameEn
+    else -> module.shortName
 }
 
 @Composable
@@ -705,7 +705,7 @@ private fun localizedModuleNotes(module: EcuModule): String {
         "IPC" -> if (notes.startsWith("Secondary odometer")) stringResource(R.string.module_note_ipc_gen6) else stringResource(R.string.module_note_ipc_gen5)
         "EBCM" -> if (notes.startsWith("Enhanced module")) stringResource(R.string.module_note_ebcm_gen6) else stringResource(R.string.module_note_ebcm_gen5)
         "SDM" -> stringResource(R.string.module_note_sdm)
-        else -> module.notesEn
+        else -> stringResource(R.string.module_note_unavailable)
     }
 }
 
@@ -838,7 +838,7 @@ private fun localizedLivePidLabel(pid: LivePidValue): String {
         "MAP" -> stringResource(R.string.live_pid_map)
         "IAT" -> stringResource(R.string.live_pid_iat)
         "MAF" -> stringResource(R.string.live_pid_maf)
-        else -> pid.labelEn
+        else -> stringResource(R.string.live_pid_generic, pid.id)
     }
 }
 
@@ -1094,7 +1094,7 @@ private fun localizedMileageSourceName(item: MileageSourceReading): String = whe
     "BCM" -> stringResource(R.string.module_bcm_name)
     "IPC" -> stringResource(R.string.module_ipc_name)
     "ECM_TOTAL_ODO" -> stringResource(R.string.mileage_source_ecm_total)
-    else -> item.moduleNameEn
+    else -> stringResource(R.string.mileage_source_generic, item.moduleId)
 }
 
 @Composable
@@ -1112,7 +1112,7 @@ private fun localizedMileageDetails(item: MileageSourceReading): String = when (
         if (item.didInfo.contains("not advertised by ECU")) stringResource(R.string.mileage_pid_not_advertised) else item.didInfo.substringAfter("•", item.didInfo).trim()
     )
     "BCM", "IPC" -> stringResource(R.string.mileage_details_module_not_read)
-    else -> item.didInfo
+    else -> stringResource(R.string.mileage_details_unavailable)
 }
 
 @Composable
@@ -1130,7 +1130,7 @@ private fun localizedMileageCaveat(item: MileageSourceReading): String = when (i
     "ECM_D3" -> stringResource(if (item.kmValue != null) R.string.mileage_caveat_ecm_d3_valid else R.string.mileage_caveat_ecm_d3_missing)
     "BCM" -> stringResource(R.string.mileage_caveat_bcm)
     "IPC" -> stringResource(R.string.mileage_caveat_ipc)
-    else -> item.caveatEn
+    else -> stringResource(R.string.mileage_caveat_unavailable)
 }
 
 @Composable
