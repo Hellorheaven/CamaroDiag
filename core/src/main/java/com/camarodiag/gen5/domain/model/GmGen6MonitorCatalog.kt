@@ -3,9 +3,10 @@ package com.camarodiag.gen5.domain.model
 /**
  * GM OBD certification-group provenance for sixth-generation Camaro engines.
  *
- * A source label identifies the certification document to consult. It does not
- * mean that detailed monitor thresholds or service diagnostic procedures have
- * been imported for that engine/year.
+ * A source label identifies the certification document to consult. The
+ * source label alone does not imply that detailed monitor thresholds or service
+ * diagnostic procedures have been imported; those are exposed only by a
+ * separately scoped evidence catalogue when its exact profile is supported.
  */
 object GmGen6MonitorCatalog {
     fun sourceLabel(vehicle: VehicleProfile): String? =
