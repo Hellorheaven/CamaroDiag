@@ -233,12 +233,13 @@ object DtcCatalogRegistry {
     fun genericDescription(code: String): Pair<String, String>? =
         saeGenericDescriptions[code.trim().uppercase(Locale.ROOT)]
 
+    /**
+     * Keep the summary status in sync with the exact per-module catalogue
+     * routing. Previously this method reported every non-LFX ECM as generic,
+     * even when LLT, V8 or the 2019 LT4 had dedicated evidence entries.
+     */
     fun evidenceStatus(vehicle: VehicleProfile, moduleId: String): DtcEvidenceStatus =
-        if (moduleId.equals("ECM", true) && CamaroDtcCatalog.isKnownLfxProfile(vehicle)) {
-            DtcEvidenceStatus.DOCUMENTED
-        } else {
-            DtcEvidenceStatus.GENERIC_ONLY
-        }
+        catalogueFor(moduleId, vehicle).evidenceStatus
 
     fun catalogueFor(moduleId: String, vehicle: VehicleProfile): DtcModuleCatalogue {
         val id = moduleId.trim().uppercase(Locale.ROOT)
