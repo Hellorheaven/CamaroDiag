@@ -590,6 +590,11 @@ object CamaroDtcCatalog {
             isKnownLltProfile(vehicle) ->
                 "Catalogue d'interprétations détaillées disponible pour LLT Gen 5 (2010–2011), en français et anglais, avec moniteurs GM propres à chaque millésime." to
                     "Detailed interpretation catalogue available for Gen 5 LLT (2010–2011), in French and English, with year-specific GM monitor evidence."
+            vehicle.modelYear == 2012 && vehicle.engine in setOf(
+                CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA
+            ) ->
+                "Catalogue DTC V8 Gen 5 2012 disponible pour L99, LS3 et LSA, avec interprétations bilingues et moniteurs GM propres à chaque architecture. Les codes non répertoriés restent à documenter." to
+                    "Gen 5 2012 V8 DTC catalogue available for L99, LS3 and LSA, with bilingual interpretations and GM monitors scoped to each architecture. Unlisted codes remain to be documented."
             isKnownV8Profile(vehicle) ->
                 "Catalogue d'interprétations détaillées disponible pour L99/LS3 Gen 5 (2010–2011). Les défauts VVT sont réservés au L99 ; le LS3 d'origine n'a pas de VVT." to
                     "Detailed interpretation catalogue available for Gen 5 L99/LS3 (2010–2011). VVT faults apply to L99 only; the factory LS3 has no VVT."
