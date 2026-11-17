@@ -606,8 +606,8 @@ object CamaroDtcCatalog {
                     "GM monitor evidence is available for the 2019 LT4 for P0196, P0197 and P0198 only. It describes OBD certification criteria and is not a complete service repair diagnostic tree."
             vehicle.modelYear == 2013 && vehicle.engine == CamaroEngine.LSA &&
                 GmEngineMonitorCatalog.find("P0033", vehicle) != null ->
-                "Référence GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée ; P0101, les moniteurs de chauffage O2 et le circuit de dérivation du compresseur P0033 sont documentés pour le LSA. Les autres moniteurs restent à extraire et vérifier." to
-                    "GM reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified; P0101, oxygen-sensor heater monitors and the LSA supercharger bypass circuit P0033 are documented. Other monitors still need extraction and verification."
+                "Référence GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée ; P0101, les moniteurs de chauffage O2, le circuit de dérivation du compresseur P0033 et la corrélation de pression P006D sont documentés pour le LSA. Les autres moniteurs restent à extraire et vérifier." to
+                    "GM reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified; P0101, oxygen-sensor heater monitors, the LSA supercharger bypass circuit P0033 and supercharger pressure correlation P006D are documented. Other monitors still need extraction and verification."
             GmEngineMonitorCatalog.find("P0101", vehicle) != null ->
                 "Référence GM ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identifiée ; P0101 et les moniteurs de chauffage O2 sont documentés pour cette motorisation. Les autres moniteurs restent à extraire et vérifier." to
                     "GM reference ${GmEngineMonitorCatalog.sourceLabel(vehicle)} identified; P0101 and oxygen-sensor heater monitors are documented for this engine. Other monitors still need extraction and verification."
