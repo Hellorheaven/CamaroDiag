@@ -123,7 +123,7 @@ class UdsClientTest {
     }
 
     @Test fun parsesDtcRecordsUsingAvailabilityMaskAndFourByteRecords() = runBlocking {
-        val transport = FakeTransport(listOf(response(0x59, 0x02, 0x05, 0x12, 0x34, 0x56, 0x09)))
+        val transport = FakeTransport(listOf(response(0x59, 0x02, 0x05, 0x00, 0x12, 0x34, 0x56, 0x09)))
         val client = UdsClient(transport, 0x7E0, 0x7E8)
 
         val dtcs = client.readDtcByStatusMask()
@@ -131,6 +131,23 @@ class UdsClientTest {
         assertEquals(1, dtcs.size)
         assertEquals(0x123456, dtcs.single().dtc)
         assertEquals(0x09, dtcs.single().status)
+        assertEquals(6, dtcs.single().raw.size)
+        assertEquals(0x05, dtcs.single().raw[0].toInt() and 0xFF)
+        assertEquals(0x00, dtcs.single().raw[1].toInt() and 0xFF)
+    }
+
+    @Test
+    fun exposesDtcFormatIdentifierAndSaEFormattedCode() = runBlocking {
+        val transport = FakeTransport(listOf(response(0x59, 0x02, 0xFF, 0x00, 0x01, 0x01, 0x01, 0x08)))
+        val client = UdsClient(transport, 0x7E0, 0x7E8)
+
+        val report = client.readDtcReport()
+
+        assertEquals(0xFF, report.statusAvailabilityMask)
+        assertEquals(0x00, report.formatIdentifier)
+        assertEquals(UdsDtcFormat.SAE_J2012_DA_FORMAT_00, report.format)
+        assertEquals("P0101-01", report.records.single().code)
+        assertTrue(report.records.single().status.confirmed)
     }
 
     @Test fun memoryAccessMustStayInsideVerifiedRegion() = runBlocking {
