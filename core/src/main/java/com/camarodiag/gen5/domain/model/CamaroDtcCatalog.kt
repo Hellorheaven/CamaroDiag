@@ -420,12 +420,9 @@ object CamaroDtcCatalog {
      */
     fun applicabilityNotice(code: String, vehicle: VehicleProfile): Pair<String, String>? {
         val normalized = code.trim().uppercase(Locale.ROOT)
-        val cylinderCount = when (vehicle.engine) {
-            CamaroEngine.LLT, CamaroEngine.LFX, CamaroEngine.LTG, CamaroEngine.LGX -> 4.takeIf { vehicle.engine == CamaroEngine.LTG } ?: 6
-            CamaroEngine.LS3, CamaroEngine.L99, CamaroEngine.LSA, CamaroEngine.LS7,
-            CamaroEngine.LT1, CamaroEngine.LT4 -> 8
-        }
-        val forcedInduction = vehicle.engine in setOf(CamaroEngine.LTG, CamaroEngine.LSA, CamaroEngine.LT4)
+        val engineProfile = DtcCatalogRegistry.engineProfile(vehicle.engine) ?: return null
+        val cylinderCount = engineProfile.cylinderCount
+        val forcedInduction = engineProfile.induction != EngineInductionType.NATURALLY_ASPIRATED
         return when {
             normalized == "P0307" && cylinderCount < 7 ->
                 "P0307 cible le cylindre 7, absent du moteur ${vehicle.engine.rpo} à $cylinderCount cylindres. Vérifier le code brut, le calculateur répondant, le VIN et le RPO avant toute interprétation." to
