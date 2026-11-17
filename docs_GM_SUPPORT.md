@@ -299,3 +299,33 @@ Références GM primaires :
 
 Référence primaire 2019 :
 - GM, 19OBDG03A Diagnostics, tables ECM communes et section « ECM Unique (LT4 Camaro) », notamment pages documentaires 1–10 et 603–608 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03A%20Diagnostics.pdf
+
+## Politique de recherche et de qualification des connaissances DTC
+
+La disponibilité d'une documentation officielle GM n'est **pas un prérequis** au développement des catalogues. CamaroDiag s'appuie en priorité sur les informations publiques accessibles sur Internet : bases de données DTC indépendantes, documentation technique de réparateurs, publications de spécialistes, forums Camaro/GM, retours d'expérience de propriétaires, dépôts communautaires et captures de diagnostic partageables.
+
+Les sources sont enregistrées avec leur URL ou leur référence précise, leur date de consultation, leur auteur/éditeur lorsqu'il est identifiable, le véhicule concerné et le périmètre réellement couvert. Les sources copiées les unes des autres ne comptent pas comme corroborations indépendantes.
+
+### Niveaux de confiance à afficher
+
+- **Normalisé** : libellé SAE/OBD générique. Il décrit le code, pas la cause propre à GM.
+- **Documenté par sources indépendantes** : explication recoupée par au moins deux sources indépendantes et cohérentes sur le code, le calculateur et l'application véhicule.
+- **Corroboré sur véhicule** : observation accompagnée d'une identification suffisamment précise du véhicule et du calculateur, avec résultat reproductible ou éléments de mesure.
+- **Piste communautaire** : information issue d'une source unique, d'un forum ou d'un retour propriétaire non recoupé. Elle peut être affichée comme hypothèse, jamais comme diagnostic certain.
+- **Inconnu / contradictoire** : données insuffisantes, incompatibles ou contradictoires ; afficher le DTC brut et les informations génériques seulement.
+
+### Règles de collecte et d'interprétation
+
+1. Rechercher chaque code sur plusieurs sources et conserver les liens, citations courtes/références, dates et contexte véhicule.
+2. Vérifier le millésime, génération, moteur/RPO, transmission, marché, calculateur, matériel et calibration lorsque ces informations sont disponibles. Ne pas étendre une observation à toute une génération sans preuve.
+3. Distinguer systématiquement le sens normalisé du DTC, le mécanisme de surveillance, les causes possibles, les contrôles recommandés et les réparations rapportées.
+4. Recouper les causes et procédures. Une réparation rapportée comme efficace par un propriétaire n'est pas une procédure universelle.
+5. Conserver les divergences entre sources et les limites d'applicabilité. Ne pas choisir arbitrairement une version.
+6. Donner la priorité aux informations techniques détaillées et reproductibles, sans considérer automatiquement un forum ou une base payante comme exacts.
+7. Respecter les licences, conditions d'utilisation et droits d'auteur : stocker des synthèses originales et des références, pas recopier des pages ou bases complètes.
+8. En l'absence de source officielle, ne jamais fabriquer une attribution GM. Présenter l'information comme issue de sources indépendantes ou communautaires.
+9. Les procédures touchant à la sécurité, aux airbags, à l'antidémarrage, aux actionneurs, à la programmation ou à l'effacement doivent conserver des garde-fous spécifiques ; une source communautaire isolée ne suffit jamais à autoriser une commande.
+
+Les sources de code sont représentées dans `DtcDefinitionSource` par des catégories distinctes : `INDEPENDENT_TECHNICAL_PUBLICATION`, `SPECIALIST_REPAIR_DATABASE`, `COMMUNITY_DATABASE`, `TECHNICAL_FORUM`, `OWNER_REPAIR_REPORT` et `VEHICLE_VALIDATED_CAPTURE`. Les catégories `GM_SERVICE_INFORMATION` et `GM_BULLETIN` restent possibles si une référence publique apparaît, mais ne sont plus des conditions de progression ou de complétude.
+
+**Critère d'acceptation :** chaque explication spécifique à un véhicule doit exposer son niveau de confiance et ses sources. Les données non corroborées restent identifiées comme hypothèses ; aucune cause, compatibilité ou réparation ne doit être présentée comme certaine sur la seule base du code DTC.
