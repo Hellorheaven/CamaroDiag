@@ -527,22 +527,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val baseCode = record.code.substringBefore('-')
                     val standard = DtcCatalogRegistry.genericDescription(baseCode)
                     val vehicleSpecific = CamaroDtcCatalog.find(baseCode, _vehicle.value)
-                    val status = buildList {
-                        if (record.status.testFailed) add("failed")
-                        if (record.status.pending) add("pending")
-                        if (record.status.confirmed) add("confirmed")
-                        if (record.status.warningIndicatorRequested) add("warning indicator requested")
-                    }.ifEmpty { listOf("status not asserted") }.joinToString(", ")
-                    DiagnosticDtc(
-                        code = record.code,
-                        module = moduleId,
-                        statusEn = status,
-                        statusFr = status,
+                    val rawCode = "0x${record.rawDtc.toString(16).uppercase().padStart(6, '0')}"
+                    record.toDiagnosticDtc(moduleId).copy(
                         descEn = vehicleSpecific?.meaningEn ?: standard?.first
-                            ?: "Raw OEM DTC 0x${record.rawDtc.toString(16).uppercase().padStart(6, '0')}; no verified definition is loaded for this ECU.",
+                            ?: "Raw OEM DTC $rawCode; no verified definition is loaded for this ECU.",
                         descFr = vehicleSpecific?.meaningFr ?: standard?.second
-                            ?: "DTC constructeur brut 0x${record.rawDtc.toString(16).uppercase().padStart(6, '0')} ; aucune définition vérifiée n'est chargée pour ce calculateur.",
-                        isPending = record.status.pending
+                            ?: "DTC constructeur brut $rawCode ; aucune définition vérifiée n'est chargée pour ce calculateur."
                     )
                 }
                 _dtcs.value = _dtcs.value.filterNot { it.module == moduleId } + mappedDtcs
