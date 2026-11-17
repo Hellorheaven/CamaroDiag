@@ -556,4 +556,9 @@
     <string name="trace_error_csv_empty">O rastro CSV está vazio.</string>
     <string name="trace_error_csv_columns">O CSV precisa de uma coluna CAN ID e uma coluna de dados/payload, ou colunas data0…data15.</string>
     <string name="trace_error_generic">O rastro contém um registo inválido ou não suportado.</string>
+    <string name="dtc_vehicle_interpretation">Interpretação específica do veículo</string>
+    <string name="dtc_severity">Gravidade</string>
+    <string name="dtc_possible_causes">Causas possíveis (não confirmadas)</string>
+    <string name="dtc_recommended_checks">Verificações recomendadas</string>
+    <string name="dtc_vehicle_specific_not_documented">Ainda não existe um procedimento específico documentado para este código e configuração. A descrição OEM/SAE é apresentada acima; confirme o VIN e o módulo nas informações de serviço GM.</string>
 </resources>
