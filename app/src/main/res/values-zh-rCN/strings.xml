@@ -102,7 +102,7 @@
     <string name="dtc_title">诊断故障码</string>
     <string name="dtc_scan">扫描</string>
     <string name="dtc_clear">清除</string>
-    <string name="dtc_clear_warning">模式 04 清除会删除与排放相关的故障码，并重置部分就绪监测器。继续前请保存报告。</string>
+    <string name="dtc_clear_warning">模式 04 清除会删除与排放相关的故障码，并重置部分就绪监测器。继续前请保存报告。 Mode 04 不会清除存储在车辆其他控制模块中的增强型 DTC。</string>
     <string name="dtc_none_returned">上次扫描未返回故障码。</string>
     <string name="dtc_confirm_clear">确认清除 DTC？</string>
     <string name="dtc_clear_description">此操作会向 ECU 发送 OBD Mode 04。就绪状态数据可能被重置，但不会修复故障根因。</string>
