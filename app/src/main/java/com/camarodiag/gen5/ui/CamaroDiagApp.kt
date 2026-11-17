@@ -1123,19 +1123,18 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                         if (gmMonitor != null) {
                             Divider(color = TextMuted.copy(alpha = 0.25f))
                             Text(
-                                if (isFrench) "Surveillance moteur GM – " + gmSourceLabel else "GM engine monitor – " + gmSourceLabel,
+                                stringResource(R.string.dtc_gm_monitor_title, gmSourceLabel),
                                 fontWeight = FontWeight.Bold,
                                 color = CamaroAmber
                             )
                             Text(if (isFrench) gmMonitor.componentFr else gmMonitor.componentEn, fontWeight = FontWeight.SemiBold)
                             Text(if (isFrench) gmMonitor.strategyFr else gmMonitor.strategyEn)
-                            Text(if (isFrench) "Critère de déclenchement : " + gmMonitor.malfunctionCriteriaFr else "Setting criteria: " + gmMonitor.malfunctionCriteriaEn)
-                            Text(if (isFrench) "Conditions d'activation : " + gmMonitor.enableConditionsFr else "Enable conditions: " + gmMonitor.enableConditionsEn)
-                            Text(if (isFrench) "Compteur / fréquence de validation : " + gmMonitor.failureCriteriaFr else "Failure counter / validation rate: " + gmMonitor.failureCriteriaEn)
-                            Text(if (isFrench) "Classe MIL : " + gmMonitor.milClassification else "MIL class: " + gmMonitor.milClassification)
+                            Text(stringResource(R.string.dtc_gm_monitor_criteria, if (isFrench) gmMonitor.malfunctionCriteriaFr else gmMonitor.malfunctionCriteriaEn))
+                            Text(stringResource(R.string.dtc_gm_monitor_enable, if (isFrench) gmMonitor.enableConditionsFr else gmMonitor.enableConditionsEn))
+                            Text(stringResource(R.string.dtc_gm_monitor_failure, if (isFrench) gmMonitor.failureCriteriaFr else gmMonitor.failureCriteriaEn))
+                            Text(stringResource(R.string.dtc_gm_monitor_mil, gmMonitor.milClassification))
                             Text(
-                                if (isFrench) "Source : GM " + gmSourceLabel + ", page " + gmMonitor.sourcePage
-                                else "Source: GM " + gmSourceLabel + ", page " + gmMonitor.sourcePage,
+                                stringResource(R.string.dtc_gm_monitor_source, gmSourceLabel, gmMonitor.sourcePage),
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
