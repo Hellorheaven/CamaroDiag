@@ -366,6 +366,43 @@ object CamaroDtcCatalog {
             listOf("Compare MAF/MAP and throttle angle", "Inspect intake ducts and seals", "Review fuel trims before replacing the MAF"),
             "Modérée",
             "Moderate"
+        ),
+        "P0299" to DtcVehicleExplanation(
+            "Le code P0299 concerne une sous-pression de suralimentation. Le moteur LFX 3.6L de cette Camaro est atmosphérique et ne possède pas de turbocompresseur ni de compresseur d'origine : ce code est donc incohérent avec la configuration LFX d'origine. Vérifier le code brut, le calculateur émetteur et toute modification moteur.",
+            "P0299 means underboost. The factory LFX 3.6L Camaro engine is naturally aspirated and has no factory turbocharger or supercharger, so this code is inconsistent with the stock LFX configuration. Verify the raw code, reporting module and any engine modifications.",
+            listOf("Mauvaise identification du véhicule ou du moteur", "Code décodé depuis une réponse incorrecte", "Suralimentation ajoutée après fabrication"),
+            listOf("Incorrect vehicle or engine identification", "Code decoded from an incorrect response", "Aftermarket forced-induction conversion"),
+            listOf("Relire le DTC avec son calculateur et les octets bruts", "Vérifier VIN, RPO moteur et calibration", "Ne pas remplacer de pièce de suralimentation sur la seule base de ce code"),
+            listOf("Re-read the DTC with its reporting ECU and raw bytes", "Verify VIN, engine RPO and calibration", "Do not replace boost-system parts based on this code alone"),
+            "À confirmer — incohérent avec un LFX d'origine",
+            "Unverified — inconsistent with a stock LFX",
+            "Code non applicable à un LFX atmosphérique d'origine.",
+            "Not applicable to a stock naturally aspirated LFX."
+        ),
+        "P0307" to DtcVehicleExplanation(
+            "P0307 désigne normalement des ratés sur le cylindre 7. Le V6 LFX ne possède que six cylindres : ce code n'est pas applicable à ce moteur d'origine. Vérifier le code brut et l'identification du calculateur.",
+            "P0307 normally indicates cylinder 7 misfire. The LFX V6 has only six cylinders, so this code does not apply to the stock engine. Verify the raw code and ECU identification.",
+            listOf("Mauvaise identification du moteur ou du calculateur", "Réponse de diagnostic mal décodée"),
+            listOf("Incorrect engine or ECU identification", "Incorrectly decoded diagnostic response"),
+            listOf("Relire les octets DTC bruts", "Vérifier le profil moteur sélectionné et le calculateur répondant"),
+            listOf("Re-read raw DTC bytes", "Verify selected engine profile and responding ECU"),
+            "À confirmer — code incompatible avec un V6 six cylindres",
+            "Unverified — code incompatible with a six-cylinder V6",
+            "Un cylindre 7 n'existe pas sur le LFX.",
+            "Cylinder 7 does not exist on the LFX."
+        ),
+        "P0308" to DtcVehicleExplanation(
+            "P0308 désigne normalement des ratés sur le cylindre 8. Le V6 LFX ne possède que six cylindres : ce code n'est pas applicable à ce moteur d'origine. Vérifier le code brut et l'identification du calculateur.",
+            "P0308 normally indicates cylinder 8 misfire. The LFX V6 has only six cylinders, so this code does not apply to the stock engine. Verify the raw code and ECU identification.",
+            listOf("Mauvaise identification du moteur ou du calculateur", "Réponse de diagnostic mal décodée"),
+            listOf("Incorrect engine or ECU identification", "Incorrectly decoded diagnostic response"),
+            listOf("Relire les octets DTC bruts", "Vérifier le profil moteur sélectionné et le calculateur répondant"),
+            listOf("Re-read raw DTC bytes", "Verify selected engine profile and responding ECU"),
+            "À confirmer — code incompatible avec un V6 six cylindres",
+            "Unverified — code incompatible with a six-cylinder V6",
+            "Un cylindre 8 n'existe pas sur le LFX.",
+            "Cylinder 8 does not exist on the LFX."
+        )
         )
     )
 
