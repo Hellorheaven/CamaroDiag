@@ -649,6 +649,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun localizedInspectionWarnings(inspection: CalibrationFileInspection): List<String> {
         val context = getApplication<Application>()
+        if (!inspection.valid && inspection.format in setOf(CalibrationFileFormat.INTEL_HEX, CalibrationFileFormat.MOTOROLA_S_RECORD)) {
+            return listOf(context.getString(R.string.cal_warning_invalid_file))
+        }
         return when (inspection.format) {
             CalibrationFileFormat.RAW_BINARY -> listOf(context.getString(R.string.cal_warning_binary_integrity))
             CalibrationFileFormat.UNKNOWN -> listOf(context.getString(R.string.cal_warning_unknown_format))
