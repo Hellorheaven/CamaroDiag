@@ -412,4 +412,41 @@ object CamaroDtcCatalog {
 
     fun isKnownLfxProfile(vehicle: VehicleProfile): Boolean =
         vehicle.engine == CamaroEngine.LFX && vehicle.modelYear in 2012..2015
+
+    /**
+     * Returns a configuration sanity warning only where the engine architecture
+     * makes the reported generic DTC impossible on a stock, correctly identified car.
+     * This is not an OEM diagnostic definition.
+     */
+    fun applicabilityNotice(code: String, vehicle: VehicleProfile): Pair<String, String>? {
+        val normalized = code.trim().uppercase(Locale.ROOT)
+        val cylinderCount = when (vehicle.engine) {
+            CamaroEngine.LLT, CamaroEngine.LFX, CamaroEngine.LTG, CamaroEngine.LGX -> 4.takeIf { vehicle.engine == CamaroEngine.LTG } ?: 6
+            CamaroEngine.LS3, CamaroEngine.L99, CamaroEngine.LSA, CamaroEngine.LS7,
+            CamaroEngine.LT1, CamaroEngine.LT4 -> 8
+        }
+        val forcedInduction = vehicle.engine in setOf(CamaroEngine.LTG, CamaroEngine.LSA, CamaroEngine.LT4)
+        return when {
+            normalized == "P0307" && cylinderCount < 7 ->
+                "P0307 cible le cylindre 7, absent du moteur ${vehicle.engine.rpo} à $cylinderCount cylindres. Vérifier le code brut, le calculateur répondant, le VIN et le RPO avant toute interprétation." to
+                    "P0307 targets cylinder 7, which does not exist on the ${vehicle.engine.rpo} $cylinderCount-cylinder engine. Verify raw bytes, reporting ECU, VIN and RPO before interpreting the code."
+            normalized == "P0308" && cylinderCount < 8 ->
+                "P0308 cible le cylindre 8, absent du moteur ${vehicle.engine.rpo} à $cylinderCount cylindres. Vérifier le code brut, le calculateur répondant, le VIN et le RPO avant toute interprétation." to
+                    "P0308 targets cylinder 8, which does not exist on the ${vehicle.engine.rpo} $cylinderCount-cylinder engine. Verify raw bytes, reporting ECU, VIN and RPO before interpreting the code."
+            normalized == "P0299" && !forcedInduction ->
+                "P0299 indique une sous-pression de suralimentation. Le moteur ${vehicle.engine.rpo} est atmosphérique en configuration d'origine : vérifier une éventuelle conversion, le code brut et l'identification véhicule." to
+                    "P0299 indicates underboost. The factory ${vehicle.engine.rpo} configuration is naturally aspirated: verify any aftermarket conversion, raw DTC bytes and vehicle identity."
+            else -> null
+        }
+    }
+
+    /** Explicitly states the evidence level available for the selected engine. */
+    fun coverageNotice(vehicle: VehicleProfile): Pair<String, String> =
+        if (isKnownLfxProfile(vehicle)) {
+            "Catalogue d'interprétations détaillées disponible pour LFX Gen 5 (2012–2015), en français et anglais. Les autres calculateurs et codes non répertoriés restent à documenter." to
+                "Detailed interpretation catalogue available for Gen 5 LFX (2012–2015), in French and English. Other ECUs and unlisted codes remain to be documented."
+        } else {
+            "Pour ${vehicle.engine.rpo} (${vehicle.modelYear}), les libellés SAE génériques sont disponibles, mais aucune interprétation GM détaillée validée par calibration n'est encore chargée. Ne pas transposer les causes du LFX." to
+                "For ${vehicle.engine.rpo} (${vehicle.modelYear}), generic SAE descriptions are available, but no calibration-validated detailed GM interpretation is loaded yet. Do not reuse LFX causes."
+        }
 }
