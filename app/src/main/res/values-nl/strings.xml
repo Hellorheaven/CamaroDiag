@@ -137,7 +137,7 @@
     <string name="cal_can_request_id">CAN-verzoek-ID (bijv. 7E0)</string>
     <string name="cal_can_response_id">CAN-antwoord-ID (bijv. 7E8)</string>
     <string name="cal_can_profile">CAN-profiel: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
-    <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
+    <string name="cal_uds_did">UDS-DID (F190 = VIN)</string>
     <string name="cal_j2534_bridge_title">J2534-PC-BRIDGE • VXDIAG VCX SE / NANO</string>
     <string name="cal_j2534_launch_instructions">Voer CamaroDiag.J2534Bridge.exe uit op de Windows-pc en vul het IP-adres en token uit de console in. Beide apparaten moeten zich op hetzelfde lokale netwerk bevinden.</string>
     <string name="cal_j2534_security_notice">Beveiliging: het token is niet met TLS versleuteld. Gebruik een vertrouwd privénetwerk en stel deze poort nooit bloot aan internet.</string>
@@ -216,7 +216,7 @@
     <string name="update_install">Installeren</string>
     <string name="update_download">Downloaden</string>
     <string name="update_later">Later</string>
-    <string name="vehicle_generation_label">Generation %1$d</string>
+    <string name="vehicle_generation_label">Generatie %1$d</string>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel (2012–2015)</string>
     <string name="engine_ls3">6.2L V8 handgeschakeld (426 pk)</string>
@@ -281,12 +281,12 @@
     <string name="remote_start_blocker_faults">De afwezigheid van kritieke storingen is niet bevestigd.</string>
     <string name="remote_start_blocker_stationary">Stilstand van het voertuig is niet bevestigd.</string>
     <string name="remote_start_blocker_equipment">De originele uitrusting voor starten op afstand is niet bevestigd.</string>
-    <string name="units_metric">SI / Metric</string>
-    <string name="units_imperial">Imperial</string>
-    <string name="live_pause">Pause</string>
-    <string name="live_recording_status">Samples: %1$d • %2$s</string>
-    <string name="live_recording_state_active">RECORDING</string>
-    <string name="live_recording_state_stopped">STOPPED</string>
+    <string name="units_metric">SI / Metrisch</string>
+    <string name="units_imperial">Imperiaal</string>
+    <string name="live_pause">Pauze</string>
+    <string name="live_recording_status">Meetpunten: %1$d • %2$s</string>
+    <string name="live_recording_state_active">OPNAME</string>
+    <string name="live_recording_state_stopped">GESTOPT</string>
     <string name="live_pid_rpm">Motortoerental</string>
     <string name="live_pid_rpm_demo">Motortoerental (DEMO)</string>
     <string name="live_pid_ect">Koelvloeistoftemperatuur</string>
@@ -302,7 +302,7 @@
     <string name="live_pid_map">Inlaatspruitstukdruk</string>
     <string name="live_pid_iat">Inlaatluchttemperatuur</string>
     <string name="live_pid_maf">Luchtmassastroom</string>
-    <string name="dtc_description_unavailable">Description unavailable in the local dictionary; check GM service information for this VIN.</string>
+    <string name="dtc_description_unavailable">Beschrijving niet beschikbaar in het lokale woordenboek; raadpleeg de GM-servicegegevens voor dit VIN.</string>
     <string name="dtc_desc_p0101">Luchtmassastroomcircuit: bereik/prestatie</string>
     <string name="dtc_desc_p0102">Luchtmassastroomcircuit: laag ingangssignaal</string>
     <string name="dtc_desc_p0103">Luchtmassastroomcircuit: hoog ingangssignaal</string>
@@ -361,11 +361,11 @@
     <string name="mileage_caveat_ecm_d3_missing">PID D3 is niet door de ECU aangeboden of gaf geen geldig antwoord.</string>
     <string name="mileage_caveat_bcm">De BCM-kilometergegevens zijn niet opgevraagd: er is geen geverifieerd VIN-specifiek adres-/DID-profiel geïnstalleerd.</string>
     <string name="mileage_caveat_ipc">De IPC-kilometergegevens zijn niet opgevraagd: er is geen geverifieerd VIN-specifiek adres-/DID-profiel geïnstalleerd.</string>
-    <string name="common_none">none</string>
-    <string name="cal_engine_profile">Engine profile: %1$s • %2$s • %3$d–%4$d</string>
-    <string name="cal_engine_profile_missing">No engine profile for this model year</string>
-    <string name="cal_catalogued_engines">Catalogued engines for %1$d: %2$s</string>
-    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Binary read: %2$s • Validated engine tables: %3$s • ECU flash: %4$s</string>
+    <string name="common_none">geen</string>
+    <string name="cal_engine_profile">Motorprofiel: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_engine_profile_missing">Geen motorprofiel voor dit modeljaar</string>
+    <string name="cal_catalogued_engines">Gecatalogiseerde motoren voor %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Binaire uitlezing: %2$s • Gevalideerde motortabellen: %3$s • ECU-flash: %4$s</string>
     <string name="cal_status_profiled">geprofileerd</string>
     <string name="cal_status_not_verified">niet geverifieerd</string>
     <string name="cal_status_validated">gevalideerd</string>
@@ -374,13 +374,13 @@
     <string name="cal_status_not_supplied">niet aangeleverd</string>
     <string name="cal_status_disabled">uitgeschakeld</string>
     <string name="cal_status_unresolved">niet opgelost</string>
-    <string name="cal_signal_metadata">DID 0x%1$s • request %2$s / response %3$s • interval %4$d s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • verzoek %2$s / antwoord %3$s • interval %4$d s</string>
     <string name="cal_axis_x">X-as</string>
     <string name="cal_axis_y">Y-as</string>
     <string name="cal_axis_summary">%1$s: %2$s</string>
     <string name="cal_axis_undefined">niet gedefinieerd</string>
     <string name="cal_axis_values">0x%1$s • aantal=%2$d • %3$s</string>
-    <string name="adapter_hardware_profile_only">Hardware profile only; an official Android SDK/API or documented bridge is still required.</string>
+    <string name="adapter_hardware_profile_only">Alleen hardwareprofiel; een officiële Android-SDK/API of gedocumenteerde bridge is nog steeds vereist.</string>
     <string name="cal_profile_notes_llt">Camaro Gen 5 LLT V6. Nominale voertuigprofielfamilie; lees vóór elke binaire bewerking de werkelijke CAL ID-, CVN- en hardware-/software-identificaties uit.</string>
     <string name="cal_profile_notes_lfx">Camaro Gen 5 LFX V6. E39/E39A is een profielindicatie; maak onderscheid tussen OS en kalibratie met identificaties die uit de ECU zijn gelezen.</string>
     <string name="cal_profile_notes_ls3">Camaro Gen 5 LS3 V8 zonder drukvulling, doorgaans gekoppeld aan een handgeschakelde transmissie. Controleer het hardwareonderdeelnummer, OS en CAL ID van de gemonteerde ECU.</string>
@@ -423,7 +423,7 @@
     <string name="msg_wifi_connection_failed">OBD-wifi-verbinding mislukt</string>
     <string name="msg_usb_connection_failed">OBD-USB-verbinding mislukt</string>
     <string name="msg_bluetooth_connection_failed">Bluetooth-SPP-verbinding mislukt</string>
-    <string name="mileage_audit_not_run">Audit not run</string>
+    <string name="mileage_audit_not_run">Controle niet uitgevoerd</string>
     <string name="msg_uds_read_failed">UDS-uitlezing mislukt.</string>
     <string name="msg_uds_dtc_read_failed">UDS-DTC-uitlezing mislukt.</string>
     <string name="msg_cal_identifiers_read">VIN / CAL ID / CVN uitgelezen via modus 09. Deze identificaties vormen geen binaire kalibratie-uitlezing.</string>
@@ -451,22 +451,22 @@
     <string name="msg_live_recording_channel_lost">OBD-II-kanaal niet beschikbaar: opname gestopt om vermenging van demogegevens of UDS-transport te voorkomen.</string>
     <string name="msg_live_recording_max_samples">Veiligheidslimiet bereikt (%1$d); opname automatisch gestopt.</string>
     <string name="vehicle_ecm_label">ECM: %1$s</string>
-    <string name="vehicle_vin_placeholder">17 characters</string>
+    <string name="vehicle_vin_placeholder">17 tekens</string>
     <string name="module_bus_hscan">HS-CAN (500 kbps)</string>
     <string name="module_bus_swcan">SW-CAN GMLAN (33.3 kbps)</string>
-    <string name="module_bus_unknown">Bus to identify</string>
+    <string name="module_bus_unknown">Bus nog te identificeren</string>
     <string name="module_can_headers">TX: 0x%1$s | RX: 0x%2$s (%3$s)</string>
-    <string name="units_metric_details">Metric (km, °C, kPa)</string>
-    <string name="units_imperial_details">Imperial (mi, °F, PSI)</string>
+    <string name="units_metric_details">Metrisch (km, °C, kPa)</string>
+    <string name="units_imperial_details">Imperiaal (mi, °F, PSI)</string>
     <string name="session_vin_label">VIN: %1$s</string>
-    <string name="session_dtcs_label">DTCs: %1$s</string>
-    <string name="cal_tcp_port">TCP port</string>
+    <string name="session_dtcs_label">DTC's: %1$s</string>
+    <string name="cal_tcp_port">TCP-poort</string>
     <string name="cal_uds_did_title">UDS %1$s</string>
     <string name="cal_mode09_vin_label">VIN • 09 02</string>
     <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
     <string name="cal_mode09_cvn_label">CVN • 09 06</string>
     <string name="cal_file_hash_label">SHA-256</string>
-    <string name="update_version_channel">Version %1$s • %2$s</string>
+    <string name="update_version_channel">Versie %1$s • %2$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
 
     <plurals name="vm_native_catalog_loaded">
