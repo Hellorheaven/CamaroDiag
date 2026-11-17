@@ -194,6 +194,35 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun acceptsExactlyFiveIsoTpFlowControlWaitFramesBeforeContinueToSend() = runBlocking {
+        val flowControlWait = CanFrame(0x7E8, byteArrayOf(0x31, 0x00, 0x00))
+        val flowControlContinue = CanFrame(0x7E8, byteArrayOf(0x30, 0x00, 0x00))
+        val transport = FakeCanTransport(List(5) { flowControlWait } + flowControlContinue)
+        val channel = IsoTpChannel(transport, 0x7E0, 0x7E8)
+
+        channel.sendOnly(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 100)
+
+        assertEquals(2, transport.sent.size)
+        assertEquals(0x10, transport.sent.first().data[0].toInt() and 0xF0)
+        assertEquals(0x21, transport.sent.last().data[0].toInt() and 0xFF)
+    }
+
+    @Test
+    fun rejectsTheSixthIsoTpFlowControlWaitFrame() = runBlocking {
+        val flowControlWait = CanFrame(0x7E8, byteArrayOf(0x31, 0x00, 0x00))
+        val transport = FakeCanTransport(List(6) { flowControlWait })
+        val channel = IsoTpChannel(transport, 0x7E0, 0x7E8)
+
+        val error = runCatching {
+            channel.sendOnly(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 100)
+        }.exceptionOrNull()
+
+        assertTrue(error is IsoTpException)
+        assertTrue(error?.message?.contains("wait limit") == true)
+        assertEquals(1, transport.sent.size)
+    }
+
+    @Test
     fun rejectsInvalidCanIdentifiersAndPayloadLengths() {
         assertTrue(runCatching { CanFrame(0x800, byteArrayOf(1)) }.isFailure)
         assertTrue(runCatching { CanFrame(0x7E0, ByteArray(9)) }.isFailure)
