@@ -54,6 +54,15 @@ class UdsDtcDecoderTest {
     }
 
     @Test
+    fun keepsSaeJ2012Format04OpaqueUntilItsDistinctBaseCodeTableIsAvailable() {
+        val report = UdsDtcDecoder.decodeReadDtcInformation(
+            byteArrayOf(0xFF.toByte(), 0x04, 0x01, 0x23, 0x45, 0x08)
+        )
+        assertEquals(UdsDtcFormat.SAE_J2012_DA_FORMAT_04, report.format)
+        assertEquals("0x012345", report.records.single().code)
+    }
+
+    @Test
     fun keepsUnknownDtcFormatOpaqueInsteadOfGuessing() {
         val report = UdsDtcDecoder.decodeReadDtcInformation(
             byteArrayOf(0xFF.toByte(), 0x7F, 0x01, 0x02, 0x03, 0x00)
