@@ -67,6 +67,12 @@ class DtcCatalogRegistryTest {
         val lt4_2019Ecm = DtcCatalogRegistry.catalogueFor(
             "ECM", VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT4)
         )
+        val impossibleLsa2011Ecm = DtcCatalogRegistry.catalogueFor(
+            "ECM", VehicleProfile(modelYear = 2011, engine = CamaroEngine.LSA)
+        )
+        val ls7_2014Ecm = DtcCatalogRegistry.catalogueFor(
+            "ECM", VehicleProfile(modelYear = 2014, engine = CamaroEngine.LS7)
+        )
         val lfxAbs = DtcCatalogRegistry.catalogueFor("EBCM", lfx)
         val unknown = DtcCatalogRegistry.catalogueFor("ECU 7E8", lfx)
 
@@ -75,6 +81,8 @@ class DtcCatalogRegistryTest {
         assertTrue(l99_2012Ecm.hasVehicleSpecificDefinitions)
         assertTrue(llt2010Ecm.hasVehicleSpecificDefinitions)
         assertTrue(lt4_2019Ecm.hasVehicleSpecificDefinitions)
+        assertFalse(impossibleLsa2011Ecm.hasVehicleSpecificDefinitions)
+        assertFalse(ls7_2014Ecm.hasVehicleSpecificDefinitions)
         assertFalse(lt1Ecm.hasVehicleSpecificDefinitions)
         assertEquals(DtcEvidenceStatus.GENERIC_ONLY, lt1Ecm.evidenceStatus)
         assertFalse(lfxAbs.hasVehicleSpecificDefinitions)
