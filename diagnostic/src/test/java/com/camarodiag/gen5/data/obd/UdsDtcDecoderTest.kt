@@ -12,7 +12,7 @@ class UdsDtcDecoderTest {
         val payload = byteArrayOf(
             0xFF.toByte(), 0x00,
             0x01, 0x01, 0x01, 0x08, // P0101-01, confirmed
-            0x52, 0x34, 0x11, 0x04, // B1234-11, pending
+            0x92.toByte(), 0x34, 0x11, 0x04, // B1234-11, pending
             0x41, 0x23, 0x45, 0x01, // C0123-45, failed
             0xC0.toByte(), 0x00, 0x01, 0x80.toByte() // U0000-01, warning requested
         )
