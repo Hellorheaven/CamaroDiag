@@ -487,4 +487,6 @@
     <string name="msg_obdb_catalog_load_failed">No se pudo cargar el catálogo OBDb de Camaro.</string>
     <string name="msg_obdb_signal_read_failed">No se pudo leer la señal OBDb.</string>
     <string name="msg_j2534_bridge_connect_failed">No se pudo conectar al puente J2534.</string>
+    <string name="live_pid_fuel_system_status">Estado del sistema de combustible</string>
+    <string name="live_pid_ltft">Ajuste de combustible a largo plazo B1</string>
 </resources>
