@@ -1,7 +1,16 @@
+import org.gradle.api.tasks.compile.JavaCompile
+
 plugins {
     id("com.android.application") version "8.10.1" apply false
     id("com.android.library") version "8.10.1" apply false
     id("org.jetbrains.kotlin.android") version "2.0.21" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
     id("com.google.devtools.ksp") version "2.0.21-1.0.28" apply false
+}
+
+// Treat Java compiler warnings as build failures across every module.
+allprojects {
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-Werror")
+    }
 }
