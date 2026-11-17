@@ -307,6 +307,111 @@ object Gm2012LfxMonitorCatalog {
             "Une fois par démarrage à froid valide ; Type B, 2 trajets.",
             "Type B – 2 trips", 22
         )
+        ,
+        GmDtcMonitorEvidence(
+            "P0101", "Mass airflow system performance (naturally aspirated engine)",
+            "Performance du système de mesure du débit d'air (moteur atmosphérique)",
+            "The ECM checks whether the MAF signal is stuck or implausible by combining filtered throttle-model error, measured-versus-modelled airflow error and measured-versus-modelled MAP error.",
+            "Le calculateur vérifie si le signal MAF est figé ou incohérent en combinant l'erreur filtrée du modèle papillon, l'écart entre débit d'air mesuré et modélisé, et l'écart entre pression MAP mesurée et modélisée.",
+            "The combined filtered residuals exceed the calibration's weighted decision criteria; this is not a single fixed airflow threshold.",
+            "Les résidus filtrés combinés dépassent les critères de décision pondérés de la calibration ; il ne s'agit pas d'un seuil unique de débit d'air.",
+            "Naturally aspirated application; engine speed 500–6,800 RPM; coolant temperature −7 to 126 °C; intake-air temperature −20 to 125 °C; relevant MAF/MAP/temperature faults must not be active.",
+            "Application atmosphérique ; régime moteur de 500 à 6 800 tr/min ; liquide de refroidissement de −7 à 126 °C ; air d'admission de −20 à 125 °C ; les défauts inhibiteurs MAF/MAP/température ne doivent pas être actifs.",
+            "Continuous monitor; calculations every 12.5 ms; Type B, 2 trips.",
+            "Surveillance continue ; calculs toutes les 12,5 ms ; Type B, 2 trajets.",
+            "Type B – 2 trips", 38
+        ),
+        GmDtcMonitorEvidence(
+            "P0102", "Mass airflow sensor circuit low frequency",
+            "Fréquence trop basse du circuit du débitmètre d'air MAF",
+            "The ECM detects a sustained low-frequency MAF output, consistent with a short to low or an open in the signal circuit or sensor.",
+            "Le calculateur détecte une fréquence de sortie MAF durablement trop faible, compatible avec un court-circuit à la masse ou un circuit/senseur ouvert.",
+            "MAF output at or below 800 Hz (approximately 0.90 g/s in the GM monitor document).",
+            "Sortie MAF inférieure ou égale à 800 Hz (environ 0,90 g/s dans le document de surveillance GM).",
+            "Engine run time above 0 s; engine speed at least 300 RPM; ignition voltage at least 10 V; condition persists at least 1 s.",
+            "Temps de fonctionnement moteur supérieur à 0 s ; régime d'au moins 300 tr/min ; tension d'allumage d'au moins 10 V ; condition présente pendant au moins 1 s.",
+            "300 failures in 375 samples; one sample per cylinder firing event; Type B, 2 trips.",
+            "300 échecs sur 375 échantillons ; un échantillon par événement d'allumage ; Type B, 2 trajets.",
+            "Type B – 2 trips", 39
+        ),
+        GmDtcMonitorEvidence(
+            "P0103", "Mass airflow sensor circuit high frequency",
+            "Fréquence trop élevée du circuit du débitmètre d'air MAF",
+            "The ECM detects an abnormally high-frequency MAF output.",
+            "Le calculateur détecte une fréquence de sortie MAF anormalement élevée.",
+            "MAF output at or above 14,500 Hz (approximately 630 g/s in the GM monitor document).",
+            "Sortie MAF supérieure ou égale à 14 500 Hz (environ 630 g/s dans le document de surveillance GM).",
+            "Engine run time above 0 s; engine speed at least 300 RPM; ignition voltage at least 10 V; condition persists at least 1 s.",
+            "Temps de fonctionnement moteur supérieur à 0 s ; régime d'au moins 300 tr/min ; tension d'allumage d'au moins 10 V ; condition présente pendant au moins 1 s.",
+            "300 failures in 375 samples; one sample per cylinder firing event; Type B, 2 trips.",
+            "300 échecs sur 375 échantillons ; un échantillon par événement d'allumage ; Type B, 2 trajets.",
+            "Type B – 2 trips", 40
+        ),
+        GmDtcMonitorEvidence(
+            "P0128", "Engine coolant temperature below thermostat regulating temperature",
+            "Température du liquide de refroidissement inférieure à la température de régulation du thermostat",
+            "The ECM detects that coolant temperature rises too slowly, consistent with an ECT-sensor or cooling-system problem.",
+            "Le calculateur détecte que la température du liquide de refroidissement augmente trop lentement, ce qui est compatible avec un défaut de sonde ECT ou du circuit de refroidissement.",
+            "The calculated cooling-system energy exceeds the calibrated model before ECT reaches 71 °C for the primary start-temperature range, or 55 °C for the alternate colder range.",
+            "L'énergie calculée transférée au système de refroidissement dépasse le modèle calibré avant que l'ECT atteigne 71 °C dans la plage principale de température au démarrage, ou 55 °C dans la plage alternative plus froide.",
+            "No relevant active sensor/airflow DTCs; valid start-up coolant and intake-air temperature ranges; vehicle-speed and engine-operation conditions must be satisfied.",
+            "Aucun défaut actif inhibiteur pertinent sur les capteurs/débit d'air ; plages valides de températures ECT/IAT au démarrage ; conditions de vitesse et de fonctionnement moteur à respecter.",
+            "30 failures; one sample per second; once per ignition cycle; Type B, 2 trips.",
+            "30 échecs ; un échantillon par seconde ; une fois par cycle de contact ; Type B, 2 trajets.",
+            "Type B – 2 trips", 57
+        ),
+        GmDtcMonitorEvidence(
+            "P0171", "Fuel system too lean – Bank 1",
+            "Système de carburant trop pauvre – banc 1",
+            "The ECM determines a lean condition from filtered long-term and short-term fuel-trim metrics.",
+            "Le calculateur détermine un mélange pauvre à partir des valeurs filtrées des corrections de carburant à long et court terme.",
+            "The filtered long-term fuel-trim metric is at least 1.400 and the filtered short-term metric is at least 0.650; the short-term criterion is suppressed when its metric is below 0.95.",
+            "La valeur filtrée de correction à long terme atteint au moins 1,400 et celle à court terme au moins 0,650 ; le critère court terme est neutralisé lorsque sa valeur est inférieure à 0,95.",
+            "400–6,600 RPM; BARO above 70 kPa; coolant and intake-air temperatures within documented ranges; MAP 5–255 kPa; MAF 0.5–510 g/s; fuel level above 10% unless its sender is faulty; at least 25 s of trim data per trip and 20 s in the active trim cell; closed-loop and long-term trim enabled.",
+            "400–6 600 tr/min ; BARO supérieure à 70 kPa ; températures de liquide et d'air dans les plages documentées ; MAP de 5 à 255 kPa ; MAF de 0,5 à 510 g/s ; carburant supérieur à 10 % sauf défaut de jauge ; au moins 25 s de données de correction par trajet et 20 s dans la cellule active ; boucle fermée et correction long terme activées.",
+            "100 ms continuous loop; Type B, 2 trips.",
+            "Boucle continue de 100 ms ; Type B, 2 trajets.",
+            "Type B – 2 trips", 111
+        ),
+        GmDtcMonitorEvidence(
+            "P0172", "Fuel system too rich – Bank 1",
+            "Système de carburant trop riche – banc 1",
+            "The ECM uses passive and intrusive fuel-trim tests. When purge-related long-term trim is at or below 0.735, it ramps purge off to determine whether excess EVAP vapour is causing the rich condition.",
+            "Le calculateur utilise des tests passifs et intrusifs de correction carburant. Lorsque la correction long terme liée à la purge est inférieure ou égale à 0,735, il réduit progressivement la purge pour déterminer si un excès de vapeurs EVAP provoque le mélange riche.",
+            "The passive test evaluates filtered non-purge long-term and short-term trims; the intrusive test evaluates purge, non-purge and short-term trims across 3 of 5 segments using the GM calibration thresholds.",
+            "Le test passif évalue les corrections filtrées long terme hors purge et court terme ; le test intrusif évalue les corrections avec purge, hors purge et court terme sur 3 segments parmi 5, selon les seuils de calibration GM.",
+            "Same general engine, airflow, temperature and closed-loop enable conditions as P0171; fuel-level threshold is not used for this rich monitor.",
+            "Conditions générales de régime, débit d'air, température et boucle fermée identiques à P0171 ; le seuil de niveau de carburant n'est pas utilisé pour ce moniteur riche.",
+            "100 ms continuous loop; Type B, 2 trips; intrusive tests are rate-limited to protect EVAP diagnosis.",
+            "Boucle continue de 100 ms ; Type B, 2 trajets ; les tests intrusifs sont limités en fréquence pour préserver le diagnostic EVAP.",
+            "Type B – 2 trips", 113
+        ),
+        GmDtcMonitorEvidence(
+            "P0174", "Fuel system too lean – Bank 2",
+            "Système de carburant trop pauvre – banc 2",
+            "The ECM determines a lean condition from filtered long-term and short-term fuel-trim metrics for Bank 2.",
+            "Le calculateur détermine un mélange pauvre sur le banc 2 à partir des valeurs filtrées des corrections de carburant à long et court terme.",
+            "The filtered long-term fuel-trim metric is at least 1.400 and the filtered short-term metric is at least 0.650; the short-term criterion is suppressed when its metric is below 0.95.",
+            "La valeur filtrée de correction à long terme atteint au moins 1,400 et celle à court terme au moins 0,650 ; le critère court terme est neutralisé lorsque sa valeur est inférieure à 0,95.",
+            "Same engine-speed, BARO, coolant, MAP, intake-air, MAF, fuel-level, trim-cell accumulation and closed-loop enable conditions as P0171.",
+            "Mêmes conditions d'activation que P0171 pour le régime, BARO, liquide, MAP, air d'admission, MAF, niveau carburant, accumulation de cellule de correction et boucle fermée.",
+            "100 ms continuous loop; Type B, 2 trips.",
+            "Boucle continue de 100 ms ; Type B, 2 trajets.",
+            "Type B – 2 trips", 115
+        ),
+        GmDtcMonitorEvidence(
+            "P0175", "Fuel system too rich – Bank 2",
+            "Système de carburant trop riche – banc 2",
+            "The ECM uses passive and intrusive fuel-trim tests for Bank 2. When purge-related long-term trim is at or below 0.735, it ramps purge off to determine whether excess EVAP vapour is causing the rich condition.",
+            "Le calculateur utilise des tests passifs et intrusifs de correction carburant sur le banc 2. Lorsque la correction long terme liée à la purge est inférieure ou égale à 0,735, il réduit progressivement la purge pour déterminer si un excès de vapeurs EVAP provoque le mélange riche.",
+            "The passive test evaluates filtered non-purge long-term and short-term trims; the intrusive test evaluates purge, non-purge and short-term trims across 3 of 5 segments using the GM calibration thresholds.",
+            "Le test passif évalue les corrections filtrées long terme hors purge et court terme ; le test intrusif évalue les corrections avec purge, hors purge et court terme sur 3 segments parmi 5, selon les seuils de calibration GM.",
+            "Same general engine, airflow, temperature and closed-loop enable conditions as P0174; fuel-level threshold is not used for this rich monitor.",
+            "Conditions générales de régime, débit d'air, température et boucle fermée identiques à P0174 ; le seuil de niveau de carburant n'est pas utilisé pour ce moniteur riche.",
+            "100 ms continuous loop; Type B, 2 trips; intrusive tests are rate-limited to protect EVAP diagnosis.",
+            "Boucle continue de 100 ms ; Type B, 2 trajets ; les tests intrusifs sont limités en fréquence pour préserver le diagnostic EVAP.",
+            "Type B – 2 trips", 117
+        )
     ).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {
