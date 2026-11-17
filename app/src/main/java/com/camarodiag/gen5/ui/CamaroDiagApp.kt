@@ -378,7 +378,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     message = obdScanMessage,
                     isConnected = adapter.tier != AdapterTier.DISCONNECTED &&
                         !adapter.deviceName.contains("Demo", ignoreCase = true),
-                    isFr = isFr,
                     onRunScan = { viewModel.runFullObdScan() }
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(

@@ -39,7 +39,6 @@ fun ObdScanScreen(
     isScanning: Boolean,
     message: String?,
     isConnected: Boolean,
-    isFr: Boolean,
     onRunScan: () -> Unit
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
@@ -124,7 +123,7 @@ fun ObdScanScreen(
                 item { Text(stringResource(R.string.obd_no_live_data), color = TextMuted) }
             } else {
                 items(report.liveData, key = { it.pid }) { value ->
-                    ObdValueCard(value, isFr)
+                    ObdValueCard(value)
                 }
             }
 
@@ -136,7 +135,7 @@ fun ObdScanScreen(
                 item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
             } else {
                 items(allCodes.distinctBy { it.code to it.status }, key = { "${it.code}-${it.status}" }) { dtc ->
-                    DtcResultCard(dtc, isFr)
+                    DtcResultCard(dtc)
                 }
             }
 
@@ -205,12 +204,28 @@ private fun InfoLine(label: String, value: String) {
 }
 
 @Composable
-private fun ObdValueCard(value: ObdValue, isFr: Boolean) {
+private fun localizedObdPidName(value: ObdValue): String = when (value.pid) {
+    0x03 -> stringResource(R.string.live_pid_fuel_system_status)
+    0x04 -> stringResource(R.string.live_pid_load)
+    0x05 -> stringResource(R.string.live_pid_ect)
+    0x06 -> stringResource(R.string.live_pid_stft)
+    0x07 -> stringResource(R.string.live_pid_ltft)
+    0x0C -> stringResource(R.string.live_pid_rpm)
+    0x0D -> stringResource(R.string.live_pid_speed)
+    0x0F -> stringResource(R.string.live_pid_iat)
+    0x10 -> stringResource(R.string.live_pid_maf)
+    0x11 -> stringResource(R.string.live_pid_throttle)
+    0x42 -> stringResource(R.string.live_pid_bat)
+    else -> value.name
+}
+
+@Composable
+private fun ObdValueCard(value: ObdValue) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("PID %02X".format(value.pid), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                Text(value.name, color = TextMuted, fontSize = 12.sp)
+                Text(localizedObdPidName(value), color = TextMuted, fontSize = 12.sp)
             }
             Text("${value.value} ${value.unit}", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
         }
@@ -218,7 +233,7 @@ private fun ObdValueCard(value: ObdValue, isFr: Boolean) {
 }
 
 @Composable
-private fun DtcResultCard(dtc: ObdDtc, isFr: Boolean) {
+private fun DtcResultCard(dtc: ObdDtc) {
     val status = when (dtc.status) {
         "pending" -> stringResource(R.string.obd_pending)
         "permanent" -> stringResource(R.string.obd_permanent)
