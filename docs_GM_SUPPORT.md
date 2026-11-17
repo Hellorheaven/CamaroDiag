@@ -248,7 +248,7 @@ Les codes P0017 et autres défauts de VVT ne sont pas proposés aux V8 à arbre 
 
 ## Groupe de certification V8 Camaro 2013 – association documentaire
 
-Le résumé GM 2013 associe les Camaro L99, LS3 et LSA au groupe 7 et au dossier moteur identifié `13OBDG07`. Cette provenance est exposée par `GmV8MonitorCatalog.sourceLabel` sans réutiliser les seuils 2012. Le moniteur P0101 est désormais extrait séparément : seuil MAF supérieur à 16 g/s pour les applications atmosphériques (L99/LS3, page ECM 9) et supérieur à 21 g/s pour l'application suralimentée (LSA, page ECM 10), avec leurs conditions de fonctionnement. Les autres critères 2013 restent à extraire et vérifier avant d'être exposés.
+Le résumé GM 2013 associe les Camaro L99, LS3 et LSA au groupe 7 et au dossier moteur identifié `13OBDG07`. Cette provenance est exposée par `GmV8MonitorCatalog.sourceLabel` sans réutiliser les seuils 2012. Les moniteurs extraits couvrent P0101 et les chauffages de sondes O2 P0030, P0036, P0050, P0056, P0053, P0054, P0059 et P0060. Pour P0101 : seuil MAF supérieur à 16 g/s pour les applications atmosphériques (L99/LS3, page ECM 9) et supérieur à 21 g/s pour l'application suralimentée (LSA, page ECM 10). Les moniteurs O2 sont référencés aux pages ECM 2 à 4. Les autres critères 2013 restent à extraire et vérifier avant d'être exposés.
 
 Références GM primaires :
 - 2013 OBD Group Summary, page 2 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2013/2013%20OBD%20GROUP%20SUMMARY.pdf.
