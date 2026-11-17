@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 V8 L99 con AFM e cambio automatico. Non riutilizzare una calibrazione LS3; verificare RPO, cambio e identificativi della centralina.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 V8 LSA sovralimentato. Verificare la calibrazione relativa a compressore, carburante, mercato e versione software.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 V8 LS7. Profilo distinto da LS3/L99 nonostante la famiglia nominale della centralina; l\'identificazione software è obbligatoria.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (copertura 2016–2020). Il bollettino GM PIP5313B indica E80 per Camaro LTG 2016–2017; verificare gli anni successivi tramite codice ricambio e CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (copertura 2016–2023). Il bollettino GM PIP5313B indica E80 per Camaro LTG 2016–2017; verificare gli anni successivi tramite codice ricambio e CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 V6 LGX. Il profilo può variare in base ad anno, mercato e revisione; confermare la centralina effettiva e il CVN prima di caricare una definizione tabella.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 V8 LT1 aspirato. Distinguere le revisioni di calibrazione tramite CAL ID/CVN, anno, mercato, cambio e codici hardware.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 V8 LT4 sovralimentato. Non confondere con LT1; convalidare i codici ricambio e i dati di sovralimentazione specifici della calibrazione.</string>
