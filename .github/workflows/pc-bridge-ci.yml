@@ -1,32 +1,86 @@
 name: PC J2534 Bridge CI
 
 on:
-  push:
-    paths:
-      - "pc-bridge/**"
-      - ".github/workflows/pc-bridge-ci.yml"
   pull_request:
+    branches:
+      - main
     paths:
       - "pc-bridge/**"
       - ".github/workflows/pc-bridge-ci.yml"
-  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: pc-bridge-debug-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  build-windows:
+  build-windows-debug:
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     runs-on: windows-latest
     steps:
-      - name: Checkout
+      - name: Checkout pull request commit
         uses: actions/checkout@v4
-      - name: Setup .NET
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - name: Build J2534 bridge
-        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release
-      - name: Publish self-contained x64 bridge
-        run: dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime win-x64 --self-contained true --output .\publish\win-x64
-      - name: Publish self-contained x86 bridge
-        run: dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime win-x86 --self-contained true --output .\publish\win-x86
+
+      - name: Build J2534 bridge in Debug configuration
+        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --no-restore
+        continue-on-error: false
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+
+      - name: Materialize CamaroDiag installer icon
+        shell: pwsh
+        run: |
+          $encoded = (Get-Content ".\pc-bridge\installer\assets\CamaroDiag.ico.b64" -Raw).Trim()
+          $bytes = [Convert]::FromBase64String($encoded)
+          [System.IO.File]::WriteAllBytes(".\pc-bridge\installer\assets\CamaroDiag.ico", $bytes)
+
+      - name: Publish and package Windows Debug installers
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iscc = Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
+
+          New-Item -ItemType Directory -Force -Path ".\dist" | Out-Null
+          $variants = @(
+            @{ Runtime = "win-x64"; Arch = "x64"; Name = "debug-win-x64" },
+            @{ Runtime = "win-x86"; Arch = "x86"; Name = "debug-win-x86" }
+          )
+
+          foreach ($variant in $variants) {
+            $output = Join-Path $PWD "publish\$($variant.Name)"
+            New-Item -ItemType Directory -Force -Path $output | Out-Null
+
+            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --runtime $variant.Runtime --self-contained true --output $output "-p:Version=0.0.0" "-p:AssemblyVersion=0.0.0.0" "-p:FileVersion=0.0.0.0"
+            if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
+
+            $outputName = "CamaroDiag-J2534-Bridge-Setup-debug-pr$env:PR_NUMBER-$($variant.Arch)"
+            & $iscc "/DAppVersion=0.0.0" "/DBuildDir=$output" "/DChannel=debug" "/DArch=$($variant.Arch)" "/DOutputName=$outputName" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss"
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed for $($variant.Name)" }
+          }
+
+      - name: Upload Windows Debug installers for this PR commit
+        uses: actions/upload-artifact@v7
+        with:
+          name: CamaroDiag-J2534-Bridge-debug-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x64.exe
+            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x86.exe
+          if-no-files-found: error
+          retention-days: 30
