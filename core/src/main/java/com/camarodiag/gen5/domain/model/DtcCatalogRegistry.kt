@@ -78,6 +78,19 @@ data class DtcModuleFamily(
     val discoveryRequired: Boolean = true
 )
 
+enum class EngineInductionType { NATURALLY_ASPIRATED, TURBOCHARGED, SUPERCHARGED }
+enum class EngineFuelSystemType { PORT_INJECTION, DIRECT_INJECTION }
+
+data class CamaroEngineDtcProfile(
+    val rpo: String,
+    val cylinderCount: Int,
+    val bankCount: Int,
+    val induction: EngineInductionType,
+    val fuelSystem: EngineFuelSystemType,
+    val ecmFamily: String,
+    val modelYears: IntRange
+)
+
 data class DtcModuleCatalogue(
     val moduleId: String,
     val evidenceStatus: DtcEvidenceStatus,
@@ -88,6 +101,22 @@ data class DtcModuleCatalogue(
 
 object DtcCatalogRegistry {
     val supportedEngineRpos: Set<String> = CamaroEngine.entries.map { it.rpo }.toSet()
+
+    val engineProfiles: Map<String, CamaroEngineDtcProfile> = listOf(
+        CamaroEngineDtcProfile("LLT", 6, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION, "Bosch E69", 2010..2011),
+        CamaroEngineDtcProfile("LFX", 6, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION, "ACDelco E39/E39A", 2012..2015),
+        CamaroEngineDtcProfile("LS3", 8, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION, "ACDelco E38", 2010..2015),
+        CamaroEngineDtcProfile("L99", 8, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION, "ACDelco E38", 2010..2015),
+        CamaroEngineDtcProfile("LSA", 8, 2, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.PORT_INJECTION, "ACDelco E67", 2012..2015),
+        CamaroEngineDtcProfile("LS7", 8, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION, "ACDelco E38", 2014..2015),
+        CamaroEngineDtcProfile("LTG", 4, 1, EngineInductionType.TURBOCHARGED, EngineFuelSystemType.DIRECT_INJECTION, "GM E80", 2016..2020),
+        CamaroEngineDtcProfile("LGX", 6, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION, "GM E92/E93", 2016..2024),
+        CamaroEngineDtcProfile("LT1", 8, 2, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION, "GM E92", 2016..2024),
+        CamaroEngineDtcProfile("LT4", 8, 2, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.DIRECT_INJECTION, "GM E92", 2017..2024)
+    ).associateBy { it.rpo }
+
+    fun engineProfile(engine: CamaroEngine): CamaroEngineDtcProfile? =
+        engineProfiles[engine.rpo]?.takeIf { it.modelYears == engine.years }
 
     val moduleFamilies: List<DtcModuleFamily> = listOf(
         DtcModuleFamily("ECM", "Engine Control Module", "Calculateur moteur", false),
