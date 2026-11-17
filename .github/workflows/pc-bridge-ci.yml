@@ -118,7 +118,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Build J2534 bridge in Debug configuration
-        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug
+        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
         continue-on-error: false
 
       - name: Install Inno Setup
@@ -153,7 +153,7 @@ jobs:
             $output = Join-Path $PWD "publish\$($variant.Name)"
             New-Item -ItemType Directory -Force -Path $output | Out-Null
 
-            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --runtime $variant.Runtime --self-contained true --output $output "-p:Version=0.0.0" "-p:AssemblyVersion=0.0.0.0" "-p:FileVersion=0.0.0.0"
+            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --runtime $variant.Runtime --self-contained true --output $output -warnaserror "-p:Version=0.0.0" "-p:AssemblyVersion=0.0.0.0" "-p:FileVersion=0.0.0.0"
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
 
             $outputName = "CamaroDiag-J2534-Bridge-Setup-debug-pr$env:PR_NUMBER-$($variant.Arch)"
