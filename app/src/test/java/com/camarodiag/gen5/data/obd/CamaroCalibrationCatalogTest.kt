@@ -16,6 +16,9 @@ class CamaroCalibrationCatalogTest {
     fun catalogueContainsEveryGen5AndGen6EngineProfile() {
         assertEquals(CamaroEngine.entries.toSet(), CamaroCalibrationCatalog.profiles.map { it.engine }.toSet())
         assertEquals(10, CamaroCalibrationCatalog.profiles.size)
+        CamaroCalibrationCatalog.profiles.forEach { profile ->
+            assertEquals(profile.engine.years, profile.modelYears)
+        }
     }
 
     @Test
