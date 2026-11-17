@@ -165,3 +165,5 @@ Références primaires :
 Le catalogue générique SAE a également été complété pour les codes d'actionnement et de corrélation d'arbres à cames manquants (P0013, P0017–P0019, P0020–P0021, P0023–P0024) ainsi que les circuits de chauffage de sondes P0030, P0036 et P0050. Ces libellés sont normalisés SAE ; les critères GM détaillés ne sont affichés que lorsqu'une entrée d'évidence dédiée existe.
 
 Le catalogue d'interprétations LFX FR/EN couvre désormais également les quatre circuits d'actionneurs P0010/P0013/P0020/P0023 et les quatre défauts de performance de déphasage P0011/P0014/P0021/P0024. Les causes restent présentées comme pistes à vérifier ; aucun de ces codes ne déclenche un remplacement automatique de pièce.
+
+Les critères GM 2012 du chauffage des sondes à oxygène ont aussi été intégrés pour P0030, P0036 et P0050 (surveillance électrique du driver) ainsi que P0053, P0054, P0059 et P0060 (résistance du chauffage hors plage 6,1–13,4 Ω). Les quatre derniers moniteurs sont exécutés lors d'un démarrage à froid valide ; l'application affiche cette condition au lieu de présenter le test comme actif en permanence.

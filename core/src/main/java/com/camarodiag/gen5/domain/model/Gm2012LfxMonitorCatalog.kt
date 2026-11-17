@@ -215,6 +215,98 @@ object Gm2012LfxMonitorCatalog {
             "Un test par période de ralenti valide ; au moins une et jusqu'à huit tentatives par trajet. Type A, 1 trajet.",
             "Type A – 1 trip", 182
         )
+        ,
+        GmDtcMonitorEvidence(
+            "P0030", "Oxygen sensor heater control circuit – Bank 1 Sensor 1",
+            "Circuit de commande du chauffage de sonde à oxygène – banc 1, sonde 1",
+            "The ECM checks the heater output-driver circuit for electrical integrity.",
+            "Le calculateur contrôle l'intégrité électrique du circuit de commande du chauffage de la sonde.",
+            "Voltage is too low while the driver is open (open circuit or short to ground), or too high while the driver is closed (short to voltage).",
+            "La tension est trop faible lorsque le driver est ouvert (circuit ouvert ou court-circuit à la masse), ou trop élevée lorsque le driver est fermé (court-circuit au positif).",
+            "Ignition in CRANK or RUN; system voltage above 11 V; engine speed above 400 RPM.",
+            "Contact en position CRANK ou RUN ; tension système supérieure à 11 V ; régime moteur supérieur à 400 tr/min.",
+            "20 failures in 25 samples; 250 ms per sample; continuous monitor.",
+            "20 échecs sur 25 échantillons ; 250 ms par échantillon ; surveillance continue.",
+            "Type B – 2 trips", 15
+        ),
+        GmDtcMonitorEvidence(
+            "P0036", "Oxygen sensor heater control circuit – Bank 1 Sensor 2",
+            "Circuit de commande du chauffage de sonde à oxygène – banc 1, sonde 2",
+            "The ECM checks the downstream Bank 1 oxygen-sensor heater output-driver circuit for electrical integrity.",
+            "Le calculateur contrôle l'intégrité électrique du circuit de commande du chauffage de la sonde aval du banc 1.",
+            "Voltage is too low while the driver is open (open circuit or short to ground), or too high while the driver is closed (short to voltage).",
+            "La tension est trop faible lorsque le driver est ouvert (circuit ouvert ou court-circuit à la masse), ou trop élevée lorsque le driver est fermé (court-circuit au positif).",
+            "Ignition in CRANK or RUN; system voltage above 11 V; engine speed above 400 RPM.",
+            "Contact en position CRANK ou RUN ; tension système supérieure à 11 V ; régime moteur supérieur à 400 tr/min.",
+            "20 failures in 25 samples; 250 ms per sample; continuous monitor.",
+            "20 échecs sur 25 échantillons ; 250 ms par échantillon ; surveillance continue.",
+            "Type B – 2 trips", 16
+        ),
+        GmDtcMonitorEvidence(
+            "P0050", "Oxygen sensor heater control circuit – Bank 2 Sensor 1",
+            "Circuit de commande du chauffage de sonde à oxygène – banc 2, sonde 1",
+            "The ECM checks the Bank 2 Sensor 1 oxygen-sensor heater output-driver circuit for electrical integrity.",
+            "Le calculateur contrôle l'intégrité électrique du circuit de commande du chauffage de la sonde 1 du banc 2.",
+            "Voltage is too low while the driver is open (open circuit or short to ground), or too high while the driver is closed (short to voltage).",
+            "La tension est trop faible lorsque le driver est ouvert (circuit ouvert ou court-circuit à la masse), ou trop élevée lorsque le driver est fermé (court-circuit au positif).",
+            "Ignition in CRANK or RUN; system voltage above 11 V; engine speed above 400 RPM.",
+            "Contact en position CRANK ou RUN ; tension système supérieure à 11 V ; régime moteur supérieur à 400 tr/min.",
+            "20 failures in 25 samples; 250 ms per sample; continuous monitor.",
+            "20 échecs sur 25 échantillons ; 250 ms par échantillon ; surveillance continue.",
+            "Type B – 2 trips", 17
+        ),
+        GmDtcMonitorEvidence(
+            "P0053", "Oxygen sensor heater resistance – Bank 1 Sensor 1",
+            "Résistance du chauffage de sonde à oxygène – banc 1, sonde 1",
+            "The ECM checks whether the Bank 1 Sensor 1 oxygen-sensor heater resistance is within its calibrated range.",
+            "Le calculateur vérifie que la résistance du chauffage de la sonde 1 du banc 1 reste dans la plage calibrée.",
+            "Heater resistance outside 6.1–13.4 ohms.",
+            "Résistance du chauffage hors de la plage 6,1–13,4 ohms.",
+            "Valid cold-start conditions; coolant and intake-air temperature, soak time, ignition voltage and engine run time must meet the calibration conditions.",
+            "Conditions de démarrage à froid valides ; températures du liquide et de l'air, durée d'immobilisation, tension d'allumage et temps de fonctionnement doivent respecter les conditions de calibration.",
+            "Once per valid cold start; Type B, 2 trips.",
+            "Une fois par démarrage à froid valide ; Type B, 2 trajets.",
+            "Type B – 2 trips", 18
+        ),
+        GmDtcMonitorEvidence(
+            "P0054", "Oxygen sensor heater resistance – Bank 1 Sensor 2",
+            "Résistance du chauffage de sonde à oxygène – banc 1, sonde 2",
+            "The ECM checks whether the Bank 1 Sensor 2 oxygen-sensor heater resistance is within its calibrated range.",
+            "Le calculateur vérifie que la résistance du chauffage de la sonde 2 du banc 1 reste dans la plage calibrée.",
+            "Heater resistance outside 6.1–13.4 ohms.",
+            "Résistance du chauffage hors de la plage 6,1–13,4 ohms.",
+            "Valid cold-start conditions; coolant and intake-air temperature, soak time, ignition voltage and engine run time must meet the calibration conditions.",
+            "Conditions de démarrage à froid valides ; températures du liquide et de l'air, durée d'immobilisation, tension d'allumage et temps de fonctionnement doivent respecter les conditions de calibration.",
+            "Once per valid cold start; Type B, 2 trips.",
+            "Une fois par démarrage à froid valide ; Type B, 2 trajets.",
+            "Type B – 2 trips", 19
+        ),
+        GmDtcMonitorEvidence(
+            "P0059", "Oxygen sensor heater resistance – Bank 2 Sensor 1",
+            "Résistance du chauffage de sonde à oxygène – banc 2, sonde 1",
+            "The ECM checks whether the Bank 2 Sensor 1 oxygen-sensor heater resistance is within its calibrated range.",
+            "Le calculateur vérifie que la résistance du chauffage de la sonde 1 du banc 2 reste dans la plage calibrée.",
+            "Heater resistance outside 6.1–13.4 ohms.",
+            "Résistance du chauffage hors de la plage 6,1–13,4 ohms.",
+            "Valid cold-start conditions; coolant and intake-air temperature, soak time, ignition voltage and engine run time must meet the calibration conditions.",
+            "Conditions de démarrage à froid valides ; températures du liquide et de l'air, durée d'immobilisation, tension d'allumage et temps de fonctionnement doivent respecter les conditions de calibration.",
+            "Once per valid cold start; Type B, 2 trips.",
+            "Une fois par démarrage à froid valide ; Type B, 2 trajets.",
+            "Type B – 2 trips", 21
+        ),
+        GmDtcMonitorEvidence(
+            "P0060", "Oxygen sensor heater resistance – Bank 2 Sensor 2",
+            "Résistance du chauffage de sonde à oxygène – banc 2, sonde 2",
+            "The ECM checks whether the Bank 2 Sensor 2 oxygen-sensor heater resistance is within its calibrated range.",
+            "Le calculateur vérifie que la résistance du chauffage de la sonde 2 du banc 2 reste dans la plage calibrée.",
+            "Heater resistance outside 6.1–13.4 ohms.",
+            "Résistance du chauffage hors de la plage 6,1–13,4 ohms.",
+            "Valid cold-start conditions; coolant and intake-air temperature, soak time, ignition voltage and engine run time must meet the calibration conditions.",
+            "Conditions de démarrage à froid valides ; températures du liquide et de l'air, durée d'immobilisation, tension d'allumage et temps de fonctionnement doivent respecter les conditions de calibration.",
+            "Once per valid cold start; Type B, 2 trips.",
+            "Une fois par démarrage à froid valide ; Type B, 2 trajets.",
+            "Type B – 2 trips", 22
+        )
     ).associateBy { it.code }
 
     fun find(code: String, vehicle: VehicleProfile): GmDtcMonitorEvidence? {

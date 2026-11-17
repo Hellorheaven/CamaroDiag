@@ -149,6 +149,76 @@ object CamaroDtcCatalog {
             "Élevée — diagnostic rapide recommandé",
             "High — prompt diagnosis recommended"
         ),
+        "P0030" to DtcVehicleExplanation(
+            "Le calculateur détecte une anomalie électrique dans le circuit de chauffage de la sonde à oxygène amont du banc 1. Le défaut peut être un circuit ouvert, un court-circuit à la masse ou au positif ; il ne prouve pas que l'élément de mesure de la sonde est défectueux.",
+            "The ECM detects an electrical fault in the Bank 1 upstream oxygen-sensor heater circuit. The fault may be an open circuit or a short to ground or voltage; it does not prove the sensor's measuring element has failed.",
+            listOf("Faisceau ou connecteur endommagé", "Circuit de chauffage ouvert ou en court-circuit", "Alimentation ou protection électrique défectueuse", "Résistance chauffante de la sonde défectueuse"),
+            listOf("Damaged harness or connector", "Open or shorted heater circuit", "Faulty power supply or circuit protection", "Failed sensor heater element"),
+            listOf("Inspecter connecteur et faisceau de la sonde amont banc 1", "Contrôler alimentation et commande du chauffage suivant le schéma GM", "Mesurer le circuit de chauffage avant de remplacer la sonde"),
+            listOf("Inspect Bank 1 upstream sensor connector and harness", "Check heater supply and driver using GM wiring information", "Test the heater circuit before replacing the sensor"),
+            "Modérée — défaut de chauffage de sonde",
+            "Moderate — oxygen-sensor heater fault"
+        ),
+        "P0036" to DtcVehicleExplanation(
+            "Le calculateur détecte une anomalie électrique dans le circuit de chauffage de la sonde à oxygène aval du banc 1. Le contrôle porte sur le circuit du chauffage, pas directement sur la capacité de mesure de la sonde.",
+            "The ECM detects an electrical fault in the Bank 1 downstream oxygen-sensor heater circuit. The monitor concerns the heater circuit, not directly the sensor's measuring ability.",
+            listOf("Circuit ouvert ou court-circuit dans le faisceau", "Connecteur oxydé ou broche détériorée", "Élément chauffant de la sonde aval défectueux", "Alimentation ou driver de commande en défaut"),
+            listOf("Open or shorted harness circuit", "Corroded connector or damaged terminal", "Failed downstream sensor heater element", "Power supply or control driver fault"),
+            listOf("Inspecter connecteur et faisceau de la sonde aval banc 1", "Contrôler alimentation, continuité et commande du chauffage", "Vérifier le chauffage avant remplacement de la sonde"),
+            listOf("Inspect Bank 1 downstream sensor connector and harness", "Check heater power, continuity and driver command", "Verify the heater before replacing the sensor"),
+            "Modérée",
+            "Moderate"
+        ),
+        "P0050" to DtcVehicleExplanation(
+            "Le calculateur détecte une anomalie électrique dans le circuit de chauffage de la sonde à oxygène amont du banc 2. Il faut contrôler le circuit de chauffage et son alimentation avant de condamner la sonde.",
+            "The ECM detects an electrical fault in the Bank 2 upstream oxygen-sensor heater circuit. Check the heater circuit and its supply before condemning the sensor.",
+            listOf("Faisceau coupé ou en court-circuit", "Connecteur ou broche oxydé(e)", "Élément chauffant de la sonde amont banc 2 défectueux", "Alimentation ou driver ECM en défaut"),
+            listOf("Open or shorted wiring", "Corroded connector or terminal", "Failed Bank 2 upstream sensor heater", "Power supply or ECM driver fault"),
+            listOf("Inspecter connecteur et faisceau de la sonde amont banc 2", "Vérifier tension, masse et commande du chauffage", "Mesurer le circuit avant remplacement de la sonde"),
+            listOf("Inspect Bank 2 upstream sensor connector and harness", "Check heater voltage, ground and driver command", "Test the circuit before replacing the sensor"),
+            "Modérée",
+            "Moderate"
+        ),
+        "P0053" to DtcVehicleExplanation(
+            "Le calculateur détecte une résistance hors plage dans le chauffage de la sonde à oxygène amont du banc 1. Le contrôle est réalisé lors d'un démarrage à froid valide ; une résistance anormale peut indiquer un élément chauffant ouvert ou dégradé.",
+            "The ECM detects heater resistance outside the expected range in the Bank 1 upstream oxygen sensor. The monitor runs during a valid cold start; abnormal resistance may indicate an open or degraded heater element.",
+            listOf("Élément chauffant interne de la sonde ouvert ou détérioré", "Connecteur ou broches avec résistance de contact", "Faisceau endommagé"),
+            listOf("Open or degraded sensor heater element", "Connector or terminal contact resistance", "Damaged wiring"),
+            listOf("Effectuer le contrôle à froid dans les conditions prescrites", "Mesurer la résistance du chauffage et la comparer à la plage GM 6,1–13,4 Ω", "Inspecter connecteur et faisceau avant remplacement"),
+            listOf("Perform the check cold under the specified enable conditions", "Measure heater resistance and compare with GM's 6.1–13.4 Ω range", "Inspect connector and wiring before replacement"),
+            "Modérée",
+            "Moderate"
+        ),
+        "P0054" to DtcVehicleExplanation(
+            "Le calculateur détecte une résistance hors plage dans le chauffage de la sonde à oxygène aval du banc 1. Le défaut concerne l'élément chauffant ou son circuit, et non nécessairement la mesure lambda.",
+            "The ECM detects heater resistance outside the expected range in the Bank 1 downstream oxygen sensor. The fault concerns the heater element or its circuit, not necessarily the oxygen measurement.",
+            listOf("Élément chauffant interne dégradé", "Connecteur ou faisceau présentant une résistance anormale", "Sonde aval endommagée"),
+            listOf("Degraded internal heater element", "Connector or harness with abnormal resistance", "Damaged downstream sensor"),
+            listOf("Mesurer la résistance du chauffage à froid selon la procédure", "Comparer à la plage GM 6,1–13,4 Ω", "Contrôler les broches et le faisceau"),
+            listOf("Measure heater resistance cold using the procedure", "Compare with GM's 6.1–13.4 Ω range", "Inspect terminals and wiring"),
+            "Modérée",
+            "Moderate"
+        ),
+        "P0059" to DtcVehicleExplanation(
+            "Le calculateur détecte une résistance hors plage dans le chauffage de la sonde à oxygène amont du banc 2. Le diagnostic est exécuté pendant un démarrage à froid valide.",
+            "The ECM detects heater resistance outside the expected range in the Bank 2 upstream oxygen sensor. The monitor runs during a valid cold start.",
+            listOf("Élément chauffant interne dégradé ou ouvert", "Connecteur ou faisceau endommagé", "Résistance de contact excessive"),
+            listOf("Degraded or open internal heater", "Damaged connector or wiring", "Excessive contact resistance"),
+            listOf("Mesurer la résistance du chauffage à froid", "Comparer à la plage GM 6,1–13,4 Ω", "Inspecter connecteur et faisceau de la sonde amont banc 2"),
+            listOf("Measure heater resistance cold", "Compare with GM's 6.1–13.4 Ω range", "Inspect Bank 2 upstream sensor connector and wiring"),
+            "Modérée",
+            "Moderate"
+        ),
+        "P0060" to DtcVehicleExplanation(
+            "Le calculateur détecte une résistance hors plage dans le chauffage de la sonde à oxygène aval du banc 2. Le code concerne le chauffage de la sonde, pas directement son signal de mesure.",
+            "The ECM detects heater resistance outside the expected range in the Bank 2 downstream oxygen sensor. The code concerns the sensor heater, not directly its measurement signal.",
+            listOf("Élément chauffant de la sonde aval dégradé", "Connecteur ou faisceau endommagé", "Résistance de contact excessive"),
+            listOf("Degraded downstream sensor heater", "Damaged connector or wiring", "Excessive contact resistance"),
+            listOf("Mesurer la résistance du chauffage à froid", "Comparer à la plage GM 6,1–13,4 Ω", "Inspecter connecteur et faisceau de la sonde aval banc 2"),
+            listOf("Measure heater resistance cold", "Compare with GM's 6.1–13.4 Ω range", "Inspect Bank 2 downstream sensor connector and wiring"),
+            "Modérée",
+            "Moderate"
+        ),
         "P0101" to DtcVehicleExplanation(
             "Le débit d'air mesuré par le débitmètre MAF ne correspond pas à la plage attendue par le calculateur pour les conditions moteur. Cela ne signifie pas automatiquement que le débitmètre est HS.",
             "Measured MAF airflow is outside the range expected by the ECM for the current engine conditions. This does not automatically mean the MAF sensor has failed.",
