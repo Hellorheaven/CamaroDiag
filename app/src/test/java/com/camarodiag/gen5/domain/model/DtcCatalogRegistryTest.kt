@@ -13,8 +13,14 @@ class DtcCatalogRegistryTest {
         CamaroEngine.entries.forEach { engine ->
             val year = engine.years.first
             val vehicle = VehicleProfile(modelYear = year, engine = engine)
+            val hasDocumentedEngineEvidence = when (engine) {
+                CamaroEngine.LLT, CamaroEngine.LFX -> true
+                CamaroEngine.LS3, CamaroEngine.L99 -> year in 2010..2012
+                CamaroEngine.LSA -> year in 2012..2012
+                else -> false
+            }
             assertEquals(
-                if (engine == CamaroEngine.LFX && year in 2012..2015) DtcEvidenceStatus.DOCUMENTED
+                if (hasDocumentedEngineEvidence) DtcEvidenceStatus.DOCUMENTED
                 else DtcEvidenceStatus.GENERIC_ONLY,
                 DtcCatalogRegistry.evidenceStatus(vehicle, "ECM")
             )
