@@ -566,4 +566,10 @@
     <string name="dtc_desc_p0018">Μη εύλογη συσχέτιση στροφαλοφόρου / εκκεντροφόρου εισαγωγής (τράπεζα 2)</string>
     <string name="dtc_desc_p0019">Μη εύλογη συσχέτιση στροφαλοφόρου / εκκεντροφόρου εξαγωγής (τράπεζα 2)</string>
     <string name="dtc_gm_calibration_not_validated">Οι παρακάτω ερμηνείες και τιμές ορίων αποτελούν δεδομένα αναφοράς για τον επιλεγμένο κινητήρα και το έτος μοντέλου. Η ταυτότητα της μονάδας ελέγχου (VIN, CAL ID, CVN, αναγνωριστικό λογισμικού και αριθμός εξαρτήματος υλικού) δεν έχει ακόμη επαληθευτεί· τα δεδομένα δεν έχουν επικυρωθεί για τη συνδεδεμένη μονάδα.</string>
+    <string name="dtc_gm_monitor_title">Παρακολούθηση κινητήρα GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Κριτήριο ενεργοποίησης: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Συνθήκες ενεργοποίησης: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Μετρητής αποτυχιών / ρυθμός επιβεβαίωσης: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Κατηγορία MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Πηγή: GM %1$s, σελίδα %2$d</string>
 </resources>
