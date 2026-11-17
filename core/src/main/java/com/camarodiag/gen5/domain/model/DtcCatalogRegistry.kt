@@ -305,6 +305,35 @@ object DtcCatalogRegistry {
         saeGenericDescriptions[code.trim().uppercase(Locale.ROOT)]
 
     /**
+     * Qualify public Internet evidence without upgrading it to OEM evidence.
+     * Reposts sharing an independenceGroup count as one source.
+     */
+    fun assessCommunityEvidence(
+        references: List<DtcCommunityEvidenceReference>,
+        vehicle: VehicleProfile,
+        respondingModuleId: String
+    ): DtcCommunityEvidenceAssessment {
+        val applicable = references.filter { it.isApplicableTo(vehicle, respondingModuleId) }
+        val independentPublisherCount = applicable
+            .distinctBy { it.independenceGroup.trim().lowercase(Locale.ROOT) }
+            .size
+        val confidence = when {
+            applicable.any { it.validatesCurrentVehicle(vehicle) } ->
+                DtcCommunityConfidence.VALIDATED_ON_THIS_VEHICLE
+            independentPublisherCount >= 2 ->
+                DtcCommunityConfidence.CORROBORATED_INDEPENDENT_SOURCES
+            independentPublisherCount == 1 ->
+                DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE
+            else -> DtcCommunityConfidence.INSUFFICIENT
+        }
+        return DtcCommunityEvidenceAssessment(
+            confidence = confidence,
+            applicableReferences = applicable,
+            independentPublisherCount = independentPublisherCount
+        )
+    }
+
+    /**
      * Keep the summary status in sync with the exact per-module catalogue
      * routing. Previously this method reported every non-LFX ECM as generic,
      * even when LLT, V8 or the 2019 LT4 had dedicated evidence entries.
