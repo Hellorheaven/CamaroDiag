@@ -284,7 +284,8 @@ Références GM primaires :
 - 2016 OBD Group Summary, pages 2–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2016/2016_OBD_GROUP_SUMMARY.pdf
 - 2017 OBD Group Summary, pages 2–5 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2017/2017_OBD_GROUP_SUMMARY.pdf
 - 2018 OBD Group Summary, pages 1–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2018/2018_OBD_GROUP_SUMMARY.pdf
-- 2019 19OBDG03A Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03A%20Diagnostics.pdf
+- 2019 19OBDG03A Diagnostics (Camaro LT1/LT4) : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03A%20Diagnostics.pdf
+- 2019 19OBDG03B Diagnostics (Camaro LTG/LGX) : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03B%20Diagnostics.pdf
 - 2020 OBD Group Summary, pages 1–2 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2020/2020_OBD_GROUP_SUMMARY.pdf
 - 2021 OBD Group Summary, pages 1–3 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2021/2021_OBD_GROUP_SUMMARY.pdf
 - 2022 OBD Group Summary, pages 1–2 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2022/2022_OBD_GROUP_SUMMARY.pdf
