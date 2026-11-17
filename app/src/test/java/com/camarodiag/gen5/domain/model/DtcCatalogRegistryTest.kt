@@ -209,6 +209,30 @@ class DtcCatalogRegistryTest {
             )
         }
         assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2021, engine = CamaroEngine.LT1)))
+
+        assertEquals(
+            "22OBDG03A",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2022, engine = CamaroEngine.LTG))
+        )
+        listOf(CamaroEngine.LGX, CamaroEngine.LT1, CamaroEngine.LT4).forEach { engine ->
+            assertEquals(
+                "22OBDG03B",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2022, engine = engine))
+            )
+            assertEquals(
+                "23OBDG03B",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2023, engine = engine))
+            )
+            assertEquals(
+                "24OBDG03B Part 2",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2024, engine = engine))
+            )
+        }
+        assertEquals(
+            "23OBDG03A Part2",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2023, engine = CamaroEngine.LTG))
+        )
+        assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LTG)))
         assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LT4)))
 
         // Group provenance is available; detailed Gen6 monitor evidence is not
