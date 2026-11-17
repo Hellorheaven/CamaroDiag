@@ -420,10 +420,15 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
                 DiagTab.GUIDE -> HardwareGuideScreen()
                 DiagTab.CONTROL -> VehicleControlsScreen(vehicle)
-                DiagTab.SETTINGS -> SettingsScreen(lang, units, savedSessions,
+                DiagTab.SETTINGS -> SettingsScreen(
+                    lang = lang,
+                    units = units,
+                    sessions = savedSessions,
                     onLang = { viewModel.setLanguage(it) },
                     onUnits = { viewModel.setUnitSystem(it) },
-                    onDeleteSession = { viewModel.deleteSavedSession(it) }
+                    onDeleteSession = { viewModel.deleteSavedSession(it) },
+                    onOpenVehicle = { currentTab = DiagTab.SETUP },
+                    onOpenAdapter = { currentTab = DiagTab.ADAPTER }
                 )
             }
         }
@@ -1255,12 +1260,33 @@ fun SettingsScreen(
     sessions: List<com.camarodiag.gen5.data.db.SavedSessionEntity>,
     onLang: (AppLanguage) -> Unit,
     onUnits: (UnitSystem) -> Unit,
-    onDeleteSession: (com.camarodiag.gen5.data.db.SavedSessionEntity) -> Unit
+    onDeleteSession: (com.camarodiag.gen5.data.db.SavedSessionEntity) -> Unit,
+    onOpenVehicle: () -> Unit,
+    onOpenAdapter: () -> Unit
 ) {
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             SectionTitle(stringResource(R.string.settings_title))
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.vehicle_setup_header), fontWeight = FontWeight.Bold, color = CamaroAmber)
+                    OutlinedButton(onClick = onOpenVehicle, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.DirectionsCar, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.tab_vehicle))
+                    }
+                    HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                    Text(stringResource(R.string.adapter_section_title), fontWeight = FontWeight.Bold, color = CamaroAmber)
+                    OutlinedButton(onClick = onOpenAdapter, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Bluetooth, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.tab_connect))
+                    }
+                }
+            }
         }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
