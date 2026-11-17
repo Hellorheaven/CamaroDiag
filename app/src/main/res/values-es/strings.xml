@@ -567,5 +567,5 @@
     <string name="dtc_desc_p0017">Correlación cigüeñal / árbol de levas de escape no plausible (banco 1)</string>
     <string name="dtc_desc_p0018">Correlación cigüeñal / árbol de levas de admisión no plausible (banco 2)</string>
     <string name="dtc_desc_p0019">Correlación cigüeñal / árbol de levas de escape no plausible (banco 2)</string>
-    <string name="dtc_gm_calibration_not_validated">Solo referencia de certificación GM: aún no se ha cotejado la identidad de la ECU (VIN, CAL ID, CVN, identificador de software y número de pieza de hardware). Estos umbrales no están validados para esta ECU.</string>
+    <string name="dtc_gm_calibration_not_validated">Las interpretaciones y los umbrales siguientes son datos de referencia para el motor y el año del modelo seleccionados. La identidad de la ECU (VIN, CAL ID, CVN, identificador de software y número de pieza de hardware) aún no se ha verificado; estos datos no están validados para la ECU conectada.</string>
 </resources>
