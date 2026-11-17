@@ -1042,6 +1042,11 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                 color = CamaroAmber,
                 fontSize = 11.sp
             )
+            Text(
+                stringResource(R.string.dtc_gm_calibration_not_validated),
+                color = CamaroAmber,
+                fontSize = 11.sp
+            )
         }
         if (dtcs.isEmpty()) {
             item {
@@ -1128,11 +1133,6 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 else "Source: GM " + gmSourceLabel + ", page " + gmMonitor.sourcePage,
                                 color = TextMuted,
                                 fontSize = 10.sp
-                            )
-                            Text(
-                                stringResource(R.string.dtc_gm_calibration_not_validated),
-                                color = CamaroAmber,
-                                fontSize = 11.sp
                             )
                         } else if (vehicleExplanation == null && gmMonitor == null && moduleCatalogue.hasVehicleSpecificDefinitions) {
                             Text(
