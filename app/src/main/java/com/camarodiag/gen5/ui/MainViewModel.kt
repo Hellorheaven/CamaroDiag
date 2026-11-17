@@ -860,7 +860,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val current = _calibrationWorkspace.value
-                require(current.importedFilePath != null && current.inspectionFormat == "BIN / raw binary") {
+                require(current.importedFilePath != null && current.inspectionFormat == "RAW_BINARY") {
                     "Importe d'abord une image BIN brute."
                 }
                 val resolver = getApplication<Application>().contentResolver
@@ -1007,14 +1007,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     importedFileSize = modifiedBytes.size.toLong(),
                     importedFileSha256 = hash,
                     importedFilePreview = modifiedBytes.take(64).joinToString(" ") { "%02X".format(it) },
-                    inspectionSummary = inspection.summary,
+                    inspectionSummary = localizedInspectionSummary(inspection, current.importedFileName ?: "calibration.bin"),
                     inspectionPayloadBytes = inspection.payloadBytes,
                     inspectionRecordCount = inspection.recordCount,
-                    inspectionChecksumStatus = inspection.checksumValidation,
+                    inspectionChecksumStatus = localizedInspectionChecksum(inspection),
                     inspectionAddressRanges = inspection.addressRanges.map {
-                        "0x${it.start.toString(16).uppercase()}–0x${it.endInclusive.toString(16).uppercase()} (${it.length} octets)"
+                        getApplication<Application>().getString(R.string.cal_address_range, it.start.toString(16).uppercase(), it.endInclusive.toString(16).uppercase(), it.length)
                     },
-                    inspectionWarnings = inspection.warnings,
+                    inspectionWarnings = localizedInspectionWarnings(inspection),
                     mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
                     mapXAxisValues = decoded.xAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
                     mapYAxisValues = decoded.yAxisValues.map(CalibrationTableCodec::formatEngineeringValue),

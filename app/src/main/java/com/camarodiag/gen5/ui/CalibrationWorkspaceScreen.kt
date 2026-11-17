@@ -676,7 +676,7 @@ fun CalibrationWorkspaceScreen(
                     )
                     OutlinedButton(
                         onClick = onImportDefinitions,
-                        enabled = state.importedFilePath != null && state.inspectionFormat == "BIN / raw binary",
+                        enabled = state.importedFilePath != null && state.inspectionFormat == "RAW_BINARY",
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(stringResource(R.string.cal_import_table_definitions)) }
                     TextButton(onClick = onExportDefinitionTemplate, modifier = Modifier.fillMaxWidth()) {
