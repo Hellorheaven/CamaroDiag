@@ -945,7 +945,6 @@ fun CalibrationWorkspaceScreen(
             item { Text(state.message, color = CamaroAmber, fontSize = 12.sp) }
         }
     }
-}
     if (showVinMismatchDialog) {
         val comparison = state.vinComparison
         if (comparison?.matches == false) {
@@ -1016,3 +1015,4 @@ fun CalibrationWorkspaceScreen(
             )
         }
     }
+}
