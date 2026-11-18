@@ -583,4 +583,15 @@
     <string name="dtc_gm_monitor_failure">عداد الإخفاق / معدل التحقق: %1$s</string>
     <string name="dtc_gm_monitor_mil">تصنيف MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">المصدر: GM %1$s، الصفحة %2$d</string>
+    <string name="system_language_current">اللغة المحددة: %1$s</string>
+    <string name="system_language_hint">اختر اللغة المستخدمة في CamaroDiag.</string>
+    <string name="settings_current_vehicle">المركبة الحالية</string>
+    <string name="settings_current_adapter">اتصال OBD-II</string>
+    <string name="settings_adapter_not_connected">لا يوجد محول متصل</string>
+    <string name="settings_last_connection">ملف تعريف الاتصال الأخير</string>
+    <string name="settings_no_last_connection">لا يوجد ملف اتصال محفوظ حتى الآن.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
 </resources>
