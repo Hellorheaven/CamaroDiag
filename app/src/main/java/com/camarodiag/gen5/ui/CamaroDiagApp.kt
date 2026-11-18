@@ -1257,6 +1257,32 @@ fun CanSnifferScreen(
                     }
                 }
             }
+            if (report.messages.isNotEmpty()) {
+                item {
+                    Text(stringResource(R.string.cal_trace_uds_services), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                }
+                items(report.messages.takeLast(30).asReversed()) { message ->
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            val didLabel = message.did?.let {
+                                " • DID 0x${String.format(Locale.ROOT, "%04X", it)}"
+                            }.orEmpty()
+                            Text(
+                                "${message.serviceName}$didLabel • CAN 0x${String.format(Locale.ROOT, "%03X", message.canId)}",
+                                color = CamaroAmber,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                message.payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) },
+                                color = TextPrimary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
