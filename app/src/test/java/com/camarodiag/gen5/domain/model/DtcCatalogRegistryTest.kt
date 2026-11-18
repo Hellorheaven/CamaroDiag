@@ -579,6 +579,30 @@ class DtcCatalogRegistryTest {
         assertEquals(DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE, samePublisherOnly.confidence)
         assertEquals(1, samePublisherOnly.independentPublisherCount)
 
+        // A cross-posted investigation may carry another publisher label. Its
+        // publisher association is ambiguous and must not inflate corroboration.
+        val crossPosted = first.copy(publisher = "Archive")
+        val mixedPublisherReferences = listOf(
+            crossPosted,
+            first,
+            samePublisherDifferentInvestigation,
+            independent
+        )
+        val mixedOrderAssessment = DtcCatalogRegistry.assessCommunityEvidence(
+            mixedPublisherReferences,
+            vehicle,
+            "ECM"
+        )
+        val reversedOrderAssessment = DtcCatalogRegistry.assessCommunityEvidence(
+            mixedPublisherReferences.reversed(),
+            vehicle,
+            "ECM"
+        )
+        assertEquals(DtcCommunityConfidence.CORROBORATED_INDEPENDENT_SOURCES, mixedOrderAssessment.confidence)
+        assertEquals(2, mixedOrderAssessment.independentPublisherCount)
+        assertEquals(mixedOrderAssessment.confidence, reversedOrderAssessment.confidence)
+        assertEquals(mixedOrderAssessment.independentPublisherCount, reversedOrderAssessment.independentPublisherCount)
+
         val single = DtcCatalogRegistry.assessCommunityEvidence(
             listOf(first, repost),
             vehicle,
