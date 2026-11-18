@@ -139,7 +139,7 @@ jobs:
           commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
           echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
 
-# Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
+          # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
           if [[ "$IS_DRAFT" == "true" ]]; then
             if [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
               echo "validation_applies=false" >> "$GITHUB_OUTPUT"
