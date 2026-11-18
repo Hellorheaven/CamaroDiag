@@ -18,6 +18,7 @@ Les contrôles stables à configurer dans la protection de branche sont `Android
 - Java : `-Werror` appliqué à toutes les tâches JavaCompile.
 - Gradle : `org.gradle.warning.mode=fail` et `--warning-mode=fail` sur les tâches CI.
 - Android Lint : toute entrée XML de sévérité Warning ou Error fait échouer le build.
+- Android SDK : `android-actions/setup-android@v4` utilise les Command-line Tools 20.0 (`14742923`) explicitement. Les outils 22.0 exécutent `sdkmanager` avec un avertissement de dépréciation en amont ; le build ne masque pas cet avertissement et conserve une version d'outil compatible avec les tâches CI actuelles.
 - La compilation Android reste indépendante du filtrage Windows.
 
 ## Compteur périodique Android
