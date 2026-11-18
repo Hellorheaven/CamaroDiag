@@ -256,18 +256,19 @@ object CanTraceAnalyzer {
             val canId = parseCanId(field(canIdIndex))
             val declaredDlc = if (dlcIndex >= 0) field(dlcIndex).toIntOrNull() else null
             val bytes = if (dataIndex >= 0) parseHexBytes(field(dataIndex)) else {
-                val rawValues = dataByteIndexes.map(field)
+                val rawValues: List<String> = dataByteIndexes.map { index -> field(index) }
                 // Empty columns after the declared DLC are normal in fixed-width CSV exports.
                 // Without a DLC column, trim only trailing empties; a gap inside the frame is invalid.
-                val byteCount = declaredDlc ?: (rawValues.indexOfLast { it.isNotBlank() } + 1)
+                val byteCount: Int = declaredDlc
+                    ?: (rawValues.indexOfLast { value -> value.isNotBlank() } + 1)
                 if (byteCount !in 0..rawValues.size) {
                     null
                 } else {
-                    val values = rawValues.take(byteCount).map { value ->
+                    val values: List<Int?> = rawValues.take(byteCount).map { value: String ->
                         if (value.isBlank()) null else value.removePrefix("0x").removePrefix("0X")
-                            .toIntOrNull(16)?.takeIf { it in 0..0xFF }
+                            .toIntOrNull(16)?.takeIf { byte -> byte in 0..0xFF }
                     }
-                    if (values.any { it == null }) null else values.filterNotNull()
+                    if (values.any { byte -> byte == null }) null else values.filterNotNull()
                 }
             }
             val timestamp = if (timestampIndex >= 0) field(timestampIndex).toDoubleOrNull() else null
