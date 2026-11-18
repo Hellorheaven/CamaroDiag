@@ -648,4 +648,5 @@
     <string name="can_sniffer_response_heading">Последний ответ OBD-II</string>
     <string name="can_sniffer_request_complete">Запрос только для чтения выполнен.</string>
     <string name="can_sniffer_request_failed">Ошибка запроса только для чтения.</string>
+    <string name="can_sniffer_bus_limit">Этот режим захвата использует активный профиль HS-CAN 11 бит, 500 кбит/с. Для SW-CAN и других шин требуется другой интерфейс.</string>
 </resources>

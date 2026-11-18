@@ -639,4 +639,5 @@
     <string name="can_sniffer_response_heading">最後のOBD-II応答</string>
     <string name="can_sniffer_request_complete">読み取り専用要求が完了しました。</string>
     <string name="can_sniffer_request_failed">読み取り専用要求に失敗しました。</string>
+    <string name="can_sniffer_bus_limit">このキャプチャ経路は、アクティブな11ビット、500 kbit/sのHS-CANプロファイルを使用します。SW-CANやその他のバスには別のインターフェースが必要です。</string>
 </resources>

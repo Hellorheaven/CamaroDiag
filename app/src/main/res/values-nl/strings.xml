@@ -643,4 +643,5 @@
     <string name="can_sniffer_response_heading">Laatste OBD-II-reactie</string>
     <string name="can_sniffer_request_complete">Alleen-lezen verzoek voltooid.</string>
     <string name="can_sniffer_request_failed">Alleen-lezen verzoek mislukt.</string>
+    <string name="can_sniffer_bus_limit">Deze opname gebruikt het actieve 11-bit, 500 kbit/s HS-CAN-profiel. Voor SW-CAN en andere bussen is een andere interface nodig.</string>
 </resources>

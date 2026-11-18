@@ -653,4 +653,5 @@
     <string name="can_sniffer_response_heading">Letzte OBD-II-Antwort</string>
     <string name="can_sniffer_request_complete">Schreibgeschützte Anfrage abgeschlossen.</string>
     <string name="can_sniffer_request_failed">Schreibgeschützte Anfrage fehlgeschlagen.</string>
+    <string name="can_sniffer_bus_limit">Dieser Erfassungspfad verwendet das aktive HS-CAN-Profil mit 11 Bit und 500 kbit/s. SW-CAN und andere Busse benötigen eine andere Schnittstelle.</string>
 </resources>

@@ -656,4 +656,5 @@
     <string name="can_sniffer_response_heading">Dernière réponse OBD-II</string>
     <string name="can_sniffer_request_complete">Requête en lecture seule terminée.</string>
     <string name="can_sniffer_request_failed">Échec de la requête en lecture seule.</string>
+    <string name="can_sniffer_bus_limit">Cette capture utilise le profil HS-CAN actif en 11 bits à 500 kbit/s. Le SW-CAN et les autres bus nécessitent une interface différente.</string>
 </resources>

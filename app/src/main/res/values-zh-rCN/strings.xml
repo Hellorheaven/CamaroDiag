@@ -639,4 +639,5 @@
     <string name="can_sniffer_response_heading">最后一条 OBD-II 响应</string>
     <string name="can_sniffer_request_complete">只读请求已完成。</string>
     <string name="can_sniffer_request_failed">只读请求失败。</string>
+    <string name="can_sniffer_bus_limit">此捕获路径使用当前的 11 位、500 kbit/s HS-CAN 配置。SW-CAN 和其他总线需要不同的接口。</string>
 </resources>
