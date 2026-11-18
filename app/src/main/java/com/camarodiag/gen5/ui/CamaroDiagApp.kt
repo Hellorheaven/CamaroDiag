@@ -455,9 +455,15 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
 @Composable
 fun VehicleSetupScreen(
     vehicle: VehicleProfile,
+    savedVehicles: List<SavedVehicleProfile>,
+    selectedSavedVehicleId: String?,
     onChange: (Int, CamaroEngine, TransmissionType, MarketRegion) -> Unit,
-    onVinChange: (String) -> Unit
+    onVinChange: (String) -> Unit,
+    onSaveVehicle: (String) -> Unit,
+    onLoadSavedVehicle: (String) -> Unit,
+    onDeleteSavedVehicle: (String) -> Unit
 ) {
+    var savedVehicleName by remember { mutableStateOf("") }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             SectionTitle(stringResource(R.string.vehicle_setup_header))
@@ -541,6 +547,74 @@ fun VehicleSetupScreen(
                         placeholder = { Text(stringResource(R.string.vehicle_vin_placeholder)) },
                         supportingText = { Text(stringResource(R.string.vehicle_vin_hint)) }
                     )
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.saved_vehicle_profiles_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = savedVehicleName,
+                        onValueChange = { savedVehicleName = it.take(60) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.saved_vehicle_name_label)) },
+                        placeholder = { Text(stringResource(R.string.saved_vehicle_name_placeholder)) }
+                    )
+                    Button(
+                        onClick = {
+                            val defaultName = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo}"
+                            onSaveVehicle(savedVehicleName.ifBlank { defaultName })
+                            savedVehicleName = ""
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.saved_vehicle_save_current))
+                    }
+                    if (savedVehicles.isEmpty()) {
+                        Text(stringResource(R.string.saved_vehicle_empty), color = TextMuted, fontSize = 12.sp)
+                    } else {
+                        savedVehicles.forEach { saved ->
+                            HorizontalDivider(color = TextMuted.copy(alpha = .2f))
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        saved.name,
+                                        color = if (saved.id == selectedSavedVehicleId) CamaroAmber else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (saved.id == selectedSavedVehicleId) {
+                                        Text(stringResource(R.string.saved_vehicle_current), color = OkGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Text(
+                                    "${saved.vehicle.modelYear} • ${saved.vehicle.engine.rpo} • ${saved.vehicle.transmission.code} • ${saved.vehicle.market.code}",
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    stringResource(R.string.session_vin_label, saved.vehicle.vin.ifBlank { "—" }),
+                                    color = TextMuted,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp
+                                )
+                                if (saved.requiresReview) {
+                                    Text(stringResource(R.string.saved_vehicle_requires_review), color = CamaroAmber, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { onLoadSavedVehicle(saved.id) }, modifier = Modifier.weight(1f)) {
+                                        Text(stringResource(R.string.saved_vehicle_load))
+                                    }
+                                    TextButton(onClick = { onDeleteSavedVehicle(saved.id) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, tint = WarnRed)
+                                        Text(stringResource(R.string.saved_vehicle_delete), color = WarnRed)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
