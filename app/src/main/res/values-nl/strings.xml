@@ -145,7 +145,7 @@
     <string name="cal_pc_pairing_token">Koppeltoken pc</string>
     <string name="cal_connect_j2534">J2534-bridge verbinden</string>
     <string name="cal_disconnect_pc_bridge">Pc-bridge verbreken</string>
-    <string name="cal_bridge_capabilities">Bridge: HS-CAN ISO15765 250/500 kbit/s en J2534-2 SW-ISO15765 indien ondersteund door de driver. CAN FD blijft uitgeschakeld.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Bridge: HS-CAN ISO15765 250/500 kbit/s en J2534-2 SW-ISO15765 indien ondersteund door de driver. CAN FD blijft uitgeschakeld.</string>
     <string name="cal_read_uds_did">UDS DID lezen</string>
     <string name="cal_read_uds_dtcs">UDS-DTC’s lezen</string>
     <string name="cal_uds_trouble_codes">UDS-foutcodes (0x19)</string>
@@ -246,8 +246,8 @@
     <string name="module_note_ecm_obd_missing">Er is geen standaard OBD 7E8-antwoord waargenomen. Houd de ECM ongeverifieerd totdat een echte functionele scan dit bevestigt.</string>
     <string name="module_note_tcm_gen5">De aanwezigheid, het adres en de ondersteunde gegevens moeten op het voertuig worden vastgesteld.</string>
     <string name="module_note_tcm_gen6">Het moduleadres en de ondersteunde services moeten op het voertuig worden vastgesteld; ze worden niet afgeleid van de Gen 5-topologie.</string>
-    <string name="module_note_bcm_gen5">GM-bulletin 07-08-49-020I noemt de BCM als odometermodule van de Camaro voor 2010–2015. Het exacte diagnoseadres en de lees-DID worden niet verondersteld.</string>
-    <string name="module_note_bcm_gen6_to2018">GM-bulletin 07-08-49-020M noemt de BCM als odometermodule van de Camaro tot en met 2018. Het diagnoseadres en de lees-DID moeten nog VIN-specifiek worden geverifieerd.</string>
+    <string name="module_note_bcm_gen5" tools:ignore="TypographyDashes">GM-bulletin 07-08-49-020I noemt de BCM als odometermodule van de Camaro voor 2010–2015. Het exacte diagnoseadres en de lees-DID worden niet verondersteld.</string>
+    <string name="module_note_bcm_gen6_to2018" tools:ignore="TypographyDashes">GM-bulletin 07-08-49-020M noemt de BCM als odometermodule van de Camaro tot en met 2018. Het diagnoseadres en de lees-DID moeten nog VIN-specifiek worden geverifieerd.</string>
     <string name="module_note_bcm_2019">Controleer voor 2019–2024 vóór het uitlezen de odometerarchitectuur en diagnose-identificaties voor dit VIN.</string>
     <string name="module_note_ipc_gen5">Service-informatie voor de Camaro 2012 beschrijft de IPC als secundaire odometeropslag. De exacte leesgegevens en het adres moeten worden geverifieerd.</string>
     <string name="module_note_ipc_gen6">Service-informatie voor de Camaro 2012 beschrijft secundaire odometeropslag; controleer de exacte modulegegevens en de VIN-relatie voordat u vergelijkt.</string>
