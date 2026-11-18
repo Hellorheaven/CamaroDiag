@@ -1024,7 +1024,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val raw = captured.takeLast(131_072)
                 val report = CanTraceAnalyzer.analyze(
-                    raw.replace("\\r\\n", "\\n").replace('\\r', '\\n'),
+                    raw.replace("\r\n", "\n").replace('\r', '\n'),
                     "live-can-monitor.txt"
                 )
                 _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
