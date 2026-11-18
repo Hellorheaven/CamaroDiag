@@ -136,6 +136,56 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun readsStandardEcuIdentityAndKeepsResponderAddressesUnmapped() = runBlocking {
+        val vin = "1G1FA1RXXR0123456"
+        val calId = "ABCDEFGH12345678"
+        val ecuName = "GM ECM MODULE".padEnd(20, ' ')
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "7E8 06 41 00 FF FF FF FF"
+                "0902" -> "490201" + vin.toByteArray().joinToString("") { "%02X".format(it) }
+                "0904" -> "490401" + calId.toByteArray().joinToString("") { "%02X".format(it) }
+                "0906" -> "4906019F3E61C2"
+                "090A" -> "490A01" + ecuName.toByteArray().joinToString("") { "%02X".format(it) }
+                else -> "OK"
+            }
+        })
+
+        val identity = engine.readEcuIdentification()
+
+        assertEquals(vin, identity.vin)
+        assertEquals(listOf(calId), identity.calibrationIds)
+        assertEquals(listOf("9F3E61C2"), identity.calibrationVerificationNumbers)
+        assertEquals(listOf("GM ECM MODULE"), identity.ecuNames)
+        assertEquals(listOf("7E8"), identity.respondingEcuAddresses)
+        assertTrue(commands.containsAll(listOf("0100", "0902", "0904", "0906", "090A")))
+        assertTrue(commands.containsAll(listOf("ATH0", "ATS0")))
+    }
+
+    @Test
+    fun retainsAvailableIdentityFieldsWhenOptionalMode09EcuNameIsUnsupported() = runBlocking {
+        val vin = "1G1FA1RXXR0123456"
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0902" -> "490201" + vin.toByteArray().joinToString("") { "%02X".format(it) }
+                "0904" -> "49040141424344454647483132333435363738"
+                "0906" -> "4906019F3E61C2"
+                "090A" -> "NO DATA"
+                else -> "NO DATA"
+            }
+        })
+
+        val identity = engine.readEcuIdentification()
+
+        assertEquals(vin, identity.vin)
+        assertEquals(listOf("ABCDEFGH12345678"), identity.calibrationIds)
+        assertEquals(listOf("9F3E61C2"), identity.calibrationVerificationNumbers)
+        assertTrue(identity.ecuNames.isEmpty())
+    }
+
+    @Test
     fun readsAndDecodesEngineRpmFromSupportedPid() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             when (command) {
