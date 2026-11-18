@@ -35,7 +35,7 @@ La variable `CAMARODIAG_DRAFT_BUILD_INTERVAL` s'applique également au suivi And
 La détection compare la base de la PR à sa tête et considère comme pertinentes :
 
 - Tout le répertoire `pc-bridge/**` : sources, projets, ressources, installateur et configuration.
-- Les configurations .NET partagées : `global.json`, `NuGet.Config`, `nuget.config`, `Directory.Build.props`, `Directory.Build.targets`, `Directory.Packages.props`, fichiers de réponse MSBuild, solutions `.sln` / `.slnx`, fichiers `.props` / `.targets` et `.config/dotnet-tools.json`, y compris dans les sous-répertoires.
+- Les configurations .NET partagées : `global.json`, `.editorconfig`, `.github/actions/**`, `NuGet.Config`, `nuget.config`, `Directory.Build.props`, `Directory.Build.targets`, `Directory.Packages.props`, fichiers de réponse MSBuild, solutions `.sln` / `.slnx`, fichiers `.props` / `.targets` et `.config/dotnet-tools.json`, y compris dans les sous-répertoires.
 - Le workflow `.github/workflows/pc-bridge-ci.yml` lui-même. Toute modification de sa logique force une validation Windows Debug.
 
 Une modification Android, Kotlin, Compose, DTC, Gradle ou des ressources Android ne déclenche pas à elle seule une compilation Windows.
