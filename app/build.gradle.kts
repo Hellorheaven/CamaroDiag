@@ -100,6 +100,14 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // The app has an in-app language selector and bundles all 14 translations locally.
+    // Keep every locale in the generated App Bundle instead of splitting languages.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 tasks.named("preBuild").configure {
