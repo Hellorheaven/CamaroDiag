@@ -453,7 +453,13 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
                     }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
+                DiagTab.DTCS -> DtcScreen(
+                    dtcs,
+                    vehicle,
+                    calibrationWorkspace.vinComparison,
+                    { viewModel.scanDtcs() },
+                    { viewModel.clearDtcs() }
+                )
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
                 DiagTab.OBD_SCAN -> ObdScanScreen(
                     report = obdScanReport,
@@ -1213,7 +1219,13 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> Unit, onClear: () -> Unit) {
+fun DtcScreen(
+    dtcs: List<DiagnosticDtc>,
+    vehicle: VehicleProfile,
+    ecuVinComparison: VehicleVinComparison?,
+    onScan: () -> Unit,
+    onClear: () -> Unit
+) {
     var confirmClear by remember { mutableStateOf(false) }
     val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1241,7 +1253,9 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                 color = CamaroAmber,
                 fontSize = 11.sp
             )
-            if (dtcs.any { DtcCatalogRegistry.catalogueFor(it.module, vehicle).hasVehicleSpecificDefinitions }) {
+            if (dtcs.any {
+                    DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, it.module, ecuVinComparison)
+                }) {
                 Text(
                     stringResource(R.string.dtc_gm_calibration_not_validated),
                     color = CamaroAmber,
@@ -1263,7 +1277,10 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                         }
                         Text(localizedDtcDescription(dtc))
                         val moduleCatalogue = DtcCatalogRegistry.catalogueFor(dtc.module, vehicle)
-                        val applicabilityNotice = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                        val mayApplyVehicleSpecific = DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(
+                            vehicle, dtc.module, ecuVinComparison
+                        )
+                        val applicabilityNotice = if (mayApplyVehicleSpecific) {
                             CamaroDtcCatalog.applicabilityNotice(dtc.code.substringBefore('-'), vehicle)
                         } else {
                             null
@@ -1282,8 +1299,15 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 color = TextMuted,
                                 fontSize = 11.sp
                             )
+                        } else if (!mayApplyVehicleSpecific) {
+                            Text(
+                                stringResource(R.string.dtc_vehicle_identity_required),
+                                color = WarnRed,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
-                        val vehicleExplanation = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                        val vehicleExplanation = if (mayApplyVehicleSpecific) {
                             CamaroDtcCatalog.find(dtc.code.substringBefore('-'), vehicle)
                         } else {
                             null
@@ -1310,7 +1334,7 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 Text(applicability, color = WarnRed)
                             }
                         }
-                        val gmMonitor = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                        val gmMonitor = if (mayApplyVehicleSpecific) {
                             GmEngineMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
                         } else {
                             null
