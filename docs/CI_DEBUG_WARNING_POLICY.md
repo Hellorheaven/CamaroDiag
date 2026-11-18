@@ -7,7 +7,7 @@ Aucune pull request vers `main` ne doit être considérée comme validée tant q
 - Android CI : `android-debug-validation`, contrôle stable distinguant compilation effectuée, build périodique différé et cas non applicable ; le job de compilation réel est `test-and-build`.
 - PC J2534 Bridge CI : `windows-debug-validation`, contrôle stable distinguant compilation effectuée, build périodique différé et cas non applicable.
 - Un job de compilation `skipped`, en attente, annulé ou exécuté sur un ancien SHA ne constitue jamais une preuve de compilation réussie.
-- `NOT APPLICABLE` signifie uniquement qu'aucun fichier Windows pertinent n'a changé ; ce statut ne signifie pas qu'une compilation a été exécutée.
+- `NOT APPLICABLE` est évalué à l'échelle de l'événement/commit courant : sur `ready_for_review`, le contrôle s'applique si la PR contient des changements Windows ; sur un événement `synchronize`, il ne s'applique que si le commit courant modifie un fichier Windows pertinent. Ce statut ne signifie jamais qu'une compilation a été exécutée.
 - `BUILD DEFERRED` signifie que des changements Windows existent mais que le seuil périodique n'est pas atteint. Ce statut n'est pas une compilation.
 
 Les contrôles stables à configurer dans la protection de branche sont `Android CI / android-debug-validation` et `PC J2534 Bridge CI / windows-debug-validation`, et non les jobs conditionnels de compilation.
@@ -30,7 +30,10 @@ La variable `CAMARODIAG_DRAFT_BUILD_INTERVAL` s'applique également au suivi And
 - Le compteur repart uniquement du SHA du dernier job `test-and-build` réellement réussi. Le succès du job d'évaluation ou du contrôle stable ne réinitialise jamais le compteur.
 - Si le seuil n'est pas atteint en Draft, le contrôle indique `BUILD DEFERRED`; le contrôle ne prétend pas que les tests, lint ou APK ont été exécutés.
 - Le passage en Ready for review déclenche immédiatement les tests unitaires, Android Lint et la génération de l'APK Debug lorsque des fichiers Android pertinents ont changé.
-- Si aucun fichier Android pertinent n'a changé, le contrôle indique `NOT APPLICABLE` sans lancer le build Android.
+- En Draft, seuls les commits Android pertinents alimentent le compteur et peuvent déclencher un build périodique ; un commit uniquement Windows ou documentaire n'entraîne pas de build Android.
+- Au passage en Ready for review, la PR est validée immédiatement si elle contient des changements Android pertinents.
+- Après ce passage, un événement `synchronize` ne déclenche Android que si le commit nouvellement poussé modifie lui-même des fichiers Android pertinents. Un commit uniquement Windows ou documentaire donne `NOT APPLICABLE` pour Android, même si des commits précédents de la PR contiennent du code Android déjà validé.
+- Si aucun fichier Android pertinent n'a changé pour l'événement/commit courant, le contrôle indique `NOT APPLICABLE` sans lancer le build Android.
 ## Contrôles Windows Debug
 
 La détection compare la base de la PR à sa tête et considère comme pertinentes :
@@ -60,7 +63,10 @@ La variable GitHub Actions `CAMARODIAG_DRAFT_BUILD_INTERVAL` définit le seuil. 
 - Si le seuil n'est pas atteint en Draft, le contrôle indique `BUILD DEFERRED` ; le build reste dû et sera retenté à chaque commit pertinent jusqu'à une réussite réelle.
 - Le passage en Ready for review déclenche immédiatement un build Windows si des fichiers Windows pertinents ont changé.
 - Chaque nouveau commit en Ready déclenche une validation Windows immédiate si les changements cumulés de la PR concernent Windows.
-- En l'absence de modification Windows pertinente, le contrôle indique `NOT APPLICABLE` et aucun runner Windows n'est démarré.
+- En Draft, seuls les commits Windows pertinents alimentent le compteur et peuvent déclencher un build périodique ; un commit uniquement Android ou documentaire n'entraîne pas de build Windows.
+- Au passage en Ready for review, la PR est validée immédiatement si elle contient des changements Windows pertinents.
+- Après ce passage, un événement `synchronize` ne déclenche Windows que si le commit nouvellement poussé modifie lui-même des fichiers Windows pertinents. Un commit uniquement Android ou documentaire donne `NOT APPLICABLE` pour Windows, même si des commits précédents de la PR contiennent du code Windows déjà validé.
+- En l'absence de modification Windows pertinente pour l'événement/commit courant, le contrôle indique `NOT APPLICABLE` et aucun runner Windows n'est démarré.
 
 ## Windows Release
 
