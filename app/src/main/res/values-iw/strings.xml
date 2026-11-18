@@ -574,4 +574,15 @@
     <string name="dtc_gm_monitor_failure">מונה כשלים / קצב אימות: %1$s</string>
     <string name="dtc_gm_monitor_mil">סיווג MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">מקור: GM %1$s, עמוד %2$d</string>
+    <string name="system_language_current">השפה שנבחרה: %1$s</string>
+    <string name="system_language_hint">בחרו את השפה לשימוש ב-CamaroDiag.</string>
+    <string name="settings_current_vehicle">הרכב הנוכחי</string>
+    <string name="settings_current_adapter">חיבור OBD-II</string>
+    <string name="settings_adapter_not_connected">אין מתאם מחובר</string>
+    <string name="settings_last_connection">פרופיל החיבור האחרון</string>
+    <string name="settings_no_last_connection">עדיין לא נשמר פרופיל חיבור.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
 </resources>
