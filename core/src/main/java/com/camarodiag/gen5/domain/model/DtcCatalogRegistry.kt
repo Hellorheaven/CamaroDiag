@@ -316,9 +316,20 @@ object DtcCatalogRegistry {
         val applicable = references.filter { it.isApplicableTo(vehicle, respondingModuleId) }
         // Reposts of one investigation count once, and multiple investigations
         // published by the same organization do not create independent corroboration.
+        // A repost may carry a different publisher label while retaining the same
+        // original-investigation group. Such an ambiguous group must not be allowed
+        // to make the result depend on input order or inflate independent corroboration.
+        // Count only groups that resolve to exactly one publisher, then deduplicate
+        // those publishers across their separate investigations.
         val independentPublisherCount = applicable
-            .distinctBy { it.independenceGroup.trim().lowercase(Locale.ROOT) }
-            .map { it.publisher.trim().lowercase(Locale.ROOT) }
+            .groupBy { it.independenceGroup.trim().lowercase(Locale.ROOT) }
+            .values
+            .mapNotNull { groupReferences ->
+                groupReferences
+                    .map { it.publisher.trim().lowercase(Locale.ROOT) }
+                    .distinct()
+                    .singleOrNull()
+            }
             .distinct()
             .size
         val confidence = when {
