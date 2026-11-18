@@ -572,4 +572,15 @@
     <string name="dtc_gm_monitor_failure">Μετρητής αποτυχιών / ρυθμός επιβεβαίωσης: %1$s</string>
     <string name="dtc_gm_monitor_mil">Κατηγορία MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Πηγή: GM %1$s, σελίδα %2$d</string>
+    <string name="system_language_current">Επιλεγμένη γλώσσα: %1$s</string>
+    <string name="system_language_hint">Επιλέξτε τη γλώσσα που χρησιμοποιείται στο CamaroDiag.</string>
+    <string name="settings_current_vehicle">Τρέχον όχημα</string>
+    <string name="settings_current_adapter">Σύνδεση OBD-II</string>
+    <string name="settings_adapter_not_connected">Δεν έχει συνδεθεί προσαρμογέας</string>
+    <string name="settings_last_connection">Τελευταίο προφίλ σύνδεσης</string>
+    <string name="settings_no_last_connection">Δεν έχει αποθηκευτεί προφίλ σύνδεσης.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
 </resources>
