@@ -705,12 +705,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disconnectJ2534Bridge() {
-        obdManager.disconnect()
-        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-            isJ2534BridgeConnecting = false,
-            isJ2534BridgeConnected = false,
-            j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_pc_bridge_disconnected)
-        )
+        viewModelScope.launch {
+            val activeMonitor = canMonitorJob
+            stopCanMonitor()
+            activeMonitor?.join()
+            obdManager.disconnect()
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isJ2534BridgeConnecting = false,
+                isJ2534BridgeConnected = false,
+                j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_pc_bridge_disconnected)
+            )
+        }
     }
 
     /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
@@ -1632,7 +1637,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             beginBusyOperation()
             _connectionMessage.value = null
+            val activeMonitor = canMonitorJob
             markAdapterDisconnected()
+            activeMonitor?.join()
             try {
                 connect()
                     .onSuccess { capabilities ->
@@ -1701,7 +1708,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectSimulatedAdapter(preset: String) {
         viewModelScope.launch {
             beginBusyOperation()
+            val activeMonitor = canMonitorJob
             markAdapterDisconnected()
+            activeMonitor?.join()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 ecuVinResponse = "",
                 calibrationIdResponse = "",
