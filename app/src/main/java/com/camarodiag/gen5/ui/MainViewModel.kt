@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
@@ -37,24 +38,40 @@ import kotlin.random.Random
 import java.security.MessageDigest
 import java.io.File
 
+data class SavedObdConnectionProfile(
+    val transport: String,
+    val adapterName: String,
+    val endpoint: String
+)
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val settingsPreferences = application.getSharedPreferences("camarodiag_settings", Context.MODE_PRIVATE)
     private val obdManager = BluetoothObdManager(application)
     @Volatile private var obdbCamaroSignalSet: ObdbCamaroSignalSet? = null
     @Volatile private var camaroSignalCatalog: CamaroSignalCatalog? = null
     private val sessionDao = DiagnosticDatabase.getInstance(application).sessionDao()
 
-    private val _language = MutableStateFlow(AppLanguage.fromLocale(application.resources.configuration.locales[0]))
+    private val _language = MutableStateFlow(
+        AppLanguage.entries.firstOrNull { it.code == settingsPreferences.getString("language", null) }
+            ?: AppLanguage.fromLocale(application.resources.configuration.locales[0])
+    )
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
-    private val _unitSystem = MutableStateFlow(UnitSystem.METRIC)
+    private val _unitSystem = MutableStateFlow(
+        runCatching { UnitSystem.valueOf(settingsPreferences.getString("unit_system", UnitSystem.METRIC.name)!!) }
+            .getOrDefault(UnitSystem.METRIC)
+    )
     val unitSystem: StateFlow<UnitSystem> = _unitSystem.asStateFlow()
 
-    private val _vehicle = MutableStateFlow(VehicleProfile())
+    private val _vehicle = MutableStateFlow(loadVehicleProfile())
     val vehicle: StateFlow<VehicleProfile> = _vehicle.asStateFlow()
 
     private val _adapter = MutableStateFlow(AdapterCapabilities())
     val adapter: StateFlow<AdapterCapabilities> = _adapter.asStateFlow()
+
+    private val _lastConnectionProfile = MutableStateFlow(loadLastConnectionProfile())
+    val lastConnectionProfile: StateFlow<SavedObdConnectionProfile?> = _lastConnectionProfile.asStateFlow()
 
     private val _pairedDevices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val pairedDevices: StateFlow<List<Pair<String, String>>> = _pairedDevices.asStateFlow()
@@ -119,8 +136,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         startLiveTelemetryLoop()
     }
 
-    fun setLanguage(lang: AppLanguage) { _language.value = lang }
+    private fun loadVehicleProfile(): VehicleProfile {
+        val year = settingsPreferences.getInt("vehicle_year", 2012).coerceIn(2010, 2024)
+        val savedEngine = runCatching {
+            CamaroEngine.valueOf(settingsPreferences.getString("vehicle_engine", CamaroEngine.LFX.name)!!)
+        }.getOrDefault(CamaroEngine.LFX)
+        val engine = if (year in savedEngine.years) savedEngine else CamaroEngine.entries.first { year in it.years }
+        val transmission = runCatching {
+            TransmissionType.valueOf(settingsPreferences.getString("vehicle_transmission", TransmissionType.MANUAL.name)!!)
+        }.getOrDefault(TransmissionType.MANUAL)
+        val market = runCatching {
+            MarketRegion.valueOf(settingsPreferences.getString("vehicle_market", MarketRegion.EU_ECE.name)!!)
+        }.getOrDefault(MarketRegion.EU_ECE)
+        val vin = settingsPreferences.getString("vehicle_vin", "").orEmpty()
+            .uppercase().filter { it.isLetterOrDigit() }.take(17)
+        return VehicleProfile(year, engine, transmission, market, vin)
+    }
 
+    private fun persistVehicleProfile(profile: VehicleProfile) {
+        settingsPreferences.edit()
+            .putInt("vehicle_year", profile.modelYear)
+            .putString("vehicle_engine", profile.engine.name)
+            .putString("vehicle_transmission", profile.transmission.name)
+            .putString("vehicle_market", profile.market.name)
+            .putString("vehicle_vin", profile.vin)
+            .apply()
+    }
+
+    private fun loadLastConnectionProfile(): SavedObdConnectionProfile? {
+        val transport = settingsPreferences.getString("last_connection_transport", null) ?: return null
+        val adapterName = settingsPreferences.getString("last_connection_adapter", null) ?: return null
+        val endpoint = settingsPreferences.getString("last_connection_endpoint", "").orEmpty()
+        return SavedObdConnectionProfile(transport, adapterName, endpoint)
+    }
+
+    private fun rememberConnectionProfile(transport: String, capabilities: AdapterCapabilities, endpoint: String) {
+        val profile = SavedObdConnectionProfile(transport, capabilities.deviceName, endpoint)
+        _lastConnectionProfile.value = profile
+        settingsPreferences.edit()
+            .putString("last_connection_transport", profile.transport)
+            .putString("last_connection_adapter", profile.adapterName)
+            .putString("last_connection_endpoint", profile.endpoint)
+            .apply()
+    }
+
+    fun setLanguage(lang: AppLanguage) {
+        _language.value = lang
+        settingsPreferences.edit().putString("language", lang.code).apply()
+    }
 
     private fun localizedMileageSummaryForStorage(report: com.camarodiag.gen5.domain.model.MileageAuditReport): String {
         val valid = report.readings.filter { reading ->
@@ -144,7 +207,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun isSystemFrench(): Boolean =
         getApplication<Application>().resources.configuration.locales[0].language.equals("fr", ignoreCase = true)
-    fun setUnitSystem(units: UnitSystem) { _unitSystem.value = units }
+    fun setUnitSystem(units: UnitSystem) {
+        _unitSystem.value = units
+        settingsPreferences.edit().putString("unit_system", units.name).apply()
+    }
 
     fun updateVehicle(
         year: Int = _vehicle.value.modelYear,
@@ -154,12 +220,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         val compatibleEngines = CamaroEngine.entries.filter { year in it.years }
         val safeEngine = if (engine in compatibleEngines) engine else compatibleEngines.first()
-        _vehicle.value = _vehicle.value.copy(
+        val updated = _vehicle.value.copy(
             modelYear = year,
             engine = safeEngine,
             transmission = transmission,
             market = market
         )
+        if (updated == _vehicle.value) return
+        _vehicle.value = updated
+        persistVehicleProfile(updated)
+        invalidateLiveRecordingForVehicleChange()
         clearVehicleEvidence()
         refreshTopologyAndDefaults()
         refreshObdbSignalYear()
@@ -167,8 +237,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateVin(vin: String) {
-        _vehicle.value = _vehicle.value.copy(vin = vin.uppercase().filter { it.isLetterOrDigit() }.take(17))
+        val normalizedVin = vin.uppercase().filter { it.isLetterOrDigit() }.take(17)
+        if (normalizedVin == _vehicle.value.vin) return
+        _vehicle.value = _vehicle.value.copy(vin = normalizedVin)
+        settingsPreferences.edit().putString("vehicle_vin", normalizedVin).apply()
+        invalidateLiveRecordingForVehicleChange()
         clearVehicleEvidence()
+    }
+
+    private fun invalidateLiveRecordingForVehicleChange() {
+        if (_liveRecordingState.value.isRecording) {
+            _liveRecordingState.value = _liveRecordingState.value.copy(
+                isRecording = false,
+                stoppedAtMillis = System.currentTimeMillis(),
+                message = getApplication<Application>().getString(R.string.msg_live_recording_stopped_count, recordedLiveSamples.size)
+            )
+        }
+        recordedLiveSamples.clear()
+        _liveRecordingState.value = LiveRecordingState()
     }
 
     private fun clearVehicleEvidence() {
@@ -1239,7 +1325,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun connectWithResult(
         connect: suspend () -> Result<AdapterCapabilities>,
-        fallbackMessage: String
+        fallbackMessage: String,
+        transport: String,
+        endpoint: String
     ) {
         viewModelScope.launch {
             beginBusyOperation()
@@ -1249,6 +1337,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 connect()
                     .onSuccess { capabilities ->
                         _adapter.value = capabilities
+                        rememberConnectionProfile(transport, capabilities, endpoint)
                         refreshTopologyAndDefaults(runInitialScans = true)
                     }
                     .onFailure { error ->
@@ -1288,7 +1377,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun connectWifi(host: String, port: Int) {
         connectWithResult(
             connect = { obdManager.connectWifi(host.trim(), port) },
-            fallbackMessage = getApplication<Application>().getString(R.string.msg_wifi_connection_failed)
+            fallbackMessage = getApplication<Application>().getString(R.string.msg_wifi_connection_failed),
+            transport = "wifi",
+            endpoint = "${host.trim()}:$port"
         )
     }
 
@@ -1301,7 +1392,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val baudRate = if (deviceLabel.contains("OBDLink", true)) 115200 else 38400
         connectWithResult(
             connect = { obdManager.connectUsb(id, baudRate) },
-            fallbackMessage = getApplication<Application>().getString(R.string.msg_usb_connection_failed)
+            fallbackMessage = getApplication<Application>().getString(R.string.msg_usb_connection_failed),
+            transport = "usb",
+            endpoint = deviceLabel
         )
     }
 
@@ -1337,7 +1430,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         connectWithResult(
             connect = { obdManager.connectAndProbe(macAddress) },
-            fallbackMessage = getApplication<Application>().getString(R.string.msg_bluetooth_connection_failed)
+            fallbackMessage = getApplication<Application>().getString(R.string.msg_bluetooth_connection_failed),
+            transport = "bluetooth",
+            endpoint = "$selectedName ($macAddress)"
         )
     }
 
