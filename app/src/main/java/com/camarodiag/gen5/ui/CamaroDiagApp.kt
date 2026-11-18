@@ -336,13 +336,51 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         }
    
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(BgDark)
                 .padding(padding)
-                .padding(14.dp)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            calibrationWorkspace.vinComparison
+                ?.takeIf { it.matches == false }
+                ?.let { comparison ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF3A2020)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, WarnRed)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                stringResource(
+                                    R.string.cal_vin_mismatch_detected,
+                                    comparison.selectedVehicleVin ?: "—",
+                                    comparison.ecuVin
+                                ),
+                                color = Color(0xFFFFB4AB),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                stringResource(R.string.cal_vin_mismatch_confirmation,
+                                    comparison.selectedVehicleVin ?: "—",
+                                    comparison.ecuVin
+                                ),
+                                color = TextPrimary,
+                                fontSize = 12.sp
+                            )
+                            TextButton(onClick = { currentTab = DiagTab.CALIBRATION }) {
+                                Text(stringResource(R.string.cal_vin_mismatch_title), color = CamaroAmber)
+                            }
+                        }
+                    }
+                }
+            Box(modifier = Modifier.fillMaxSize().weight(1f)) {
             when (currentTab) {
                 DiagTab.SETUP -> VehicleSetupScreen(
                     vehicle = vehicle,
@@ -446,6 +484,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onOpenVehicle = { currentTab = DiagTab.SETUP },
                     onOpenAdapter = { currentTab = DiagTab.ADAPTER }
                 )
+            }
             }
         }
     }
