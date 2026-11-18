@@ -1156,6 +1156,7 @@ fun CanSnifferScreen(
                     SectionTitle(stringResource(R.string.can_sniffer_title))
                     Text(stringResource(R.string.can_sniffer_description), color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.can_sniffer_safety), color = CamaroAmber, fontSize = 11.sp)
+                    Text(stringResource(R.string.can_sniffer_bus_limit), color = TextMuted, fontSize = 10.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = onStart,
