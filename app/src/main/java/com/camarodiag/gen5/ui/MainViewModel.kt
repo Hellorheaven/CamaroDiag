@@ -38,11 +38,21 @@ import kotlin.math.sin
 import kotlin.random.Random
 import java.security.MessageDigest
 import java.io.File
+import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class SavedObdConnectionProfile(
     val transport: String,
     val adapterName: String,
     val endpoint: String
+)
+
+data class SavedVehicleProfile(
+    val id: String,
+    val name: String,
+    val vehicle: VehicleProfile,
+    val requiresReview: Boolean = false
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -73,6 +83,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _lastConnectionProfile = MutableStateFlow(loadLastConnectionProfile())
     val lastConnectionProfile: StateFlow<SavedObdConnectionProfile?> = _lastConnectionProfile.asStateFlow()
+
+    private val _savedVehicles = MutableStateFlow(loadSavedVehicleProfiles())
+    val savedVehicles: StateFlow<List<SavedVehicleProfile>> = _savedVehicles.asStateFlow()
+
+    private val _selectedSavedVehicleId = MutableStateFlow(settingsPreferences.getString("selected_vehicle_id", null))
+    val selectedSavedVehicleId: StateFlow<String?> = _selectedSavedVehicleId.asStateFlow()
 
     private val _pairedDevices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val pairedDevices: StateFlow<List<Pair<String, String>>> = _pairedDevices.asStateFlow()
@@ -169,6 +185,140 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val adapterName = settingsPreferences.getString("last_connection_adapter", null) ?: return null
         val endpoint = settingsPreferences.getString("last_connection_endpoint", "").orEmpty()
         return SavedObdConnectionProfile(transport, adapterName, endpoint)
+    }
+
+    private fun loadSavedVehicleProfiles(): List<SavedVehicleProfile> = runCatching {
+        val source = settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
+        val array = JSONArray(source)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val id = item.optString("id").takeIf { it.isNotBlank() } ?: continue
+                val name = item.optString("name").takeIf { it.isNotBlank() } ?: continue
+                val year = item.optInt("year", 2012).coerceIn(2010, 2024)
+                val storedEngine = runCatching {
+                    CamaroEngine.valueOf(item.optString("engine", CamaroEngine.LFX.name))
+                }.getOrDefault(CamaroEngine.LFX)
+                val engine = if (year in storedEngine.years) storedEngine
+                    else CamaroEngine.entries.first { year in it.years }
+                val transmission = runCatching {
+                    TransmissionType.valueOf(item.optString("transmission", TransmissionType.MANUAL.name))
+                }.getOrDefault(TransmissionType.MANUAL)
+                val market = runCatching {
+                    MarketRegion.valueOf(item.optString("market", MarketRegion.EU_ECE.name))
+                }.getOrDefault(MarketRegion.EU_ECE)
+                val vin = item.optString("vin").uppercase().filter { it.isLetterOrDigit() }.take(17)
+                add(
+                    SavedVehicleProfile(
+                        id = id,
+                        name = name,
+                        vehicle = VehicleProfile(year, engine, transmission, market, vin),
+                        requiresReview = item.optBoolean("requiresReview", false)
+                    )
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    private fun persistSavedVehicleProfiles(profiles: List<SavedVehicleProfile>) {
+        val array = JSONArray()
+        profiles.forEach { saved ->
+            array.put(
+                JSONObject().apply {
+                    put("id", saved.id)
+                    put("name", saved.name)
+                    put("year", saved.vehicle.modelYear)
+                    put("engine", saved.vehicle.engine.name)
+                    put("transmission", saved.vehicle.transmission.name)
+                    put("market", saved.vehicle.market.name)
+                    put("vin", saved.vehicle.vin)
+                    put("requiresReview", saved.requiresReview)
+                }
+            )
+        }
+        settingsPreferences.edit { putString("saved_vehicle_profiles", array.toString()) }
+    }
+
+    fun saveCurrentVehicle(name: String) {
+        val cleanName = name.trim().take(60)
+        if (cleanName.isBlank()) {
+            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_profile_name_required)
+            return
+        }
+        val current = _vehicle.value
+        val existingId = _selectedSavedVehicleId.value
+            ?.takeIf { id -> _savedVehicles.value.any { it.id == id } }
+            ?: current.vin.takeIf { it.isNotBlank() }?.let { vin ->
+                _savedVehicles.value.firstOrNull { it.vehicle.vin.equals(vin, ignoreCase = true) }?.id
+            }
+        val profile = SavedVehicleProfile(
+            id = existingId ?: UUID.randomUUID().toString(),
+            name = cleanName,
+            vehicle = current,
+            requiresReview = false
+        )
+        val updated = if (_savedVehicles.value.any { it.id == profile.id }) {
+            _savedVehicles.value.map { if (it.id == profile.id) profile else it }
+        } else {
+            _savedVehicles.value + profile
+        }
+        _savedVehicles.value = updated
+        persistSavedVehicleProfiles(updated)
+        _selectedSavedVehicleId.value = profile.id
+        settingsPreferences.edit { putString("selected_vehicle_id", profile.id) }
+        _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_profile_saved)
+    }
+
+    fun selectSavedVehicle(id: String) {
+        val saved = _savedVehicles.value.firstOrNull { it.id == id } ?: return
+        updateVehicle(
+            year = saved.vehicle.modelYear,
+            engine = saved.vehicle.engine,
+            transmission = saved.vehicle.transmission,
+            market = saved.vehicle.market
+        )
+        updateVin(saved.vehicle.vin)
+        _selectedSavedVehicleId.value = saved.id
+        settingsPreferences.edit { putString("selected_vehicle_id", saved.id) }
+        _connectionMessage.value = if (saved.requiresReview) {
+            getApplication<Application>().getString(R.string.msg_vehicle_profile_review_required)
+        } else {
+            getApplication<Application>().getString(R.string.msg_vehicle_profile_loaded, saved.name)
+        }
+    }
+
+    fun deleteSavedVehicle(id: String) {
+        val updated = _savedVehicles.value.filterNot { it.id == id }
+        if (updated.size == _savedVehicles.value.size) return
+        _savedVehicles.value = updated
+        persistSavedVehicleProfiles(updated)
+        if (_selectedSavedVehicleId.value == id) {
+            _selectedSavedVehicleId.value = null
+            settingsPreferences.edit { remove("selected_vehicle_id") }
+        }
+    }
+
+    fun createVehicleFromEcuVin(ecuVin: String) {
+        val normalizedVin = VehicleVinMatcher.normalize(ecuVin)
+        if (normalizedVin == null) {
+            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_ecu_vin_invalid)
+            return
+        }
+        val vehicleFromEcu = _vehicle.value.copy(vin = normalizedVin)
+        val suffix = normalizedVin.takeLast(6)
+        val saved = SavedVehicleProfile(
+            id = UUID.randomUUID().toString(),
+            name = getApplication<Application>().getString(R.string.saved_vehicle_ecu_default_name, suffix),
+            vehicle = vehicleFromEcu,
+            requiresReview = true
+        )
+        val updated = _savedVehicles.value + saved
+        _savedVehicles.value = updated
+        persistSavedVehicleProfiles(updated)
+        updateVin(normalizedVin)
+        _selectedSavedVehicleId.value = saved.id
+        settingsPreferences.edit { putString("selected_vehicle_id", saved.id) }
+        _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_profile_review_required)
     }
 
     private fun rememberConnectionProfile(transport: String, capabilities: AdapterCapabilities, endpoint: String) {
@@ -683,6 +833,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isReading = true,
                 ecuVinResponse = "",
+                vinComparison = null,
                 calibrationIdResponse = "",
                 cvnResponse = "",
                 message = ""
@@ -697,9 +848,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val validCal = calIds.isNotEmpty()
                 val validCvn = cvns.isNotEmpty()
+                val vinComparison = VehicleVinMatcher.compare(_vehicle.value.vin, ecuVin)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                    vinComparison = vinComparison,
                     calibrationIdResponse = calIds.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
                     cvnResponse = cvns.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
                     message = getApplication<Application>().getString(
