@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Idioma de la aplicación</string>
-    <string name="system_language_current">Idioma del sistema: %1$s</string>
-    <string name="system_language_hint">CamaroDiag utiliza el idioma del dispositivo cuando es compatible. Para los demás idiomas se utiliza el inglés.</string>
+    
+    
     <string name="tab_vehicle">Vehículo</string>
     <string name="tab_connect">Conectar</string>
     <string name="tab_live">Datos en vivo</string>
@@ -574,17 +574,28 @@
     <string name="dtc_gm_monitor_failure">Contador de fallos / frecuencia de validación: %1$s</string>
     <string name="dtc_gm_monitor_mil">Clasificación MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Fuente: GM %1$s, página %2$d</string>
-    <string name="system_language_current">Idioma seleccionado: %1$s</string>
-    <string name="system_language_hint">Elige el idioma utilizado en CamaroDiag.</string>
-    <string name="settings_current_vehicle">Vehículo actual</string>
-    <string name="settings_current_adapter">Conexión OBD-II</string>
-    <string name="settings_adapter_not_connected">No hay ningún adaptador conectado</string>
-    <string name="settings_last_connection">Último perfil de conexión</string>
-    <string name="settings_no_last_connection">Todavía no hay ningún perfil de conexión guardado.</string>
-    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
-    <string name="settings_connection_bluetooth">Bluetooth</string>
-    <string name="settings_connection_usb">USB</string>
-    <string name="settings_connection_wifi">Wi-Fi</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <string name="system_language_current">Idioma seleccionado: %1$s</string>
     <string name="system_language_hint">Elige el idioma utilizado en CamaroDiag.</string>
     <string name="settings_current_vehicle">Vehículo actual</string>
