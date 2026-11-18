@@ -456,6 +456,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun clearVehicleEvidence() {
         stopCanMonitor()
+        _liveCanMonitorState.value = LiveCanMonitorState()
         obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
             obdManager.disconnect()
