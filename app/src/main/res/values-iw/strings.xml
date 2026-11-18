@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">שפת האפליקציה</string>
-    <string name="system_language_current">שפת המערכת: %1$s</string>
-    <string name="system_language_hint">CamaroDiag משתמש בשפת המכשיר כאשר היא נתמכת. בשפות שאינן נתמכות, האפליקציה משתמשת באנגלית.</string>
+    
+    
     <string name="tab_vehicle">רכב</string>
     <string name="tab_connect">חיבור</string>
     <string name="tab_live">נתונים בזמן אמת</string>
@@ -574,4 +574,57 @@
     <string name="dtc_gm_monitor_failure">מונה כשלים / קצב אימות: %1$s</string>
     <string name="dtc_gm_monitor_mil">סיווג MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">מקור: GM %1$s, עמוד %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">השפה שנבחרה: %1$s</string>
+    <string name="system_language_hint">בחרו את השפה לשימוש ב-CamaroDiag.</string>
+    <string name="settings_current_vehicle">הרכב הנוכחי</string>
+    <string name="settings_current_adapter">חיבור OBD-II</string>
+    <string name="settings_adapter_not_connected">אין מתאם מחובר</string>
+    <string name="settings_last_connection">פרופיל החיבור האחרון</string>
+    <string name="settings_no_last_connection">עדיין לא נשמר פרופיל חיבור.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">פרופילי רכבים שמורים</string>
+    <string name="saved_vehicle_name_label">שם הפרופיל</string>
+    <string name="saved_vehicle_name_placeholder">לדוגמה Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">שמירת הרכב הנוכחי</string>
+    <string name="saved_vehicle_empty">עדיין לא נשמרו פרופילי רכבים.</string>
+    <string name="saved_vehicle_load">טעינה</string>
+    <string name="saved_vehicle_delete">מחיקה</string>
+    <string name="saved_vehicle_requires_review">הפרופיל נוצר לפי VIN של מחשב הרכב. יש לוודא את שנת הדגם, המנוע ותיבת ההילוכים לפני אבחון.</string>
+    <string name="saved_vehicle_current">נבחר</string>
+    <string name="saved_vehicle_ecu_default_name">רכב ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">הזינו שם לפרופיל.</string>
+    <string name="msg_vehicle_profile_saved">פרופיל הרכב נשמר.</string>
+    <string name="msg_vehicle_profile_review_required">נוצר פרופיל לפי VIN של מחשב הרכב. יש לוודא שנה, מנוע ותיבת הילוכים לפני אבחון.</string>
+    <string name="msg_vehicle_profile_loaded">פרופיל הרכב נטען: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">מחשב הרכב לא החזיר VIN תקין בן 17 תווים. לא נוצר פרופיל.</string>
+    <string name="cal_vin_matches_profile">VIN של מחשב הרכב תואם לפרופיל הרכב שנבחר.</string>
+    <string name="cal_vin_mismatch_detected">אי-התאמה ב-VIN — פרופיל: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">בפרופיל הרכב שנבחר לא נשמר VIN תקין.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">שימוש ב-VIN של ECU בפרופיל הנוכחי</string>
+    <string name="cal_vin_mismatch_title">זוהתה אי-התאמה ב-VIN</string>
+    <string name="cal_vin_mismatch_confirmation">ה-VIN בפרופיל שנבחר הוא %1$s, אך מחשב הרכב החזיר %2$s. ייתכן שמדובר בכלי רכב שונים. צרו פרופיל נפרד כדי לשמור על הרכב שנבחר, או סנכרנו את ה-VIN רק לאחר אימות הרכב הפיזי.</string>
+    <string name="cal_vin_create_vehicle">יצירת פרופיל רכב</string>
+    <string name="cal_vin_sync_existing">סנכרון ה-VIN של הפרופיל שנבחר</string>
+    <string name="cal_vin_sync_warning_title">לאשר החלפת VIN?</string>
+    <string name="cal_vin_sync_warning_message">ה-VIN השמור בפרופיל שנבחר (%1$s) יוחלף ב-VIN של מחשב הרכב (%2$s). שנת הדגם, המנוע, תיבת ההילוכים והשוק לא ישתנו. יש לאשר רק לאחר אימות שהרכב המחובר הוא הרכב הרצוי.</string>
+    <string name="cal_vin_sync_confirm">החלפת VIN</string>
+    <string name="vin_photo_capture">צילום VIN</string>
+    <string name="vin_photo_cancelled">צילום ה-VIN בוטל.</string>
+    <string name="vin_photo_success">ה-VIN זוהה והועתק לפרופיל הרכב. יש לבדוק כל תו.</string>
+    <string name="vin_photo_not_found">לא זוהה VIN תקין בן 17 תווים. יש להזין אותו ידנית או לצלם תמונה נוספת.</string>
+    <string name="vin_photo_error">לא ניתן לקרוא את תמונת ה-VIN. יש לנסות שוב בתאורה ובמיקוד טובים יותר.</string>
 </resources>

@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">アプリの言語</string>
-    <string name="system_language_current">システム言語: %1$s</string>
-    <string name="system_language_hint">CamaroDiag は対応している場合、端末の言語に従います。対応していない言語では英語を使用します。</string>
+    
+    
     <string name="tab_vehicle">車両</string>
     <string name="tab_connect">接続</string>
     <string name="tab_live">ライブデータ</string>
@@ -568,4 +568,57 @@
     <string name="dtc_gm_monitor_failure">故障カウンター／判定頻度: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL分類: %1$s</string>
     <string name="dtc_gm_monitor_source">出典: GM %1$s、%2$dページ</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">選択中の言語：%1$s</string>
+    <string name="system_language_hint">CamaroDiagで使用する言語を選択します。</string>
+    <string name="settings_current_vehicle">現在の車両</string>
+    <string name="settings_current_adapter">OBD-II接続</string>
+    <string name="settings_adapter_not_connected">アダプター未接続</string>
+    <string name="settings_last_connection">前回の接続プロファイル</string>
+    <string name="settings_no_last_connection">保存された接続プロファイルはありません。</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">保存済み車両プロファイル</string>
+    <string name="saved_vehicle_name_label">プロファイル名</string>
+    <string name="saved_vehicle_name_placeholder">例：2012 Camaro LFX</string>
+    <string name="saved_vehicle_save_current">現在の車両を保存</string>
+    <string name="saved_vehicle_empty">保存済み車両プロファイルはありません。</string>
+    <string name="saved_vehicle_load">読み込む</string>
+    <string name="saved_vehicle_delete">削除</string>
+    <string name="saved_vehicle_requires_review">このプロファイルはECUのVINから作成されました。診断前に年式、エンジン、トランスミッションを確認してください。</string>
+    <string name="saved_vehicle_current">選択中</string>
+    <string name="saved_vehicle_ecu_default_name">ECU車両 • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">プロファイル名を入力してください。</string>
+    <string name="msg_vehicle_profile_saved">車両プロファイルを保存しました。</string>
+    <string name="msg_vehicle_profile_review_required">ECUのVINからプロファイルを作成しました。診断前に年式、エンジン、トランスミッションを確認してください。</string>
+    <string name="msg_vehicle_profile_loaded">車両プロファイルを読み込みました：%1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECUから有効な17文字のVINが返されませんでした。プロファイルは作成されていません。</string>
+    <string name="cal_vin_matches_profile">ECUのVINは選択中の車両プロファイルと一致しています。</string>
+    <string name="cal_vin_mismatch_detected">VIN不一致 — プロファイル：%1$s • ECU：%2$s</string>
+    <string name="cal_vin_profile_not_set">選択中の車両プロファイルに有効なVINがありません。</string>
+    <string name="cal_use_ecu_vin_for_current_profile">ECUのVINを現在のプロファイルに使用</string>
+    <string name="cal_vin_mismatch_title">VINの不一致を検出しました</string>
+    <string name="cal_vin_mismatch_confirmation">選択中のプロファイルのVINは%1$sですが、ECUは%2$sを返しました。別の車両である可能性があります。現在の車両を保持するため別のプロファイルを作成するか、実車を確認した後にのみVINを同期してください。</string>
+    <string name="cal_vin_create_vehicle">車両プロファイルを作成</string>
+    <string name="cal_vin_sync_existing">選択中のプロファイルのVINを同期</string>
+    <string name="cal_vin_sync_warning_title">VINの置き換えを確認しますか？</string>
+    <string name="cal_vin_sync_warning_message">選択中の車両プロファイルに保存されているVIN（%1$s）をECUのVIN（%2$s）に置き換えます。年式、エンジン、トランスミッション、市場は変更されません。接続中の車両が正しいことを確認してから実行してください。</string>
+    <string name="cal_vin_sync_confirm">VINを置き換える</string>
+    <string name="vin_photo_capture">VINを撮影</string>
+    <string name="vin_photo_cancelled">VIN写真の撮影をキャンセルしました。</string>
+    <string name="vin_photo_success">VINを検出し、車両プロフィールにコピーしました。すべての文字を確認してください。</string>
+    <string name="vin_photo_not_found">有効な17文字のVINを検出できませんでした。手動で入力するか、もう一度撮影してください。</string>
+    <string name="vin_photo_error">VIN写真を読み取れませんでした。照明とピントを改善して再試行してください。</string>
 </resources>

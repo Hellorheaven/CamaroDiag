@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Lingua dell\'app</string>
-    <string name="system_language_current">Lingua di sistema: %1$s</string>
-    <string name="system_language_hint">CamaroDiag usa la lingua del dispositivo quando è supportata. Per tutte le altre lingue viene usato l\'inglese.</string>
+    
+    
     <string name="tab_vehicle">Veicolo</string>
     <string name="tab_connect">Connessione</string>
     <string name="tab_live">Dati in tempo reale</string>
@@ -574,4 +574,68 @@
     <string name="dtc_gm_monitor_failure">Contatore errori / frequenza di convalida: %1$s</string>
     <string name="dtc_gm_monitor_mil">Classificazione MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Fonte: GM %1$s, pagina %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">Lingua selezionata: %1$s</string>
+    <string name="system_language_hint">Scegli la lingua utilizzata in CamaroDiag.</string>
+    <string name="settings_current_vehicle">Veicolo attuale</string>
+    <string name="settings_current_adapter">Connessione OBD-II</string>
+    <string name="settings_adapter_not_connected">Nessun adattatore collegato</string>
+    <string name="settings_last_connection">Ultimo profilo di connessione</string>
+    <string name="settings_no_last_connection">Nessun profilo di connessione salvato.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">Profili veicolo salvati</string>
+    <string name="saved_vehicle_name_label">Nome profilo</string>
+    <string name="saved_vehicle_name_placeholder">ad es. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Salva veicolo corrente</string>
+    <string name="saved_vehicle_empty">Nessun profilo veicolo salvato.</string>
+    <string name="saved_vehicle_load">Carica</string>
+    <string name="saved_vehicle_delete">Elimina</string>
+    <string name="saved_vehicle_requires_review">Questo profilo è stato creato dal VIN della centralina. Verifica anno, motore e cambio prima della diagnosi.</string>
+    <string name="saved_vehicle_current">SELEZIONATO</string>
+    <string name="saved_vehicle_ecu_default_name">Veicolo ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Inserisci un nome per il profilo.</string>
+    <string name="msg_vehicle_profile_saved">Profilo veicolo salvato.</string>
+    <string name="msg_vehicle_profile_review_required">È stato creato un profilo dal VIN della centralina. Verifica anno, motore e cambio prima della diagnosi.</string>
+    <string name="msg_vehicle_profile_loaded">Profilo veicolo caricato: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">La centralina non ha restituito un VIN valido di 17 caratteri. Nessun profilo è stato creato.</string>
+    <string name="cal_vin_matches_profile">Il VIN della centralina corrisponde al profilo veicolo selezionato.</string>
+    <string name="cal_vin_mismatch_detected">VIN DIVERSO — profilo: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Il profilo veicolo selezionato non contiene un VIN valido.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">Usa il VIN ECU per il profilo corrente</string>
+    <string name="cal_vin_mismatch_title">Rilevata discordanza del VIN</string>
+    <string name="cal_vin_mismatch_confirmation">Il VIN del profilo selezionato è %1$s, ma la centralina ha restituito %2$s. Potrebbero essere veicoli diversi. Crea un profilo separato per conservare il veicolo selezionato oppure sincronizza il VIN solo dopo aver verificato il veicolo fisico.</string>
+    <string name="cal_vin_create_vehicle">Crea profilo veicolo</string>
+    <string name="cal_vin_sync_existing">Sincronizza il VIN del profilo selezionato</string>
+    <string name="cal_vin_sync_warning_title">Confermare la sostituzione del VIN?</string>
+    <string name="cal_vin_sync_warning_message">Il VIN salvato nel profilo selezionato (%1$s) sarà sostituito dal VIN della centralina (%2$s). Anno, motore, cambio e mercato non cambieranno. Conferma solo dopo aver verificato che il veicolo collegato sia quello previsto.</string>
+    <string name="cal_vin_sync_confirm">Sostituisci VIN</string>
+    <string name="vin_photo_capture">Fotografa VIN</string>
+    <string name="vin_photo_cancelled">Acquisizione della foto del VIN annullata.</string>
+    <string name="vin_photo_success">VIN rilevato e copiato nel profilo del veicolo. Verifica ogni carattere.</string>
+    <string name="vin_photo_not_found">Nessun VIN valido di 17 caratteri rilevato. Inseriscilo manualmente o scatta una nuova foto.</string>
+    <string name="vin_photo_error">Impossibile leggere la foto del VIN. Riprova con illuminazione e messa a fuoco migliori.</string>
 </resources>

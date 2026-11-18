@@ -1,7 +1,10 @@
 package com.camarodiag.gen5.ui
 
 import android.Manifest
+import android.content.res.Configuration
 import android.os.Build
+import android.os.LocaleList
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -24,11 +27,17 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import com.camarodiag.gen5.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.camarodiag.gen5.domain.model.*
 import com.camarodiag.gen5.control.VehicleControlCatalog
 import com.camarodiag.gen5.control.ControlAvailability
@@ -105,10 +114,19 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CamaroDiagApp(viewModel: MainViewModel) {
-    val lang = AppLanguage.fromLocale(LocalConfiguration.current.locales[0])
+    val lang by viewModel.language.collectAsState()
+    val systemConfiguration = LocalConfiguration.current
+    val localizedConfiguration = remember(systemConfiguration, lang) {
+        Configuration(systemConfiguration).apply {
+            setLocales(LocaleList.forLanguageTags(if (lang == AppLanguage.ZH) "zh-CN" else lang.code))
+        }
+    }
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
+    val savedVehicles by viewModel.savedVehicles.collectAsState()
+    val selectedSavedVehicleId by viewModel.selectedSavedVehicleId.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
+    val lastConnectionProfile by viewModel.lastConnectionProfile.collectAsState()
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
     val connError by viewModel.connectionMessage.collectAsState()
@@ -140,6 +158,33 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) viewModel.refreshPairedDevices()
+    }
+
+    val vinPhotoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap == null) {
+            Toast.makeText(viewModel.getApplication(), R.string.vin_photo_cancelled, Toast.LENGTH_SHORT).show()
+        } else {
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            recognizer.process(InputImage.fromBitmap(bitmap, 0))
+                .addOnSuccessListener { result ->
+                    val normalizedText = result.text.uppercase().replace(Regex("[^A-Z0-9]"), "")
+                    val detectedVin = Regex("[A-HJ-NPR-Z0-9]{17}")
+                        .find(normalizedText)?.value
+                    if (detectedVin != null) {
+                        viewModel.updateVin(detectedVin)
+                        Toast.makeText(viewModel.getApplication(), R.string.vin_photo_success, Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(viewModel.getApplication(), R.string.vin_photo_not_found, Toast.LENGTH_LONG).show()
+                    }
+                    recognizer.close()
+                }
+                .addOnFailureListener {
+                    recognizer.close()
+                    Toast.makeText(viewModel.getApplication(), R.string.vin_photo_error, Toast.LENGTH_LONG).show()
+                }
+        }
     }
 
     val calibrationFilePicker = rememberLauncherForActivityResult(
@@ -192,6 +237,10 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         }
     }
 
+    CompositionLocalProvider(
+        LocalConfiguration provides localizedConfiguration,
+        LocalLayoutDirection provides if (lang == AppLanguage.AR || lang == AppLanguage.HE) LayoutDirection.Rtl else LayoutDirection.Ltr
+    ) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -318,18 +367,62 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         }
    
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(BgDark)
                 .padding(padding)
-                .padding(14.dp)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            calibrationWorkspace.vinComparison
+                ?.takeIf { it.matches == false }
+                ?.let { comparison ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF3A2020)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, WarnRed)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                stringResource(
+                                    R.string.cal_vin_mismatch_detected,
+                                    comparison.selectedVehicleVin ?: "—",
+                                    comparison.ecuVin
+                                ),
+                                color = Color(0xFFFFB4AB),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                stringResource(R.string.cal_vin_mismatch_confirmation,
+                                    comparison.selectedVehicleVin ?: "—",
+                                    comparison.ecuVin
+                                ),
+                                color = TextPrimary,
+                                fontSize = 12.sp
+                            )
+                            TextButton(onClick = { currentTab = DiagTab.CALIBRATION }) {
+                                Text(stringResource(R.string.cal_vin_mismatch_title), color = CamaroAmber)
+                            }
+                        }
+                    }
+                }
+            Box(modifier = Modifier.fillMaxSize().weight(1f)) {
             when (currentTab) {
                 DiagTab.SETUP -> VehicleSetupScreen(
                     vehicle = vehicle,
+                    savedVehicles = savedVehicles,
+                    selectedSavedVehicleId = selectedSavedVehicleId,
                     onChange = { y, e, tr, m -> viewModel.updateVehicle(y, e, tr, m) },
-                    onVinChange = { viewModel.updateVin(it) }
+                    onVinChange = { viewModel.updateVin(it) },
+                    onCaptureVinPhoto = { vinPhotoLauncher.launch(null) },
+                    onSaveVehicle = { viewModel.saveCurrentVehicle(it) },
+                    onLoadSavedVehicle = { viewModel.selectSavedVehicle(it) },
+                    onDeleteSavedVehicle = { viewModel.deleteSavedVehicle(it) }
                 )
                 DiagTab.ADAPTER -> AdapterScreen(
                     adapter = adapter,
@@ -379,6 +472,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         adapter.tier != AdapterTier.DISCONNECTED,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onCreateVehicleFromEcuVin = { viewModel.createVehicleFromEcuVin(it) },
+                    onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
                     onReadUdsDtcs = { requestId, responseId, protocol -> viewModel.readUdsDtcs(requestId, responseId, protocol) },
                     onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
@@ -411,6 +506,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 DiagTab.SETTINGS -> SettingsScreen(
                     lang = lang,
                     units = units,
+                    vehicle = vehicle,
+                    adapter = adapter,
+                    lastConnectionProfile = lastConnectionProfile,
                     sessions = savedSessions,
                     onLang = { viewModel.setLanguage(it) },
                     onUnits = { viewModel.setUnitSystem(it) },
@@ -419,16 +517,25 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onOpenAdapter = { currentTab = DiagTab.ADAPTER }
                 )
             }
+            }
         }
+    }
     }
 }
 
 @Composable
 fun VehicleSetupScreen(
     vehicle: VehicleProfile,
+    savedVehicles: List<SavedVehicleProfile>,
+    selectedSavedVehicleId: String?,
     onChange: (Int, CamaroEngine, TransmissionType, MarketRegion) -> Unit,
-    onVinChange: (String) -> Unit
+    onVinChange: (String) -> Unit,
+    onCaptureVinPhoto: () -> Unit,
+    onSaveVehicle: (String) -> Unit,
+    onLoadSavedVehicle: (String) -> Unit,
+    onDeleteSavedVehicle: (String) -> Unit
 ) {
+    var savedVehicleName by remember { mutableStateOf("") }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             SectionTitle(stringResource(R.string.vehicle_setup_header))
@@ -512,6 +619,82 @@ fun VehicleSetupScreen(
                         placeholder = { Text(stringResource(R.string.vehicle_vin_placeholder)) },
                         supportingText = { Text(stringResource(R.string.vehicle_vin_hint)) }
                     )
+                    OutlinedButton(
+                        onClick = onCaptureVinPhoto,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.vin_photo_capture))
+                    }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.saved_vehicle_profiles_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = savedVehicleName,
+                        onValueChange = { savedVehicleName = it.take(60) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.saved_vehicle_name_label)) },
+                        placeholder = { Text(stringResource(R.string.saved_vehicle_name_placeholder)) }
+                    )
+                    Button(
+                        onClick = {
+                            val defaultName = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo}"
+                            onSaveVehicle(savedVehicleName.ifBlank { defaultName })
+                            savedVehicleName = ""
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.saved_vehicle_save_current))
+                    }
+                    if (savedVehicles.isEmpty()) {
+                        Text(stringResource(R.string.saved_vehicle_empty), color = TextMuted, fontSize = 12.sp)
+                    } else {
+                        savedVehicles.forEach { saved ->
+                            HorizontalDivider(color = TextMuted.copy(alpha = .2f))
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        saved.name,
+                                        color = if (saved.id == selectedSavedVehicleId) CamaroAmber else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (saved.id == selectedSavedVehicleId) {
+                                        Text(stringResource(R.string.saved_vehicle_current), color = OkGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Text(
+                                    "${saved.vehicle.modelYear} • ${saved.vehicle.engine.rpo} • ${saved.vehicle.transmission.code} • ${saved.vehicle.market.code}",
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    stringResource(R.string.session_vin_label, saved.vehicle.vin.ifBlank { "—" }),
+                                    color = TextMuted,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp
+                                )
+                                if (saved.requiresReview) {
+                                    Text(stringResource(R.string.saved_vehicle_requires_review), color = CamaroAmber, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { onLoadSavedVehicle(saved.id) }, modifier = Modifier.weight(1f)) {
+                                        Text(stringResource(R.string.saved_vehicle_load))
+                                    }
+                                    TextButton(onClick = { onDeleteSavedVehicle(saved.id) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, tint = WarnRed)
+                                        Text(stringResource(R.string.saved_vehicle_delete), color = WarnRed)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1366,6 +1549,9 @@ fun HardwareGuideScreen() {
 fun SettingsScreen(
     lang: AppLanguage,
     units: UnitSystem,
+    vehicle: VehicleProfile,
+    adapter: AdapterCapabilities,
+    lastConnectionProfile: SavedObdConnectionProfile?,
     sessions: List<com.camarodiag.gen5.data.db.SavedSessionEntity>,
     onLang: (AppLanguage) -> Unit,
     onUnits: (UnitSystem) -> Unit,
@@ -1374,6 +1560,22 @@ fun SettingsScreen(
     onOpenAdapter: () -> Unit
 ) {
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    var languageExpanded by remember { mutableStateOf(false) }
+    val currentVehicle = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.transmission.code} • ${vehicle.market.code} • ${vehicle.vin.ifBlank { "VIN —" }}"
+    val currentAdapter = if (adapter.tier == AdapterTier.DISCONNECTED) {
+        stringResource(R.string.settings_adapter_not_connected)
+    } else {
+        "${adapter.deviceName} • ${localizedAdapterTierName(adapter.tier)}"
+    }
+    val savedConnectionText = lastConnectionProfile?.let { profile ->
+        val transportLabel = when (profile.transport) {
+            "bluetooth" -> stringResource(R.string.settings_connection_bluetooth)
+            "usb" -> stringResource(R.string.settings_connection_usb)
+            "wifi" -> stringResource(R.string.settings_connection_wifi)
+            else -> profile.transport
+        }
+        stringResource(R.string.settings_connection_details, transportLabel, profile.adapterName, profile.endpoint)
+    } ?: stringResource(R.string.settings_no_last_connection)
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             SectionTitle(stringResource(R.string.settings_title))
@@ -1402,7 +1604,32 @@ fun SettingsScreen(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.system_language_current, lang.label), color = CamaroAmber)
+                    Box {
+                        OutlinedButton(onClick = { languageExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(lang.label)
+                        }
+                        DropdownMenu(
+                            expanded = languageExpanded,
+                            onDismissRequest = { languageExpanded = false }
+                        ) {
+                            AppLanguage.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.label) },
+                                    onClick = {
+                                        onLang(option)
+                                        languageExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                     Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_current_vehicle), fontWeight = FontWeight.Bold)
+                    Text(currentVehicle, color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_current_adapter), fontWeight = FontWeight.Bold)
+                    Text(currentAdapter, color = if (adapter.tier == AdapterTier.DISCONNECTED) TextMuted else CamaroAmber, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_last_connection), fontWeight = FontWeight.Bold)
+                    Text(savedConnectionText, color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.settings_unit_system), fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text(stringResource(R.string.units_metric_details)) })

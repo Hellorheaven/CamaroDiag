@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">应用语言</string>
-    <string name="system_language_current">系统语言：%1$s</string>
-    <string name="system_language_hint">CamaroDiag 在支持的情况下会使用设备语言。其他语言将使用英语。</string>
+    
+    
     <string name="tab_vehicle">车辆</string>
     <string name="tab_connect">连接</string>
     <string name="tab_live">实时数据</string>
@@ -568,4 +568,57 @@
     <string name="dtc_gm_monitor_failure">故障计数／确认频率：%1$s</string>
     <string name="dtc_gm_monitor_mil">MIL分类：%1$s</string>
     <string name="dtc_gm_monitor_source">来源：GM %1$s，第%2$d页</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">当前语言：%1$s</string>
+    <string name="system_language_hint">选择 CamaroDiag 使用的语言。</string>
+    <string name="settings_current_vehicle">当前车辆</string>
+    <string name="settings_current_adapter">OBD-II 连接</string>
+    <string name="settings_adapter_not_connected">未连接适配器</string>
+    <string name="settings_last_connection">上次连接配置</string>
+    <string name="settings_no_last_connection">尚未保存连接配置。</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">蓝牙</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">已保存的车辆配置</string>
+    <string name="saved_vehicle_name_label">配置名称</string>
+    <string name="saved_vehicle_name_placeholder">例如：2012 Camaro LFX</string>
+    <string name="saved_vehicle_save_current">保存当前车辆</string>
+    <string name="saved_vehicle_empty">尚未保存车辆配置。</string>
+    <string name="saved_vehicle_load">加载</string>
+    <string name="saved_vehicle_delete">删除</string>
+    <string name="saved_vehicle_requires_review">此配置根据 ECU VIN 创建。诊断前请确认车型年份、发动机和变速箱。</string>
+    <string name="saved_vehicle_current">已选择</string>
+    <string name="saved_vehicle_ecu_default_name">ECU 车辆 • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">请输入配置名称。</string>
+    <string name="msg_vehicle_profile_saved">车辆配置已保存。</string>
+    <string name="msg_vehicle_profile_review_required">已根据 ECU VIN 创建配置。诊断前请确认年份、发动机和变速箱。</string>
+    <string name="msg_vehicle_profile_loaded">已加载车辆配置：%1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU 未返回有效的 17 位 VIN，未创建配置。</string>
+    <string name="cal_vin_matches_profile">ECU VIN 与当前车辆配置一致。</string>
+    <string name="cal_vin_mismatch_detected">VIN 不匹配 — 配置：%1$s • ECU：%2$s</string>
+    <string name="cal_vin_profile_not_set">当前车辆配置未填写有效 VIN。</string>
+    <string name="cal_use_ecu_vin_for_current_profile">将 ECU VIN 用于当前配置</string>
+    <string name="cal_vin_mismatch_title">检测到 VIN 不匹配</string>
+    <string name="cal_vin_mismatch_confirmation">当前配置的 VIN 为 %1$s，但 ECU 返回了 %2$s。这可能是两辆不同的车辆。创建单独配置以保留当前车辆；只有在确认实际连接车辆后才同步 VIN。</string>
+    <string name="cal_vin_create_vehicle">创建车辆配置</string>
+    <string name="cal_vin_sync_existing">同步当前配置的 VIN</string>
+    <string name="cal_vin_sync_warning_title">确认替换 VIN？</string>
+    <string name="cal_vin_sync_warning_message">将用 ECU VIN（%2$s）替换当前车辆配置中保存的 VIN（%1$s）。车型年份、发动机、变速箱和市场不会改变。请仅在确认连接的车辆正确后继续。</string>
+    <string name="cal_vin_sync_confirm">替换 VIN</string>
+    <string name="vin_photo_capture">拍摄 VIN</string>
+    <string name="vin_photo_cancelled">已取消 VIN 照片拍摄。</string>
+    <string name="vin_photo_success">已识别 VIN 并复制到车辆配置文件。请逐个核对字符。</string>
+    <string name="vin_photo_not_found">未检测到有效的 17 位 VIN。请手动输入或重新拍照。</string>
+    <string name="vin_photo_error">无法读取 VIN 照片。请改善光线和对焦后重试。</string>
 </resources>

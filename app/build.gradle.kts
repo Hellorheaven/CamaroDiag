@@ -100,6 +100,14 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // The app has an in-app language selector and bundles all 14 translations locally.
+    // Keep every locale in the generated App Bundle instead of splitting languages.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 tasks.named("preBuild").configure {
@@ -117,6 +125,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.2")
     
     // Material Components remains compatible with the project Android Gradle Plugin baseline.

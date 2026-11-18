@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">App language</string>
-    <string name="system_language_current">System language: %1$s</string>
-    <string name="system_language_hint">CamaroDiag follows the device language when it is supported. English is used for all other languages.</string>
+    
+    
     <string name="tab_vehicle">Vehicle</string>
     <string name="tab_connect">Connect</string>
     <string name="tab_live">Live</string>
@@ -571,4 +571,68 @@
     <string name="dtc_gm_monitor_failure">Failure counter / validation rate: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL classification: %1$s</string>
     <string name="dtc_gm_monitor_source">Source: GM %1$s, page %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">Selected language: %1$s</string>
+    <string name="system_language_hint">Choose the language used throughout CamaroDiag.</string>
+    <string name="settings_current_vehicle">Current vehicle</string>
+    <string name="settings_current_adapter">OBD-II connection</string>
+    <string name="settings_adapter_not_connected">No adapter connected</string>
+    <string name="settings_last_connection">Last connection profile</string>
+    <string name="settings_no_last_connection">No saved connection profile yet.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">Saved vehicle profiles</string>
+    <string name="saved_vehicle_name_label">Profile name</string>
+    <string name="saved_vehicle_name_placeholder">e.g. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Save current vehicle</string>
+    <string name="saved_vehicle_empty">No saved vehicle profiles yet.</string>
+    <string name="saved_vehicle_load">Load</string>
+    <string name="saved_vehicle_delete">Delete</string>
+    <string name="saved_vehicle_requires_review">ECU VIN was used to create this profile. Verify model year, engine and transmission before diagnosis.</string>
+    <string name="saved_vehicle_current">SELECTED</string>
+    <string name="saved_vehicle_ecu_default_name">ECU vehicle • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Enter a profile name.</string>
+    <string name="msg_vehicle_profile_saved">Vehicle profile saved.</string>
+    <string name="msg_vehicle_profile_review_required">A profile was created from the ECU VIN. Verify year, engine and transmission before diagnosis.</string>
+    <string name="msg_vehicle_profile_loaded">Loaded vehicle profile: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">The ECU did not return a valid 17-character VIN. No profile was created.</string>
+    <string name="cal_vin_matches_profile">ECU VIN matches the selected vehicle profile.</string>
+    <string name="cal_vin_mismatch_detected">VIN MISMATCH — profile: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">The selected vehicle profile does not contain a valid VIN.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">Use ECU VIN for current profile</string>
+    <string name="cal_vin_mismatch_title">Vehicle VIN mismatch detected</string>
+    <string name="cal_vin_mismatch_confirmation">The selected profile VIN is %1$s, but the ECU returned %2$s. These may be different vehicles. Create a separate profile to preserve the selected vehicle, or synchronize only after verifying the physical vehicle.</string>
+    <string name="cal_vin_create_vehicle">Create vehicle profile</string>
+    <string name="cal_vin_sync_existing">Synchronize selected profile VIN</string>
+    <string name="cal_vin_sync_warning_title">Confirm VIN replacement?</string>
+    <string name="cal_vin_sync_warning_message">This will replace the VIN stored in the selected vehicle profile (%1$s) with the ECU VIN (%2$s). Year, engine, transmission and market will not change. Do this only after confirming that the connected car is the intended vehicle.</string>
+    <string name="cal_vin_sync_confirm">Replace VIN</string>
+    <string name="vin_photo_capture">Photograph VIN</string>
+    <string name="vin_photo_cancelled">VIN photo capture cancelled.</string>
+    <string name="vin_photo_success">VIN detected and copied to the vehicle profile. Verify every character.</string>
+    <string name="vin_photo_not_found">No valid 17-character VIN detected. Enter it manually or take another photo.</string>
+    <string name="vin_photo_error">Could not read the VIN photo. Try again with better lighting and focus.</string>
 </resources>

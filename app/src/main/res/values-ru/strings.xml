@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Язык приложения</string>
-    <string name="system_language_current">Язык системы: %1$s</string>
-    <string name="system_language_hint">CamaroDiag использует язык устройства, если он поддерживается. Для остальных языков используется английский.</string>
+    
+    
     <string name="tab_vehicle">Автомобиль</string>
     <string name="tab_connect">Подключение</string>
     <string name="tab_live">Данные в реальном времени</string>
@@ -577,4 +577,57 @@
     <string name="dtc_gm_monitor_failure">Счётчик отказов / частота подтверждения: %1$s</string>
     <string name="dtc_gm_monitor_mil">Классификация MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Источник: GM %1$s, страница %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">Выбранный язык: %1$s</string>
+    <string name="system_language_hint">Выберите язык интерфейса CamaroDiag.</string>
+    <string name="settings_current_vehicle">Текущий автомобиль</string>
+    <string name="settings_current_adapter">Подключение OBD-II</string>
+    <string name="settings_adapter_not_connected">Адаптер не подключен</string>
+    <string name="settings_last_connection">Последний профиль подключения</string>
+    <string name="settings_no_last_connection">Сохраненных профилей подключения пока нет.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">Сохранённые профили автомобилей</string>
+    <string name="saved_vehicle_name_label">Название профиля</string>
+    <string name="saved_vehicle_name_placeholder">например, Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Сохранить текущий автомобиль</string>
+    <string name="saved_vehicle_empty">Сохранённых профилей автомобилей пока нет.</string>
+    <string name="saved_vehicle_load">Загрузить</string>
+    <string name="saved_vehicle_delete">Удалить</string>
+    <string name="saved_vehicle_requires_review">Профиль создан по VIN блока ECU. Перед диагностикой проверьте год выпуска, двигатель и коробку передач.</string>
+    <string name="saved_vehicle_current">ВЫБРАНО</string>
+    <string name="saved_vehicle_ecu_default_name">Автомобиль ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Введите название профиля.</string>
+    <string name="msg_vehicle_profile_saved">Профиль автомобиля сохранён.</string>
+    <string name="msg_vehicle_profile_review_required">Создан профиль по VIN ECU. Перед диагностикой проверьте год, двигатель и коробку передач.</string>
+    <string name="msg_vehicle_profile_loaded">Загружен профиль автомобиля: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU не вернул корректный 17-значный VIN. Профиль не создан.</string>
+    <string name="cal_vin_matches_profile">VIN ECU совпадает с выбранным профилем автомобиля.</string>
+    <string name="cal_vin_mismatch_detected">VIN НЕ СОВПАДАЕТ — профиль: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">В выбранном профиле автомобиля нет корректного VIN.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">Использовать VIN ECU для текущего профиля</string>
+    <string name="cal_vin_mismatch_title">Обнаружено несовпадение VIN</string>
+    <string name="cal_vin_mismatch_confirmation">VIN выбранного профиля — %1$s, но ECU вернул %2$s. Возможно, это разные автомобили. Создайте отдельный профиль, чтобы сохранить выбранный автомобиль, или синхронизируйте VIN только после проверки фактического автомобиля.</string>
+    <string name="cal_vin_create_vehicle">Создать профиль автомобиля</string>
+    <string name="cal_vin_sync_existing">Синхронизировать VIN выбранного профиля</string>
+    <string name="cal_vin_sync_warning_title">Подтвердить замену VIN?</string>
+    <string name="cal_vin_sync_warning_message">VIN в выбранном профиле (%1$s) будет заменён на VIN ECU (%2$s). Год, двигатель, коробка передач и рынок не изменятся. Подтверждайте только после проверки подключённого автомобиля.</string>
+    <string name="cal_vin_sync_confirm">Заменить VIN</string>
+    <string name="vin_photo_capture">Сфотографировать VIN</string>
+    <string name="vin_photo_cancelled">Съёмка VIN отменена.</string>
+    <string name="vin_photo_success">VIN распознан и скопирован в профиль автомобиля. Проверьте каждый символ.</string>
+    <string name="vin_photo_not_found">Не удалось распознать корректный VIN из 17 символов. Введите его вручную или сделайте другое фото.</string>
+    <string name="vin_photo_error">Не удалось прочитать фото VIN. Повторите попытку при лучшем освещении и фокусировке.</string>
 </resources>

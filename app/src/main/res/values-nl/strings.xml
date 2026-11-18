@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">App-taal</string>
-    <string name="system_language_current">Systeemtaal: %1$s</string>
-    <string name="system_language_hint">CamaroDiag gebruikt de apparaattaal wanneer deze wordt ondersteund. Voor alle andere talen wordt Engels gebruikt.</string>
+    
+    
     <string name="tab_vehicle">Voertuig</string>
     <string name="tab_connect">Verbinden</string>
     <string name="tab_live">Livegegevens</string>
@@ -572,4 +572,57 @@
     <string name="dtc_gm_monitor_failure">Foutenteller / validatiefrequentie: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL-classificatie: %1$s</string>
     <string name="dtc_gm_monitor_source">Bron: GM %1$s, pagina %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">Geselecteerde taal: %1$s</string>
+    <string name="system_language_hint">Kies de taal die CamaroDiag gebruikt.</string>
+    <string name="settings_current_vehicle">Huidig voertuig</string>
+    <string name="settings_current_adapter">OBD-II-verbinding</string>
+    <string name="settings_adapter_not_connected">Geen adapter verbonden</string>
+    <string name="settings_last_connection">Laatst gebruikte verbindingsprofiel</string>
+    <string name="settings_no_last_connection">Er is nog geen verbindingsprofiel opgeslagen.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">Opgeslagen voertuigprofielen</string>
+    <string name="saved_vehicle_name_label">Profielnaam</string>
+    <string name="saved_vehicle_name_placeholder">bijv. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Huidig voertuig opslaan</string>
+    <string name="saved_vehicle_empty">Er zijn nog geen voertuigprofielen opgeslagen.</string>
+    <string name="saved_vehicle_load">Laden</string>
+    <string name="saved_vehicle_delete">Verwijderen</string>
+    <string name="saved_vehicle_requires_review">Dit profiel is gemaakt op basis van het ECU-VIN. Controleer modeljaar, motor en transmissie vóór diagnose.</string>
+    <string name="saved_vehicle_current">GESELECTEERD</string>
+    <string name="saved_vehicle_ecu_default_name">ECU-voertuig • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Voer een profielnaam in.</string>
+    <string name="msg_vehicle_profile_saved">Voertuigprofiel opgeslagen.</string>
+    <string name="msg_vehicle_profile_review_required">Er is een profiel gemaakt op basis van het ECU-VIN. Controleer jaar, motor en transmissie vóór diagnose.</string>
+    <string name="msg_vehicle_profile_loaded">Voertuigprofiel geladen: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">De ECU heeft geen geldig VIN van 17 tekens teruggegeven. Er is geen profiel gemaakt.</string>
+    <string name="cal_vin_matches_profile">Het ECU-VIN komt overeen met het geselecteerde voertuigprofiel.</string>
+    <string name="cal_vin_mismatch_detected">VIN WIJKT AF — profiel: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Het geselecteerde voertuigprofiel bevat geen geldig VIN.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">ECU-VIN gebruiken voor huidig profiel</string>
+    <string name="cal_vin_mismatch_title">VIN-afwijking gedetecteerd</string>
+    <string name="cal_vin_mismatch_confirmation">Het VIN van het geselecteerde profiel is %1$s, maar de ECU gaf %2$s terug. Dit kunnen verschillende voertuigen zijn. Maak een apart profiel om het geselecteerde voertuig te bewaren, of synchroniseer het VIN alleen nadat het fysieke voertuig is gecontroleerd.</string>
+    <string name="cal_vin_create_vehicle">Voertuigprofiel maken</string>
+    <string name="cal_vin_sync_existing">VIN van geselecteerd profiel synchroniseren</string>
+    <string name="cal_vin_sync_warning_title">VIN-vervanging bevestigen?</string>
+    <string name="cal_vin_sync_warning_message">Het VIN in het geselecteerde voertuigprofiel (%1$s) wordt vervangen door het ECU-VIN (%2$s). Modeljaar, motor, transmissie en markt blijven ongewijzigd. Bevestig dit alleen nadat u hebt gecontroleerd dat het aangesloten voertuig het bedoelde voertuig is.</string>
+    <string name="cal_vin_sync_confirm">VIN vervangen</string>
+    <string name="vin_photo_capture">VIN fotograferen</string>
+    <string name="vin_photo_cancelled">Het maken van de VIN-foto is geannuleerd.</string>
+    <string name="vin_photo_success">VIN herkend en naar het voertuigprofiel gekopieerd. Controleer elk teken.</string>
+    <string name="vin_photo_not_found">Geen geldige VIN van 17 tekens gevonden. Voer deze handmatig in of maak een nieuwe foto.</string>
+    <string name="vin_photo_error">De VIN-foto kon niet worden gelezen. Probeer het opnieuw met betere belichting en scherpstelling.</string>
 </resources>

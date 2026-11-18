@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">App-Sprache</string>
-    <string name="system_language_current">Systemsprache: %1$s</string>
-    <string name="system_language_hint">CamaroDiag verwendet die Gerätesprache, sofern sie unterstützt wird. Für alle anderen Sprachen wird Englisch verwendet.</string>
+    
+    
     <string name="tab_vehicle">Fahrzeug</string>
     <string name="tab_connect">Verbinden</string>
     <string name="tab_live">Live-Daten</string>
@@ -571,4 +571,68 @@
     <string name="dtc_gm_monitor_failure">Fehlerzähler / Validierungsrate: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL-Klassifizierung: %1$s</string>
     <string name="dtc_gm_monitor_source">Quelle: GM %1$s, Seite %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">Ausgewählte Sprache: %1$s</string>
+    <string name="system_language_hint">Wählen Sie die in CamaroDiag verwendete Sprache.</string>
+    <string name="settings_current_vehicle">Aktuelles Fahrzeug</string>
+    <string name="settings_current_adapter">OBD-II-Verbindung</string>
+    <string name="settings_adapter_not_connected">Kein Adapter verbunden</string>
+    <string name="settings_last_connection">Letztes Verbindungsprofil</string>
+    <string name="settings_no_last_connection">Noch kein Verbindungsprofil gespeichert.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">WLAN</string>
+    <string name="saved_vehicle_profiles_title">Gespeicherte Fahrzeugprofile</string>
+    <string name="saved_vehicle_name_label">Profilname</string>
+    <string name="saved_vehicle_name_placeholder">z. B. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Aktuelles Fahrzeug speichern</string>
+    <string name="saved_vehicle_empty">Noch keine Fahrzeugprofile gespeichert.</string>
+    <string name="saved_vehicle_load">Laden</string>
+    <string name="saved_vehicle_delete">Löschen</string>
+    <string name="saved_vehicle_requires_review">Dieses Profil wurde anhand der ECU-VIN erstellt. Modelljahr, Motor und Getriebe vor der Diagnose prüfen.</string>
+    <string name="saved_vehicle_current">AUSGEWÄHLT</string>
+    <string name="saved_vehicle_ecu_default_name">ECU-Fahrzeug • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Profilnamen eingeben.</string>
+    <string name="msg_vehicle_profile_saved">Fahrzeugprofil gespeichert.</string>
+    <string name="msg_vehicle_profile_review_required">Ein Profil wurde anhand der ECU-VIN erstellt. Jahr, Motor und Getriebe vor der Diagnose prüfen.</string>
+    <string name="msg_vehicle_profile_loaded">Fahrzeugprofil geladen: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">Die ECU hat keine gültige 17-stellige VIN zurückgegeben. Es wurde kein Profil erstellt.</string>
+    <string name="cal_vin_matches_profile">ECU-VIN stimmt mit dem ausgewählten Fahrzeugprofil überein.</string>
+    <string name="cal_vin_mismatch_detected">VIN-ABWEICHUNG — Profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Das ausgewählte Fahrzeugprofil enthält keine gültige VIN.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">ECU-VIN für aktuelles Profil übernehmen</string>
+    <string name="cal_vin_mismatch_title">VIN-Abweichung erkannt</string>
+    <string name="cal_vin_mismatch_confirmation">Die VIN des ausgewählten Profils lautet %1$s, die ECU hat jedoch %2$s zurückgegeben. Es könnten unterschiedliche Fahrzeuge sein. Erstellen Sie ein separates Profil, um das ausgewählte Fahrzeug zu behalten, oder synchronisieren Sie die VIN erst nach Prüfung des tatsächlichen Fahrzeugs.</string>
+    <string name="cal_vin_create_vehicle">Fahrzeugprofil erstellen</string>
+    <string name="cal_vin_sync_existing">VIN des ausgewählten Profils synchronisieren</string>
+    <string name="cal_vin_sync_warning_title">VIN-Ersetzung bestätigen?</string>
+    <string name="cal_vin_sync_warning_message">Die im ausgewählten Fahrzeugprofil gespeicherte VIN (%1$s) wird durch die ECU-VIN (%2$s) ersetzt. Modelljahr, Motor, Getriebe und Markt bleiben unverändert. Nur bestätigen, wenn das angeschlossene Fahrzeug überprüft wurde.</string>
+    <string name="cal_vin_sync_confirm">VIN ersetzen</string>
+    <string name="vin_photo_capture">VIN fotografieren</string>
+    <string name="vin_photo_cancelled">Aufnahme des VIN-Fotos abgebrochen.</string>
+    <string name="vin_photo_success">VIN erkannt und in das Fahrzeugprofil übernommen. Prüfen Sie jedes Zeichen.</string>
+    <string name="vin_photo_not_found">Keine gültige 17-stellige VIN erkannt. Geben Sie sie manuell ein oder machen Sie ein neues Foto.</string>
+    <string name="vin_photo_error">Das VIN-Foto konnte nicht gelesen werden. Sorgen Sie für bessere Beleuchtung und Schärfe.</string>
 </resources>

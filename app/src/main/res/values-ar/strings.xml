@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">لغة التطبيق</string>
-    <string name="system_language_current">لغة النظام: %1$s</string>
-    <string name="system_language_hint">يتبع CamaroDiag لغة الجهاز إذا كانت مدعومة. تُستخدم الإنجليزية لجميع اللغات الأخرى.</string>
+    
+    
     <string name="tab_vehicle">المركبة</string>
     <string name="tab_connect">اتصال</string>
     <string name="tab_live">البيانات المباشرة</string>
@@ -583,4 +583,57 @@
     <string name="dtc_gm_monitor_failure">عداد الإخفاق / معدل التحقق: %1$s</string>
     <string name="dtc_gm_monitor_mil">تصنيف MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">المصدر: GM %1$s، الصفحة %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">اللغة المحددة: %1$s</string>
+    <string name="system_language_hint">اختر اللغة المستخدمة في CamaroDiag.</string>
+    <string name="settings_current_vehicle">المركبة الحالية</string>
+    <string name="settings_current_adapter">اتصال OBD-II</string>
+    <string name="settings_adapter_not_connected">لا يوجد محول متصل</string>
+    <string name="settings_last_connection">ملف تعريف الاتصال الأخير</string>
+    <string name="settings_no_last_connection">لا يوجد ملف اتصال محفوظ حتى الآن.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">ملفات المركبات المحفوظة</string>
+    <string name="saved_vehicle_name_label">اسم الملف</string>
+    <string name="saved_vehicle_name_placeholder">مثال: Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">حفظ المركبة الحالية</string>
+    <string name="saved_vehicle_empty">لا توجد ملفات مركبات محفوظة بعد.</string>
+    <string name="saved_vehicle_load">تحميل</string>
+    <string name="saved_vehicle_delete">حذف</string>
+    <string name="saved_vehicle_requires_review">تم إنشاء هذا الملف من VIN الخاص بوحدة التحكم. تحقق من سنة الطراز والمحرك وناقل الحركة قبل التشخيص.</string>
+    <string name="saved_vehicle_current">محدد</string>
+    <string name="saved_vehicle_ecu_default_name">مركبة ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">أدخل اسمًا للملف.</string>
+    <string name="msg_vehicle_profile_saved">تم حفظ ملف المركبة.</string>
+    <string name="msg_vehicle_profile_review_required">تم إنشاء ملف من VIN الخاص بوحدة التحكم. تحقق من السنة والمحرك وناقل الحركة قبل التشخيص.</string>
+    <string name="msg_vehicle_profile_loaded">تم تحميل ملف المركبة: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">لم تُرجع وحدة التحكم VIN صالحًا من 17 خانة. لم يتم إنشاء ملف.</string>
+    <string name="cal_vin_matches_profile">يتطابق VIN لوحدة التحكم مع ملف المركبة المحدد.</string>
+    <string name="cal_vin_mismatch_detected">عدم تطابق VIN — الملف: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">لا يحتوي ملف المركبة المحدد على VIN صالح.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">استخدام VIN لوحدة التحكم للملف الحالي</string>
+    <string name="cal_vin_mismatch_title">تم اكتشاف اختلاف في VIN</string>
+    <string name="cal_vin_mismatch_confirmation">VIN في الملف المحدد هو %1$s، لكن وحدة التحكم أعادت %2$s. قد تكون المركبتان مختلفتين. أنشئ ملفًا منفصلًا للحفاظ على المركبة المحددة، أو زامن VIN فقط بعد التحقق من المركبة الفعلية.</string>
+    <string name="cal_vin_create_vehicle">إنشاء ملف مركبة</string>
+    <string name="cal_vin_sync_existing">مزامنة VIN للملف المحدد</string>
+    <string name="cal_vin_sync_warning_title">هل تريد تأكيد استبدال VIN؟</string>
+    <string name="cal_vin_sync_warning_message">سيتم استبدال VIN المحفوظ في ملف المركبة المحدد (%1$s) بـ VIN وحدة التحكم (%2$s). لن تتغير سنة الطراز أو المحرك أو ناقل الحركة أو السوق. تابع فقط بعد التأكد من أن المركبة المتصلة هي المركبة المقصودة.</string>
+    <string name="cal_vin_sync_confirm">استبدال VIN</string>
+    <string name="vin_photo_capture">التقاط صورة لرقم VIN</string>
+    <string name="vin_photo_cancelled">تم إلغاء التقاط صورة رقم VIN.</string>
+    <string name="vin_photo_success">تم اكتشاف رقم VIN ونسخه إلى ملف تعريف المركبة. تحقق من كل حرف.</string>
+    <string name="vin_photo_not_found">لم يتم العثور على رقم VIN صالح مكوّن من 17 حرفًا. أدخله يدويًا أو التقط صورة أخرى.</string>
+    <string name="vin_photo_error">تعذرت قراءة صورة رقم VIN. حاول مرة أخرى مع إضاءة وتركيز أفضل.</string>
 </resources>

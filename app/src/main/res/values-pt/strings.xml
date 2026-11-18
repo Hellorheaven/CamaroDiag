@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Idioma da aplicação</string>
-    <string name="system_language_current">Idioma do sistema: %1$s</string>
-    <string name="system_language_hint">CamaroDiag utiliza o idioma do dispositivo quando este é suportado. Para os restantes idiomas, é utilizado o inglês.</string>
+    
+    
     <string name="tab_vehicle">Veículo</string>
     <string name="tab_connect">Ligar</string>
     <string name="tab_live">Dados em tempo real</string>
@@ -575,4 +575,57 @@
     <string name="dtc_gm_monitor_failure">Contador de falhas / frequência de validação: %1$s</string>
     <string name="dtc_gm_monitor_mil">Classificação MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Fonte: GM %1$s, página %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <string name="system_language_current">Idioma selecionado: %1$s</string>
+    <string name="system_language_hint">Escolha o idioma utilizado no CamaroDiag.</string>
+    <string name="settings_current_vehicle">Veículo atual</string>
+    <string name="settings_current_adapter">Ligação OBD-II</string>
+    <string name="settings_adapter_not_connected">Nenhum adaptador ligado</string>
+    <string name="settings_last_connection">Último perfil de ligação</string>
+    <string name="settings_no_last_connection">Ainda não existe um perfil de ligação guardado.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="saved_vehicle_profiles_title">Perfis de veículos guardados</string>
+    <string name="saved_vehicle_name_label">Nome do perfil</string>
+    <string name="saved_vehicle_name_placeholder">por exemplo, Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Guardar veículo atual</string>
+    <string name="saved_vehicle_empty">Ainda não existem perfis de veículos guardados.</string>
+    <string name="saved_vehicle_load">Carregar</string>
+    <string name="saved_vehicle_delete">Eliminar</string>
+    <string name="saved_vehicle_requires_review">Este perfil foi criado a partir do VIN da ECU. Confirme o ano, motor e caixa antes do diagnóstico.</string>
+    <string name="saved_vehicle_current">SELECIONADO</string>
+    <string name="saved_vehicle_ecu_default_name">Veículo ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Introduza um nome para o perfil.</string>
+    <string name="msg_vehicle_profile_saved">Perfil do veículo guardado.</string>
+    <string name="msg_vehicle_profile_review_required">Foi criado um perfil a partir do VIN da ECU. Confirme ano, motor e caixa antes do diagnóstico.</string>
+    <string name="msg_vehicle_profile_loaded">Perfil do veículo carregado: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">A ECU não devolveu um VIN válido de 17 caracteres. Não foi criado nenhum perfil.</string>
+    <string name="cal_vin_matches_profile">O VIN da ECU corresponde ao perfil de veículo selecionado.</string>
+    <string name="cal_vin_mismatch_detected">VIN DIFERENTE — perfil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">O perfil de veículo selecionado não contém um VIN válido.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">Usar o VIN da ECU no perfil atual</string>
+    <string name="cal_vin_mismatch_title">Foi detetada uma divergência de VIN</string>
+    <string name="cal_vin_mismatch_confirmation">O VIN do perfil selecionado é %1$s, mas a ECU devolveu %2$s. Podem ser veículos diferentes. Crie um perfil separado para preservar o veículo selecionado ou sincronize o VIN apenas depois de confirmar o veículo físico.</string>
+    <string name="cal_vin_create_vehicle">Criar perfil de veículo</string>
+    <string name="cal_vin_sync_existing">Sincronizar o VIN do perfil selecionado</string>
+    <string name="cal_vin_sync_warning_title">Confirmar substituição do VIN?</string>
+    <string name="cal_vin_sync_warning_message">Isto irá substituir o VIN guardado no perfil selecionado (%1$s) pelo VIN da ECU (%2$s). O ano, motor, caixa e mercado não serão alterados. Confirme apenas depois de verificar que o veículo ligado é o pretendido.</string>
+    <string name="cal_vin_sync_confirm">Substituir VIN</string>
+    <string name="vin_photo_capture">Fotografar VIN</string>
+    <string name="vin_photo_cancelled">A captura da fotografia do VIN foi cancelada.</string>
+    <string name="vin_photo_success">VIN detetado e copiado para o perfil do veículo. Verifique todos os caracteres.</string>
+    <string name="vin_photo_not_found">Não foi detetado um VIN válido de 17 caracteres. Introduza-o manualmente ou tire outra fotografia.</string>
+    <string name="vin_photo_error">Não foi possível ler a fotografia do VIN. Tente novamente com melhor iluminação e focagem.</string>
 </resources>
