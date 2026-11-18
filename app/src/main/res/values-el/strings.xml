@@ -145,7 +145,7 @@
     <string name="cal_pc_pairing_token">Token σύζευξης υπολογιστή</string>
     <string name="cal_connect_j2534">Σύνδεση γέφυρας J2534</string>
     <string name="cal_disconnect_pc_bridge">Αποσύνδεση γέφυρας υπολογιστή</string>
-    <string name="cal_bridge_capabilities">Γέφυρα: HS-CAN ISO15765 250/500 kbit/s και J2534-2 SW-ISO15765 όταν υποστηρίζεται από το πρόγραμμα οδήγησης. Το CAN FD παραμένει απενεργοποιημένο.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Γέφυρα: HS-CAN ISO15765 250/500 kbit/s και J2534-2 SW-ISO15765 όταν υποστηρίζεται από το πρόγραμμα οδήγησης. Το CAN FD παραμένει απενεργοποιημένο.</string>
     <string name="cal_read_uds_did">Ανάγνωση UDS DID</string>
     <string name="cal_read_uds_dtcs">Ανάγνωση UDS DTC</string>
     <string name="cal_uds_trouble_codes">Κωδικοί βλάβης UDS (0x19)</string>
@@ -246,8 +246,8 @@
     <string name="module_note_ecm_obd_missing">Δεν παρατηρήθηκε τυπική απόκριση OBD 7E8. Διατηρήστε την ECM ως μη επαληθευμένη μέχρι να το επιβεβαιώσει πραγματική λειτουργική σάρωση.</string>
     <string name="module_note_tcm_gen5">Η παρουσία, η διεύθυνση και τα υποστηριζόμενα δεδομένα πρέπει να εντοπιστούν στο όχημα.</string>
     <string name="module_note_tcm_gen6">Η διεύθυνση της μονάδας και οι υποστηριζόμενες υπηρεσίες πρέπει να εντοπιστούν στο όχημα· δεν θεωρούνται δεδομένες από την τοπολογία Gen 5.</string>
-    <string name="module_note_bcm_gen5">Το δελτίο GM 07-08-49-020I προσδιορίζει την BCM ως μονάδα αποθήκευσης χιλιομετρητή Camaro για τα έτη 2010–2015. Δεν θεωρούνται δεδομένες η ακριβής διεύθυνση διάγνωσης και το DID ανάγνωσης.</string>
-    <string name="module_note_bcm_gen6_to2018">Το δελτίο GM 07-08-49-020M αναφέρει την BCM ως μονάδα αποθήκευσης χιλιομετρητή Camaro έως το 2018. Η διεύθυνση διάγνωσης και το DID ανάγνωσης απαιτούν ακόμη επαλήθευση βάσει VIN.</string>
+    <string name="module_note_bcm_gen5" tools:ignore="TypographyDashes">Το δελτίο GM 07-08-49-020I προσδιορίζει την BCM ως μονάδα αποθήκευσης χιλιομετρητή Camaro για τα έτη 2010–2015. Δεν θεωρούνται δεδομένες η ακριβής διεύθυνση διάγνωσης και το DID ανάγνωσης.</string>
+    <string name="module_note_bcm_gen6_to2018" tools:ignore="TypographyDashes">Το δελτίο GM 07-08-49-020M αναφέρει την BCM ως μονάδα αποθήκευσης χιλιομετρητή Camaro έως το 2018. Η διεύθυνση διάγνωσης και το DID ανάγνωσης απαιτούν ακόμη επαλήθευση βάσει VIN.</string>
     <string name="module_note_bcm_2019">Για τα έτη 2019–2024, επιβεβαιώστε την αρχιτεκτονική αποθήκευσης χιλιομετρητή και τα αναγνωριστικά διάγνωσης για αυτό το VIN πριν από την ανάγνωση.</string>
     <string name="module_note_ipc_gen5">Οι πληροφορίες σέρβις Camaro 2012 περιγράφουν την IPC ως δευτερεύουσα αποθήκευση χιλιομετρητή. Τα ακριβή δεδομένα ανάγνωσης και η διεύθυνση πρέπει να επαληθευτούν.</string>
     <string name="module_note_ipc_gen6">Οι πληροφορίες σέρβις Camaro 2012 περιγράφουν δευτερεύουσα αποθήκευση χιλιομετρητή· επαληθεύστε τα ακριβή δεδομένα της μονάδας και τη σχέση με το VIN πριν από τη σύγκριση.</string>
