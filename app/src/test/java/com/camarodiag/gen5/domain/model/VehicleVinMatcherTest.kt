@@ -58,4 +58,21 @@ class VehicleVinMatcherTest {
         assertNull(VehicleVinMatcher.modelYearFromVin("INVALID"))
         assertNull(VehicleVinMatcher.modelYearFromVin("1G1FA1RXXS0123456"))
     }
+
+    @Test
+    fun decodesEveryCamaroModelYearCodeInTheSupportedRange() {
+        val yearCodes = "ABCDEFGHJKLMNPR"
+        yearCodes.forEachIndexed { index, code ->
+            val vin = selectedVin.toCharArray().also { it[9] = code }.concatToString()
+            assertEquals(2010 + index, VehicleVinMatcher.modelYearFromVin(vin))
+        }
+    }
+
+    @Test
+    fun rejectsExcludedVinYearCharacters() {
+        listOf('I', 'O', 'Q').forEach { code ->
+            val vin = selectedVin.toCharArray().also { it[9] = code }.concatToString()
+            assertNull(VehicleVinMatcher.modelYearFromVin(vin))
+        }
+    }
 }
