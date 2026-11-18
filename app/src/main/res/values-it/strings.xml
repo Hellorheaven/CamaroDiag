@@ -657,4 +657,5 @@
     <string name="can_sniffer_request_complete">Richiesta in sola lettura completata.</string>
     <string name="can_sniffer_request_failed">Richiesta in sola lettura non riuscita.</string>
     <string name="can_sniffer_stn_filter_notice">Sugli adattatori STN, i filtri temporanei vengono cancellati per la cattura grezza e poi viene riattivato il filtraggio OBD automatico. I filtri personalizzati impostati da altri software non vengono ripristinati.</string>
+    <string name="can_sniffer_bus_limit">Questa acquisizione usa il profilo HS-CAN attivo a 11 bit e 500 kbit/s. SW-CAN e altri bus richiedono un adattatore diverso.</string>
 </resources>
