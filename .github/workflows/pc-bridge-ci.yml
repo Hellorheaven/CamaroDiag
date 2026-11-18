@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           paths=(
-            'pc-bridge/**' 'global.json' 'NuGet.Config' 'nuget.config'
+            'pc-bridge/**' 'global.json' '.editorconfig' '.github/actions/**' 'NuGet.Config' 'nuget.config'
             '**/Directory.Build.props' '**/Directory.Build.targets'
             '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
             '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
@@ -117,7 +117,7 @@ jobs:
           count_base="$BASE_SHA"
           if [[ -n "$PREVIOUS_BUILD_SHA" ]]; then count_base="$PREVIOUS_BUILD_SHA"; fi
           paths=(
-            'pc-bridge/**' 'global.json' 'NuGet.Config' 'nuget.config'
+            'pc-bridge/**' 'global.json' '.editorconfig' '.github/actions/**' 'NuGet.Config' 'nuget.config'
             '**/Directory.Build.props' '**/Directory.Build.targets'
             '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
             '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
