@@ -327,6 +327,7 @@ class BluetoothObdManager(context: Context) {
                 // to command mode even when the caller cancels the capture.
                 withContext(NonCancellable) {
                     runCatching { sendAtCommandInternal("\u001B", 1_000L) }
+                    runCatching { sendAtCommandInternal("AT", 1_000L) }
                 }
             }
             captured.toString()
