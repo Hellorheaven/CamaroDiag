@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Idioma da aplicação</string>
-    <string name="system_language_current">Idioma do sistema: %1$s</string>
-    <string name="system_language_hint">CamaroDiag utiliza o idioma do dispositivo quando este é suportado. Para os restantes idiomas, é utilizado o inglês.</string>
+    
+    
     <string name="tab_vehicle">Veículo</string>
     <string name="tab_connect">Ligar</string>
     <string name="tab_live">Dados em tempo real</string>
@@ -575,6 +575,17 @@
     <string name="dtc_gm_monitor_failure">Contador de falhas / frequência de validação: %1$s</string>
     <string name="dtc_gm_monitor_mil">Classificação MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Fonte: GM %1$s, página %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <string name="system_language_current">Idioma selecionado: %1$s</string>
     <string name="system_language_hint">Escolha o idioma utilizado no CamaroDiag.</string>
     <string name="settings_current_vehicle">Veículo atual</string>
