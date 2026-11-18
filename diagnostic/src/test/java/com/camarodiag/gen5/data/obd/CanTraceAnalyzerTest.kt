@@ -67,4 +67,64 @@ class CanTraceAnalyzerTest {
         assertTrue(report.frames.isEmpty())
         assertTrue(report.errors.any { it.contains("invalid ELM327 header/DLC/data record") })
     }
+
+    @Test
+    fun reassemblesInterleavedIsoTpMessagesIndependentlyByCanId() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 8 10 08 62 F1 90 AA BB CC",
+                "7E9 8 10 08 62 F1 91 11 22 33",
+                "7E8 3 21 DD EE",
+                "7E9 3 21 44 55"
+            ).joinToString("\n"),
+            "capture.txt"
+        )
+
+        assertEquals(2, report.messages.size)
+        assertEquals(listOf(0x7E8, 0x7E9), report.messages.map { it.canId })
+        assertEquals(listOf(0xF190, 0xF191), report.didObservations.map { it.did })
+        assertEquals(0, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
+    fun reportsIsoTpSequenceMismatchAndKeepsMessageIncomplete() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 8 10 08 62 F1 90 AA BB CC",
+                "7E8 3 22 DD EE"
+            ).joinToString("\n"),
+            "capture.txt"
+        )
+
+        assertTrue(report.messages.isEmpty())
+        assertEquals(0, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.any { it.contains("ISO-TP sequence mismatch") })
+    }
+
+    @Test
+    fun recognizesNegativeUdsResponseWithoutInventingDidObservation() {
+        val report = CanTraceAnalyzer.analyze(
+            "7E8 3 03 7F 22 31",
+            "capture.txt"
+        )
+
+        assertEquals(1, report.messages.size)
+        assertEquals(0x22, report.messages.single().service)
+        assertEquals(0x31, report.messages.single().negativeResponseCode)
+        assertEquals("ReadDataByIdentifier", report.messages.single().serviceName)
+        assertTrue(report.didObservations.isEmpty())
+        assertTrue(report.readDidCandidates.isEmpty())
+    }
+
+    @Test
+    fun rejectsMalformedCsvByteColumnInsteadOfSilentlyDroppingIt() {
+        val report = CanTraceAnalyzer.analyze(
+            "can_id,data0,data1,data2\n7E8,03,41,GG",
+            "capture.csv"
+        )
+
+        assertTrue(report.frames.isEmpty())
+        assertTrue(report.errors.any { it.contains("invalid CSV CAN frame") })
+    }
 }
