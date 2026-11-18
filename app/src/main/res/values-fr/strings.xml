@@ -633,4 +633,9 @@
     <string name="cal_vin_sync_warning_title">Confirmer le remplacement du VIN ?</string>
     <string name="cal_vin_sync_warning_message">Le VIN enregistré dans le profil sélectionné (%1$s) sera remplacé par le VIN ECU (%2$s). L’année, le moteur, la boîte et le marché ne changeront pas. Confirmez uniquement après avoir vérifié que le véhicule connecté est bien celui attendu.</string>
     <string name="cal_vin_sync_confirm">Remplacer le VIN</string>
+    <string name="vin_photo_capture">Photographier le VIN</string>
+    <string name="vin_photo_cancelled">Capture de la photo du VIN annulée.</string>
+    <string name="vin_photo_success">VIN détecté et copié dans le profil véhicule. Vérifiez chaque caractère.</string>
+    <string name="vin_photo_not_found">Aucun VIN valide de 17 caractères détecté. Saisissez-le manuellement ou reprenez la photo.</string>
+    <string name="vin_photo_error">Impossible de lire la photo du VIN. Réessayez avec plus de lumière et une meilleure mise au point.</string>
 </resources>
