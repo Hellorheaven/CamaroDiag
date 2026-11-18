@@ -205,6 +205,16 @@ jobs:
             }
           }
 
+      - name: Upload Windows Debug installers for this PR commit
+        uses: actions/upload-artifact@v7
+        with:
+          name: CamaroDiag-J2534-Bridge-debug-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x64.exe
+            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x86.exe
+          if-no-files-found: error
+          retention-days: 30
+
   windows-debug-validation:
     needs: [evaluate-build-checkpoint, build-windows-debug]
     if: always()
@@ -238,12 +248,3 @@ jobs:
             exit 1
           fi
           echo "VALIDATED: Windows Debug build and x64/x86 installers completed successfully."
-      - name: Upload Windows Debug installers for this PR commit
-        uses: actions/upload-artifact@v7
-        with:
-          name: CamaroDiag-J2534-Bridge-debug-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          path: |
-            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x64.exe
-            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x86.exe
-          if-no-files-found: error
-          retention-days: 30
