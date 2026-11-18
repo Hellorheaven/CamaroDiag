@@ -1994,6 +1994,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
                         vinComparison = comparison
                     )
+                    // Do not automatically interpret or audit data against the wrong saved vehicle.
+                    // The user can resolve the mismatch first, then start diagnostics explicitly.
+                    if (comparison?.matches != false) {
+                        scanDtcs()
+                        runMileageAudit()
+                    }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -2001,9 +2007,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ecuVinResponse = getApplication<Application>().getString(R.string.obd_not_available),
                         vinComparison = null
                     )
+                    scanDtcs()
+                    runMileageAudit()
                 }
-                scanDtcs()
-                runMileageAudit()
             }
         }
     }
