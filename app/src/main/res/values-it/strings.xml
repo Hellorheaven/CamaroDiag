@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Lingua dell\'app</string>
-    <string name="system_language_current">Lingua di sistema: %1$s</string>
-    <string name="system_language_hint">CamaroDiag usa la lingua del dispositivo quando è supportata. Per tutte le altre lingue viene usato l\'inglese.</string>
+    
+    
     <string name="tab_vehicle">Veicolo</string>
     <string name="tab_connect">Connessione</string>
     <string name="tab_live">Dati in tempo reale</string>
@@ -574,17 +574,28 @@
     <string name="dtc_gm_monitor_failure">Contatore errori / frequenza di convalida: %1$s</string>
     <string name="dtc_gm_monitor_mil">Classificazione MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Fonte: GM %1$s, pagina %2$d</string>
-    <string name="system_language_current">Lingua selezionata: %1$s</string>
-    <string name="system_language_hint">Scegli la lingua utilizzata in CamaroDiag.</string>
-    <string name="settings_current_vehicle">Veicolo attuale</string>
-    <string name="settings_current_adapter">Connessione OBD-II</string>
-    <string name="settings_adapter_not_connected">Nessun adattatore collegato</string>
-    <string name="settings_last_connection">Ultimo profilo di connessione</string>
-    <string name="settings_no_last_connection">Nessun profilo di connessione salvato.</string>
-    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
-    <string name="settings_connection_bluetooth">Bluetooth</string>
-    <string name="settings_connection_usb">USB</string>
-    <string name="settings_connection_wifi">Wi-Fi</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <string name="system_language_current">Lingua selezionata: %1$s</string>
     <string name="system_language_hint">Scegli la lingua utilizzata in CamaroDiag.</string>
     <string name="settings_current_vehicle">Veicolo attuale</string>
