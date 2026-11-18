@@ -456,7 +456,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun clearVehicleEvidence() {
-        stopCanMonitor()
+        discardCanMonitor()
         _liveCanMonitorState.value = LiveCanMonitorState()
         obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
@@ -1065,6 +1065,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         canMonitorJob = monitorJob
         monitorJob.start()
+    }
+
+    /**
+     * Cancels and detaches a capture when its vehicle/adapter context is being discarded.
+     * Detaching first prevents the cancelled job from publishing buffered frames into the
+     * newly selected vehicle's empty CAN monitor state.
+     */
+    private fun discardCanMonitor() {
+        val activeJob = canMonitorJob
+        canMonitorJob = null
+        activeJob?.cancel()
     }
 
     /** Cancels monitor capture; the transport sends ESC in a non-cancellable cleanup block. */
