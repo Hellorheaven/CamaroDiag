@@ -1190,7 +1190,8 @@ fun CanSnifferScreen(
                         onValueChange = { requestInput = it.take(16) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("01 0C") }
+                        label = { Text(stringResource(R.string.can_sniffer_request_label)) },
+                        placeholder = { Text("01 0C") }
                     )
                     Button(
                         onClick = { onSendRequest(requestInput) },
