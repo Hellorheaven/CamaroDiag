@@ -33,8 +33,12 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=assets\\CamaroDiag.ico
-ArchitecturesAllowed=x86 x64
-ArchitecturesInstallIn64BitMode=x64
+#if Arch == "x64"
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+#else
+ArchitecturesAllowed=x86compatible
+#endif
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
