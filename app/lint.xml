@@ -7,5 +7,6 @@
     <issue id="AndroidGradlePluginVersion" severity="informational" />
     <issue id="GradleDependency" severity="informational" />
     <issue id="PluralsCandidate" severity="informational" />
+    <issue id="Typos" severity="informational" />
     <issue id="UnusedResources" severity="informational" />
 </lint>
