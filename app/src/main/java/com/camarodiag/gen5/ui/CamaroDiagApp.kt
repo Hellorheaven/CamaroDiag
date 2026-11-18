@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.res.Configuration
 import android.os.Build
 import android.os.LocaleList
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -34,6 +35,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.camarodiag.gen5.domain.model.*
 import com.camarodiag.gen5.control.VehicleControlCatalog
 import com.camarodiag.gen5.control.ControlAvailability
@@ -154,6 +158,33 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) viewModel.refreshPairedDevices()
+    }
+
+    val vinPhotoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap == null) {
+            Toast.makeText(viewModel.getApplication(), R.string.vin_photo_cancelled, Toast.LENGTH_SHORT).show()
+        } else {
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            recognizer.process(InputImage.fromBitmap(bitmap, 0))
+                .addOnSuccessListener { result ->
+                    val normalizedText = result.text.uppercase().replace(Regex("[^A-Z0-9]"), "")
+                    val detectedVin = Regex("[A-HJ-NPR-Z0-9]{17}")
+                        .find(normalizedText)?.value
+                    if (detectedVin != null) {
+                        viewModel.updateVin(detectedVin)
+                        Toast.makeText(viewModel.getApplication(), R.string.vin_photo_success, Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(viewModel.getApplication(), R.string.vin_photo_not_found, Toast.LENGTH_LONG).show()
+                    }
+                    recognizer.close()
+                }
+                .addOnFailureListener {
+                    recognizer.close()
+                    Toast.makeText(viewModel.getApplication(), R.string.vin_photo_error, Toast.LENGTH_LONG).show()
+                }
+        }
     }
 
     val calibrationFilePicker = rememberLauncherForActivityResult(
@@ -388,6 +419,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selectedSavedVehicleId = selectedSavedVehicleId,
                     onChange = { y, e, tr, m -> viewModel.updateVehicle(y, e, tr, m) },
                     onVinChange = { viewModel.updateVin(it) },
+                    onCaptureVinPhoto = { vinPhotoLauncher.launch(null) },
                     onSaveVehicle = { viewModel.saveCurrentVehicle(it) },
                     onLoadSavedVehicle = { viewModel.selectSavedVehicle(it) },
                     onDeleteSavedVehicle = { viewModel.deleteSavedVehicle(it) }
@@ -498,6 +530,7 @@ fun VehicleSetupScreen(
     selectedSavedVehicleId: String?,
     onChange: (Int, CamaroEngine, TransmissionType, MarketRegion) -> Unit,
     onVinChange: (String) -> Unit,
+    onCaptureVinPhoto: () -> Unit,
     onSaveVehicle: (String) -> Unit,
     onLoadSavedVehicle: (String) -> Unit,
     onDeleteSavedVehicle: (String) -> Unit
@@ -586,6 +619,14 @@ fun VehicleSetupScreen(
                         placeholder = { Text(stringResource(R.string.vehicle_vin_placeholder)) },
                         supportingText = { Text(stringResource(R.string.vehicle_vin_hint)) }
                     )
+                    OutlinedButton(
+                        onClick = onCaptureVinPhoto,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.vin_photo_capture))
+                    }
                 }
             }
         }
