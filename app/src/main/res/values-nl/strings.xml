@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">App-taal</string>
-    <string name="system_language_current">Systeemtaal: %1$s</string>
-    <string name="system_language_hint">CamaroDiag gebruikt de apparaattaal wanneer deze wordt ondersteund. Voor alle andere talen wordt Engels gebruikt.</string>
+    
+    
     <string name="tab_vehicle">Voertuig</string>
     <string name="tab_connect">Verbinden</string>
     <string name="tab_live">Livegegevens</string>
@@ -572,6 +572,17 @@
     <string name="dtc_gm_monitor_failure">Foutenteller / validatiefrequentie: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL-classificatie: %1$s</string>
     <string name="dtc_gm_monitor_source">Bron: GM %1$s, pagina %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <string name="system_language_current">Geselecteerde taal: %1$s</string>
     <string name="system_language_hint">Kies de taal die CamaroDiag gebruikt.</string>
     <string name="settings_current_vehicle">Huidig voertuig</string>
