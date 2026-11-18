@@ -314,8 +314,12 @@ object DtcCatalogRegistry {
         respondingModuleId: String
     ): DtcCommunityEvidenceAssessment {
         val applicable = references.filter { it.isApplicableTo(vehicle, respondingModuleId) }
+        // Reposts of one investigation count once, and multiple investigations
+        // published by the same organization do not create independent corroboration.
         val independentPublisherCount = applicable
             .distinctBy { it.independenceGroup.trim().lowercase(Locale.ROOT) }
+            .map { it.publisher.trim().lowercase(Locale.ROOT) }
+            .distinct()
             .size
         val confidence = when {
             applicable.any { it.validatesCurrentVehicle(vehicle) } ->
