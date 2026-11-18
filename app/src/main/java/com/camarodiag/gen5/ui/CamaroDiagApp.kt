@@ -459,10 +459,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
                 DiagTab.CAN_SNIFFER -> CanSnifferScreen(
                     state = liveCanMonitorState,
-                    isAvailable = adapter.tier != AdapterTier.DISCONNECTED &&
-                        adapter.supportsCanHeaders &&
-                        !adapter.deviceName.contains("Demo", ignoreCase = true) &&
-                        !adapter.deviceName.contains("Simulated", ignoreCase = true),
+                    isAvailable = viewModel.canMonitorAvailable(),
                     onStart = { viewModel.startCanMonitor() },
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendSafeObdRequest(it) }
