@@ -56,6 +56,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     ADAPTER("Adapter", "Interface", R.string.tab_connect),
     MODULES("Modules", "Modules", R.string.tab_modules),
     LIVE("Live", "Direct", R.string.tab_live),
+    CAN_SNIFFER("CAN Sniffer", "CAN Sniffer", R.string.tab_can_sniffer),
     DTCS("DTCs", "Défauts", R.string.tab_dtcs),
     MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
     CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
@@ -140,6 +141,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val mileageReport by viewModel.mileageReport.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
+    val liveCanMonitorState by viewModel.liveCanMonitorState.collectAsState()
     val obdScanReport by viewModel.obdScanReport.collectAsState()
     val obdScanMessage by viewModel.obdScanMessage.collectAsState()
     val isObdScanning by viewModel.isObdScanning.collectAsState()
@@ -323,6 +325,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab in setOf(
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
+                        DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
@@ -347,6 +350,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     listOf(
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
+                        DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
@@ -452,6 +456,16 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onExportRecording = {
                         liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
                     }
+                )
+                DiagTab.CAN_SNIFFER -> CanSnifferScreen(
+                    state = liveCanMonitorState,
+                    isAvailable = adapter.tier != AdapterTier.DISCONNECTED &&
+                        adapter.supportsCanHeaders &&
+                        !adapter.deviceName.contains("Demo", ignoreCase = true) &&
+                        !adapter.deviceName.contains("Simulated", ignoreCase = true),
+                    onStart = { viewModel.startCanMonitor() },
+                    onStop = { viewModel.stopCanMonitor() },
+                    onSendRequest = { viewModel.sendSafeObdRequest(it) }
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
@@ -1118,6 +1132,127 @@ fun LiveDataScreen(
                     if (pid.history.size > 2) {
                         Spacer(Modifier.height(8.dp))
                         Sparkline(pid.history, pid.minMetric, pid.maxMetric)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CanSnifferScreen(
+    state: LiveCanMonitorState,
+    isAvailable: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onSendRequest: (String) -> Unit
+) {
+    var requestInput by remember { mutableStateOf("01 0C") }
+    val report = state.report
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionTitle(stringResource(R.string.can_sniffer_title))
+                    Text(stringResource(R.string.can_sniffer_description), color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.can_sniffer_safety), color = CamaroAmber, fontSize = 11.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onStart,
+                            enabled = isAvailable && !state.isCapturing,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.can_sniffer_start))
+                        }
+                        OutlinedButton(
+                            onClick = onStop,
+                            enabled = state.isCapturing,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.can_sniffer_stop))
+                        }
+                    }
+                    if (!isAvailable) {
+                        Text(stringResource(R.string.can_sniffer_unavailable), color = WarnRed, fontSize = 11.sp)
+                    }
+                    state.message?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.can_sniffer_request_label), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = requestInput,
+                        onValueChange = { requestInput = it.take(16) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("01 0C") }
+                    )
+                    Button(
+                        onClick = { onSendRequest(requestInput) },
+                        enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.can_sniffer_send))
+                    }
+                    state.requestResponse?.let { response ->
+                        Text(stringResource(R.string.can_sniffer_response_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        Text(response.ifBlank { "—" }, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        if (report == null || report.frames.isEmpty()) {
+            item {
+                Text(stringResource(R.string.can_sniffer_empty), color = TextMuted, fontSize = 12.sp)
+            }
+        } else {
+            item {
+                Text(stringResource(R.string.can_sniffer_frame_count, report.frames.size), color = CamaroAmber, fontWeight = FontWeight.Bold)
+            }
+            items(report.frames.takeLast(100).asReversed()) { frame ->
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            "#${frame.lineNumber} • 0x${String.format(Locale.ROOT, "%03X", frame.canId)} • DLC ${frame.data.size}",
+                            color = CamaroAmber,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            frame.data.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) },
+                            color = TextPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+            if (report.pidObservations.isNotEmpty()) {
+                item {
+                    Text(stringResource(R.string.can_sniffer_pid_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                }
+                items(report.pidObservations.takeLast(30).asReversed()) { observation ->
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(observation.name, fontSize = 12.sp, color = TextMuted)
+                                Text("PID 0x${String.format(Locale.ROOT, "%02X", observation.pid)} • CAN 0x${String.format(Locale.ROOT, "%03X", observation.canId)}", fontSize = 10.sp, color = TextMuted)
+                            }
+                            Text(
+                                "${String.format(Locale.ROOT, "%.1f", observation.value)} ${observation.unit}",
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
                     }
                 }
             }
