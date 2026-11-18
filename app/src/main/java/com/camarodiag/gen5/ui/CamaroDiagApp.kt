@@ -1398,7 +1398,7 @@ fun SettingsScreen(
 ) {
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
     var languageExpanded by remember { mutableStateOf(false) }
-    val currentVehicle = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.transmission.code} • ${vehicle.market.code} • ${vehicle.vin.ifBlank { "VIN —" }}"
+    val currentVehicle = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.transmission.code} • ${vehicle.market.code} • ${vehicle.vin.ifBlank { "VIN —" }}"
     val currentAdapter = if (adapter.tier == AdapterTier.DISCONNECTED) {
         stringResource(R.string.settings_adapter_not_connected)
     } else {
