@@ -577,4 +577,15 @@
     <string name="dtc_gm_monitor_failure">Счётчик отказов / частота подтверждения: %1$s</string>
     <string name="dtc_gm_monitor_mil">Классификация MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Источник: GM %1$s, страница %2$d</string>
+    <string name="system_language_current">Выбранный язык: %1$s</string>
+    <string name="system_language_hint">Выберите язык интерфейса CamaroDiag.</string>
+    <string name="settings_current_vehicle">Текущий автомобиль</string>
+    <string name="settings_current_adapter">Подключение OBD-II</string>
+    <string name="settings_adapter_not_connected">Адаптер не подключен</string>
+    <string name="settings_last_connection">Последний профиль подключения</string>
+    <string name="settings_no_last_connection">Сохраненных профилей подключения пока нет.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
 </resources>
