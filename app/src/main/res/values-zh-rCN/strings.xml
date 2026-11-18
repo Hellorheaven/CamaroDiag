@@ -568,4 +568,15 @@
     <string name="dtc_gm_monitor_failure">故障计数／确认频率：%1$s</string>
     <string name="dtc_gm_monitor_mil">MIL分类：%1$s</string>
     <string name="dtc_gm_monitor_source">来源：GM %1$s，第%2$d页</string>
+    <string name="system_language_current">当前语言：%1$s</string>
+    <string name="system_language_hint">选择 CamaroDiag 使用的语言。</string>
+    <string name="settings_current_vehicle">当前车辆</string>
+    <string name="settings_current_adapter">OBD-II 连接</string>
+    <string name="settings_adapter_not_connected">未连接适配器</string>
+    <string name="settings_last_connection">上次连接配置</string>
+    <string name="settings_no_last_connection">尚未保存连接配置。</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">蓝牙</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
 </resources>
