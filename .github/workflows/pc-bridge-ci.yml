@@ -129,7 +129,7 @@ jobs:
           if [[ "$IS_DRAFT" != "true" ]]; then
             echo "build_required=true" >> "$GITHUB_OUTPUT"
             echo "PR is Ready for review: immediate Windows Debug validation required."
-          elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- '.github/workflows/pc-bridge-ci.yml'; then
+          elif git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/pc-bridge-ci.yml'; then
             if (( commits_since_build >= interval )); then
               echo "build_required=true" >> "$GITHUB_OUTPUT"
               echo "Windows Debug build due: $commits_since_build relevant commits (interval $interval)."
