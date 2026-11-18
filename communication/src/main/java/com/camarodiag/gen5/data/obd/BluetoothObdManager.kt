@@ -309,6 +309,9 @@ class BluetoothObdManager(context: Context) {
             val monitorCommand = if (capabilities.tier == AdapterTier.PRO_STN) "STMA" else "ATMA"
             val captured = StringBuilder()
             try {
+                sendAtCommandInternal("ATE0", 1_000L)
+                sendAtCommandInternal("ATL0", 1_000L)
+                sendAtCommandInternal("ATH1", 1_000L)
                 sendAtCommandInternal(monitorCommand, durationMs) { chunk ->
                     check(captured.length + chunk.length <= 131_072) {
                         "CAN monitor capture exceeded the 128 KiB safety limit."
