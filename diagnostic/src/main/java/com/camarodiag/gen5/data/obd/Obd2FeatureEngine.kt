@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 
 /** A single-command OBD transport. Implement with Bluetooth/USB/Wi-Fi ELM or a documented provider. */
 fun interface ObdCommandChannel {
@@ -16,6 +17,14 @@ data class ObdValue(
 )
 
 data class ObdDtc(val code: String, val status: String)
+
+data class ObdEcuIdentification(
+    val vin: String?,
+    val calibrationIds: List<String>,
+    val calibrationVerificationNumbers: List<String>,
+    val ecuNames: List<String>,
+    val respondingEcuAddresses: List<String>
+)
 
 data class ObdScanReport(
     val supportedPids: Set<Int>,
@@ -222,6 +231,29 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     suspend fun readEcuName(): List<String> =
         decodeAsciiRecords(ask("090A"), 0x49, 0x0A, 20)
 
+    /**
+     * Reads only standardized functional OBD-II identity data. Response addresses
+     * are retained as observations and are never mapped to GM module names here.
+     * Individual unsupported Mode 09 records remain unavailable without aborting
+     * the other identity reads.
+     */
+    suspend fun readEcuIdentification(): ObdEcuIdentification {
+        val responders = readOrDefault(emptyList()) { discoverFunctionalObdResponders() }
+        val vin = readOrDefault<String?>(null) { readVin() }
+        val calibrationIds = readOrDefault(emptyList()) { readCalibrationIds() }
+        val cvns = readOrDefault(emptyList()) { readCalibrationVerificationNumbers() }
+        val ecuNames = readOrDefault(emptyList()) { readEcuName() }
+        return ObdEcuIdentification(vin, calibrationIds, cvns, ecuNames, responders)
+    }
+
+    private suspend fun <T> readOrDefault(default: T, read: suspend () -> T): T =
+        try {
+            read()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            default
+        }
     suspend fun readReadiness(): String? {
         val data = payload(ask("0101"), 0x41, 0x01) ?: return null
         if (data.size < 4) return null
