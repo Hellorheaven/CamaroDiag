@@ -572,4 +572,15 @@
     <string name="dtc_gm_monitor_failure">Foutenteller / validatiefrequentie: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL-classificatie: %1$s</string>
     <string name="dtc_gm_monitor_source">Bron: GM %1$s, pagina %2$d</string>
+    <string name="system_language_current">Geselecteerde taal: %1$s</string>
+    <string name="system_language_hint">Kies de taal die CamaroDiag gebruikt.</string>
+    <string name="settings_current_vehicle">Huidig voertuig</string>
+    <string name="settings_current_adapter">OBD-II-verbinding</string>
+    <string name="settings_adapter_not_connected">Geen adapter verbonden</string>
+    <string name="settings_last_connection">Laatst gebruikte verbindingsprofiel</string>
+    <string name="settings_no_last_connection">Er is nog geen verbindingsprofiel opgeslagen.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
 </resources>
