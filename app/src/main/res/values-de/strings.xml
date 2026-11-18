@@ -571,4 +571,15 @@
     <string name="dtc_gm_monitor_failure">Fehlerzähler / Validierungsrate: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL-Klassifizierung: %1$s</string>
     <string name="dtc_gm_monitor_source">Quelle: GM %1$s, Seite %2$d</string>
+    <string name="system_language_current">Ausgewählte Sprache: %1$s</string>
+    <string name="system_language_hint">Wählen Sie die in CamaroDiag verwendete Sprache.</string>
+    <string name="settings_current_vehicle">Aktuelles Fahrzeug</string>
+    <string name="settings_current_adapter">OBD-II-Verbindung</string>
+    <string name="settings_adapter_not_connected">Kein Adapter verbunden</string>
+    <string name="settings_last_connection">Letztes Verbindungsprofil</string>
+    <string name="settings_no_last_connection">Noch kein Verbindungsprofil gespeichert.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">WLAN</string>
 </resources>
