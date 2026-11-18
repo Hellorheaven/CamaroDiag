@@ -1608,6 +1608,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             markAdapterDisconnected()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 ecuVinResponse = "",
+                vinComparison = null,
+                vinModelYear = null,
+                ecuNameResponse = "",
+                respondingEcuAddresses = emptyList(),
                 calibrationIdResponse = "",
                 cvnResponse = ""
             )
