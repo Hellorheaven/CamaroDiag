@@ -585,4 +585,15 @@
     <string name="settings_connection_bluetooth">Bluetooth</string>
     <string name="settings_connection_usb">USB</string>
     <string name="settings_connection_wifi">Wi-Fi</string>
+    <string name="system_language_current">Idioma seleccionado: %1$s</string>
+    <string name="system_language_hint">Elige el idioma utilizado en CamaroDiag.</string>
+    <string name="settings_current_vehicle">Vehículo actual</string>
+    <string name="settings_current_adapter">Conexión OBD-II</string>
+    <string name="settings_adapter_not_connected">No hay ningún adaptador conectado</string>
+    <string name="settings_last_connection">Último perfil de conexión</string>
+    <string name="settings_no_last_connection">Todavía no hay ningún perfil de conexión guardado.</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
 </resources>
