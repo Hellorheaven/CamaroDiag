@@ -25,83 +25,122 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     outputs:
+      android_changed: ${{ steps.android_changes.outputs.android_changed }}
       build_required: ${{ steps.checkpoint.outputs.build_required }}
       commits_since_build: ${{ steps.checkpoint.outputs.commits_since_build }}
       interval: ${{ steps.checkpoint.outputs.interval }}
     steps:
-      - name: Evaluate flexible periodic build checkpoint
-        id: checkpoint
-        uses: actions/github-script@v8
+      - name: Checkout pull request history
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Detect Android-relevant changes
+        id: android_changes
+        shell: bash
         env:
-          BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          paths=(
+            'app/**' 'core/**' 'diagnostic/**' 'communication/**'
+            'control/**' 'mileageaudit/**' 'storage/**' 'third_party/**'
+            'build.gradle' 'build.gradle.kts' 'settings.gradle' 'settings.gradle.kts'
+            '*.gradle' '*.gradle.kts' 'gradle.properties' 'gradle/**'
+            'gradlew' 'gradlew.bat' 'version.properties'
+            '.github/workflows/android-ci.yml'
+          )
+          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"; then
+            echo "android_changed=false" >> "$GITHUB_OUTPUT"
+            echo "NOT APPLICABLE: no Android source, resource, module, or Gradle build changes."
+          else
+            echo "android_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Android-relevant changes detected:"
+            git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
+          fi
+
+      - name: Find last successful Android Debug validation
+        id: previous_build
+        if: steps.android_changes.outputs.android_changed == 'true' && github.event.pull_request.draft
+        uses: actions/github-script@v8
         with:
           script: |
-            const configured = Number(process.env.BUILD_INTERVAL);
-            const interval = Number.isInteger(configured) && configured > 0 ? configured : 50;
             const pr = context.payload.pull_request;
-            if (!pr.draft) {
-              core.setOutput('build_required', 'true');
-              core.setOutput('commits_since_build', 'ready-for-review');
-              core.setOutput('interval', String(interval));
-              return;
-            }
-
             const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'android-ci.yml',
-              branch: pr.head.ref,
-              event: 'pull_request',
-              status: 'completed',
-              per_page: 100
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: 'android-ci.yml', branch: pr.head.ref,
+              event: 'pull_request', status: 'completed', per_page: 100
             });
             const candidates = runs
-              .filter(run => run.conclusion === 'success' &&
-                run.head_sha !== pr.head.sha &&
+              .filter(run => run.conclusion === 'success' && run.head_sha !== pr.head.sha &&
                 (run.pull_requests || []).some(item => item.number === pr.number))
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             let previous = null;
             for (const candidate of candidates) {
               const jobs = await github.rest.actions.listJobsForWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: candidate.id,
-                per_page: 100
+                owner: context.repo.owner, repo: context.repo.repo,
+                run_id: candidate.id, per_page: 100
               });
-              // A successful checkpoint means the actual platform build job passed.
-              // The lightweight evaluator succeeding while the build job is skipped
-              // must never reset the commit counter.
-              if (jobs.data.jobs.some(job =>
-                job.name === 'test-and-build' && job.conclusion === 'success')) {
+              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.conclusion === 'success')) {
                 previous = candidate;
                 break;
               }
             }
+            core.setOutput('sha', previous ? previous.head_sha : '');
+            core.info(previous
+              ? 'Last successful Android Debug build: ' + previous.head_sha
+              : 'No previous successful Android Debug build; counting relevant commits from the PR base.');
 
-            let commitsSinceBuild = pr.commits;
-            if (previous) {
-              try {
-                const comparison = await github.rest.repos.compareCommits({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  base: previous.head_sha,
-                  head: pr.head.sha
-                });
-                commitsSinceBuild = comparison.data.ahead_by;
-              } catch (error) {
-                core.warning(`Unable to compare against the last successful build (${error.message}); falling back to the PR commit count.`);
-                commitsSinceBuild = pr.commits;
-              }
-            }
-
-            const required = commitsSinceBuild >= interval;
-            core.setOutput('build_required', String(required));
-            core.setOutput('commits_since_build', String(commitsSinceBuild));
-            core.setOutput('interval', String(interval));
-            core.info(required
-              ? `Periodic build due: ${commitsSinceBuild} commits since last successful build (interval ${interval}).`
-              : `No periodic build due: ${commitsSinceBuild}/${interval} commits since last successful build.`);
-            
+      - name: Evaluate Android-only periodic build checkpoint
+        id: checkpoint
+        shell: bash
+        env:
+          BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
+          ANDROID_CHANGED: ${{ steps.android_changes.outputs.android_changed }}
+          PREVIOUS_BUILD_SHA: ${{ steps.previous_build.outputs.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          configured="${BUILD_INTERVAL:-}"
+          if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
+          echo "interval=$interval" >> "$GITHUB_OUTPUT"
+          if [[ "$ANDROID_CHANGED" != "true" ]]; then
+            echo "build_required=false" >> "$GITHUB_OUTPUT"
+            echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
+            echo "Android build not applicable: no Android-relevant changes."
+            exit 0
+          fi
+          count_base="$BASE_SHA"
+          if [[ -n "$PREVIOUS_BUILD_SHA" ]]; then count_base="$PREVIOUS_BUILD_SHA"; fi
+          paths=(
+            'app/**' 'core/**' 'diagnostic/**' 'communication/**'
+            'control/**' 'mileageaudit/**' 'storage/**' 'third_party/**'
+            'build.gradle' 'build.gradle.kts' 'settings.gradle' 'settings.gradle.kts'
+            '*.gradle' '*.gradle.kts' 'gradle.properties' 'gradle/**'
+            'gradlew' 'gradlew.bat' 'version.properties'
+            '.github/workflows/android-ci.yml'
+          )
+          commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
+          echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
+          if [[ "$IS_DRAFT" != "true" ]]; then
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "PR is Ready for review: immediate Android Debug validation required."
+          elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- '.github/workflows/android-ci.yml'; then
+            if (( commits_since_build >= interval )); then
+              echo "build_required=true" >> "$GITHUB_OUTPUT"
+              echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
+            else
+              echo "build_required=false" >> "$GITHUB_OUTPUT"
+              echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits."
+            fi
+          else
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "Android CI workflow changed: forcing validation of the modified workflow."
+          fi
   test-and-build:
     needs: evaluate-build-checkpoint
     if: needs.evaluate-build-checkpoint.outputs.build_required == 'true'
@@ -193,3 +232,36 @@ jobs:
           path: app/build/outputs/apk/debug/CamaroDiag-debug.apk
           if-no-files-found: error
           retention-days: 30
+  android-debug-validation:
+    needs: [evaluate-build-checkpoint, test-and-build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Android Debug validation applicability
+        env:
+          EVALUATION_RESULT: ${{ needs.evaluate-build-checkpoint.result }}
+          ANDROID_CHANGED: ${{ needs.evaluate-build-checkpoint.outputs.android_changed }}
+          BUILD_REQUIRED: ${{ needs.evaluate-build-checkpoint.outputs.build_required }}
+          BUILD_RESULT: ${{ needs.test-and-build.result }}
+          COMMITS_SINCE_BUILD: ${{ needs.evaluate-build-checkpoint.outputs.commits_since_build }}
+          BUILD_INTERVAL: ${{ needs.evaluate-build-checkpoint.outputs.interval }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVALUATION_RESULT" != "success" ]]; then
+            echo "::error::Android applicability/checkpoint evaluation did not succeed."
+            exit 1
+          fi
+          if [[ "$ANDROID_CHANGED" != "true" ]]; then
+            echo "NOT APPLICABLE: no Android source, resource, module, or Gradle build changes."
+            exit 0
+          fi
+          if [[ "$BUILD_REQUIRED" != "true" ]]; then
+            echo "BUILD DEFERRED: $COMMITS_SINCE_BUILD/$BUILD_INTERVAL Android-relevant commits."
+            echo "This control is not a compilation and does not reset the checkpoint."
+            exit 0
+          fi
+          if [[ "$BUILD_RESULT" != "success" ]]; then
+            echo "::error::Android Debug validation was required but its result was $BUILD_RESULT."
+            exit 1
+          fi
+          echo "VALIDATED: Android unit tests, lint, and Debug APK build completed successfully."
