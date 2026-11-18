@@ -306,12 +306,22 @@ class BluetoothObdManager(context: Context) {
         }
 
         commandSessionMutex.withLock {
-            val monitorCommand = if (capabilities.tier == AdapterTier.PRO_STN) "STMA" else "ATMA"
+            val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
+            // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
+            // STM uses the current filter table, so clear it for this bounded session and restore
+            // automatic OBD filtering after the capture.
+            val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = StringBuilder()
             try {
                 sendAtCommandInternal("ATE0", 1_000L)
                 sendAtCommandInternal("ATL0", 1_000L)
                 sendAtCommandInternal("ATH1", 1_000L)
+                if (isStnAdapter) {
+                    val filterResponse = sendAtCommandInternal("STFAC", 1_000L)
+                    check(!filterResponse.contains("?")) {
+                        "The STN adapter could not clear its temporary CAN filters."
+                    }
+                }
                 val monitorResponse = sendAtCommandInternal(monitorCommand, durationMs) { chunk ->
                     check(captured.length + chunk.length <= 131_072) {
                         "CAN monitor capture exceeded the 128 KiB safety limit."
@@ -327,6 +337,9 @@ class BluetoothObdManager(context: Context) {
                 // to command mode even when the caller cancels the capture.
                 withContext(NonCancellable) {
                     runCatching { sendAtCommandInternal("\u001B", 1_000L) }
+                    if (isStnAdapter) {
+                        runCatching { sendAtCommandInternal("STFA", 1_000L) }
+                    }
                     runCatching { sendAtCommandInternal("AT", 1_000L) }
                 }
             }
