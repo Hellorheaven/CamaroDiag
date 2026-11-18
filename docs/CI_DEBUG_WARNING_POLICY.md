@@ -71,6 +71,8 @@ Le job `cleanup-old-releases` accepte explicitement le résultat `skipped` de `b
 
 Les builds Windows Release x64/x86 utilisent `dotnet publish -warnaserror` et rejettent les avertissements Inno Setup.
 
+Le commit de fusion de référence de la PR #32 est marqué `[skip release]` afin de ne pas publier une version applicative pour cette fusion de maintenance. Ce marqueur ne désactive pas les releases des commits ordinaires sur `main` ; les règles habituelles de Release restent actives pour les changements ultérieurs.
+
 ## Protection GitHub à activer sur main
 
 Dans Settings → Branches (ou Rulesets), créer/éditer une règle ciblant `main` et activer Require status checks to pass before merging.
