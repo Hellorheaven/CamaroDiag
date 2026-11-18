@@ -298,6 +298,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun syncVehicleVinFromEcu(ecuVin: String) {
+        val normalizedVin = VehicleVinMatcher.normalize(ecuVin)
+        if (normalizedVin == null) {
+            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_ecu_vin_invalid)
+            return
+        }
+        val selectedId = _selectedSavedVehicleId.value
+        updateVin(normalizedVin)
+        if (selectedId != null) {
+            val updated = _savedVehicles.value.map { saved ->
+                if (saved.id == selectedId) saved.copy(vehicle = _vehicle.value) else saved
+            }
+            _savedVehicles.value = updated
+            persistSavedVehicleProfiles(updated)
+            _selectedSavedVehicleId.value = selectedId
+            settingsPreferences.edit { putString("selected_vehicle_id", selectedId) }
+        }
+    }
+
     fun createVehicleFromEcuVin(ecuVin: String) {
         val normalizedVin = VehicleVinMatcher.normalize(ecuVin)
         if (normalizedVin == null) {
@@ -363,6 +382,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         settingsPreferences.edit { putString("unit_system", units.name) }
     }
 
+    private fun markSavedVehicleSelectionDirty() {
+        if (_selectedSavedVehicleId.value == null) return
+        _selectedSavedVehicleId.value = null
+        settingsPreferences.edit { remove("selected_vehicle_id") }
+    }
+
     fun updateVehicle(
         year: Int = _vehicle.value.modelYear,
         engine: CamaroEngine = _vehicle.value.engine,
@@ -378,6 +403,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             market = market
         )
         if (updated == _vehicle.value) return
+        markSavedVehicleSelectionDirty()
         _vehicle.value = updated
         persistVehicleProfile(updated)
         invalidateLiveRecordingForVehicleChange()
@@ -390,6 +416,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateVin(vin: String) {
         val normalizedVin = vin.uppercase().filter { it.isLetterOrDigit() }.take(17)
         if (normalizedVin == _vehicle.value.vin) return
+        markSavedVehicleSelectionDirty()
         _vehicle.value = _vehicle.value.copy(vin = normalizedVin)
         settingsPreferences.edit { putString("vehicle_vin", normalizedVin) }
         invalidateLiveRecordingForVehicleChange()
@@ -821,6 +848,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
+                    vinComparison = null,
                     calibrationIdResponse = "",
                     cvnResponse = "",
                     message = if (bridgeOnly) {
@@ -866,6 +894,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
+                    ecuVinResponse = "",
+                    vinComparison = null,
                     message = getApplication<Application>().getString(R.string.msg_cal_identifiers_failed)
                 )
             }
