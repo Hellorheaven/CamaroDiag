@@ -433,6 +433,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveTelemetryMessage.value = null
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             ecuVinResponse = "",
+            vinComparison = null,
             calibrationIdResponse = "",
             cvnResponse = "",
             udsDidResponse = "",
