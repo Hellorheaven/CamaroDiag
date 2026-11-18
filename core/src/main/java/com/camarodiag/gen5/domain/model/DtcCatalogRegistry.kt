@@ -321,17 +321,37 @@ object DtcCatalogRegistry {
         // to make the result depend on input order or inflate independent corroboration.
         // Count only groups that resolve to exactly one publisher, then deduplicate
         // those publishers across their separate investigations.
-        val independentPublisherCount = applicable
+        val publisherGroups = applicable
             .groupBy { it.independenceGroup.trim().lowercase(Locale.ROOT) }
             .values
-            .mapNotNull { groupReferences ->
+            .map { groupReferences ->
                 groupReferences
                     .map { it.publisher.trim().lowercase(Locale.ROOT) }
-                    .distinct()
-                    .singleOrNull()
+                    .toSet()
             }
-            .distinct()
-            .size
+
+        // A single investigation can be cross-posted under different publisher
+        // labels. Treat those labels as aliases of one evidence lineage rather
+        // than discarding the investigation or counting every label separately.
+        // Merge overlapping publisher sets transitively: if two investigations
+        // share a publisher identity, they cannot provide independent corroboration.
+        val publisherLineages = mutableListOf<MutableSet<String>>()
+        publisherGroups.forEach { publishers ->
+            val mergedLineage = publishers.toMutableSet()
+            var index = 0
+            while (index < publisherLineages.size) {
+                val existingLineage = publisherLineages[index]
+                if (existingLineage.any { it in mergedLineage }) {
+                    mergedLineage.addAll(existingLineage)
+                    publisherLineages.removeAt(index)
+                    index = 0
+                } else {
+                    index++
+                }
+            }
+            publisherLineages.add(mergedLineage)
+        }
+        val independentPublisherCount = publisherLineages.size
         val confidence = when {
             applicable.any { it.validatesCurrentVehicle(vehicle) } ->
                 DtcCommunityConfidence.VALIDATED_ON_THIS_VEHICLE
