@@ -403,7 +403,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onCreateVehicleFromEcuVin = { viewModel.createVehicleFromEcuVin(it) },
-                    onSyncVehicleVinFromEcu = { viewModel.updateVin(it) },
+                    onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
                     onReadUdsDtcs = { requestId, responseId, protocol -> viewModel.readUdsDtcs(requestId, responseId, protocol) },
                     onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
