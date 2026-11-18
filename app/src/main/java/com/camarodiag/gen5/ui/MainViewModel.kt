@@ -1009,26 +1009,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         _liveCanMonitorState.value = LiveCanMonitorState(isCapturing = true)
         canMonitorJob = viewModelScope.launch(Dispatchers.IO) {
+            val pendingChunks = StringBuilder()
             try {
-                obdManager.captureCanMonitor(durationMs) { chunk ->
-                    val current = _liveCanMonitorState.value
-                    val raw = (current.rawText + chunk).takeLast(131_072)
-                    val report = CanTraceAnalyzer.analyze(
-                        raw.replace("\r\n", "\n").replace('\r', '\n'),
-                        "live-can-monitor.txt"
-                    )
-                    _liveCanMonitorState.value = current.copy(rawText = raw, report = report)
+                val captured = obdManager.captureCanMonitor(durationMs) { chunk ->
+                    pendingChunks.append(chunk)
+                    // Avoid publishing/analyzing every tiny transport read. A bounded batch
+                    // keeps UI updates responsive without repeatedly re-parsing the full trace.
+                    if (pendingChunks.length >= 512) {
+                        val current = _liveCanMonitorState.value
+                        val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                        pendingChunks.clear()
+                        _liveCanMonitorState.value = current.copy(rawText = raw)
+                    }
                 }
+                val raw = captured.takeLast(131_072)
+                val report = CanTraceAnalyzer.analyze(
+                    raw.replace("\\r\\n", "\\n").replace('\\r', '\\n'),
+                    "live-can-monitor.txt"
+                )
                 _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
                     isCapturing = false,
+                    rawText = raw,
+                    report = report,
                     message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
                 )
             } catch (cancelled: CancellationException) {
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isCapturing = false)
+                val current = _liveCanMonitorState.value
+                val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                _liveCanMonitorState.value = current.copy(isCapturing = false, rawText = raw)
                 throw cancelled
             } catch (_: Exception) {
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                val current = _liveCanMonitorState.value
+                val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                _liveCanMonitorState.value = current.copy(
                     isCapturing = false,
+                    rawText = raw,
                     message = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
                 )
             } finally {
