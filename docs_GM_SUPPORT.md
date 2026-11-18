@@ -12,7 +12,7 @@ Ce guide décrit les fonctions disponibles, les interfaces compatibles et les li
 | Gen 5 | 2010–2015 | 6.2 V8 L99 | ACDelco E38 |
 | Gen 5 | 2012–2015 | 6.2 V8 LSA compressé | ACDelco E67 |
 | Gen 5 | 2014–2015 | 7.0 V8 LS7 | ACDelco E38 |
-| Gen 6 | 2016–2020 | 2.0 turbo LTG | GM E80, à confirmer |
+| Gen 6 | 2016–2023 | 2.0 turbo LTG | GM E80, à confirmer par référence matérielle et CAL ID |
 | Gen 6 | 2016–2024 | 3.6 V6 LGX | GM E92 / E93 selon variante |
 | Gen 6 | 2016–2024 | 6.2 V8 LT1 | GM E92 |
 | Gen 6 | 2017–2024 | 6.2 V8 LT4 compressé | GM E92 |
@@ -59,7 +59,7 @@ Le lecteur UDS direct Android est actuellement destiné à l'OBDLink MX+ authent
 | Readiness | Mode 01 |
 | Tests embarqués | Mode 06 ; données brutes conservées lorsque le décodage dépend du véhicule |
 | Signaux Camaro | Catalogue OBDb : 133 commandes et 136 définitions, filtrées par année et adressage |
-| UDS | MX+ ou pont J2534, DID et CAN ID compatibles |
+| UDS | MX+ ou pont J2534, DID et CAN ID compatibles ; décodage générique des enregistrements DTC 24 bits et des 8 bits d'état UDS (0x19/0x02) |
 | Audit kilométrique | Comparaison de sources vérifiées ; pas de valeur inventée |
 | Télémétrie | Enregistrement et export CSV |
 
@@ -101,3 +101,244 @@ Le catalogue de signaux communautaire est issu du projet **OBDb Chevrolet Camaro
 Références générales : documentation OBDLink (https://support.obdsol.com/support/solutions/articles/43000713351-which-obdlink-adapter-is-right-for-me-), fiche MX+ (https://www.obdlink.com/products/obdlink-mxp/), GM MDI 2 (https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf), GM TIS2Web (https://gsi.ext.gm.com/userguides/GM_TIS2Web_User_Guide.pdf). Les adresses et procédures détaillées doivent provenir des informations de service GM du VIN concerné.
 
 CamaroDiag est un outil indépendant d'aide au diagnostic et ne constitue pas une certification GM.
+
+
+## Décodage DTC UDS multi-calculateurs
+
+Le décodeur commun `UdsDtcDecoder` interprète la réponse positive UDS `0x59 0x02` après retrait de l'en-tête de service par le client :
+- conservation du DTC brut sur 24 bits, du masque de disponibilité et du `DTCFormatIdentifier` ;
+- affichage SAE J2012-DA format 0x00 sous la forme `P/C/B/Uxxxx-FTB` ; format 0x04 conservé en hexadécimal tant que sa table de base distincte n'est pas intégrée ; format ISO 14229 constructeur (0x01) et autres formats non décodés conservés en hexadécimal sans conversion supposée ;
+- décodage individuel des huit bits d'état (défaut présent, cycle courant, pending, confirmé, tests non terminés/échoués et demande de voyant) ;
+- rejet explicite des réponses tronquées ou mal alignées.
+
+Ce décodage de transport est indépendant du calculateur et peut donc être appliqué aux réponses ECM/PCM, TCM, BCM, EBCM, IPC, SDM et autres calculateurs qui répondent réellement au service. Il ne fournit volontairement aucune définition de panne OEM : le libellé et la procédure de réparation nécessitent toujours un catalogue documenté pour le calculateur, le VIN, l'année, le moteur, la transmission et l'identité logicielle correspondants. Un DTC brut décodé n'est pas une preuve qu'un module ou une adresse présumée est présent.
+
+
+### Familles de calculateurs à découvrir
+
+La topologie Gen 5 et Gen 6 recense désormais, en plus des calculateurs principaux, les candidats optionnels suivants : HVAC, PSCM, RCDLR, RADIO/HMI, AMP, DDM, PDM, FPCM et Park Assist. Ils sont explicitement marqués `DISCOVERY_REQUIRED`, sans adresse TX/RX ni réseau présumé. Cette liste sert à structurer l'inventaire et les futurs scans ; elle ne prétend pas que tous ces modules sont montés sur chaque finition ou chaque année. La présence doit être confirmée par une réponse réelle et le VIN/RPO.
+
+
+## Catalogue DTC multi-moteurs et multi-calculateurs
+
+Le registre commun `DtcCatalogRegistry` couvre les RPO moteur déclarés dans le modèle véhicule : LLT, LFX, LS3, L99, LSA, LS7, LTG, LGX, LT1 et LT4. Il fournit les libellés SAE génériques disponibles et inventorie ECM, PCM, TCM, EBCM, BCM, IPC, SDM, HVAC, PSCM, RCDLR, RADIO, AMP, DDM, PDM, FPCM, Park Assist et HMI.
+
+Le registre sépare explicitement :
+- `SAE_J2012_GENERIC` : libellé normalisé du code, sans prétendre décrire la stratégie GM ;
+- `GM_SERVICE_INFORMATION` / `GM_BULLETIN` : définition constructeur avec référence documentaire ;
+- `VEHICLE_VALIDATED_CAPTURE` : résultat confirmé sur un véhicule identifié ;
+- `UNVERIFIED` : donnée non exploitable pour une interprétation technique.
+
+Une définition OEM ne peut être considérée comme exploitable qu'avec l'identification exacte du véhicule et du calculateur : VIN, année, RPO moteur, transmission, module répondant, référence matériel, OS, CAL ID, CVN et source technique traçable. Les profils UDS avancés existants appliquent également une validation d'identité et de preuve.
+
+À ce stade, les interprétations détaillées moteur présentes dans `CamaroDtcCatalog` restent limitées au LFX Gen 5 2012–2015. Les autres moteurs disposent des libellés SAE génériques, pas de causes/procédures GM extrapolées depuis le LFX. Les calculateurs hors ECM restent au niveau catalogue de découverte tant que leurs DTC et procédures OEM n'ont pas de source vérifiable.
+
+### Intégration des réponses UDS dans l'écran DTC
+
+L'action de lecture UDS 0x19/0x02 utilise désormais le `DTCFormatIdentifier` avant de décoder les enregistrements. Les résultats sont convertis en `DiagnosticDtc` et ajoutés à la liste de diagnostic avec l'adresse de réponse affichée comme identité provisoire (par exemple `ECU 7E8`). Cette identité d'adresse n'est pas transformée en nom de calculateur sans découverte/validation séparée.
+
+Les codes SAE reçoivent le libellé localisé déjà disponible dans les ressources Android. Les codes OEM inconnus restent affichés en hexadécimal avec leurs octets bruts et sans définition inventée. Le suffixe Failure Type Byte est conservé dans le code affiché ; la recherche du catalogue SAE utilise le code de base.
+
+Les avertissements d'applicabilité moteur couvrent notamment les DTC cylindre 7/8 sur moteurs six cylindres et le code de sous-pression P0299 sur les configurations atmosphériques d'origine. Ces avertissements vérifient la cohérence de la configuration ; ils ne remplacent pas une définition de service GM.
+
+
+Le registre contient également un profil d'architecture par RPO (nombre de cylindres, nombre de bancs, suralimentation, type d'injection et famille ECM). Ces données servent uniquement aux contrôles de cohérence et au routage du catalogue ; elles ne remplacent pas les identifiants matériel/OS/CAL ID/CVN réellement lus sur le calculateur.
+
+L'effacement SAE Mode 04 est strictement séparé des résultats UDS améliorés : après confirmation du Mode 04, seuls les DTC standard ECM sont retirés de la liste. Les défauts UDS associés à d'autres calculateurs sont conservés, car aucune commande UDS d'effacement n'est envoyée. L'avertissement utilisateur sur cette portée est traduit dans les 14 langues de l'application.
+
+
+Le format SAE J2012-DA 0x04 n'est pas interchangeable avec le format 0x00 : les deux octets de base utilisent des listes de décodage distinctes. Le décodeur garde donc le 0x04 brut plutôt que de produire un faux code P/C/B/U. Références : SAE J2012 (https://saemobilus.sae.org/standards/j2012_201612-diagnostic-trouble-code-definitions) et ISO 27145-2 (https://www.iteh.fr/catalog/standards/iso/16cfed3f-fea5-4b18-9193-e58f635fd493/iso-27145-2-2012).
+
+
+## Données de surveillance GM documentées – Camaro LFX 2012
+
+Le catalogue d'évidence `Gm2012LfxMonitorCatalog` ajoute les stratégies de surveillance moteur documentées dans le dossier GM **12OBDG05B Engine Diagnostics** pour le groupe OBD 5B. Le résumé officiel 2012 associe explicitement le groupe 5B au moteur 3.6L RPO LFX et aux Camaro (coupé et cabriolet), avec les RPO de transmission MV5/MYB.
+
+Codes couverts par cette première extraction : P0010, P0011, P0013, P0014, P0016, P0017, P0018, P0019, P0020, P0021, P0023, P0024, P0300 et P0420. Pour chaque code, l'application affiche la stratégie de surveillance, le critère de déclenchement, les conditions d'activation, le compteur d'échecs et la classification MIL tels que synthétisés depuis le dossier GM.
+
+**Limite importante :** ces données sont des critères de surveillance OBD de certification 2012, pas l'intégralité des arbres de diagnostic de réparation SI. Elles ne remplacent pas la vérification VIN, RPO de transmission, CAL ID, CVN, OS et matériel. Elles ne sont affichées que pour un profil LFX de l'année modèle 2012 ; elles ne sont pas extrapolées aux LFX 2013–2015 ni aux autres motorisations.
+
+Références primaires :
+- GM, *12 OBDG05B Engine Diagnostics*, notamment pages 1–16 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/12OBDG05B%20Engine%20Diagnostics.pdf
+- GM, *2012 OBD Group Summary*, tableau groupe 5B : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/2012_OBD_GROUP_SUMMARY.pdf
+
+Le catalogue générique SAE a également été complété pour les codes d'actionnement et de corrélation d'arbres à cames manquants (P0013, P0017–P0019, P0020–P0021, P0023–P0024) ainsi que les circuits de chauffage de sondes P0030, P0036 et P0050. Ces libellés sont normalisés SAE ; les critères GM détaillés ne sont affichés que lorsqu'une entrée d'évidence dédiée existe.
+
+Le catalogue d'interprétations LFX FR/EN couvre désormais également les quatre circuits d'actionneurs P0010/P0013/P0020/P0023 et les quatre défauts de performance de déphasage P0011/P0014/P0021/P0024. Les causes restent présentées comme pistes à vérifier ; aucun de ces codes ne déclenche un remplacement automatique de pièce.
+
+Les critères GM 2012 du chauffage des sondes à oxygène ont aussi été intégrés pour P0030, P0036 et P0050 (surveillance électrique du driver) ainsi que P0053, P0054, P0059 et P0060 (résistance du chauffage hors plage 6,1–13,4 Ω). Les quatre derniers moniteurs sont exécutés lors d'un démarrage à froid valide ; l'application affiche cette condition au lieu de présenter le test comme actif en permanence.
+
+La couverture de surveillance GM a été étendue aux mesures d'air et aux corrections carburant : P0101, P0102, P0103, P0128, P0171, P0172, P0174 et P0175. Les critères distinguent les fréquences MAF, les conditions de montée en température, les corrections LTFT/STFT et les tests EVAP intrusifs de purge associés aux défauts de richesse. Les seuils de correction sont conservés sous leur forme de métriques calibrées GM et ne sont pas convertis abusivement en pourcentages génériques.
+
+La surveillance de l'injection directe est maintenant documentée pour P0089 (limites d'autorité de commande de pompe haute pression), P0191 (cohérence du capteur de pression de rampe) et P00C6 (montée en pression pendant le démarrage). P00C6 est volontairement limité au millésime 2012 dans le catalogue détaillé tant que les groupes de certification des années suivantes n'ont pas été vérifiés.
+
+
+## Données de surveillance GM – Camaro LFX 2013 et 2014
+
+La couverture LFX ne réutilise plus les seuils 2012 pour les années suivantes. Deux documents GM distincts ont été vérifiés :
+- 2013 : groupe OBD 5A, RPO LFX, Camaro, dossier 13OBDG05A Engine Diagnostics.
+- 2014 : groupe OBD 6A, RPO LFX, Camaro, dossier 14OBDG06A Engine Diagnostics.
+
+Le catalogue Gm2013And2014LfxMonitorCatalog ajoute 12 moniteurs de distribution (P0010, P0011, P0013, P0014, P0016, P0017, P0018, P0019, P0020, P0021, P0023, P0024). Les seuils de performance des arbres à cames sont de 50/150 échantillons pour P0011/P0021 et de 100/300 pour P0014/P0024 ; ils sont distincts de ceux du dossier 2012. Les seuils de corrélation P0016–P0019 sont également ceux du groupe 2013/2014, avec les conditions du diagnostic de pignon intermédiaire.
+
+Références primaires :
+- GM, 2013 OBD Group Summary : https://gsi.ext.gm.com/gmspo/mode6/pdf/2013/2013%20OBD%20GROUP%20SUMMARY.pdf
+- GM, 13OBDG05A Engine Diagnostics : https://gsi.ext.gm.com/gmspo/mode6/pdf/2013/13OBDG05A%20Engine%20Diagnostics.pdf
+- GM, 2014 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/2014%20OBD%20GROUP%20SUMMARY.pdf
+- GM, 14OBDG06A Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/14OBDG06A%20Engine%20Diagnostics.pdf
+
+Ces données restent limitées aux profils LFX 2013 et 2014. Le résumé GM 2015 confirme désormais l'association du Camaro LFX (transmissions MYB/MV5) au groupe 6 et au dossier moteur 15OBDG06 ; le registre expose cette provenance. Les critères de surveillance 2015 ne sont toutefois pas intégrés : aucun seuil 2013/2014 n'est extrapolé au LFX 2015 tant que le dossier moteur 15OBDG06 n'a pas été extrait et vérifié. Références primaires : GM, 2015 OBD Group Summary, page 2 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2015/2015%20OBD%20GROUP%20SUMMARY.pdf ; GM, 15OBDG06 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2015/15OBDG06%20Engine%20Diagnostics.pdf.
+
+
+## Données de surveillance GM – Camaro LLT 2010 et 2011
+
+Les profils LLT sont désormais associés à leurs propres dossiers de certification, sans reprendre les seuils LFX :
+- 2010 Camaro 3.6L LLT : groupe OBD 2, dossier 10OBDG02 Engine Diagnostics.
+- 2011 Camaro 3.6L LLT : groupe OBD 6 SIDI, dossier 11OBDG06 Engine Diagnostics.
+
+Pour chaque année, 18 moniteurs moteur sont disponibles : P0008/P0009 (pignons intermédiaires), P000A–P000D (réponse lente des arbres à cames), P0010/P0013/P0020/P0023 (circuits d'actionneurs), P0011/P0014/P0021/P0024 (cohérence du déphasage) et P0016–P0019 (alignement vilebrequin/arbre à cames).
+
+Les paramètres restent strictement annuels : par exemple, le seuil de réponse lente et les critères de cohérence des arbres à cames ne sont pas identiques entre 2010 et 2011. L'application affiche le dossier GM correspondant au millésime.
+
+Références primaires :
+- GM, 2010 OBD Grouping Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2010/2010%20OBD%20Grouping%20Summary.pdf
+- GM, 10OBDG02 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2010/10OBDG02%20Engine%20Diagnostics.pdf
+- GM, 2011 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/2011%20OBD%20GROUP%20SUMMARY.pdf
+- GM, 11OBDG06 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/11OBDG06%20Engine%20Diagnostics.pdf
+
+Les paramètres ci-dessus décrivent les moniteurs de certification OBD. Ils ne remplacent pas les arbres de diagnostic de réparation SI ni la validation par VIN/CAL ID.
+
+Le catalogue d'interprétations FR/EN LLT 2010–2011 couvre maintenant les 18 codes moteur de surveillance de distribution listés dans les dossiers GM 10OBDG02 et 11OBDG06 : P0008/P0009, P000A–P000D, P0010/P0011/P0013/P0014, P0016–P0019 et P0020/P0021/P0023/P0024. Les causes sont des pistes de diagnostic, pas une condamnation automatique d'une pièce.
+
+
+## Données de surveillance GM – V8 Camaro 2010 et 2011
+
+Les moteurs V8 sont maintenant séparés par RPO et architecture :
+- L99 6.2L automatique : VVT et AFM ; moniteurs VVT P0010, P0011, P0013, P0014 et corrélation P0016/P0017.
+- LS3 6.2L manuel : pas de VVT d'origine ; seuls les moniteurs de corrélation P0016/P0017 sont exposés dans cette première extraction.
+
+Les groupes GM sont 10OBDG12 pour 2010 et 11OBDG07 pour 2011. Les critères de surveillance et seuils d'alimentation sont propres à chaque année ; les seuils de position d'arbre à cames issus des tables de calibration ne sont pas remplacés par une valeur inventée.
+
+Références primaires :
+- GM, 2010 OBD Grouping Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2010/2010%20OBD%20Grouping%20Summary.pdf
+- GM, 10OBDG12 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2010/10OBDG12%20Engine%20Diagnostics.pdf
+- GM, 2011 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/2011%20OBD%20GROUP%20SUMMARY.pdf
+- GM, 11OBDG07 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2011/11OBDG07%20Engine%20Diagnostics.pdf
+
+Le LS3 et le L99 partagent une base mécanique mais pas l'équipement VVT/AFM. Le catalogue n'affiche donc pas P0010/P0011/P0013/P0014 sur un LS3 d'origine.
+
+
+## Données GM 2012 – V8 L99, LS3 et LSA
+
+Le dossier de certification 12OBDG07 couvre les Camaro 2012 équipées des RPO L99, LS3 et LSA. Les catalogues distinguent les équipements :
+- L99 automatique : VVT ; P0010/P0011/P0013/P0014 et P0016.
+- LS3 manuel : pas de VVT ; P0016 uniquement parmi les moniteurs de distribution.
+- LSA suralimenté : pas de VVT d'origine ; P0016 et modèle MAF suralimenté.
+
+Les trois profils utilisent les moniteurs de chauffage des sondes à oxygène du groupe 12OBDG07. Les plages de résistance sont propres à la position : 2,8–9,5 Ω pour les sondes 1 et 4,1–10,8 Ω pour les sondes 2. Le seuil MAF est également distinct : atmosphérique (12 g/s et 15 kPa) contre LSA suralimenté (21 g/s et 22 kPa, avec critères MAP/SCIAP supplémentaires).
+
+Références primaires :
+- GM, 2012 OBD Group Summary : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/2012%20OBD_GROUP_SUMMARY.pdf
+- GM, 12OBDG07 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2012/12OBDG07%20Engine%20Diagnostics.pdf
+- GM Service Information, Camaro V8 2012 P0016 : https://charm.li/Chevrolet/2012/Camaro%20V8-6.2L/Repair%20and%20Diagnosis/A%20L%20L%20%20Diagnostic%20Trouble%20Codes%20%28%20DTC%20%29/Testing%20and%20Inspection/P%20Code%20Charts/P0016/
+- GM Service Information, Camaro V8 2011 P0011 (L99 VVT) : https://charm.li/Chevrolet/2011/Camaro%20V8-6.2L/Repair%20and%20Diagnosis/A%20L%20L%20%20Diagnostic%20Trouble%20Codes%20%28%20DTC%20%29/Testing%20and%20Inspection/P%20Code%20Charts/P0011/
+
+Les codes P0017 et autres défauts de VVT ne sont pas proposés aux V8 à arbre à cames unique sans preuve d'applicabilité.
+
+
+## Groupe de certification V8 Camaro 2013 – association documentaire
+
+Le résumé GM 2013 associe les Camaro L99, LS3 et LSA au groupe 7 et au dossier moteur identifié `13OBDG07`. Cette provenance est exposée par `GmV8MonitorCatalog.sourceLabel` sans réutiliser les seuils 2012. Les moniteurs extraits couvrent P0101, P0102 (circuit MAF bas, page ECM 10 ; seuil ≤1 400 Hz, environ 0,90 g/s ; liste complète des prérequis inhibiteurs encore à transcrire), P0103 (circuit MAF haute fréquence, page ECM 11 ; seuil ≥14 500 Hz, environ 1 037,5 g/s) et les chauffages de sondes O2 P0030, P0036, P0050, P0056, P0053, P0054, P0059 et P0060 ; le LSA dispose également de P0033 (circuit de dérivation du compresseur, page ECM 2), de P006D (corrélation BARO/pression d'entrée du compresseur, page ECM 5 ; seuil 25,0 kPa jusqu'à 0,01 mile depuis la dernière estimation BARO, puis 15,0 kPa au-delà) et de P0097/P0098 (circuits IAT2, page ECM 5 ; seuils de résistance 45 ohms et 420 000 ohms). Pour P0101 : seuil MAF supérieur à 16 g/s pour les applications atmosphériques (L99/LS3, page ECM 9) et supérieur à 21 g/s pour l'application suralimentée (LSA, page ECM 10). Les moniteurs O2 sont référencés aux pages ECM 2 à 4. Les autres critères 2013 restent à extraire et vérifier avant d'être exposés.
+
+Références GM primaires :
+- 2013 OBD Group Summary, page 2 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2013/2013%20OBD%20GROUP%20SUMMARY.pdf.
+- 13OBDG07 Engine Diagnostics (305 pages, ECM section) : https://gsi.ext.gm.com/gmspo/mode6/pdf/2013/13OBDG07%20Engine%20Diagnostics.pdf.
+- 2014 14OBDG07 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/14OBDG07%20Engine%20Diagnostics.pdf (accès GM Service Information requis).
+- 2015 15OBDG07 Engine Diagnostics : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2015/15OBDG07%20Engine%20Diagnostics.pdf (accès GM Service Information requis).
+
+## Groupes de certification V8 Camaro 2014–2015 – association documentaire
+
+Les résumés GM des groupes OBD confirment les associations suivantes pour le groupe 7 :
+- 2014 : L99 Camaro, LSA Camaro, LS3 Camaro et LS7 Camaro → `14OBDG07`.
+- 2015 : L99 Camaro, LSA Camaro, LS3 Camaro et LS7 Camaro → `15OBDG07`.
+
+Ces associations sont enregistrées dans `GmV8MonitorCatalog.sourceLabel`, y compris pour le LS7. Elles attestent uniquement du dossier de certification à consulter : elles ne constituent pas des définitions DTC. Aucun moniteur LS7 2014–2015 n'est exposé tant que les critères du dossier moteur correspondant n'ont pas été extraits et vérifiés. Les résultats de groupe ne sont pas extrapolés aux années 2010–2013.
+
+Références GM primaires :
+- 2014 OBD Group Summary, groupe 7 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2014/2014%20OBD%20GROUP%20SUMMARY.pdf
+- 2015 OBD Group Summary, groupe 7 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2015/2015_OBD_GROUP_SUMMARY.pdf
+
+
+## Groupes de certification Gen 6 – Camaro 2016 et 2017
+
+Les résumés GM permettent d'associer les premières motorisations Gen 6 à leurs dossiers de certification :
+- 2016 : LTG Camaro → `16OBDG03` ; LGX Camaro → `16OBDG05` ; LT1 Camaro → `16OBDG07A`.
+- 2017 : LTG, LGX, LT1 et LT4 Camaro → `17OBDG03`.
+- 2018 : LTG, LGX, LT1 et LT4 Camaro → `18OBDG03A`.
+- 2019 : LT1 et LT4 Camaro → `19OBDG03A` (le dossier LT4 contient la section ECM dédiée Camaro) ; LTG et LGX Camaro → `19OBDG03B`.
+- 2020 : LTG, LGX, LT1 et LT4 Camaro → `20OBDG03A`.
+- 2021 : LTG → `21OBDG03A` ; LGX, LT1 et LT4 → `21OBDG03B`.
+- 2022 : LTG → `22OBDG03A` ; LGX, LT1 et LT4 → `22OBDG03B`.
+- 2023 : LTG → `23OBDG03A Part2` ; LGX, LT1 et LT4 → `23OBDG03B`.
+- 2024 : LGX, LT1 et LT4 → `24OBDG03B Part 2` ; le LTG n'est pas présent dans la matrice Camaro consultée.
+
+`GmGen6MonitorCatalog` expose ces références dans le registre commun. Le LT4 n'est pas associé à une Camaro 2016 dans le résumé GM consulté ; son premier groupe Camaro est documenté ici en 2017. Ces libellés sont des références de certification uniquement : leur seule présence n'active aucune définition détaillée, aucun seuil de surveillance ni procédure de réparation Gen 6. Exception strictement limitée au LT4 Camaro 2019 : `Gm2019Lt4MonitorCatalog` intègre P0196, P0197 et P0198 à partir de la section GM « ECM Unique (LT4 Camaro) » (pages documentaires 603–608). P0196 regroupe les tests EOT à froid, de montée en température et continu, avec seuils issus des tables de soutien ; P0197 utilise une résistance de circuit inférieure à 25 Ω et P0198 supérieure à 450 000 Ω. Les trois entrées restent des moniteurs de certification, pas des arbres de réparation SI. Les associations sont propres à chaque millésime et moteur ; aucune référence n'est extrapolée aux configurations non listées.
+
+Références GM primaires :
+- 2016 OBD Group Summary, pages 2–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2016/2016_OBD_GROUP_SUMMARY.pdf
+- 2017 OBD Group Summary, pages 2–5 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2017/2017_OBD_GROUP_SUMMARY.pdf
+- 2018 OBD Group Summary, pages 1–4 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2018/2018_OBD_GROUP_SUMMARY.pdf
+- 2019 19OBDG03A Diagnostics (Camaro LT1/LT4) : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03A%20Diagnostics.pdf
+- 2019 19OBDG03B Diagnostics (Camaro LTG/LGX) : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03B%20Diagnostics.pdf
+- 2020 OBD Group Summary, pages 1–2 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2020/2020_OBD_GROUP_SUMMARY.pdf
+- 2021 OBD Group Summary, pages 1–3 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2021/2021_OBD_GROUP_SUMMARY.pdf
+- 2022 OBD Group Summary, pages 1–2 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2022/2022_OBD_GROUP_SUMMARY.pdf
+- 2023 OBD Group Summary, pages 1–2 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2023/2023_OBD_GROUP_SUMMARY.pdf
+- 2024 Engine & Transmission Diagnostic Parameter File Matrix, pages 1–2 : https://gsi.ext.gm.com/gmspo/mode6/pdf/2024/2024%20Engine%20%26%20Transmission%20Diagnostic%20Parameter%20File%20Matrix.pdf
+
+
+Référence primaire 2019 :
+- GM, 19OBDG03A Diagnostics, tables ECM communes et section « ECM Unique (LT4 Camaro) », notamment pages documentaires 1–10 et 603–608 : https://gsitlc.ext.gm.com/gmspo/mode6/pdf/2019/19OBDG03A%20Diagnostics.pdf
+
+## Politique de recherche et de qualification des connaissances DTC
+
+La disponibilité d'une documentation officielle GM n'est **pas un prérequis** au développement des catalogues. CamaroDiag s'appuie en priorité sur les informations publiques accessibles sur Internet : bases de données DTC indépendantes, documentation technique de réparateurs, publications de spécialistes, forums Camaro/GM, retours d'expérience de propriétaires, dépôts communautaires et captures de diagnostic partageables.
+
+Les sources sont enregistrées avec leur URL ou leur référence précise, leur date de consultation, leur auteur/éditeur lorsqu'il est identifiable, le véhicule concerné et le périmètre réellement couvert. Les sources copiées les unes des autres ne comptent pas comme corroborations indépendantes.
+
+### Niveaux de confiance à afficher
+
+- **Normalisé** : libellé SAE/OBD générique. Il décrit le code, pas la cause propre à GM.
+- **Documenté par sources indépendantes** : explication recoupée par au moins deux sources indépendantes et cohérentes sur le code, le calculateur et l'application véhicule.
+- **Corroboré sur véhicule** : observation accompagnée d'une identification suffisamment précise du véhicule et du calculateur, avec résultat reproductible ou éléments de mesure.
+- **Piste communautaire** : information issue d'une source unique, d'un forum ou d'un retour propriétaire non recoupé. Elle peut être affichée comme hypothèse, jamais comme diagnostic certain.
+- **Inconnu / contradictoire** : données insuffisantes, incompatibles ou contradictoires ; afficher le DTC brut et les informations génériques seulement.
+
+### Règles de collecte et d'interprétation
+
+1. Rechercher chaque code sur plusieurs sources et conserver les liens, citations courtes/références, dates et contexte véhicule.
+2. Vérifier le millésime, génération, moteur/RPO, transmission, marché, calculateur, matériel et calibration lorsque ces informations sont disponibles. Ne pas étendre une observation à toute une génération sans preuve.
+3. Distinguer systématiquement le sens normalisé du DTC, le mécanisme de surveillance, les causes possibles, les contrôles recommandés et les réparations rapportées.
+4. Recouper les causes et procédures. Une réparation rapportée comme efficace par un propriétaire n'est pas une procédure universelle.
+5. Conserver les divergences entre sources et les limites d'applicabilité. Ne pas choisir arbitrairement une version.
+6. Donner la priorité aux informations techniques détaillées et reproductibles, sans considérer automatiquement un forum ou une base payante comme exacts.
+7. Respecter les licences, conditions d'utilisation et droits d'auteur : stocker des synthèses originales et des références, pas recopier des pages ou bases complètes.
+8. En l'absence de source officielle, ne jamais fabriquer une attribution GM. Présenter l'information comme issue de sources indépendantes ou communautaires.
+9. Les procédures touchant à la sécurité, aux airbags, à l'antidémarrage, aux actionneurs, à la programmation ou à l'effacement doivent conserver des garde-fous spécifiques ; une source communautaire isolée ne suffit jamais à autoriser une commande.
+
+Les sources de code sont représentées dans `DtcDefinitionSource` par des catégories distinctes : `INDEPENDENT_TECHNICAL_PUBLICATION`, `SPECIALIST_REPAIR_DATABASE`, `COMMUNITY_DATABASE`, `TECHNICAL_FORUM`, `OWNER_REPAIR_REPORT` et `VEHICLE_VALIDATED_CAPTURE`. Les catégories `GM_SERVICE_INFORMATION` et `GM_BULLETIN` restent possibles si une référence publique apparaît, mais ne sont plus des conditions de progression ou de complétude.
+
+**Critère d'acceptation :** chaque explication spécifique à un véhicule doit exposer son niveau de confiance et ses sources. Les données non corroborées restent identifiées comme hypothèses ; aucune cause, compatibilité ou réparation ne doit être présentée comme certaine sur la seule base du code DTC.
+
+
+### Qualification technique des sources indépendantes (implémentation)
+
+Le registre distingue désormais l'évaluation des sources indépendantes de la qualification OEM :
+- seules les références HTTP(S) traçables, avec éditeur, groupe d'indépendance, millésimes, RPO et calculateur explicitement renseignés, sont retenues ;
+- plusieurs reprises d'une même publication partageant le même groupe d'indépendance ne comptent que pour une seule source ;
+- une source applicable donne le niveau « source indépendante unique » ; au moins deux groupes indépendants donnent « sources indépendantes corroborées » ;
+- une capture/réparation associée à un VIN valide identique au véhicule courant peut être signalée « validée sur ce véhicule » ;
+- les références hors périmètre, sans URL, sans éditeur ou sans groupe d'indépendance sont exclues de l'évaluation ;
+- même corroborées, ces sources ne peuvent jamais être qualifiées de définition OEM : elles restent affichables uniquement avec leur niveau de confiance communautaire.
+
+Cette évaluation est ajoutée au modèle métier et couverte par des tests unitaires. Son raccordement à l'écran de détail DTC et à l'alimentation réelle des catalogues reste un travail distinct.

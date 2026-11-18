@@ -16,6 +16,9 @@ class CamaroCalibrationCatalogTest {
     fun catalogueContainsEveryGen5AndGen6EngineProfile() {
         assertEquals(CamaroEngine.entries.toSet(), CamaroCalibrationCatalog.profiles.map { it.engine }.toSet())
         assertEquals(10, CamaroCalibrationCatalog.profiles.size)
+        CamaroCalibrationCatalog.profiles.forEach { profile ->
+            assertEquals(profile.engine.years, profile.modelYears)
+        }
     }
 
     @Test
@@ -44,7 +47,9 @@ class CamaroCalibrationCatalogTest {
         )
         assertTrue(2016 in CamaroEngine.LTG.years)
         assertTrue(2020 in CamaroEngine.LTG.years)
-        assertFalse(2021 in CamaroEngine.LTG.years)
+        assertTrue(2021 in CamaroEngine.LTG.years)
+        assertTrue(2023 in CamaroEngine.LTG.years)
+        assertFalse(2024 in CamaroEngine.LTG.years)
     }
 
     @Test
@@ -52,12 +57,22 @@ class CamaroCalibrationCatalogTest {
         val valid = CamaroCalibrationCatalog.forVehicle(
             VehicleProfile(modelYear = 2018, engine = CamaroEngine.LTG)
         )
-        val invalid = CamaroCalibrationCatalog.forVehicle(
+        val valid2022 = CamaroCalibrationCatalog.forVehicle(
             VehicleProfile(modelYear = 2022, engine = CamaroEngine.LTG)
+        )
+        val valid2023 = CamaroCalibrationCatalog.forVehicle(
+            VehicleProfile(modelYear = 2023, engine = CamaroEngine.LTG)
+        )
+        val invalid = CamaroCalibrationCatalog.forVehicle(
+            VehicleProfile(modelYear = 2024, engine = CamaroEngine.LTG)
         )
 
         assertNotNull(valid)
+        assertNotNull(valid2022)
+        assertNotNull(valid2023)
         assertEquals("GM E80 (RPO LTG)", valid?.nominalControllerFamily)
+        assertEquals("GM E80 (RPO LTG)", valid2022?.nominalControllerFamily)
+        assertEquals("GM E80 (RPO LTG)", valid2023?.nominalControllerFamily)
         assertNull(invalid)
     }
 

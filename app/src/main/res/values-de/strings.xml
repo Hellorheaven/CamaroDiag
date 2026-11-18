@@ -102,7 +102,7 @@
     <string name="dtc_title">Diagnosefehlercodes</string>
     <string name="dtc_scan">Scannen</string>
     <string name="dtc_clear">Löschen</string>
-    <string name="dtc_clear_warning">Das Löschen mit Modus 04 entfernt emissionsbezogene Fehlercodes und setzt einige Bereitschaftsmonitore zurück. Speichere den Bericht, bevor du fortfährst.</string>
+    <string name="dtc_clear_warning">Das Löschen mit Modus 04 entfernt emissionsbezogene Fehlercodes und setzt einige Bereitschaftsmonitore zurück. Speichere den Bericht, bevor du fortfährst. Modus 04 löscht keine erweiterten Fehlercodes, die in anderen Fahrzeugsteuergeräten gespeichert sind.</string>
     <string name="dtc_none_returned">Der letzte Scan hat keine Fehlercodes zurückgegeben.</string>
     <string name="dtc_confirm_clear">Löschen der Fehlercodes bestätigen?</string>
     <string name="dtc_clear_description">Dadurch wird OBD-Modus 04 an das Steuergerät gesendet. Bereitschaftsdaten können zurückgesetzt werden. Die Fehlerursache wird dadurch nicht behoben.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8 mit AFM und Automatikgetriebe. Keine LS3-Kalibrierung wiederverwenden; RPO, Getriebe und Steuergerätekennungen prüfen.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 LSA V8 mit Kompressor. Kalibrierung für Kompressor, Kraftstoff, Markt und Softwareversion prüfen.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8. Eigenständiges Profil gegenüber LS3/L99 trotz gleicher nomineller Steuergerätefamilie; Softwareidentifikation ist zwingend.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (Abdeckungszeitraum 2016–2020). GM-Bulletin PIP5313B nennt E80 für Camaro LTG 2016–2017; spätere Jahre anhand Teilenummer und CAL ID prüfen.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (Abdeckungszeitraum 2016–2023). GM-Bulletin PIP5313B nennt E80 für Camaro LTG 2016–2017; spätere Jahre anhand Teilenummer und CAL ID prüfen.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6. Das Profil kann je nach Jahr, Markt und Version variieren; vor dem Laden einer Kennfelddefinition das tatsächliche Steuergerät und CVN bestätigen.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 LT1 V8 ohne Aufladung. Kalibrierungsrevisionen anhand CAL ID/CVN, Modelljahr, Markt, Getriebe und Hardware-Nummern unterscheiden.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 LT4 V8 mit Kompressor. Nicht mit LT1 vermischen; Teilenummern und kalibrierungsspezifische Ladedruckdaten überprüfen.</string>
@@ -555,4 +555,20 @@
     <string name="trace_error_csv_empty">Der CSV-Trace ist leer.</string>
     <string name="trace_error_csv_columns">Die CSV-Datei benötigt eine CAN-ID- und eine Daten-/Payload-Spalte oder data0…data15-Spalten.</string>
     <string name="trace_error_generic">Der Trace enthält einen ungültigen oder nicht unterstützten Datensatz.</string>
+    <string name="dtc_vehicle_interpretation">Fahrzeugspezifische Interpretation</string>
+    <string name="dtc_severity">Schweregrad</string>
+    <string name="dtc_possible_causes">Mögliche Ursachen (nicht bestätigt)</string>
+    <string name="dtc_recommended_checks">Empfohlene Prüfungen</string>
+    <string name="dtc_vehicle_specific_not_documented">Für diesen Code und diese Fahrzeugkonfiguration ist noch keine fahrzeugspezifische Diagnose dokumentiert. Die OEM/SAE-Beschreibung steht oben; VIN und Steuergerät anhand der GM-Serviceinformationen prüfen.</string>
+    <string name="dtc_desc_p0016">Kurbelwellenposition – Einlassnockenwellenposition unplausibel (Bank 1)</string>
+    <string name="dtc_desc_p0017">Kurbelwellenposition – Auslassnockenwellenposition unplausibel (Bank 1)</string>
+    <string name="dtc_desc_p0018">Kurbelwellenposition – Einlassnockenwellenposition unplausibel (Bank 2)</string>
+    <string name="dtc_desc_p0019">Kurbelwellenposition – Auslassnockenwellenposition unplausibel (Bank 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Die folgenden Interpretationen und Schwellenwerte sind Referenzdaten für den ausgewählten Motor und Modelljahrgang. Die Identität des Steuergeräts (VIN, CAL ID, CVN, Softwarekennung und Hardware-Teilenummer) wurde noch nicht geprüft; diese Daten sind für das angeschlossene Steuergerät nicht validiert.</string>
+    <string name="dtc_gm_monitor_title">GM-Motorüberwachung – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Auslösekriterium: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Aktivierungsbedingungen: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Fehlerzähler / Validierungsrate: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL-Klassifizierung: %1$s</string>
+    <string name="dtc_gm_monitor_source">Quelle: GM %1$s, Seite %2$d</string>
 </resources>

@@ -102,7 +102,7 @@
     <string name="dtc_title">진단 고장 코드</string>
     <string name="dtc_scan">스캔</string>
     <string name="dtc_clear">삭제</string>
-    <string name="dtc_clear_warning">모드 04 삭제는 배출가스 관련 고장 코드를 제거하고 일부 준비 상태 모니터를 초기화합니다. 계속하기 전에 보고서를 저장하세요.</string>
+    <string name="dtc_clear_warning">모드 04 삭제는 배출가스 관련 고장 코드를 제거하고 일부 준비 상태 모니터를 초기화합니다. 계속하기 전에 보고서를 저장하세요. 모드 04는 차량의 다른 제어 모듈에 저장된 확장 DTC를 삭제하지 않습니다. 모드 04는 차량의 다른 제어 모듈에 저장된 확장 DTC를 삭제하지 않습니다.</string>
     <string name="dtc_none_returned">마지막 스캔에서 고장 코드가 반환되지 않았습니다.</string>
     <string name="dtc_confirm_clear">DTC를 삭제하시겠습니까?</string>
     <string name="dtc_clear_description">ECU에 OBD 모드 04를 전송합니다. 준비 상태 데이터가 초기화될 수 있으며 고장의 원인을 수리하는 것은 아닙니다.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8, AFM 및 자동 변속기 사양입니다. LS3 보정을 재사용하지 말고 RPO, 변속기 및 ECU 식별자를 확인하세요.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 슈퍼차저 LSA V8입니다. 슈퍼차저, 연료, 시장 및 소프트웨어 개정에 맞는 보정을 확인하세요.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8입니다. 표시된 제어기 계열이 같더라도 LS3/L99와 별도의 프로필이며 소프트웨어 식별이 필수입니다.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG(지원 범위 2016–2020년). GM 공지 PIP5313B는 2016–2017 Camaro LTG에 E80을 명시합니다. 이후 연식은 부품 번호와 CAL ID로 확인하세요.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG(지원 범위 2016–2023년). GM 공지 PIP5313B는 2016–2017 Camaro LTG에 E80을 명시합니다. 이후 연식은 부품 번호와 CAL ID로 확인하세요.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6입니다. 연식, 시장 및 개정에 따라 프로필이 다를 수 있으므로 테이블 정의를 불러오기 전에 실제 제어기와 CVN을 확인하세요.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 자연흡기 LT1 V8입니다. CAL ID/CVN, 연식, 시장, 변속기 및 하드웨어 번호로 보정 개정을 구분하세요.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 슈퍼차저 LT4 V8입니다. LT1과 혼용하지 말고 부품 번호와 보정별 부스트 데이터를 검증하세요.</string>
@@ -552,4 +552,20 @@
     <string name="trace_error_csv_empty">CSV 트레이스가 비어 있습니다.</string>
     <string name="trace_error_csv_columns">CSV에는 CAN ID 열과 데이터/payload 열 또는 data0…data15 열이 필요합니다.</string>
     <string name="trace_error_generic">트레이스에 잘못되었거나 지원되지 않는 레코드가 있습니다.</string>
+    <string name="dtc_vehicle_interpretation">차량별 해석</string>
+    <string name="dtc_severity">심각도</string>
+    <string name="dtc_possible_causes">가능한 원인(미확인)</string>
+    <string name="dtc_recommended_checks">권장 점검 항목</string>
+    <string name="dtc_vehicle_specific_not_documented">이 코드와 선택한 차량 구성에 대한 전용 진단 절차가 아직 문서화되지 않았습니다. 위의 OEM/SAE 설명을 확인하고 GM 정비 정보에서 VIN과 제어 모듈을 검증하세요.</string>
+    <string name="dtc_desc_p0016">크랭크축 위치와 흡기 캠축 위치 상관관계 이상(뱅크 1)</string>
+    <string name="dtc_desc_p0017">크랭크축 위치와 배기 캠축 위치 상관관계 이상(뱅크 1)</string>
+    <string name="dtc_desc_p0018">크랭크축 위치와 흡기 캠축 위치 상관관계 이상(뱅크 2)</string>
+    <string name="dtc_desc_p0019">크랭크축 위치와 배기 캠축 위치 상관관계 이상(뱅크 2)</string>
+    <string name="dtc_gm_calibration_not_validated">아래 해석과 임계값은 선택한 엔진 및 연식에 대한 참고 자료입니다. ECU 식별 정보(VIN, CAL ID, CVN, 소프트웨어 ID 및 하드웨어 부품 번호)는 아직 확인되지 않았으며, 이 데이터는 연결된 ECU에 대해 검증되지 않았습니다.</string>
+    <string name="dtc_gm_monitor_title">GM 엔진 모니터 – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">고장 판정 기준: %1$s</string>
+    <string name="dtc_gm_monitor_enable">활성화 조건: %1$s</string>
+    <string name="dtc_gm_monitor_failure">고장 카운터 / 판정 빈도: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL 분류: %1$s</string>
+    <string name="dtc_gm_monitor_source">출처: GM %1$s, %2$d페이지</string>
 </resources>

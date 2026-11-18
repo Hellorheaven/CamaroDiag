@@ -102,7 +102,7 @@
     <string name="dtc_title">Códigos de avería</string>
     <string name="dtc_scan">Escanear</string>
     <string name="dtc_clear">Borrar</string>
-    <string name="dtc_clear_warning">El borrado mediante el Modo 04 elimina los códigos de avería relacionados con las emisiones y restablece algunos monitores de preparación. Guarda el informe antes de continuar.</string>
+    <string name="dtc_clear_warning">El borrado mediante el Modo 04 elimina los códigos de avería relacionados con las emisiones y restablece algunos monitores de preparación. Guarda el informe antes de continuar. El Modo 04 no borra los DTC ampliados almacenados por otros módulos del vehículo. El Modo 04 no borra los DTC ampliados almacenados por otros módulos del vehículo.</string>
     <string name="dtc_none_returned">El último escaneo no devolvió códigos de avería.</string>
     <string name="dtc_confirm_clear">¿Confirmar el borrado de los DTC?</string>
     <string name="dtc_clear_description">Esto envía el servicio OBD Modo 04 a la ECU. Los datos de preparación pueden restablecerse. No repara la causa del fallo.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 V8 L99 con AFM y transmisión automática. No reutilices una calibración LS3; verifica RPO, transmisión e identificadores de la ECU.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 V8 LSA sobrealimentado. Verifica la calibración correspondiente al compresor, combustible, mercado y versión de software.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 V8 LS7. Perfil distinto de LS3/L99 aunque la familia nominal de la ECU coincida; la identificación del software es obligatoria.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (cobertura 2016–2020). El boletín GM PIP5313B identifica E80 en Camaro LTG 2016–2017; verifica los años posteriores mediante el número de pieza y el CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (cobertura 2016–2023). El boletín GM PIP5313B identifica E80 en Camaro LTG 2016–2017; verifica los años posteriores mediante el número de pieza y el CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 V6 LGX. El perfil puede variar según el año, mercado y revisión; confirma la ECU real y el CVN antes de cargar una definición de tablas.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 V8 LT1 atmosférico. Distingue las revisiones de calibración por CAL ID/CVN, año, mercado, transmisión y referencias de hardware.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 V8 LT4 sobrealimentado. No mezclar con LT1; valida los números de pieza y los datos de sobrealimentación específicos de la calibración.</string>
@@ -558,4 +558,20 @@
     <string name="trace_error_csv_empty">La traza CSV está vacía.</string>
     <string name="trace_error_csv_columns">El CSV necesita una columna CAN ID y una columna de datos/payload, o columnas data0…data15.</string>
     <string name="trace_error_generic">La traza contiene un registro no válido o no compatible.</string>
+    <string name="dtc_vehicle_interpretation">Interpretación específica del vehículo</string>
+    <string name="dtc_severity">Gravedad</string>
+    <string name="dtc_possible_causes">Posibles causas (no confirmadas)</string>
+    <string name="dtc_recommended_checks">Comprobaciones recomendadas</string>
+    <string name="dtc_vehicle_specific_not_documented">Aún no hay un procedimiento específico documentado para este código y esta configuración. Arriba se muestra la descripción OEM/SAE; verifica el VIN y la unidad de control en la información de servicio GM.</string>
+    <string name="dtc_desc_p0016">Correlación cigüeñal / árbol de levas de admisión no plausible (banco 1)</string>
+    <string name="dtc_desc_p0017">Correlación cigüeñal / árbol de levas de escape no plausible (banco 1)</string>
+    <string name="dtc_desc_p0018">Correlación cigüeñal / árbol de levas de admisión no plausible (banco 2)</string>
+    <string name="dtc_desc_p0019">Correlación cigüeñal / árbol de levas de escape no plausible (banco 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Las interpretaciones y los umbrales siguientes son datos de referencia para el motor y el año del modelo seleccionados. La identidad de la ECU (VIN, CAL ID, CVN, identificador de software y número de pieza de hardware) aún no se ha verificado; estos datos no están validados para la ECU conectada.</string>
+    <string name="dtc_gm_monitor_title">Monitor del motor GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Criterio de activación: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Condiciones de habilitación: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Contador de fallos / frecuencia de validación: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Clasificación MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Fuente: GM %1$s, página %2$d</string>
 </resources>

@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
 import com.camarodiag.gen5.domain.model.CamaroGeneration
+import com.camarodiag.gen5.domain.model.DiagnosticDtc
 import com.camarodiag.gen5.domain.model.VehicleProfile
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -130,19 +131,23 @@ internal class IsoTpChannel(
 
     private suspend fun awaitFlowControl(timeoutMs: Long): Pair<Int, Long> {
         var waits = 0
-        while (waits <= MAX_FLOW_CONTROL_WAIT_FRAMES) {
+        while (true) {
             val frame = awaitFrame(timeoutMs)
             requireFrameLength(frame, 3, "Flow-control frame")
             if ((frame.data[0].toInt() and 0xF0) != 0x30) continue
 
             when (frame.data[0].toInt() and 0x0F) {
                 0x00 -> return (frame.data[1].toInt() and 0xFF) to decodeSeparationTime(frame.data[2].toInt() and 0xFF)
-                0x01 -> waits++
+                0x01 -> {
+                    waits++
+                    if (waits > MAX_FLOW_CONTROL_WAIT_FRAMES) {
+                        throw IsoTpException("ISO-TP flow-control wait limit exceeded.")
+                    }
+                }
                 0x02 -> throw IsoTpException("Remote ECU reported ISO-TP flow-control overflow.")
                 else -> throw IsoTpException("Remote ECU returned an invalid ISO-TP flow-control status.")
             }
         }
-        throw IsoTpException("ISO-TP flow-control wait limit exceeded.")
     }
 
     private suspend fun receivePayload(timeoutMs: Long): ByteArray {
@@ -282,6 +287,10 @@ class UdsReadOnlyClient(
         }
         return response.copyOfRange(2, response.size)
     }
+
+    /** Reads and decodes the ECU's declared DTC format without guessing OEM definitions. */
+    suspend fun readDtcReport(statusMask: Int = 0xFF): UdsDtcReport =
+        UdsDtcDecoder.decodeReadDtcInformation(readDtcInformation(statusMask))
 
     private fun verifyPositiveResponse(response: ByteArray, requestedService: Int) {
         require(response.isNotEmpty()) { "ECU returned an empty UDS response." }
@@ -427,6 +436,13 @@ class ProfiledUdsReadSession private constructor(
 
     suspend fun readDtcInformation(statusMask: Int = 0xFF): ByteArray =
         client.readDtcInformation(statusMask)
+
+    suspend fun readDtcReport(statusMask: Int = 0xFF): UdsDtcReport =
+        client.readDtcReport(statusMask)
+
+    /** Returns ECU-tagged records compatible with the shared diagnostics presentation model. */
+    suspend fun readDiagnosticDtcs(statusMask: Int = 0xFF): List<DiagnosticDtc> =
+        readDtcReport(statusMask).records.map { it.toDiagnosticDtc(profile.moduleId) }
 
     companion object {
         suspend fun open(

@@ -102,7 +102,7 @@
     <string name="dtc_title">诊断故障码</string>
     <string name="dtc_scan">扫描</string>
     <string name="dtc_clear">清除</string>
-    <string name="dtc_clear_warning">模式 04 清除会删除与排放相关的故障码，并重置部分就绪监测器。继续前请保存报告。</string>
+    <string name="dtc_clear_warning">模式 04 清除会删除与排放相关的故障码，并重置部分就绪监测器。继续前请保存报告。 Mode 04 不会清除存储在车辆其他控制模块中的增强型 DTC。 Mode 04 不会清除存储在车辆其他控制模块中的增强型 DTC。</string>
     <string name="dtc_none_returned">上次扫描未返回故障码。</string>
     <string name="dtc_confirm_clear">确认清除 DTC？</string>
     <string name="dtc_clear_description">此操作会向 ECU 发送 OBD Mode 04。就绪状态数据可能被重置，但不会修复故障根因。</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8，配备 AFM 和自动变速箱。不要重复使用 LS3 标定；请核对 RPO、变速箱和 ECU 标识。</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 增压 LSA V8。请核实与机械增压器、燃油、市场和软件版本相关的标定。</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8。尽管控制器系列相同，它仍是不同于 LS3/L99 的配置；必须识别软件版本。</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG（支持年份范围 2016–2020）。GM 通告 PIP5313B 指出 2016–2017 Camaro LTG 使用 E80；后续年份需通过零件号和 CAL ID 核实。</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG（支持年份范围 2016–2023）。GM 通告 PIP5313B 指出 2016–2017 Camaro LTG 使用 E80；后续年份需通过零件号和 CAL ID 核实。</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6。配置可能因年份、市场和版本而异；加载表格定义前，请确认实际控制器和 CVN。</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 自然吸气 LT1 V8。应根据 CAL ID/CVN、年份、市场、变速箱和硬件编号区分标定版本。</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 增压 LT4 V8。不要与 LT1 混用；请验证零件号和该标定专属的增压数据。</string>
@@ -552,4 +552,20 @@
     <string name="trace_error_csv_empty">CSV 跟踪文件为空。</string>
     <string name="trace_error_csv_columns">CSV 必须包含 CAN ID 列和数据/payload 列，或 data0…data15 列。</string>
     <string name="trace_error_generic">跟踪文件包含无效或不支持的记录。</string>
+    <string name="dtc_vehicle_interpretation">针对该车辆的解释</string>
+    <string name="dtc_severity">严重程度</string>
+    <string name="dtc_possible_causes">可能原因（尚未确认）</string>
+    <string name="dtc_recommended_checks">建议检查项目</string>
+    <string name="dtc_vehicle_specific_not_documented">尚无针对该代码和所选车辆配置的专用诊断流程。上方显示的是 OEM/SAE 描述；请根据 GM 维修资料核对 VIN 和控制模块。</string>
+    <string name="dtc_desc_p0016">曲轴位置与进气凸轮轴位置相关性异常（组1）</string>
+    <string name="dtc_desc_p0017">曲轴位置与排气凸轮轴位置相关性异常（组1）</string>
+    <string name="dtc_desc_p0018">曲轴位置与进气凸轮轴位置相关性异常（组2）</string>
+    <string name="dtc_desc_p0019">曲轴位置与排气凸轮轴位置相关性异常（组2）</string>
+    <string name="dtc_gm_calibration_not_validated">以下解释和阈值是针对所选发动机和车型年份的参考数据。尚未核实 ECU 身份信息（VIN、CAL ID、CVN、软件标识和硬件零件号）；这些数据尚未针对已连接的 ECU 验证。</string>
+    <string name="dtc_gm_monitor_title">GM发动机监测 – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">故障判定标准：%1$s</string>
+    <string name="dtc_gm_monitor_enable">启用条件：%1$s</string>
+    <string name="dtc_gm_monitor_failure">故障计数／确认频率：%1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL分类：%1$s</string>
+    <string name="dtc_gm_monitor_source">来源：GM %1$s，第%2$d页</string>
 </resources>

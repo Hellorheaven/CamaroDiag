@@ -102,7 +102,7 @@
     <string name="dtc_title">Codici guasto</string>
     <string name="dtc_scan">Scansiona</string>
     <string name="dtc_clear">Cancella</string>
-    <string name="dtc_clear_warning">La cancellazione con Modalità 04 rimuove i codici guasto relativi alle emissioni e azzera alcuni monitor di readiness. Salva il rapporto prima di continuare.</string>
+    <string name="dtc_clear_warning">La cancellazione con Modalità 04 rimuove i codici guasto relativi alle emissioni e azzera alcuni monitor di readiness. Salva il rapporto prima di continuare. La Modalità 04 non cancella i DTC avanzati memorizzati dalle altre centraline del veicolo. La Modalità 04 non cancella i DTC avanzati memorizzati dalle altre centraline del veicolo.</string>
     <string name="dtc_none_returned">L\'ultima scansione non ha restituito codici guasto.</string>
     <string name="dtc_confirm_clear">Confermare la cancellazione dei DTC?</string>
     <string name="dtc_clear_description">Questa operazione invia il servizio OBD Modalità 04 alla centralina. I dati di readiness potrebbero essere azzerati. Non risolve la causa del guasto.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 V8 L99 con AFM e cambio automatico. Non riutilizzare una calibrazione LS3; verificare RPO, cambio e identificativi della centralina.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 V8 LSA sovralimentato. Verificare la calibrazione relativa a compressore, carburante, mercato e versione software.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 V8 LS7. Profilo distinto da LS3/L99 nonostante la famiglia nominale della centralina; l\'identificazione software è obbligatoria.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (copertura 2016–2020). Il bollettino GM PIP5313B indica E80 per Camaro LTG 2016–2017; verificare gli anni successivi tramite codice ricambio e CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (copertura 2016–2023). Il bollettino GM PIP5313B indica E80 per Camaro LTG 2016–2017; verificare gli anni successivi tramite codice ricambio e CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 V6 LGX. Il profilo può variare in base ad anno, mercato e revisione; confermare la centralina effettiva e il CVN prima di caricare una definizione tabella.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 V8 LT1 aspirato. Distinguere le revisioni di calibrazione tramite CAL ID/CVN, anno, mercato, cambio e codici hardware.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 V8 LT4 sovralimentato. Non confondere con LT1; convalidare i codici ricambio e i dati di sovralimentazione specifici della calibrazione.</string>
@@ -558,4 +558,20 @@
     <string name="trace_error_csv_empty">La traccia CSV è vuota.</string>
     <string name="trace_error_csv_columns">Il CSV deve contenere una colonna CAN ID e una colonna dati/payload oppure le colonne data0…data15.</string>
     <string name="trace_error_generic">La traccia contiene un record non valido o non supportato.</string>
+    <string name="dtc_vehicle_interpretation">Interpretazione specifica del veicolo</string>
+    <string name="dtc_severity">Gravità</string>
+    <string name="dtc_possible_causes">Possibili cause (non confermate)</string>
+    <string name="dtc_recommended_checks">Controlli consigliati</string>
+    <string name="dtc_vehicle_specific_not_documented">Non è ancora documentata una procedura specifica per questo codice e questa configurazione. Sopra è mostrata la descrizione OEM/SAE; verificare VIN e centralina nelle informazioni di servizio GM.</string>
+    <string name="dtc_desc_p0016">Correlazione albero motore / albero a camme di aspirazione non plausibile (banco 1)</string>
+    <string name="dtc_desc_p0017">Correlazione albero motore / albero a camme di scarico non plausibile (banco 1)</string>
+    <string name="dtc_desc_p0018">Correlazione albero motore / albero a camme di aspirazione non plausibile (banco 2)</string>
+    <string name="dtc_desc_p0019">Correlazione albero motore / albero a camme di scarico non plausibile (banco 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Le interpretazioni e le soglie seguenti sono dati di riferimento per il motore e l\'anno modello selezionati. L\'identità della centralina (VIN, CAL ID, CVN, identificativo software e codice hardware) non è ancora stata verificata; questi dati non sono validati per la centralina collegata.</string>
+    <string name="dtc_gm_monitor_title">Monitor motore GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Criterio di attivazione: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Condizioni di abilitazione: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Contatore errori / frequenza di convalida: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Classificazione MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Fonte: GM %1$s, pagina %2$d</string>
 </resources>

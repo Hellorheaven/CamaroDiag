@@ -1,0 +1,715 @@
+package com.camarodiag.gen5.domain.model
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class DtcCatalogRegistryTest {
+    @Test
+    fun registryCoversEveryEngineRpoDeclaredByTheVehicleModel() {
+        assertEquals(CamaroEngine.entries.map { it.rpo }.toSet(), DtcCatalogRegistry.supportedEngineRpos)
+        CamaroEngine.entries.forEach { engine ->
+            val year = engine.years.first
+            val vehicle = VehicleProfile(modelYear = year, engine = engine)
+            val hasDocumentedEngineEvidence = when (engine) {
+                CamaroEngine.LLT, CamaroEngine.LFX -> true
+                CamaroEngine.LS3, CamaroEngine.L99 -> year in 2010..2012
+                CamaroEngine.LSA -> year in 2012..2012
+                else -> false
+            }
+            assertEquals(
+                if (hasDocumentedEngineEvidence) DtcEvidenceStatus.DOCUMENTED
+                else DtcEvidenceStatus.GENERIC_ONLY,
+                DtcCatalogRegistry.evidenceStatus(vehicle, "ECM")
+            )
+        }
+    }
+
+    @Test
+    fun engineProfilesExposeRpoSpecificArchitectureWithoutCrossEngineAssumptions() {
+        val expected = mapOf(
+            "LLT" to Triple(6, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LFX" to Triple(6, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LS3" to Triple(8, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION),
+            "L99" to Triple(8, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION),
+            "LSA" to Triple(8, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.PORT_INJECTION),
+            "LS7" to Triple(8, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.PORT_INJECTION),
+            "LTG" to Triple(4, EngineInductionType.TURBOCHARGED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LGX" to Triple(6, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LT1" to Triple(8, EngineInductionType.NATURALLY_ASPIRATED, EngineFuelSystemType.DIRECT_INJECTION),
+            "LT4" to Triple(8, EngineInductionType.SUPERCHARGED, EngineFuelSystemType.DIRECT_INJECTION)
+        )
+        assertEquals(expected.keys, DtcCatalogRegistry.engineProfiles.keys)
+        assertEquals(2016..2023, CamaroEngine.LTG.years)
+        assertEquals(2016..2023, DtcCatalogRegistry.engineProfiles.getValue("LTG").modelYears)
+        assertEquals(CamaroEngine.LTG.years, DtcCatalogRegistry.engineProfile(CamaroEngine.LTG)?.modelYears)
+        CamaroEngine.entries.forEach { engine ->
+            assertEquals(engine.years, DtcCatalogRegistry.engineProfile(engine)?.modelYears)
+        }
+        expected.forEach { (rpo, architecture) ->
+            val profile = DtcCatalogRegistry.engineProfiles.getValue(rpo)
+            assertEquals(architecture.first, profile.cylinderCount)
+            assertEquals(architecture.second, profile.induction)
+            assertEquals(architecture.third, profile.fuelSystem)
+        }
+    }
+
+    @Test
+    fun moduleInventoryIncludesCoreAndOptionalVehicleSystems() {
+        val ids = DtcCatalogRegistry.moduleFamilies.map { it.id }.toSet()
+        assertTrue(ids.containsAll(setOf("ECM", "PCM", "TCM", "EBCM", "BCM", "IPC", "SDM")))
+        assertTrue(ids.containsAll(setOf("HVAC", "PSCM", "RCDLR", "RADIO", "AMP", "DDM", "PDM", "FPCM", "PARK_ASSIST", "HMI")))
+    }
+
+    @Test
+    fun perModuleCatalogueNeverClaimsUnsupportedOemCoverage() {
+        val lfx = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val lt1 = VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)
+
+        val lfxEcm = DtcCatalogRegistry.catalogueFor("ECM", lfx)
+        val lt1Ecm = DtcCatalogRegistry.catalogueFor("ECM", lt1)
+        val l99_2012Ecm = DtcCatalogRegistry.catalogueFor(
+            "ECM", VehicleProfile(modelYear = 2012, engine = CamaroEngine.L99)
+        )
+        val llt2010Ecm = DtcCatalogRegistry.catalogueFor(
+            "ECM", VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
+        )
+        val lt4_2019Ecm = DtcCatalogRegistry.catalogueFor(
+            "ECM", VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT4)
+        )
+        val impossibleLsa2011Ecm = DtcCatalogRegistry.catalogueFor(
+            "ECM", VehicleProfile(modelYear = 2011, engine = CamaroEngine.LSA)
+        )
+        val ls7_2014Ecm = DtcCatalogRegistry.catalogueFor(
+            "ECM", VehicleProfile(modelYear = 2014, engine = CamaroEngine.LS7)
+        )
+        val lfxAbs = DtcCatalogRegistry.catalogueFor("EBCM", lfx)
+        val unknown = DtcCatalogRegistry.catalogueFor("ECU 7E8", lfx)
+
+        assertTrue(lfxEcm.hasVehicleSpecificDefinitions)
+        assertEquals(DtcEvidenceStatus.DOCUMENTED, lfxEcm.evidenceStatus)
+        assertTrue(lfxEcm.noteEn.contains("Partial"))
+        assertTrue(lfxEcm.noteFr.contains("partielles"))
+        assertTrue(l99_2012Ecm.hasVehicleSpecificDefinitions)
+        assertTrue(llt2010Ecm.hasVehicleSpecificDefinitions)
+        assertTrue(lt4_2019Ecm.hasVehicleSpecificDefinitions)
+        assertFalse(impossibleLsa2011Ecm.hasVehicleSpecificDefinitions)
+        assertFalse(ls7_2014Ecm.hasVehicleSpecificDefinitions)
+        assertFalse(lt1Ecm.hasVehicleSpecificDefinitions)
+        assertEquals(DtcEvidenceStatus.GENERIC_ONLY, lt1Ecm.evidenceStatus)
+        assertFalse(lfxAbs.hasVehicleSpecificDefinitions)
+        assertEquals(DtcEvidenceStatus.GENERIC_ONLY, lfxAbs.evidenceStatus)
+        assertFalse(unknown.hasVehicleSpecificDefinitions)
+        assertEquals(DtcEvidenceStatus.DISCOVERY_REQUIRED, unknown.evidenceStatus)
+        assertTrue(unknown.noteEn.contains("generic SAE description"))
+        assertTrue(unknown.noteFr.contains("SAE générique"))
+    }
+
+    @Test
+    fun genericSaeDescriptionsAreAvailableWithoutClaimingOemSpecificity() {
+        assertNotNull(DtcCatalogRegistry.genericDescription("P0101"))
+        listOf("P0008", "P0009", "P000A", "P000B", "P000C", "P000D", "P0013", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024", "P0030", "P0036", "P0050", "P0053", "P0054", "P0056", "P0059", "P0060").forEach { code ->
+            assertNotNull("Missing generic SAE description for $code", DtcCatalogRegistry.genericDescription(code))
+        }
+        assertNotNull(DtcCatalogRegistry.genericDescription("P0308"))
+        assertEquals(null, DtcCatalogRegistry.genericDescription("B1234"))
+    }
+
+    @Test
+    fun applicabilityWarningsFollowTheSelectedEngineArchitecture() {
+        val lfx = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val lt1 = VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)
+        val ltg = VehicleProfile(modelYear = 2018, engine = CamaroEngine.LTG)
+
+        assertNotNull(CamaroDtcCatalog.applicabilityNotice("P0308", lfx))
+        assertEquals(null, CamaroDtcCatalog.applicabilityNotice("P0308", lt1))
+        assertNotNull(CamaroDtcCatalog.applicabilityNotice("P0299", lfx))
+        assertEquals(null, CamaroDtcCatalog.applicabilityNotice("P0299", ltg))
+    }
+
+    @Test
+    fun gm2012V8MonitorDataSeparatesL99Ls3AndLsaHardware() {
+        val l99 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.L99)
+        val ls3 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LS3)
+        val lsa = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LSA)
+
+        assertNotNull(GmEngineMonitorCatalog.find("P0011", l99))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", ls3))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", lsa))
+        assertNotNull(GmEngineMonitorCatalog.find("P0016", ls3))
+        assertTrue(GmEngineMonitorCatalog.find("P0053", l99)?.malfunctionCriteriaEn?.contains("2.8") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0054", l99)?.malfunctionCriteriaEn?.contains("4.1") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0101", ls3)?.malfunctionCriteriaEn?.contains("12 g/s") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0101", lsa)?.malfunctionCriteriaEn?.contains("21 g/s") == true)
+        assertEquals("12OBDG07", GmEngineMonitorCatalog.sourceLabel(lsa))
+        assertEquals(14, Gm2012L99MonitorCatalog.supportedCodes().size)
+        assertEquals(10, Gm2012Ls3MonitorCatalog.supportedCodes().size)
+        assertEquals(10, Gm2012LsaMonitorCatalog.supportedCodes().size)
+        assertNotNull(CamaroDtcCatalog.find("P0056", l99))
+        assertEquals(null, CamaroDtcCatalog.find("P0017", ls3))
+        listOf(l99, ls3, lsa).forEach { profile ->
+            assertTrue(CamaroDtcCatalog.coverageNotice(profile).first.contains("V8 Gen 5 2012"))
+        }
+    }
+
+    @Test
+    fun v8DtcAndMonitorCatalogsRespectL99VvtVersusLs3NonVvtArchitecture() {
+        val l99_2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.L99)
+        val l99_2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.L99)
+        val ls3_2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LS3)
+        val ls3_2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LS3)
+        val l99_2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.L99)
+
+        listOf("P0010", "P0011", "P0013", "P0014", "P0016").forEach { code ->
+            assertNotNull("Missing L99 interpretation for $code", CamaroDtcCatalog.find(code, l99_2010))
+            assertNotNull("Missing L99 monitor for $code", GmEngineMonitorCatalog.find(code, l99_2010))
+        }
+        listOf("P0016").forEach { code ->
+            assertNotNull("Missing LS3 correlation interpretation for $code", CamaroDtcCatalog.find(code, ls3_2010))
+            assertNotNull("Missing LS3 correlation monitor for $code", GmEngineMonitorCatalog.find(code, ls3_2011))
+        }
+        listOf("P0010", "P0011", "P0013", "P0014").forEach { code ->
+            assertEquals(null, CamaroDtcCatalog.find(code, ls3_2010))
+            assertEquals(null, GmEngineMonitorCatalog.find(code, ls3_2011))
+        }
+        assertEquals("10OBDG12", GmEngineMonitorCatalog.sourceLabel(l99_2010))
+        assertEquals("11OBDG07", GmEngineMonitorCatalog.sourceLabel(ls3_2011))
+        assertNotNull("2012 L99 retains its VVT monitor", GmEngineMonitorCatalog.find("P0011", l99_2012))
+        assertEquals(5, GmL99MonitorCatalog.supportedCodes().size)
+        assertEquals(1, GmLs3MonitorCatalog.supportedCodes().size)
+    }
+
+    @Test
+    fun gm2014And2015V8SourceGroupsIncludeLs7WithoutInventingMonitorData() {
+        val v8Engines = listOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA, CamaroEngine.LS7)
+        listOf(CamaroEngine.L99, CamaroEngine.LS3, CamaroEngine.LSA).forEach { engine ->
+            assertEquals(
+                "13OBDG07",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2013, engine = engine))
+            )
+        }
+
+        v8Engines.forEach { engine ->
+            assertEquals(
+                "14OBDG07",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2014, engine = engine))
+            )
+            assertEquals(
+                "15OBDG07",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2015, engine = engine))
+            )
+        }
+
+        // The group summary establishes the certification file association,
+        // but no LS7-specific monitor evidence has been integrated yet.
+        assertEquals(
+            null,
+            GmEngineMonitorCatalog.find("P0016", VehicleProfile(modelYear = 2014, engine = CamaroEngine.LS7))
+        )
+        assertEquals(
+            null,
+            GmEngineMonitorCatalog.find("P0016", VehicleProfile(modelYear = 2015, engine = CamaroEngine.LS7))
+        )
+    }
+
+    @Test
+    fun gm2013V8MafMonitorUsesSeparateNaturallyAspiratedAndSuperchargedThresholds() {
+        val l99 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.L99)
+        val ls3 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LS3)
+        val lsa = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LSA)
+        val ls7 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LS7)
+
+        assertTrue(GmEngineMonitorCatalog.find("P0101", l99)?.malfunctionCriteriaEn?.contains("16 g/s") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0101", ls3)?.malfunctionCriteriaEn?.contains("16 g/s") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0101", lsa)?.malfunctionCriteriaEn?.contains("21 g/s") == true)
+        assertEquals(9, GmEngineMonitorCatalog.find("P0101", l99)?.sourcePage)
+        assertEquals(10, GmEngineMonitorCatalog.find("P0101", lsa)?.sourcePage)
+        assertEquals(2, GmEngineMonitorCatalog.find("P0030", l99)?.sourcePage)
+        assertEquals(3, GmEngineMonitorCatalog.find("P0053", lsa)?.sourcePage)
+        assertEquals(4, GmEngineMonitorCatalog.find("P0059", ls3)?.sourcePage)
+        assertEquals(11, Gm2013V8MonitorCatalog.supportedCodes(l99).size)
+        assertEquals(15, Gm2013V8MonitorCatalog.supportedCodes(lsa).size)
+        assertEquals(10, GmEngineMonitorCatalog.find("P0102", l99)?.sourcePage)
+        assertTrue(GmEngineMonitorCatalog.find("P0102", ls3)?.malfunctionCriteriaEn?.contains("1,400 Hz") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0102", lsa)?.malfunctionCriteriaEn?.contains("1,400 Hz") == true)
+        assertEquals(11, GmEngineMonitorCatalog.find("P0103", l99)?.sourcePage)
+        assertTrue(GmEngineMonitorCatalog.find("P0103", ls3)?.malfunctionCriteriaEn?.contains("14,500 Hz") == true)
+        assertEquals(2, GmEngineMonitorCatalog.find("P0033", lsa)?.sourcePage)
+        assertEquals(5, GmEngineMonitorCatalog.find("P006D", lsa)?.sourcePage)
+        assertTrue(GmEngineMonitorCatalog.find("P006D", lsa)?.malfunctionCriteriaEn?.contains("25.0 kPa") == true)
+        assertEquals(5, GmEngineMonitorCatalog.find("P0097", lsa)?.sourcePage)
+        assertEquals(5, GmEngineMonitorCatalog.find("P0098", lsa)?.sourcePage)
+        assertTrue(GmEngineMonitorCatalog.find("P0097", lsa)?.malfunctionCriteriaEn?.contains("45 ohms") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0098", lsa)?.malfunctionCriteriaEn?.contains("420,000 ohms") == true)
+        assertEquals(null, GmEngineMonitorCatalog.find("P0033", l99))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0033", ls3))
+        assertEquals(null, GmEngineMonitorCatalog.find("P006D", l99))
+        assertEquals(null, GmEngineMonitorCatalog.find("P006D", ls3))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0097", l99))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0098", ls3))
+        assertTrue(CamaroDtcCatalog.coverageNotice(l99).first.contains("P0101/P0102/P0103"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(l99).first.contains("O2"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("P0033"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("P006D"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("P0097/P0098"))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0101", ls7))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0030", ls7))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0102", ls7))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0103", ls7))
+        assertTrue(DtcCatalogRegistry.catalogueFor("ECM", l99).hasVehicleSpecificDefinitions)
+        assertTrue(DtcCatalogRegistry.catalogueFor("ECM", lsa).hasVehicleSpecificDefinitions)
+    }
+
+    @Test
+    fun gen5V8CertificationProvenanceIsVisibleWithoutInventingMonitorDefinitions() {
+        val ls7 = VehicleProfile(modelYear = 2015, engine = CamaroEngine.LS7)
+        val lsa = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LSA)
+
+        assertEquals("15OBDG07", GmEngineMonitorCatalog.sourceLabel(ls7))
+        assertEquals("14OBDG07", GmEngineMonitorCatalog.sourceLabel(lsa))
+        assertTrue(CamaroDtcCatalog.coverageNotice(ls7).first.contains("15OBDG07"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lsa).first.contains("14OBDG07"))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0016", ls7))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0016", lsa))
+    }
+
+    @Test
+    fun gen6CertificationSourcesAreYearAndEngineSpecific() {
+        assertEquals(
+            "16OBDG03",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2016, engine = CamaroEngine.LTG))
+        )
+        assertEquals(
+            "16OBDG05",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2016, engine = CamaroEngine.LGX))
+        )
+        assertEquals(
+            "16OBDG07A",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2016, engine = CamaroEngine.LT1))
+        )
+        assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2016, engine = CamaroEngine.LT4)))
+
+        listOf(CamaroEngine.LTG, CamaroEngine.LGX, CamaroEngine.LT1, CamaroEngine.LT4).forEach { engine ->
+            assertEquals(
+                "17OBDG03",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2017, engine = engine))
+            )
+            assertEquals(
+                "18OBDG03A",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2018, engine = engine))
+            )
+            assertEquals(
+                if (engine == CamaroEngine.LTG || engine == CamaroEngine.LGX) "19OBDG03B" else "19OBDG03A",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2019, engine = engine))
+            )
+            assertEquals(
+                "20OBDG03A",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2020, engine = engine))
+            )
+        }
+        assertEquals(
+            "21OBDG03A",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2021, engine = CamaroEngine.LTG))
+        )
+        listOf(CamaroEngine.LGX, CamaroEngine.LT1, CamaroEngine.LT4).forEach { engine ->
+            assertEquals(
+                "21OBDG03B",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2021, engine = engine))
+            )
+        }
+
+        assertEquals(
+            "22OBDG03A",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2022, engine = CamaroEngine.LTG))
+        )
+        listOf(CamaroEngine.LGX, CamaroEngine.LT1, CamaroEngine.LT4).forEach { engine ->
+            assertEquals(
+                "22OBDG03B",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2022, engine = engine))
+            )
+            assertEquals(
+                "23OBDG03B",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2023, engine = engine))
+            )
+            assertEquals(
+                "24OBDG03B Part 2",
+                GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2024, engine = engine))
+            )
+        }
+        assertEquals(
+            "23OBDG03A Part2",
+            GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2023, engine = CamaroEngine.LTG))
+        )
+        assertEquals(null, GmEngineMonitorCatalog.sourceLabel(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LTG)))
+        assertTrue(
+            CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2019, engine = CamaroEngine.LTG))
+                .first.contains("19OBDG03B")
+        )
+        assertTrue(
+            CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT1))
+                .first.contains("19OBDG03A")
+        )
+        assertTrue(
+            CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2023, engine = CamaroEngine.LTG))
+                .first.contains("23OBDG03A Part2")
+        )
+        assertTrue(
+            CamaroDtcCatalog.coverageNotice(VehicleProfile(modelYear = 2024, engine = CamaroEngine.LT1))
+                .first.contains("24OBDG03B Part 2")
+        )
+
+        // Group provenance is available; detailed Gen6 monitor evidence is not
+        // yet integrated and must not be inferred from a certification label.
+        assertEquals(
+            null,
+            GmEngineMonitorCatalog.find("P0011", VehicleProfile(modelYear = 2017, engine = CamaroEngine.LTG))
+        )
+    }
+
+    @Test
+    fun gm2019Lt4MonitorEvidenceIsRestrictedToTheDocumentedCamaroProfile() {
+        val lt4_2019 = VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT4)
+        val lt1_2019 = VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT1)
+        val lt4_2020 = VehicleProfile(modelYear = 2020, engine = CamaroEngine.LT4)
+        val lt1_2016 = VehicleProfile(modelYear = 2016, engine = CamaroEngine.LT1)
+        val lt4_2024 = VehicleProfile(modelYear = 2024, engine = CamaroEngine.LT4)
+
+        val performance = requireNotNull(GmEngineMonitorCatalog.find("P0196", lt4_2019))
+        val low = requireNotNull(GmEngineMonitorCatalog.find("P0197", lt4_2019))
+        val high = requireNotNull(GmEngineMonitorCatalog.find("P0198", lt4_2019))
+
+        assertTrue(performance.strategyEn.contains("three independent tests"))
+        assertTrue(performance.failureCriteriaEn.contains("210 failures out of 300"))
+        assertEquals(603, performance.sourcePage)
+        assertTrue(low.malfunctionCriteriaEn.contains("below 25"))
+        assertTrue(high.malfunctionCriteriaEn.contains("above 450,000"))
+        assertTrue(low.failureCriteriaEn.contains("20 failures out of 50"))
+        assertTrue(high.enableConditionsEn.contains("above 20.0 seconds"))
+        assertEquals(607, low.sourcePage)
+        assertEquals(608, high.sourcePage)
+        assertEquals("Type B – 2 trips", low.milClassification)
+        assertEquals("Type B – 2 trips", high.milClassification)
+        assertEquals(3, Gm2019Lt4MonitorCatalog.supportedCodes().size)
+        assertTrue(CamaroDtcCatalog.coverageNotice(lt4_2019).first.contains("P0196"))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lt4_2019).second.contains("P0198"))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0197", lt1_2019))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0197", lt4_2020))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0196", lt1_2016))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0196", lt4_2024))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", lt4_2019))
+    }
+
+    @Test
+    fun lltDtcCatalogProvidesBilingualVehicleSpecificInterpretations() {
+        val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
+        val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)
+        val lfx2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val codes = listOf("P0008", "P0009", "P000A", "P000B", "P000C", "P000D", "P0010", "P0011", "P0013", "P0014", "P0016", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024")
+
+        codes.forEach { code ->
+            assertNotNull("Missing LLT explanation for $code", CamaroDtcCatalog.find(code, llt2010))
+            assertNotNull("Missing LLT explanation for $code", CamaroDtcCatalog.find(code, llt2011))
+        }
+        assertEquals(18, CamaroLltDtcCatalog.supportedCodes().size)
+        assertTrue(CamaroDtcCatalog.coverageNotice(llt2010).first.contains("LLT"))
+        assertNotNull(CamaroDtcCatalog.find("P0010", lfx2012))
+    }
+
+    @Test
+    fun gm2010And2011LltMonitorsUseYearSpecificCalibrationEvidence() {
+        val llt2010 = VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT)
+        val llt2011 = VehicleProfile(modelYear = 2011, engine = CamaroEngine.LLT)
+        val llt2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LLT)
+
+        assertTrue(GmEngineMonitorCatalog.find("P0011", llt2010)?.malfunctionCriteriaEn?.contains("7.0–8.0") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0011", llt2011)?.malfunctionCriteriaEn?.contains("6.0–11.0") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P000A", llt2010)?.malfunctionCriteriaEn?.contains("1.5") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P000A", llt2011)?.malfunctionCriteriaEn?.contains("2.5") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0016", llt2010)?.malfunctionCriteriaEn?.contains("9.9") == true)
+        assertTrue(GmEngineMonitorCatalog.find("P0016", llt2011)?.malfunctionCriteriaEn?.contains("11.7") == true)
+        assertEquals("10OBDG02", GmEngineMonitorCatalog.sourceLabel(llt2010))
+        assertEquals("11OBDG06", GmEngineMonitorCatalog.sourceLabel(llt2011))
+        assertEquals(null, GmEngineMonitorCatalog.find("P0011", llt2012))
+        assertEquals(18, Gm2010LltMonitorCatalog.supportedCodes().size)
+        assertEquals(18, Gm2011LltMonitorCatalog.supportedCodes().size)
+    }
+
+    @Test
+    fun gm2013And2014LfxCamshaftMonitorsUseTheirOwnCertificationThresholds() {
+        val lfx2013 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX)
+        val lfx2014 = VehicleProfile(modelYear = 2014, engine = CamaroEngine.LFX)
+        val lfx2015 = VehicleProfile(modelYear = 2015, engine = CamaroEngine.LFX)
+
+        val intake2013 = GmLfxMonitorCatalog.find("P0011", lfx2013)
+        assertNotNull(intake2013)
+        assertTrue(intake2013?.failureCriteriaEn?.contains("50 failures in 150 samples") == true)
+        assertTrue(GmLfxMonitorCatalog.find("P0014", lfx2014)?.failureCriteriaEn?.contains("100 failures in 300 samples") == true)
+        assertTrue(GmLfxMonitorCatalog.find("P0016", lfx2013)?.malfunctionCriteriaEn?.contains("6.0 crank degrees") == true)
+        assertEquals("13OBDG05A", GmLfxMonitorCatalog.sourceLabel(lfx2013))
+        assertEquals("14OBDG06A", GmLfxMonitorCatalog.sourceLabel(lfx2014))
+        assertEquals("15OBDG06", GmLfxMonitorCatalog.sourceLabel(lfx2015))
+        assertTrue(CamaroDtcCatalog.coverageNotice(lfx2015).first.contains("15OBDG06"))
+        assertEquals(null, GmLfxMonitorCatalog.find("P0011", lfx2015))
+        assertEquals(12, Gm2013And2014LfxMonitorCatalog.supportedCodes().size)
+    }
+
+    @Test
+    fun detailedLfxCamshaftInterpretationsCoverAllFourActuatorCircuitsAndBothPerformanceBanks() {
+        val lfx = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        listOf("P0010", "P0011", "P0013", "P0014", "P0020", "P0021", "P0023", "P0024").forEach { code ->
+            assertNotNull("Missing LFX explanation for $code", CamaroDtcCatalog.find(code, lfx))
+        }
+        assertEquals(null, CamaroDtcCatalog.find("P0021", VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)))
+    }
+
+    @Test
+    fun gm2012LfxMonitorEvidenceIsRestrictedToItsDocumentedVehicleGroup() {
+        val lfx2012 = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val lfx2013 = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX)
+        val lt1 = VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)
+
+        val p0011 = Gm2012LfxMonitorCatalog.find("p0011", lfx2012)
+        assertNotNull(p0011)
+        assertEquals("P0011", p0011?.code)
+        assertTrue(p0011?.malfunctionCriteriaEn?.contains("5.00 cam degrees") == true)
+        assertEquals(null, Gm2012LfxMonitorCatalog.find("P0011", lfx2013))
+        assertEquals(null, Gm2012LfxMonitorCatalog.find("P0011", lt1))
+        assertEquals(32, Gm2012LfxMonitorCatalog.supportedCodes().size)
+        listOf("P0089", "P0191", "P00C6").forEach { code ->
+            assertNotNull("Missing GM monitor evidence for $code", Gm2012LfxMonitorCatalog.find(code, lfx2012))
+        }
+        assertNotNull(CamaroDtcCatalog.find("P00C6", lfx2012))
+        assertEquals(null, CamaroDtcCatalog.find("P00C6", lfx2013))
+        listOf("P0101", "P0102", "P0103", "P0128", "P0171", "P0172", "P0174", "P0175").forEach { code ->
+            assertNotNull("Missing GM monitor evidence for $code", Gm2012LfxMonitorCatalog.find(code, lfx2012))
+            assertNotNull("Missing LFX explanation for $code", CamaroDtcCatalog.find(code, lfx2012))
+        }
+        listOf("P0030", "P0036", "P0050", "P0053", "P0054", "P0059", "P0060").forEach { code ->
+            assertNotNull("Missing GM monitor evidence for $code", Gm2012LfxMonitorCatalog.find(code, lfx2012))
+            assertNotNull("Missing LFX explanation for $code", CamaroDtcCatalog.find(code, lfx2012))
+        }
+        assertNotNull(Gm2012LfxMonitorCatalog.find("P0300", lfx2012))
+        assertNotNull(Gm2012LfxMonitorCatalog.find("P0420", lfx2012))
+        assertTrue(Gm2012LfxMonitorCatalog.SOURCE_DOCUMENT.contains("12OBDG05B"))
+    }
+
+    @Test
+    fun oemEvidenceCannotBeUsedWithoutExactVehicleAndCalibrationIdentity() {
+        val evidence = DtcDefinitionEvidence(
+            source = DtcDefinitionSource.GM_SERVICE_INFORMATION,
+            status = DtcEvidenceStatus.DOCUMENTED,
+            modelYears = 2012..2015,
+            engineRpos = setOf("LFX"),
+            transmission = TransmissionType.MANUAL,
+            moduleId = "ECM",
+            hardwarePartNumber = null,
+            operatingSystemId = null,
+            calibrationId = null,
+            calibrationVerificationNumber = null,
+            vin = null,
+            reference = ""
+        )
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX, vin = "1G1FB1E30C9123456")
+
+        assertFalse(evidence.isUsableForOemInterpretation(vehicle, "ECM"))
+        assertTrue(evidence.validationIssues(vehicle, "ECM").size >= 6)
+    }
+
+    @Test
+    fun evidenceStatusMatchesTheActualPerModuleCatalogueCoverage() {
+        val coveredProfiles = listOf(
+            VehicleProfile(modelYear = 2010, engine = CamaroEngine.LLT),
+            VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX),
+            VehicleProfile(modelYear = 2012, engine = CamaroEngine.L99),
+            VehicleProfile(modelYear = 2013, engine = CamaroEngine.LS3),
+            VehicleProfile(modelYear = 2013, engine = CamaroEngine.LSA),
+            VehicleProfile(modelYear = 2019, engine = CamaroEngine.LT4)
+        )
+
+        coveredProfiles.forEach { vehicle ->
+            assertEquals(
+                "Evidence status must agree with catalogue routing for ${vehicle.modelYear} ${vehicle.engine.rpo}",
+                DtcCatalogRegistry.catalogueFor("ECM", vehicle).evidenceStatus,
+                DtcCatalogRegistry.evidenceStatus(vehicle, "ECM")
+            )
+            assertEquals(DtcEvidenceStatus.DOCUMENTED, DtcCatalogRegistry.evidenceStatus(vehicle, "ECM"))
+        }
+
+        val genericProfile = VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)
+        assertEquals(DtcEvidenceStatus.GENERIC_ONLY, DtcCatalogRegistry.evidenceStatus(genericProfile, "ECM"))
+        assertEquals(DtcEvidenceStatus.GENERIC_ONLY, DtcCatalogRegistry.evidenceStatus(genericProfile, "EBCM"))
+        assertEquals(DtcEvidenceStatus.DISCOVERY_REQUIRED, DtcCatalogRegistry.evidenceStatus(genericProfile, "ECU 7E8"))
+    }
+
+    @Test
+    fun independentCommunityEvidenceRequiresTwoDistinctApplicablePublishers() {
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val first = DtcCommunityEvidenceReference(
+            source = DtcDefinitionSource.TECHNICAL_FORUM,
+            reference = "https://forum.example/threads/dtc-investigation",
+            publisher = "Forum A",
+            independenceGroup = "forum-a-original-thread",
+            modelYears = 2012..2015,
+            engineRpos = setOf("LFX"),
+            moduleId = "ECM"
+        )
+        val repost = first.copy(
+            reference = "https://archive.example/repost",
+            publisher = "Archive",
+            independenceGroup = "forum-a-original-thread"
+        )
+        val samePublisherDifferentInvestigation = first.copy(
+            reference = "https://forum.example/threads/another-investigation",
+            independenceGroup = "forum-a-second-original-thread"
+        )
+        val independent = first.copy(
+            source = DtcDefinitionSource.SPECIALIST_REPAIR_DATABASE,
+            reference = "https://repair.example/dtc",
+            publisher = "Repair database",
+            independenceGroup = "repair-database-entry"
+        )
+
+        val samePublisherOnly = DtcCatalogRegistry.assessCommunityEvidence(
+            listOf(first, samePublisherDifferentInvestigation),
+            vehicle,
+            "ECM"
+        )
+        assertEquals(DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE, samePublisherOnly.confidence)
+        assertEquals(1, samePublisherOnly.independentPublisherCount)
+
+        // A cross-posted investigation may carry another publisher label. Its
+        // publisher association is ambiguous and must not inflate corroboration.
+        val crossPosted = first.copy(publisher = "Archive")
+        val mixedPublisherReferences = listOf(
+            crossPosted,
+            first,
+            samePublisherDifferentInvestigation,
+            independent
+        )
+        val mixedOrderAssessment = DtcCatalogRegistry.assessCommunityEvidence(
+            mixedPublisherReferences,
+            vehicle,
+            "ECM"
+        )
+        val reversedOrderAssessment = DtcCatalogRegistry.assessCommunityEvidence(
+            mixedPublisherReferences.reversed(),
+            vehicle,
+            "ECM"
+        )
+        assertEquals(DtcCommunityConfidence.CORROBORATED_INDEPENDENT_SOURCES, mixedOrderAssessment.confidence)
+        assertEquals(2, mixedOrderAssessment.independentPublisherCount)
+        assertEquals(mixedOrderAssessment.confidence, reversedOrderAssessment.confidence)
+        assertEquals(mixedOrderAssessment.independentPublisherCount, reversedOrderAssessment.independentPublisherCount)
+
+        val single = DtcCatalogRegistry.assessCommunityEvidence(
+            listOf(first, repost),
+            vehicle,
+            "ECM"
+        )
+        assertEquals(DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE, single.confidence)
+        assertEquals(1, single.independentPublisherCount)
+        assertTrue(single.mayShowCommunityExplanation)
+
+        val corroborated = DtcCatalogRegistry.assessCommunityEvidence(
+            listOf(first, repost, independent),
+            vehicle,
+            "ECM"
+        )
+        assertEquals(DtcCommunityConfidence.CORROBORATED_INDEPENDENT_SOURCES, corroborated.confidence)
+        assertEquals(2, corroborated.independentPublisherCount)
+        assertEquals(3, corroborated.applicableReferences.size)
+    }
+
+    @Test
+    fun communityEvidenceRejectsOutOfScopeAndUntraceableReferences() {
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX)
+        val base = DtcCommunityEvidenceReference(
+            source = DtcDefinitionSource.COMMUNITY_DATABASE,
+            reference = "https://community.example/dtc",
+            publisher = "Community",
+            independenceGroup = "community-original",
+            modelYears = 2012..2015,
+            engineRpos = setOf("LFX"),
+            moduleId = "ECM"
+        )
+        val rejected = listOf(
+            base.copy(reference = "not-a-url"),
+            base.copy(modelYears = 2010..2011),
+            base.copy(engineRpos = setOf("LLT")),
+            base.copy(moduleId = "TCM"),
+            base.copy(publisher = ""),
+            base.copy(independenceGroup = ""),
+            base.copy(source = DtcDefinitionSource.SAE_J2012_GENERIC)
+        )
+
+        rejected.forEach { reference ->
+            val assessment = DtcCatalogRegistry.assessCommunityEvidence(
+                listOf(reference),
+                vehicle,
+                "ECM"
+            )
+            assertEquals(DtcCommunityConfidence.INSUFFICIENT, assessment.confidence)
+            assertFalse(assessment.mayShowCommunityExplanation)
+            assertTrue(assessment.applicableReferences.isEmpty())
+        }
+    }
+
+    @Test
+    fun communityEvidenceIsMarkedVehicleValidatedOnlyForTheMatchingVin() {
+        val vin = "1G1FB1E30C9123456"
+        val vehicle = VehicleProfile(
+            modelYear = 2012,
+            engine = CamaroEngine.LFX,
+            vin = vin
+        )
+        val reference = DtcCommunityEvidenceReference(
+            source = DtcDefinitionSource.OWNER_REPAIR_REPORT,
+            reference = "https://owners.example/report",
+            publisher = "Vehicle owner",
+            independenceGroup = "owner-report-2012-lfx",
+            modelYears = 2012..2012,
+            engineRpos = setOf("LFX"),
+            moduleId = "ECM",
+            validatedVin = vin
+        )
+
+        val matching = DtcCatalogRegistry.assessCommunityEvidence(listOf(reference), vehicle, "ECM")
+        assertEquals(DtcCommunityConfidence.VALIDATED_ON_THIS_VEHICLE, matching.confidence)
+
+        val otherVehicle = vehicle.copy(vin = "1G1FB1E30C9123457")
+        val notMatching = DtcCatalogRegistry.assessCommunityEvidence(listOf(reference), otherVehicle, "ECM")
+        assertEquals(DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE, notMatching.confidence)
+    }
+
+
+    @Test
+    fun corroboratedCommunityEvidenceNeverQualifiesAsOemInterpretation() {
+        val vin = "1G1FB1E30C9123456"
+        val vehicle = VehicleProfile(
+            modelYear = 2012,
+            engine = CamaroEngine.LFX,
+            transmission = TransmissionType.MANUAL,
+            vin = vin
+        )
+        val communityEvidence = DtcDefinitionEvidence(
+            source = DtcDefinitionSource.COMMUNITY_DATABASE,
+            status = DtcEvidenceStatus.DOCUMENTED,
+            modelYears = 2012..2015,
+            engineRpos = setOf("LFX"),
+            transmission = TransmissionType.MANUAL,
+            moduleId = "ECM",
+            hardwarePartNumber = "HW-123",
+            operatingSystemId = "OS-123",
+            calibrationId = "CAL-123",
+            calibrationVerificationNumber = "CVN-123",
+            vin = vin,
+            reference = "https://community.example/dtc"
+        )
+
+        assertTrue(communityEvidence.validationIssues(vehicle, "ECM").isEmpty())
+        assertFalse(communityEvidence.isUsableForOemInterpretation(vehicle, "ECM"))
+    }
+
+}

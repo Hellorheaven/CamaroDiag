@@ -18,6 +18,7 @@ import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
 import com.camarodiag.gen5.data.obd.UdsAccessPolicy
+import com.camarodiag.gen5.data.obd.toDiagnosticDtc
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
@@ -521,12 +522,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         timeoutMs = 5000L
                     )
                 }
-                val dtcs = client.readDtcByStatusMask()
-                val rendered = if (dtcs.isEmpty()) {
+                val report = client.readDtcReport()
+                val moduleId = "ECU ${responseCanIdHex.uppercase()}"
+                val mappedDtcs = report.records.map { record ->
+                    val baseCode = record.code.substringBefore('-')
+                    val standard = DtcCatalogRegistry.genericDescription(baseCode)
+                    // A raw CAN response address is not an identified ECU family.
+                    // Keep UDS results generic until module discovery confirms ECM identity.
+                    val vehicleSpecific = if (moduleId == "ECM") {
+                        CamaroDtcCatalog.find(baseCode, _vehicle.value)
+                    } else {
+                        null
+                    }
+                    val rawCode = "0x${record.rawDtc.toString(16).uppercase().padStart(6, '0')}"
+                    record.toDiagnosticDtc(moduleId).copy(
+                        descEn = vehicleSpecific?.meaningEn ?: standard?.first
+                            ?: "Raw OEM DTC $rawCode; no verified definition is loaded for this ECU.",
+                        descFr = vehicleSpecific?.meaningFr ?: standard?.second
+                            ?: "DTC constructeur brut $rawCode ; aucune définition vérifiée n'est chargée pour ce calculateur."
+                    )
+                }
+                _dtcs.value = _dtcs.value.filterNot { it.module == moduleId } + mappedDtcs
+                val rendered = if (report.records.isEmpty()) {
                     getApplication<Application>().getString(R.string.vm_no_dtcs_returned, responseCanIdHex.uppercase())
                 } else {
-                    dtcs.joinToString("\\n") { record ->
-                        "0x${record.dtc.toString(16).uppercase().padStart(6, '0')}  status=0x${record.status.toString(16).uppercase().padStart(2, '0')}"
+                    report.records.joinToString("\\n") { record ->
+                        "${record.code}  status=0x${record.statusByte.toString(16).uppercase().padStart(2, '0')}"
                     }
                 }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -1430,7 +1451,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                     _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_simulated_lfx)
                 } else if (!obdManager.isObdCommandChannelAvailable) {
-                    _dtcs.value = emptyList()
+                    // No SAE OBD channel is available; keep independently read UDS ECU records.
+                    _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
                         getApplication<Application>().getString(R.string.msg_dtc_j2534_unavailable)
                     else getApplication<Application>().getString(R.string.msg_dtc_adapter_required)
@@ -1438,7 +1460,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
                         engine.readDtcs()
                     }
-                    _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
+                    _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } +
+                        mapObdDtcs(confirmed + pending + permanent)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -1472,53 +1495,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-    private val standardDtcDescriptions = mapOf(
-            "P0101" to ("Mass or Volume Air Flow Circuit Range/Performance" to "Débitmètre d'air : plage / performance"),
-            "P0102" to ("Mass or Volume Air Flow Circuit Low Input" to "Débitmètre d'air : signal trop faible"),
-            "P0103" to ("Mass or Volume Air Flow Circuit High Input" to "Débitmètre d'air : signal trop élevé"),
-            "P0113" to ("Intake Air Temperature Sensor 1 Circuit High" to "Sonde de température d'air admission : signal élevé"),
-            "P0128" to ("Coolant Thermostat (Coolant Temperature Below Thermostat Regulating Temperature)" to "Thermostat moteur : température sous le seuil de régulation"),
-            "P0171" to ("System Too Lean (Bank 1)" to "Mélange trop pauvre (banc 1)"),
-            "P0172" to ("System Too Rich (Bank 1)" to "Mélange trop riche (banc 1)"),
-            "P0174" to ("System Too Lean (Bank 2)" to "Mélange trop pauvre (banc 2)"),
-            "P0175" to ("System Too Rich (Bank 2)" to "Mélange trop riche (banc 2)"),
-            "P0300" to ("Random/Multiple Cylinder Misfire Detected" to "Ratés d'allumage aléatoires / multiples"),
-            "P0301" to ("Cylinder 1 Misfire Detected" to "Ratés d'allumage cylindre 1"),
-            "P0302" to ("Cylinder 2 Misfire Detected" to "Ratés d'allumage cylindre 2"),
-            "P0303" to ("Cylinder 3 Misfire Detected" to "Ratés d'allumage cylindre 3"),
-            "P0304" to ("Cylinder 4 Misfire Detected" to "Ratés d'allumage cylindre 4"),
-            "P0305" to ("Cylinder 5 Misfire Detected" to "Ratés d'allumage cylindre 5"),
-            "P0306" to ("Cylinder 6 Misfire Detected" to "Ratés d'allumage cylindre 6"),
-            "P0307" to ("Cylinder 7 Misfire Detected" to "Ratés d'allumage cylindre 7"),
-            "P0308" to ("Cylinder 8 Misfire Detected" to "Ratés d'allumage cylindre 8"),
-            "P0420" to ("Catalyst System Efficiency Below Threshold (Bank 1)" to "Efficacité du catalyseur sous le seuil (banc 1)"),
-            "P0430" to ("Catalyst System Efficiency Below Threshold (Bank 2)" to "Efficacité du catalyseur sous le seuil (banc 2)"),
-            "P0442" to ("EVAP System Small Leak Detected" to "Circuit EVAP : petite fuite détectée"),
-            "P0455" to ("EVAP System Large Leak Detected" to "Circuit EVAP : fuite importante détectée"),
-            "P0496" to ("EVAP Flow During Non-Purge Condition" to "Débit EVAP détecté hors phase de purge"),
-            "P0507" to ("Idle Control System RPM Higher Than Expected" to "Régime de ralenti supérieur à la consigne"),
-            "P06DD" to ("Engine Oil Pressure Control Solenoid Performance" to "Commande de pression d'huile moteur : performance"),
-            "P1101" to ("Intake Air Flow System Performance" to "Système de débit d'air admission : performance"),
-            "P0010" to ("Intake Camshaft Position Actuator Circuit (Bank 1)" to "Commande d'actionneur d'arbre à cames admission (banc 1)"),
-            "P0011" to ("Intake Camshaft Position Timing Over-Advanced (Bank 1)" to "Calage arbre à cames admission trop avancé (banc 1)"),
-            "P0014" to ("Exhaust Camshaft Position Timing Over-Advanced (Bank 1)" to "Calage arbre à cames échappement trop avancé (banc 1)"),
-            "P0087" to ("Fuel Rail/System Pressure Too Low" to "Pression de rampe / circuit carburant trop faible"),
-            "P0089" to ("Fuel Pressure Regulator Performance" to "Régulateur de pression carburant : performance"),
-            "P0191" to ("Fuel Rail Pressure Sensor Circuit Range/Performance" to "Capteur de pression de rampe : plage / performance"),
-            "P0299" to ("Turbocharger/Supercharger Underboost" to "Sous-pression de suralimentation"),
-        )
-
     private fun standardDtcDescription(code: String, isFr: Boolean): String {
-        val entry = standardDtcDescriptions[code]
+        val entry = DtcCatalogRegistry.genericDescription(code)
             ?: return if (isFr) {
-                "Description non disponible dans le dictionnaire local ; vérifier la documentation GM correspondant au VIN."
+                "Description normalisée indisponible ; vérifier la documentation GM correspondant au VIN et au calculateur."
             } else {
-                "Description unavailable in the local dictionary; check GM service information for this VIN."
+                "Generic description unavailable; check GM service information for this VIN and reporting ECU."
             }
         return if (isFr) entry.second else entry.first
     }
 
-    fun clearDtcs() {
+        fun clearDtcs() {
         viewModelScope.launch {
             beginBusyOperation()
             try {
@@ -1532,7 +1519,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
                     if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
-                        _dtcs.value = emptyList()
+                        // SAE Mode 04 clears standardized emissions DTCs only.
+                        // Preserve enhanced UDS records from other ECUs: no GM UDS clear is issued here.
+                        _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
                         _connectionMessage.value = null
                     } else {
                         _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_clear_not_confirmed, response)
@@ -1645,7 +1634,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     respondingAddresses = report.respondingEcuAddresses
                 )
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
-                _dtcs.value = mapObdDtcs(allDtcs)
+                _dtcs.value = if (obdManager.isSimulationActive) {
+                    mapObdDtcs(allDtcs)
+                } else {
+                    _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } + mapObdDtcs(allDtcs)
+                }
                 _obdScanMessage.value = if (obdManager.isSimulationActive) {
                     getApplication<Application>().getString(R.string.msg_full_scan_simulation_complete, report.supportedPids.size, allDtcs.size)
                 } else {

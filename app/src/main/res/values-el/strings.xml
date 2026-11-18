@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Γλώσσα εφαρμογής</string>
     <string name="system_language_current">Γλώσσα συστήματος: %1$s</string>
@@ -102,7 +102,7 @@
     <string name="dtc_title">Διαγνωστικοί κωδικοί βλάβης</string>
     <string name="dtc_scan">Σάρωση</string>
     <string name="dtc_clear">Εκκαθάριση</string>
-    <string name="dtc_clear_warning">Η εκκαθάριση με τη Λειτουργία 04 αφαιρεί κωδικούς βλάβης σχετικούς με τις εκπομπές και επαναφέρει ορισμένες οθόνες ετοιμότητας. Αποθηκεύστε την αναφορά πριν συνεχίσετε.</string>
+    <string name="dtc_clear_warning">Η εκκαθάριση με τη Λειτουργία 04 αφαιρεί κωδικούς βλάβης σχετικούς με τις εκπομπές και επαναφέρει ορισμένες οθόνες ετοιμότητας. Αποθηκεύστε την αναφορά πριν συνεχίσετε. Η Λειτουργία 04 δεν διαγράφει τους διευρυμένους DTC που είναι αποθηκευμένοι σε άλλες μονάδες ελέγχου του οχήματος.</string>
     <string name="dtc_none_returned">Η τελευταία σάρωση δεν επέστρεψε κωδικούς βλάβης.</string>
     <string name="dtc_confirm_clear">Επιβεβαίωση εκκαθάρισης DTC;</string>
     <string name="dtc_clear_description">Αυτό αποστέλλει τη Λειτουργία OBD 04 στην ECU. Τα δεδομένα ετοιμότητας μπορεί να επαναφερθούν. Δεν επισκευάζει την αιτία της βλάβης.</string>
@@ -145,7 +145,7 @@
     <string name="cal_pc_pairing_token">Token σύζευξης υπολογιστή</string>
     <string name="cal_connect_j2534">Σύνδεση γέφυρας J2534</string>
     <string name="cal_disconnect_pc_bridge">Αποσύνδεση γέφυρας υπολογιστή</string>
-    <string name="cal_bridge_capabilities">Γέφυρα: HS-CAN ISO15765 250/500 kbit/s και J2534-2 SW-ISO15765 όταν υποστηρίζεται από το πρόγραμμα οδήγησης. Το CAN FD παραμένει απενεργοποιημένο.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Γέφυρα: HS-CAN ISO15765 250/500 kbit/s και J2534-2 SW-ISO15765 όταν υποστηρίζεται από το πρόγραμμα οδήγησης. Το CAN FD παραμένει απενεργοποιημένο.</string>
     <string name="cal_read_uds_did">Ανάγνωση UDS DID</string>
     <string name="cal_read_uds_dtcs">Ανάγνωση UDS DTC</string>
     <string name="cal_uds_trouble_codes">Κωδικοί βλάβης UDS (0x19)</string>
@@ -246,8 +246,8 @@
     <string name="module_note_ecm_obd_missing">Δεν παρατηρήθηκε τυπική απόκριση OBD 7E8. Διατηρήστε την ECM ως μη επαληθευμένη μέχρι να το επιβεβαιώσει πραγματική λειτουργική σάρωση.</string>
     <string name="module_note_tcm_gen5">Η παρουσία, η διεύθυνση και τα υποστηριζόμενα δεδομένα πρέπει να εντοπιστούν στο όχημα.</string>
     <string name="module_note_tcm_gen6">Η διεύθυνση της μονάδας και οι υποστηριζόμενες υπηρεσίες πρέπει να εντοπιστούν στο όχημα· δεν θεωρούνται δεδομένες από την τοπολογία Gen 5.</string>
-    <string name="module_note_bcm_gen5">Το δελτίο GM 07-08-49-020I προσδιορίζει την BCM ως μονάδα αποθήκευσης χιλιομετρητή Camaro για τα έτη 2010–2015. Δεν θεωρούνται δεδομένες η ακριβής διεύθυνση διάγνωσης και το DID ανάγνωσης.</string>
-    <string name="module_note_bcm_gen6_to2018">Το δελτίο GM 07-08-49-020M αναφέρει την BCM ως μονάδα αποθήκευσης χιλιομετρητή Camaro έως το 2018. Η διεύθυνση διάγνωσης και το DID ανάγνωσης απαιτούν ακόμη επαλήθευση βάσει VIN.</string>
+    <string name="module_note_bcm_gen5" tools:ignore="TypographyDashes">Το δελτίο GM 07-08-49-020I προσδιορίζει την BCM ως μονάδα αποθήκευσης χιλιομετρητή Camaro για τα έτη 2010–2015. Δεν θεωρούνται δεδομένες η ακριβής διεύθυνση διάγνωσης και το DID ανάγνωσης.</string>
+    <string name="module_note_bcm_gen6_to2018" tools:ignore="TypographyDashes">Το δελτίο GM 07-08-49-020M αναφέρει την BCM ως μονάδα αποθήκευσης χιλιομετρητή Camaro έως το 2018. Η διεύθυνση διάγνωσης και το DID ανάγνωσης απαιτούν ακόμη επαλήθευση βάσει VIN.</string>
     <string name="module_note_bcm_2019">Για τα έτη 2019–2024, επιβεβαιώστε την αρχιτεκτονική αποθήκευσης χιλιομετρητή και τα αναγνωριστικά διάγνωσης για αυτό το VIN πριν από την ανάγνωση.</string>
     <string name="module_note_ipc_gen5">Οι πληροφορίες σέρβις Camaro 2012 περιγράφουν την IPC ως δευτερεύουσα αποθήκευση χιλιομετρητή. Τα ακριβή δεδομένα ανάγνωσης και η διεύθυνση πρέπει να επαληθευτούν.</string>
     <string name="module_note_ipc_gen6">Οι πληροφορίες σέρβις Camaro 2012 περιγράφουν δευτερεύουσα αποθήκευση χιλιομετρητή· επαληθεύστε τα ακριβή δεδομένα της μονάδας και τη σχέση με το VIN πριν από τη σύγκριση.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8 με AFM και αυτόματο κιβώτιο. Μην επαναχρησιμοποιείτε βαθμονόμηση LS3· επαληθεύστε RPO, κιβώτιο και αναγνωριστικά ECU.</string>
     <string name="cal_profile_notes_lsa">Camaro Gen 5 ZL1 με υπερτροφοδοτούμενο LSA V8. Επαληθεύστε τη βαθμονόμηση για τον υπερσυμπιεστή, το καύσιμο, την αγορά και την έκδοση λογισμικού.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8. Ξεχωριστό προφίλ από τα LS3/L99 παρά την ονομαστική οικογένεια ελεγκτή· η ταυτοποίηση λογισμικού είναι υποχρεωτική.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 LTG 2.0 Turbo (εύρος κάλυψης 2016–2020). Το δελτίο GM PIP5313B προσδιορίζει E80 στο Camaro LTG 2016–2017· επαληθεύστε τα επόμενα έτη με αριθμό ανταλλακτικού και CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (εύρος κάλυψης 2016–2023). Το δελτίο GM PIP5313B προσδιορίζει E80 στο Camaro LTG 2016–2017· επαληθεύστε τα επόμενα έτη με αριθμό ανταλλακτικού και CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6. Το προφίλ μπορεί να διαφέρει ανά έτος, αγορά και αναθεώρηση· επιβεβαιώστε τον πραγματικό ελεγκτή και το CVN πριν φορτώσετε ορισμό πίνακα.</string>
     <string name="cal_profile_notes_lt1">Camaro Gen 6 LT1 V8 ατμοσφαιρικός. Διακρίνετε τις αναθεωρήσεις βαθμονόμησης με βάση CAL ID/CVN, έτος, αγορά, κιβώτιο και αριθμούς υλικού.</string>
     <string name="cal_profile_notes_lt4">Camaro Gen 6 ZL1 με υπερτροφοδοτούμενο LT4 V8. Μην το συγχέετε με το LT1· επικυρώστε τους αριθμούς ανταλλακτικών και τα δεδομένα πίεσης υπερπλήρωσης της συγκεκριμένης βαθμονόμησης.</string>
@@ -556,4 +556,20 @@
     <string name="trace_error_csv_empty">Το ίχνος CSV είναι κενό.</string>
     <string name="trace_error_csv_columns">Το CSV χρειάζεται στήλη CAN ID και στήλη δεδομένων/payload ή στήλες data0…data15.</string>
     <string name="trace_error_generic">Το ίχνος περιέχει μη έγκυρη ή μη υποστηριζόμενη εγγραφή.</string>
+    <string name="dtc_vehicle_interpretation">Ερμηνεία ειδικά για το όχημα</string>
+    <string name="dtc_severity">Σοβαρότητα</string>
+    <string name="dtc_possible_causes">Πιθανές αιτίες (μη επιβεβαιωμένες)</string>
+    <string name="dtc_recommended_checks">Συνιστώμενοι έλεγχοι</string>
+    <string name="dtc_vehicle_specific_not_documented">Δεν έχει τεκμηριωθεί ακόμη ειδική διαδικασία για αυτόν τον κωδικό και τη συγκεκριμένη διαμόρφωση. Η περιγραφή OEM/SAE εμφανίζεται παραπάνω· επαληθεύστε το VIN και τη μονάδα ελέγχου στις πληροφορίες σέρβις της GM.</string>
+    <string name="dtc_desc_p0016">Μη εύλογη συσχέτιση στροφαλοφόρου / εκκεντροφόρου εισαγωγής (τράπεζα 1)</string>
+    <string name="dtc_desc_p0017">Μη εύλογη συσχέτιση στροφαλοφόρου / εκκεντροφόρου εξαγωγής (τράπεζα 1)</string>
+    <string name="dtc_desc_p0018">Μη εύλογη συσχέτιση στροφαλοφόρου / εκκεντροφόρου εισαγωγής (τράπεζα 2)</string>
+    <string name="dtc_desc_p0019">Μη εύλογη συσχέτιση στροφαλοφόρου / εκκεντροφόρου εξαγωγής (τράπεζα 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Οι παρακάτω ερμηνείες και τιμές ορίων αποτελούν δεδομένα αναφοράς για τον επιλεγμένο κινητήρα και το έτος μοντέλου. Η ταυτότητα της μονάδας ελέγχου (VIN, CAL ID, CVN, αναγνωριστικό λογισμικού και αριθμός εξαρτήματος υλικού) δεν έχει ακόμη επαληθευτεί· τα δεδομένα δεν έχουν επικυρωθεί για τη συνδεδεμένη μονάδα.</string>
+    <string name="dtc_gm_monitor_title">Παρακολούθηση κινητήρα GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Κριτήριο ενεργοποίησης: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Συνθήκες ενεργοποίησης: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Μετρητής αποτυχιών / ρυθμός επιβεβαίωσης: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Κατηγορία MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Πηγή: GM %1$s, σελίδα %2$d</string>
 </resources>

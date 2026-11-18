@@ -102,7 +102,7 @@
     <string name="dtc_title">Codes Défaut (DTC)</string>
     <string name="dtc_scan">Scanner</string>
     <string name="dtc_clear">Effacer</string>
-    <string name="dtc_clear_warning">L\'effacement Mode 04 supprime les défauts d\'émissions et réinitialise certains moniteurs de readiness. Enregistrer le rapport avant de continuer.</string>
+    <string name="dtc_clear_warning">L\'effacement Mode 04 supprime les défauts d\'émissions et réinitialise certains moniteurs de readiness. Enregistrer le rapport avant de continuer. Le Mode 04 n\'efface pas les DTC constructeur mémorisés par les autres calculateurs.</string>
     <string name="dtc_none_returned">Aucun code défaut retourné par le dernier scan.</string>
     <string name="dtc_confirm_clear">Confirmer l\'effacement des défauts ?</string>
     <string name="dtc_clear_description">Cette opération envoie le service OBD Mode 04 à l\'ECU. Les données de readiness peuvent être réinitialisées. Elle ne répare pas la cause du défaut.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 V8 L99 avec AFM et boîte automatique. Ne pas réutiliser une calibration LS3 : vérifier RPO, boîte et identifiants ECU.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 V8 compressé LSA. Vérifier la calibration liée au compresseur, au carburant, au marché et à la version logicielle.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 V8 LS7. Profil distinct LS3/L99 malgré la famille de calculateur indiquée ; identification logicielle obligatoire.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (années 2016 à 2020 dans la matrice de couverture). Le bulletin GM PIP5313B cite l\'E80 sur Camaro LTG 2016–2017 ; confirmer les années suivantes par référence et CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (années 2016 à 2023 dans la matrice de couverture). Le bulletin GM PIP5313B cite l\'E80 sur Camaro LTG 2016–2017 ; confirmer les années suivantes par référence matérielle et CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 V6 LGX. Le profil peut varier selon année, marché et version ; confirmer le calculateur réel et le CVN avant de charger une définition de tables.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 V8 LT1 atmosphérique. Distinguer les versions de calibration par CAL ID/CVN, année, marché, boîte et références matérielles.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 V8 LT4 compressé. Ne pas mélanger avec LT1 ; valider les références et les données de suralimentation propres à la calibration.</string>
@@ -558,4 +558,20 @@
     <string name="trace_error_csv_empty">La trace CSV est vide.</string>
     <string name="trace_error_csv_columns">Le CSV doit contenir une colonne CAN ID et une colonne données/payload, ou des colonnes data0…data15.</string>
     <string name="trace_error_generic">La trace contient un enregistrement invalide ou non pris en charge.</string>
+    <string name="dtc_vehicle_interpretation">Interprétation pour ce véhicule</string>
+    <string name="dtc_severity">Gravité</string>
+    <string name="dtc_possible_causes">Causes possibles (non confirmées)</string>
+    <string name="dtc_recommended_checks">Contrôles recommandés</string>
+    <string name="dtc_vehicle_specific_not_documented">Aucune procédure spécifique à cette configuration n\'est encore documentée pour ce code. Le libellé OEM/SAE est affiché ci-dessus ; vérifier le VIN exact et le calculateur dans la documentation GM.</string>
+    <string name="dtc_desc_p0016">Corrélation vilebrequin / arbre à cames d\'admission non plausible (banc 1)</string>
+    <string name="dtc_desc_p0017">Corrélation vilebrequin / arbre à cames d\'échappement non plausible (banc 1)</string>
+    <string name="dtc_desc_p0018">Corrélation vilebrequin / arbre à cames d\'admission non plausible (banc 2)</string>
+    <string name="dtc_desc_p0019">Corrélation vilebrequin / arbre à cames d\'échappement non plausible (banc 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Les interprétations et seuils ci-dessous sont des références pour le moteur et le millésime sélectionnés. L\'identité du calculateur (VIN, CAL ID, CVN, identifiant logiciel et référence matérielle) n\'est pas encore vérifiée : ces données ne sont pas validées pour l\'ECU connecté.</string>
+    <string name="dtc_gm_monitor_title">Surveillance moteur GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Critère de déclenchement : %1$s</string>
+    <string name="dtc_gm_monitor_enable">Conditions d\'activation : %1$s</string>
+    <string name="dtc_gm_monitor_failure">Compteur / fréquence de validation : %1$s</string>
+    <string name="dtc_gm_monitor_mil">Classe MIL : %1$s</string>
+    <string name="dtc_gm_monitor_source">Source : GM %1$s, page %2$d</string>
 </resources>

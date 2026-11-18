@@ -158,6 +158,28 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun listsOptionalEcuFamiliesForDiscoveryWithoutInventingAddresses() {
+        val optionalIds = setOf("HVAC", "PSCM", "RCDLR", "RADIO", "AMP", "DDM", "PDM", "FPCM", "PARK_ASSIST", "HMI")
+        listOf(
+            VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX),
+            VehicleProfile(modelYear = 2018, engine = CamaroEngine.LT1)
+        ).forEach { vehicle ->
+            val modules = CamaroUdsProtocol.buildTopology(
+                vehicle,
+                AdapterCapabilities(tier = AdapterTier.PRO_STN, supportsCanHeaders = true)
+            )
+            val candidates = modules.filter { it.id in optionalIds }
+            assertEquals(optionalIds, candidates.map { it.id }.toSet())
+            candidates.forEach { module ->
+                assertEquals(ModuleStatus.DISCOVERY_REQUIRED, module.status)
+                assertEquals("", module.txHeader)
+                assertEquals("", module.rxHeader)
+                assertTrue(module.notesEn.contains("Optional equipment candidate"))
+            }
+        }
+    }
+
+    @Test
     fun gen5AndGen6EngineRangesDoNotOverlap() {
         assertTrue(2012 in CamaroEngine.LFX.years)
         assertTrue(2020 in CamaroEngine.LGX.years)

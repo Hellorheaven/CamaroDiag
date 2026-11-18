@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Idioma da aplicação</string>
     <string name="system_language_current">Idioma do sistema: %1$s</string>
@@ -102,7 +102,7 @@
     <string name="dtc_title">Códigos de avaria de diagnóstico</string>
     <string name="dtc_scan">Diagnosticar</string>
     <string name="dtc_clear">Apagar</string>
-    <string name="dtc_clear_warning">A limpeza do Modo 04 remove códigos de avaria relacionados com emissões e reinicia alguns monitores de prontidão. Guarde o relatório antes de continuar.</string>
+    <string name="dtc_clear_warning">A limpeza do Modo 04 remove códigos de avaria relacionados com emissões e reinicia alguns monitores de prontidão. Guarde o relatório antes de continuar. O Modo 04 não apaga DTC avançados armazenados por outros módulos do veículo.</string>
     <string name="dtc_none_returned">O último diagnóstico não devolveu códigos de avaria.</string>
     <string name="dtc_confirm_clear">Confirmar a limpeza dos DTC?</string>
     <string name="dtc_clear_description">Isto envia o Modo OBD 04 à ECU. Os dados de prontidão podem ser reiniciados. Não repara a causa da avaria.</string>
@@ -145,7 +145,7 @@
     <string name="cal_pc_pairing_token">Token de emparelhamento do PC</string>
     <string name="cal_connect_j2534">Ligar à ponte J2534</string>
     <string name="cal_disconnect_pc_bridge">Desligar ponte do PC</string>
-    <string name="cal_bridge_capabilities">Ponte: HS-CAN ISO15765 250/500 kbit/s e J2534-2 SW-ISO15765 quando suportado pelo controlador. CAN FD permanece desativado.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Ponte: HS-CAN ISO15765 250/500 kbit/s e J2534-2 SW-ISO15765 quando suportado pelo controlador. CAN FD permanece desativado.</string>
     <string name="cal_read_uds_did">Ler DID UDS</string>
     <string name="cal_read_uds_dtcs">Ler DTC UDS</string>
     <string name="cal_uds_trouble_codes">Códigos de avaria UDS (0x19)</string>
@@ -246,8 +246,8 @@
     <string name="module_note_ecm_obd_missing">Não foi observada qualquer resposta OBD padrão 7E8. Mantenha o ECM como não verificado até que uma leitura funcional real o confirme.</string>
     <string name="module_note_tcm_gen5">A presença, o endereço e os dados suportados têm de ser identificados no veículo.</string>
     <string name="module_note_tcm_gen6">O endereço do módulo e os serviços suportados têm de ser identificados no veículo; não são presumidos com base na arquitetura Gen 5.</string>
-    <string name="module_note_bcm_gen5">O boletim GM 07-08-49-020I identifica o BCM como módulo de armazenamento do odómetro do Camaro de 2010–2015. O endereço de diagnóstico e o DID de leitura exatos não são presumidos.</string>
-    <string name="module_note_bcm_gen6_to2018">O boletim GM 07-08-49-020M indica o BCM como módulo de armazenamento do odómetro do Camaro até 2018. O endereço de diagnóstico e o DID de leitura ainda exigem verificação específica pelo VIN.</string>
+    <string name="module_note_bcm_gen5" tools:ignore="TypographyDashes">O boletim GM 07-08-49-020I identifica o BCM como módulo de armazenamento do odómetro do Camaro de 2010–2015. O endereço de diagnóstico e o DID de leitura exatos não são presumidos.</string>
+    <string name="module_note_bcm_gen6_to2018" tools:ignore="TypographyDashes">O boletim GM 07-08-49-020M indica o BCM como módulo de armazenamento do odómetro do Camaro até 2018. O endereço de diagnóstico e o DID de leitura ainda exigem verificação específica pelo VIN.</string>
     <string name="module_note_bcm_2019">Para 2019–2024, confirme a arquitetura de armazenamento do odómetro e os identificadores de diagnóstico deste VIN antes da leitura.</string>
     <string name="module_note_ipc_gen5">A informação de serviço do Camaro 2012 descreve o IPC como armazenamento secundário do odómetro. Os dados exatos de leitura e o endereço têm de ser verificados.</string>
     <string name="module_note_ipc_gen6">A informação de serviço do Camaro 2012 descreve o armazenamento secundário do odómetro; verifique os dados exatos do módulo e a relação com o VIN antes de comparar.</string>
@@ -387,9 +387,9 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8 met AFM en automatische transmissie. Gebruik geen LS3-kalibratie opnieuw; controleer RPO, transmissie en ECU-identificaties.</string>
     <string name="cal_profile_notes_lsa">Camaro Gen 5 ZL1 com LSA V8 sobrealimentado. Verifique a calibração para o compressor, combustível, mercado e revisão de software.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8. Perfil separado de LS3/L99 apesar da família nominal do controlador; a identificação do software é obrigatória.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 LTG 2.0 Turbo (intervalo de cobertura 2016–2020). O boletim GM PIP5313B identifica E80 no Camaro LTG 2016–2017; verifique os anos seguintes pelo número da peça e CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (cobertura de 2016 a 2023). O boletim GM PIP5313B identifica E80 no Camaro LTG 2016–2017; confirme os anos posteriores pelo número da peça e CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6. O perfil pode variar conforme o ano, mercado e revisão; confirme o controlador real e o CVN antes de carregar uma definição de tabela.</string>
-    <string name="cal_profile_notes_lt1">Camaro Gen 6 LT1 V8 atmosférico. Distinga as revisões de calibração pelo CAL ID/CVN, ano, mercado, transmissão e números de hardware.</string>
+    <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 LT1 V8 atmosférico. Distinga as revisões de calibração pelo CAL ID/CVN, ano, mercado, transmissão e números de hardware.</string>
     <string name="cal_profile_notes_lt4">Camaro Gen 6 ZL1 com LT4 V8 sobrealimentado. Não misture com LT1; valide os números de peça e os dados de pressão específicos da calibração.</string>
     <string name="msg_refresh_adapters_failed">Não foi possível atualizar os adaptadores.</string>
     <string name="msg_usb_identifier_unavailable">Identificador do dispositivo USB indisponível</string>
@@ -472,14 +472,17 @@
     <plurals name="vm_native_catalog_loaded">
         <item quantity="one">Perfil Camaro oficial: %1$d para o ano de modelo %2$d. A leitura em tempo real requer evidências do veículo.</item>
         <item quantity="other">Perfis Camaro oficiais: %1$d para o ano de modelo %2$d. A leitura em tempo real requer evidências do veículo.</item>
+        <item quantity="many">Perfis Camaro oficiais: %1$d para o ano de modelo %2$d. A leitura em tempo real requer evidências do veículo.</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
         <item quantity="one">Definição comunitária de sinal disponível: %1$d para o ano de modelo %2$d.</item>
         <item quantity="other">Definições comunitárias de sinais disponíveis: %1$d para o ano de modelo %2$d.</item>
+        <item quantity="many">Definições comunitárias de sinais disponíveis: %1$d para o ano de modelo %2$d.</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
         <item quantity="one">%1$d byte</item>
         <item quantity="other">%1$d bytes</item>
+        <item quantity="many">%1$d bytes</item>
     </plurals>
     <string name="msg_native_catalog_load_failed">Não foi possível carregar o catálogo nativo de sinais do Camaro.</string>
     <string name="msg_obdb_catalog_load_failed">Não foi possível carregar o catálogo OBDb do Camaro.</string>
@@ -556,4 +559,20 @@
     <string name="trace_error_csv_empty">O rastro CSV está vazio.</string>
     <string name="trace_error_csv_columns">O CSV precisa de uma coluna CAN ID e uma coluna de dados/payload, ou colunas data0…data15.</string>
     <string name="trace_error_generic">O rastro contém um registo inválido ou não suportado.</string>
+    <string name="dtc_vehicle_interpretation">Interpretação específica do veículo</string>
+    <string name="dtc_severity">Gravidade</string>
+    <string name="dtc_possible_causes">Causas possíveis (não confirmadas)</string>
+    <string name="dtc_recommended_checks">Verificações recomendadas</string>
+    <string name="dtc_vehicle_specific_not_documented">Ainda não existe um procedimento específico documentado para este código e configuração. A descrição OEM/SAE é apresentada acima; confirme o VIN e o módulo nas informações de serviço GM.</string>
+    <string name="dtc_desc_p0016">Correlação cambota / árvore de cames de admissão não plausível (banco 1)</string>
+    <string name="dtc_desc_p0017">Correlação cambota / árvore de cames de escape não plausível (banco 1)</string>
+    <string name="dtc_desc_p0018">Correlação cambota / árvore de cames de admissão não plausível (banco 2)</string>
+    <string name="dtc_desc_p0019">Correlação cambota / árvore de cames de escape não plausível (banco 2)</string>
+    <string name="dtc_gm_calibration_not_validated">As interpretações e os limites abaixo são dados de referência para o motor e o ano-modelo selecionados. A identidade do módulo (VIN, CAL ID, CVN, identificador do software e número da peça de hardware) ainda não foi verificada; estes dados não estão validados para o módulo ligado.</string>
+    <string name="dtc_gm_monitor_title">Monitor do motor GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Critério de acionamento: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Condições de ativação: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Contador de falhas / frequência de validação: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Classificação MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Fonte: GM %1$s, página %2$d</string>
 </resources>

@@ -2,40 +2,213 @@ name: PC J2534 Bridge CI
 
 on:
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - converted_to_draft
     branches:
       - main
 
 permissions:
+  actions: read
   contents: read
+  pull-requests: read
 
 concurrency:
   group: pc-bridge-debug-pr-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  build-windows-debug:
+  evaluate-build-checkpoint:
     if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      windows_changed: ${{ steps.windows_changes.outputs.windows_changed }}
+      current_windows_changed: ${{ steps.windows_changes.outputs.current_windows_changed }}
+      build_required: ${{ steps.checkpoint.outputs.build_required }}
+      windows_validation_applies: ${{ steps.checkpoint.outputs.validation_applies }}
+      commits_since_build: ${{ steps.checkpoint.outputs.commits_since_build }}
+      interval: ${{ steps.checkpoint.outputs.interval }}
+    steps:
+      - name: Checkout pull request history
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Detect Windows-relevant changes
+        id: windows_changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          paths=(
+            'pc-bridge/**' 'global.json' '.editorconfig' '.github/actions/**' 'NuGet.Config' 'nuget.config'
+            '**/Directory.Build.props' '**/Directory.Build.targets'
+            '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
+            '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
+            '**/NuGet.Config' '**/nuget.config' '.config/dotnet-tools.json'
+            '.github/workflows/pc-bridge-ci.yml'
+          )
+          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"; then
+            echo "windows_changed=false" >> "$GITHUB_OUTPUT"
+            echo "NOT APPLICABLE: no Windows bridge, shared .NET build, installer, or Windows CI workflow changes."
+          else
+            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Windows-relevant changes detected:"
+            git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
+          fi
+          if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- "${paths[@]}"; then
+            echo "current_windows_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "current_windows_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Current commit contains Windows-relevant changes."
+          fi
+
+      - name: Find last successful Windows Debug build
+        id: previous_build
+        if: steps.windows_changes.outputs.windows_changed == 'true' && github.event.pull_request.draft
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: 'pc-bridge-ci.yml', branch: pr.head.ref,
+              event: 'pull_request', status: 'completed', per_page: 100
+            });
+            const candidates = runs
+              .filter(run => run.conclusion === 'success' && run.head_sha !== pr.head.sha &&
+                (run.pull_requests || []).some(item => item.number === pr.number))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            let previous = null;
+            for (const candidate of candidates) {
+              const jobs = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner, repo: context.repo.repo,
+                run_id: candidate.id, per_page: 100
+              });
+              if (jobs.data.jobs.some(job => job.name === 'build-windows-debug' && job.conclusion === 'success')) {
+                previous = candidate;
+                break;
+              }
+            }
+            core.setOutput('sha', previous ? previous.head_sha : '');
+            core.info(previous
+              ? 'Last successful Windows Debug build: ' + previous.head_sha
+              : 'No previous successful Windows Debug build; counting relevant commits from the PR base.');
+
+      - name: Evaluate Windows-only periodic build checkpoint
+        id: checkpoint
+        shell: bash
+        env:
+          BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
+          WINDOWS_CHANGED: ${{ steps.windows_changes.outputs.windows_changed }}
+          CURRENT_WINDOWS_CHANGED: ${{ steps.windows_changes.outputs.current_windows_changed }}
+          EVENT_ACTION: ${{ github.event.action }}
+          PREVIOUS_BUILD_SHA: ${{ steps.previous_build.outputs.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          configured="${BUILD_INTERVAL:-}"
+          if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
+          echo "interval=$interval" >> "$GITHUB_OUTPUT"
+          if [[ "$WINDOWS_CHANGED" != "true" ]]; then
+            echo "validation_applies=false" >> "$GITHUB_OUTPUT"
+            echo "build_required=false" >> "$GITHUB_OUTPUT"
+            echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
+            echo "NOT APPLICABLE: this PR contains no Windows-relevant changes."
+            exit 0
+          fi
+
+          count_base="$BASE_SHA"
+          if [[ -n "$PREVIOUS_BUILD_SHA" ]]; then count_base="$PREVIOUS_BUILD_SHA"; fi
+          paths=(
+            'pc-bridge/**' 'global.json' '.editorconfig' '.github/actions/**' 'NuGet.Config' 'nuget.config'
+            '**/Directory.Build.props' '**/Directory.Build.targets'
+            '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
+            '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
+            '**/NuGet.Config' '**/nuget.config' '.config/dotnet-tools.json'
+            '.github/workflows/pc-bridge-ci.yml'
+          )
+          commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
+          echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
+
+          # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            if [[ "$CURRENT_WINDOWS_CHANGED" != "true" ]]; then
+              echo "validation_applies=false" >> "$GITHUB_OUTPUT"
+              echo "build_required=false" >> "$GITHUB_OUTPUT"
+              echo "NOT APPLICABLE to this commit: no Windows-relevant files changed."
+            else
+              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+              if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/pc-bridge-ci.yml'; then
+                if (( commits_since_build >= interval )); then
+                  echo "build_required=true" >> "$GITHUB_OUTPUT"
+                  echo "Windows Debug build due: $commits_since_build relevant commits (interval $interval)."
+                else
+                  echo "build_required=false" >> "$GITHUB_OUTPUT"
+                  echo "Windows Debug build deferred: $commits_since_build/$interval Windows-relevant commits."
+                fi
+              else
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "Windows Debug workflow changed in this commit: forcing validation."
+              fi
+            fi
+          else
+            case "$EVENT_ACTION" in
+              ready_for_review|opened|reopened)
+                echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "Initial Ready-for-review validation: Windows changes exist in the PR."
+                ;;
+              *)
+                if [[ "$CURRENT_WINDOWS_CHANGED" == "true" ]]; then
+                  echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+                  echo "build_required=true" >> "$GITHUB_OUTPUT"
+                  echo "Ready PR commit changes Windows files: immediate Windows Debug validation required."
+                else
+                  echo "validation_applies=false" >> "$GITHUB_OUTPUT"
+                  echo "build_required=false" >> "$GITHUB_OUTPUT"
+                  echo "NOT APPLICABLE to this Ready PR commit: no Windows-relevant files changed."
+                fi
+                ;;
+            esac
+          fi
+  build-windows-debug:
+    needs: evaluate-build-checkpoint
+    if: needs.evaluate-build-checkpoint.outputs.build_required == 'true'
     runs-on: windows-latest
     steps:
       - name: Checkout pull request commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
 
       - name: Build J2534 bridge in Debug configuration
-        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug
+        run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
         continue-on-error: false
 
-      - name: Install Inno Setup
+      - name: Ensure Inno Setup is available
         shell: pwsh
         run: |
-          choco install innosetup --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+          $iscc = Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+          } else {
+            Write-Host "Inno Setup is already available: $iscc"
+          }
 
       - name: Materialize CamaroDiag installer icon
         shell: pwsh
@@ -63,12 +236,17 @@ jobs:
             $output = Join-Path $PWD "publish\$($variant.Name)"
             New-Item -ItemType Directory -Force -Path $output | Out-Null
 
-            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --runtime $variant.Runtime --self-contained true --output $output "-p:Version=0.0.0" "-p:AssemblyVersion=0.0.0.0" "-p:FileVersion=0.0.0.0"
+            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --runtime $variant.Runtime --self-contained true --output $output -warnaserror "-p:Version=0.0.0" "-p:AssemblyVersion=0.0.0.0" "-p:FileVersion=0.0.0.0"
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
 
             $outputName = "CamaroDiag-J2534-Bridge-Setup-debug-pr$env:PR_NUMBER-$($variant.Arch)"
-            & $iscc "/DAppVersion=0.0.0" "/DBuildDir=$output" "/DChannel=debug" "/DArch=$($variant.Arch)" "/DOutputName=$outputName" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss"
+            $installerLog = Join-Path $PWD "dist\$($variant.Name)-installer.log"
+            $installerOutput = & $iscc "/DAppVersion=0.0.0" "/DBuildDir=$output" "/DChannel=debug" "/DArch=$($variant.Arch)" "/DOutputName=$outputName" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss" 2>&1
+            $installerOutput | Tee-Object -FilePath $installerLog
             if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed for $($variant.Name)" }
+            if (($installerOutput | Out-String) -match '(?i)\bwarning\b') {
+              throw "Inno Setup emitted a warning for $($variant.Name); warning-free Debug builds are mandatory. See $installerLog"
+            }
           }
 
       - name: Upload Windows Debug installers for this PR commit
@@ -80,3 +258,38 @@ jobs:
             dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x86.exe
           if-no-files-found: error
           retention-days: 30
+
+  windows-debug-validation:
+    needs: [evaluate-build-checkpoint, build-windows-debug]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Windows Debug validation applicability
+        env:
+          EVALUATION_RESULT: ${{ needs.evaluate-build-checkpoint.result }}
+          WINDOWS_CHANGED: ${{ needs.evaluate-build-checkpoint.outputs.windows_changed }}
+          BUILD_REQUIRED: ${{ needs.evaluate-build-checkpoint.outputs.build_required }}
+          BUILD_RESULT: ${{ needs.build-windows-debug.result }}
+          COMMITS_SINCE_BUILD: ${{ needs.evaluate-build-checkpoint.outputs.commits_since_build }}
+          BUILD_INTERVAL: ${{ needs.evaluate-build-checkpoint.outputs.interval }}
+          VALIDATION_APPLIES: ${{ needs.evaluate-build-checkpoint.outputs.windows_validation_applies }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVALUATION_RESULT" != "success" ]]; then
+            echo "::error::Windows applicability/checkpoint evaluation did not succeed."
+            exit 1
+          fi
+          if [[ "$VALIDATION_APPLIES" != "true" ]]; then
+            echo "NOT APPLICABLE: this PR event/commit does not change Windows-relevant files."
+            exit 0
+          fi
+          if [[ "$BUILD_REQUIRED" != "true" ]]; then
+            echo "BUILD DEFERRED: $COMMITS_SINCE_BUILD/$BUILD_INTERVAL Windows-relevant commits."
+            echo "This control is not a compilation and does not reset the checkpoint."
+            exit 0
+          fi
+          if [[ "$BUILD_RESULT" != "success" ]]; then
+            echo "::error::Windows Debug build was required but its result was $BUILD_RESULT."
+            exit 1
+          fi
+          echo "VALIDATED: Windows Debug build and x64/x86 installers completed successfully."

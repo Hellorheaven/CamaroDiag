@@ -200,20 +200,28 @@ class UdsClient private constructor(
         return response.copyOfRange(2, response.size)
     }
 
-    suspend fun readDtcByStatusMask(statusMask: Int = 0xFF): List<UdsDtcRecord> {
+    suspend fun readDtcReport(statusMask: Int = 0xFF): UdsDtcReport {
         require(statusMask in 0..0xFF)
         val data = readDtcInformation(0x02, byteArrayOf(statusMask.toByte()))
-        require(data.isNotEmpty()) { "Incomplete ReadDTCInformation response." }
-        val availabilityMask = data[0].toInt() and 0xFF
-        val records = data.copyOfRange(1, data.size)
-        require(records.size % 4 == 0) { "DTC record payload is not a multiple of four bytes." }
-        return records.asList().chunked(4).map { record ->
-            val raw = record.map { it.toByte() }.toByteArray()
+        return UdsDtcDecoder.decodeReadDtcInformation(data)
+    }
+
+    suspend fun readDtcByStatusMask(statusMask: Int = 0xFF): List<UdsDtcRecord> {
+        val report = readDtcReport(statusMask)
+        return report.records.map { record ->
+            val rawBytes = byteArrayOf(
+                record.rawDtc.ushr(16).toByte(),
+                record.rawDtc.ushr(8).toByte(),
+                record.rawDtc.toByte(),
+                record.statusByte.toByte()
+            )
             UdsDtcRecord(
-                dtc = ((raw[0].toInt() and 0xFF) shl 16) or
-                    ((raw[1].toInt() and 0xFF) shl 8) or (raw[2].toInt() and 0xFF),
-                status = raw[3].toInt() and 0xFF,
-                raw = byteArrayOf(availabilityMask.toByte()) + raw
+                dtc = record.rawDtc,
+                status = record.statusByte,
+                raw = byteArrayOf(
+                    report.statusAvailabilityMask.toByte(),
+                    report.formatIdentifier.toByte()
+                ) + rawBytes
             )
         }
     }

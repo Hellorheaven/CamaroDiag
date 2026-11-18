@@ -69,10 +69,10 @@ object CamaroCalibrationCatalog {
             "Gen 5 Z/28 LS7 V8. Separate profile from LS3/L99 despite the nominal controller family; software identification is mandatory."
         ),
         profile(
-            CamaroEngine.LTG, CamaroGeneration.GEN6, 2016..2020,
+            CamaroEngine.LTG, CamaroGeneration.GEN6, 2016..2023,
             "GM E80 (RPO LTG)",
-            "Camaro Gen 6 2.0 Turbo LTG (années 2016 à 2020 dans la matrice de couverture). Le bulletin GM PIP5313B cite l'E80 sur Camaro LTG 2016–2017 ; confirmer les années suivantes par référence et CAL ID.",
-            "Gen 6 2.0 Turbo LTG Camaro (2016–2020 coverage range). GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG; verify later years by part number and CAL ID."
+            "Camaro Gen 6 2.0 Turbo LTG (années 2016 à 2023 dans les matrices de groupes OBD GM). Le bulletin GM PIP5313B cite l'E80 sur Camaro LTG 2016–2017 ; confirmer chaque année et version par référence matérielle et CAL ID.",
+            "Gen 6 2.0 Turbo LTG Camaro (2016–2023 in GM OBD group matrices). GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG; confirm each year and revision by hardware part number and CAL ID."
         ),
         profile(
             CamaroEngine.LGX, CamaroGeneration.GEN6, 2016..2024,

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- These checks are advisory in this project: dependency upgrades are gated by
+         compileSdk/AGP compatibility; plural-candidate strings contain multiple
+         counters in diagnostic summaries; the channel string is retained for the
+         updater UI contract. Keep findings visible as informational, not warnings. -->
+    <issue id="AndroidGradlePluginVersion" severity="informational" />
+    <issue id="GradleDependency" severity="informational" />
+    <issue id="PluralsCandidate" severity="informational" />
+    <issue id="Typos" severity="informational" />
+    <issue id="UnusedResources" severity="informational" />
+</lint>

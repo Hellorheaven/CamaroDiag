@@ -102,7 +102,7 @@
     <string name="dtc_title">Diagnostic Trouble Codes</string>
     <string name="dtc_scan">Scan</string>
     <string name="dtc_clear">Clear</string>
-    <string name="dtc_clear_warning">Mode 04 clearing removes emissions-related trouble codes and resets some readiness monitors. Save the report before continuing.</string>
+    <string name="dtc_clear_warning">Mode 04 clearing removes emissions-related trouble codes and resets some readiness monitors. Save the report before continuing. Mode 04 does not clear enhanced DTCs stored by other vehicle modules.</string>
     <string name="dtc_none_returned">No trouble codes returned by the last scan.</string>
     <string name="dtc_confirm_clear">Confirm DTC clearing?</string>
     <string name="dtc_clear_description">This sends OBD Mode 04 to the ECU. Readiness data may be reset. It does not repair the cause of a fault.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Gen 5 L99 V8 with AFM and automatic transmission. Do not reuse an LS3 calibration; verify RPO, transmission and ECU identifiers.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Gen 5 ZL1 supercharged LSA V8. Verify calibration for supercharger, fuel, market and software revision.</string>
     <string name="cal_profile_notes_ls7">Gen 5 Z/28 LS7 V8. Separate profile from LS3/L99 despite the nominal controller family; software identification is mandatory.</string>
-    <string name="cal_profile_notes_ltg">Gen 6 2.0 Turbo LTG Camaro (2016–2020 coverage range). GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG; verify later years by part number and CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Gen 6 2.0 Turbo LTG Camaro (2016–2023 coverage range). GM bulletin PIP5313B identifies E80 on 2016–2017 Camaro LTG; verify later years by part number and CAL ID.</string>
     <string name="cal_profile_notes_lgx">Gen 6 LGX V6 Camaro. Profile may vary by year, market and revision; confirm the actual controller and CVN before loading a table definition.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Gen 6 naturally aspirated LT1 V8 Camaro. Distinguish calibration revisions by CAL ID/CVN, year, market, transmission and hardware numbers.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Gen 6 ZL1 supercharged LT4 V8 Camaro. Do not mix with LT1; validate part numbers and calibration-specific boost data.</string>
@@ -555,4 +555,20 @@
     <string name="trace_error_csv_empty">The CSV trace is empty.</string>
     <string name="trace_error_csv_columns">The CSV needs a CAN ID column and a data/payload column, or data0…data15 columns.</string>
     <string name="trace_error_generic">The trace contains an unsupported or invalid record.</string>
+    <string name="dtc_vehicle_interpretation">Vehicle-specific interpretation</string>
+    <string name="dtc_severity">Severity</string>
+    <string name="dtc_possible_causes">Possible causes (not confirmed)</string>
+    <string name="dtc_recommended_checks">Recommended checks</string>
+    <string name="dtc_vehicle_specific_not_documented">No vehicle-specific procedure is documented for this code and selected configuration. The OEM/SAE description is shown above; verify the exact VIN and control module in GM service information.</string>
+    <string name="dtc_desc_p0016">Crankshaft Position - Intake Camshaft Position Not Plausible (Bank 1)</string>
+    <string name="dtc_desc_p0017">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 1)</string>
+    <string name="dtc_desc_p0018">Crankshaft Position - Intake Camshaft Position Not Plausible (Bank 2)</string>
+    <string name="dtc_desc_p0019">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 2)</string>
+    <string name="dtc_gm_calibration_not_validated">The explanations and thresholds below are reference data for the selected engine and model year. ECU identity (VIN, CAL ID, CVN, software ID and hardware part number) has not yet been verified; these data are not validated for the connected ECU.</string>
+    <string name="dtc_gm_monitor_title">GM engine monitor – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Setting criteria: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Enable conditions: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Failure counter / validation rate: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL classification: %1$s</string>
+    <string name="dtc_gm_monitor_source">Source: GM %1$s, page %2$d</string>
 </resources>

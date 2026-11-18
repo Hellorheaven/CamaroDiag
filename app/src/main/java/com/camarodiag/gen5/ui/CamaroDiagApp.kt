@@ -196,13 +196,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark),
-                navigationIcon = {
-                    if (currentTab == DiagTab.SETUP || currentTab == DiagTab.ADAPTER) {
-                        IconButton(onClick = { currentTab = DiagTab.SETTINGS }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.tab_settings), tint = CamaroAmber)
-                        }
-                    }
-                },
                 title = {
                     Column {
                         Text(
@@ -266,6 +259,18 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
 
                 NavigationBarItem(
+                    selected = currentTab == DiagTab.SETTINGS,
+                    onClick = { currentTab = DiagTab.SETTINGS },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tab_settings)) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = BgDark,
+                        selectedTextColor = CamaroAmber,
+                        indicatorColor = CamaroAmber
+                    )
+                )
+
+                NavigationBarItem(
                     selected = currentTab in setOf(
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
@@ -273,7 +278,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
-                        DiagTab.SETTINGS,
                         DiagTab.SETUP,
                         DiagTab.ADAPTER
                     ),
@@ -297,8 +301,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
-                        DiagTab.CONTROL,
-                        DiagTab.SETTINGS
+                        DiagTab.CONTROL
                     ).forEach { tab ->
                         DropdownMenuItem(
                             text = {
@@ -357,7 +360,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
                     }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
+                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
                 DiagTab.OBD_SCAN -> ObdScanScreen(
                     report = obdScanReport,
@@ -956,53 +959,80 @@ fun Sparkline(values: List<Double>, minVal: Double, maxVal: Double) {
 }
 
 @Composable
-private fun localizedDtcStatus(dtc: DiagnosticDtc): String = when {
-    dtc.isPending -> stringResource(R.string.obd_pending)
-    dtc.statusEn.equals("Permanent", ignoreCase = true) -> stringResource(R.string.obd_permanent)
-    else -> stringResource(R.string.obd_confirmed)
+private fun localizedDtcStatus(dtc: DiagnosticDtc): String {
+    val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+    val rawStatus = dtc.statusEn.trim()
+    // UDS ReadDTCInformation carries eight independent status bits. Preserve their
+    // complete decoded summary instead of collapsing it to a single pending/confirmed badge.
+    if (rawStatus.isNotBlank() &&
+        !rawStatus.equals("Pending", ignoreCase = true) &&
+        !rawStatus.equals("Confirmed", ignoreCase = true) &&
+        !rawStatus.equals("Permanent", ignoreCase = true)
+    ) {
+        return (if (isFrench) dtc.statusFr else dtc.statusEn).ifBlank { rawStatus }
+    }
+    return when {
+        dtc.isPending -> stringResource(R.string.obd_pending)
+        dtc.statusEn.equals("Permanent", ignoreCase = true) -> stringResource(R.string.obd_permanent)
+        else -> stringResource(R.string.obd_confirmed)
+    }
 }
 
 @Composable
-private fun localizedDtcDescription(dtc: DiagnosticDtc): String = when (dtc.code.uppercase()) {
-    "P0101" -> stringResource(R.string.dtc_desc_p0101)
-    "P0102" -> stringResource(R.string.dtc_desc_p0102)
-    "P0103" -> stringResource(R.string.dtc_desc_p0103)
-    "P0113" -> stringResource(R.string.dtc_desc_p0113)
-    "P0128" -> stringResource(R.string.dtc_desc_p0128)
-    "P0171" -> stringResource(R.string.dtc_desc_p0171)
-    "P0172" -> stringResource(R.string.dtc_desc_p0172)
-    "P0174" -> stringResource(R.string.dtc_desc_p0174)
-    "P0175" -> stringResource(R.string.dtc_desc_p0175)
-    "P0300" -> stringResource(R.string.dtc_desc_p0300)
-    "P0301" -> stringResource(R.string.dtc_desc_p0301)
-    "P0302" -> stringResource(R.string.dtc_desc_p0302)
-    "P0303" -> stringResource(R.string.dtc_desc_p0303)
-    "P0304" -> stringResource(R.string.dtc_desc_p0304)
-    "P0305" -> stringResource(R.string.dtc_desc_p0305)
-    "P0306" -> stringResource(R.string.dtc_desc_p0306)
-    "P0307" -> stringResource(R.string.dtc_desc_p0307)
-    "P0308" -> stringResource(R.string.dtc_desc_p0308)
-    "P0420" -> stringResource(R.string.dtc_desc_p0420)
-    "P0430" -> stringResource(R.string.dtc_desc_p0430)
-    "P0442" -> stringResource(R.string.dtc_desc_p0442)
-    "P0455" -> stringResource(R.string.dtc_desc_p0455)
-    "P0496" -> stringResource(R.string.dtc_desc_p0496)
-    "P0507" -> stringResource(R.string.dtc_desc_p0507)
-    "P06DD" -> stringResource(R.string.dtc_desc_p06dd)
-    "P1101" -> stringResource(R.string.dtc_desc_p1101)
-    "P0010" -> stringResource(R.string.dtc_desc_p0010)
-    "P0011" -> stringResource(R.string.dtc_desc_p0011)
-    "P0014" -> stringResource(R.string.dtc_desc_p0014)
-    "P0087" -> stringResource(R.string.dtc_desc_p0087)
-    "P0089" -> stringResource(R.string.dtc_desc_p0089)
-    "P0191" -> stringResource(R.string.dtc_desc_p0191)
-    "P0299" -> stringResource(R.string.dtc_desc_p0299)
-    else -> stringResource(R.string.dtc_description_unavailable)
+private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
+    val code = dtc.code.substringBefore('-').uppercase()
+    val translated = when (code) {
+        "P0101" -> stringResource(R.string.dtc_desc_p0101)
+        "P0102" -> stringResource(R.string.dtc_desc_p0102)
+        "P0103" -> stringResource(R.string.dtc_desc_p0103)
+        "P0113" -> stringResource(R.string.dtc_desc_p0113)
+        "P0128" -> stringResource(R.string.dtc_desc_p0128)
+        "P0171" -> stringResource(R.string.dtc_desc_p0171)
+        "P0172" -> stringResource(R.string.dtc_desc_p0172)
+        "P0174" -> stringResource(R.string.dtc_desc_p0174)
+        "P0175" -> stringResource(R.string.dtc_desc_p0175)
+        "P0300" -> stringResource(R.string.dtc_desc_p0300)
+        "P0301" -> stringResource(R.string.dtc_desc_p0301)
+        "P0302" -> stringResource(R.string.dtc_desc_p0302)
+        "P0303" -> stringResource(R.string.dtc_desc_p0303)
+        "P0304" -> stringResource(R.string.dtc_desc_p0304)
+        "P0305" -> stringResource(R.string.dtc_desc_p0305)
+        "P0306" -> stringResource(R.string.dtc_desc_p0306)
+        "P0307" -> stringResource(R.string.dtc_desc_p0307)
+        "P0308" -> stringResource(R.string.dtc_desc_p0308)
+        "P0420" -> stringResource(R.string.dtc_desc_p0420)
+        "P0430" -> stringResource(R.string.dtc_desc_p0430)
+        "P0442" -> stringResource(R.string.dtc_desc_p0442)
+        "P0455" -> stringResource(R.string.dtc_desc_p0455)
+        "P0496" -> stringResource(R.string.dtc_desc_p0496)
+        "P0507" -> stringResource(R.string.dtc_desc_p0507)
+        "P06DD" -> stringResource(R.string.dtc_desc_p06dd)
+        "P1101" -> stringResource(R.string.dtc_desc_p1101)
+        "P0010" -> stringResource(R.string.dtc_desc_p0010)
+        "P0011" -> stringResource(R.string.dtc_desc_p0011)
+        "P0014" -> stringResource(R.string.dtc_desc_p0014)
+        "P0016" -> stringResource(R.string.dtc_desc_p0016)
+        "P0017" -> stringResource(R.string.dtc_desc_p0017)
+        "P0018" -> stringResource(R.string.dtc_desc_p0018)
+        "P0019" -> stringResource(R.string.dtc_desc_p0019)
+        "P0087" -> stringResource(R.string.dtc_desc_p0087)
+        "P0089" -> stringResource(R.string.dtc_desc_p0089)
+        "P0191" -> stringResource(R.string.dtc_desc_p0191)
+        "P0299" -> stringResource(R.string.dtc_desc_p0299)
+        else -> ""
+    }
+    return translated.ifBlank {
+        val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+        (if (isFrench) dtc.descFr else dtc.descEn).ifBlank {
+            stringResource(R.string.dtc_description_unavailable)
+        }
+    }
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, onScan: () -> Unit, onClear: () -> Unit) {
+fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> Unit, onClear: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
+    val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -1021,6 +1051,21 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, onScan: () -> Unit, onClear: () -> Unit
                 color = TextMuted, fontSize = 11.sp
             )
         }
+        item {
+            val coverage = CamaroDtcCatalog.coverageNotice(vehicle)
+            Text(
+                if (isFrench) coverage.first else coverage.second,
+                color = CamaroAmber,
+                fontSize = 11.sp
+            )
+            if (dtcs.any { DtcCatalogRegistry.catalogueFor(it.module, vehicle).hasVehicleSpecificDefinitions }) {
+                Text(
+                    stringResource(R.string.dtc_gm_calibration_not_validated),
+                    color = CamaroAmber,
+                    fontSize = 11.sp
+                )
+            }
+        }
         if (dtcs.isEmpty()) {
             item {
                 Text(stringResource(R.string.dtc_none_returned), color = OkGreen)
@@ -1034,6 +1079,85 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, onScan: () -> Unit, onClear: () -> Unit
                             Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
                         }
                         Text(localizedDtcDescription(dtc))
+                        val moduleCatalogue = DtcCatalogRegistry.catalogueFor(dtc.module, vehicle)
+                        val applicabilityNotice = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            CamaroDtcCatalog.applicabilityNotice(dtc.code.substringBefore('-'), vehicle)
+                        } else {
+                            null
+                        }
+                        if (applicabilityNotice != null) {
+                            Text(
+                                if (isFrench) applicabilityNotice.first else applicabilityNotice.second,
+                                color = WarnRed,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        if (!moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            Text(
+                                if (isFrench) moduleCatalogue.noteFr else moduleCatalogue.noteEn,
+                                color = TextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                        val vehicleExplanation = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            CamaroDtcCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        } else {
+                            null
+                        }
+                        if (vehicleExplanation != null) {
+                            HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
+                            Text(stringResource(R.string.dtc_vehicle_interpretation), fontWeight = FontWeight.Bold, color = CamaroAmber)
+                            Text(if (isFrench) vehicleExplanation.meaningFr else vehicleExplanation.meaningEn)
+                            Text(
+                                stringResource(R.string.dtc_severity) + ": " +
+                                    if (isFrench) vehicleExplanation.severityFr else vehicleExplanation.severityEn,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(stringResource(R.string.dtc_possible_causes), fontWeight = FontWeight.Bold)
+                            (if (isFrench) vehicleExplanation.causesFr else vehicleExplanation.causesEn).forEach { cause ->
+                                Text("• $cause")
+                            }
+                            Text(stringResource(R.string.dtc_recommended_checks), fontWeight = FontWeight.Bold)
+                            (if (isFrench) vehicleExplanation.checksFr else vehicleExplanation.checksEn).forEachIndexed { index, check ->
+                                Text("${index + 1}. $check")
+                            }
+                            val applicability = if (isFrench) vehicleExplanation.applicabilityFr else vehicleExplanation.applicabilityEn
+                            if (!applicability.isNullOrBlank()) {
+                                Text(applicability, color = WarnRed)
+                            }
+                        }
+                        val gmMonitor = if (moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            GmEngineMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
+                        } else {
+                            null
+                        }
+                        val gmSourceLabel = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
+                        if (gmMonitor != null) {
+                            HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
+                            Text(
+                                stringResource(R.string.dtc_gm_monitor_title, gmSourceLabel),
+                                fontWeight = FontWeight.Bold,
+                                color = CamaroAmber
+                            )
+                            Text(if (isFrench) gmMonitor.componentFr else gmMonitor.componentEn, fontWeight = FontWeight.SemiBold)
+                            Text(if (isFrench) gmMonitor.strategyFr else gmMonitor.strategyEn)
+                            Text(stringResource(R.string.dtc_gm_monitor_criteria, if (isFrench) gmMonitor.malfunctionCriteriaFr else gmMonitor.malfunctionCriteriaEn))
+                            Text(stringResource(R.string.dtc_gm_monitor_enable, if (isFrench) gmMonitor.enableConditionsFr else gmMonitor.enableConditionsEn))
+                            Text(stringResource(R.string.dtc_gm_monitor_failure, if (isFrench) gmMonitor.failureCriteriaFr else gmMonitor.failureCriteriaEn))
+                            Text(stringResource(R.string.dtc_gm_monitor_mil, gmMonitor.milClassification))
+                            Text(
+                                stringResource(R.string.dtc_gm_monitor_source, gmSourceLabel, gmMonitor.sourcePage),
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        } else if (vehicleExplanation == null && moduleCatalogue.hasVehicleSpecificDefinitions) {
+                            Text(
+                                stringResource(R.string.dtc_vehicle_specific_not_documented),
+                                color = TextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }

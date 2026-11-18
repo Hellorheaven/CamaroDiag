@@ -102,7 +102,7 @@
     <string name="dtc_title">診断トラブルコード</string>
     <string name="dtc_scan">スキャン</string>
     <string name="dtc_clear">消去</string>
-    <string name="dtc_clear_warning">Mode 04 の消去では排出ガス関連の故障コードが削除され、一部のレディネスモニターがリセットされます。続行する前にレポートを保存してください。</string>
+    <string name="dtc_clear_warning">Mode 04 の消去では排出ガス関連の故障コードが削除され、一部のレディネスモニターがリセットされます。続行する前にレポートを保存してください。 Mode 04 では、車両の他の制御モジュールに保存された拡張 DTC は消去されません。 Mode 04 では、車両の他の制御モジュールに保存された拡張 DTC は消去されません。</string>
     <string name="dtc_none_returned">前回のスキャンでは故障コードが返されませんでした。</string>
     <string name="dtc_confirm_clear">DTC を消去しますか？</string>
     <string name="dtc_clear_description">ECU に OBD Mode 04 を送信します。レディネスデータがリセットされる場合がありますが、故障原因が修復されるわけではありません。</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8、AFM搭載、オートマチックトランスミッション仕様です。LS3のキャリブレーションを流用せず、RPO、トランスミッション、ECU識別子を確認してください。</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1のスーパーチャージャー付きLSA V8です。スーパーチャージャー、燃料、市場、ソフトウェアリビジョンに対応したキャリブレーションを確認してください。</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28のLS7 V8です。コントローラー系統が同じでもLS3/L99とは別プロファイルであり、ソフトウェア識別が必須です。</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG（対応範囲：2016～2020年）。GM資料PIP5313Bは2016～2017年のCamaro LTGでE80を示しています。それ以降の年式は部品番号とCAL IDで確認してください。</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG（対応範囲：2016～2023年）。GM資料PIP5313Bは2016～2017年のCamaro LTGでE80を示しています。それ以降の年式は部品番号とCAL IDで確認してください。</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6です。年式、市場、リビジョンによってプロファイルが異なる場合があります。テーブル定義を読み込む前に実際のコントローラーとCVNを確認してください。</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6の自然吸気LT1 V8です。CAL ID/CVN、年式、市場、トランスミッション、ハードウェア番号でキャリブレーションの改訂を区別してください。</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1のスーパーチャージャー付きLT4 V8です。LT1と混同せず、部品番号とキャリブレーション固有の過給データを検証してください。</string>
@@ -552,4 +552,20 @@
     <string name="trace_error_csv_empty">CSV トレースが空です。</string>
     <string name="trace_error_csv_columns">CSV には CAN ID 列と data/payload 列、または data0…data15 列が必要です。</string>
     <string name="trace_error_generic">トレースに無効または未対応のレコードが含まれています。</string>
+    <string name="dtc_vehicle_interpretation">車両固有の解釈</string>
+    <string name="dtc_severity">重大度</string>
+    <string name="dtc_possible_causes">考えられる原因（未確認）</string>
+    <string name="dtc_recommended_checks">推奨点検項目</string>
+    <string name="dtc_vehicle_specific_not_documented">このコードと選択された車両構成に固有の診断手順はまだ登録されていません。上記のOEM/SAE説明を確認し、GM整備情報でVINと制御モジュールを照合してください。</string>
+    <string name="dtc_desc_p0016">クランクシャフト位置と吸気カムシャフト位置の相関異常（バンク1）</string>
+    <string name="dtc_desc_p0017">クランクシャフト位置と排気カムシャフト位置の相関異常（バンク1）</string>
+    <string name="dtc_desc_p0018">クランクシャフト位置と吸気カムシャフト位置の相関異常（バンク2）</string>
+    <string name="dtc_desc_p0019">クランクシャフト位置と排気カムシャフト位置の相関異常（バンク2）</string>
+    <string name="dtc_gm_calibration_not_validated">以下の解釈としきい値は、選択されたエンジンとモデル年式に対する参考データです。ECUの識別情報（VIN、CAL ID、CVN、ソフトウェアID、ハードウェア部品番号）は未確認です。これらのデータは接続中のECUについて検証されていません。</string>
+    <string name="dtc_gm_monitor_title">GMエンジンモニター – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">故障判定基準: %1$s</string>
+    <string name="dtc_gm_monitor_enable">作動条件: %1$s</string>
+    <string name="dtc_gm_monitor_failure">故障カウンター／判定頻度: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL分類: %1$s</string>
+    <string name="dtc_gm_monitor_source">出典: GM %1$s、%2$dページ</string>
 </resources>

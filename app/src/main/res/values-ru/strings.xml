@@ -102,7 +102,7 @@
     <string name="dtc_title">Диагностические коды неисправностей</string>
     <string name="dtc_scan">Сканировать</string>
     <string name="dtc_clear">Очистить</string>
-    <string name="dtc_clear_warning">Очистка в режиме 04 удаляет коды неисправностей, связанные с выбросами, и сбрасывает некоторые мониторы готовности. Перед продолжением сохраните отчет.</string>
+    <string name="dtc_clear_warning">Очистка в режиме 04 удаляет коды неисправностей, связанные с выбросами, и сбрасывает некоторые мониторы готовности. Перед продолжением сохраните отчет. Режим 04 не удаляет расширенные DTC, сохранённые в других блоках управления автомобиля. Режим 04 не удаляет расширенные DTC, сохранённые в других блоках управления автомобиля.</string>
     <string name="dtc_none_returned">Последнее сканирование не вернуло кодов неисправностей.</string>
     <string name="dtc_confirm_clear">Подтвердить очистку DTC?</string>
     <string name="dtc_clear_description">Это отправит ЭБУ команду OBD Mode 04. Данные готовности могут быть сброшены. Причина неисправности при этом не устраняется.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 с двигателем L99 V8, системой AFM и автоматической коробкой передач. Не используйте калибровку LS3; проверьте RPO, коробку передач и идентификаторы ECU.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro Gen 5 ZL1 с наддувным двигателем LSA V8. Проверьте калибровку нагнетателя, топлива, рынка и версии программного обеспечения.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 с двигателем LS7 V8. Это отдельный профиль от LS3/L99, несмотря на указанное семейство контроллера; идентификация программного обеспечения обязательна.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 с двигателем 2.0 Turbo LTG (диапазон поддержки 2016–2020). Бюллетень GM PIP5313B указывает E80 для Camaro LTG 2016–2017; последующие годы необходимо проверять по номеру детали и CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 с двигателем 2.0 Turbo LTG (диапазон поддержки 2016–2023). Бюллетень GM PIP5313B указывает E80 для Camaro LTG 2016–2017; последующие годы необходимо проверять по номеру детали и CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 с двигателем LGX V6. Профиль может различаться в зависимости от года, рынка и версии; перед загрузкой определения таблиц подтвердите фактический контроллер и CVN.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro Gen 6 с атмосферным двигателем LT1 V8. Различайте версии калибровки по CAL ID/CVN, году, рынку, коробке передач и номерам аппаратных частей.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro Gen 6 ZL1 с наддувным двигателем LT4 V8. Не смешивайте его с LT1; проверьте номера деталей и данные наддува для конкретной калибровки.</string>
@@ -561,4 +561,20 @@
     <string name="trace_error_csv_empty">Трасса CSV пуста.</string>
     <string name="trace_error_csv_columns">В CSV нужен столбец CAN ID и столбец данных/payload либо столбцы data0…data15.</string>
     <string name="trace_error_generic">Трасса содержит недопустимую или неподдерживаемую запись.</string>
+    <string name="dtc_vehicle_interpretation">Интерпретация для данного автомобиля</string>
+    <string name="dtc_severity">Серьёзность</string>
+    <string name="dtc_possible_causes">Возможные причины (не подтверждены)</string>
+    <string name="dtc_recommended_checks">Рекомендуемые проверки</string>
+    <string name="dtc_vehicle_specific_not_documented">Для этого кода и выбранной конфигурации ещё не документирована специальная процедура. Выше приведено описание OEM/SAE; проверьте VIN и блок управления по сервисной документации GM.</string>
+    <string name="dtc_desc_p0016">Несоответствие положения коленчатого вала и впускного распредвала (банк 1)</string>
+    <string name="dtc_desc_p0017">Несоответствие положения коленчатого вала и выпускного распредвала (банк 1)</string>
+    <string name="dtc_desc_p0018">Несоответствие положения коленчатого вала и впускного распредвала (банк 2)</string>
+    <string name="dtc_desc_p0019">Несоответствие положения коленчатого вала и выпускного распредвала (банк 2)</string>
+    <string name="dtc_gm_calibration_not_validated">Приведённые ниже интерпретации и пороговые значения являются справочными данными для выбранного двигателя и модельного года. Идентификаторы ЭБУ (VIN, CAL ID, CVN, идентификатор ПО и номер аппаратной детали) ещё не проверены; эти данные не подтверждены для подключённого ЭБУ.</string>
+    <string name="dtc_gm_monitor_title">Монитор двигателя GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Критерий срабатывания: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Условия активации: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Счётчик отказов / частота подтверждения: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Классификация MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Источник: GM %1$s, страница %2$d</string>
 </resources>

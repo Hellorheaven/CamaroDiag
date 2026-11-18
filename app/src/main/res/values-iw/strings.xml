@@ -102,7 +102,7 @@
     <string name="dtc_title">קודי תקלה</string>
     <string name="dtc_scan">סרוק</string>
     <string name="dtc_clear">נקה</string>
-    <string name="dtc_clear_warning">מחיקה באמצעות מצב 04 מסירה קודי תקלה הקשורים לפליטות ומאפסת חלק ממוני המוכנות. שמור את הדוח לפני ההמשך.</string>
+    <string name="dtc_clear_warning">מחיקה באמצעות מצב 04 מסירה קודי תקלה הקשורים לפליטות ומאפסת חלק ממוני המוכנות. שמור את הדוח לפני ההמשך. מצב 04 אינו מוחק קודי DTC מורחבים השמורים במחשבי רכב אחרים. מצב 04 אינו מוחק קודי DTC מורחבים השמורים במחשבי רכב אחרים.</string>
     <string name="dtc_none_returned">הסריקה האחרונה לא החזירה קודי תקלה.</string>
     <string name="dtc_confirm_clear">לאשר מחיקת קודי DTC?</string>
     <string name="dtc_clear_description">פעולה זו שולחת למחשב הרכב את שירות OBD במצב 04. נתוני המוכנות עשויים להתאפס. הפעולה אינה מתקנת את סיבת התקלה.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro דור 5 V8 L99 עם AFM ותיבת הילוכים אוטומטית. אין להשתמש בכיול LS3; יש לאמת RPO, תיבת הילוכים ומזהי מחשב הרכב.</string>
     <string name="cal_profile_notes_lsa" tools:ignore="Typos">Camaro דור 5 ZL1 V8 LSA מוגדש. יש לבדוק את הכיול בהתאם למגדש, לדלק, לשוק ולגרסת התוכנה.</string>
     <string name="cal_profile_notes_ls7">Camaro דור 5 Z/28 V8 LS7. פרופיל נפרד מ-LS3/L99 למרות משפחת מחשב הרכב הנומינלית; זיהוי התוכנה חובה.</string>
-    <string name="cal_profile_notes_ltg">Camaro דור 6 2.0 Turbo LTG (טווח הכיסוי 2016–2020). עלון GM ‏PIP5313B מציין E80 ב-Camaro LTG ‏2016–2017; יש לאמת שנים מאוחרות יותר לפי מספר חלק ו-CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro דור 6 2.0 Turbo LTG (טווח הכיסוי 2016–2023). עלון GM ‏PIP5313B מציין E80 ב-Camaro LTG ‏2016–2017; יש לאמת שנים מאוחרות יותר לפי מספר חלק ו-CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro דור 6 V6 LGX. הפרופיל עשוי להשתנות לפי שנה, שוק וגרסה; יש לאשר את מחשב הרכב בפועל ואת ה-CVN לפני טעינת הגדרת טבלאות.</string>
     <string name="cal_profile_notes_lt1" tools:ignore="Typos">Camaro דור 6 V8 LT1 אטמוספרי. יש להבחין בין גרסאות כיול לפי CAL ID/CVN, שנה, שוק, תיבת הילוכים ומספרי חומרה.</string>
     <string name="cal_profile_notes_lt4" tools:ignore="Typos">Camaro דור 6 ZL1 V8 LT4 מוגדש. אין לערבב עם LT1; יש לאמת מספרי חלק ונתוני גדישה הייחודיים לכיול.</string>
@@ -558,4 +558,20 @@
     <string name="trace_error_csv_empty">עקבת ה-CSV ריקה.</string>
     <string name="trace_error_csv_columns">קובץ CSV חייב לכלול עמודת CAN ID ועמודת נתונים/payload, או עמודות data0…data15.</string>
     <string name="trace_error_generic">העקבה מכילה רשומה לא תקינה או לא נתמכת.</string>
+    <string name="dtc_vehicle_interpretation">פירוש ייחודי לרכב</string>
+    <string name="dtc_severity">חומרה</string>
+    <string name="dtc_possible_causes">סיבות אפשריות (לא מאומתות)</string>
+    <string name="dtc_recommended_checks">בדיקות מומלצות</string>
+    <string name="dtc_vehicle_specific_not_documented">עדיין לא תועד נוהל אבחון ייחודי לקוד ולתצורת הרכב האלה. תיאור OEM/SAE מופיע למעלה; יש לאמת את מספר ה‑VIN ואת יחידת הבקרה במידע השירות של GM.</string>
+    <string name="dtc_desc_p0016">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של היניקה (בנק 1)</string>
+    <string name="dtc_desc_p0017">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של הפליטה (בנק 1)</string>
+    <string name="dtc_desc_p0018">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של היניקה (בנק 2)</string>
+    <string name="dtc_desc_p0019">חוסר התאמה בין מיקום גל הארכובה למיקום גל הזיזים של הפליטה (בנק 2)</string>
+    <string name="dtc_gm_calibration_not_validated">הפרשנויות והספים שלהלן הם נתוני ייחוס למנוע ולשנת הדגם שנבחרו. זהות יחידת הבקרה (VIN, CAL ID, CVN, מזהה תוכנה ומספר חלק חומרה) טרם אומתה; הנתונים אינם מאומתים עבור היחידה המחוברת.</string>
+    <string name="dtc_gm_monitor_title">ניטור מנוע GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">קריטריון להפעלת התקלה: %1$s</string>
+    <string name="dtc_gm_monitor_enable">תנאי הפעלה: %1$s</string>
+    <string name="dtc_gm_monitor_failure">מונה כשלים / קצב אימות: %1$s</string>
+    <string name="dtc_gm_monitor_mil">סיווג MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">מקור: GM %1$s, עמוד %2$d</string>
 </resources>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">App-taal</string>
     <string name="system_language_current">Systeemtaal: %1$s</string>
@@ -102,7 +102,7 @@
     <string name="dtc_title">Diagnostische foutcodes</string>
     <string name="dtc_scan">Scannen</string>
     <string name="dtc_clear">Wissen</string>
-    <string name="dtc_clear_warning">Wissen via modus 04 verwijdert emissiegerelateerde foutcodes en reset sommige gereedheidsmonitors. Sla het rapport op voordat u doorgaat.</string>
+    <string name="dtc_clear_warning">Wissen via modus 04 verwijdert emissiegerelateerde foutcodes en reset sommige gereedheidsmonitors. Sla het rapport op voordat u doorgaat. Modus 04 wist geen uitgebreide DTC-codes die in andere voertuigmodules zijn opgeslagen.</string>
     <string name="dtc_none_returned">De laatste scan heeft geen foutcodes geretourneerd.</string>
     <string name="dtc_confirm_clear">DTC’s wissen bevestigen?</string>
     <string name="dtc_clear_description">Dit verzendt OBD-modus 04 naar de ECU. Gereedheidsgegevens kunnen worden gereset. De oorzaak van een storing wordt hiermee niet hersteld.</string>
@@ -145,7 +145,7 @@
     <string name="cal_pc_pairing_token">Koppeltoken pc</string>
     <string name="cal_connect_j2534">J2534-bridge verbinden</string>
     <string name="cal_disconnect_pc_bridge">Pc-bridge verbreken</string>
-    <string name="cal_bridge_capabilities">Bridge: HS-CAN ISO15765 250/500 kbit/s en J2534-2 SW-ISO15765 indien ondersteund door de driver. CAN FD blijft uitgeschakeld.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Bridge: HS-CAN ISO15765 250/500 kbit/s en J2534-2 SW-ISO15765 indien ondersteund door de driver. CAN FD blijft uitgeschakeld.</string>
     <string name="cal_read_uds_did">UDS DID lezen</string>
     <string name="cal_read_uds_dtcs">UDS-DTC’s lezen</string>
     <string name="cal_uds_trouble_codes">UDS-foutcodes (0x19)</string>
@@ -246,8 +246,8 @@
     <string name="module_note_ecm_obd_missing">Er is geen standaard OBD 7E8-antwoord waargenomen. Houd de ECM ongeverifieerd totdat een echte functionele scan dit bevestigt.</string>
     <string name="module_note_tcm_gen5">De aanwezigheid, het adres en de ondersteunde gegevens moeten op het voertuig worden vastgesteld.</string>
     <string name="module_note_tcm_gen6">Het moduleadres en de ondersteunde services moeten op het voertuig worden vastgesteld; ze worden niet afgeleid van de Gen 5-topologie.</string>
-    <string name="module_note_bcm_gen5">GM-bulletin 07-08-49-020I noemt de BCM als odometermodule van de Camaro voor 2010–2015. Het exacte diagnoseadres en de lees-DID worden niet verondersteld.</string>
-    <string name="module_note_bcm_gen6_to2018">GM-bulletin 07-08-49-020M noemt de BCM als odometermodule van de Camaro tot en met 2018. Het diagnoseadres en de lees-DID moeten nog VIN-specifiek worden geverifieerd.</string>
+    <string name="module_note_bcm_gen5" tools:ignore="TypographyDashes">GM-bulletin 07-08-49-020I noemt de BCM als odometermodule van de Camaro voor 2010–2015. Het exacte diagnoseadres en de lees-DID worden niet verondersteld.</string>
+    <string name="module_note_bcm_gen6_to2018" tools:ignore="TypographyDashes">GM-bulletin 07-08-49-020M noemt de BCM als odometermodule van de Camaro tot en met 2018. Het diagnoseadres en de lees-DID moeten nog VIN-specifiek worden geverifieerd.</string>
     <string name="module_note_bcm_2019">Controleer voor 2019–2024 vóór het uitlezen de odometerarchitectuur en diagnose-identificaties voor dit VIN.</string>
     <string name="module_note_ipc_gen5">Service-informatie voor de Camaro 2012 beschrijft de IPC als secundaire odometeropslag. De exacte leesgegevens en het adres moeten worden geverifieerd.</string>
     <string name="module_note_ipc_gen6">Service-informatie voor de Camaro 2012 beschrijft secundaire odometeropslag; controleer de exacte modulegegevens en de VIN-relatie voordat u vergelijkt.</string>
@@ -387,7 +387,7 @@
     <string name="cal_profile_notes_l99">Camaro Gen 5 L99 V8 met AFM en automatische transmissie. Hergebruik geen LS3-kalibratie; controleer RPO, transmissie en ECU-identificaties.</string>
     <string name="cal_profile_notes_lsa">Camaro Gen 5 ZL1 met supercharged LSA V8. Controleer de kalibratie voor compressor, brandstof, markt en softwareversie.</string>
     <string name="cal_profile_notes_ls7">Camaro Gen 5 Z/28 LS7 V8. Afzonderlijk profiel van LS3/L99 ondanks de nominale controllerfamilie; software-identificatie is verplicht.</string>
-    <string name="cal_profile_notes_ltg">Camaro Gen 6 LTG 2.0 Turbo (dekkingsperiode 2016–2020). GM-bulletin PIP5313B noemt E80 voor de Camaro LTG 2016–2017; controleer latere bouwjaren aan de hand van onderdeelnummer en CAL ID.</string>
+    <string name="cal_profile_notes_ltg">Camaro Gen 6 2.0 Turbo LTG (dekkingsperiode 2016–2023). GM-bulletin PIP5313B vermeldt E80 voor Camaro LTG 2016–2017; controleer latere bouwjaren aan de hand van onderdeelnummer en CAL ID.</string>
     <string name="cal_profile_notes_lgx">Camaro Gen 6 LGX V6. Het profiel kan per bouwjaar, markt en revisie verschillen; bevestig de werkelijke controller en CVN voordat een tabeldefinitie wordt geladen.</string>
     <string name="cal_profile_notes_lt1">Camaro Gen 6 LT1 V8 zonder drukvulling. Onderscheid kalibratierevisies aan de hand van CAL ID/CVN, bouwjaar, markt, transmissie en hardwarenummers.</string>
     <string name="cal_profile_notes_lt4">Camaro Gen 6 ZL1 met supercharged LT4 V8. Niet verwarren met LT1; valideer onderdeelnummers en kalibratiespecifieke laaddrukgegevens.</string>
@@ -556,4 +556,20 @@
     <string name="trace_error_csv_empty">De CSV-trace is leeg.</string>
     <string name="trace_error_csv_columns">De CSV heeft een CAN ID-kolom en een data-/payloadkolom nodig, of kolommen data0…data15.</string>
     <string name="trace_error_generic">De trace bevat een ongeldig of niet-ondersteund record.</string>
+    <string name="dtc_vehicle_interpretation">Voertuigspecifieke interpretatie</string>
+    <string name="dtc_severity">Ernst</string>
+    <string name="dtc_possible_causes">Mogelijke oorzaken (niet bevestigd)</string>
+    <string name="dtc_recommended_checks">Aanbevolen controles</string>
+    <string name="dtc_vehicle_specific_not_documented">Voor deze code en voertuigconfiguratie is nog geen voertuigspecifieke procedure gedocumenteerd. De OEM/SAE-beschrijving staat hierboven; controleer het VIN en de regeleenheid in de GM-servicegegevens.</string>
+    <string name="dtc_desc_p0016">Krukaspositie – inlaatnokkenaspositie niet plausibel (bank 1)</string>
+    <string name="dtc_desc_p0017">Krukaspositie – uitlaatnokkenaspositie niet plausibel (bank 1)</string>
+    <string name="dtc_desc_p0018">Krukaspositie – inlaatnokkenaspositie niet plausibel (bank 2)</string>
+    <string name="dtc_desc_p0019">Krukaspositie – uitlaatnokkenaspositie niet plausibel (bank 2)</string>
+    <string name="dtc_gm_calibration_not_validated">De onderstaande interpretaties en grenswaarden zijn referentiegegevens voor de geselecteerde motor en het modeljaar. De identiteit van de regeleenheid (VIN, CAL ID, CVN, software-ID en hardwareonderdeelnummer) is nog niet gecontroleerd; deze gegevens zijn niet gevalideerd voor de aangesloten regeleenheid.</string>
+    <string name="dtc_gm_monitor_title">GM-motormonitor – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Activeringscriterium: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Inschakelvoorwaarden: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Foutenteller / validatiefrequentie: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL-classificatie: %1$s</string>
+    <string name="dtc_gm_monitor_source">Bron: GM %1$s, pagina %2$d</string>
 </resources>
