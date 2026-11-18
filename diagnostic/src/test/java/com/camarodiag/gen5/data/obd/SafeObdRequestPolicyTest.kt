@@ -42,4 +42,18 @@ class SafeObdRequestPolicyTest {
         assertNull(SafeObdRequestPolicy.parse("hello"))
         assertNull(SafeObdRequestPolicy.parse("0xGG 0x0C"))
     }
+
+    @Test
+    fun rejectsMisplacedOrRepeatedHexPrefixes() {
+        assertNull(SafeObdRequestPolicy.parse("0x0x010C"))
+        assertNull(SafeObdRequestPolicy.parse("010xC"))
+        assertNull(SafeObdRequestPolicy.parse("0x01 0x0x0C"))
+        assertNull(SafeObdRequestPolicy.parse("01:0C"))
+    }
+
+    @Test
+    fun acceptsOnlyOnePairRegardlessOfWhitespace() {
+        assertEquals("010C", SafeObdRequestPolicy.parse("  01   0c  ")?.elmCommand)
+        assertNull(SafeObdRequestPolicy.parse("01\t0C extra"))
+    }
 }
