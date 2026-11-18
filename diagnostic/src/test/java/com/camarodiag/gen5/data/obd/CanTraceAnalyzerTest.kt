@@ -137,7 +137,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun decodesStandardMode01PidsWithoutGuessingUnknownPids() {
         val trace = """
-            0.000000 1 7E8 Rx d 8 04 41 0C 1A F8 00 00
+            0.000000 1 7E8 Rx d 7 04 41 0C 1A F8 00 00
             0.001000 1 7E8 Rx d 8 03 41 0D 64 00 00 00 00
             0.002000 1 7E8 Rx d 8 03 41 05 7A 00 00 00 00
             0.003000 1 7E8 Rx d 8 03 41 11 80 00 00 00 00
