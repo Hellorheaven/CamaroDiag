@@ -88,7 +88,7 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
-    fun reportsIsoTpSequenceMismatchAndKeepsMessageIncomplete() {
+    fun reportsIsoTpSequenceMismatchAndDiscardsInvalidPartialMessage() {
         val report = CanTraceAnalyzer.analyze(
             listOf(
                 "7E8 8 10 08 62 F1 90 AA BB CC",
@@ -105,7 +105,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun recognizesNegativeUdsResponseWithoutInventingDidObservation() {
         val report = CanTraceAnalyzer.analyze(
-            "7E8 3 03 7F 22 31",
+            "7E8 4 03 7F 22 31",
             "capture.txt"
         )
 
