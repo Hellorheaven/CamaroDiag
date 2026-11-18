@@ -2260,7 +2260,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        val activeMonitor = canMonitorJob
+        stopCanMonitor()
+        if (activeMonitor != null) {
+            activeMonitor.invokeOnCompletion { obdManager.disconnect() }
+        } else {
+            obdManager.disconnect()
+        }
         super.onCleared()
-        obdManager.disconnect()
     }
 }
