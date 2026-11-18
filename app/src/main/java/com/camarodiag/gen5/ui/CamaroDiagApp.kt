@@ -119,6 +119,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     }
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
+    val savedVehicles by viewModel.savedVehicles.collectAsState()
+    val selectedSavedVehicleId by viewModel.selectedSavedVehicleId.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
     val lastConnectionProfile by viewModel.lastConnectionProfile.collectAsState()
     val pairedDevices by viewModel.pairedDevices.collectAsState()
@@ -344,8 +346,13 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
             when (currentTab) {
                 DiagTab.SETUP -> VehicleSetupScreen(
                     vehicle = vehicle,
+                    savedVehicles = savedVehicles,
+                    selectedSavedVehicleId = selectedSavedVehicleId,
                     onChange = { y, e, tr, m -> viewModel.updateVehicle(y, e, tr, m) },
-                    onVinChange = { viewModel.updateVin(it) }
+                    onVinChange = { viewModel.updateVin(it) },
+                    onSaveVehicle = { viewModel.saveCurrentVehicle(it) },
+                    onLoadSavedVehicle = { viewModel.selectSavedVehicle(it) },
+                    onDeleteSavedVehicle = { viewModel.deleteSavedVehicle(it) }
                 )
                 DiagTab.ADAPTER -> AdapterScreen(
                     adapter = adapter,
@@ -395,6 +402,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         adapter.tier != AdapterTier.DISCONNECTED,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onCreateVehicleFromEcuVin = { viewModel.createVehicleFromEcuVin(it) },
+                    onSyncVehicleVinFromEcu = { viewModel.updateVin(it) },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
                     onReadUdsDtcs = { requestId, responseId, protocol -> viewModel.readUdsDtcs(requestId, responseId, protocol) },
                     onConnectJ2534Bridge = { host, port, token, requestId, responseId, baud ->
