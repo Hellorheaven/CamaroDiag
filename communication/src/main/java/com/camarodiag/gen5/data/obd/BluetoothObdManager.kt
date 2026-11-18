@@ -317,8 +317,14 @@ class BluetoothObdManager(context: Context) {
                 sendAtCommandInternal("ATL0", 1_000L)
                 sendAtCommandInternal("ATH1", 1_000L)
                 if (isStnAdapter) {
+                    val canFilterResponse = sendAtCommandInternal("ATCF 000", 1_000L)
+                    val canMaskResponse = sendAtCommandInternal("ATCM 000", 1_000L)
                     val filterResponse = sendAtCommandInternal("STFAC", 1_000L)
-                    check(!filterResponse.contains("?")) {
+                    check(
+                        !canFilterResponse.contains("?") &&
+                            !canMaskResponse.contains("?") &&
+                            !filterResponse.contains("?")
+                    ) {
                         "The STN adapter could not clear its temporary CAN filters."
                     }
                 }
