@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,6 +32,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -52,6 +54,7 @@ import com.camarodiag.gen5.ui.theme.OkGreen
 import com.camarodiag.gen5.ui.theme.SurfaceDark
 import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
+import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
@@ -59,10 +62,12 @@ import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
 import com.camarodiag.gen5.data.obd.CamaroSignalDefinition
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.domain.model.VehicleProfile
+import com.camarodiag.gen5.domain.model.VehicleVinComparison
 
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
     val ecuVinResponse: String = "",
+    val vinComparison: VehicleVinComparison? = null,
     val calibrationIdResponse: String = "",
     val cvnResponse: String = "",
     val message: String = "",
@@ -182,6 +187,8 @@ fun CalibrationWorkspaceScreen(
     ecmType: String,
     isConnected: Boolean,
     onReadIdentification: () -> Unit,
+    onCreateVehicleFromEcuVin: (String) -> Unit,
+    onSyncVehicleVinFromEcu: (String) -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
     onReadUdsDtcs: (String, String, String) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
@@ -209,6 +216,11 @@ fun CalibrationWorkspaceScreen(
     var j2534Token by remember { mutableStateOf("") }
     var obdbSignalSearch by remember { mutableStateOf("") }
     var obdbSignalMenuExpanded by remember { mutableStateOf(false) }
+    var showVinMismatchDialog by remember { mutableStateOf(false) }
+    var showVinSyncConfirmation by remember { mutableStateOf(false) }
+    LaunchedEffect(state.vinComparison) {
+        if (state.vinComparison?.matches == false) showVinMismatchDialog = true
+    }
     var selectedObdbSignalId by remember { mutableStateOf("") }
     val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
         ?: state.obdbSignals.firstOrNull()
@@ -456,6 +468,32 @@ fun CalibrationWorkspaceScreen(
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(stringResource(R.string.cal_mode09_vin_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.ecuVinResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        state.vinComparison?.let { comparison ->
+                            when (comparison.matches) {
+                                true -> Text(
+                                    stringResource(R.string.cal_vin_matches_profile),
+                                    color = OkGreen,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                false -> Text(
+                                    stringResource(
+                                        R.string.cal_vin_mismatch_detected,
+                                        comparison.selectedVehicleVin.orEmpty(),
+                                        comparison.ecuVin
+                                    ),
+                                    color = WarnRed,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                null -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(stringResource(R.string.cal_vin_profile_not_set), color = CamaroAmber, fontSize = 12.sp)
+                                    TextButton(onClick = { onSyncVehicleVinFromEcu(comparison.ecuVin) }) {
+                                        Text(stringResource(R.string.cal_use_ecu_vin_for_current_profile))
+                                    }
+                                }
+                            }
+                        }
                         Text(stringResource(R.string.cal_mode09_calid_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.calibrationIdResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text(stringResource(R.string.cal_mode09_cvn_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -908,3 +946,73 @@ fun CalibrationWorkspaceScreen(
         }
     }
 }
+    if (showVinMismatchDialog) {
+        val comparison = state.vinComparison
+        if (comparison?.matches == false) {
+            AlertDialog(
+                onDismissRequest = { showVinMismatchDialog = false },
+                title = { Text(stringResource(R.string.cal_vin_mismatch_title), color = WarnRed) },
+                text = {
+                    Text(
+                        stringResource(
+                            R.string.cal_vin_mismatch_confirmation,
+                            comparison.selectedVehicleVin.orEmpty(),
+                            comparison.ecuVin
+                        )
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onCreateVehicleFromEcuVin(comparison.ecuVin)
+                        showVinMismatchDialog = false
+                    }) {
+                        Text(stringResource(R.string.cal_vin_create_vehicle))
+                    }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(onClick = {
+                            showVinMismatchDialog = false
+                            showVinSyncConfirmation = true
+                        }) {
+                            Text(stringResource(R.string.cal_vin_sync_existing))
+                        }
+                        TextButton(onClick = { showVinMismatchDialog = false }) {
+                            Text(stringResource(R.string.common_cancel))
+                        }
+                    }
+                }
+            )
+        }
+    }
+    if (showVinSyncConfirmation) {
+        val comparison = state.vinComparison
+        if (comparison != null) {
+            AlertDialog(
+                onDismissRequest = { showVinSyncConfirmation = false },
+                title = { Text(stringResource(R.string.cal_vin_sync_warning_title), color = WarnRed) },
+                text = {
+                    Text(
+                        stringResource(
+                            R.string.cal_vin_sync_warning_message,
+                            comparison.selectedVehicleVin.orEmpty(),
+                            comparison.ecuVin
+                        )
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onSyncVehicleVinFromEcu(comparison.ecuVin)
+                        showVinSyncConfirmation = false
+                    }) {
+                        Text(stringResource(R.string.cal_vin_sync_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showVinSyncConfirmation = false }) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
+                }
+            )
+        }
+    }
