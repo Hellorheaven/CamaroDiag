@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">アプリの言語</string>
-    <string name="system_language_current">システム言語: %1$s</string>
-    <string name="system_language_hint">CamaroDiag は対応している場合、端末の言語に従います。対応していない言語では英語を使用します。</string>
+    
+    
     <string name="tab_vehicle">車両</string>
     <string name="tab_connect">接続</string>
     <string name="tab_live">ライブデータ</string>
@@ -568,6 +568,17 @@
     <string name="dtc_gm_monitor_failure">故障カウンター／判定頻度: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL分類: %1$s</string>
     <string name="dtc_gm_monitor_source">出典: GM %1$s、%2$dページ</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <string name="system_language_current">選択中の言語：%1$s</string>
     <string name="system_language_hint">CamaroDiagで使用する言語を選択します。</string>
     <string name="settings_current_vehicle">現在の車両</string>
