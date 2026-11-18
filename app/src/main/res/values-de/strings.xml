@@ -630,4 +630,9 @@
     <string name="cal_vin_sync_warning_title">VIN-Ersetzung bestätigen?</string>
     <string name="cal_vin_sync_warning_message">Die im ausgewählten Fahrzeugprofil gespeicherte VIN (%1$s) wird durch die ECU-VIN (%2$s) ersetzt. Modelljahr, Motor, Getriebe und Markt bleiben unverändert. Nur bestätigen, wenn das angeschlossene Fahrzeug überprüft wurde.</string>
     <string name="cal_vin_sync_confirm">VIN ersetzen</string>
+    <string name="vin_photo_capture">VIN fotografieren</string>
+    <string name="vin_photo_cancelled">Aufnahme des VIN-Fotos abgebrochen.</string>
+    <string name="vin_photo_success">VIN erkannt und in das Fahrzeugprofil übernommen. Prüfen Sie jedes Zeichen.</string>
+    <string name="vin_photo_not_found">Keine gültige 17-stellige VIN erkannt. Geben Sie sie manuell ein oder machen Sie ein neues Foto.</string>
+    <string name="vin_photo_error">Das VIN-Foto konnte nicht gelesen werden. Sorgen Sie für bessere Beleuchtung und Schärfe.</string>
 </resources>

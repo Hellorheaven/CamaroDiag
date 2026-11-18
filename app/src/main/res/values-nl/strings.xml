@@ -620,4 +620,9 @@
     <string name="cal_vin_sync_warning_title">VIN-vervanging bevestigen?</string>
     <string name="cal_vin_sync_warning_message">Het VIN in het geselecteerde voertuigprofiel (%1$s) wordt vervangen door het ECU-VIN (%2$s). Modeljaar, motor, transmissie en markt blijven ongewijzigd. Bevestig dit alleen nadat u hebt gecontroleerd dat het aangesloten voertuig het bedoelde voertuig is.</string>
     <string name="cal_vin_sync_confirm">VIN vervangen</string>
+    <string name="vin_photo_capture">VIN fotograferen</string>
+    <string name="vin_photo_cancelled">Het maken van de VIN-foto is geannuleerd.</string>
+    <string name="vin_photo_success">VIN herkend en naar het voertuigprofiel gekopieerd. Controleer elk teken.</string>
+    <string name="vin_photo_not_found">Geen geldige VIN van 17 tekens gevonden. Voer deze handmatig in of maak een nieuwe foto.</string>
+    <string name="vin_photo_error">De VIN-foto kon niet worden gelezen. Probeer het opnieuw met betere belichting en scherpstelling.</string>
 </resources>

@@ -631,4 +631,9 @@
     <string name="cal_vin_sync_warning_title">Επιβεβαίωση αντικατάστασης VIN;</string>
     <string name="cal_vin_sync_warning_message">Θα αντικατασταθεί το VIN του επιλεγμένου προφίλ (%1$s) με το VIN της ECU (%2$s). Το έτος, ο κινητήρας, το κιβώτιο και η αγορά δεν θα αλλάξουν. Επιβεβαιώστε μόνο αφού βεβαιωθείτε ότι το συνδεδεμένο όχημα είναι το σωστό.</string>
     <string name="cal_vin_sync_confirm">Αντικατάσταση VIN</string>
+    <string name="vin_photo_capture">Φωτογράφιση VIN</string>
+    <string name="vin_photo_cancelled">Η λήψη φωτογραφίας VIN ακυρώθηκε.</string>
+    <string name="vin_photo_success">Το VIN εντοπίστηκε και αντιγράφηκε στο προφίλ οχήματος. Ελέγξτε κάθε χαρακτήρα.</string>
+    <string name="vin_photo_not_found">Δεν εντοπίστηκε έγκυρο VIN 17 χαρακτήρων. Εισαγάγετέ το χειροκίνητα ή τραβήξτε άλλη φωτογραφία.</string>
+    <string name="vin_photo_error">Δεν ήταν δυνατή η ανάγνωση της φωτογραφίας VIN. Δοκιμάστε ξανά με καλύτερο φωτισμό και εστίαση.</string>
 </resources>

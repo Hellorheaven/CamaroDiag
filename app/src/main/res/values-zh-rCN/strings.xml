@@ -616,4 +616,9 @@
     <string name="cal_vin_sync_warning_title">确认替换 VIN？</string>
     <string name="cal_vin_sync_warning_message">将用 ECU VIN（%2$s）替换当前车辆配置中保存的 VIN（%1$s）。车型年份、发动机、变速箱和市场不会改变。请仅在确认连接的车辆正确后继续。</string>
     <string name="cal_vin_sync_confirm">替换 VIN</string>
+    <string name="vin_photo_capture">拍摄 VIN</string>
+    <string name="vin_photo_cancelled">已取消 VIN 照片拍摄。</string>
+    <string name="vin_photo_success">已识别 VIN 并复制到车辆配置文件。请逐个核对字符。</string>
+    <string name="vin_photo_not_found">未检测到有效的 17 位 VIN。请手动输入或重新拍照。</string>
+    <string name="vin_photo_error">无法读取 VIN 照片。请改善光线和对焦后重试。</string>
 </resources>

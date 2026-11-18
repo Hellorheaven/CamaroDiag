@@ -616,4 +616,9 @@
     <string name="cal_vin_sync_warning_title">VINの置き換えを確認しますか？</string>
     <string name="cal_vin_sync_warning_message">選択中の車両プロファイルに保存されているVIN（%1$s）をECUのVIN（%2$s）に置き換えます。年式、エンジン、トランスミッション、市場は変更されません。接続中の車両が正しいことを確認してから実行してください。</string>
     <string name="cal_vin_sync_confirm">VINを置き換える</string>
+    <string name="vin_photo_capture">VINを撮影</string>
+    <string name="vin_photo_cancelled">VIN写真の撮影をキャンセルしました。</string>
+    <string name="vin_photo_success">VINを検出し、車両プロフィールにコピーしました。すべての文字を確認してください。</string>
+    <string name="vin_photo_not_found">有効な17文字のVINを検出できませんでした。手動で入力するか、もう一度撮影してください。</string>
+    <string name="vin_photo_error">VIN写真を読み取れませんでした。照明とピントを改善して再試行してください。</string>
 </resources>

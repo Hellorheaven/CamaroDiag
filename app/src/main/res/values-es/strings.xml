@@ -633,4 +633,9 @@
     <string name="cal_vin_sync_warning_title">¿Confirmar sustitución del VIN?</string>
     <string name="cal_vin_sync_warning_message">Esto sustituirá el VIN guardado en el perfil seleccionado (%1$s) por el VIN de la ECU (%2$s). El año, motor, transmisión y mercado no cambiarán. Hazlo solo después de confirmar que el vehículo conectado es el correcto.</string>
     <string name="cal_vin_sync_confirm">Sustituir VIN</string>
+    <string name="vin_photo_capture">Fotografiar VIN</string>
+    <string name="vin_photo_cancelled">Se canceló la captura de la foto del VIN.</string>
+    <string name="vin_photo_success">VIN detectado y copiado al perfil del vehículo. Verifica cada carácter.</string>
+    <string name="vin_photo_not_found">No se detectó un VIN válido de 17 caracteres. Introdúcelo manualmente o toma otra foto.</string>
+    <string name="vin_photo_error">No se pudo leer la foto del VIN. Inténtalo de nuevo con mejor iluminación y enfoque.</string>
 </resources>

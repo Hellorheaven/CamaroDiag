@@ -631,4 +631,9 @@
     <string name="cal_vin_sync_warning_title">هل تريد تأكيد استبدال VIN؟</string>
     <string name="cal_vin_sync_warning_message">سيتم استبدال VIN المحفوظ في ملف المركبة المحدد (%1$s) بـ VIN وحدة التحكم (%2$s). لن تتغير سنة الطراز أو المحرك أو ناقل الحركة أو السوق. تابع فقط بعد التأكد من أن المركبة المتصلة هي المركبة المقصودة.</string>
     <string name="cal_vin_sync_confirm">استبدال VIN</string>
+    <string name="vin_photo_capture">التقاط صورة لرقم VIN</string>
+    <string name="vin_photo_cancelled">تم إلغاء التقاط صورة رقم VIN.</string>
+    <string name="vin_photo_success">تم اكتشاف رقم VIN ونسخه إلى ملف تعريف المركبة. تحقق من كل حرف.</string>
+    <string name="vin_photo_not_found">لم يتم العثور على رقم VIN صالح مكوّن من 17 حرفًا. أدخله يدويًا أو التقط صورة أخرى.</string>
+    <string name="vin_photo_error">تعذرت قراءة صورة رقم VIN. حاول مرة أخرى مع إضاءة وتركيز أفضل.</string>
 </resources>

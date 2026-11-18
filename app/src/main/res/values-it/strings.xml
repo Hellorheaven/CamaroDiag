@@ -633,4 +633,9 @@
     <string name="cal_vin_sync_warning_title">Confermare la sostituzione del VIN?</string>
     <string name="cal_vin_sync_warning_message">Il VIN salvato nel profilo selezionato (%1$s) sarà sostituito dal VIN della centralina (%2$s). Anno, motore, cambio e mercato non cambieranno. Conferma solo dopo aver verificato che il veicolo collegato sia quello previsto.</string>
     <string name="cal_vin_sync_confirm">Sostituisci VIN</string>
+    <string name="vin_photo_capture">Fotografa VIN</string>
+    <string name="vin_photo_cancelled">Acquisizione della foto del VIN annullata.</string>
+    <string name="vin_photo_success">VIN rilevato e copiato nel profilo del veicolo. Verifica ogni carattere.</string>
+    <string name="vin_photo_not_found">Nessun VIN valido di 17 caratteri rilevato. Inseriscilo manualmente o scatta un'altra foto.</string>
+    <string name="vin_photo_error">Impossibile leggere la foto del VIN. Riprova con illuminazione e messa a fuoco migliori.</string>
 </resources>

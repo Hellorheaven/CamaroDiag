@@ -616,4 +616,9 @@
     <string name="cal_vin_sync_warning_title">VIN 교체를 확인하시겠습니까?</string>
     <string name="cal_vin_sync_warning_message">선택한 차량 프로필에 저장된 VIN(%1$s)이 ECU VIN(%2$s)으로 교체됩니다. 연식, 엔진, 변속기 및 시장은 변경되지 않습니다. 연결된 차량이 올바른지 확인한 후에만 진행하세요.</string>
     <string name="cal_vin_sync_confirm">VIN 교체</string>
+    <string name="vin_photo_capture">VIN 사진 촬영</string>
+    <string name="vin_photo_cancelled">VIN 사진 촬영이 취소되었습니다.</string>
+    <string name="vin_photo_success">VIN을 감지하여 차량 프로필에 복사했습니다. 모든 문자를 확인하세요.</string>
+    <string name="vin_photo_not_found">유효한 17자리 VIN을 찾지 못했습니다. 직접 입력하거나 사진을 다시 촬영하세요.</string>
+    <string name="vin_photo_error">VIN 사진을 읽을 수 없습니다. 조명과 초점을 개선한 후 다시 시도하세요.</string>
 </resources>
