@@ -312,12 +312,15 @@ class BluetoothObdManager(context: Context) {
                 sendAtCommandInternal("ATE0", 1_000L)
                 sendAtCommandInternal("ATL0", 1_000L)
                 sendAtCommandInternal("ATH1", 1_000L)
-                sendAtCommandInternal(monitorCommand, durationMs) { chunk ->
+                val monitorResponse = sendAtCommandInternal(monitorCommand, durationMs) { chunk ->
                     check(captured.length + chunk.length <= 131_072) {
                         "CAN monitor capture exceeded the 128 KiB safety limit."
                     }
                     captured.append(chunk)
                     onChunk(chunk)
+                }
+                check(monitorResponse.trim() != "?") {
+                    "The connected adapter does not support the selected CAN monitor command."
                 }
             } finally {
                 // ELM/STN monitor mode has no normal prompt; ESC returns the adapter
