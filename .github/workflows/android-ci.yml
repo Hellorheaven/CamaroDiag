@@ -26,7 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       android_changed: ${{ steps.android_changes.outputs.android_changed }}
+      current_android_changed: ${{ steps.android_changes.outputs.current_android_changed }}
       build_required: ${{ steps.checkpoint.outputs.build_required }}
+      android_validation_applies: ${{ steps.checkpoint.outputs.validation_applies }}
       commits_since_build: ${{ steps.checkpoint.outputs.commits_since_build }}
       interval: ${{ steps.checkpoint.outputs.interval }}
     steps:
@@ -59,6 +61,12 @@ jobs:
             echo "android_changed=true" >> "$GITHUB_OUTPUT"
             echo "Android-relevant changes detected:"
             git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
+          fi
+          if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- "${paths[@]}"; then
+            echo "current_android_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "current_android_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Current commit contains Android-relevant changes."
           fi
 
       - name: Find last successful Android Debug validation
@@ -99,6 +107,8 @@ jobs:
         env:
           BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
           ANDROID_CHANGED: ${{ steps.android_changes.outputs.android_changed }}
+          CURRENT_ANDROID_CHANGED: ${{ steps.android_changes.outputs.current_android_changed }}
+          EVENT_ACTION: ${{ github.event.action }}
           PREVIOUS_BUILD_SHA: ${{ steps.previous_build.outputs.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -109,11 +119,13 @@ jobs:
           if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
           echo "interval=$interval" >> "$GITHUB_OUTPUT"
           if [[ "$ANDROID_CHANGED" != "true" ]]; then
+            echo "validation_applies=false" >> "$GITHUB_OUTPUT"
             echo "build_required=false" >> "$GITHUB_OUTPUT"
             echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
-            echo "Android build not applicable: no Android-relevant changes."
+            echo "NOT APPLICABLE: this PR contains no Android-relevant changes."
             exit 0
           fi
+
           count_base="$BASE_SHA"
           if [[ -n "$PREVIOUS_BUILD_SHA" ]]; then count_base="$PREVIOUS_BUILD_SHA"; fi
           paths=(
@@ -126,20 +138,46 @@ jobs:
           )
           commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
           echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
-          if [[ "$IS_DRAFT" != "true" ]]; then
-            echo "build_required=true" >> "$GITHUB_OUTPUT"
-            echo "PR is Ready for review: immediate Android Debug validation required."
-          elif git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/android-ci.yml'; then
-            if (( commits_since_build >= interval )); then
-              echo "build_required=true" >> "$GITHUB_OUTPUT"
-              echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
-            else
+
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            if [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
+              echo "validation_applies=false" >> "$GITHUB_OUTPUT"
               echo "build_required=false" >> "$GITHUB_OUTPUT"
-              echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits."
+              echo "NOT APPLICABLE to this commit: no Android-relevant files changed."
+            else
+              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+              if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/android-ci.yml'; then
+                if (( commits_since_build >= interval )); then
+                  echo "build_required=true" >> "$GITHUB_OUTPUT"
+                  echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
+                else
+                  echo "build_required=false" >> "$GITHUB_OUTPUT"
+                  echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits."
+                fi
+              else
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "Android CI workflow changed in this commit: forcing validation."
+              fi
             fi
           else
-            echo "build_required=true" >> "$GITHUB_OUTPUT"
-            echo "Android CI workflow changed: forcing validation of the modified workflow."
+            case "$EVENT_ACTION" in
+              ready_for_review|opened|reopened)
+                echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "Initial Ready-for-review validation: Android changes exist in the PR."
+                ;;
+              *)
+                if [[ "$CURRENT_ANDROID_CHANGED" == "true" ]]; then
+                  echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+                  echo "build_required=true" >> "$GITHUB_OUTPUT"
+                  echo "Ready PR commit changes Android files: immediate Android Debug validation required."
+                else
+                  echo "validation_applies=false" >> "$GITHUB_OUTPUT"
+                  echo "build_required=false" >> "$GITHUB_OUTPUT"
+                  echo "NOT APPLICABLE to this Ready PR commit: no Android-relevant files changed."
+                fi
+                ;;
+            esac
           fi
   test-and-build:
     needs: evaluate-build-checkpoint
@@ -246,14 +284,15 @@ jobs:
           BUILD_RESULT: ${{ needs.test-and-build.result }}
           COMMITS_SINCE_BUILD: ${{ needs.evaluate-build-checkpoint.outputs.commits_since_build }}
           BUILD_INTERVAL: ${{ needs.evaluate-build-checkpoint.outputs.interval }}
+          VALIDATION_APPLIES: ${{ needs.evaluate-build-checkpoint.outputs.android_validation_applies }}
         run: |
           set -euo pipefail
           if [[ "$EVALUATION_RESULT" != "success" ]]; then
             echo "::error::Android applicability/checkpoint evaluation did not succeed."
             exit 1
           fi
-          if [[ "$ANDROID_CHANGED" != "true" ]]; then
-            echo "NOT APPLICABLE: no Android source, resource, module, or Gradle build changes."
+          if [[ "$VALIDATION_APPLIES" != "true" ]]; then
+            echo "NOT APPLICABLE: this PR event/commit does not change Android-relevant files."
             exit 0
           fi
           if [[ "$BUILD_REQUIRED" != "true" ]]; then
