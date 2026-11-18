@@ -102,7 +102,7 @@ class CamaroUdsProtocolTest {
                 macAddress = "00:00:00:00:00:00",
                 atzResp = "OBDLink",
                 stiResp = "?",
-                atalResp = "OK",
+                atalResp = "?",
                 stp61Resp = "OK",
                 headersResp = "OK",
                 protocolResp = "OK"
