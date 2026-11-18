@@ -657,4 +657,5 @@
     <string name="can_sniffer_request_complete">Requête en lecture seule terminée.</string>
     <string name="can_sniffer_request_failed">Échec de la requête en lecture seule.</string>
     <string name="can_sniffer_bus_limit">Cette capture utilise le profil HS-CAN actif en 11 bits à 500 kbit/s. Le SW-CAN et les autres bus nécessitent une interface différente.</string>
+    <string name="can_sniffer_stn_filter_notice">Sur les adaptateurs STN, les filtres temporaires sont effacés pour la capture brute puis le filtrage OBD automatique est réactivé. Les filtres personnalisés définis par un autre logiciel ne sont pas restaurés.</string>
 </resources>

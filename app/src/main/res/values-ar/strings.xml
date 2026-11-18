@@ -655,4 +655,5 @@
     <string name="can_sniffer_request_complete">اكتمل طلب القراءة فقط.</string>
     <string name="can_sniffer_request_failed">فشل طلب القراءة فقط.</string>
     <string name="can_sniffer_bus_limit">يستخدم مسار الالتقاط هذا ملف HS-CAN النشط بعرض 11 بت وسرعة 500 كيلوبت/ثانية. يتطلب SW-CAN والحافلات الأخرى واجهة مختلفة.</string>
+    <string name="can_sniffer_stn_filter_notice">في محولات STN، تتم إزالة عوامل التصفية المؤقتة لالتقاط الإطارات الخام ثم يُعاد تفعيل تصفية OBD التلقائية. لا تتم استعادة عوامل التصفية المخصصة التي ضبطتها برامج أخرى.</string>
 </resources>

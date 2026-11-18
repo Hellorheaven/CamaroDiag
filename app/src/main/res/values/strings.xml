@@ -654,4 +654,5 @@
     <string name="can_sniffer_request_complete">Read-only request completed.</string>
     <string name="can_sniffer_request_failed">Read-only request failed.</string>
     <string name="can_sniffer_bus_limit">This capture path uses the active 11-bit, 500 kbit/s HS-CAN profile. SW-CAN and other buses require a different interface.</string>
+    <string name="can_sniffer_stn_filter_notice">On STN adapters, temporary filters are cleared for raw capture and automatic OBD filtering is re-enabled afterward. Custom filters set by other software are not restored.</string>
 </resources>

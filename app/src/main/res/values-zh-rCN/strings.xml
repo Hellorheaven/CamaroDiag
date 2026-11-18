@@ -640,4 +640,5 @@
     <string name="can_sniffer_request_complete">只读请求已完成。</string>
     <string name="can_sniffer_request_failed">只读请求失败。</string>
     <string name="can_sniffer_bus_limit">此捕获路径使用当前的 11 位、500 kbit/s HS-CAN 配置。SW-CAN 和其他总线需要不同的接口。</string>
+    <string name="can_sniffer_stn_filter_notice">在 STN 适配器上，为捕获原始帧会清除临时筛选器，随后重新启用 OBD 自动筛选。其他软件设置的自定义筛选器不会恢复。</string>
 </resources>

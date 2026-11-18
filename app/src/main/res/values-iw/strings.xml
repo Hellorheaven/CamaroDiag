@@ -646,4 +646,5 @@
     <string name="can_sniffer_request_complete">בקשת הקריאה בלבד הושלמה.</string>
     <string name="can_sniffer_request_failed">בקשת הקריאה בלבד נכשלה.</string>
     <string name="can_sniffer_bus_limit">נתיב לכידה זה משתמש בפרופיל HS-CAN הפעיל של 11 ביט ו-500 kbit/s. עבור SW-CAN ואפיקים אחרים נדרש מתאם שונה.</string>
+    <string name="can_sniffer_stn_filter_notice">במתאמי STN, מסננים זמניים נמחקים לצורך לכידה גולמית ולאחר מכן מופעל מחדש סינון OBD אוטומטי. מסננים מותאמים שהוגדרו בתוכנה אחרת אינם משוחזרים.</string>
 </resources>

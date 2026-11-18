@@ -640,4 +640,5 @@
     <string name="can_sniffer_request_complete">읽기 전용 요청이 완료되었습니다.</string>
     <string name="can_sniffer_request_failed">읽기 전용 요청에 실패했습니다.</string>
     <string name="can_sniffer_bus_limit">이 캡처 경로는 활성 11비트, 500 kbit/s HS-CAN 프로필을 사용합니다. SW-CAN 및 다른 버스에는 별도의 인터페이스가 필요합니다.</string>
+    <string name="can_sniffer_stn_filter_notice">STN 어댑터에서는 원시 캡처를 위해 임시 필터를 지운 뒤 자동 OBD 필터링을 다시 활성화합니다. 다른 소프트웨어에서 설정한 사용자 지정 필터는 복원되지 않습니다.</string>
 </resources>

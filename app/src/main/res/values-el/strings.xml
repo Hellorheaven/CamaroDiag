@@ -655,4 +655,5 @@
     <string name="can_sniffer_request_complete">Το αίτημα μόνο για ανάγνωση ολοκληρώθηκε.</string>
     <string name="can_sniffer_request_failed">Το αίτημα μόνο για ανάγνωση απέτυχε.</string>
     <string name="can_sniffer_bus_limit">Αυτή η διαδρομή καταγραφής χρησιμοποιεί το ενεργό προφίλ HS-CAN 11 bit και 500 kbit/s. Το SW-CAN και άλλα δίκτυα απαιτούν διαφορετική διεπαφή.</string>
+    <string name="can_sniffer_stn_filter_notice">Στους προσαρμογείς STN, τα προσωρινά φίλτρα διαγράφονται για την ακατέργαστη καταγραφή και στη συνέχεια ενεργοποιείται ξανά το αυτόματο φιλτράρισμα OBD. Τα προσαρμοσμένα φίλτρα άλλου λογισμικού δεν επαναφέρονται.</string>
 </resources>
