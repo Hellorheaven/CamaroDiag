@@ -246,15 +246,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun invalidateLiveRecordingForVehicleChange() {
-        if (_liveRecordingState.value.isRecording) {
-            _liveRecordingState.value = _liveRecordingState.value.copy(
-                isRecording = false,
-                stoppedAtMillis = System.currentTimeMillis(),
-                message = getApplication<Application>().getString(R.string.msg_live_recording_stopped_count, recordedLiveSamples.size)
-            )
-        }
+        val wasRecording = _liveRecordingState.value.isRecording
+        val previousSampleCount = recordedLiveSamples.size
         recordedLiveSamples.clear()
-        _liveRecordingState.value = LiveRecordingState()
+        _liveRecordingState.value = if (wasRecording) {
+            _liveRecordingState.value.copy(
+                isRecording = false,
+                sampleCount = 0,
+                stoppedAtMillis = System.currentTimeMillis(),
+                message = getApplication<Application>().getString(
+                    R.string.msg_live_recording_stopped_count,
+                    previousSampleCount
+                )
+            )
+        } else {
+            LiveRecordingState()
+        }
     }
 
     private fun clearVehicleEvidence() {
