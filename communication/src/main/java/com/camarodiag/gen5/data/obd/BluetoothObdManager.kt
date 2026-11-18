@@ -338,7 +338,7 @@ class BluetoothObdManager(context: Context) {
                 withContext(NonCancellable) {
                     runCatching { sendAtCommandInternal("\u001B", 1_000L) }
                     if (isStnAdapter) {
-                        runCatching { sendAtCommandInternal("STFA", 1_000L) }
+                        runCatching { sendAtCommandInternal("ATAR", 1_000L) }
                     }
                     runCatching { sendAtCommandInternal("AT", 1_000L) }
                 }
