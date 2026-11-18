@@ -131,7 +131,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun parsesFixedWidthCsvByteColumnsUsingDeclaredDlc() {
         val report = CanTraceAnalyzer.analyze(
-            "can_id,dlc,data0,data1,data2,data3,data4,data5,data6,data7\\n" +
+            "can_id,dlc,data0,data1,data2,data3,data4,data5,data6,data7\n" +
                 "7E8,3,02,41,0C,,,,,",
             "capture.csv"
         )
@@ -144,7 +144,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun rejectsGapsInsideCsvByteColumns() {
         val report = CanTraceAnalyzer.analyze(
-            "can_id,dlc,data0,data1,data2\\n7E8,3,02,,0C",
+            "can_id,dlc,data0,data1,data2\n7E8,3,02,,0C",
             "capture.csv"
         )
 
