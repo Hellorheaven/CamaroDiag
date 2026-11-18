@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
+import androidx.core.content.edit
 import com.camarodiag.gen5.R
 import androidx.lifecycle.viewModelScope
 import com.camarodiag.gen5.data.db.DiagnosticDatabase
@@ -154,13 +155,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun persistVehicleProfile(profile: VehicleProfile) {
-        settingsPreferences.edit()
-            .putInt("vehicle_year", profile.modelYear)
-            .putString("vehicle_engine", profile.engine.name)
-            .putString("vehicle_transmission", profile.transmission.name)
-            .putString("vehicle_market", profile.market.name)
-            .putString("vehicle_vin", profile.vin)
-            .apply()
+        settingsPreferences.edit {
+            putInt("vehicle_year", profile.modelYear)
+            putString("vehicle_engine", profile.engine.name)
+            putString("vehicle_transmission", profile.transmission.name)
+            putString("vehicle_market", profile.market.name)
+            putString("vehicle_vin", profile.vin)
+        }
     }
 
     private fun loadLastConnectionProfile(): SavedObdConnectionProfile? {
@@ -173,16 +174,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun rememberConnectionProfile(transport: String, capabilities: AdapterCapabilities, endpoint: String) {
         val profile = SavedObdConnectionProfile(transport, capabilities.deviceName, endpoint)
         _lastConnectionProfile.value = profile
-        settingsPreferences.edit()
-            .putString("last_connection_transport", profile.transport)
-            .putString("last_connection_adapter", profile.adapterName)
-            .putString("last_connection_endpoint", profile.endpoint)
-            .apply()
+        settingsPreferences.edit {
+            putString("last_connection_transport", profile.transport)
+            putString("last_connection_adapter", profile.adapterName)
+            putString("last_connection_endpoint", profile.endpoint)
+        }
     }
 
     fun setLanguage(lang: AppLanguage) {
         _language.value = lang
-        settingsPreferences.edit().putString("language", lang.code).apply()
+        settingsPreferences.edit { putString("language", lang.code) }
     }
 
     private fun localizedMileageSummaryForStorage(report: com.camarodiag.gen5.domain.model.MileageAuditReport): String {
@@ -209,7 +210,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         getApplication<Application>().resources.configuration.locales[0].language.equals("fr", ignoreCase = true)
     fun setUnitSystem(units: UnitSystem) {
         _unitSystem.value = units
-        settingsPreferences.edit().putString("unit_system", units.name).apply()
+        settingsPreferences.edit { putString("unit_system", units.name) }
     }
 
     fun updateVehicle(
@@ -240,7 +241,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val normalizedVin = vin.uppercase().filter { it.isLetterOrDigit() }.take(17)
         if (normalizedVin == _vehicle.value.vin) return
         _vehicle.value = _vehicle.value.copy(vin = normalizedVin)
-        settingsPreferences.edit().putString("vehicle_vin", normalizedVin).apply()
+        settingsPreferences.edit { putString("vehicle_vin", normalizedVin) }
         invalidateLiveRecordingForVehicleChange()
         clearVehicleEvidence()
     }
