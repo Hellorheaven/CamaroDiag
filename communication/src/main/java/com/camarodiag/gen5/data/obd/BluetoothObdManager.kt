@@ -315,7 +315,12 @@ class BluetoothObdManager(context: Context) {
             try {
                 sendAtCommandInternal("ATE0", 1_000L)
                 sendAtCommandInternal("ATL0", 1_000L)
+                sendAtCommandInternal("ATS1", 1_000L)
                 sendAtCommandInternal("ATH1", 1_000L)
+                val formattingResponse = sendAtCommandInternal("ATCAF0", 1_000L)
+                check(!formattingResponse.contains("?")) {
+                    "The connected adapter cannot switch to raw CAN formatting."
+                }
                 if (isStnAdapter) {
                     val canFilterResponse = sendAtCommandInternal("ATCF 000", 1_000L)
                     val canMaskResponse = sendAtCommandInternal("ATCM 000", 1_000L)
@@ -346,6 +351,7 @@ class BluetoothObdManager(context: Context) {
                     if (isStnAdapter) {
                         runCatching { sendAtCommandInternal("ATAR", 1_000L) }
                     }
+                    runCatching { sendAtCommandInternal("ATCAF1", 1_000L) }
                     runCatching { sendAtCommandInternal("AT", 1_000L) }
                 }
             }
