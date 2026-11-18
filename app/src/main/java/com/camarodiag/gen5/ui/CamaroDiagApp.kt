@@ -1,7 +1,9 @@
 package com.camarodiag.gen5.ui
 
 import android.Manifest
+import android.content.res.Configuration
 import android.os.Build
+import android.os.LocaleList
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -24,6 +26,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import com.camarodiag.gen5.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -105,10 +110,17 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CamaroDiagApp(viewModel: MainViewModel) {
-    val lang = AppLanguage.fromLocale(LocalConfiguration.current.locales[0])
+    val lang by viewModel.language.collectAsState()
+    val systemConfiguration = LocalConfiguration.current
+    val localizedConfiguration = remember(systemConfiguration, lang) {
+        Configuration(systemConfiguration).apply {
+            setLocales(LocaleList.forLanguageTags(lang.code))
+        }
+    }
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
+    val lastConnectionProfile by viewModel.lastConnectionProfile.collectAsState()
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
     val connError by viewModel.connectionMessage.collectAsState()
@@ -192,6 +204,10 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         }
     }
 
+    CompositionLocalProvider(
+        LocalConfiguration provides localizedConfiguration,
+        LocalLayoutDirection provides if (lang == AppLanguage.AR || lang == AppLanguage.HE) LayoutDirection.Rtl else LayoutDirection.Ltr
+    ) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -411,6 +427,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 DiagTab.SETTINGS -> SettingsScreen(
                     lang = lang,
                     units = units,
+                    vehicle = vehicle,
+                    adapter = adapter,
+                    lastConnectionProfile = lastConnectionProfile,
                     sessions = savedSessions,
                     onLang = { viewModel.setLanguage(it) },
                     onUnits = { viewModel.setUnitSystem(it) },
@@ -420,6 +439,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
             }
         }
+    }
     }
 }
 
@@ -1366,6 +1386,9 @@ fun HardwareGuideScreen() {
 fun SettingsScreen(
     lang: AppLanguage,
     units: UnitSystem,
+    vehicle: VehicleProfile,
+    adapter: AdapterCapabilities,
+    lastConnectionProfile: SavedObdConnectionProfile?,
     sessions: List<com.camarodiag.gen5.data.db.SavedSessionEntity>,
     onLang: (AppLanguage) -> Unit,
     onUnits: (UnitSystem) -> Unit,
@@ -1374,6 +1397,22 @@ fun SettingsScreen(
     onOpenAdapter: () -> Unit
 ) {
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    var languageExpanded by remember { mutableStateOf(false) }
+    val currentVehicle = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.transmission.code} • ${vehicle.market.code} • ${vehicle.vin.ifBlank { "VIN —" }}"
+    val currentAdapter = if (adapter.tier == AdapterTier.DISCONNECTED) {
+        stringResource(R.string.settings_adapter_not_connected)
+    } else {
+        "${adapter.deviceName} • ${localizedAdapterTierName(adapter.tier)}"
+    }
+    val savedConnectionText = lastConnectionProfile?.let { profile ->
+        val transportLabel = when (profile.transport) {
+            "bluetooth" -> stringResource(R.string.settings_connection_bluetooth)
+            "usb" -> stringResource(R.string.settings_connection_usb)
+            "wifi" -> stringResource(R.string.settings_connection_wifi)
+            else -> profile.transport
+        }
+        stringResource(R.string.settings_connection_details, transportLabel, profile.adapterName, profile.endpoint)
+    } ?: stringResource(R.string.settings_no_last_connection)
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             SectionTitle(stringResource(R.string.settings_title))
@@ -1402,7 +1441,32 @@ fun SettingsScreen(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.system_language_current, lang.label), color = CamaroAmber)
+                    Box {
+                        OutlinedButton(onClick = { languageExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(lang.label)
+                        }
+                        DropdownMenu(
+                            expanded = languageExpanded,
+                            onDismissRequest = { languageExpanded = false }
+                        ) {
+                            AppLanguage.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.label) },
+                                    onClick = {
+                                        onLang(option)
+                                        languageExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                     Text(stringResource(R.string.system_language_hint), color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_current_vehicle), fontWeight = FontWeight.Bold)
+                    Text(currentVehicle, color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_current_adapter), fontWeight = FontWeight.Bold)
+                    Text(currentAdapter, color = if (adapter.tier == AdapterTier.DISCONNECTED) TextMuted else CamaroAmber, fontSize = 12.sp)
+                    Text(stringResource(R.string.settings_last_connection), fontWeight = FontWeight.Bold)
+                    Text(savedConnectionText, color = TextMuted, fontSize = 12.sp)
                     Text(stringResource(R.string.settings_unit_system), fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = units == UnitSystem.METRIC, onClick = { onUnits(UnitSystem.METRIC) }, label = { Text(stringResource(R.string.units_metric_details)) })
