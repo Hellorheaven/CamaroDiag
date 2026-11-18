@@ -675,6 +675,19 @@ fun CalibrationWorkspaceScreen(
                             stringResource(R.string.cal_trace_candidate_dids, report.readDidCandidates.joinToString { "0x" + it.toString(16).uppercase().padStart(4, '0') }.ifBlank { stringResource(R.string.common_none) }),
                             color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp
                         )
+                        if (report.pidObservations.isNotEmpty()) {
+                            HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                            Text("SAE J1979 • Mode 01 PID signals", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            report.pidObservations.take(30).forEach { observation ->
+                                Text(
+                                    "CAN ${observation.canId.toString(16).uppercase()} • PID ${observation.pid.toString(16).uppercase().padStart(2, '0')} • ${observation.name}: ${"%.1f".format(java.util.Locale.ROOT, observation.value)} ${observation.unit}",
+                                    color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp
+                                )
+                            }
+                            if (report.pidObservations.size > 30) {
+                                Text("… and ${report.pidObservations.size - 30} more PID observation(s).", color = TextMuted, fontSize = 10.sp)
+                            }
+                        }
                         report.didObservations.take(20).forEach { observation ->
                             val direction = when (observation.direction) {
                                 com.camarodiag.gen5.data.obd.CanTraceDirection.TX -> "TX"
