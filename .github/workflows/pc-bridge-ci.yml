@@ -160,11 +160,16 @@ jobs:
         run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
         continue-on-error: false
 
-      - name: Install Inno Setup
+      - name: Ensure Inno Setup is available
         shell: pwsh
         run: |
-          choco install innosetup --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+          $iscc = Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+          } else {
+            Write-Host "Inno Setup is already available: $iscc"
+          }
 
       - name: Materialize CamaroDiag installer icon
         shell: pwsh
