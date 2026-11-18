@@ -114,7 +114,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val systemConfiguration = LocalConfiguration.current
     val localizedConfiguration = remember(systemConfiguration, lang) {
         Configuration(systemConfiguration).apply {
-            setLocales(LocaleList.forLanguageTags(lang.code))
+            setLocales(LocaleList.forLanguageTags(if (lang == AppLanguage.ZH) "zh-CN" else lang.code))
         }
     }
     val units by viewModel.unitSystem.collectAsState()
