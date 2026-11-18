@@ -1983,8 +1983,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun refreshTopologyAndDefaults(runInitialScans: Boolean = false) {
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         if (runInitialScans && obdManager.isObdCommandChannelAvailable) {
-            scanDtcs()
-            runMileageAudit()
+            // Read the ECU VIN immediately after a successful OBD connection so that
+            // the selected vehicle profile can be checked before the user starts diagnosis.
+            // Keep this request ahead of the initial scans to avoid competing for the ELM channel.
+            viewModelScope.launch {
+                try {
+                    val ecuVin = obdManager.withObdCommandSession { engine -> engine.readVin() }
+                    val comparison = VehicleVinMatcher.compare(_vehicle.value.vin, ecuVin)
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                        vinComparison = comparison
+                    )
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        ecuVinResponse = getApplication<Application>().getString(R.string.obd_not_available),
+                        vinComparison = null
+                    )
+                }
+                scanDtcs()
+                runMileageAudit()
+            }
         }
     }
 
