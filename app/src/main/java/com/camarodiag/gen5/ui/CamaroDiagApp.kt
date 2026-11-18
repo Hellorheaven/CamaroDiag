@@ -1106,7 +1106,7 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                             null
                         }
                         if (vehicleExplanation != null) {
-                            Divider(color = TextMuted.copy(alpha = 0.25f))
+                            HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
                             Text(stringResource(R.string.dtc_vehicle_interpretation), fontWeight = FontWeight.Bold, color = CamaroAmber)
                             Text(if (isFrench) vehicleExplanation.meaningFr else vehicleExplanation.meaningEn)
                             Text(
@@ -1151,7 +1151,7 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
-                        } else if (vehicleExplanation == null && gmMonitor == null && moduleCatalogue.hasVehicleSpecificDefinitions) {
+                        } else if (vehicleExplanation == null && moduleCatalogue.hasVehicleSpecificDefinitions) {
                             Text(
                                 stringResource(R.string.dtc_vehicle_specific_not_documented),
                                 color = TextMuted,
