@@ -621,4 +621,9 @@
     <string name="vin_photo_success">VINを検出し、車両プロフィールにコピーしました。すべての文字を確認してください。</string>
     <string name="vin_photo_not_found">有効な17文字のVINを検出できませんでした。手動で入力するか、もう一度撮影してください。</string>
     <string name="vin_photo_error">VIN写真を読み取れませんでした。照明とピントを改善して再試行してください。</string>
+    <string name="cal_vin_model_year">VINから判定したモデル年式: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">VINはモデル年式%1$dを示していますが、選択中のプロファイルは%2$dです。診断前に車両プロファイルを確認してください。</string>
+    <string name="cal_ecu_name_label">ECU名（標準OBD、Mode 09 PID 0A）</string>
+    <string name="cal_ecu_response_addresses_label">検出された機能OBD応答アドレス（ECUへの割り当てなし）</string>
+    <string name="cal_ecu_identity_limits">これらの標準OBD応答では、RPO、トランスミッション、ECUハードウェア番号、GM OSは確認できません。応答アドレスだけではECUを特定できません。GM固有の識別情報には、車両別の検証済み資料が必要です。</string>
 </resources>

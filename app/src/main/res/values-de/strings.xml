@@ -635,4 +635,9 @@
     <string name="vin_photo_success">VIN erkannt und in das Fahrzeugprofil übernommen. Prüfen Sie jedes Zeichen.</string>
     <string name="vin_photo_not_found">Keine gültige 17-stellige VIN erkannt. Geben Sie sie manuell ein oder machen Sie ein neues Foto.</string>
     <string name="vin_photo_error">Das VIN-Foto konnte nicht gelesen werden. Sorgen Sie für bessere Beleuchtung und Schärfe.</string>
+    <string name="cal_vin_model_year">Aus der VIN abgeleitetes Modelljahr: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">Die VIN weist auf Modelljahr %1$d hin, das ausgewählte Profil jedoch auf %2$d. Bitte das Fahrzeugprofil vor der Diagnose prüfen.</string>
+    <string name="cal_ecu_name_label">ECU-Name (standardmäßiges OBD Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Beobachtete funktionale OBD-Antwortadressen (keinem Steuergerät zugeordnet)</string>
+    <string name="cal_ecu_identity_limits">RPO, Getriebe, Hardware-Teilenummer des Steuergeräts und GM-Betriebssystem werden durch diese standardisierten OBD-Antworten nicht bestätigt. Antwortadressen sind keine Steuergeräte-Identitäten. GM-spezifische Kennungen erfordern verifizierte fahrzeugspezifische Dokumentation.</string>
 </resources>

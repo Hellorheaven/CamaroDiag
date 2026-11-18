@@ -625,4 +625,9 @@
     <string name="vin_photo_success">VIN herkend en naar het voertuigprofiel gekopieerd. Controleer elk teken.</string>
     <string name="vin_photo_not_found">Geen geldige VIN van 17 tekens gevonden. Voer deze handmatig in of maak een nieuwe foto.</string>
     <string name="vin_photo_error">De VIN-foto kon niet worden gelezen. Probeer het opnieuw met betere belichting en scherpstelling.</string>
+    <string name="cal_vin_model_year">Modeljaar afgeleid uit VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">De VIN geeft modeljaar %1$d aan, maar het geselecteerde profiel is %2$d. Controleer het voertuigprofiel vóór de diagnose.</string>
+    <string name="cal_ecu_name_label">ECU-naam (standaard OBD, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Waargenomen functionele OBD-responsadressen (niet aan modules gekoppeld)</string>
+    <string name="cal_ecu_identity_limits">Deze standaard OBD-responsen bevestigen geen RPO, transmissie, hardwareonderdeelnummer van de regeleenheid of GM-besturingssysteem. Responsadressen identificeren geen modules. GM-specifieke identificatie vereist geverifieerde voertuigspecifieke documentatie.</string>
 </resources>

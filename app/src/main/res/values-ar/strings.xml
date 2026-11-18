@@ -636,4 +636,9 @@
     <string name="vin_photo_success">تم اكتشاف رقم VIN ونسخه إلى ملف تعريف المركبة. تحقق من كل حرف.</string>
     <string name="vin_photo_not_found">لم يتم العثور على رقم VIN صالح مكوّن من 17 حرفًا. أدخله يدويًا أو التقط صورة أخرى.</string>
     <string name="vin_photo_error">تعذرت قراءة صورة رقم VIN. حاول مرة أخرى مع إضاءة وتركيز أفضل.</string>
+    <string name="cal_vin_model_year">سنة الطراز المستنتجة من رقم VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">يشير رقم VIN إلى سنة الطراز %1$d، بينما الملف المحدد هو %2$d. تحقّق من ملف المركبة قبل التشخيص.</string>
+    <string name="cal_ecu_name_label">اسم وحدة التحكم (OBD القياسي، Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">عناوين استجابة OBD الوظيفية المرصودة (غير مرتبطة بوحدات محددة)</string>
+    <string name="cal_ecu_identity_limits">لا تؤكد استجابات OBD القياسية هذه رمز RPO أو ناقل الحركة أو رقم عتاد وحدة التحكم أو نظام GM. عناوين الاستجابة لا تحدد هوية الوحدات. تتطلب معرّفات GM وثائق موثوقة خاصة بالمركبة.</string>
 </resources>

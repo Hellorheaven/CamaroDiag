@@ -630,4 +630,9 @@
     <string name="vin_photo_success">VIN распознан и скопирован в профиль автомобиля. Проверьте каждый символ.</string>
     <string name="vin_photo_not_found">Не удалось распознать корректный VIN из 17 символов. Введите его вручную или сделайте другое фото.</string>
     <string name="vin_photo_error">Не удалось прочитать фото VIN. Повторите попытку при лучшем освещении и фокусировке.</string>
+    <string name="cal_vin_model_year">Год модели по VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">VIN указывает на модельный год %1$d, а выбранный профиль — %2$d. Проверьте профиль автомобиля перед диагностикой.</string>
+    <string name="cal_ecu_name_label">Имя ЭБУ (стандартный OBD, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Обнаруженные адреса ответов функционального OBD (не сопоставлены блокам)</string>
+    <string name="cal_ecu_identity_limits">Эти стандартные ответы OBD не подтверждают RPO, трансмиссию, аппаратный номер блока или ОС GM. Адрес ответа не определяет блок управления. Для идентификаторов GM нужна проверенная документация именно для данного автомобиля.</string>
 </resources>

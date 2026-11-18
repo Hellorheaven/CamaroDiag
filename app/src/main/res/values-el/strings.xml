@@ -636,4 +636,9 @@
     <string name="vin_photo_success">Το VIN εντοπίστηκε και αντιγράφηκε στο προφίλ οχήματος. Ελέγξτε κάθε χαρακτήρα.</string>
     <string name="vin_photo_not_found">Δεν εντοπίστηκε έγκυρο VIN 17 χαρακτήρων. Εισαγάγετέ το χειροκίνητα ή τραβήξτε άλλη φωτογραφία.</string>
     <string name="vin_photo_error">Δεν ήταν δυνατή η ανάγνωση της φωτογραφίας VIN. Δοκιμάστε ξανά με καλύτερο φωτισμό και εστίαση.</string>
+    <string name="cal_vin_model_year">Έτος μοντέλου από το VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">Το VIN υποδεικνύει έτος μοντέλου %1$d, ενώ το επιλεγμένο προφίλ είναι %2$d. Ελέγξτε το προφίλ του οχήματος πριν από τη διάγνωση.</string>
+    <string name="cal_ecu_name_label">Όνομα ECU (τυπικό OBD, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Παρατηρημένες διευθύνσεις απόκρισης λειτουργικού OBD (χωρίς αντιστοίχιση σε μονάδες)</string>
+    <string name="cal_ecu_identity_limits">Οι τυπικές αυτές αποκρίσεις OBD δεν επιβεβαιώνουν το RPO, το κιβώτιο, τον αριθμό υλικού της μονάδας ή το GM OS. Οι διευθύνσεις απόκρισης δεν ταυτοποιούν μονάδες. Τα ειδικά αναγνωριστικά GM απαιτούν επαληθευμένη τεκμηρίωση για το συγκεκριμένο όχημα.</string>
 </resources>

@@ -621,4 +621,9 @@
     <string name="vin_photo_success">已识别 VIN 并复制到车辆配置文件。请逐个核对字符。</string>
     <string name="vin_photo_not_found">未检测到有效的 17 位 VIN。请手动输入或重新拍照。</string>
     <string name="vin_photo_error">无法读取 VIN 照片。请改善光线和对焦后重试。</string>
+    <string name="cal_vin_model_year">VIN 解码的车型年款：%1$d（%2$s）</string>
+    <string name="cal_vin_model_year_mismatch">VIN 表示车型年款为 %1$d，但所选车辆配置为 %2$d。诊断前请核对车辆配置。</string>
+    <string name="cal_ecu_name_label">ECU 名称（标准 OBD，Mode 09 PID 0A）</string>
+    <string name="cal_ecu_response_addresses_label">检测到的功能 OBD 响应地址（未映射到控制模块）</string>
+    <string name="cal_ecu_identity_limits">这些标准 OBD 响应无法确认 RPO、变速箱、控制模块硬件编号或 GM 操作系统。响应地址不能用于识别控制模块。GM 专用标识需要经过验证的车辆专属技术资料。</string>
 </resources>

@@ -627,4 +627,9 @@
     <string name="vin_photo_success">ה-VIN זוהה והועתק לפרופיל הרכב. יש לבדוק כל תו.</string>
     <string name="vin_photo_not_found">לא זוהה VIN תקין בן 17 תווים. יש להזין אותו ידנית או לצלם תמונה נוספת.</string>
     <string name="vin_photo_error">לא ניתן לקרוא את תמונת ה-VIN. יש לנסות שוב בתאורה ובמיקוד טובים יותר.</string>
+    <string name="cal_vin_model_year">שנת הדגם שפוענחה ממספר VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">מספר ה‑VIN מציין שנת דגם %1$d, אך הפרופיל שנבחר הוא %2$d. יש לוודא את פרופיל הרכב לפני האבחון.</string>
+    <string name="cal_ecu_name_label">שם ECU (OBD תקני, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">כתובות תגובה פונקציונליות של OBD שנצפו (ללא שיוך למודולים)</string>
+    <string name="cal_ecu_identity_limits">תגובות OBD תקניות אלה אינן מאשרות RPO, תיבת הילוכים, מספר חומרה של יחידת הבקרה או מערכת הפעלה של GM. כתובות תגובה אינן מזהות מודולים. מזהי GM דורשים תיעוד מאומת המותאם לרכב.</string>
 </resources>

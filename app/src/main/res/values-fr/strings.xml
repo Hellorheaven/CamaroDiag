@@ -638,4 +638,9 @@
     <string name="vin_photo_success">VIN détecté et copié dans le profil véhicule. Vérifiez chaque caractère.</string>
     <string name="vin_photo_not_found">Aucun VIN valide de 17 caractères détecté. Saisissez-le manuellement ou reprenez la photo.</string>
     <string name="vin_photo_error">Impossible de lire la photo du VIN. Réessayez avec plus de lumière et une meilleure mise au point.</string>
+    <string name="cal_vin_model_year">Année modèle décodée depuis le VIN : %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">Le VIN indique l’année modèle %1$d, mais le profil sélectionné indique %2$d. Vérifie le profil avant tout diagnostic.</string>
+    <string name="cal_ecu_name_label">Nom du calculateur (OBD standard, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Adresses de réponse OBD fonctionnelles observées (non associées à un calculateur)</string>
+    <string name="cal_ecu_identity_limits">Le RPO, la transmission, la référence matérielle du calculateur et l’OS GM ne sont pas confirmés par ces réponses OBD standard. Une adresse de réponse ne permet pas d’identifier un calculateur. Les identifiants GM nécessitent une documentation vérifiée propre au véhicule.</string>
 </resources>

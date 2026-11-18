@@ -638,4 +638,9 @@
     <string name="vin_photo_success">VIN rilevato e copiato nel profilo del veicolo. Verifica ogni carattere.</string>
     <string name="vin_photo_not_found">Nessun VIN valido di 17 caratteri rilevato. Inseriscilo manualmente o scatta una nuova foto.</string>
     <string name="vin_photo_error">Impossibile leggere la foto del VIN. Riprova con illuminazione e messa a fuoco migliori.</string>
+    <string name="cal_vin_model_year">Anno modello ricavato dal VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">Il VIN indica l’anno modello %1$d, mentre il profilo selezionato è %2$d. Verifica il profilo del veicolo prima della diagnosi.</string>
+    <string name="cal_ecu_name_label">Nome ECU (OBD standard, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Indirizzi di risposta OBD funzionali rilevati (non associati a centraline)</string>
+    <string name="cal_ecu_identity_limits">Queste risposte OBD standard non confermano RPO, trasmissione, codice hardware della centralina o sistema operativo GM. Gli indirizzi di risposta non identificano le centraline. Gli identificativi GM richiedono documentazione verificata specifica del veicolo.</string>
 </resources>
