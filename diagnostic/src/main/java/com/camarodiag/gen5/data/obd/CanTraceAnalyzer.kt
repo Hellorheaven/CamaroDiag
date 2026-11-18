@@ -254,17 +254,25 @@ object CanTraceAnalyzer {
             val fields = splitCsvLine(line, delimiter)
             fun field(index: Int): String = fields.getOrNull(index).orEmpty().trim().trim('"')
             val canId = parseCanId(field(canIdIndex))
+            val declaredDlc = if (dlcIndex >= 0) field(dlcIndex).toIntOrNull() else null
             val bytes = if (dataIndex >= 0) parseHexBytes(field(dataIndex)) else {
-                val values = dataByteIndexes.map { idx ->
-                    val value = field(idx)
-                    if (value.isBlank()) null else value.removePrefix("0x").removePrefix("0X")
-                        .toIntOrNull(16)?.takeIf { it in 0..0xFF }
+                val rawValues = dataByteIndexes.map(field)
+                // Empty columns after the declared DLC are normal in fixed-width CSV exports.
+                // Without a DLC column, trim only trailing empties; a gap inside the frame is invalid.
+                val byteCount = declaredDlc ?: (rawValues.indexOfLast { it.isNotBlank() } + 1)
+                if (byteCount !in 0..rawValues.size) {
+                    null
+                } else {
+                    val values = rawValues.take(byteCount).map { value ->
+                        if (value.isBlank()) null else value.removePrefix("0x").removePrefix("0X")
+                            .toIntOrNull(16)?.takeIf { it in 0..0xFF }
+                    }
+                    if (values.any { it == null }) null else values.filterNotNull()
                 }
-                if (values.any { it == null }) null else values.filterNotNull()
             }
             val timestamp = if (timestampIndex >= 0) field(timestampIndex).toDoubleOrNull() else null
             val direction = if (directionIndex >= 0) parseDirection(field(directionIndex)) else CanTraceDirection.UNKNOWN
-            val dlc = if (dlcIndex >= 0) field(dlcIndex).toIntOrNull() else bytes?.size
+            val dlc = declaredDlc ?: bytes?.size
             if (canId == null || bytes == null || dlc == null || dlc !in 0..64 || bytes.size < dlc) {
                 errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
                 continue
