@@ -1134,7 +1134,7 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, onScan: () -> 
                         }
                         val gmSourceLabel = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
                         if (gmMonitor != null) {
-                            Divider(color = TextMuted.copy(alpha = 0.25f))
+                            HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
                             Text(
                                 stringResource(R.string.dtc_gm_monitor_title, gmSourceLabel),
                                 fontWeight = FontWeight.Bold,
