@@ -51,7 +51,9 @@ object SafeObdRequestPolicy {
     private fun normalizeHexToken(token: String, expectedLength: Int): String? {
         val value = if (token.startsWith("0x", ignoreCase = true)) token.substring(2) else token
         return value.takeIf {
-            it.length == expectedLength && it.all { character -> character.digitToIntOrNull(16) != null }
+            it.length == expectedLength && it.all { character ->
+                character in '0'..'9' || character in 'A'..'F' || character in 'a'..'f'
+            }
         }
     }
 }
