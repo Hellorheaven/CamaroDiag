@@ -989,6 +989,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun canMonitorAvailable(): Boolean =
+        obdManager.isObdCommandChannelAvailable && _adapter.value.supportsCanHeaders
+
     /** Starts a bounded, passive monitor session on a real header-capable ELM/STN adapter. */
     fun startCanMonitor(durationMs: Long = 10_000L) {
         if (canMonitorJob?.isActive == true) return
