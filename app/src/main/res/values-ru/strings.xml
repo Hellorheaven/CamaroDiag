@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">Язык приложения</string>
-    <string name="system_language_current">Язык системы: %1$s</string>
-    <string name="system_language_hint">CamaroDiag использует язык устройства, если он поддерживается. Для остальных языков используется английский.</string>
+    
+    
     <string name="tab_vehicle">Автомобиль</string>
     <string name="tab_connect">Подключение</string>
     <string name="tab_live">Данные в реальном времени</string>
@@ -577,6 +577,17 @@
     <string name="dtc_gm_monitor_failure">Счётчик отказов / частота подтверждения: %1$s</string>
     <string name="dtc_gm_monitor_mil">Классификация MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Источник: GM %1$s, страница %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <string name="system_language_current">Выбранный язык: %1$s</string>
     <string name="system_language_hint">Выберите язык интерфейса CamaroDiag.</string>
     <string name="settings_current_vehicle">Текущий автомобиль</string>
