@@ -638,4 +638,22 @@
     <string name="vin_photo_success">VIN détecté et copié dans le profil véhicule. Vérifiez chaque caractère.</string>
     <string name="vin_photo_not_found">Aucun VIN valide de 17 caractères détecté. Saisissez-le manuellement ou reprenez la photo.</string>
     <string name="vin_photo_error">Impossible de lire la photo du VIN. Réessayez avec plus de lumière et une meilleure mise au point.</string>
+    <string name="tab_can_sniffer">Analyseur CAN</string>
+    <string name="can_sniffer_title">Moniteur CAN en direct</string>
+    <string name="can_sniffer_description">Capture des trames CAN avec un adaptateur ELM ou STN réel et compatible. Chaque capture s’arrête automatiquement après une courte session.</string>
+    <string name="can_sniffer_safety">Seules les requêtes OBD-II en lecture seule sont acceptées. Les trames CAN arbitraires et les écritures UDS sont bloquées.</string>
+    <string name="can_sniffer_start">Capturer pendant 10 secondes</string>
+    <string name="can_sniffer_stop">Arrêter la capture</string>
+    <string name="can_sniffer_request_label">Requête OBD-II en lecture seule (hexadécimal)</string>
+    <string name="can_sniffer_send">Envoyer la requête en lecture seule</string>
+    <string name="can_sniffer_empty">Aucune trame CAN capturée pour le moment.</string>
+    <string name="can_sniffer_unavailable">Connectez un adaptateur réel prenant en charge les en-têtes CAN. La simulation et les ponts non compatibles ne permettent pas la capture en direct.</string>
+    <string name="can_sniffer_capture_complete">Capture CAN terminée.</string>
+    <string name="can_sniffer_capture_failed">Échec de la capture CAN ou absence de réponse de l’adaptateur.</string>
+    <string name="can_sniffer_invalid_request">Requête refusée. Utilisez uniquement les couples service/PID OBD-II Mode 01 ou Mode 09 autorisés.</string>
+    <string name="can_sniffer_frame_count">Trames capturées : %1$d</string>
+    <string name="can_sniffer_pid_heading">Valeurs OBD-II standard décodées</string>
+    <string name="can_sniffer_response_heading">Dernière réponse OBD-II</string>
+    <string name="can_sniffer_request_complete">Requête en lecture seule terminée.</string>
+    <string name="can_sniffer_request_failed">Échec de la requête en lecture seule.</string>
 </resources>

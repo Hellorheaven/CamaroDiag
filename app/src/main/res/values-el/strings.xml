@@ -636,4 +636,22 @@
     <string name="vin_photo_success">Το VIN εντοπίστηκε και αντιγράφηκε στο προφίλ οχήματος. Ελέγξτε κάθε χαρακτήρα.</string>
     <string name="vin_photo_not_found">Δεν εντοπίστηκε έγκυρο VIN 17 χαρακτήρων. Εισαγάγετέ το χειροκίνητα ή τραβήξτε άλλη φωτογραφία.</string>
     <string name="vin_photo_error">Δεν ήταν δυνατή η ανάγνωση της φωτογραφίας VIN. Δοκιμάστε ξανά με καλύτερο φωτισμό και εστίαση.</string>
+    <string name="tab_can_sniffer">Παρακολούθηση CAN</string>
+    <string name="can_sniffer_title">Ζωντανή παρακολούθηση CAN</string>
+    <string name="can_sniffer_description">Καταγράψτε πλαίσια CAN με πραγματικό συμβατό προσαρμογέα ELM ή STN. Κάθε καταγραφή σταματά αυτόματα μετά από σύντομη συνεδρία.</string>
+    <string name="can_sniffer_safety">Επιτρέπονται μόνο αιτήματα OBD-II για ανάγνωση. Αποκλείονται αυθαίρετα πλαίσια CAN και υπηρεσίες εγγραφής UDS.</string>
+    <string name="can_sniffer_start">Έναρξη καταγραφής 10 δευτερολέπτων</string>
+    <string name="can_sniffer_stop">Διακοπή καταγραφής</string>
+    <string name="can_sniffer_request_label">Αίτημα OBD-II μόνο για ανάγνωση (hex)</string>
+    <string name="can_sniffer_send">Αποστολή αιτήματος μόνο για ανάγνωση</string>
+    <string name="can_sniffer_empty">Δεν έχουν καταγραφεί ακόμη πλαίσια CAN.</string>
+    <string name="can_sniffer_unavailable">Συνδέστε πραγματικό προσαρμογέα με υποστήριξη κεφαλίδων CAN. Η προσομοίωση και οι μη υποστηριζόμενες γέφυρες δεν υποστηρίζουν ζωντανή παρακολούθηση.</string>
+    <string name="can_sniffer_capture_complete">Η καταγραφή CAN ολοκληρώθηκε.</string>
+    <string name="can_sniffer_capture_failed">Η καταγραφή CAN απέτυχε ή ο προσαρμογέας σταμάτησε να αποκρίνεται.</string>
+    <string name="can_sniffer_invalid_request">Το αίτημα απορρίφθηκε. Χρησιμοποιήστε μόνο επιτρεπόμενα ζεύγη υπηρεσίας/PID OBD-II Mode 01 ή Mode 09.</string>
+    <string name="can_sniffer_frame_count">Καταγεγραμμένα πλαίσια: %1$d</string>
+    <string name="can_sniffer_pid_heading">Αποκωδικοποιημένες τυπικές τιμές OBD-II</string>
+    <string name="can_sniffer_response_heading">Τελευταία απόκριση OBD-II</string>
+    <string name="can_sniffer_request_complete">Το αίτημα μόνο για ανάγνωση ολοκληρώθηκε.</string>
+    <string name="can_sniffer_request_failed">Το αίτημα μόνο για ανάγνωση απέτυχε.</string>
 </resources>

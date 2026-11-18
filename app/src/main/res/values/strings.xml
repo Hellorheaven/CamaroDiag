@@ -635,4 +635,22 @@
     <string name="vin_photo_success">VIN detected and copied to the vehicle profile. Verify every character.</string>
     <string name="vin_photo_not_found">No valid 17-character VIN detected. Enter it manually or take another photo.</string>
     <string name="vin_photo_error">Could not read the VIN photo. Try again with better lighting and focus.</string>
+    <string name="tab_can_sniffer">CAN Sniffer</string>
+    <string name="can_sniffer_title">Live CAN Monitor</string>
+    <string name="can_sniffer_description">Capture CAN frames on a real compatible ELM or STN adapter. Each capture stops automatically after a short session.</string>
+    <string name="can_sniffer_safety">Only read-only OBD-II requests are accepted. Arbitrary CAN frames and UDS write services are blocked.</string>
+    <string name="can_sniffer_start">Start 10-second capture</string>
+    <string name="can_sniffer_stop">Stop capture</string>
+    <string name="can_sniffer_request_label">Read-only OBD-II request (hex)</string>
+    <string name="can_sniffer_send">Send read-only request</string>
+    <string name="can_sniffer_empty">No CAN frames captured yet.</string>
+    <string name="can_sniffer_unavailable">Connect a real adapter with CAN header support. Simulation and unsupported bridges cannot monitor live CAN.</string>
+    <string name="can_sniffer_capture_complete">CAN capture complete.</string>
+    <string name="can_sniffer_capture_failed">CAN capture failed or the adapter stopped responding.</string>
+    <string name="can_sniffer_invalid_request">Request rejected. Use only whitelisted OBD-II Mode 01 or Mode 09 service and PID pairs.</string>
+    <string name="can_sniffer_frame_count">Frames captured: %1$d</string>
+    <string name="can_sniffer_pid_heading">Decoded standard OBD-II values</string>
+    <string name="can_sniffer_response_heading">Last OBD-II response</string>
+    <string name="can_sniffer_request_complete">Read-only request completed.</string>
+    <string name="can_sniffer_request_failed">Read-only request failed.</string>
 </resources>
