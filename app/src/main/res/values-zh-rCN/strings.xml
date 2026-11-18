@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">应用语言</string>
-    <string name="system_language_current">系统语言：%1$s</string>
-    <string name="system_language_hint">CamaroDiag 在支持的情况下会使用设备语言。其他语言将使用英语。</string>
+    
+    
     <string name="tab_vehicle">车辆</string>
     <string name="tab_connect">连接</string>
     <string name="tab_live">实时数据</string>
@@ -568,6 +568,17 @@
     <string name="dtc_gm_monitor_failure">故障计数／确认频率：%1$s</string>
     <string name="dtc_gm_monitor_mil">MIL分类：%1$s</string>
     <string name="dtc_gm_monitor_source">来源：GM %1$s，第%2$d页</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <string name="system_language_current">当前语言：%1$s</string>
     <string name="system_language_hint">选择 CamaroDiag 使用的语言。</string>
     <string name="settings_current_vehicle">当前车辆</string>
