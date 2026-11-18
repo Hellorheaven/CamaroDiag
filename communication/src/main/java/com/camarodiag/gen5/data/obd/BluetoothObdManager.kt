@@ -352,6 +352,8 @@ class BluetoothObdManager(context: Context) {
                         runCatching { sendAtCommandInternal("ATAR", 1_000L) }
                     }
                     runCatching { sendAtCommandInternal("ATCAF1", 1_000L) }
+                    // Restore ELM default spacing; the capture temporarily enabled ATS1.
+                    runCatching { sendAtCommandInternal("ATS0", 1_000L) }
                     runCatching { sendAtCommandInternal("AT", 1_000L) }
                 }
             }
