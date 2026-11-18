@@ -35,7 +35,7 @@ data class UdsTraceMessage(
         get() = if (payload.firstOrNull() == 0x7F) payload.getOrNull(2) else null
     val serviceName: String
         get() = when (service) {
-            0x01 -> "ShowCurrentData (OBD-II)",
+            0x01 -> "ShowCurrentData (OBD-II)"
             0x10 -> "DiagnosticSessionControl"
             0x11 -> "ECUReset"
             0x14 -> "ClearDiagnosticInformation"
