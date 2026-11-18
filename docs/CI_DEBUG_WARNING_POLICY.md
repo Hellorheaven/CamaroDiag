@@ -24,7 +24,7 @@ Les contrôles stables à configurer dans la protection de branche sont `Android
 
 La variable `CAMARODIAG_DRAFT_BUILD_INTERVAL` s'applique également au suivi Android, avec une valeur par défaut de 50.
 
-- Les commits Android pertinents comprennent les modules applicatifs (`app`, `core`, `diagnostic`, `communication`, `control`, `mileageaudit`, `storage`, `third_party`), les configurations et wrappers Gradle, `version.properties` et le workflow `.github/workflows/android-ci.yml`.
+- Les commits Android pertinents comprennent les modules applicatifs (`app`, `core`, `diagnostic`, `communication`, `control`, `mileageaudit`, `storage`, `third_party`), les configurations et wrappers Gradle, `version.properties` et le workflow `.github/workflows/android-ci.yml`. Un commit qui modifie le workflow Android force immédiatement la validation complète.
 - Les commits purement Windows, notamment `pc-bridge/**` et ses fichiers .NET, ne font pas progresser le compteur Android.
 - Le compteur repart uniquement du SHA du dernier job `test-and-build` réellement réussi. Le succès du job d'évaluation ou du contrôle stable ne réinitialise jamais le compteur.
 - Si le seuil n'est pas atteint en Draft, le contrôle indique `BUILD DEFERRED`; le contrôle ne prétend pas que les tests, lint ou APK ont été exécutés.
@@ -36,7 +36,7 @@ La détection compare la base de la PR à sa tête et considère comme pertinent
 
 - Tout le répertoire `pc-bridge/**` : sources, projets, ressources, installateur et configuration.
 - Les configurations .NET partagées : `global.json`, `.editorconfig`, `.github/actions/**`, `NuGet.Config`, `nuget.config`, `Directory.Build.props`, `Directory.Build.targets`, `Directory.Packages.props`, fichiers de réponse MSBuild, solutions `.sln` / `.slnx`, fichiers `.props` / `.targets` et `.config/dotnet-tools.json`, y compris dans les sous-répertoires.
-- Le workflow `.github/workflows/pc-bridge-ci.yml` lui-même. Toute modification de sa logique force une validation Windows Debug.
+- Le workflow `.github/workflows/pc-bridge-ci.yml` lui-même. Un commit qui modifie ce workflow force une validation Windows Debug ; les commits suivants reprennent le compteur périodique après la réussite réelle.
 
 Une modification Android, Kotlin, Compose, DTC, Gradle ou des ressources Android ne déclenche pas à elle seule une compilation Windows.
 
