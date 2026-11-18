@@ -25,83 +25,122 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     outputs:
+      windows_changed: ${{ steps.windows_changes.outputs.windows_changed }}
       build_required: ${{ steps.checkpoint.outputs.build_required }}
       commits_since_build: ${{ steps.checkpoint.outputs.commits_since_build }}
       interval: ${{ steps.checkpoint.outputs.interval }}
     steps:
-      - name: Evaluate flexible periodic build checkpoint
-        id: checkpoint
-        uses: actions/github-script@v8
+      - name: Checkout pull request history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Detect Windows-relevant changes
+        id: windows_changes
+        shell: bash
         env:
-          BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          paths=(
+            'pc-bridge/**' 'global.json' 'NuGet.Config' 'nuget.config'
+            '**/Directory.Build.props' '**/Directory.Build.targets'
+            '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
+            '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
+            '**/NuGet.Config' '**/nuget.config' '.config/dotnet-tools.json'
+            '.github/workflows/pc-bridge-ci.yml'
+          )
+          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"; then
+            echo "windows_changed=false" >> "$GITHUB_OUTPUT"
+            echo "NOT APPLICABLE: no Windows bridge, shared .NET build, installer, or Windows CI workflow changes."
+          else
+            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Windows-relevant changes detected:"
+            git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
+          fi
+
+      - name: Find last successful Windows Debug build
+        id: previous_build
+        if: steps.windows_changes.outputs.windows_changed == 'true' && github.event.pull_request.draft
+        uses: actions/github-script@v8
         with:
           script: |
-            const configured = Number(process.env.BUILD_INTERVAL);
-            const interval = Number.isInteger(configured) && configured > 0 ? configured : 50;
             const pr = context.payload.pull_request;
-            if (!pr.draft) {
-              core.setOutput('build_required', 'true');
-              core.setOutput('commits_since_build', 'ready-for-review');
-              core.setOutput('interval', String(interval));
-              return;
-            }
-
             const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'pc-bridge-ci.yml',
-              branch: pr.head.ref,
-              event: 'pull_request',
-              status: 'completed',
-              per_page: 100
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: 'pc-bridge-ci.yml', branch: pr.head.ref,
+              event: 'pull_request', status: 'completed', per_page: 100
             });
             const candidates = runs
-              .filter(run => run.conclusion === 'success' &&
-                run.head_sha !== pr.head.sha &&
+              .filter(run => run.conclusion === 'success' && run.head_sha !== pr.head.sha &&
                 (run.pull_requests || []).some(item => item.number === pr.number))
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             let previous = null;
             for (const candidate of candidates) {
               const jobs = await github.rest.actions.listJobsForWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: candidate.id,
-                per_page: 100
+                owner: context.repo.owner, repo: context.repo.repo,
+                run_id: candidate.id, per_page: 100
               });
-              // A successful checkpoint means the actual platform build job passed.
-              // The lightweight evaluator succeeding while the build job is skipped
-              // must never reset the commit counter.
-              if (jobs.data.jobs.some(job =>
-                job.name === 'build-windows-debug' && job.conclusion === 'success')) {
+              if (jobs.data.jobs.some(job => job.name === 'build-windows-debug' && job.conclusion === 'success')) {
                 previous = candidate;
                 break;
               }
             }
+            core.setOutput('sha', previous ? previous.head_sha : '');
+            core.info(previous
+              ? 'Last successful Windows Debug build: ' + previous.head_sha
+              : 'No previous successful Windows Debug build; counting relevant commits from the PR base.');
 
-            let commitsSinceBuild = pr.commits;
-            if (previous) {
-              try {
-                const comparison = await github.rest.repos.compareCommits({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  base: previous.head_sha,
-                  head: pr.head.sha
-                });
-                commitsSinceBuild = comparison.data.ahead_by;
-              } catch (error) {
-                core.warning(`Unable to compare against the last successful build (${error.message}); falling back to the PR commit count.`);
-                commitsSinceBuild = pr.commits;
-              }
-            }
-
-            const required = commitsSinceBuild >= interval;
-            core.setOutput('build_required', String(required));
-            core.setOutput('commits_since_build', String(commitsSinceBuild));
-            core.setOutput('interval', String(interval));
-            core.info(required
-              ? `Periodic build due: ${commitsSinceBuild} commits since last successful build (interval ${interval}).`
-              : `No periodic build due: ${commitsSinceBuild}/${interval} commits since last successful build.`);
-
+      - name: Evaluate Windows-only periodic build checkpoint
+        id: checkpoint
+        shell: bash
+        env:
+          BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
+          WINDOWS_CHANGED: ${{ steps.windows_changes.outputs.windows_changed }}
+          PREVIOUS_BUILD_SHA: ${{ steps.previous_build.outputs.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          configured="${BUILD_INTERVAL:-}"
+          if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
+          echo "interval=$interval" >> "$GITHUB_OUTPUT"
+          if [[ "$WINDOWS_CHANGED" != "true" ]]; then
+            echo "build_required=false" >> "$GITHUB_OUTPUT"
+            echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
+            echo "Windows build not applicable: no Windows-relevant changes."
+            exit 0
+          fi
+          count_base="$BASE_SHA"
+          if [[ -n "$PREVIOUS_BUILD_SHA" ]]; then count_base="$PREVIOUS_BUILD_SHA"; fi
+          paths=(
+            'pc-bridge/**' 'global.json' 'NuGet.Config' 'nuget.config'
+            '**/Directory.Build.props' '**/Directory.Build.targets'
+            '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
+            '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
+            '**/NuGet.Config' '**/nuget.config' '.config/dotnet-tools.json'
+            '.github/workflows/pc-bridge-ci.yml'
+          )
+          commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
+          echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
+          if [[ "$IS_DRAFT" != "true" ]]; then
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "PR is Ready for review: immediate Windows Debug validation required."
+          elif git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- '.github/workflows/pc-bridge-ci.yml'; then
+            if (( commits_since_build >= interval )); then
+              echo "build_required=true" >> "$GITHUB_OUTPUT"
+              echo "Windows Debug build due: $commits_since_build relevant commits (interval $interval)."
+            else
+              echo "build_required=false" >> "$GITHUB_OUTPUT"
+              echo "Windows Debug build deferred: $commits_since_build/$interval Windows-relevant commits."
+            fi
+          else
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "Windows Debug workflow changed: forcing validation of the modified workflow."
+          fi
   build-windows-debug:
     needs: evaluate-build-checkpoint
     if: needs.evaluate-build-checkpoint.outputs.build_required == 'true'
@@ -166,6 +205,39 @@ jobs:
             }
           }
 
+  windows-debug-validation:
+    needs: [evaluate-build-checkpoint, build-windows-debug]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Windows Debug validation applicability
+        env:
+          EVALUATION_RESULT: ${{ needs.evaluate-build-checkpoint.result }}
+          WINDOWS_CHANGED: ${{ needs.evaluate-build-checkpoint.outputs.windows_changed }}
+          BUILD_REQUIRED: ${{ needs.evaluate-build-checkpoint.outputs.build_required }}
+          BUILD_RESULT: ${{ needs.build-windows-debug.result }}
+          COMMITS_SINCE_BUILD: ${{ needs.evaluate-build-checkpoint.outputs.commits_since_build }}
+          BUILD_INTERVAL: ${{ needs.evaluate-build-checkpoint.outputs.interval }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVALUATION_RESULT" != "success" ]]; then
+            echo "::error::Windows applicability/checkpoint evaluation did not succeed."
+            exit 1
+          fi
+          if [[ "$WINDOWS_CHANGED" != "true" ]]; then
+            echo "NOT APPLICABLE: no Windows bridge or shared .NET build changes."
+            exit 0
+          fi
+          if [[ "$BUILD_REQUIRED" != "true" ]]; then
+            echo "BUILD DEFERRED: $COMMITS_SINCE_BUILD/$BUILD_INTERVAL Windows-relevant commits."
+            echo "This control is not a compilation and does not reset the checkpoint."
+            exit 0
+          fi
+          if [[ "$BUILD_RESULT" != "success" ]]; then
+            echo "::error::Windows Debug build was required but its result was $BUILD_RESULT."
+            exit 1
+          fi
+          echo "VALIDATED: Windows Debug build and x64/x86 installers completed successfully."
       - name: Upload Windows Debug installers for this PR commit
         uses: actions/upload-artifact@v7
         with:
