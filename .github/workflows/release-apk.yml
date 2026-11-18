@@ -138,8 +138,50 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  detect-windows-release-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      windows_changed: ${{ steps.detect.outputs.windows_changed }}
+    steps:
+      - name: Checkout pushed revision and history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Detect Windows bridge and shared .NET changes
+        id: detect
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          paths=(
+            'pc-bridge/**' 'global.json' 'NuGet.Config' 'nuget.config'
+            '**/Directory.Build.props' '**/Directory.Build.targets'
+            '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
+            '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
+            '**/NuGet.Config' '**/nuget.config' '.config/dotnet-tools.json'
+            '.github/workflows/pc-bridge-ci.yml' '.github/workflows/release-apk.yml'
+          )
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
+            echo "No valid push base SHA; running Windows Release defensively."
+          elif git diff --quiet "$BEFORE_SHA" "$HEAD_SHA" -- "${paths[@]}"; then
+            echo "windows_changed=false" >> "$GITHUB_OUTPUT"
+            echo "No Windows bridge or shared .NET build changes in this push."
+          else
+            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Windows-relevant changes detected:"
+            git diff --name-only "$BEFORE_SHA" "$HEAD_SHA" -- "${paths[@]}"
+          fi
   bridge-installers:
-    needs: release
+    needs:
+      - release
+      - detect-windows-release-changes
+    if: needs.release.result == 'success' && needs.detect-windows-release-changes.result == 'success' && needs.detect-windows-release-changes.outputs.windows_changed == 'true'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -187,11 +229,16 @@ jobs:
             $output = Join-Path $PWD "publish\$($variant.Name)"
             New-Item -ItemType Directory -Force -Path $output | Out-Null
 
-            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime $variant.Runtime --self-contained true --output $output "-p:Version=$env:VERSION_NAME" "-p:AssemblyVersion=$($env:VERSION_NAME).0" "-p:FileVersion=$($env:VERSION_NAME).0"
+            dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime $variant.Runtime --self-contained true --output $output -warnaserror "-p:Version=$env:VERSION_NAME" "-p:AssemblyVersion=$($env:VERSION_NAME).0" "-p:FileVersion=$($env:VERSION_NAME).0"
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
 
-            & $iscc "/DAppVersion=$env:VERSION_NAME" "/DBuildDir=$output" "/DChannel=release" "/DArch=$($variant.Arch)" "/DOutputName=CamaroDiag-J2534-Bridge-Setup-$($variant.Name)" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss"
+            $installerLog = Join-Path $PWD "dist\$($variant.Name)-installer.log"
+            $installerOutput = & $iscc "/DAppVersion=$env:VERSION_NAME" "/DBuildDir=$output" "/DChannel=release" "/DArch=$($variant.Arch)" "/DOutputName=CamaroDiag-J2534-Bridge-Setup-$($variant.Name)" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss" 2>&1
+            $installerOutput | Tee-Object -FilePath $installerLog
             if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed for $($variant.Name)" }
+            if (($installerOutput | Out-String) -match '(?i)\bwarning\b') {
+              throw "Inno Setup emitted a warning for $($variant.Name). See $installerLog"
+            }
           }
 
       - name: Upload Windows release setup installers
@@ -206,8 +253,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cleanup-old-releases:
-    needs: [release, bridge-installers]
-    if: success()
+    needs: [release, bridge-installers, detect-windows-release-changes]
+    if: always() && needs.release.result == 'success' && needs.detect-windows-release-changes.result == 'success' && (needs.bridge-installers.result == 'success' || needs.bridge-installers.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
