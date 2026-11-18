@@ -486,12 +486,11 @@ fun CalibrationWorkspaceScreen(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                                null -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(stringResource(R.string.cal_vin_profile_not_set), color = CamaroAmber, fontSize = 12.sp)
-                                    TextButton(onClick = { onSyncVehicleVinFromEcu(comparison.ecuVin) }) {
-                                        Text(stringResource(R.string.cal_use_ecu_vin_for_current_profile))
-                                    }
-                                }
+                                null -> Text(
+                                    stringResource(R.string.cal_vin_profile_not_set),
+                                    color = CamaroAmber,
+                                    fontSize = 12.sp
+                                )
                             }
                         }
                         Text(stringResource(R.string.cal_mode09_calid_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
