@@ -24,18 +24,34 @@ object SafeObdRequestPolicy {
         0x09 to setOf(0x02, 0x04, 0x06)
     )
 
-    /** Accepts one service/parameter pair (for example "01 0C" or "0902"). */
+    /**
+     * Accepts exactly one service/PID pair: compact ("010C"), spaced ("01 0C"),
+     * or explicitly prefixed ("0x01 0x0C"). Extra tokens and misplaced prefixes
+     * are rejected instead of being silently stripped.
+     */
     fun parse(input: String): SafeObdRequest? {
-        val compact = input.trim()
-            .replace("0x", "", ignoreCase = true)
-            .filterNot(Char::isWhitespace)
-            .uppercase()
-        if (!compact.matches(Regex("[0-9A-F]{4}"))) return null
+        val tokens = input.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
+        val compact = when (tokens.size) {
+            1 -> normalizeHexToken(tokens[0], 4) ?: return null
+            2 -> {
+                val service = normalizeHexToken(tokens[0], 2) ?: return null
+                val parameter = normalizeHexToken(tokens[1], 2) ?: return null
+                service + parameter
+            }
+            else -> return null
+        }.uppercase()
 
         val service = compact.substring(0, 2).toIntOrNull(16) ?: return null
         val parameter = compact.substring(2, 4).toIntOrNull(16) ?: return null
         if (parameter !in allowedParametersByService[service].orEmpty()) return null
 
         return SafeObdRequest(service, parameter, compact)
+    }
+
+    private fun normalizeHexToken(token: String, expectedLength: Int): String? {
+        val value = if (token.startsWith("0x", ignoreCase = true)) token.substring(2) else token
+        return value.takeIf {
+            it.length == expectedLength && it.all { character -> character.digitToIntOrNull(16) != null }
+        }
     }
 }
