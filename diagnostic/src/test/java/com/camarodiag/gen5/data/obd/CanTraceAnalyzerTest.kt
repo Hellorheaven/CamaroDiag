@@ -127,4 +127,28 @@ class CanTraceAnalyzerTest {
         assertTrue(report.frames.isEmpty())
         assertTrue(report.errors.any { it.contains("invalid CSV CAN frame") })
     }
+
+    @Test
+    fun parsesFixedWidthCsvByteColumnsUsingDeclaredDlc() {
+        val report = CanTraceAnalyzer.analyze(
+            "can_id,dlc,data0,data1,data2,data3,data4,data5,data6,data7\\n" +
+                "7E8,3,02,41,0C,,,,,",
+            "capture.csv"
+        )
+
+        assertEquals(1, report.frames.size)
+        assertEquals(listOf(0x02, 0x41, 0x0C), report.frames.single().data)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
+    fun rejectsGapsInsideCsvByteColumns() {
+        val report = CanTraceAnalyzer.analyze(
+            "can_id,dlc,data0,data1,data2\\n7E8,3,02,,0C",
+            "capture.csv"
+        )
+
+        assertTrue(report.frames.isEmpty())
+        assertTrue(report.errors.any { it.contains("invalid CSV CAN frame") })
+    }
 }
