@@ -255,10 +255,12 @@ object CanTraceAnalyzer {
             fun field(index: Int): String = fields.getOrNull(index).orEmpty().trim().trim('"')
             val canId = parseCanId(field(canIdIndex))
             val bytes = if (dataIndex >= 0) parseHexBytes(field(dataIndex)) else {
-                dataByteIndexes.mapNotNull { idx ->
-                    field(idx).takeIf(String::isNotBlank)?.removePrefix("0x")?.removePrefix("0X")
-                        ?.toIntOrNull(16)?.takeIf { it in 0..0xFF }
+                val values = dataByteIndexes.map { idx ->
+                    val value = field(idx)
+                    if (value.isBlank()) null else value.removePrefix("0x").removePrefix("0X")
+                        .toIntOrNull(16)?.takeIf { it in 0..0xFF }
                 }
+                if (values.any { it == null }) null else values.filterNotNull()
             }
             val timestamp = if (timestampIndex >= 0) field(timestampIndex).toDoubleOrNull() else null
             val direction = if (directionIndex >= 0) parseDirection(field(directionIndex)) else CanTraceDirection.UNKNOWN
