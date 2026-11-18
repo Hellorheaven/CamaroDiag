@@ -108,6 +108,21 @@ class DtcCatalogRegistryTest {
     }
 
     @Test
+    fun vehicleSpecificDefinitionsRequireAnExplicitMatchingEcuVin() {
+        val vin = "1G1FB1E30C9123456"
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX, vin = vin)
+        val matching = VehicleVinMatcher.compare(vin, vin)
+        val mismatch = VehicleVinMatcher.compare(vin, "1G1FB1E30C9123457")
+
+        assertTrue(DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, "ECM", matching))
+        assertFalse(DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, "ECM", mismatch))
+        assertFalse(DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, "ECM", null))
+        assertFalse(DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(
+            vehicle, "EBCM", matching
+        ))
+    }
+
+    @Test
     fun genericSaeDescriptionsAreAvailableWithoutClaimingOemSpecificity() {
         assertNotNull(DtcCatalogRegistry.genericDescription("P0101"))
         listOf("P0008", "P0009", "P000A", "P000B", "P000C", "P000D", "P0013", "P0017", "P0018", "P0019", "P0020", "P0021", "P0023", "P0024", "P0030", "P0036", "P0050", "P0053", "P0054", "P0056", "P0059", "P0060").forEach { code ->
