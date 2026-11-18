@@ -560,12 +560,24 @@ class DtcCatalogRegistryTest {
             publisher = "Archive",
             independenceGroup = "forum-a-original-thread"
         )
+        val samePublisherDifferentInvestigation = first.copy(
+            reference = "https://forum.example/threads/another-investigation",
+            independenceGroup = "forum-a-second-original-thread"
+        )
         val independent = first.copy(
             source = DtcDefinitionSource.SPECIALIST_REPAIR_DATABASE,
             reference = "https://repair.example/dtc",
             publisher = "Repair database",
             independenceGroup = "repair-database-entry"
         )
+
+        val samePublisherOnly = DtcCatalogRegistry.assessCommunityEvidence(
+            listOf(first, samePublisherDifferentInvestigation),
+            vehicle,
+            "ECM"
+        )
+        assertEquals(DtcCommunityConfidence.SINGLE_INDEPENDENT_SOURCE, samePublisherOnly.confidence)
+        assertEquals(1, samePublisherOnly.independentPublisherCount)
 
         val single = DtcCatalogRegistry.assessCommunityEvidence(
             listOf(first, repost),
