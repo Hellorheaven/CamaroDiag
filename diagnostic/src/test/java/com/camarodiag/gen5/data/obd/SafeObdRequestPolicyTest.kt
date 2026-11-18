@@ -52,6 +52,12 @@ class SafeObdRequestPolicyTest {
     }
 
     @Test
+    fun rejectsNonAsciiHexDigits() {
+        assertNull(SafeObdRequestPolicy.parse("０１ ０Ｃ"))
+        assertNull(SafeObdRequestPolicy.parse("٠١ ٠C"))
+    }
+
+    @Test
     fun acceptsOnlyOnePairRegardlessOfWhitespace() {
         assertEquals("010C", SafeObdRequestPolicy.parse("  01   0c  ")?.elmCommand)
         assertNull(SafeObdRequestPolicy.parse("01\t0C extra"))
