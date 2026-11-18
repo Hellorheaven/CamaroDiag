@@ -30,6 +30,7 @@ import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -1008,48 +1009,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         _liveCanMonitorState.value = LiveCanMonitorState(isCapturing = true)
-        canMonitorJob = viewModelScope.launch(Dispatchers.IO) {
+        // Install the job reference before it can execute. A lazy start also lets the
+        // finally block compare its identity, so an older cancelled capture cannot clear
+        // or overwrite the state of a newer capture started immediately afterward.
+        lateinit var monitorJob: Job
+        monitorJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             val pendingChunks = StringBuilder()
             try {
                 val captured = obdManager.captureCanMonitor(durationMs) { chunk ->
-                    pendingChunks.append(chunk)
-                    // Avoid publishing/analyzing every tiny transport read. A bounded batch
-                    // keeps UI updates responsive without repeatedly re-parsing the full trace.
-                    if (pendingChunks.length >= 512) {
-                        val current = _liveCanMonitorState.value
-                        val raw = (current.rawText + pendingChunks).takeLast(131_072)
-                        pendingChunks.clear()
-                        _liveCanMonitorState.value = current.copy(rawText = raw)
+                    if (canMonitorJob === monitorJob) {
+                        pendingChunks.append(chunk)
+                        // Avoid publishing/analyzing every tiny transport read. A bounded batch
+                        // keeps UI updates responsive without repeatedly re-parsing the full trace.
+                        if (pendingChunks.length >= 512) {
+                            val current = _liveCanMonitorState.value
+                            val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                            pendingChunks.clear()
+                            _liveCanMonitorState.value = current.copy(rawText = raw)
+                        }
                     }
                 }
-                val raw = captured.takeLast(131_072)
-                val report = CanTraceAnalyzer.analyze(
-                    raw.replace("\r\n", "\n").replace('\r', '\n'),
-                    "live-can-monitor.txt"
-                )
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
-                    isCapturing = false,
-                    rawText = raw,
-                    report = report,
-                    message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
-                )
+                if (canMonitorJob === monitorJob) {
+                    val raw = captured.takeLast(131_072)
+                    val report = CanTraceAnalyzer.analyze(
+                        raw.replace("\r\n", "\n").replace('\r', '\n'),
+                        "live-can-monitor.txt"
+                    )
+                    _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                        isCapturing = false,
+                        rawText = raw,
+                        report = report,
+                        message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
+                    )
+                }
             } catch (cancelled: CancellationException) {
-                val current = _liveCanMonitorState.value
-                val raw = (current.rawText + pendingChunks).takeLast(131_072)
-                _liveCanMonitorState.value = current.copy(isCapturing = false, rawText = raw)
+                if (canMonitorJob === monitorJob) {
+                    val current = _liveCanMonitorState.value
+                    val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                    _liveCanMonitorState.value = current.copy(isCapturing = false, rawText = raw)
+                }
                 throw cancelled
             } catch (_: Exception) {
-                val current = _liveCanMonitorState.value
-                val raw = (current.rawText + pendingChunks).takeLast(131_072)
-                _liveCanMonitorState.value = current.copy(
-                    isCapturing = false,
-                    rawText = raw,
-                    message = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
-                )
+                if (canMonitorJob === monitorJob) {
+                    val current = _liveCanMonitorState.value
+                    val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                    _liveCanMonitorState.value = current.copy(
+                        isCapturing = false,
+                        rawText = raw,
+                        message = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
+                    )
+                }
             } finally {
-                canMonitorJob = null
+                if (canMonitorJob === monitorJob) canMonitorJob = null
             }
         }
+        canMonitorJob = monitorJob
+        monitorJob.start()
     }
 
     /** Cancels monitor capture; the transport sends ESC in a non-cancellable cleanup block. */
