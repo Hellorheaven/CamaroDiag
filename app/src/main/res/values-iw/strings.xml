@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CamaroDiag</string>
     <string name="system_language_title">שפת האפליקציה</string>
-    <string name="system_language_current">שפת המערכת: %1$s</string>
-    <string name="system_language_hint">CamaroDiag משתמש בשפת המכשיר כאשר היא נתמכת. בשפות שאינן נתמכות, האפליקציה משתמשת באנגלית.</string>
+    
+    
     <string name="tab_vehicle">רכב</string>
     <string name="tab_connect">חיבור</string>
     <string name="tab_live">נתונים בזמן אמת</string>
@@ -574,6 +574,17 @@
     <string name="dtc_gm_monitor_failure">מונה כשלים / קצב אימות: %1$s</string>
     <string name="dtc_gm_monitor_mil">סיווג MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">מקור: GM %1$s, עמוד %2$d</string>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     <string name="system_language_current">השפה שנבחרה: %1$s</string>
     <string name="system_language_hint">בחרו את השפה לשימוש ב-CamaroDiag.</string>
     <string name="settings_current_vehicle">הרכב הנוכחי</string>
