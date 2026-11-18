@@ -625,4 +625,22 @@
     <string name="vin_photo_success">VIN herkend en naar het voertuigprofiel gekopieerd. Controleer elk teken.</string>
     <string name="vin_photo_not_found">Geen geldige VIN van 17 tekens gevonden. Voer deze handmatig in of maak een nieuwe foto.</string>
     <string name="vin_photo_error">De VIN-foto kon niet worden gelezen. Probeer het opnieuw met betere belichting en scherpstelling.</string>
+    <string name="tab_can_sniffer">CAN-monitor</string>
+    <string name="can_sniffer_title">Live CAN-monitor</string>
+    <string name="can_sniffer_description">Leg CAN-frames vast met een echte, compatibele ELM- of STN-adapter. Elke opname stopt automatisch na een korte sessie.</string>
+    <string name="can_sniffer_safety">Alleen alleen-lezen OBD-II-verzoeken zijn toegestaan. Willekeurige CAN-frames en UDS-schrijfservices worden geblokkeerd.</string>
+    <string name="can_sniffer_start">Opname van 10 seconden starten</string>
+    <string name="can_sniffer_stop">Opname stoppen</string>
+    <string name="can_sniffer_request_label">Alleen-lezen OBD-II-verzoek (hex)</string>
+    <string name="can_sniffer_send">Alleen-lezen verzoek verzenden</string>
+    <string name="can_sniffer_empty">Er zijn nog geen CAN-frames vastgelegd.</string>
+    <string name="can_sniffer_unavailable">Sluit een echte adapter met CAN-headerondersteuning aan. Simulatie en niet-ondersteunde bridges kunnen CAN niet live monitoren.</string>
+    <string name="can_sniffer_capture_complete">CAN-opname voltooid.</string>
+    <string name="can_sniffer_capture_failed">CAN-opname mislukt of de adapter reageert niet meer.</string>
+    <string name="can_sniffer_invalid_request">Verzoek geweigerd. Gebruik alleen toegestane OBD-II Mode 01- of Mode 09-service/PID-paren.</string>
+    <string name="can_sniffer_frame_count">Vastgelegde frames: %1$d</string>
+    <string name="can_sniffer_pid_heading">Gedecodeerde standaard OBD-II-waarden</string>
+    <string name="can_sniffer_response_heading">Laatste OBD-II-reactie</string>
+    <string name="can_sniffer_request_complete">Alleen-lezen verzoek voltooid.</string>
+    <string name="can_sniffer_request_failed">Alleen-lezen verzoek mislukt.</string>
 </resources>

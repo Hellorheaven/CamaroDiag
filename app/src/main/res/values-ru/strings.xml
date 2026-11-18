@@ -630,4 +630,22 @@
     <string name="vin_photo_success">VIN распознан и скопирован в профиль автомобиля. Проверьте каждый символ.</string>
     <string name="vin_photo_not_found">Не удалось распознать корректный VIN из 17 символов. Введите его вручную или сделайте другое фото.</string>
     <string name="vin_photo_error">Не удалось прочитать фото VIN. Повторите попытку при лучшем освещении и фокусировке.</string>
+    <string name="tab_can_sniffer">Монитор CAN</string>
+    <string name="can_sniffer_title">Монитор CAN в реальном времени</string>
+    <string name="can_sniffer_description">Захват кадров CAN с помощью реального совместимого адаптера ELM или STN. Каждая сессия автоматически останавливается через короткое время.</string>
+    <string name="can_sniffer_safety">Разрешены только запросы OBD-II на чтение. Произвольные кадры CAN и службы записи UDS заблокированы.</string>
+    <string name="can_sniffer_start">Начать захват на 10 секунд</string>
+    <string name="can_sniffer_stop">Остановить захват</string>
+    <string name="can_sniffer_request_label">Запрос OBD-II только для чтения (hex)</string>
+    <string name="can_sniffer_send">Отправить запрос только для чтения</string>
+    <string name="can_sniffer_empty">Кадры CAN ещё не захвачены.</string>
+    <string name="can_sniffer_unavailable">Подключите реальный адаптер с поддержкой заголовков CAN. Симуляция и неподдерживаемые мосты не обеспечивают мониторинг CAN в реальном времени.</string>
+    <string name="can_sniffer_capture_complete">Захват CAN завершён.</string>
+    <string name="can_sniffer_capture_failed">Не удалось захватить CAN или адаптер перестал отвечать.</string>
+    <string name="can_sniffer_invalid_request">Запрос отклонён. Используйте только разрешённые пары сервис/PID OBD-II Mode 01 или Mode 09.</string>
+    <string name="can_sniffer_frame_count">Захвачено кадров: %1$d</string>
+    <string name="can_sniffer_pid_heading">Декодированные стандартные значения OBD-II</string>
+    <string name="can_sniffer_response_heading">Последний ответ OBD-II</string>
+    <string name="can_sniffer_request_complete">Запрос только для чтения выполнен.</string>
+    <string name="can_sniffer_request_failed">Ошибка запроса только для чтения.</string>
 </resources>
