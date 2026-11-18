@@ -632,4 +632,5 @@
     <string name="cal_ecu_name_label">שם ECU (OBD תקני, Mode 09 PID 0A)</string>
     <string name="cal_ecu_response_addresses_label">כתובות תגובה פונקציונליות של OBD שנצפו (ללא שיוך למודולים)</string>
     <string name="cal_ecu_identity_limits">תגובות OBD תקניות אלה אינן מאשרות RPO, תיבת הילוכים, מספר חומרה של יחידת הבקרה או מערכת הפעלה של GM. כתובות תגובה אינן מזהות מודולים. מזהי GM דורשים תיעוד מאומת המותאם לרכב.</string>
+    <string name="dtc_vehicle_identity_required">הפרטים הייחודיים לרכב מוסתרים משום שמספר ה‑VIN של יחידת הבקרה המחוברת לא נקרא או שאינו תואם לרכב שנבחר. יש לקרוא ולאמת את VIN של ה‑ECU לפני השימוש בפרשנויות אלה.</string>
 </resources>

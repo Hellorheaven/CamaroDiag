@@ -626,4 +626,5 @@
     <string name="cal_ecu_name_label">ECU 이름(표준 OBD, Mode 09 PID 0A)</string>
     <string name="cal_ecu_response_addresses_label">관찰된 기능 OBD 응답 주소(모듈에 매핑되지 않음)</string>
     <string name="cal_ecu_identity_limits">이 표준 OBD 응답만으로는 RPO, 변속기, ECU 하드웨어 번호 또는 GM OS를 확인할 수 없습니다. 응답 주소는 모듈 식별자가 아닙니다. GM 전용 식별 정보에는 차량별로 검증된 문서가 필요합니다.</string>
+    <string name="dtc_vehicle_identity_required">연결된 ECU의 VIN을 읽지 못했거나 선택한 차량과 일치하지 않아 차량별 세부 정보가 숨겨져 있습니다. 이 해석을 사용하기 전에 ECU VIN을 읽고 확인하세요.</string>
 </resources>

@@ -641,4 +641,5 @@
     <string name="cal_ecu_name_label">اسم وحدة التحكم (OBD القياسي، Mode 09 PID 0A)</string>
     <string name="cal_ecu_response_addresses_label">عناوين استجابة OBD الوظيفية المرصودة (غير مرتبطة بوحدات محددة)</string>
     <string name="cal_ecu_identity_limits">لا تؤكد استجابات OBD القياسية هذه رمز RPO أو ناقل الحركة أو رقم عتاد وحدة التحكم أو نظام GM. عناوين الاستجابة لا تحدد هوية الوحدات. تتطلب معرّفات GM وثائق موثوقة خاصة بالمركبة.</string>
+    <string name="dtc_vehicle_identity_required">تم إخفاء التفاصيل الخاصة بالمركبة لأن رقم VIN لوحدة التحكم المتصلة لم يُقرأ أو لا يطابق المركبة المحددة. اقرأ رقم VIN لوحدة التحكم وتحقق منه قبل استخدام هذه التفسيرات.</string>
 </resources>

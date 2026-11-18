@@ -640,4 +640,5 @@
     <string name="cal_ecu_name_label">ECU-Name (standardmäßiges OBD Mode 09 PID 0A)</string>
     <string name="cal_ecu_response_addresses_label">Beobachtete funktionale OBD-Antwortadressen (keinem Steuergerät zugeordnet)</string>
     <string name="cal_ecu_identity_limits">RPO, Getriebe, Hardware-Teilenummer des Steuergeräts und GM-Betriebssystem werden durch diese standardisierten OBD-Antworten nicht bestätigt. Antwortadressen sind keine Steuergeräte-Identitäten. GM-spezifische Kennungen erfordern verifizierte fahrzeugspezifische Dokumentation.</string>
+    <string name="dtc_vehicle_identity_required">Fahrzeugspezifische Details werden ausgeblendet, da die VIN des verbundenen Steuergeräts nicht gelesen wurde oder nicht zum ausgewählten Fahrzeug passt. Lesen und prüfen Sie die ECU-VIN, bevor Sie diese Interpretationen verwenden.</string>
 </resources>

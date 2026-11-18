@@ -633,4 +633,5 @@
     <string name="cal_ecu_name_label">Nome da ECU (OBD padrão, Mode 09 PID 0A)</string>
     <string name="cal_ecu_response_addresses_label">Endereços de resposta OBD funcional observados (não associados a módulos)</string>
     <string name="cal_ecu_identity_limits">Estas respostas OBD padrão não confirmam RPO, transmissão, referência de hardware da unidade ou sistema operacional GM. Os endereços de resposta não identificam módulos. Identificadores GM exigem documentação verificada específica do veículo.</string>
+    <string name="dtc_vehicle_identity_required">Os detalhes específicos do veículo estão ocultos porque o VIN da ECU conectada não foi lido ou não corresponde ao veículo selecionado. Leia e verifique o VIN da ECU antes de usar estas interpretações.</string>
 </resources>

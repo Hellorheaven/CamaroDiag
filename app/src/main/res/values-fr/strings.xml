@@ -643,4 +643,5 @@
     <string name="cal_ecu_name_label">Nom du calculateur (OBD standard, Mode 09 PID 0A)</string>
     <string name="cal_ecu_response_addresses_label">Adresses de réponse OBD fonctionnelles observées (non associées à un calculateur)</string>
     <string name="cal_ecu_identity_limits">Le RPO, la transmission, la référence matérielle du calculateur et l’OS GM ne sont pas confirmés par ces réponses OBD standard. Une adresse de réponse ne permet pas d’identifier un calculateur. Les identifiants GM nécessitent une documentation vérifiée propre au véhicule.</string>
+    <string name="dtc_vehicle_identity_required">Les détails propres au véhicule sont masqués car le VIN du calculateur connecté n’a pas été lu ou ne correspond pas au véhicule sélectionné. Lisez et vérifiez le VIN ECU avant d’utiliser ces interprétations.</string>
 </resources>

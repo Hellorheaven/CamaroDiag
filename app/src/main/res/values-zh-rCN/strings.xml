@@ -626,4 +626,5 @@
     <string name="cal_ecu_name_label">ECU 名称（标准 OBD，Mode 09 PID 0A）</string>
     <string name="cal_ecu_response_addresses_label">检测到的功能 OBD 响应地址（未映射到控制模块）</string>
     <string name="cal_ecu_identity_limits">这些标准 OBD 响应无法确认 RPO、变速箱、控制模块硬件编号或 GM 操作系统。响应地址不能用于识别控制模块。GM 专用标识需要经过验证的车辆专属技术资料。</string>
+    <string name="dtc_vehicle_identity_required">由于尚未读取连接的 ECU VIN，或该 VIN 与所选车辆不匹配，因此已隐藏车辆专属详情。使用这些解释前，请读取并核对 ECU VIN。</string>
 </resources>
