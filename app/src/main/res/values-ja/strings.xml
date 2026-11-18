@@ -568,4 +568,15 @@
     <string name="dtc_gm_monitor_failure">故障カウンター／判定頻度: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL分類: %1$s</string>
     <string name="dtc_gm_monitor_source">出典: GM %1$s、%2$dページ</string>
+    <string name="system_language_current">選択中の言語：%1$s</string>
+    <string name="system_language_hint">CamaroDiagで使用する言語を選択します。</string>
+    <string name="settings_current_vehicle">現在の車両</string>
+    <string name="settings_current_adapter">OBD-II接続</string>
+    <string name="settings_adapter_not_connected">アダプター未接続</string>
+    <string name="settings_last_connection">前回の接続プロファイル</string>
+    <string name="settings_no_last_connection">保存された接続プロファイルはありません。</string>
+    <string name="settings_connection_details">%1$s • %2$s • %3$s</string>
+    <string name="settings_connection_bluetooth">Bluetooth</string>
+    <string name="settings_connection_usb">USB</string>
+    <string name="settings_connection_wifi">Wi-Fi</string>
 </resources>
