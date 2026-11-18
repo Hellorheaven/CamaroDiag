@@ -46,4 +46,16 @@ class VehicleVinMatcherTest {
     fun vinInputMayContainSeparatorsButMustNormalizeToValidVin() {
         assertEquals(selectedVin, VehicleVinMatcher.normalize("1g1-fb1e30-c9123456"))
     }
+
+    @Test
+    fun decodesCamaroModelYearFromTheStandardVinYearPosition() {
+        assertEquals(2012, VehicleVinMatcher.modelYearFromVin(selectedVin))
+        assertEquals(2024, VehicleVinMatcher.modelYearFromVin("1G1FA1RXXR0123456"))
+    }
+
+    @Test
+    fun doesNotGuessModelYearFromInvalidOrUnsupportedVin() {
+        assertNull(VehicleVinMatcher.modelYearFromVin("INVALID"))
+        assertNull(VehicleVinMatcher.modelYearFromVin("1G1FA1RXXS0123456"))
+    }
 }
