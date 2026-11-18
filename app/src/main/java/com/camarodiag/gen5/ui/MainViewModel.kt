@@ -24,9 +24,12 @@ import com.camarodiag.gen5.data.obd.toDiagnosticDtc
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
+import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
+import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -53,6 +56,15 @@ data class SavedVehicleProfile(
     val name: String,
     val vehicle: VehicleProfile,
     val requiresReview: Boolean = false
+)
+
+data class LiveCanMonitorState(
+    val isCapturing: Boolean = false,
+    val rawText: String = "",
+    val report: CanTraceAnalysisReport? = null,
+    val isSendingRequest: Boolean = false,
+    val requestResponse: String? = null,
+    val message: String? = null
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -443,6 +455,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun clearVehicleEvidence() {
+        stopCanMonitor()
         obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
             obdManager.disconnect()
@@ -471,6 +484,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _calibrationWorkspace = MutableStateFlow(CalibrationWorkspaceState())
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
+
+    private val _liveCanMonitorState = MutableStateFlow(LiveCanMonitorState())
+    val liveCanMonitorState: StateFlow<LiveCanMonitorState> = _liveCanMonitorState.asStateFlow()
+    private var canMonitorJob: Job? = null
 
     private fun loadNativeCamaroSignalCatalog() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -961,6 +978,95 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isTraceAnalyzing = false,
                     canTraceReport = null,
                     traceMessage = getApplication<Application>().getString(R.string.msg_trace_analysis_failed)
+                )
+            }
+        }
+    }
+
+    /** Starts a bounded, passive monitor session on a real header-capable ELM/STN adapter. */
+    fun startCanMonitor(durationMs: Long = 10_000L) {
+        if (canMonitorJob?.isActive == true) return
+        if (!obdManager.isObdCommandChannelAvailable) {
+            _liveCanMonitorState.value = LiveCanMonitorState(
+                message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            )
+            return
+        }
+        if (!_adapter.value.supportsCanHeaders) {
+            _liveCanMonitorState.value = LiveCanMonitorState(
+                message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            )
+            return
+        }
+        _liveCanMonitorState.value = LiveCanMonitorState(isCapturing = true)
+        canMonitorJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                obdManager.captureCanMonitor(durationMs) { chunk ->
+                    val current = _liveCanMonitorState.value
+                    val raw = (current.rawText + chunk).takeLast(131_072)
+                    val report = CanTraceAnalyzer.analyze(
+                        raw.replace("\r\n", "\n").replace('\r', '\n'),
+                        "live-can-monitor.txt"
+                    )
+                    _liveCanMonitorState.value = current.copy(rawText = raw, report = report)
+                }
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                    isCapturing = false,
+                    message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
+                )
+            } catch (cancelled: CancellationException) {
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isCapturing = false)
+                throw cancelled
+            } catch (_: Exception) {
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                    isCapturing = false,
+                    message = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
+                )
+            } finally {
+                canMonitorJob = null
+            }
+        }
+    }
+
+    /** Cancels monitor capture; the transport sends ESC in a non-cancellable cleanup block. */
+    fun stopCanMonitor() {
+        canMonitorJob?.cancel()
+    }
+
+    /** Sends only a whitelisted, read-only SAE J1979 request; arbitrary CAN/UDS payloads are rejected. */
+    fun sendSafeObdRequest(input: String) {
+        val request = SafeObdRequestPolicy.parse(input)
+        if (request == null) {
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                message = getApplication<Application>().getString(R.string.can_sniffer_invalid_request)
+            )
+            return
+        }
+        if (!obdManager.isObdCommandChannelAvailable || _liveCanMonitorState.value.isCapturing) {
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            )
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                isSendingRequest = true,
+                message = null
+            )
+            try {
+                val response = obdManager.sendAtCommand(request.elmCommand, 4_000L)
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                    isSendingRequest = false,
+                    requestResponse = response,
+                    message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
+                )
+            } catch (cancelled: CancellationException) {
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isSendingRequest = false)
+                throw cancelled
+            } catch (_: Exception) {
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                    isSendingRequest = false,
+                    message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
                 )
             }
         }
@@ -1509,6 +1615,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun markAdapterDisconnected() {
+        stopCanMonitor()
+        _liveCanMonitorState.value = LiveCanMonitorState()
         _adapter.value = AdapterCapabilities()
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         clearVehicleEvidence()
