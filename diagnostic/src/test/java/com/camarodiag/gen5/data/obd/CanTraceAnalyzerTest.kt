@@ -133,4 +133,34 @@ class CanTraceAnalyzerTest {
         assertEquals(1, report.incompleteIsoTpMessages)
         assertTrue(report.messages.isEmpty())
     }
+
+    @Test
+    fun decodesStandardMode01PidsWithoutGuessingUnknownPids() {
+        val trace = """
+            0.000000 1 7E8 Rx d 8 03 41 0C 1A F8 00 00 00
+            0.001000 1 7E8 Rx d 8 03 41 0D 64 00 00 00 00
+            0.002000 1 7E8 Rx d 8 03 41 05 7A 00 00 00 00
+            0.003000 1 7E8 Rx d 8 03 41 11 80 00 00 00 00
+            0.004000 1 7E8 Rx d 8 03 41 99 01 00 00 00 00
+        """.trimIndent()
+
+        val report = CanTraceAnalyzer.analyze(trace, "mode01.asc")
+
+        assertEquals(4, report.pidObservations.size)
+        assertEquals(1726.0, report.pidObservations[0].value, 0.0)
+        assertEquals("rpm", report.pidObservations[0].unit)
+        assertEquals(100.0, report.pidObservations[1].value, 0.0)
+        assertEquals("km/h", report.pidObservations[1].unit)
+        assertEquals(82.0, report.pidObservations[2].value, 0.0)
+        assertEquals(128.0 * 100.0 / 255.0, report.pidObservations[3].value, 0.0001)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
+    fun ignoresIncompleteStandardPidPayloads() {
+        val trace = "0.000000 1 7E8 Rx d 8 02 41 0C 00 00 00 00 00"
+        val report = CanTraceAnalyzer.analyze(trace, "incomplete-pid.asc")
+        assertTrue(report.pidObservations.isEmpty())
+    }
+
 }

@@ -35,6 +35,7 @@ data class UdsTraceMessage(
         get() = if (payload.firstOrNull() == 0x7F) payload.getOrNull(2) else null
     val serviceName: String
         get() = when (service) {
+            0x01 -> "ShowCurrentData (OBD-II)",
             0x10 -> "DiagnosticSessionControl"
             0x11 -> "ECUReset"
             0x14 -> "ClearDiagnosticInformation"
@@ -63,11 +64,23 @@ data class CanTraceDidObservation(
     val positiveResponse: Boolean
 )
 
+data class CanTracePidObservation(
+    val timestampSeconds: Double?,
+    val canId: Int,
+    val direction: CanTraceDirection,
+    val pid: Int,
+    val name: String,
+    val value: Double,
+    val unit: String,
+    val rawBytes: List<Int>
+)
+
 data class CanTraceAnalysisReport(
     val sourceName: String,
     val frames: List<CanTraceFrame>,
     val messages: List<UdsTraceMessage>,
     val didObservations: List<CanTraceDidObservation>,
+    val pidObservations: List<CanTracePidObservation>,
     val errors: List<String>,
     val incompleteIsoTpMessages: Int
 ) {
@@ -121,13 +134,49 @@ object CanTraceAnalyzer {
                 positiveResponse = response == service + 0x40
             )
         }
+        val pidObservations = messages.mapNotNull(::decodeStandardPid)
         return CanTraceAnalysisReport(
             sourceName = sourceName,
             frames = parsed.frames,
             messages = messages,
             didObservations = observations,
+            pidObservations = pidObservations,
             errors = allErrors,
             incompleteIsoTpMessages = incomplete
+        )
+    }
+
+    /**
+     * Decodes only standardized SAE J1979 Mode 01 response PIDs.
+     * Unknown PIDs and incomplete payloads remain raw observations and are not guessed.
+     */
+    private fun decodeStandardPid(message: UdsTraceMessage): CanTracePidObservation? {
+        if (message.responseService != 0x41 || message.payload.size < 3) return null
+        val pid = message.payload[1]
+        val a = message.payload.getOrNull(2) ?: return null
+        val b = message.payload.getOrNull(3) ?: 0
+        val decoded = when (pid) {
+            0x04 -> Triple("Calculated engine load", a * 100.0 / 255.0, "%")
+            0x05 -> Triple("Engine coolant temperature", (a - 40).toDouble(), "°C")
+            0x0B -> Triple("Intake manifold absolute pressure", a.toDouble(), "kPa")
+            0x0C -> Triple("Engine speed", ((a * 256) + b) / 4.0, "rpm")
+            0x0D -> Triple("Vehicle speed", a.toDouble(), "km/h")
+            0x0F -> Triple("Intake air temperature", (a - 40).toDouble(), "°C")
+            0x10 -> Triple("Mass air flow", ((a * 256) + b) / 100.0, "g/s")
+            0x11 -> Triple("Throttle position", a * 100.0 / 255.0, "%")
+            else -> return null
+        }
+        val requiredBytes = if (pid == 0x0C || pid == 0x10) 4 else 3
+        if (message.payload.size < requiredBytes) return null
+        return CanTracePidObservation(
+            timestampSeconds = message.timestampSeconds,
+            canId = message.canId,
+            direction = message.direction,
+            pid = pid,
+            name = decoded.first,
+            value = decoded.second,
+            unit = decoded.third,
+            rawBytes = message.payload.drop(2).take(requiredBytes - 2)
         )
     }
 
