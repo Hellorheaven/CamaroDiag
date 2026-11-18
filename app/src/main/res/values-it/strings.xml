@@ -636,6 +636,6 @@
     <string name="vin_photo_capture">Fotografa VIN</string>
     <string name="vin_photo_cancelled">Acquisizione della foto del VIN annullata.</string>
     <string name="vin_photo_success">VIN rilevato e copiato nel profilo del veicolo. Verifica ogni carattere.</string>
-    <string name="vin_photo_not_found">Nessun VIN valido di 17 caratteri rilevato. Inseriscilo manualmente o scatta un'altra foto.</string>
+    <string name="vin_photo_not_found">Nessun VIN valido di 17 caratteri rilevato. Inseriscilo manualmente o scatta una nuova foto.</string>
     <string name="vin_photo_error">Impossibile leggere la foto del VIN. Riprova con illuminazione e messa a fuoco migliori.</string>
 </resources>
