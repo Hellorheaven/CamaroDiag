@@ -139,13 +139,14 @@ jobs:
           commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
           echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
 
-          # Force immediate tests/builds for test changes and safety-critical protocol parsers,
-          # even while a Draft PR is below its periodic build checkpoint.
+          # Force immediate tests/builds when tests or safety-critical protocol parsers changed
+          # anywhere since the last successful Android build, even if a later commit only changes UI.
           current_files="$(git diff --name-only "$HEAD_SHA^" "$HEAD_SHA")"
-          if grep -Eq 'src/test|CanTraceAnalyzer|SafeObdRequestPolicy' <<< "$current_files"; then
+          validation_files="$(git diff --name-only "$count_base" "$HEAD_SHA")"
+          if grep -Eq 'src/test|CanTraceAnalyzer|SafeObdRequestPolicy' <<< "$validation_files"; then
             echo "validation_applies=true" >> "$GITHUB_OUTPUT"
             echo "build_required=true" >> "$GITHUB_OUTPUT"
-            echo "Critical test/protocol parser change detected: forcing Android Debug validation."
+            echo "Critical test/protocol parser changes since last successful build detected: forcing Android Debug validation."
             exit 0
           fi
 
