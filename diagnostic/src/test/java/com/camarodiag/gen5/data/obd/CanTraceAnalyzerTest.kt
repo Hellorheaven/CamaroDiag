@@ -29,7 +29,7 @@ class CanTraceAnalyzerTest {
         val trace = listOf(
             "0.100000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
             "0.050000 1 7E8 Rx d 8 03 7F 22 31 00 00 00 00"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val report = CanTraceAnalyzer.analyze(trace, "out-of-order-timestamps.asc")
 
         assertEquals(1, report.exchanges.size)
