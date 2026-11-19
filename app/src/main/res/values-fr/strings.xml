@@ -665,4 +665,7 @@
     <string name="can_sniffer_direction_tx">TX</string>
     <string name="can_sniffer_search">Rechercher un ID CAN ou des octets de données</string>
     <string name="can_sniffer_filtered_count">Affichage de %1$d trames sur %2$d</string>
+    <string name="live_sensor_count">Capteurs affichés (%1$d/%2$d)</string>
+    <string name="live_sensor_search">Rechercher un capteur</string>
+    <string name="live_sensor_show_all">Afficher tous les capteurs</string>
 </resources>
