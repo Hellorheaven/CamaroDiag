@@ -826,4 +826,19 @@ class CanTraceAnalyzerTest {
         assertTrue(report.errors.isEmpty())
     }
 
+    @Test
+    fun rejectsNonFiniteAscTimestampsAndAcceptsScientificNotation() {
+        val trace = listOf(
+            "NaN 1 7E8 Rx d 8 03 41 0C 00 00 00 00",
+            "Infinity 1 7E8 Rx d 8 03 41 0C 00 00 00 00",
+            "1.25e-3 1 7E8 Rx d 8 03 41 0C 00 00 00 00"
+        ).joinToString("\\n")
+
+        val report = CanTraceAnalyzer.analyze(trace, "timestamp-validation.asc")
+
+        assertEquals(1, report.frames.size)
+        assertEquals(0.00125, report.frames.single().timestampSeconds!!, 0.0000001)
+        assertEquals(2, report.errors.size)
+    }
+
 }
