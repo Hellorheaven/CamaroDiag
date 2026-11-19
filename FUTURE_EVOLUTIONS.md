@@ -75,6 +75,26 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Ajouter des garde-fous, provenance et rapports pour chaque opération sur fichier.
 - [ ] Ne pas activer l'écriture ECU, flash, recovery, correction de checksum GM, accès mémoire direct ou Seed/Key sans spécifications fiables, tests matériels et validation dédiée.
 
+#### Évolution future — modes de programmation et récupération ECU (Camaro Gen 5 / Gen 6)
+- [ ] Ajouter au module Cartographie deux modes distincts, sur le modèle des fonctions HP Tuners :
+  - **Write Calibration Only** : programmation limitée aux zones de calibration prises en charge par le calculateur, sans réécriture du firmware.
+  - **Write Completely** : programmation complète du contenu programmable prévu par la procédure constructeur/outillage pour le calculateur concerné ; préciser exactement les zones touchées et ne jamais assimiler ce mode à une simple écriture de calibration.
+- [ ] Maintenir ces deux modes désactivés tant que la compatibilité exacte du calculateur, la méthode d'accès, les contrôles d'intégrité, l'alimentation requise et les procédures de récupération ne sont pas documentés et validés.
+- [ ] Créer un référentiel versionné des calculateurs Camaro Gen 5 et Gen 6, par année, motorisation, transmission, référence matérielle, identifiant logiciel/calibration et variante de calculateur.
+- [ ] Pour chaque ECU/TCM, documenter séparément : lecture, écriture Calibration Only, écriture Completely, zones mémoire concernées, outil/interface requis, conditions d'alimentation, contrôles avant/après écriture et niveau de validation.
+- [ ] Référencer les procédures officielles GM et les documentations fabricants autorisées relatives aux interruptions de programmation ; conserver la source, le numéro de bulletin/document, son applicabilité exacte et sa version.
+- [ ] Ajouter un assistant de récupération intégré au module Cartographie : identifier le calculateur et l'étape interrompue, afficher la procédure applicable, expliquer les actions à effectuer et indiquer les situations nécessitant un spécialiste.
+- [ ] Après perte de connexion pendant une écriture : arrêter l'opération, ne pas reprendre automatiquement, ne pas renvoyer aveuglément le dernier bloc, marquer l'état ECU/calibration comme inconnu et imposer une nouvelle identification/lecture de contrôle avant toute tentative.
+- [ ] Ne jamais déclencher automatiquement **Write Completely** pour récupérer un échec de **Write Calibration Only** ; aucune procédure générique ne doit être appliquée à tous les ECU.
+- [ ] Si la procédure de récupération applicable n'est pas connue ou ne correspond pas précisément à la référence matérielle/logicielle détectée, bloquer la programmation et expliquer pourquoi.
+- [ ] Commencer par établir la matrice de compatibilité Gen 5 / Gen 6 (ECM/PCM et TCM), sans extrapoler les capacités d'une famille de calculateur à une autre.
+- [ ] Préparer des tests automatisés des états et scénarios d'interruption, puis des validations sur banc et sur véhicule avec alimentation stabilisée et matériel compatible avant toute activation réelle.
+
+- [ ] Continuer l'amélioration de l'espace atelier pour l'import, l'identification, l'inspection et la comparaison de fichiers BIN/ORI/MOD, Intel HEX, Motorola S-record et archives prises en charge.
+- [ ] Améliorer les tables, axes, unités, offsets, dimensions et affichage tablette en corrigeant les défauts connus avant d'étendre les fonctions.
+- [ ] Ajouter des garde-fous, provenance et rapports pour chaque opération sur fichier.
+- [ ] Ne pas activer l'écriture ECU, flash, recovery, correction de checksum GM, accès mémoire direct ou Seed/Key sans spécifications fiables, tests matériels et validation dédiée.
+
 ## 3. Priorité basse — extension à d'autres marques et modèles
 
 **Statut global : backlog uniquement. Aucun développement multimarque ne doit commencer tant que le socle Camaro prioritaire et la fiabilité de la PR active ne sont pas suffisamment stabilisés.**
