@@ -128,7 +128,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun reportConnectionLoss(error: Throwable) {
-        if (error !is IOException) return
+        // A missing ELM prompt is a command timeout, not proof that the adapter disconnected.
+        if (error !is IOException || error is java.net.SocketTimeoutException) return
         stopCanMonitor()
         _isObdScanning.value = false
         val messageId = if (_lastConnectionProfile.value?.transport.equals("bluetooth", ignoreCase = true)) {
