@@ -131,6 +131,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
     val connError by viewModel.connectionMessage.collectAsState()
+    val connectionLossMessage by viewModel.connectionLossMessage.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
     val modules by viewModel.modules.collectAsState()
     val dtcs by viewModel.dtcs.collectAsState()
@@ -379,6 +380,25 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            connectionLossMessage?.let { message ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF4A2020)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, WarnRed)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = WarnRed)
+                        Text(message, modifier = Modifier.weight(1f), color = TextPrimary)
+                        IconButton(onClick = { viewModel.dismissConnectionLoss() }) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close), tint = TextPrimary)
+                        }
+                    }
+                }
+            }
             calibrationWorkspace.vinComparison
                 ?.takeIf { it.matches == false }
                 ?.let { comparison ->
