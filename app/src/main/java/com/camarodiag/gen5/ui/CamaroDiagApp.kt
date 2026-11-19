@@ -1223,6 +1223,7 @@ fun CanSnifferScreen(
     var canIdFilter by remember { mutableStateOf("") }
     var dataPrefixFilter by remember { mutableStateOf("") }
     var directionFilter by remember { mutableStateOf("ALL") }
+    var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
     val report = state.report
     val parsedCanId = remember(canIdFilter) {
         if (canIdFilter.isBlank()) null else CanTraceFilter.parseCanId(canIdFilter)
@@ -1377,9 +1378,15 @@ fun CanSnifferScreen(
                     fontSize = 11.sp
                 )
             }
-            items(visibleFrames) { frame ->
-                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            items(visibleFrames, key = { it.lineNumber }) { frame ->
+                val expanded = expandedFrameLine == frame.lineNumber
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        expandedFrameLine = if (expanded) null else frame.lineNumber
+                    },
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+                ) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(
                             "#${frame.lineNumber} • ${frame.direction.name} • 0x${String.format(Locale.ROOT, "%03X", frame.canId)} • DLC ${frame.data.size}",
                             color = CamaroAmber,
@@ -1392,6 +1399,21 @@ fun CanSnifferScreen(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 12.sp
                         )
+                        if (expanded) {
+                            Text(
+                                "Timestamp: ${frame.timestampSeconds?.let { String.format(Locale.ROOT, "%.6f s", it) } ?: "not provided"}",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                            frame.data.forEachIndexed { index, byte ->
+                                Text(
+                                    "Byte ${index.toString().padStart(2, '0')}  •  0x${String.format(Locale.ROOT, "%02X", byte)}  •  ${byte.toString().padStart(3, '0')}  •  ${byte.toString(2).padStart(8, '0')}",
+                                    color = TextMuted,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
