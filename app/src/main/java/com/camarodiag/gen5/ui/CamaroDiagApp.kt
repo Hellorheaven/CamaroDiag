@@ -394,7 +394,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         Icon(Icons.Default.Warning, contentDescription = null, tint = WarnRed)
                         Text(message, modifier = Modifier.weight(1f), color = TextPrimary)
                         IconButton(onClick = { viewModel.dismissConnectionLoss() }) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close), tint = TextPrimary)
+                            Icon(Icons.Default.Close, contentDescription = null, tint = TextPrimary)
                         }
                     }
                 }
