@@ -5,6 +5,7 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 ## 2026-11-19
 
 ### Analyse des traces — cohérence DLC / données
+- Complément : les exports CSV à colonnes fixes `data0…data63` rejettent aussi les octets renseignés après le DLC, au lieu de les ignorer. Tests ajoutés pour les formats ELM, ASC, CSV en colonne `data` et CSV à colonnes fixes.
 - Les parseurs ELM327, Vector ASC et CSV rejettent maintenant une trame lorsque le nombre d'octets fournis ne correspond pas exactement au DLC déclaré. Les octets surnuméraires ne sont plus tronqués silencieusement, ce qui évite d'analyser une trame mal formée comme si elle était valide.
 - Ajout d'un test couvrant les trois formats. Exécution Gradle non disponible depuis cette session ; le test est ajouté mais non déclaré comme exécuté.
 
