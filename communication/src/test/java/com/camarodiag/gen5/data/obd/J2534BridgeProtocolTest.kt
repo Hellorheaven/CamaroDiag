@@ -44,4 +44,13 @@ class J2534BridgeProtocolTest {
         assertNull(J2534BridgeProtocol.readBoundedLine(input))
     }
 
+
+    @Test
+    fun clampsBridgeOperationTimeoutToSafeBounds() {
+        assertEquals(100, J2534BridgeProtocol.boundedTimeoutMs(0))
+        assertEquals(100, J2534BridgeProtocol.boundedTimeoutMs(25))
+        assertEquals(750, J2534BridgeProtocol.boundedTimeoutMs(750))
+        assertEquals(10_000, J2534BridgeProtocol.boundedTimeoutMs(30_000))
+    }
+
 }
