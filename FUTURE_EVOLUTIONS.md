@@ -75,6 +75,21 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Ajouter des garde-fous, provenance et rapports pour chaque opération sur fichier.
 - [ ] Ne pas activer l'écriture ECU, flash, recovery, correction de checksum GM, accès mémoire direct ou Seed/Key sans spécifications fiables, tests matériels et validation dédiée.
 
+#### Évolution future — éditeur graphique de tables et cartes de calibration (style HP Tuners / EFILive)
+- [ ] Faire évoluer la grille actuelle en véritable éditeur graphique de calibration : cellules numériques colorées selon une échelle de valeurs configurable, avec légende, unités, précision et indication des valeurs modifiées.
+- [ ] Proposer les vues tableau, graphique 2D et surface 3D pour les tables compatibles ; permettre de basculer entre les vues et d'afficher le tableau et le graphique simultanément lorsque l'écran le permet.
+- [ ] Ajouter une navigation structurée par calculateur, catégorie et paramètre, avec recherche, favoris et ouverture de plusieurs tables.
+- [ ] Permettre la sélection d'une cellule, d'une plage, d'une ligne, d'une colonne ou de toute la table, puis les opérations courantes : remplacer, ajouter, soustraire, multiplier, copier/coller et annuler/rétablir.
+- [ ] Ajouter l'interpolation et le lissage horizontal, vertical et global, avec aperçu du résultat et possibilité d'annuler ; ne jamais appliquer silencieusement une transformation.
+- [ ] Ajouter la comparaison de deux calibrations compatibles : vue principale, vue de comparaison et vue des différences, avec couleurs et légende distinctes des couleurs de modification locale non enregistrée.
+- [ ] Afficher clairement la description du paramètre, les axes X/Y, unités, limites connues, résolution, type de donnée, facteur d'échelle, offset et provenance de la définition.
+- [ ] Permettre l'édition directe des cellules et, si le modèle de données le permet sans ambiguïté, l'ajustement des points sur les graphiques 2D/3D ; synchroniser immédiatement les représentations.
+- [ ] Adapter l'éditeur aux téléphones et tablettes : grille défilante et zoom lisible, commandes tactiles, sélection précise, panneaux redimensionnables et orientation paysage privilégiée pour les grandes tables.
+- [ ] Conserver un historique des changements par fichier/table, avec comparaison avant/après, restauration et export individuel des tables lorsque le format est pris en charge.
+- [ ] Ne présenter que les tables dont la définition est documentée pour le véhicule et le calculateur identifiés. Les définitions génériques ou non vérifiées doivent être signalées et ne doivent pas être éditables par défaut.
+- [ ] Garder les modifications hors ligne tant que l'utilisateur n'a pas explicitement exporté le fichier ; l'application des changements à un fichier ne déclenche jamais une écriture ECU.
+- [ ] Respecter strictement la règle calibration-only : aucune vue, transformation, importation ou exportation ne doit toucher le firmware, l'OS, le bootloader ou une région mémoire hors calibration.
+
 #### Évolution future — import/export de cartographies et compatibilité HP Tuners
 - [ ] Permettre l'export d'une cartographie seule ou d'un ensemble de cartographies liées à un même véhicule/projet.
 - [ ] Gérer les projets multi-cartographies, notamment les configurations FlexFuel lorsqu'elles nécessitent plusieurs calibrations (par exemple cartographie essence, cartographie éthanol/flexfuel ou variantes associées) ; conserver explicitement le rôle, les dépendances et les conditions d'utilisation de chaque fichier, sans supposer qu'un véhicule utilise toujours deux fichiers.
