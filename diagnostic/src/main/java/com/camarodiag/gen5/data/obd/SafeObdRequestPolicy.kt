@@ -9,7 +9,7 @@ package com.camarodiag.gen5.data.obd
  */
 data class SafeObdRequest(
     val service: Int,
-    val parameter: Int,
+    val parameter: Int?,
     val elmCommand: String
 )
 
@@ -23,16 +23,25 @@ object SafeObdRequestPolicy {
         // SAE J1979 vehicle information: VIN, calibration IDs and CVNs.
         0x09 to setOf(0x02, 0x04, 0x06)
     )
+    // Standard diagnostic trouble-code retrieval modes; these have no PID parameter.
+    private val parameterlessReadOnlyServices = setOf(0x03, 0x07, 0x0A)
 
     /**
-     * Accepts exactly one service/PID pair: compact ("010C"), spaced ("01 0C"),
-     * or explicitly prefixed ("0x01 0x0C"). Extra tokens and misplaced prefixes
-     * are rejected instead of being silently stripped.
+     * Accepts one whitelisted read-only request: a service/PID pair such as "010C"
+     * or "01 0C", or a parameterless DTC read such as "03", "07" or "0A".
+     * Explicit byte prefixes are supported; extra tokens and misplaced prefixes are rejected.
      */
     fun parse(input: String): SafeObdRequest? {
         val tokens = input.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val compact = when (tokens.size) {
-            1 -> normalizeHexToken(tokens[0], 4) ?: return null
+            1 -> {
+                val token = tokens[0]
+                when {
+                    normalizeHexToken(token, 2) != null -> normalizeHexToken(token, 2)!!
+                    normalizeHexToken(token, 4) != null -> normalizeHexToken(token, 4)!!
+                    else -> return null
+                }
+            }
             2 -> {
                 val service = normalizeHexToken(tokens[0], 2) ?: return null
                 val parameter = normalizeHexToken(tokens[1], 2) ?: return null
@@ -42,6 +51,12 @@ object SafeObdRequestPolicy {
         }.uppercase()
 
         val service = compact.substring(0, 2).toIntOrNull(16) ?: return null
+        if (service in parameterlessReadOnlyServices) {
+            if (compact.length != 2) return null
+            return SafeObdRequest(service, null, compact)
+        }
+        if (compact.length != 4) return null
+
         val parameter = compact.substring(2, 4).toIntOrNull(16) ?: return null
         if (parameter !in allowedParametersByService[service].orEmpty()) return null
 
