@@ -132,3 +132,7 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Les transports USB/Wi-Fi conservent la détection de fermeture au niveau des opérations de lecture/écriture ; aucune reconnexion automatique n'est prétendue.
 - Commits : `2f4205e` (callbacks GATT obsolètes), `d9e0a45` (état du canal OBD).
 - Relecture statique uniquement ; aucun test Gradle/build CI ni essai sur matériel exécuté.
+
+- La politique de disponibilité du canal est maintenant isolée dans `ObdTransportConnectionState`, avec quatre tests couvrant socket Bluetooth ouverte/fermée, session BLE active/inactive, modes démo/simulation et transport non pris en charge.
+- Commits complémentaires : `aec1251` (règle pure), `70e7b42` (tests), `6f4c3ba` (intégration au gestionnaire).
+- Les tests sont ajoutés mais non exécutés à ce stade.
