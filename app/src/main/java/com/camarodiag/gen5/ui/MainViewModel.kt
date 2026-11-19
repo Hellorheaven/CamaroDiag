@@ -2252,6 +2252,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             while (currentCoroutineContext().isActive) {
                 if (_isStreamingLive.value) {
                     activeTelemetryBatch = (activeTelemetryBatch + 1) % 4
+                    var valuesForRecording = emptyList<LivePidValue>()
                     try {
                         when {
                             obdManager.isSimulationActive -> {
@@ -2268,6 +2269,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     LivePidValue("STFT", "Short Term Fuel Trim B1 (DEMO)", "Correction carburant B1 (DÉMO)", stft, "%", stft, "%", -6.0, 6.0, push("STFT", stft)),
                                     LivePidValue("BAT", "Control Module Voltage (DEMO)", "Tension calculateur (DÉMO)", voltage, "V", voltage, "V", 11.5, 15.2, push("BAT", voltage))
                                 )
+                                valuesForRecording = _livePids.value
                                 _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_simulation_active)
                             }
                             obdManager.isDemoMode -> {
@@ -2415,6 +2417,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 val mergedValues = _livePids.value.associateBy { it.id }.toMutableMap()
                                 values.forEach { mergedValues[it.id] = it }
                                 _livePids.value = mergedValues.values.toList()
+                                valuesForRecording = values
                                 _liveTelemetryMessage.value = if (_livePids.value.isEmpty()) {
                                     getApplication<Application>().getString(R.string.msg_live_no_pid_response)
                                 } else {
@@ -2422,7 +2425,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             }
                         }
-                        captureLiveTelemetrySample(_livePids.value)
+                        captureLiveTelemetrySample(valuesForRecording)
                         consecutiveFailures = 0
                     } catch (cancelled: CancellationException) {
                         throw cancelled
