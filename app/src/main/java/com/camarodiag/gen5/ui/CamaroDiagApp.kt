@@ -1355,8 +1355,8 @@ fun CanSnifferScreen(
                     onValueChange = { canIdFilter = it.take(8) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("CAN ID filter (hex)") },
-                    placeholder = { Text("7E8 or 18DAF110") },
+                    label = { Text(stringResource(R.string.can_trace_id_filter)) },
+                    placeholder = { Text(stringResource(R.string.can_trace_id_hint)) },
                     isError = canIdFilter.isNotBlank() && parsedCanId == null
                 )
                 OutlinedTextField(
@@ -1364,12 +1364,12 @@ fun CanSnifferScreen(
                     onValueChange = { dataPrefixFilter = it.take(48) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("Payload prefix (hex bytes)") },
-                    placeholder = { Text("03 22 F1") },
+                    label = { Text(stringResource(R.string.can_trace_data_prefix)) },
+                    placeholder = { Text(stringResource(R.string.can_trace_data_hint)) },
                     isError = parsedDataPrefix == null
                 )
                 if (!filterInputValid) {
-                    Text("Invalid CAN ID or payload prefix.", color = WarnRed, fontSize = 11.sp)
+                    Text(stringResource(R.string.can_trace_filter_invalid), color = WarnRed, fontSize = 11.sp)
                 }
                 Text(
                     stringResource(R.string.can_sniffer_filtered_count, visibleFrames.size, report.frames.size),
