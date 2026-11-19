@@ -200,6 +200,16 @@ Les lots sont regroupés par responsabilité fonctionnelle. Leur ordre proposé 
 - Garder des tailles tactiles suffisantes et une hiérarchie lisible ; ne pas simplement agrandir les contrôles téléphone.
 - Définir et tester des seuils de largeur en dp sur émulateur/téléphone/tablette, portrait/paysage et multi-fenêtre.
 
+#### Profils de recette écran de référence
+Les diagonales suivantes sont des cibles explicites de recette, pas des dimensions codées en dur :
+- **8 pouces — compact :** hiérarchiser les commandes essentielles, éviter les colonnes trop étroites et vérifier les écrans denses.
+- **10 pouces — référence :** disposition équilibrée, panneaux côte à côte lorsque cela améliore la lecture.
+- **12 pouces — grand format :** exploiter l'espace pour tableaux de bord, console et tableaux de calibration multi-panneaux.
+- Tester chaque profil en portrait et paysage, avec interaction tactile ; compléter par clavier/souris et redimensionnement lorsque le matériel/émulateur le permet.
+- L'interface doit réellement s'adapter à la largeur disponible en dp, à la densité et à la taille de fenêtre. La diagonale en pouces sert uniquement à choisir les appareils/profils de recette.
+
+**Critères d'acceptation supplémentaires :** recette documentée sur les profils 8", 10" et 12" (appareils réels ou émulateurs représentatifs), portrait/paysage, redimensionnement et multi-fenêtre ; aucune disposition ne doit dépendre uniquement de la diagonale physique.
+
 **État constaté lors de l'audit du 19 novembre 2026 :** le projet utilise Jetpack Compose, mais l'arborescence Android ne contient pas de layouts alternatifs sw600dp/w600dp ou de ressources spécifiques tablette. Les écrans consultés utilisent majoritairement des colonnes/listes pleine largeur. Aucune adaptation tablette complète n'est donc confirmée ; ce lot reste à développer et à tester.
 
 ## 4. Règle de construction périodique pendant le développement
