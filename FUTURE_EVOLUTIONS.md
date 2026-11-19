@@ -53,6 +53,16 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Améliorer la détection des capacités, les diagnostics de connexion, les délais, la reprise après erreur et la gestion des sessions exclusives.
 - [ ] Maintenir une matrice de compatibilité adaptateur / protocole / fonction / OS / niveau de validation.
 
+#### Interfaces supplémentaires appartenant à l'utilisateur — inventaire et étude de compatibilité
+- [ ] Ajouter à la matrice matérielle l'interface Autocom utilisée pour les véhicules PSA. Modèle/référence exacte à identifier avant de choisir le pilote ou de revendiquer une compatibilité.
+- [ ] Ajouter le VXDIAG VCX Nano utilisé avec Mazda et Ford. Identifier la variante matérielle, le firmware, les pilotes disponibles, les protocoles et le mode de connexion réellement utilisés.
+- [ ] Étudier pour chaque interface les transports USB/USB OTG, Bluetooth ou pont PC disponibles, sans supposer qu'ils sont tous pris en charge par chaque modèle.
+- [ ] Distinguer les protocoles et fonctions réellement exposés : diagnostic constructeur, OBD générique, CAN, K-Line, J2534/PassThru, programmation et fonctions spécifiques à une marque. La présence d'un outil ou d'un pilote constructeur ne prouve pas que toutes ces fonctions sont accessibles à CamaroDiag.
+- [ ] Concevoir une architecture de pilotes/adaptateurs indépendante de la marque, avec profils de capacités déclarées et testées par modèle, firmware, système d'exploitation et protocole.
+- [ ] Étudier l'intégration du VXDIAG Nano dans le pont Windows 11 si son pilote et son interface le permettent ; ne pas annoncer la prise en charge J2534/PassThru sans confirmer la référence exacte et réussir les tests de conformité.
+- [ ] Étudier l'Autocom comme interface diagnostic multimarque/PSA candidate ; ne pas supposer qu'il est compatible avec les protocoles ou fonctions d'écriture GM.
+- [ ] Prioriser l'inventaire et l'identification des matériels déjà possédés avant de recommander l'achat d'interfaces supplémentaires.
+
 #### Extension matérielle — câble KKL USB / FTDI via OTG
 - [ ] Ajouter à la matrice matérielle le câble USB KKL noir multi-motos utilisé avec TuneECU et BHELI32, comme interface série filaire candidate ; référence utilisateur : câble KKL USB spécial Aprilia/KTM/Triumph/Moto Guzzi/Ducati, connexion Android par USB OTG.
 - [ ] Concevoir une couche USB Host/OTG indépendante des applications tierces : détection/autorisation USB, identification VID/PID et chipset, ouverture/fermeture propre, gestion des permissions, déconnexion, délais et erreurs ; ne pas dépendre de TuneECU ou BHELI32.
@@ -379,6 +389,7 @@ Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L
 - Aucune plaque d'immatriculation ni donnée personnelle ne doit être conservée dans ce backlog.
 
 ## 6. Historique des décisions
+- 2026-11-19 : compléter l'inventaire matériel avec l'interface Autocom utilisée sur PSA (modèle à identifier) et le VXDIAG Nano utilisé sur Mazda/Ford ; étudier leurs pilotes, transports et capacités réelles avant toute annonce de compatibilité CamaroDiag.
 - 2026-11-19 : ajouter le câble KKL USB multi-motos utilisé avec TuneECU/BHELI32 comme interface USB-série candidate via OTG/Windows ; étudier FTDI/K-Line et la compatibilité réelle avec le calculateur Camaro avant toute revendication, notamment pour la programmation calibration qui reste soumise à validation et garde-fous spécifiques.
 - 2026-11-19 : étendre le tableau de bord temps réel à un catalogue personnalisable multi-calculateurs (moteur, transmission, TPMS, carrosserie, éclairage, châssis et confort), avec découverte des données réellement disponibles, unités, états de disponibilité, courbes et enregistrement ; les données constructeur et limites d'interface doivent être explicites.
 
