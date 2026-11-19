@@ -213,35 +213,38 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Toute nouvelle marque/modèle proposé ultérieurement doit être ajouté ici avec son groupe constructeur, génération, moteur et priorité.
 - [ ] Évaluer la faisabilité à partir des protocoles, interfaces, données vérifiables et possibilités de validation avant d'accepter un nouveau périmètre.
 
-### 2.7 Mode avancé — regroupement des fonctions expertes
+### 2.7 Mode avancé — fonctions à risque élevé et opérations sensibles
 
-**Décision utilisateur — 2026-11-19 :** l'atelier Cartographie professionnel doit être accessible dans une zone dédiée « Mode avancé », séparée des fonctions de diagnostic courant. Ce mode regroupe les outils techniques destinés aux utilisateurs qui connaissent les calculateurs, les protocoles et les conséquences de leurs manipulations.
+**Précision utilisateur — 2026-11-19 :** le Mode avancé ne doit pas devenir un simple regroupement de tous les outils techniques. Le CAN Sniffer, les logs, l'identification ECU et les diagnostics approfondis ne mettent pas, à eux seuls, le véhicule en péril lorsqu'ils restent en lecture seule. Ils restent dans les écrans de diagnostic adaptés. Le Mode avancé doit surtout regrouper les opérations qui peuvent modifier durablement le comportement, l'identité, la sécurité ou le logiciel du véhicule.
 
-- [ ] Ajouter un accès « Mode avancé » dans la navigation ou les paramètres, avec une présentation distincte des fonctions de diagnostic courant.
-- [ ] À la première activation, afficher un avertissement explicite et demander une confirmation. Permettre ensuite de retrouver cet avertissement depuis les informations du mode.
-- [ ] Employer le texte d'avertissement suivant, à ajuster avec les traductions de l'application :
+- [ ] Créer une zone dédiée « Mode avancé », distincte du diagnostic courant et accessible par activation explicite.
+- [ ] À la première entrée, afficher un avertissement et demander une confirmation. L'avertissement doit rester consultable depuis le mode.
+- [ ] Utiliser le texte suivant comme base de l'avertissement :
 
   > **Mode avancé — réservé aux utilisateurs avertis**
   >
-  > Ce mode donne accès à des outils techniques pouvant modifier des données sensibles du véhicule. Une mauvaise manipulation, un fichier incompatible ou une opération interrompue peut endommager un calculateur, corrompre ses données, empêcher le démarrage du véhicule ou rendre certains systèmes inopérants.
+  > Les fonctions de cette rubrique peuvent modifier des données essentielles du véhicule, ses systèmes de sécurité ou le logiciel de ses calculateurs. Une opération incorrecte, un fichier incompatible, une alimentation instable ou une interruption de communication peut rendre un calculateur inutilisable, empêcher le démarrage du véhicule ou provoquer le dysfonctionnement de certains équipements.
   >
-  > La modification des paramètres du véhicule peut également être soumise à des restrictions légales selon le pays, notamment lorsqu'elle affecte les émissions polluantes, les dispositifs antipollution, la sécurité ou l'homologation du véhicule. Il appartient à l'utilisateur de vérifier la réglementation applicable et de s'assurer que toute modification est autorisée pour l'usage prévu du véhicule.
+  > Certaines modifications peuvent également être interdites ou soumises à des obligations réglementaires selon le pays, notamment lorsqu'elles concernent l'antidémarrage, l'identification du véhicule, les émissions polluantes, les dispositifs de sécurité ou l'homologation.
   >
-  > **N'utilisez ces fonctions que si vous maîtrisez leurs implications et disposez des fichiers, équipements et connaissances adaptés.** La présence de cet avertissement ne garantit ni la compatibilité ni l'absence de risque.
+  > Réservez ces fonctions aux interventions légitimes sur un véhicule que vous êtes autorisé à réparer ou configurer. Vérifiez la compatibilité, la documentation et la réglementation applicables avant toute opération. Une sauvegarde ne garantit pas qu'une opération interrompue puisse être récupérée.
+  >
+  > **Vous êtes responsable de vérifier que l'intervention est autorisée et adaptée au véhicule concerné.**
 
-- [ ] Présenter un rappel de prudence dans l'atelier Cartographie avant les opérations sensibles, sans répéter une boîte de dialogue à chaque simple consultation ou ouverture de table.
-- [ ] Classer les fonctions selon leur niveau de risque et leur état réel : lecture seule, modification hors ligne, fonction expérimentale, écriture ECU désactivée ou fonction validée. Le mode avancé ne doit jamais lever à lui seul un verrou de sécurité.
-- [ ] Placer dans cette zone l'atelier Cartographie professionnel : inspection, édition hors ligne, comparaison, import/export, simulation, analyse de logs et courbes Puissance & Couple.
-- [ ] Étudier également le regroupement des outils suivants, lorsqu'ils sont implémentés et clairement documentés :
-  - CAN Sniffer et visualisation avancée des trames, en lecture seule ;
-  - console de requêtes techniques OBD/UDS avec liste blanche et commandes autorisées uniquement ;
-  - identification détaillée des calculateurs, références matérielles/logicielles, CAL ID et CVN ;
-  - enregistrement et analyse avancée des données temps réel, avec rejeu de logs hors ligne ;
-  - diagnostics approfondis par calculateur et rapports techniques.
-- [ ] Conserver les fonctions courantes (lecture/effacement DTC autorisé, données standard, identification simple et état de connexion) dans l'expérience normale afin de ne pas rendre l'application inutilement complexe.
-- [ ] Ne pas ajouter au Mode avancé, même comme raccourci accessible, de fonctions d'antidémarrage, Seed/Key, désactivation de dispositifs antipollution/sécurité, programmation firmware ou écriture mémoire non-calibration.
-- [ ] Maintenir les écritures de calibration partielle/complète désactivées tant que les exigences de sécurité et de validation ECU décrites dans la section Cartographie ne sont pas satisfaites. L'activation du Mode avancé ne constitue jamais une autorisation d'écriture.
-- [ ] Ajouter des tests UI et d'accès : mode désactivé par défaut ou activation explicite, confirmation initiale, retour à l'expérience normale, et vérification qu'aucun accès au mode ne contourne les garde-fous techniques.
+- [ ] Placer dans ce mode l'atelier Cartographie professionnel et ses opérations de modification de calibration. Maintenir les règles strictes calibration-only : aucune écriture de firmware, d'OS ECU, de bootloader ou de zone hors calibration via les fonctions de cartographie.
+- [ ] Étudier un module Antidémarrage / Immobilizer pour les opérations légitimes et documentées : apprentissage ou remplacement de clés, ajout de clés, réinitialisation/reconfiguration après remplacement d'un module et diagnostic de synchronisation entre modules.
+- [ ] Étudier la gestion des clés et télécommandes, y compris les procédures de réapprentissage après remplacement ou perte, uniquement pour les véhicules et variantes où les procédures et prérequis sont documentés.
+- [ ] Ne pas proposer de fonction générique de désactivation ou de contournement de l'antidémarrage. Toute opération doit suivre une procédure constructeur autorisée, avec contrôle de légitimité/autorisation, compatibilité exacte et journalisation. Si les prérequis ne sont pas réunis, la fonction doit rester indisponible.
+- [ ] Étudier les procédures de configuration et d'appairage des systèmes radio/infodivertissement après remplacement, selon le module et le véhicule : identification, configuration, apprentissage et restauration des paramètres documentés.
+- [ ] Étudier les changements d'identifiants véhicule (VIN) uniquement pour les cas de réparation/remplacement de module où une procédure constructeur autorisée le prévoit. Ne pas fournir de fonction de réécriture arbitraire du VIN, de clonage d'identité ou de masquage de provenance. Conserver une trace de l'identifiant initial, du motif, de la procédure et du résultat lorsque cela est légalement permis.
+- [ ] Étudier un gestionnaire de mises à jour logicielles constructeur pour les calculateurs GM : inventaire des modules et versions, recherche de mises à jour applicables, vérification de compatibilité, téléchargement depuis une source autorisée, contrôle d'intégrité/signature si disponible, alimentation requise, sauvegardes possibles et procédure de programmation documentée.
+- [ ] Ne jamais supposer que les firmwares GM sont librement disponibles. Rechercher d'abord les voies d'accès légitimes (portails et services de programmation GM, abonnements professionnels, fournisseurs autorisés ou fichiers fournis légalement par l'utilisateur). Ne pas intégrer de dépôts non autorisés, de fichiers d'origine incertaine ou de firmware dont la provenance/licence n'est pas établie.
+- [ ] Distinguer strictement les mises à jour firmware constructeur des opérations de calibration. Un firmware peut inclure ou remplacer l'OS du calculateur : il doit donc disposer d'un module, d'un processus et de garde-fous séparés de l'atelier Cartographie.
+- [ ] Avant toute programmation firmware, exiger l'identification précise du véhicule et du module, une correspondance vérifiée du matériel/logiciel, un fichier authentique et applicable, une alimentation stabilisée, une interface officiellement compatible et une procédure de récupération documentée. À défaut, afficher que la programmation n'est pas prise en charge.
+- [ ] Maintenir les outils en lecture seule (CAN Sniffer, visualisation des données, logs, identification ECU et diagnostics approfondis) dans leurs rubriques de diagnostic normales ; ils ne doivent pas être déplacés artificiellement dans le Mode avancé.
+- [ ] Ne jamais considérer l'activation du Mode avancé comme une autorisation technique : chaque fonction sensible conserve ses propres contrôles d'accès, conditions de compatibilité et verrous de sécurité.
+- [ ] Ajouter des tests d'interface et de sécurité pour vérifier que les opérations sensibles restent indisponibles sans leurs prérequis et qu'aucune fonction de diagnostic en lecture seule ne déclenche une écriture.
+
 
 ## 4. Qualité, traçabilité et éventuelle commercialisation — à préparer progressivement
 
