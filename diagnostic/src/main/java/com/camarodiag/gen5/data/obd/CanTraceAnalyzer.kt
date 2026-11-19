@@ -553,7 +553,7 @@ object CanTraceAnalyzer {
                                     frame.data[5].toLong()
                             } else shortLength.toLong()
                             if (lengthLong <= 0 ||
-                                lengthLong > MAX_SUPPORTED_ISOTP_PAYLOAD_BYTES ||
+                                lengthLong > MAX_SUPPORTED_ISOTP_PAYLOAD_BYTES.toLong() ||
                                 (usesExtendedLength && lengthLong <= 4095)
                             ) {
                                 errors += "Line ${frame.lineNumber}: unsupported ISO-TP first-frame length."
