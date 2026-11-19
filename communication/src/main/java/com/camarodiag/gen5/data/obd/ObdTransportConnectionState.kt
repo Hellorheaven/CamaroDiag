@@ -1,0 +1,22 @@
+package com.camarodiag.gen5.data.obd
+
+/** Pure availability policy shared by the OBD manager and its unit tests. */
+internal object ObdTransportConnectionState {
+    fun isCommandChannelAvailable(
+        isDemoMode: Boolean,
+        isSimulationActive: Boolean,
+        activeTransport: String,
+        classicSocketConnected: Boolean = false,
+        classicSocketClosed: Boolean = true,
+        bleConnected: Boolean = false
+    ): Boolean {
+        if (isDemoMode || isSimulationActive) return false
+        return when (activeTransport) {
+            "BLUETOOTH" -> classicSocketConnected && !classicSocketClosed
+            "BLE" -> bleConnected
+            // USB and Wi-Fi report physical disconnects through read/write failures.
+            "USB", "WIFI" -> true
+            else -> false
+        }
+    }
+}
