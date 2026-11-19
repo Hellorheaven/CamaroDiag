@@ -271,6 +271,40 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun expiresIsoTpMessageWhenConsecutiveFrameArrivesAfterLongTimestampGap() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "0.000000 1 7E8 Rx d 8 10 0F 62 F1 90 AA BB CC",
+                "0.800000 1 7E8 Rx d 8 21 01 02 03 04 05 06 07",
+                "1.900000 1 7E8 Rx d 8 22 08 09 00 00 00 00 00"
+            ).joinToString("\\n"),
+            "stale-isotp-session.asc"
+        )
+
+        assertTrue(report.messages.isEmpty())
+        assertEquals(1, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.any { it.contains("ISO-TP consecutive frame timed out") })
+        assertFalse(report.errors.any { it.contains("consecutive frame has no matching first frame") })
+    }
+
+    @Test
+    fun refreshesIsoTpConsecutiveFrameTimeoutAfterEachValidFrame() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "0.000000 1 7E8 Rx d 8 10 0F 62 F1 90 AA BB CC",
+                "0.800000 1 7E8 Rx d 8 21 01 02 03 04 05 06 07",
+                "1.600000 1 7E8 Rx d 8 22 08 09 00 00 00 00 00"
+            ).joinToString("\\n"),
+            "refreshed-isotp-session.asc"
+        )
+
+        assertEquals(1, report.messages.size)
+        assertEquals(15, report.messages.single().payload.size)
+        assertEquals(0, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
     fun singleFrameInterruptsPreviouslyPendingIsoTpMessage() {
         val report = CanTraceAnalyzer.analyze(
             listOf(
