@@ -108,3 +108,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - La cause de déconnexion est réinitialisée lors d'une nouvelle connexion et à la fermeture du transport.
 - Commits : `1f15322` (état d'erreur BLE), `205fe6b` (réveil des lectures en attente).
 - Relecture statique uniquement ; aucun test Android/Gradle, build ou essai avec OBDLink CX exécuté.
+
+### Transports USB et Wi-Fi — détection de fermeture — 2026-11-19
+- La lecture USB remonte désormais une fin de flux (EOF) comme une déconnexion explicite au lieu d'attendre silencieusement le timeout de commande.
+- La lecture TCP Wi-Fi traite également le retour EOF comme une fermeture de la connexion par l'adaptateur.
+- Les timeouts de lecture normaux restent distincts d'une fermeture de transport.
+- Commit : `5d16421`.
+- Relecture statique uniquement ; aucun test matériel, test Gradle ou build CI exécuté.
