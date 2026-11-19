@@ -227,7 +227,7 @@ Les diagonales suivantes sont des cibles explicites de recette, pas des dimensio
 ## Politique de mise à jour documentaire
 
 - `docs/PROMPT_REPRISE.md` et `docs/FUTURE_FEATURES_CAN_VEHICLE_GARAGE.md` sont maintenus exclusivement sur `main`.
-- `CHANGELOG.md` est maintenu dans la branche de chaque PR et documente les changements réellement apportés par cette PR, ainsi que les tests/builds et leur statut.
+- Un changelog propre à chaque PR, nommé `docs/CHANGELOG_PR<number>.md` (ex. `docs/CHANGELOG_PR35.md`), est maintenu sur la branche de cette PR et documente les changements réels, tests/builds et leur statut.
 - Le changelog d'une PR ne doit pas être écrit directement sur `main) avant fusion ; il rejoint `main` avec la PR.
 - Mettre à jour les documents au fil du travail, dans le même lot que le changement concerné. Ne jamais déclarer une validation réussie sans preuve ; distinguer réussi, échoué, ignoré (`skipped`) et non exécuté.
 
