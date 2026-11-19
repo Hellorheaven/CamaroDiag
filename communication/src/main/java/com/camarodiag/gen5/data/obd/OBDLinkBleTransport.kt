@@ -47,6 +47,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
                 connectionFailure = failure
                 connectResult?.completeExceptionally(failure)
                 writeResult?.completeExceptionally(failure)
+                incoming.trySend(ByteArray(0))
                 return
             }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
