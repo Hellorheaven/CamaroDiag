@@ -550,7 +550,9 @@ object CanTraceAnalyzer {
                 // Without a DLC column, trim only trailing empties; a gap inside the frame is invalid.
                 val byteCount: Int = declaredDlc
                     ?: (rawValues.indexOfLast { value -> value.isNotBlank() } + 1)
-                if (byteCount !in 0..rawValues.size) {
+                val hasBytesBeyondDeclaredDlc = declaredDlc != null &&
+                    rawValues.drop(declaredDlc).any { value -> value.isNotBlank() }
+                if (byteCount !in 0..rawValues.size || hasBytesBeyondDeclaredDlc) {
                     null
                 } else {
                     val values: List<Int?> = rawValues.take(byteCount).map { value: String ->
