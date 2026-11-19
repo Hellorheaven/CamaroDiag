@@ -127,6 +127,38 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun correlatesMode01ResponsesByPidWhenSeveralRequestsArePending() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 02 01 0C 00 00 00 00 00",
+            "0.001000 1 7E0 Tx d 8 02 01 0D 00 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 03 41 0D 54 00 00 00 00",
+            "0.030000 1 7E8 Rx d 8 03 41 0C 1A F8 00 00 00 00"
+        ).joinToString("\\n")
+        val report = CanTraceAnalyzer.analyze(trace, "multiple-pids.asc")
+
+        assertEquals(2, report.exchanges.size)
+        val byPid = report.exchanges.associateBy { it.request.parameterId }
+        assertEquals(setOf(0x0C, 0x0D), byPid.keys)
+        assertEquals(UdsExchangeStatus.COMPLETED, byPid[0x0C]?.status)
+        assertEquals(UdsExchangeStatus.COMPLETED, byPid[0x0D]?.status)
+        assertEquals(0x0C, byPid[0x0C]?.responses?.single()?.parameterId)
+        assertEquals(0x0D, byPid[0x0D]?.responses?.single()?.parameterId)
+    }
+
+    @Test
+    fun recognizesInputOutputControlDidForExchangeCorrelation() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 04 2F F1 90 03 00 00 00",
+            "0.025000 1 7E8 Rx d 8 05 6F F1 90 03 AA 00 00"
+        ).joinToString("\\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "io-control.asc").exchanges.single()
+
+        assertEquals(0xF190, exchange.request.did)
+        assertEquals(0xF190, exchange.responses.single().did)
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+    }
+
+    @Test
     fun decodesCanFdEscapedIsoTpSingleFrameLength() {
         val report = CanTraceAnalyzer.analyze(
             "0.000000 1 7E8 Rx d 12 00 0A 62 F1 90 01 02 03 04 05 00 00",
