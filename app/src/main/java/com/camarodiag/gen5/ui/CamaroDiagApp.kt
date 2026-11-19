@@ -1444,6 +1444,27 @@ fun CanSnifferScreen(
                     )
                 }
             }
+            if (report.dtcObservations.isNotEmpty()) {
+                item {
+                    Text(stringResource(R.string.can_sniffer_dtc_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                }
+                items(report.dtcObservations.takeLast(30).asReversed()) { observation ->
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(observation.code, color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            Text(
+                                stringResource(R.string.can_sniffer_dtc_service, observation.service),
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+            }
             if (report.pidObservations.isNotEmpty()) {
                 item {
                     Text(stringResource(R.string.can_sniffer_pid_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
