@@ -147,27 +147,48 @@ object CanTraceAnalyzer {
     }
 
     /**
-     * Decodes only standardized SAE J1979 Mode 01 response PIDs.
-     * Unknown PIDs and incomplete payloads remain raw observations and are not guessed.
+     * Decodes standardized SAE J1979 Mode 01 response PIDs.
+     * Unsupported PIDs and truncated payloads remain available in the raw trace.
      */
     private fun decodeStandardPid(message: UdsTraceMessage): CanTracePidObservation? {
         if (message.responseService != 0x41 || message.payload.size < 3) return null
         val pid = message.payload[1]
-        val a = message.payload.getOrNull(2) ?: return null
-        val b = message.payload.getOrNull(3) ?: 0
+        val bytes = message.payload.drop(2)
+        val a = bytes.getOrNull(0) ?: return null
+        val b = bytes.getOrNull(1) ?: 0
         val decoded = when (pid) {
             0x04 -> Triple("Calculated engine load", a * 100.0 / 255.0, "%")
             0x05 -> Triple("Engine coolant temperature", (a - 40).toDouble(), "°C")
+            0x06 -> Triple("Short-term fuel trim Bank 1", a * 100.0 / 128.0 - 100.0, "%")
+            0x07 -> Triple("Long-term fuel trim Bank 1", a * 100.0 / 128.0 - 100.0, "%")
+            0x08 -> Triple("Short-term fuel trim Bank 2", a * 100.0 / 128.0 - 100.0, "%")
+            0x09 -> Triple("Long-term fuel trim Bank 2", a * 100.0 / 128.0 - 100.0, "%")
+            0x0A -> Triple("Fuel pressure", a * 3.0, "kPa")
             0x0B -> Triple("Intake manifold absolute pressure", a.toDouble(), "kPa")
             0x0C -> Triple("Engine speed", ((a * 256) + b) / 4.0, "rpm")
             0x0D -> Triple("Vehicle speed", a.toDouble(), "km/h")
+            0x0E -> Triple("Timing advance", a / 2.0 - 64.0, "°")
             0x0F -> Triple("Intake air temperature", (a - 40).toDouble(), "°C")
             0x10 -> Triple("Mass air flow", ((a * 256) + b) / 100.0, "g/s")
             0x11 -> Triple("Throttle position", a * 100.0 / 255.0, "%")
+            in 0x14..0x1B -> Triple("Oxygen sensor " + (pid - 0x13) + " voltage", a / 200.0, "V")
+            in 0x24..0x2B -> Triple("Wide-range oxygen sensor " + (pid - 0x23) + " equivalence ratio", ((a * 256 + b) * 2.0) / 65536.0, "ratio")
+            in 0x34..0x3B -> Triple("Wide-range oxygen sensor " + (pid - 0x33) + " equivalence ratio", ((a * 256 + b) * 2.0) / 65536.0, "ratio")
+            0x42 -> Triple("Control module voltage", (a * 256 + b) / 1000.0, "V")
+            0x43 -> Triple("Absolute engine load", ((a * 256 + b) * 100.0) / 65535.0, "%")
+            0x44 -> Triple("Commanded equivalence ratio", ((a * 256 + b) * 2.0) / 65535.0, "ratio")
+            0x45 -> Triple("Relative throttle position", a * 100.0 / 255.0, "%")
+            0x46 -> Triple("Ambient air temperature", (a - 40).toDouble(), "°C")
+            in 0x47..0x4B -> Triple("Absolute throttle position " + (pid - 0x46), a * 100.0 / 255.0, "%")
+            0x4C -> Triple("Commanded throttle actuator", a * 100.0 / 255.0, "%")
             else -> return null
         }
-        val requiredBytes = if (pid == 0x0C || pid == 0x10) 4 else 3
-        if (message.payload.size < requiredBytes) return null
+        val requiredDataBytes = when (pid) {
+            0x0C, 0x10, in 0x14..0x1B, 0x42, 0x43, 0x44 -> 2
+            in 0x24..0x2B, in 0x34..0x3B -> 4
+            else -> 1
+        }
+        if (bytes.size < requiredDataBytes) return null
         return CanTracePidObservation(
             timestampSeconds = message.timestampSeconds,
             canId = message.canId,
@@ -176,10 +197,9 @@ object CanTraceAnalyzer {
             name = decoded.first,
             value = decoded.second,
             unit = decoded.third,
-            rawBytes = message.payload.drop(2).take(requiredBytes - 2)
+            rawBytes = bytes.take(requiredDataBytes)
         )
     }
-
     private data class ParsedFrames(val frames: List<CanTraceFrame>, val errors: List<String>)
 
     private fun parseAsc(lines: List<String>): ParsedFrames {
