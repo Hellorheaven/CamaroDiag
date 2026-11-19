@@ -60,12 +60,20 @@ data class SavedVehicleProfile(
     val requiresReview: Boolean = false
 )
 
+data class CanConsoleRequestHistoryEntry(
+    val command: String,
+    val response: String?,
+    val completedAtMillis: Long,
+    val succeeded: Boolean
+)
+
 data class LiveCanMonitorState(
     val isCapturing: Boolean = false,
     val rawText: String = "",
     val report: CanTraceAnalysisReport? = null,
     val isSendingRequest: Boolean = false,
     val requestResponse: String? = null,
+    val requestHistory: List<CanConsoleRequestHistoryEntry> = emptyList(),
     val message: String? = null
 )
 
@@ -1029,7 +1037,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        _liveCanMonitorState.value = LiveCanMonitorState(isCapturing = true)
+        if (_liveCanMonitorState.value.isSendingRequest) return
+        val requestHistory = _liveCanMonitorState.value.requestHistory
+        _liveCanMonitorState.value = LiveCanMonitorState(
+            isCapturing = true,
+            requestHistory = requestHistory
+        )
         // Install the job reference before it can execute. A lazy start also lets the
         // finally block compare its identity, so an older cancelled capture cannot clear
         // or overwrite the state of a newer capture started immediately afterward.
@@ -1134,9 +1147,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val response = obdManager.sendAtCommand(request.elmCommand, 4_000L)
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                val current = _liveCanMonitorState.value
+                val historyEntry = CanConsoleRequestHistoryEntry(
+                    command = request.elmCommand,
+                    response = response.take(4_096),
+                    completedAtMillis = System.currentTimeMillis(),
+                    succeeded = true
+                )
+                _liveCanMonitorState.value = current.copy(
                     isSendingRequest = false,
                     requestResponse = response,
+                    requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
                     message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                 )
             } catch (cancelled: CancellationException) {
@@ -1144,8 +1165,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 reportConnectionLoss(error)
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                val current = _liveCanMonitorState.value
+                val historyEntry = CanConsoleRequestHistoryEntry(
+                    command = request.elmCommand,
+                    response = null,
+                    completedAtMillis = System.currentTimeMillis(),
+                    succeeded = false
+                )
+                _liveCanMonitorState.value = current.copy(
                     isSendingRequest = false,
+                    requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
                     message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
                 )
             }
