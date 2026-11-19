@@ -172,3 +172,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Ajout de trois tests couvrant ces comportements.
 - Commits : `0c3f635` (parseur), `be238ac` (tests).
 - Tests Gradle/build Android non exécutés.
+
+### Validation des horodatages Vector ASC — 2026-11-19
+- Le parseur ASC accepte maintenant les notations décimales et scientifiques valides.
+- Les horodatages non finis (`NaN`, `Infinity`) sont reconnus comme métadonnées invalides et la trame est rejetée, au lieu d'être ignorée silencieusement.
+- Ajout d'un test couvrant les deux valeurs non finies et une notation scientifique valide.
+- Commits : `b04682d` (parseur), `55383ba` (tests).
+- Tests Gradle/build Android non exécutés.
