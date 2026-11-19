@@ -172,6 +172,10 @@ object CanTraceAnalyzer {
     // Bound hostile or accidental 32-bit ISO-TP lengths before buffering a trace payload.
     private const val MAX_SUPPORTED_ISOTP_PAYLOAD_BYTES = 1_048_576
 
+    // Offline traces use a conservative one-second gap to flag stale partial ISO-TP sessions.
+    // The timeout is applied only when both frame timestamps are available and monotonic.
+    private const val MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS = 1.0
+
     private val ascFrameRegex = Regex(
         """^\s*(\d+(?:\.\d+)?)\s+\d+\s+([0-9A-Fa-f]{3,8})\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
         RegexOption.IGNORE_CASE
@@ -582,7 +586,19 @@ object CanTraceAnalyzer {
         val expectedLength: Int,
         val payload: MutableList<Int>,
         var nextSequence: Int
-    )
+    ) {
+        var lastFrameTimestampSeconds: Double? = timestampSeconds
+    }
+
+    private fun hasIsoTpConsecutiveFrameTimedOut(
+        previousTimestampSeconds: Double?,
+        currentTimestampSeconds: Double?
+    ): Boolean {
+        if (previousTimestampSeconds == null || currentTimestampSeconds == null) return false
+        if (currentTimestampSeconds < previousTimestampSeconds) return false
+        return currentTimestampSeconds - previousTimestampSeconds >
+            MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS
+    }
 
     private data class ReassemblyResult(
         val messages: List<UdsTraceMessage>,
@@ -671,6 +687,15 @@ object CanTraceAnalyzer {
                     val state = pending[key]
                     if (state == null) {
                         errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame has no matching first frame."
+                    } else if (hasIsoTpConsecutiveFrameTimedOut(
+                            state.lastFrameTimestampSeconds,
+                            frame.timestampSeconds
+                        )
+                    ) {
+                        val elapsed = frame.timestampSeconds!! - state.lastFrameTimestampSeconds!!
+                        errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame timed out after ${elapsed}s."
+                        pending.remove(key)
+                        discardedIncompleteMessages++
                     } else if (frame.data.size < 2) {
                         errors += "Line ${frame.lineNumber}: truncated ISO-TP consecutive frame."
                         pending.remove(key)
@@ -683,6 +708,9 @@ object CanTraceAnalyzer {
                             discardedIncompleteMessages++
                         } else {
                             state.payload += frame.data.drop(1).take(state.expectedLength - state.payload.size)
+                            if (frame.timestampSeconds != null) {
+                                state.lastFrameTimestampSeconds = frame.timestampSeconds
+                            }
                             state.nextSequence = (state.nextSequence + 1) and 0x0F
                             if (state.payload.size >= state.expectedLength) {
                                 messages += UdsTraceMessage(
