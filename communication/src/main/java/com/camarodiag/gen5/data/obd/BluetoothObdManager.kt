@@ -357,10 +357,14 @@ class BluetoothObdManager(context: Context) {
                     if (isStnAdapter) {
                         runCatching { sendAtCommandInternal("ATAR", 1_000L) }
                     }
-                    runCatching { sendAtCommandInternal("ATCAF1", 1_000L) }
-                    // Restore ELM default spacing; the capture temporarily enabled ATS1.
+                    // Restore the command-channel formatting established during adapter probing.
+                    // A bare "AT" is not an ELM reset command; ATD would reset protocol and
+                    // other settings that the app relies on, so restore each changed setting.
+                    runCatching { sendAtCommandInternal("ATE0", 1_000L) }
+                    runCatching { sendAtCommandInternal("ATL0", 1_000L) }
+                    runCatching { sendAtCommandInternal("ATH1", 1_000L) }
                     runCatching { sendAtCommandInternal("ATS0", 1_000L) }
-                    runCatching { sendAtCommandInternal("AT", 1_000L) }
+                    runCatching { sendAtCommandInternal("ATCAF1", 1_000L) }
                 }
             }
             captured.toString()
