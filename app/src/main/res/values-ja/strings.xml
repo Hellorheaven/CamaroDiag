@@ -643,4 +643,7 @@
     <string name="can_sniffer_stn_filter_notice">STNアダプターでは、生フレーム取得のため一時フィルターを消去し、その後OBD自動フィルターを再度有効にします。他のソフトウェアで設定したカスタムフィルターは復元されません。</string>
     <string name="can_sniffer_search">CAN ID またはデータバイトを検索</string>
     <string name="can_sniffer_filtered_count">%2$d フレーム中 %1$d 件を表示</string>
+    <string name="can_sniffer_direction_all">すべて</string>
+    <string name="can_sniffer_direction_rx">RX</string>
+    <string name="can_sniffer_direction_tx">TX</string>
 </resources>
