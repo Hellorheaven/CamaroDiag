@@ -142,3 +142,5 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Ajout d'un test de classification de cette exception.
 - Validation Gradle/build Android : non exécutée dans cette session ; aucune validation matérielle BLE effectuée.
 - Le traitement commun d'une perte de transport ferme désormais aussi l'adaptateur physique et réinitialise son état interne. Cela évite qu'un canal USB/Wi-Fi reste déclaré disponible après une erreur d'E/S, alors que seul l'état visuel avait été réinitialisé.
+- Les callbacks GATT `STATE_DISCONNECTED` et les statuts de rupture de connexion sont également convertis en `ObdTransportDisconnectedException` ; une écriture en attente ne remonte donc plus une `IllegalStateException` ignorée par le suivi global.
+- Commit complémentaire : `ff1ddd8` (classification des callbacks GATT) et `0476497` (dernier chemin de lecture).
