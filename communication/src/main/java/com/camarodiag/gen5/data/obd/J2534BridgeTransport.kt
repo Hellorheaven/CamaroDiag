@@ -123,32 +123,13 @@ class J2534BridgeTransport(
         output.write(json.toString())
         output.newLine()
         output.flush()
-        val line = readBoundedLine(input, MAX_RESPONSE_LINE_CHARS)
+        val line = J2534BridgeProtocol.readBoundedLine(input)
             ?: error("Le pont PC a fermé la connexion.")
         val response = JSONObject(line)
         if (!response.optBoolean("ok", false)) {
             throw IllegalStateException(response.optString("error", "Erreur inconnue du pont J2534."))
         }
         return response
-    }
-
-    private fun readBoundedLine(input: BufferedReader, maxChars: Int): String? {
-        val line = StringBuilder()
-        while (true) {
-            val next = input.read()
-            if (next == -1) {
-                if (line.isEmpty()) return null
-                break
-            }
-            if (next == '\n'.code) break
-            if (next != '\r'.code) {
-                check(line.length < maxChars) {
-                    "La réponse du pont J2534 dépasse la taille maximale autorisée."
-                }
-                line.append(next.toChar())
-            }
-        }
-        return line.toString()
     }
 
     private fun ensureOpen() {
@@ -173,11 +154,33 @@ class J2534BridgeTransport(
         opened = false
     }
 
-    private companion object { const val MAX_RESPONSE_LINE_CHARS = 32 * 1024 }
-
     private fun ByteArray.toHex(): String =
         joinToString("") { "%02X".format(Locale.ROOT, it.toInt() and 0xFF) }
 
     private fun String.hexToBytes(): ByteArray =
         chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+}
+
+/** Bounded framing helpers for the untrusted JSON-lines PC bridge stream. */
+internal object J2534BridgeProtocol {
+    private const val MAX_RESPONSE_LINE_CHARS = 32 * 1024
+
+    fun readBoundedLine(input: BufferedReader): String? {
+        val line = StringBuilder()
+        while (true) {
+            val next = input.read()
+            if (next == -1) {
+                if (line.isEmpty()) return null
+                break
+            }
+            if (next == '\n'.code) break
+            if (next != '\r'.code) {
+                check(line.length < MAX_RESPONSE_LINE_CHARS) {
+                    "The J2534 bridge response exceeds the maximum allowed line size."
+                }
+                line.append(next.toChar())
+            }
+        }
+        return line.toString()
+    }
 }
