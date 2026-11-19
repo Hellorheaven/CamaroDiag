@@ -224,6 +224,13 @@ Les diagonales suivantes sont des cibles explicites de recette, pas des dimensio
 - Les releases restent exclusivement déclenchées depuis la branche principale.
 - Afficher explicitement les états « en attente du seuil », « différé car commit intermédiaire », « build en cours », « réussi » et « échoué ». Un job ignoré/skipped ne vaut jamais build réussi.
 
+## Politique de mise à jour documentaire
+
+- `docs/PROMPT_REPRISE.md` et `docs/FUTURE_FEATURES_CAN_VEHICLE_GARAGE.md` sont maintenus exclusivement sur `main`.
+- `CHANGELOG.md` est maintenu dans la branche de chaque PR et documente les changements réellement apportés par cette PR, ainsi que les tests/builds et leur statut.
+- Le changelog d'une PR ne doit pas être écrit directement sur `main) avant fusion ; il rejoint `main` avec la PR.
+- Mettre à jour les documents au fil du travail, dans le même lot que le changement concerné. Ne jamais déclarer une validation réussie sans preuve ; distinguer réussi, échoué, ignoré (`skipped`) et non exécuté.
+
 ## 5. Organisation des PR et suivi
 
 - **PR #35 :** uniquement le module unifié Sniffer / Console CAN décrit en section 1.
