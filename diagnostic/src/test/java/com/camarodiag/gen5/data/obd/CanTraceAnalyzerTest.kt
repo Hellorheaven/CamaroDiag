@@ -133,7 +133,7 @@ class CanTraceAnalyzerTest {
             "0.001000 1 7E0 Tx d 8 02 01 0D 00 00 00 00 00",
             "0.025000 1 7E8 Rx d 8 03 41 0D 54 00 00 00 00",
             "0.030000 1 7E8 Rx d 8 03 41 0C 1A F8 00 00 00 00"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val report = CanTraceAnalyzer.analyze(trace, "multiple-pids.asc")
 
         assertEquals(2, report.exchanges.size)
@@ -150,7 +150,7 @@ class CanTraceAnalyzerTest {
         val trace = listOf(
             "0.000000 1 7E0 Tx d 8 04 2F F1 90 03 00 00 00",
             "0.025000 1 7E8 Rx d 8 05 6F F1 90 03 AA 00 00"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val exchange = CanTraceAnalyzer.analyze(trace, "io-control.asc").exchanges.single()
 
         assertEquals(0xF190, exchange.request.did)
