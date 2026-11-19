@@ -38,3 +38,11 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Les autres langues seront traduites dans le lot d'internationalisation dédié ; les traductions déjà présentes sont conservées.
 - En l'absence de ressource dans la langue choisie, Android retombe sur la ressource anglaise par défaut (values/).
 - Pour le message de déconnexion Bluetooth ajouté dans cette PR, les traductions provisoires des 12 autres locales ont été retirées ; les versions anglaise et française sont conservées.
+
+
+### Export de capture CAN — 2026-11-19
+- Correction de l'intégration UI : `CanSnifferScreen` reçoit désormais le callback `onExport` déjà fourni par l'écran parent.
+- Ajout du bouton d'export dans l'écran Sniffer CAN ; il est activé uniquement lorsqu'une capture terminée contient des trames.
+- Export déclenché via le sélecteur de document Android déjà câblé dans `CamaroDiagApp`.
+- Commit : `29513d72f4aca160be3f598fa261b7219afdef4a`.
+- Validation CI : en attente d'un résultat observable ; aucun build réussi n'est revendiqué à ce stade.
