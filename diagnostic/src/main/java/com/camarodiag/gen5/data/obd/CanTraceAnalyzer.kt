@@ -314,9 +314,13 @@ object CanTraceAnalyzer {
             }
         }
         pending.forEach { candidate ->
-            val status = if (candidate.responses.lastOrNull()?.negativeResponseCode == 0x78) {
-                UdsExchangeStatus.RESPONSE_PENDING
-            } else UdsExchangeStatus.UNANSWERED
+            val status = when {
+                candidate.responses.lastOrNull()?.negativeResponseCode == 0x78 ->
+                    UdsExchangeStatus.RESPONSE_PENDING
+                candidate.responses.isNotEmpty() ->
+                    UdsExchangeStatus.COMPLETED
+                else -> UdsExchangeStatus.UNANSWERED
+            }
             exchanges += candidate.toExchange(status)
         }
         return exchanges.sortedBy { it.request.timestampSeconds ?: Double.POSITIVE_INFINITY }
