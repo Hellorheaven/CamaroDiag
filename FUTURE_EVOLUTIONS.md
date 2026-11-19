@@ -325,6 +325,20 @@ Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L
 - [ ] Ajouter des tests d'interface et de sécurité pour vérifier que les opérations sensibles restent indisponibles sans leurs prérequis et qu'aucune fonction de diagnostic en lecture seule ne déclenche une écriture.
 
 
+### 2.9. Tableau de bord temps réel multi-calculateurs — priorité haute
+
+- [ ] Remplacer la sélection limitée de paramètres moteur par un catalogue dynamique de toutes les données réellement annoncées ou accessibles sur le véhicule et ses calculateurs.
+- [ ] Permettre à l'utilisateur de rechercher, sélectionner, ajouter, retirer et réorganiser librement les paramètres affichés, avec plusieurs tableaux de bord/profils personnalisés.
+- [ ] Proposer des présentations adaptées : valeur numérique, état/booléen, jauge et courbe temporelle ; choix des unités, échelle, fréquence d'actualisation et couleurs/seuils lorsque pertinents.
+- [ ] Couvrir le moteur et la transmission (sondes lambda/O2 amont et aval, richesse, STFT/LTFT par banc, températures, pressions, débit d'air, ratés, régime, vitesses et températures de transmission, etc.) selon les données disponibles.
+- [ ] Couvrir aussi les calculateurs carrosserie, châssis, sécurité et confort lorsque l'interface, le bus et les définitions du véhicule le permettent : pression et température de chaque pneu/TPMS, états portes/coffre/capot, verrouillage, vitres, ceintures, commandes et états des feux (veilleuses, croisement, route, stop, clignotants, antibrouillards), ABS, vitesse de chaque roue, ESP/traction, direction assistée, etc.
+- [ ] Découvrir les PID OBD standards annoncés, puis compléter par des catalogues/profils constructeur spécifiques et des données UDS/CAN documentées ; ne pas limiter artificiellement le tableau de bord aux seuls PID moteur génériques.
+- [ ] Identifier pour chaque mesure sa source (calculateur, PID/service, bus), son unité, son mode de décodage, sa fréquence et son statut de disponibilité. Distinguer « non pris en charge », « non annoncé », « non accessible avec cette interface » et « valeur indisponible ».
+- [ ] Ne jamais inventer une valeur ni présenter une donnée comme disponible sans prise en charge vérifiée du calculateur, du protocole et de l'interface. Les données de pression pneus, états de portes et éclairage peuvent nécessiter un accès constructeur, un autre bus ou un adaptateur plus évolué que l'ELM327.
+- [ ] Permettre l'enregistrement synchronisé des paramètres sélectionnés, leur affichage en courbes, l'export et la relecture/analyse hors ligne.
+- [ ] Optimiser les groupes de requêtes et fréquences pour éviter de saturer le bus ou de ralentir les calculateurs ; afficher les limites de débit et d'actualisation.
+- [ ] Prévoir tests unitaires des décodeurs, tests de découverte des paramètres, tests UI et profils de référence par véhicule/ECU ; valider séparément chaque famille de données sur matériel compatible.
+
 ## 4. Qualité, traçabilité et éventuelle commercialisation — à préparer progressivement
 
 - [ ] Maintenir une architecture modulaire et testable sans introduire prématurément une couche commerciale.
@@ -353,6 +367,7 @@ Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L
 - Aucune plaque d'immatriculation ni donnée personnelle ne doit être conservée dans ce backlog.
 
 ## 6. Historique des décisions
+- 2026-11-19 : étendre le tableau de bord temps réel à un catalogue personnalisable multi-calculateurs (moteur, transmission, TPMS, carrosserie, éclairage, châssis et confort), avec découverte des données réellement disponibles, unités, états de disponibilité, courbes et enregistrement ; les données constructeur et limites d'interface doivent être explicites.
 
 - 2026-11-19 : structurer l'atelier Cartographie professionnel en chantier prioritaire après PR #35, avec phases socle fichiers, éditeur graphique, simulation hors ligne, analyse puissance/couple, multi-cartographies/formats externes et programmation calibration-only strictement désactivée jusqu'à validation.
 - 2026-11-19 : ajouter les courbes de puissance et de couple avant/après cartographie, avec gains par régime, pics et rapports ; distinguer strictement mesures banc/logs, estimations fondées sur un modèle validé et calculs théoriques, sans déduire de gains fiables des seules tables.
