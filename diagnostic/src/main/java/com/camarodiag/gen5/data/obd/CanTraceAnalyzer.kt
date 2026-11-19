@@ -27,10 +27,17 @@ data class UdsTraceMessage(
         }
     val did: Int?
         get() = if (responseService != 0x7F &&
-            (service == 0x22 || service == 0x2E) && payload.size >= 3
+            (service == 0x22 || service == 0x2E || service == 0x2F) && payload.size >= 3
         ) {
             (payload[1] shl 8) or payload[2]
         } else null
+    /** Mode-specific PID/test identifier for OBD services that carry one. */
+    val parameterId: Int?
+        get() = when (service) {
+            0x01, 0x02, 0x05, 0x06, 0x08, 0x09 ->
+                if (responseService != 0x7F) payload.getOrNull(1) else null
+            else -> null
+        }
     val negativeResponseCode: Int?
         get() = if (payload.firstOrNull() == 0x7F) payload.getOrNull(2) else null
     val serviceName: String
@@ -230,14 +237,16 @@ object CanTraceAnalyzer {
                     request.direction != message.direction &&
                         request.canId != message.canId &&
                         request.service == service &&
-                        when (service) {
-                            // Read/write DID responses must echo the requested identifier.
+                        when {
+                            // Read, write and I/O-control DID responses must echo the DID.
                             // A negative response has no DID, so it is safe only when the
                             // surrounding candidate set contains exactly one request.
-                            0x22, 0x2E -> request.did != null && (
-                                isNegativeResponse ||
-                                    (message.did != null && request.did == message.did)
-                                )
+                            service == 0x22 || service == 0x2E || service == 0x2F ->
+                                request.did != null && (isNegativeResponse || message.did == request.did)
+                            // OBD modes with a PID/test identifier must be paired by that
+                            // identifier when several requests of the same mode are in flight.
+                            request.parameterId != null ->
+                                isNegativeResponse || message.parameterId == request.parameterId
                             else -> request.did == null || message.did == null ||
                                 request.did == message.did
                         }
