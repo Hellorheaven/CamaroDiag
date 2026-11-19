@@ -92,6 +92,16 @@ data class CanTraceDidObservation(
     val positiveResponse: Boolean
 )
 
+data class CanTraceDtcObservation(
+    val timestampSeconds: Double?,
+    val canId: Int,
+    val direction: CanTraceDirection,
+    /** Original OBD-II request mode: 03 stored, 07 pending, 0A permanent. */
+    val service: Int,
+    val code: String,
+    val rawBytes: List<Int>
+)
+
 data class CanTracePidObservation(
     val timestampSeconds: Double?,
     val canId: Int,
@@ -142,7 +152,8 @@ data class CanTraceAnalysisReport(
     /** Multi-frame messages not completed, including sessions discarded before end of capture. */
     val incompleteIsoTpMessages: Int,
     val flowControlObservations: List<CanTraceFlowControl> = emptyList(),
-    val exchanges: List<UdsTraceExchange> = emptyList()
+    val exchanges: List<UdsTraceExchange> = emptyList(),
+    val dtcObservations: List<CanTraceDtcObservation> = emptyList()
 ) {
     val observedCanIds: List<Int> = frames.map { it.canId }.distinct().sorted()
     val udsServices: List<Int> = messages.mapNotNull { it.service }.distinct().sorted()
@@ -198,6 +209,7 @@ object CanTraceAnalyzer {
             )
         }
         val pidObservations = messages.mapNotNull(::decodeStandardPid)
+        val dtcObservations = messages.flatMap(::decodeStandardDtc)
         return CanTraceAnalysisReport(
             sourceName = sourceName,
             frames = parsed.frames,
@@ -207,7 +219,8 @@ object CanTraceAnalyzer {
             errors = allErrors,
             incompleteIsoTpMessages = incomplete,
             flowControlObservations = parsed.frames.mapNotNull(::decodeFlowControl),
-            exchanges = correlateExchanges(messages)
+            exchanges = correlateExchanges(messages),
+            dtcObservations = dtcObservations
         )
     }
 
@@ -367,6 +380,47 @@ object CanTraceAnalyzer {
             rawBytes = bytes.take(requiredDataBytes)
         )
     }
+    /**
+     * Decodes the standardized five-character DTC encoding in OBD-II Mode 03/07/0A
+     * positive responses. Zero pairs are padding, not reported trouble codes.
+     */
+    private fun decodeStandardDtc(message: UdsTraceMessage): List<CanTraceDtcObservation> {
+        val mode = when (message.responseService) {
+            0x43 -> 0x03
+            0x47 -> 0x07
+            0x4A -> 0x0A
+            else -> return emptyList()
+        }
+        if (message.payload.size < 3) return emptyList()
+
+        return message.payload.drop(1).chunked(2).mapNotNull { pair ->
+            if (pair.size != 2 || (pair[0] == 0 && pair[1] == 0)) return@mapNotNull null
+            val first = pair[0]
+            val second = pair[1]
+            val system = when (first ushr 6) {
+                0 -> 'P'
+                1 -> 'C'
+                2 -> 'B'
+                else -> 'U'
+            }
+            val code = buildString(5) {
+                append(system)
+                append((first ushr 4) and 0x03)
+                append((first and 0x0F).toString(16).uppercase(Locale.ROOT))
+                append((second ushr 4).toString(16).uppercase(Locale.ROOT))
+                append((second and 0x0F).toString(16).uppercase(Locale.ROOT))
+            }
+            CanTraceDtcObservation(
+                timestampSeconds = message.timestampSeconds,
+                canId = message.canId,
+                direction = message.direction,
+                service = mode,
+                code = code,
+                rawBytes = pair
+            )
+        }
+    }
+
     private data class ParsedFrames(val frames: List<CanTraceFrame>, val errors: List<String>)
 
     private fun parseAsc(lines: List<String>): ParsedFrames {
