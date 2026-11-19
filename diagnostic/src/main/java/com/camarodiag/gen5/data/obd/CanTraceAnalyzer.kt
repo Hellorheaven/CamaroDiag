@@ -257,6 +257,9 @@ object CanTraceAnalyzer {
             val service = message.service ?: return@forEach
             val isPositiveResponse = rawService == service + 0x40
             val isNegativeResponse = rawService == 0x7F
+            // A negative UDS response must contain both the original service and an NRC.
+            // Ignore a truncated 0x7F record instead of misclassifying it as a request.
+            if (isNegativeResponse && message.negativeResponseCode == null) return@forEach
             if (isPositiveResponse || isNegativeResponse) {
                 // A negative response has no DID. When multiple same-service requests are
                 // outstanding, choosing the first one would fabricate a request/response pair.
