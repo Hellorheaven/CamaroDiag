@@ -1493,6 +1493,33 @@ fun CanSnifferScreen(
                     }
                 }
             }
+            if (report.exchanges.isNotEmpty()) {
+                item {
+                    Text(stringResource(R.string.can_trace_exchange_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                }
+                items(report.exchanges.takeLast(30).asReversed()) { exchange ->
+                    val request = exchange.request
+                    val didLabel = request.did?.let { " • DID 0x${String.format(Locale.ROOT, "%04X", it)}" }.orEmpty()
+                    val statusLabel = when (exchange.status) {
+                        com.camarodiag.gen5.data.obd.UdsExchangeStatus.COMPLETED -> stringResource(R.string.can_trace_exchange_completed)
+                        com.camarodiag.gen5.data.obd.UdsExchangeStatus.RESPONSE_PENDING -> stringResource(R.string.can_trace_exchange_pending)
+                        com.camarodiag.gen5.data.obd.UdsExchangeStatus.UNANSWERED -> stringResource(R.string.can_trace_exchange_unanswered)
+                    }
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("${request.serviceName}$didLabel", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(stringResource(R.string.can_trace_exchange_summary, request.direction.name, request.canId, statusLabel), color = TextPrimary, fontSize = 11.sp)
+                            Text(stringResource(R.string.can_trace_exchange_request, request.payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) }), color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            exchange.responses.forEach { response ->
+                                Text(stringResource(R.string.can_trace_exchange_response, response.canId, response.payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) }), color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            }
+                            exchange.elapsedMilliseconds?.let { elapsed ->
+                                Text(stringResource(R.string.can_trace_exchange_elapsed, elapsed), color = TextMuted, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            }
             if (report.flowControlObservations.isNotEmpty()) {
                 item {
                     Text(
