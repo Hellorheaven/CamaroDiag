@@ -136,3 +136,8 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - La politique de disponibilité du canal est maintenant isolée dans `ObdTransportConnectionState`, avec quatre tests couvrant socket Bluetooth ouverte/fermée, session BLE active/inactive, modes démo/simulation et transport non pris en charge.
 - Commits complémentaires : `aec1251` (règle pure), `70e7b42` (tests), `6f4c3ba` (intégration au gestionnaire).
 - Les tests sont ajoutés mais non exécutés à ce stade.
+
+### Correction de la remontée de déconnexion BLE — 2026-11-19
+- Les pertes de connexion OBDLink BLE pendant lecture/écriture remontent maintenant sous forme d'`IOException` (`ObdTransportDisconnectedException`), afin d'activer le traitement commun de perte de connexion dans le ViewModel au lieu de laisser l'état UI de l'adaptateur inchangé.
+- Ajout d'un test de classification de cette exception.
+- Validation Gradle/build Android : non exécutée dans cette session ; aucune validation matérielle BLE effectuée.
