@@ -177,6 +177,24 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun singleFrameInterruptsPreviouslyPendingIsoTpMessage() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 8 10 08 62 F1 90 AA BB CC",
+                "7E8 3 02 3E 00",
+                "7E8 3 21 DD EE"
+            ).joinToString("\n"),
+            "interrupted-by-single-frame.txt"
+        )
+
+        assertEquals(1, report.messages.size)
+        assertEquals(listOf(0x3E, 0x00), report.messages.single().payload)
+        assertEquals(1, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.any { it.contains("single frame interrupted an unfinished ISO-TP message") })
+        assertTrue(report.errors.any { it.contains("consecutive frame has no matching first frame") })
+    }
+
+    @Test
     fun malformedFirstFrameInterruptsPreviouslyPendingIsoTpMessage() {
         val report = CanTraceAnalyzer.analyze(
             listOf(
