@@ -650,6 +650,8 @@
     <string name="can_sniffer_capture_failed">CAN capture failed or the adapter stopped responding.</string>
     <string name="can_sniffer_invalid_request">Request rejected. Only whitelisted read-only OBD-II modes 01, 03, 07, 09 and 0A are accepted. Clear-codes Mode 04 is blocked.</string>
     <string name="can_sniffer_frame_count">Frames captured: %1$d</string>
+    <string name="can_sniffer_dtc_heading">Observed OBD-II trouble codes</string>
+    <string name="can_sniffer_dtc_service">Read from OBD-II Mode %1$02X</string>
     <string name="can_sniffer_pid_heading">Decoded standard OBD-II values</string>
     <string name="can_sniffer_response_heading">Last OBD-II response</string>
     <string name="can_sniffer_request_complete">Read-only request completed.</string>
