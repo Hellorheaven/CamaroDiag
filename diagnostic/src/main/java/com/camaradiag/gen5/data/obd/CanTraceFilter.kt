@@ -37,13 +37,14 @@ data class CanTraceFilter(
         if (dataPrefix.size > frame.data.size) return false
         if (dataPrefix.isNotEmpty() && frame.data.take(dataPrefix.size) != dataPrefix) return false
 
-        val timestamp = frame.timestampSeconds
-        if (fromTimestampSeconds != null &&
-            (timestamp == null || timestamp < fromTimestampSeconds)
-        ) return false
-        if (toTimestampSeconds != null &&
-            (timestamp == null || timestamp > toTimestampSeconds)
-        ) return false
+        if (fromTimestampSeconds != null || toTimestampSeconds != null) {
+            val timestamp = frame.timestampSeconds ?: return false
+            // NaN compares false against both bounds, so reject non-finite trace
+            // timestamps explicitly instead of allowing them through a bounded filter.
+            if (!timestamp.isFinite()) return false
+            if (fromTimestampSeconds != null && timestamp < fromTimestampSeconds) return false
+            if (toTimestampSeconds != null && timestamp > toTimestampSeconds) return false
+        }
 
         val query = searchText.trim()
         if (query.isEmpty()) return true
