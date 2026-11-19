@@ -927,4 +927,21 @@ class CanTraceAnalyzerTest {
         assertEquals(0x7E8, exchange.responses.single().canId)
     }
 
+
+    @Test
+    fun aggregatesResponsesFromMultipleEcusToOneFunctionalObdRequest() {
+        val trace = listOf(
+            "0.000000 1 7DF Tx d 8 02 01 0C 00 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 04 41 0C 1A F8 00 00 00",
+            "0.030000 1 7E9 Rx d 8 04 41 0C 1A F0 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "functional-multiple-ecus.asc")
+
+        assertEquals(1, report.exchanges.size)
+        val exchange = report.exchanges.single()
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(listOf(0x7E8, 0x7E9), exchange.responses.map { it.canId })
+        assertEquals(30.0, exchange.elapsedMilliseconds!!, 0.001)
+    }
+
 }
