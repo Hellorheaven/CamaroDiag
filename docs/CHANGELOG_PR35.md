@@ -121,5 +121,6 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Si le délai expire sans prompt, une `SocketTimeoutException` explicite est remontée : une réponse partielle n'est plus présentée comme complète.
 - Le mode de capture CAN continue reste exempté de cette exigence, car les commandes de monitoring ne terminent pas sur le prompt ELM normal ; l'arrêt reste piloté par ESC et la durée bornée de capture.
 - Les fins de flux USB/Wi-Fi et les déconnexions BLE restent des erreurs de transport distinctes du timeout de réponse.
-- Commit : `a8b7f5d`.
-- Relecture statique des quatre chemins de transport ; aucun test Gradle/build CI ni essai sur véhicule exécuté.
+- La règle de complétude est isolée dans `ElmResponseCompletion` et couverte par trois tests unitaires : réponse complète, réponse incomplète et capture streaming sans prompt.
+- Commits : `a8b7f5d` (comportement), `6f7d42a` (helper), `afac1ef` (tests), `13bca42` (intégration aux quatre transports).
+- Relecture statique des quatre chemins et présence des trois cas de test vérifiées ; les tests Gradle n'ont pas encore été exécutés, aucun build CI ni essai sur véhicule réalisé.
