@@ -164,3 +164,11 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Ajout de tests pour `NaN` et l'infini positif.
 - Commits : `d6dba73` (correctif), `f983b9d` (tests).
 - Tests Gradle/build Android non exécutés.
+
+### Validation des métadonnées CSV CAN — 2026-11-19
+- Le parseur n'infère plus silencieusement la longueur d'une trame lorsque le CSV déclare une colonne DLC mais fournit une valeur invalide ou hors plage.
+- Les horodatages CSV non vides mal formés ou non finis (`NaN`, `Infinity`) font maintenant rejeter la ligne au lieu d'être convertis en horodatage inconnu.
+- Un horodatage vide reste accepté comme inconnu lorsqu'il est réellement absent ; cela préserve les captures sans horodatage.
+- Ajout de trois tests couvrant ces comportements.
+- Commits : `0c3f635` (parseur), `be238ac` (tests).
+- Tests Gradle/build Android non exécutés.
