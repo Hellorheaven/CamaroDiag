@@ -26,10 +26,11 @@ object CamaroUdsProtocol {
             "> ATSP 6 -> $protocolResp"
         )
 
+        // Select STN-only monitor commands only when the adapter's firmware response
+        // identifies an STN chipset. A Bluetooth name or the OBDLink product banner is
+        // not sufficient: some adapters expose ELM-compatible firmware instead.
         val isStn = stiResp.contains("STN", ignoreCase = true) ||
-            atzResp.contains("OBDLink", ignoreCase = true) ||
-            deviceName.contains("OBDLink", ignoreCase = true) ||
-            deviceName.contains("vLinker", ignoreCase = true)
+            atzResp.contains("STN", ignoreCase = true)
 
         // STP 61 alone is not proof of DLC pin-1 wiring. MX/MX+ are explicitly listed by the adapter maker as SW-CAN capable.
         val normalizedDeviceName = deviceName.uppercase(Locale.ROOT)

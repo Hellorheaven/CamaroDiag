@@ -95,6 +95,25 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun doesNotSelectStnModeFromObdLinkOrVlinkerNameWithoutFirmwareEvidence() {
+        listOf("OBDLink MX+", "OBDLink CX", "vLinker MC+").forEach { name ->
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = name,
+                macAddress = "00:00:00:00:00:00",
+                atzResp = "OBDLink",
+                stiResp = "?",
+                atalResp = "?",
+                stp61Resp = "OK",
+                headersResp = "OK",
+                protocolResp = "OK"
+            )
+
+            assertEquals(name, AdapterTier.CLONE_ELM, capabilities.tier)
+            assertFalse(name, capabilities.supportsSwCan)
+        }
+    }
+
+    @Test
     fun enablesSwCanOnlyForDocumentedMxHardwareWithAcceptedProtocol() {
         val mxPlus = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "OBDLink MX+",

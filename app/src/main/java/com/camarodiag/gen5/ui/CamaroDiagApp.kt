@@ -47,6 +47,10 @@ import com.camarodiag.gen5.control.VehicleGear
 import com.camarodiag.gen5.control.VehicleSignal
 import com.camarodiag.gen5.control.VehicleControlId
 import com.camarodiag.gen5.data.obd.VxdiagProfiles
+import com.camarodiag.gen5.data.obd.CanTraceFilter
+import com.camarodiag.gen5.data.obd.CanTraceDirection
+import com.camarodiag.gen5.data.obd.filterCanTrace
+import com.camarodiag.gen5.data.obd.UdsNegativeResponse
 import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -56,6 +60,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     ADAPTER("Adapter", "Interface", R.string.tab_connect),
     MODULES("Modules", "Modules", R.string.tab_modules),
     LIVE("Live", "Direct", R.string.tab_live),
+    CAN_SNIFFER("CAN Sniffer", "CAN Sniffer", R.string.tab_can_sniffer),
     DTCS("DTCs", "Défauts", R.string.tab_dtcs),
     MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
     CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
@@ -130,6 +135,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
     val connError by viewModel.connectionMessage.collectAsState()
+    val connectionLossMessage by viewModel.connectionLossMessage.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
     val modules by viewModel.modules.collectAsState()
     val dtcs by viewModel.dtcs.collectAsState()
@@ -140,6 +146,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val mileageReport by viewModel.mileageReport.collectAsState()
     val savedSessions by viewModel.savedSessions.collectAsState()
     val calibrationWorkspace by viewModel.calibrationWorkspace.collectAsState()
+    val liveCanMonitorState by viewModel.liveCanMonitorState.collectAsState()
     val obdScanReport by viewModel.obdScanReport.collectAsState()
     val obdScanMessage by viewModel.obdScanMessage.collectAsState()
     val isObdScanning by viewModel.isObdScanning.collectAsState()
@@ -221,6 +228,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
         uri?.let { viewModel.exportLiveRecording(it) }
+    }
+
+    val canTraceExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        uri?.let { viewModel.exportCanCapture(it) }
     }
 
     val calibrationFileExporter = rememberLauncherForActivityResult(
@@ -323,6 +336,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     selected = currentTab in setOf(
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
+                        DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
@@ -347,6 +361,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     listOf(
                         DiagTab.MODULES,
                         DiagTab.MILEAGE,
+                        DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
@@ -375,6 +390,25 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            connectionLossMessage?.let { message ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF4A2020)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, WarnRed)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = WarnRed)
+                        Text(message, modifier = Modifier.weight(1f), color = TextPrimary)
+                        IconButton(onClick = { viewModel.dismissConnectionLoss() }) {
+                            Icon(Icons.Default.Close, contentDescription = null, tint = TextPrimary)
+                        }
+                    }
+                }
+            }
             calibrationWorkspace.vinComparison
                 ?.takeIf { it.matches == false }
                 ?.let { comparison ->
@@ -452,6 +486,14 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onExportRecording = {
                         liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
                     }
+                )
+                DiagTab.CAN_SNIFFER -> CanSnifferScreen(
+                    state = liveCanMonitorState,
+                    isAvailable = viewModel.canMonitorAvailable(),
+                    onStart = { viewModel.startCanMonitor() },
+                    onStop = { viewModel.stopCanMonitor() },
+                    onSendRequest = { viewModel.sendSafeObdRequest(it) },
+                    onExport = { canTraceExporter.launch("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") }
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
@@ -1037,6 +1079,15 @@ fun LiveDataScreen(
     onToggleRecording: () -> Unit,
     onExportRecording: () -> Unit
 ) {
+    var pidSearch by remember { mutableStateOf("") }
+    var selectedPidIds by remember { mutableStateOf<Set<String>?>(null) }
+    val allPidIds = pids.map { it.id }.toSet()
+    val activePidIds = selectedPidIds ?: allPidIds
+    val visiblePids = pids.filter { pid ->
+        pid.id in activePidIds &&
+            (pidSearch.isBlank() || pid.labelEn.contains(pidSearch, true) ||
+                pid.labelFr.contains(pidSearch, true) || pid.id.contains(pidSearch, true))
+    }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1100,7 +1151,41 @@ fun LiveDataScreen(
                 }
             }
         }
-        items(pids) { pid ->
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Capteurs affichés (${visiblePids.size}/${pids.size})", color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = pidSearch,
+                        onValueChange = { pidSearch = it.take(48) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.live_sensor_search)) },
+                        placeholder = { Text("Lambda, pression, température…") }
+                    )
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        pids.distinctBy { it.id }.forEach { pid ->
+                            FilterChip(
+                                selected = pid.id in activePidIds,
+                                onClick = {
+                                    val updated = activePidIds.toMutableSet()
+                                    if (!updated.add(pid.id)) updated.remove(pid.id)
+                                    selectedPidIds = if (updated.containsAll(allPidIds)) null else updated
+                                },
+                                label = { Text(pid.id) }
+                            )
+                        }
+                    }
+                    TextButton(onClick = { selectedPidIds = null; pidSearch = "" }) {
+                        Text(stringResource(R.string.live_sensor_show_all), color = CamaroBlue)
+                    }
+                }
+            }
+        }
+        items(visiblePids) { pid ->
             val displayVal = if (units == UnitSystem.METRIC) pid.metricValue else pid.imperialValue
             val displayUnit = if (units == UnitSystem.METRIC) pid.metricUnit else pid.imperialUnit
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -1118,6 +1203,362 @@ fun LiveDataScreen(
                     if (pid.history.size > 2) {
                         Spacer(Modifier.height(8.dp))
                         Sparkline(pid.history, pid.minMetric, pid.maxMetric)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CanSnifferScreen(
+    state: LiveCanMonitorState,
+    isAvailable: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onSendRequest: (String) -> Unit,
+    onExport: () -> Unit
+) {
+    var requestInput by remember { mutableStateOf("01 0C") }
+    var frameSearch by remember { mutableStateOf("") }
+    var canIdFilter by remember { mutableStateOf("") }
+    var dataPrefixFilter by remember { mutableStateOf("") }
+    var directionFilter by remember { mutableStateOf("ALL") }
+    var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
+    val report = state.report
+    val parsedCanId = remember(canIdFilter) {
+        if (canIdFilter.isBlank()) null else CanTraceFilter.parseCanId(canIdFilter)
+    }
+    val parsedDataPrefix = remember(dataPrefixFilter) {
+        CanTraceFilter.parseDataPrefix(dataPrefixFilter)
+    }
+    val filterInputValid = (canIdFilter.isBlank() || parsedCanId != null) &&
+        parsedDataPrefix != null
+    val traceFilter = remember(frameSearch, parsedCanId, parsedDataPrefix, directionFilter) {
+        CanTraceFilter(
+            canId = parsedCanId,
+            direction = when (directionFilter) {
+                "RX" -> CanTraceDirection.RX
+                "TX" -> CanTraceDirection.TX
+                else -> null
+            },
+            dataPrefix = parsedDataPrefix.orEmpty(),
+            searchText = frameSearch
+        )
+    }
+    val visibleFrames = if (filterInputValid) {
+        report?.frames.orEmpty().filterCanTrace(traceFilter).asReversed()
+    } else emptyList()
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionTitle(stringResource(R.string.can_sniffer_title))
+                    Text(stringResource(R.string.can_sniffer_description), color = TextMuted, fontSize = 12.sp)
+                    Text(stringResource(R.string.can_sniffer_safety), color = CamaroAmber, fontSize = 11.sp)
+                    Text(stringResource(R.string.can_sniffer_bus_limit), color = TextMuted, fontSize = 10.sp)
+                    Text(stringResource(R.string.can_sniffer_stn_filter_notice), color = TextMuted, fontSize = 10.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onStart,
+                            enabled = isAvailable && !state.isCapturing,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.can_sniffer_start))
+                        }
+                        OutlinedButton(
+                            onClick = onStop,
+                            enabled = state.isCapturing,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(R.string.can_sniffer_stop))
+                        }
+                    }
+                    if (!isAvailable) {
+                        Text(stringResource(R.string.can_sniffer_unavailable), color = WarnRed, fontSize = 11.sp)
+                    }
+                    state.message?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.can_sniffer_request_label), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = requestInput,
+                        onValueChange = { requestInput = it.take(16) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.can_sniffer_request_label)) },
+                        placeholder = { Text("01 0C") }
+                    )
+                    Button(
+                        onClick = { onSendRequest(requestInput) },
+                        enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.can_sniffer_send))
+                    }
+                    state.requestResponse?.let { response ->
+                        Text(stringResource(R.string.can_sniffer_response_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        Text(response.ifBlank { "—" }, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        if (report == null || report.frames.isEmpty()) {
+            item {
+                Text(stringResource(R.string.can_sniffer_empty), color = TextMuted, fontSize = 12.sp)
+            }
+        } else {
+            item {
+                Text(stringResource(R.string.can_sniffer_frame_count, report.frames.size), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(
+                        onClick = onExport,
+                        enabled = !state.isCapturing && report.frames.isNotEmpty()
+                    ) {
+                        Text(stringResource(R.string.live_export_csv))
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = directionFilter == "ALL",
+                        onClick = { directionFilter = "ALL" },
+                        label = { Text(stringResource(R.string.can_sniffer_direction_all)) }
+                    )
+                    FilterChip(
+                        selected = directionFilter == "RX",
+                        onClick = { directionFilter = "RX" },
+                        label = { Text(stringResource(R.string.can_sniffer_direction_rx)) }
+                    )
+                    FilterChip(
+                        selected = directionFilter == "TX",
+                        onClick = { directionFilter = "TX" },
+                        label = { Text(stringResource(R.string.can_sniffer_direction_tx)) }
+                    )
+                }
+                OutlinedTextField(
+                    value = frameSearch,
+                    onValueChange = { frameSearch = it.take(32) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.can_sniffer_search)) },
+                    placeholder = { Text("7E8 or 41 0C") },
+                )
+                OutlinedTextField(
+                    value = canIdFilter,
+                    onValueChange = { canIdFilter = it.take(8) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.can_trace_id_filter)) },
+                    placeholder = { Text(stringResource(R.string.can_trace_id_hint)) },
+                    isError = canIdFilter.isNotBlank() && parsedCanId == null
+                )
+                OutlinedTextField(
+                    value = dataPrefixFilter,
+                    onValueChange = { dataPrefixFilter = it.take(48) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.can_trace_data_prefix)) },
+                    placeholder = { Text(stringResource(R.string.can_trace_data_hint)) },
+                    isError = parsedDataPrefix == null
+                )
+                if (!filterInputValid) {
+                    Text(stringResource(R.string.can_trace_filter_invalid), color = WarnRed, fontSize = 11.sp)
+                }
+                OutlinedButton(
+                    onClick = {
+                        frameSearch = ""
+                        canIdFilter = ""
+                        dataPrefixFilter = ""
+                        directionFilter = "ALL"
+                    },
+                    enabled = frameSearch.isNotBlank() || canIdFilter.isNotBlank() ||
+                        dataPrefixFilter.isNotBlank() || directionFilter != "ALL",
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.can_trace_clear_filters))
+                }
+                Text(
+                    stringResource(R.string.can_sniffer_filtered_count, visibleFrames.size, report.frames.size),
+                    color = TextMuted,
+                    fontSize = 11.sp
+                )
+            }
+            items(visibleFrames, key = { it.lineNumber }) { frame ->
+                val expanded = expandedFrameLine == frame.lineNumber
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        expandedFrameLine = if (expanded) null else frame.lineNumber
+                    },
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+                ) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(
+                            "#${frame.lineNumber} • ${frame.direction.name} • 0x${String.format(Locale.ROOT, "%03X", frame.canId)} • DLC ${frame.data.size}",
+                            color = CamaroAmber,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            frame.data.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) },
+                            color = TextPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        )
+                        if (expanded) {
+                            Text(
+                                "Timestamp: ${frame.timestampSeconds?.let { String.format(Locale.ROOT, "%.6f s", it) } ?: "not provided"}",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                            frame.data.forEachIndexed { index, byte ->
+                                Text(
+                                    "Byte ${index.toString().padStart(2, '0')}  •  0x${String.format(Locale.ROOT, "%02X", byte)}  •  ${byte.toString().padStart(3, '0')}  •  ${byte.toString(2).padStart(8, '0')}",
+                                    color = TextMuted,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (report.pidObservations.isNotEmpty()) {
+                item {
+                    Text(stringResource(R.string.can_sniffer_pid_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                }
+                items(report.pidObservations.takeLast(30).asReversed()) { observation ->
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(observation.name, fontSize = 12.sp, color = TextMuted)
+                                Text("PID 0x${String.format(Locale.ROOT, "%02X", observation.pid)} • CAN 0x${String.format(Locale.ROOT, "%03X", observation.canId)}", fontSize = 10.sp, color = TextMuted)
+                            }
+                            Text(
+                                "${String.format(Locale.ROOT, "%.1f", observation.value)} ${observation.unit}",
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+                }
+            }
+            if (report.messages.isNotEmpty()) {
+                item {
+                    Text(stringResource(R.string.cal_trace_uds_services), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                }
+                items(report.messages.takeLast(30).asReversed()) { message ->
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            val didLabel = message.did?.let {
+                                " • DID 0x${String.format(Locale.ROOT, "%04X", it)}"
+                            }.orEmpty()
+                            Text(
+                                "${message.serviceName}$didLabel • CAN 0x${String.format(Locale.ROOT, "%03X", message.canId)}",
+                                color = CamaroAmber,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                            message.negativeResponseCode?.let { nrc ->
+                                val language = LocalConfiguration.current.locales[0].language
+                                Text(
+                                    stringResource(
+                                        R.string.can_trace_nrc_detail,
+                                        nrc,
+                                        UdsNegativeResponse.description(nrc, language)
+                                    ),
+                                    color = WarnRed,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Text(
+                                message.payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) },
+                                color = TextPrimary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+            if (report.exchanges.isNotEmpty()) {
+                item {
+                    Text(stringResource(R.string.can_trace_exchange_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                }
+                items(report.exchanges.takeLast(30).asReversed()) { exchange ->
+                    val request = exchange.request
+                    val didLabel = request.did?.let { " • DID 0x${String.format(Locale.ROOT, "%04X", it)}" }.orEmpty()
+                    val statusLabel = when (exchange.status) {
+                        com.camarodiag.gen5.data.obd.UdsExchangeStatus.COMPLETED -> stringResource(R.string.can_trace_exchange_completed)
+                        com.camarodiag.gen5.data.obd.UdsExchangeStatus.RESPONSE_PENDING -> stringResource(R.string.can_trace_exchange_pending)
+                        com.camarodiag.gen5.data.obd.UdsExchangeStatus.UNANSWERED -> stringResource(R.string.can_trace_exchange_unanswered)
+                    }
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("${request.serviceName}$didLabel", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(stringResource(R.string.can_trace_exchange_summary, request.direction.name, request.canId, statusLabel), color = TextPrimary, fontSize = 11.sp)
+                            Text(stringResource(R.string.can_trace_exchange_request, request.payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) }), color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            exchange.responses.forEach { response ->
+                                Text(stringResource(R.string.can_trace_exchange_response, response.canId, response.payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) }), color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            }
+                            exchange.elapsedMilliseconds?.let { elapsed ->
+                                Text(stringResource(R.string.can_trace_exchange_elapsed, elapsed), color = TextMuted, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            }
+            if (report.flowControlObservations.isNotEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.can_trace_flow_control_heading),
+                        color = CamaroAmber,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                items(report.flowControlObservations.takeLast(30).asReversed()) { flow ->
+                    val statusLabel = when (flow.status) {
+                        com.camarodiag.gen5.data.obd.IsoTpFlowStatus.CONTINUE_TO_SEND ->
+                            stringResource(R.string.can_trace_flow_status_cts)
+                        com.camarodiag.gen5.data.obd.IsoTpFlowStatus.WAIT ->
+                            stringResource(R.string.can_trace_flow_status_wait)
+                        com.camarodiag.gen5.data.obd.IsoTpFlowStatus.OVERFLOW ->
+                            stringResource(R.string.can_trace_flow_status_overflow)
+                        com.camarodiag.gen5.data.obd.IsoTpFlowStatus.RESERVED ->
+                            stringResource(R.string.can_trace_flow_status_reserved)
+                    }
+                    val stMin = flow.separationTimeMicros?.let { micros ->
+                        if (micros % 1_000 == 0) {
+                            stringResource(R.string.can_trace_flow_stmin_ms, micros / 1_000)
+                        } else {
+                            stringResource(R.string.can_trace_flow_stmin_us, micros)
+                        }
+                    } ?: stringResource(R.string.can_trace_flow_stmin_reserved, flow.separationTimeRaw)
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Text(
+                            stringResource(
+                                R.string.can_trace_flow_control_detail,
+                                String.format(Locale.ROOT, "%03X", flow.canId),
+                                statusLabel,
+                                flow.blockSize,
+                                stMin
+                            ),
+                            modifier = Modifier.padding(10.dp),
+                            color = TextPrimary,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }

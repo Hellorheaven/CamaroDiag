@@ -13,6 +13,7 @@ import com.camarodiag.gen5.domain.model.*
 import com.camarodiag.gen5.data.obd.Obd2FeatureEngine
 import com.camarodiag.gen5.data.obd.ObdCommandChannel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
@@ -283,6 +284,83 @@ class BluetoothObdManager(context: Context) {
         cachedSupportedMode01PidsAtMillis = 0L
     }
 
+    /**
+     * Captures passive CAN traffic from a real, header-capable ELM/STN adapter.
+     * The command session stays exclusively locked for the whole capture so live
+     * PID polling or another diagnostic request cannot corrupt the monitor stream.
+     */
+    suspend fun captureCanMonitor(
+        durationMs: Long = 10_000L,
+        onChunk: (String) -> Unit
+    ): String = withContext(Dispatchers.IO) {
+        check(isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive) {
+            "Live CAN monitoring requires a connected physical OBD command adapter."
+        }
+        val capabilities = activeAdapterCapabilities
+            ?: error("The connected adapter has not been identified.")
+        check(capabilities.supportsCanHeaders) {
+            "The connected adapter does not report CAN header support."
+        }
+        require(durationMs in 1_000L..30_000L) {
+            "CAN monitor duration must be between 1 and 30 seconds."
+        }
+
+        commandSessionMutex.withLock {
+            val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
+            // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
+            // STM uses the current filter table, so clear it for this bounded session and restore
+            // automatic OBD filtering after the capture.
+            val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
+            val captured = StringBuilder()
+            try {
+                sendAtCommandInternal("ATE0", 1_000L)
+                sendAtCommandInternal("ATL0", 1_000L)
+                sendAtCommandInternal("ATS1", 1_000L)
+                sendAtCommandInternal("ATH1", 1_000L)
+                val formattingResponse = sendAtCommandInternal("ATCAF0", 1_000L)
+                check(!formattingResponse.contains("?")) {
+                    "The connected adapter cannot switch to raw CAN formatting."
+                }
+                if (isStnAdapter) {
+                    val canFilterResponse = sendAtCommandInternal("ATCF 000", 1_000L)
+                    val canMaskResponse = sendAtCommandInternal("ATCM 000", 1_000L)
+                    val filterResponse = sendAtCommandInternal("STFAC", 1_000L)
+                    check(
+                        !canFilterResponse.contains("?") &&
+                            !canMaskResponse.contains("?") &&
+                            !filterResponse.contains("?")
+                    ) {
+                        "The STN adapter could not clear its temporary CAN filters."
+                    }
+                }
+                val monitorResponse = sendAtCommandInternal(monitorCommand, durationMs) { chunk ->
+                    check(captured.length + chunk.length <= 131_072) {
+                        "CAN monitor capture exceeded the 128 KiB safety limit."
+                    }
+                    captured.append(chunk)
+                    onChunk(chunk)
+                }
+                check(monitorResponse.trim() != "?") {
+                    "The connected adapter does not support the selected CAN monitor command."
+                }
+            } finally {
+                // ELM/STN monitor mode has no normal prompt; ESC returns the adapter
+                // to command mode even when the caller cancels the capture.
+                withContext(NonCancellable) {
+                    runCatching { sendAtCommandInternal("\u001B", 1_000L) }
+                    if (isStnAdapter) {
+                        runCatching { sendAtCommandInternal("ATAR", 1_000L) }
+                    }
+                    runCatching { sendAtCommandInternal("ATCAF1", 1_000L) }
+                    // Restore ELM default spacing; the capture temporarily enabled ATS1.
+                    runCatching { sendAtCommandInternal("ATS0", 1_000L) }
+                    runCatching { sendAtCommandInternal("AT", 1_000L) }
+                }
+            }
+            captured.toString()
+        }
+    }
+
     suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String =
         withContext(Dispatchers.IO) {
             commandSessionMutex.withLock {
@@ -292,7 +370,8 @@ class BluetoothObdManager(context: Context) {
 
     private suspend fun sendAtCommandInternal(
         command: String,
-        timeoutMs: Long
+        timeoutMs: Long,
+        onChunk: ((String) -> Unit)? = null
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
             val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
@@ -301,8 +380,13 @@ class BluetoothObdManager(context: Context) {
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     val n = usbTransport.read(bytes, 100)
-                    if (n > 0) { val chunk = String(bytes, 0, n, Charsets.US_ASCII); if (chunk.contains('>')) { buffer.append(chunk.substringBefore('>')); break }; buffer.append(chunk) }
-                    else delay(10)
+                    if (n > 0) {
+                        val chunk = String(bytes, 0, n, Charsets.US_ASCII)
+                        val payloadChunk = chunk.substringBefore('>')
+                        buffer.append(payloadChunk)
+                        if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
+                        if (chunk.contains('>')) break
+                    } else delay(10)
                 }
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else if (activeTransport == "BLE") {
@@ -310,16 +394,29 @@ class BluetoothObdManager(context: Context) {
                 val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     val n = bleTransport.read(bytes, 100)
-                    if (n > 0) { val chunk = String(bytes, 0, n, Charsets.US_ASCII); if (chunk.contains('>')) { buffer.append(chunk.substringBefore('>')); break }; buffer.append(chunk) }
-                    else delay(10)
+                    if (n > 0) {
+                        val chunk = String(bytes, 0, n, Charsets.US_ASCII)
+                        val payloadChunk = chunk.substringBefore('>')
+                        buffer.append(payloadChunk)
+                        if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
+                        if (chunk.contains('>')) break
+                    } else delay(10)
                 }
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else if (activeTransport == "WIFI") {
                 wifiTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
                 while (System.currentTimeMillis() - start < timeoutMs) {
-                    try { val n = wifiTransport.read(bytes); if (n > 0) { val chunk = String(bytes, 0, n, Charsets.US_ASCII); if (chunk.contains('>')) { buffer.append(chunk.substringBefore('>')); break }; buffer.append(chunk) } }
-                    catch (_: java.net.SocketTimeoutException) { }
+                    try {
+                        val n = wifiTransport.read(bytes)
+                        if (n > 0) {
+                            val chunk = String(bytes, 0, n, Charsets.US_ASCII)
+                            val payloadChunk = chunk.substringBefore('>')
+                            buffer.append(payloadChunk)
+                            if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
+                            if (chunk.contains('>')) break
+                        }
+                    } catch (_: java.net.SocketTimeoutException) { }
                     delay(10)
                 }
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
@@ -328,10 +425,25 @@ class BluetoothObdManager(context: Context) {
                 if (out == null || inp == null) return@withLock "NO_SOCKET"
                 while (inp.available() > 0) inp.read()
                 out.write(payload); out.flush()
-                val buffer = StringBuilder(); val start = System.currentTimeMillis()
+                val buffer = StringBuilder()
+                val callbackBuffer = StringBuilder()
+                val start = System.currentTimeMillis()
                 while (System.currentTimeMillis() - start < timeoutMs) {
-                    if (inp.available() > 0) { val char = inp.read().toChar(); if (char == '>') break; buffer.append(char) } else delay(15)
+                    if (inp.available() > 0) {
+                        val char = inp.read().toChar()
+                        if (char == '>') {
+                            if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
+                            break
+                        }
+                        buffer.append(char)
+                        callbackBuffer.append(char)
+                        if (char == '\r' || char == '\n' || callbackBuffer.length >= 128) {
+                            onChunk?.invoke(callbackBuffer.toString())
+                            callbackBuffer.clear()
+                        }
+                    } else delay(15)
                 }
+                if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             }
         }
