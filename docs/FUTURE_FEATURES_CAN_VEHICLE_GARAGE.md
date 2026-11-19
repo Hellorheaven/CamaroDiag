@@ -170,6 +170,38 @@ Les lots sont regroupés par responsabilité fonctionnelle. Leur ordre proposé 
 
 **Dépendances :** construction progressive à partir des critères d'acceptation des Lots 1 à 7. La préparation du modèle de classeur peut commencer avant la fin, mais la recette complète ne peut être figée qu'une fois le périmètre stabilisé.
 
+
+### Lot 9 — Internationalisation complète et choix de langue indépendant du téléphone
+
+**Objectif :** proposer toutes les langues officielles de l'Union européenne, tout en conservant les langues supplémentaires déjà prévues.
+
+- Couvrir les 24 langues officielles de l'Union européenne : allemand, anglais, bulgare, croate, danois, espagnol, estonien, finnois, français, grec, hongrois, irlandais, italien, letton, lituanien, maltais, néerlandais, polonais, portugais, roumain, slovaque, slovène, suédois et tchèque.
+- Conserver également les langues hors UE déjà prévues ou présentes : hébreu, russe, chinois (simplifié), japonais, coréen et arabe.
+- Au premier lancement, suivre par défaut la langue du système si elle est intégralement prise en charge ; sinon utiliser l'anglais.
+- Ajouter dans les paramètres de l'application un sélecteur permettant de choisir explicitement une langue, indépendamment de celle du téléphone, ainsi qu'une option « Suivre la langue du téléphone ».
+- Mémoriser le choix manuel et le conserver après redémarrage, mise à jour et changement de langue du système ; le choix « suivre le téléphone » doit revenir automatiquement au comportement système.
+- Synchroniser la liste des langues disponibles avec la configuration Android des langues par application (Android 13+) et utiliser une solution compatible avec les versions antérieures ciblées (Android 10 à 12).
+- Prendre en charge correctement les langues RTL (arabe et hébreu), les formats régionaux, dates, nombres, unités et pluriels.
+- Ne jamais afficher une langue comme disponible si ses traductions sont absentes ou seulement partiellement vérifiées. Prévoir un contrôle automatisé de complétude des ressources et des clés manquantes.
+- Traduire tous les écrans, dialogues, erreurs, notifications, outils, contenus d'aide et chaînes ajoutées dans les PR ultérieures ; éviter les chaînes codées en dur.
+
+**Critères d'acceptation :** test du choix manuel sur Android 10 à 16 ; test du suivi système ; test du repli anglais ; persistance après redémarrage ; test RTL ; contrôle de couverture de toutes les chaînes pour chacune des langues annoncées.
+
+### Lot 10 — Adaptation réelle aux tablettes et grands écrans
+
+**Objectif :** offrir une interface pensée pour les tablettes, et pas simplement étirée depuis la disposition téléphone.
+
+- Détecter la largeur disponible de la fenêtre et adapter les compositions aux tailles compactes, moyennes et étendues, y compris en mode paysage et multi-fenêtre.
+- Prévoir une navigation adaptée aux grands écrans (navigation latérale ou rail lorsque pertinent) et conserver une navigation claire sur téléphone.
+- Exploiter l'espace disponible avec des dispositions multi-colonnes : liste à gauche et détail à droite, panneaux de diagnostic côte à côte, sans imposer une largeur excessive aux contenus.
+- Adapter particulièrement le Sniffer/Console CAN, les tableaux de données temps réel, les rapports et l'atelier de calibration.
+- Pour les cartographies, afficher des tableaux plus larges et lisibles, avec axes, en-têtes et commandes accessibles sans défilement horizontal permanent lorsque la largeur le permet.
+- Respecter les changements de taille, rotation, clavier/souris, tactile et fenêtres redimensionnables ; conserver l'état de l'écran lors des changements de configuration.
+- Garder des tailles tactiles suffisantes et une hiérarchie lisible ; ne pas simplement agrandir les contrôles téléphone.
+- Définir et tester des seuils de largeur en dp sur émulateur/téléphone/tablette, portrait/paysage et multi-fenêtre.
+
+**État constaté lors de l'audit du 19 novembre 2026 :** le projet utilise Jetpack Compose, mais l'arborescence Android ne contient pas de layouts alternatifs sw600dp/w600dp ou de ressources spécifiques tablette. Les écrans consultés utilisent majoritairement des colonnes/listes pleine largeur. Aucune adaptation tablette complète n'est donc confirmée ; ce lot reste à développer et à tester.
+
 ## 4. Règle de construction périodique pendant le développement
 
 - Intervalle nominal : **50 commits de la PR depuis le dernier build complet réussi**, configurable avec 50 comme valeur par défaut.
