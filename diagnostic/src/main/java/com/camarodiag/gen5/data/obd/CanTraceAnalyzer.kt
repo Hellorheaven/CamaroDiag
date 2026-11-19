@@ -75,6 +75,25 @@ data class CanTracePidObservation(
     val rawBytes: List<Int>
 )
 
+enum class IsoTpFlowStatus { CONTINUE_TO_SEND, WAIT, OVERFLOW, RESERVED }
+
+data class CanTraceFlowControl(
+    val timestampSeconds: Double?,
+    val canId: Int,
+    val direction: CanTraceDirection,
+    val status: IsoTpFlowStatus,
+    val blockSize: Int,
+    val separationTimeRaw: Int
+) {
+    /** ISO-TP STmin in microseconds; null means the raw value is reserved. */
+    val separationTimeMicros: Int?
+        get() = when (separationTimeRaw) {
+            in 0x00..0x7F -> separationTimeRaw * 1_000
+            in 0xF1..0xF9 -> (separationTimeRaw - 0xF0) * 100
+            else -> null
+        }
+}
+
 data class CanTraceAnalysisReport(
     val sourceName: String,
     val frames: List<CanTraceFrame>,
@@ -82,7 +101,8 @@ data class CanTraceAnalysisReport(
     val didObservations: List<CanTraceDidObservation>,
     val pidObservations: List<CanTracePidObservation>,
     val errors: List<String>,
-    val incompleteIsoTpMessages: Int
+    val incompleteIsoTpMessages: Int,
+    val flowControlObservations: List<CanTraceFlowControl> = emptyList()
 ) {
     val observedCanIds: List<Int> = frames.map { it.canId }.distinct().sorted()
     val udsServices: List<Int> = messages.mapNotNull { it.service }.distinct().sorted()
@@ -142,7 +162,28 @@ object CanTraceAnalyzer {
             didObservations = observations,
             pidObservations = pidObservations,
             errors = allErrors,
-            incompleteIsoTpMessages = incomplete
+            incompleteIsoTpMessages = incomplete,
+            flowControlObservations = parsed.frames.mapNotNull(::decodeFlowControl)
+        )
+    }
+
+    /** Decode ISO-TP Flow Control (PCI type 3) without treating it as a UDS payload. */
+    private fun decodeFlowControl(frame: CanTraceFrame): CanTraceFlowControl? {
+        if (frame.data.firstOrNull()?.and(0xF0) != 0x30 || frame.data.size < 3) return null
+        val rawStatus = frame.data[0] and 0x0F
+        val status = when (rawStatus) {
+            0x00 -> IsoTpFlowStatus.CONTINUE_TO_SEND
+            0x01 -> IsoTpFlowStatus.WAIT
+            0x02 -> IsoTpFlowStatus.OVERFLOW
+            else -> IsoTpFlowStatus.RESERVED
+        }
+        return CanTraceFlowControl(
+            timestampSeconds = frame.timestampSeconds,
+            canId = frame.canId,
+            direction = frame.direction,
+            status = status,
+            blockSize = frame.data[1],
+            separationTimeRaw = frame.data[2]
         )
     }
 
