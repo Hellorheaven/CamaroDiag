@@ -1170,7 +1170,7 @@ fun CanSnifferScreen(
     val report = state.report
     val searchToken = frameSearch.trim().uppercase(Locale.ROOT)
     val normalizedSearch = searchToken.removePrefix("0X").filterNot(Char::isWhitespace)
-    val visibleFrames = report?.frames.orEmpty().takeLast(100).asReversed().filter { frame ->
+    val visibleFrames = report?.frames.orEmpty().asReversed().filter { frame ->
         val directionMatches = when (directionFilter) {
             "RX" -> frame.direction.name == "RX"
             "TX" -> frame.direction.name == "TX"
