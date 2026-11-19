@@ -650,4 +650,7 @@
     <string name="can_sniffer_stn_filter_notice">Nos adaptadores STN, os filtros temporários são limpos para a captura bruta e a filtragem OBD automática é reativada depois. Os filtros personalizados definidos por outro software não são restaurados.</string>
     <string name="can_sniffer_search">Pesquisar ID CAN ou bytes de dados</string>
     <string name="can_sniffer_filtered_count">A mostrar %1$d de %2$d tramas</string>
+    <string name="can_sniffer_direction_all">Todos</string>
+    <string name="can_sniffer_direction_rx">RX</string>
+    <string name="can_sniffer_direction_tx">TX</string>
 </resources>
