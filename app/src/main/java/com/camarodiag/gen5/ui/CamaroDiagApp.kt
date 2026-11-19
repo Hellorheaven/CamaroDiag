@@ -1075,6 +1075,15 @@ fun LiveDataScreen(
     onToggleRecording: () -> Unit,
     onExportRecording: () -> Unit
 ) {
+    var pidSearch by remember { mutableStateOf("") }
+    var selectedPidIds by remember { mutableStateOf<Set<String>?>(null) }
+    val allPidIds = pids.map { it.id }.toSet()
+    val activePidIds = selectedPidIds ?: allPidIds
+    val visiblePids = pids.filter { pid ->
+        pid.id in activePidIds &&
+            (pidSearch.isBlank() || pid.labelEn.contains(pidSearch, true) ||
+                pid.labelFr.contains(pidSearch, true) || pid.id.contains(pidSearch, true))
+    }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1138,7 +1147,41 @@ fun LiveDataScreen(
                 }
             }
         }
-        items(pids) { pid ->
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Capteurs affichés (${visiblePids.size}/${pids.size})", color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = pidSearch,
+                        onValueChange = { pidSearch = it.take(48) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Rechercher un capteur") },
+                        placeholder = { Text("Lambda, pression, température…") }
+                    )
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        pids.distinctBy { it.id }.forEach { pid ->
+                            FilterChip(
+                                selected = pid.id in activePidIds,
+                                onClick = {
+                                    val updated = activePidIds.toMutableSet()
+                                    if (!updated.add(pid.id)) updated.remove(pid.id)
+                                    selectedPidIds = if (updated.containsAll(allPidIds)) null else updated
+                                },
+                                label = { Text(pid.id) }
+                            )
+                        }
+                    }
+                    TextButton(onClick = { selectedPidIds = null; pidSearch = "" }) {
+                        Text("Afficher tous les capteurs", color = CamaroBlue)
+                    }
+                }
+            }
+        }
+        items(visiblePids) { pid ->
             val displayVal = if (units == UnitSystem.METRIC) pid.metricValue else pid.imperialValue
             val displayUnit = if (units == UnitSystem.METRIC) pid.metricUnit else pid.imperialUnit
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
