@@ -647,4 +647,7 @@
     <string name="can_sniffer_stn_filter_notice">Bij STN-adapters worden tijdelijke filters gewist voor ruwe opname en wordt automatische OBD-filtering daarna opnieuw ingeschakeld. Aangepaste filters van andere software worden niet hersteld.</string>
     <string name="can_sniffer_search">CAN-ID of databytes zoeken</string>
     <string name="can_sniffer_filtered_count">%1$d van %2$d frames weergegeven</string>
+    <string name="can_sniffer_direction_all">Alle</string>
+    <string name="can_sniffer_direction_rx">RX</string>
+    <string name="can_sniffer_direction_tx">TX</string>
 </resources>
