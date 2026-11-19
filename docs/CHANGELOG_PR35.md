@@ -26,3 +26,9 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Ajout des libellés dans les ressources des 14 langues présentes dans la PR.
 - Cette fonction est une recherche locale dans la capture déjà chargée ; elle ne modifie pas les filtres matériels de l'adaptateur.
 - Commit UI : `2e070ea749875e47e92b1d50e45ec9860dc9c313`. Les commits de ressources et le correctif de l'icône de recherche suivent dans l'historique de la branche.
+
+### Politique de langues — règle de travail confirmée
+- Pour les nouvelles fonctionnalités, seules les ressources anglaises (values/) et françaises (values-fr/) sont obligatoires dans les PR fonctionnelles.
+- Les autres langues seront traduites dans le lot d'internationalisation dédié ; les traductions déjà présentes sont conservées.
+- En l'absence de ressource dans la langue choisie, Android retombe sur la ressource anglaise par défaut (values/).
+- Pour le message de déconnexion Bluetooth ajouté dans cette PR, les traductions provisoires des 12 autres locales ont été retirées ; les versions anglaise et française sont conservées.
