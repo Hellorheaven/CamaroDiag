@@ -88,6 +88,20 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Prévoir un rapport exportable comparant les courbes, les gains/pertes par plage de régime, les pics, les conditions de mesure et le niveau de confiance ; conserver les fichiers sources sans les modifier.
 - [ ] Ajouter des tests sur conversions d'unités, calcul puissance/couple, interpolation des courbes, synchronisation RPM, données manquantes, comparaison avant/après et distinction mesure/estimation.
 
+#### Chantier prioritaire après clôture de la PR #35 — atelier Cartographie professionnel
+**Objectif :** transformer l'espace Cartographie existant en atelier hors ligne complet, inspiré des capacités fonctionnelles de HP Tuners/EFILive, sans reproduire leurs formats ou interfaces propriétaires et sans autoriser une écriture ECU non validée.
+
+- [ ] Planifier ce chantier comme prochaine évolution fonctionnelle prioritaire après finalisation de la PR #35 ; ne pas ouvrir de PR concurrente et conserver la règle d'une seule PR active.
+- [ ] Phase 1 — fiabiliser le socle fichiers : import/export, conservation de l'original, inspection, comparaison, métadonnées, validation du format et identification exacte véhicule/ECU/CAL ID/CVN.
+- [ ] Phase 2 — construire l'éditeur graphique : tables colorées, axes/unités, vues 2D/3D, sélection de cellules, opérations mathématiques, interpolation, lissage, comparaison et historique undo/redo.
+- [ ] Phase 3 — construire la validation et simulation hors ligne : contrôles statiques, vérifications de cohérence documentées, simulation des tables/interpolations et rejeu de logs.
+- [ ] Phase 4 — construire l'analyse Puissance & Couple : courbes origine/modifiée, gains/pertes par régime, pics, unités et rapports ; distinguer mesures banc, calculs dérivés de mesures, estimations issues d'un modèle validé et données théoriques.
+- [ ] Phase 5 — ajouter les projets multi-cartographies, profils FlexFuel, import/export HP Tuners et EFILive dans la limite des formats réellement interprétables et des droits/licences applicables.
+- [ ] Phase 6 — préparer la matrice ECU et les modes d'écriture partielle/complète calibration-only ainsi que l'assistant de récupération ; ces fonctions restent désactivées tant que les zones de calibration, protocoles et procédures ne sont pas validés pour chaque ECU.
+- [ ] À chaque phase, livrer des écrans utilisables, tests automatisés et documentation ; ne pas marquer une fonction terminée sur la seule base d'une maquette ou d'une définition dans le backlog.
+- [ ] Maintenir une séparation technique stricte entre outils hors ligne (inspection, édition, comparaison, simulation, export) et toute communication ECU ; le mode simulation ne doit pas pouvoir appeler de chemin d'écriture.
+- [ ] Pour les courbes de puissance/couple, ne jamais déduire un gain réel de la seule modification des tables : afficher « données insuffisantes » si aucune mesure exploitable ni modèle validé n'est disponible.
+
 #### Évolution future — validation et simulation de cartographie sans écriture ECU
 - [ ] Ajouter un mode « Vérifier / Simuler » accessible depuis l'atelier Cartographie, strictement hors ligne et sans envoyer de commande d'écriture au véhicule.
 - [ ] Prévoir une validation statique du fichier : format et structure, taille, intégrité, sommes de contrôle lorsqu'elles sont documentées, cohérence des sections et présence des métadonnées attendues.
@@ -228,6 +242,7 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 
 ## 6. Historique des décisions
 
+- 2026-11-19 : structurer l'atelier Cartographie professionnel en chantier prioritaire après PR #35, avec phases socle fichiers, éditeur graphique, simulation hors ligne, analyse puissance/couple, multi-cartographies/formats externes et programmation calibration-only strictement désactivée jusqu'à validation.
 - 2026-11-19 : ajouter les courbes de puissance et de couple avant/après cartographie, avec gains par régime, pics et rapports ; distinguer strictement mesures banc/logs, estimations fondées sur un modèle validé et calculs théoriques, sans déduire de gains fiables des seules tables.
 - 2026-11-19 : ajout d'un mode de validation et simulation hors ligne des cartographies, comparaison avant/après, contrôles statiques, simulation des tables lorsque les définitions sont connues et rejeu de logs ; aucune écriture ECU, et aucune prétention à remplacer un essai moteur sur banc/véhicule.
 - 2026-11-19 : préciser l'éditeur graphique de calibration de niveau professionnel (grilles colorées, vues 2D/3D, opérations sur cellules, interpolation/lissage, comparaison, historique, ergonomie tablette, définitions vérifiées et tests) ainsi que les exigences d'import/export multi-cartographies et HP Tuners ; ces éléments restent au backlog et ne sont pas déclarés implémentés.
