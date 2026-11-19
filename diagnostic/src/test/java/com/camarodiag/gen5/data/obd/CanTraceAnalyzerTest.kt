@@ -944,4 +944,22 @@ class CanTraceAnalyzerTest {
         assertEquals(30.0, exchange.elapsedMilliseconds!!, 0.001)
     }
 
+
+    @Test
+    fun discardsIsoTpMessageWhenConsecutiveFrameTimestampMovesBackwards() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "0.500000 1 7E8 Rx d 8 10 0F 62 F1 90 AA BB CC",
+                "0.400000 1 7E8 Rx d 8 21 01 02 03 04 05 06 07",
+                "0.600000 1 7E8 Rx d 8 22 08 09 00 00 00 00 00"
+            ).joinToString("\n"),
+            "out-of-order-isotp.asc"
+        )
+
+        assertTrue(report.messages.isEmpty())
+        assertEquals(1, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.any { it.contains("timestamp moved backwards") })
+        assertTrue(report.errors.any { it.contains("no matching first frame") })
+    }
+
 }
