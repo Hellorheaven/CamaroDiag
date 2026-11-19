@@ -55,7 +55,7 @@ class CanTraceAnalyzerTest {
         val trace = listOf(
             "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
             "0.025000 1 7E8 Rx d 8 02 62 00 00 00 00 00 00"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val exchange = CanTraceAnalyzer.analyze(trace, "truncated-did-response.asc").exchanges.single()
 
         assertEquals(UdsExchangeStatus.UNANSWERED, exchange.status)
@@ -68,7 +68,7 @@ class CanTraceAnalyzerTest {
             "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
             "0.001000 1 7E0 Tx d 8 03 22 F1 91 00 00 00 00",
             "0.025000 1 7E8 Rx d 8 03 7F 22 31 00 00 00 00"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val report = CanTraceAnalyzer.analyze(trace, "ambiguous.asc")
 
         assertEquals(2, report.exchanges.size)
@@ -82,7 +82,7 @@ class CanTraceAnalyzerTest {
             "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
             "0.001000 1 7E0 Tx d 8 03 22 F1 91 00 00 00 00",
             "0.025000 1 7E8 Rx d 8 04 62 F1 90 AA 00 00 00"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val report = CanTraceAnalyzer.analyze(trace, "did-match.asc")
 
         assertEquals(2, report.exchanges.size)
@@ -115,7 +115,7 @@ class CanTraceAnalyzerTest {
             listOf(
                 "7E8 8 10 08 62 F1 90 AA BB CC",
                 "7E8 1 21"
-            ).joinToString("\\n"),
+            ).joinToString("\n"),
             "capture.txt"
         )
 
@@ -135,7 +135,7 @@ class CanTraceAnalyzerTest {
             }
             frames += "7E8 8 $encoded"
         }
-        val report = CanTraceAnalyzer.analyze(frames.joinToString("\\n"), "sequence-wrap.txt")
+        val report = CanTraceAnalyzer.analyze(frames.joinToString("\n"), "sequence-wrap.txt")
 
         assertEquals(1, report.messages.size)
         assertEquals(118, report.messages.single().payload.size)
@@ -153,7 +153,7 @@ class CanTraceAnalyzerTest {
                 "7E8,RX,10 08 62 F1 91 11 22 33",
                 "7E8,TX,21 DD EE",
                 "7E8,RX,21 44 55"
-            ).joinToString("\\n"),
+            ).joinToString("\n"),
             "same-id-directions.csv"
         )
 
