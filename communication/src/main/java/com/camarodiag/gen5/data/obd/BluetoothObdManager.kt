@@ -57,13 +57,14 @@ class BluetoothObdManager(context: Context) {
 
     /** True only when the active transport accepts ELM/SAE J1979 command traffic. */
     val isObdCommandChannelAvailable: Boolean
-        get() = !isDemoMode && !isSimulationActive &&
-            when (activeTransport) {
-                "BLUETOOTH" -> socket?.let { it.isConnected && !it.isClosed } == true
-                "BLE" -> bleTransport.isConnected
-                "USB", "WIFI" -> true // Read/write operations surface physical disconnects for these transports.
-                else -> false
-            }
+        get() = ObdTransportConnectionState.isCommandChannelAvailable(
+            isDemoMode = isDemoMode,
+            isSimulationActive = isSimulationActive,
+            activeTransport = activeTransport,
+            classicSocketConnected = socket?.isConnected == true,
+            classicSocketClosed = socket?.isClosed != false,
+            bleConnected = bleTransport.isConnected
+        )
 
     @SuppressLint("MissingPermission")
     fun getPairedDevices(): List<Pair<String, String>> {
