@@ -645,12 +645,13 @@
     <string name="can_sniffer_start">Capturer pendant 10 secondes</string>
     <string name="can_sniffer_stop">Arrêter la capture</string>
     <string name="can_sniffer_request_label">Requête OBD-II en lecture seule (hexadécimal)</string>
+    <string name="can_sniffer_request_examples">Exemples : 01 0C (régime), 09 02 (VIN), 03 / 07 / 0A (lecture des défauts). L’effacement est interdit.</string>
     <string name="can_sniffer_send">Envoyer la requête en lecture seule</string>
     <string name="can_sniffer_empty">Aucune trame CAN capturée pour le moment.</string>
     <string name="can_sniffer_unavailable">Connectez un adaptateur réel prenant en charge les en-têtes CAN. La simulation et les ponts non compatibles ne permettent pas la capture en direct.</string>
     <string name="can_sniffer_capture_complete">Capture CAN terminée.</string>
     <string name="can_sniffer_capture_failed">Échec de la capture CAN ou absence de réponse de l’adaptateur.</string>
-    <string name="can_sniffer_invalid_request">Requête refusée. Utilisez uniquement les couples service/PID OBD-II Mode 01 ou Mode 09 autorisés.</string>
+    <string name="can_sniffer_invalid_request">Requête refusée. Seuls les modes OBD-II en lecture seule 01, 03, 07, 09 et 0A autorisés sont acceptés. L’effacement Mode 04 est bloqué.</string>
     <string name="can_sniffer_frame_count">Trames capturées : %1$d</string>
     <string name="can_sniffer_pid_heading">Valeurs OBD-II standard décodées</string>
     <string name="can_sniffer_response_heading">Dernière réponse OBD-II</string>
