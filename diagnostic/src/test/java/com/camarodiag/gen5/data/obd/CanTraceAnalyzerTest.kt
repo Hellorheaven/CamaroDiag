@@ -159,6 +159,43 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun correlatesDiagnosticSessionResponsesBySubFunctionWhenRequestsOverlap() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 02 10 03 00 00 00 00 00",
+            "0.001000 1 7E0 Tx d 8 02 10 02 00 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 02 50 02 00 00 00 00 00",
+            "0.030000 1 7E8 Rx d 8 02 50 03 00 00 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "overlapping-sessions.asc")
+
+        assertEquals(2, report.exchanges.size)
+        val bySubFunction = report.exchanges.associateBy { it.request.subFunction }
+        assertEquals(setOf(0x02, 0x03), bySubFunction.keys)
+        assertEquals(UdsExchangeStatus.COMPLETED, bySubFunction[0x02]?.status)
+        assertEquals(UdsExchangeStatus.COMPLETED, bySubFunction[0x03]?.status)
+        assertEquals(0x02, bySubFunction[0x02]?.responses?.single()?.subFunction)
+        assertEquals(0x03, bySubFunction[0x03]?.responses?.single()?.subFunction)
+    }
+
+    @Test
+    fun correlatesRoutineControlResponsesBySubFunctionAndRoutineIdentifier() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 04 31 01 F0 01 00 00 00",
+            "0.001000 1 7E0 Tx d 8 04 31 01 F0 02 00 00 00",
+            "0.025000 1 7E8 Rx d 8 05 71 01 F0 02 00 00 00",
+            "0.030000 1 7E8 Rx d 8 05 71 01 F0 01 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "overlapping-routines.asc")
+
+        assertEquals(2, report.exchanges.size)
+        val byRoutine = report.exchanges.associateBy { it.request.routineIdentifier }
+        assertEquals(setOf(0xF001, 0xF002), byRoutine.keys)
+        assertTrue(byRoutine.values.all { it.status == UdsExchangeStatus.COMPLETED })
+        assertEquals(0xF001, byRoutine[0xF001]?.responses?.single()?.routineIdentifier)
+        assertEquals(0xF002, byRoutine[0xF002]?.responses?.single()?.routineIdentifier)
+    }
+
+    @Test
     fun decodesCanFdEscapedIsoTpSingleFrameLength() {
         val report = CanTraceAnalyzer.analyze(
             "0.000000 1 7E8 Rx d 12 00 0A 62 F1 90 01 02 03 04 05 00 00",
