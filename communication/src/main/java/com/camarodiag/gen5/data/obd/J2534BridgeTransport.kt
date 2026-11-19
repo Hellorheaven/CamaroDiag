@@ -78,7 +78,7 @@ class J2534BridgeTransport(
     override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            require(payload.isNotEmpty())
+            require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
             val boundedTimeout = timeoutMs.coerceIn(100L, 10_000L).toInt()
             socket?.soTimeout = boundedTimeout + 3000
             val response = request(
@@ -90,7 +90,9 @@ class J2534BridgeTransport(
                 boundedTimeout + 3000
             )
             val hex = response.optString("payloadHex")
-            require(hex.isNotBlank() && hex.length % 2 == 0) { "Réponse UDS vide ou mal formée du pont J2534." }
+            require(hex.isNotBlank() && hex.length % 2 == 0 && hex.length <= 8190 && hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }) {
+                "Réponse UDS vide, trop longue ou mal formée du pont J2534."
+            }
             try { hex.hexToBytes() } catch (error: IllegalArgumentException) {
                 throw IllegalStateException("Le pont J2534 a retourné une réponse hexadécimale invalide.", error)
             }
@@ -100,7 +102,7 @@ class J2534BridgeTransport(
     override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            require(payload.isNotEmpty())
+            require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
             socket?.soTimeout = 3000
             request(
                 JSONObject()
@@ -121,12 +123,32 @@ class J2534BridgeTransport(
         output.write(json.toString())
         output.newLine()
         output.flush()
-        val line = input.readLine() ?: error("Le pont PC a fermé la connexion.")
+        val line = readBoundedLine(input, MAX_RESPONSE_LINE_CHARS)
+            ?: error("Le pont PC a fermé la connexion.")
         val response = JSONObject(line)
         if (!response.optBoolean("ok", false)) {
             throw IllegalStateException(response.optString("error", "Erreur inconnue du pont J2534."))
         }
         return response
+    }
+
+    private fun readBoundedLine(input: BufferedReader, maxChars: Int): String? {
+        val line = StringBuilder()
+        while (true) {
+            val next = input.read()
+            if (next == -1) {
+                if (line.isEmpty()) return null
+                break
+            }
+            if (next == '\n'.code) break
+            if (next != '\r'.code) {
+                check(line.length < maxChars) {
+                    "La réponse du pont J2534 dépasse la taille maximale autorisée."
+                }
+                line.append(next.toChar())
+            }
+        }
+        return line.toString()
     }
 
     private fun ensureOpen() {
@@ -150,6 +172,8 @@ class J2534BridgeTransport(
         socket = null
         opened = false
     }
+
+    private companion object { const val MAX_RESPONSE_LINE_CHARS = 32 * 1024 }
 
     private fun ByteArray.toHex(): String =
         joinToString("") { "%02X".format(Locale.ROOT, it.toInt() and 0xFF) }
