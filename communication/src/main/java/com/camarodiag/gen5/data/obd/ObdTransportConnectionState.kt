@@ -20,3 +20,8 @@ internal object ObdTransportConnectionState {
         }
     }
 }
+
+
+/** Signals a physical adapter disconnect to the app-level connection monitor. */
+class ObdTransportDisconnectedException(message: String, cause: Throwable? = null) :
+    java.io.IOException(message, cause)
