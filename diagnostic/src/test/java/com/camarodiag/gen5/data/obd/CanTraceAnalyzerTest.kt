@@ -25,6 +25,24 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun correlatesStandardObdMode01RequestAndResponse() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 02 01 0C 00 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 04 41 0C 1A F8 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "obd-mode01.asc")
+
+        assertEquals(1, report.exchanges.size)
+        val exchange = report.exchanges.single()
+        assertEquals("ShowCurrentData (OBD-II)", exchange.request.serviceName)
+        assertEquals(0x01, exchange.request.service)
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(0x41, exchange.responses.single().responseService)
+        assertEquals(1, report.pidObservations.size)
+        assertEquals(1726.0, report.pidObservations.single().value, 0.0)
+    }
+
+    @Test
     fun keepsNrcResponsePendingOpenUntilFinalNegativeResponse() {
         val trace = listOf(
             "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
