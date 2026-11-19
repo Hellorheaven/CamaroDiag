@@ -90,12 +90,13 @@ class J2534BridgeTransport(
                 boundedTimeout + 3000
             )
             val hex = response.optString("payloadHex")
-            require(hex.isNotBlank() && hex.length % 2 == 0 && hex.length <= 8190 && hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }) {
-                "Réponse UDS vide, trop longue ou mal formée du pont J2534."
+            if (hex.isBlank() || hex.length % 2 != 0 || hex.length > 8190 ||
+                !hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }
+            ) {
+                closeInternal()
+                throw IllegalStateException("Réponse UDS vide, trop longue ou mal formée du pont J2534.")
             }
-            try { hex.hexToBytes() } catch (error: IllegalArgumentException) {
-                throw IllegalStateException("Le pont J2534 a retourné une réponse hexadécimale invalide.", error)
-            }
+            hex.hexToBytes()
         }
     }
 
@@ -103,13 +104,14 @@ class J2534BridgeTransport(
         mutex.withLock {
             ensureOpen()
             require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
-            socket?.soTimeout = 3000
+            val boundedTimeout = timeoutMs.coerceIn(100L, 10_000L).toInt()
             request(
                 JSONObject()
                     .put("op", "sendOnly")
                     .put("token", pairingToken)
-                    .put("payloadHex", payload.toHex()),
-                2000
+                    .put("payloadHex", payload.toHex())
+                    .put("timeoutMs", boundedTimeout),
+                boundedTimeout + 3000
             )
             Unit
         }
