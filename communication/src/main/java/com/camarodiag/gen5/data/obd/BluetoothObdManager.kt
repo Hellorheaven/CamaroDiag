@@ -378,6 +378,7 @@ class BluetoothObdManager(context: Context) {
             if (activeTransport == "USB") {
                 usbTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
+                var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     val n = usbTransport.read(bytes, 100)
                     if (n > 0) {
@@ -385,15 +386,17 @@ class BluetoothObdManager(context: Context) {
                         val payloadChunk = chunk.substringBefore('>')
                         buffer.append(payloadChunk)
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                        if (chunk.contains('>')) break
+                        if (chunk.contains('>')) { promptReceived = true; break }
                     } else if (n < 0) {
                         throw java.io.EOFException("USB OBD adapter disconnected while reading")
                     } else delay(10)
                 }
+                if (onChunk == null && !promptReceived) throw java.net.SocketTimeoutException("Timed out waiting for the ELM prompt after command: $command")
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else if (activeTransport == "BLE") {
                 bleTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
+                var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     val n = bleTransport.read(bytes, 100)
                     if (n > 0) {
@@ -401,13 +404,15 @@ class BluetoothObdManager(context: Context) {
                         val payloadChunk = chunk.substringBefore('>')
                         buffer.append(payloadChunk)
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                        if (chunk.contains('>')) break
+                        if (chunk.contains('>')) { promptReceived = true; break }
                     } else delay(10)
                 }
+                if (onChunk == null && !promptReceived) throw java.net.SocketTimeoutException("Timed out waiting for the ELM prompt after command: $command")
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else if (activeTransport == "WIFI") {
                 wifiTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
+                var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     try {
                         val n = wifiTransport.read(bytes)
@@ -416,13 +421,14 @@ class BluetoothObdManager(context: Context) {
                             val payloadChunk = chunk.substringBefore('>')
                             buffer.append(payloadChunk)
                             if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
-                            if (chunk.contains('>')) break
+                            if (chunk.contains('>')) { promptReceived = true; break }
                         } else if (n < 0) {
                             throw java.io.EOFException("Wi-Fi OBD adapter closed the connection")
                         }
                     } catch (_: java.net.SocketTimeoutException) { }
                     delay(10)
                 }
+                if (onChunk == null && !promptReceived) throw java.net.SocketTimeoutException("Timed out waiting for the ELM prompt after command: $command")
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else {
                 val out = outputStream; val inp = inputStream
@@ -432,10 +438,12 @@ class BluetoothObdManager(context: Context) {
                 val buffer = StringBuilder()
                 val callbackBuffer = StringBuilder()
                 val start = System.currentTimeMillis()
+                var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     if (inp.available() > 0) {
                         val char = inp.read().toChar()
                         if (char == '>') {
+                            promptReceived = true
                             if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                             break
                         }
@@ -448,6 +456,7 @@ class BluetoothObdManager(context: Context) {
                     } else delay(15)
                 }
                 if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
+                if (onChunk == null && !promptReceived) throw java.net.SocketTimeoutException("Timed out waiting for the ELM prompt after command: $command")
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             }
         }
