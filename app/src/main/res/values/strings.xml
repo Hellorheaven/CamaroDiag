@@ -642,12 +642,13 @@
     <string name="can_sniffer_start">Start 10-second capture</string>
     <string name="can_sniffer_stop">Stop capture</string>
     <string name="can_sniffer_request_label">Read-only OBD-II request (hex)</string>
+    <string name="can_sniffer_request_examples">Examples: 01 0C (RPM), 09 02 (VIN), 03 / 07 / 0A (read DTCs). Clear codes is not allowed.</string>
     <string name="can_sniffer_send">Send read-only request</string>
     <string name="can_sniffer_empty">No CAN frames captured yet.</string>
     <string name="can_sniffer_unavailable">Connect a real adapter with CAN header support. Simulation and unsupported bridges cannot monitor live CAN.</string>
     <string name="can_sniffer_capture_complete">CAN capture complete.</string>
     <string name="can_sniffer_capture_failed">CAN capture failed or the adapter stopped responding.</string>
-    <string name="can_sniffer_invalid_request">Request rejected. Use only whitelisted OBD-II Mode 01 or Mode 09 service and PID pairs.</string>
+    <string name="can_sniffer_invalid_request">Request rejected. Only whitelisted read-only OBD-II modes 01, 03, 07, 09 and 0A are accepted. Clear-codes Mode 04 is blocked.</string>
     <string name="can_sniffer_frame_count">Frames captured: %1$d</string>
     <string name="can_sniffer_pid_heading">Decoded standard OBD-II values</string>
     <string name="can_sniffer_response_heading">Last OBD-II response</string>
