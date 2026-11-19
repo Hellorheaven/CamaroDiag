@@ -660,5 +660,4 @@
     <string name="can_sniffer_bus_limit">Questa acquisizione usa il profilo HS-CAN attivo a 11 bit e 500 kbit/s. SW-CAN e altri bus richiedono un adattatore diverso.</string>
     <string name="can_sniffer_search">Cerca ID CAN o byte dei dati</string>
     <string name="can_sniffer_filtered_count">Visualizzazione di %1$d frame su %2$d</string>
-    <string name="connection_lost_bluetooth">Connessione Bluetooth persa. Ricollega l\'adattatore e riavvia l\'operazione.</string>
 </resources>
