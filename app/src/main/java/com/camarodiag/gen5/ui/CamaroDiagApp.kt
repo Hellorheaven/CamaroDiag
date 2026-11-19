@@ -1293,8 +1293,9 @@ fun CanSnifferScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         label = { Text(stringResource(R.string.can_sniffer_request_label)) },
-                        placeholder = { Text("01 0C") }
+                        placeholder = { Text("01 0C / 09 02 / 03 / 07 / 0A") }
                     )
+                    Text(stringResource(R.string.can_sniffer_request_examples), color = TextMuted, fontSize = 10.sp)
                     Button(
                         onClick = { onSendRequest(requestInput) },
                         enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
