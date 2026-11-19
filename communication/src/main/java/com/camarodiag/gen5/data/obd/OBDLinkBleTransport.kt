@@ -197,7 +197,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         connectionFailure?.let { throw ObdTransportDisconnectedException("OBDLink BLE disconnected while reading", it) }
         if (pending.isEmpty()) {
             val packet = withTimeoutOrNull(timeoutMs.toLong()) { incoming.receive() } ?: run {
-                connectionFailure?.let { throw IllegalStateException("OBDLink BLE disconnected while reading", it) }
+                connectionFailure?.let { throw ObdTransportDisconnectedException("OBDLink BLE disconnected while reading", it) }
                 return 0
             }
             connectionFailure?.let { throw IllegalStateException("OBDLink BLE disconnected while reading", it) }
