@@ -47,6 +47,9 @@ import com.camarodiag.gen5.control.VehicleGear
 import com.camarodiag.gen5.control.VehicleSignal
 import com.camarodiag.gen5.control.VehicleControlId
 import com.camarodiag.gen5.data.obd.VxdiagProfiles
+import com.camarodiag.gen5.data.obd.CanTraceFilter
+import com.camarodiag.gen5.data.obd.CanTraceDirection
+import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
