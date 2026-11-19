@@ -5,6 +5,7 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 ## 2026-11-19
 
 ### Analyse des traces — cohérence DLC / données
+- ISO-TP Flow Control : validation du statut (CTS/WAIT/OVERFLOW), du champ STmin et de la longueur minimale. Les valeurs STmin réservées ou les trames tronquées sont maintenant signalées au lieu d'être ignorées silencieusement. Tests couvrant les valeurs valides et invalides.
 - Réassemblage ISO-TP : une trame consécutive dont l'horodatage recule par rapport à la trame précédente invalide désormais la session incomplète. Elle n'est plus intégrée silencieusement à un message potentiellement mal ordonné. Test de régression ajouté.
 - Requêtes OBD fonctionnelles envoyées sur 7DF : les réponses de plusieurs calculateurs (7E8–7EF) sont désormais regroupées dans un seul échange, sans réutiliser deux fois la réponse d'un même identifiant ECU. Un échange fonctionnel ayant reçu au moins une réponse est finalisé à la fin de la capture ; NRC 0x78 reste en attente.
 - Test ajouté avec deux calculateurs répondant au même PID à une requête fonctionnelle.
