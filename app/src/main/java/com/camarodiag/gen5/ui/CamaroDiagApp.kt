@@ -1493,6 +1493,48 @@ fun CanSnifferScreen(
                     }
                 }
             }
+            if (report.flowControlObservations.isNotEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.can_trace_flow_control_heading),
+                        color = CamaroAmber,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                items(report.flowControlObservations.takeLast(30).asReversed()) { flow ->
+                    val statusLabel = when (flow.status) {
+                        com.camarodiag.gen5.data.obd.IsoTpFlowStatus.CONTINUE_TO_SEND ->
+                            stringResource(R.string.can_trace_flow_status_cts)
+                        com.camarodiag.gen5.data.obd.IsoTpFlowStatus.WAIT ->
+                            stringResource(R.string.can_trace_flow_status_wait)
+                        com.camarodiag.gen5.data.obd.IsoTpFlowStatus.OVERFLOW ->
+                            stringResource(R.string.can_trace_flow_status_overflow)
+                        com.camarodiag.gen5.data.obd.IsoTpFlowStatus.RESERVED ->
+                            stringResource(R.string.can_trace_flow_status_reserved)
+                    }
+                    val stMin = flow.separationTimeMicros?.let { micros ->
+                        if (micros % 1_000 == 0) {
+                            stringResource(R.string.can_trace_flow_stmin_ms, micros / 1_000)
+                        } else {
+                            stringResource(R.string.can_trace_flow_stmin_us, micros)
+                        }
+                    } ?: stringResource(R.string.can_trace_flow_stmin_reserved, flow.separationTimeRaw)
+                    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                        Text(
+                            stringResource(
+                                R.string.can_trace_flow_control_detail,
+                                String.format(Locale.ROOT, "%03X", flow.canId),
+                                statusLabel,
+                                flow.blockSize,
+                                stMin
+                            ),
+                            modifier = Modifier.padding(10.dp),
+                            color = TextPrimary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
