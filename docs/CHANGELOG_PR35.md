@@ -150,3 +150,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Ajout de cinq tests unitaires couvrant déconnexion BLE, EOF, timeout ELM, erreur non-E/S et erreur E/S générique.
 - Commits : `ca00d0b` (politique), `f623f56` (tests), `09397df` (intégration), `b404801` (nettoyage import).
 - Tests non exécutés dans cette session ; validation Gradle et CI encore requises.
+
+### Restauration de l'interface ELM après capture CAN — 2026-11-19
+- Suppression de l'envoi isolé de `AT` en fin de capture : ce n'est pas la commande ELM de remise à zéro des paramètres (la commande de retour aux valeurs par défaut est `ATD`, qui réinitialiserait aussi des paramètres de protocole dont l'application dépend).
+- La sortie du mode monitor restaure explicitement les paramètres de formatage utilisés lors de l'initialisation de l'adaptateur : `ATE0`, `ATL0`, `ATH1`, `ATS0` et `ATCAF1`.
+- La restauration reste exécutée dans `NonCancellable` et chaque commande est tentée indépendamment, même si une étape échoue.
+- Commit : `7f5033f`.
+- Contrôle documentaire des commandes ELM ; aucun test Gradle, build Android ni essai matériel n'a été exécuté.
