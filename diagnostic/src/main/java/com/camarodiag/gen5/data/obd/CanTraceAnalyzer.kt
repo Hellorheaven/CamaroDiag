@@ -529,7 +529,21 @@ object CanTraceAnalyzer {
             val fields = splitCsvLine(line, delimiter)
             fun field(index: Int): String = fields.getOrNull(index).orEmpty().trim().trim('"')
             val canId = parseCanId(field(canIdIndex))
-            val declaredDlc = if (dlcIndex >= 0) field(dlcIndex).toIntOrNull() else null
+            val dlcText = if (dlcIndex >= 0) field(dlcIndex) else ""
+            val declaredDlc = if (dlcIndex >= 0) dlcText.toIntOrNull() else null
+            if (dlcIndex >= 0 && (declaredDlc == null || declaredDlc !in 0..64)) {
+                errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
+                continue
+            }
+            val timestampText = if (timestampIndex >= 0) field(timestampIndex) else ""
+            val timestamp = when {
+                timestampIndex < 0 || timestampText.isBlank() -> null
+                else -> timestampText.toDoubleOrNull()?.takeIf { it.isFinite() }
+            }
+            if (timestampIndex >= 0 && timestampText.isNotBlank() && timestamp == null) {
+                errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
+                continue
+            }
             val bytes = if (dataIndex >= 0) parseHexBytes(field(dataIndex)) else {
                 val rawValues: List<String> = dataByteIndexes.map { index -> field(index) }
                 // Empty columns after the declared DLC are normal in fixed-width CSV exports.
@@ -546,7 +560,6 @@ object CanTraceAnalyzer {
                     if (values.any { byte -> byte == null }) null else values.filterNotNull()
                 }
             }
-            val timestamp = if (timestampIndex >= 0) field(timestampIndex).toDoubleOrNull() else null
             val direction = if (directionIndex >= 0) parseDirection(field(directionIndex)) else CanTraceDirection.UNKNOWN
             val dlc = declaredDlc ?: bytes?.size
             if (canId == null || bytes == null || dlc == null || dlc !in 0..64 || bytes.size < dlc) {
