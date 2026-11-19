@@ -207,13 +207,18 @@ object CanTraceAnalyzer {
             val isPositiveResponse = rawService == service + 0x40
             val isNegativeResponse = rawService == 0x7F
             if (isPositiveResponse || isNegativeResponse) {
-                val matchIndex = pending.indexOfFirst { candidate ->
-                    candidate.request.direction != message.direction &&
-                        candidate.request.canId != message.canId &&
-                        candidate.request.service == service &&
-                        (candidate.request.did == null || message.did == null || candidate.request.did == message.did)
+                // A negative response has no DID. When multiple same-service requests are
+                // outstanding, choosing the first one would fabricate a request/response pair.
+                // Keep the response unpaired unless exactly one candidate is compatible.
+                val matchingIndexes = pending.indices.filter { index ->
+                    val request = pending[index].request
+                    request.direction != message.direction &&
+                        request.canId != message.canId &&
+                        request.service == service &&
+                        (request.did == null || message.did == null || request.did == message.did)
                 }
-                if (matchIndex >= 0) {
+                val matchIndex = matchingIndexes.singleOrNull()
+                if (matchIndex != null) {
                     val candidate = pending[matchIndex]
                     candidate.responses += message
                     if (message.negativeResponseCode != 0x78) {
@@ -488,13 +493,19 @@ object CanTraceAnalyzer {
             val pci = frame.data[0]
             when (pci and 0xF0) {
                 0x00 -> {
-                    val length = pci and 0x0F
-                    if (length == 0 || length > frame.data.size - 1) {
+                    // CAN FD permits the escaped Single Frame length form: SF_DL=0,
+                    // followed by one byte containing the actual payload length.
+                    val shortLength = pci and 0x0F
+                    val headerLength = if (shortLength == 0) 2 else 1
+                    val length = if (shortLength == 0) frame.data.getOrNull(1) ?: 0 else shortLength
+                    if (length == 0 || length > 62 ||
+                        length > frame.data.size - headerLength
+                    ) {
                         errors += "Line ${frame.lineNumber}: invalid ISO-TP single-frame length."
                     } else {
                         messages += UdsTraceMessage(
                             frame.timestampSeconds, frame.canId, frame.direction,
-                            frame.data.drop(1).take(length)
+                            frame.data.drop(headerLength).take(length)
                         )
                     }
                 }
@@ -530,6 +541,9 @@ object CanTraceAnalyzer {
                     val state = pending[key]
                     if (state == null) {
                         errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame has no matching first frame."
+                    } else if (frame.data.size < 2) {
+                        errors += "Line ${frame.lineNumber}: truncated ISO-TP consecutive frame."
+                        pending.remove(key)
                     } else {
                         val sequence = pci and 0x0F
                         if (sequence != state.nextSequence) {
