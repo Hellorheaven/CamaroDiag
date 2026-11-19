@@ -115,3 +115,11 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Les timeouts de lecture normaux restent distincts d'une fermeture de transport.
 - Commit : `5d16421`.
 - Relecture statique uniquement ; aucun test matériel, test Gradle ou build CI exécuté.
+
+### Commandes ELM — validation de fin de réponse — 2026-11-19
+- Les commandes ELM ordinaires sur Bluetooth classique, BLE, USB et Wi-Fi exigent maintenant la réception du prompt `>` avant de retourner une réponse.
+- Si le délai expire sans prompt, une `SocketTimeoutException` explicite est remontée : une réponse partielle n'est plus présentée comme complète.
+- Le mode de capture CAN continue reste exempté de cette exigence, car les commandes de monitoring ne terminent pas sur le prompt ELM normal ; l'arrêt reste piloté par ESC et la durée bornée de capture.
+- Les fins de flux USB/Wi-Fi et les déconnexions BLE restent des erreurs de transport distinctes du timeout de réponse.
+- Commit : `a8b7f5d`.
+- Relecture statique des quatre chemins de transport ; aucun test Gradle/build CI ni essai sur véhicule exécuté.
