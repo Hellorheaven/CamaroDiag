@@ -472,7 +472,7 @@ object CanTraceAnalyzer {
                 errors += "Line ${index + 1}: invalid ASC frame header or hexadecimal data."
                 return@forEachIndexed
             }
-            if (dlc !in 0..64 || bytes.size < dlc) {
+            if (dlc !in 0..64 || bytes.size != dlc) {
                 errors += "Line ${index + 1}: DLC does not match the available data bytes."
                 return@forEachIndexed
             }
@@ -493,7 +493,7 @@ object CanTraceAnalyzer {
             val canId = parseCanId(match.groupValues[1])
             val dlc = match.groupValues[2].toIntOrNull(16)
             val bytes = parseHexBytes(match.groupValues[3])
-            if (canId == null || dlc == null || bytes == null || dlc !in 0..8 || bytes.size < dlc) {
+            if (canId == null || dlc == null || bytes == null || dlc !in 0..8 || bytes.size != dlc) {
                 errors += "Line ${index + 1}: invalid ELM327 header/DLC/data record."
                 return@forEachIndexed
             }
@@ -562,7 +562,7 @@ object CanTraceAnalyzer {
             }
             val direction = if (directionIndex >= 0) parseDirection(field(directionIndex)) else CanTraceDirection.UNKNOWN
             val dlc = declaredDlc ?: bytes?.size
-            if (canId == null || bytes == null || dlc == null || dlc !in 0..64 || bytes.size < dlc) {
+            if (canId == null || bytes == null || dlc == null || dlc !in 0..64 || bytes.size != dlc) {
                 errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
                 continue
             }
