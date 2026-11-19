@@ -55,11 +55,14 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 
 #### Interfaces supplémentaires appartenant à l'utilisateur — inventaire et étude de compatibilité
 - [ ] Ajouter à la matrice matérielle l'interface Autocom utilisée pour les véhicules PSA, avec logiciel annoncé en version 2021.24 (version exacte à confirmer). Identifier la référence matérielle de l'interface Autocom avant de choisir le pilote ou de revendiquer une compatibilité.
-- [ ] Ajouter le VXDIAG VCX Nano utilisé avec Mazda et Ford. Identifier la variante matérielle exacte, le firmware, les pilotes disponibles, les protocoles et le mode de connexion réellement utilisés. Étudier en priorité son intégration au pont Windows 11 et son éventuel accès J2534/PassThru, uniquement après vérification de la variante et des pilotes.
+- [ ] Ajouter le VXDIAG VCX Nano Ford/Mazda actuellement possédé à la matrice comme matériel dédié à ces marques ; ne pas le déclarer compatible GM par simple changement de firmware ou de pilote.
+- [ ] Étudier séparément la variante VCX Nano GM : les informations officielles VXDIAG indiquent que les Nano sont monomarque et ne permettent pas l'ajout d'une autre licence. Considérer le Nano GM comme une variante matérielle/logicielle et d'autorisation dédiée, sans supposer qu'un firmware GM peut être installé sur le Nano Ford/Mazda existant.
+- [ ] Comparer également VCX FD (licences GM + Ford/Mazda annoncées), VCX SE et VCX PLUS (gammes multimarques), sans achat ni compatibilité présumés ; confirmer auprès du fabricant la référence exacte, le matériel, les protocoles, les licences et la couverture du Camaro 2012 LFX avant intégration.
 - [ ] Étudier pour chaque interface les transports USB/USB OTG, Bluetooth ou pont PC disponibles, sans supposer qu'ils sont tous pris en charge par chaque modèle.
 - [ ] Distinguer les protocoles et fonctions réellement exposés : diagnostic constructeur, OBD générique, CAN, K-Line, J2534/PassThru, programmation et fonctions spécifiques à une marque. La présence d'un outil ou d'un pilote constructeur ne prouve pas que toutes ces fonctions sont accessibles à CamaroDiag.
 - [ ] Concevoir une architecture de pilotes/adaptateurs indépendante de la marque, avec profils de capacités déclarées et testées par modèle, firmware, système d'exploitation et protocole.
-- [ ] Étudier l'intégration du VXDIAG Nano dans le pont Windows 11 si son pilote et son interface le permettent ; ne pas annoncer la prise en charge J2534/PassThru sans confirmer la référence exacte et réussir les tests de conformité.
+- [ ] Étudier l'intégration du VXDIAG Nano Ford/Mazda dans le pont Windows 11 uniquement pour les fonctions et pilotes correspondant à cette variante ; ne pas annoncer GM ni J2534/PassThru sans confirmer la référence exacte et réussir les tests de conformité.
+- [ ] Pour GM, prévoir une détection/prise en charge distincte de la variante VCX Nano GM ou d'un VCX FD/SE/PLUS autorisé ; les licences Nano sont monomarque selon VXDIAG et ne sont pas transférables par simple mise à jour de firmware.
 - [ ] Étudier l'Autocom comme interface diagnostic multimarque/PSA candidate ; ne pas supposer qu'il est compatible avec les protocoles ou fonctions d'écriture GM.
 - [ ] Prioriser l'inventaire et l'identification des matériels déjà possédés avant de recommander l'achat d'interfaces supplémentaires.
 
@@ -389,7 +392,8 @@ Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L
 - Aucune plaque d'immatriculation ni donnée personnelle ne doit être conservée dans ce backlog.
 
 ## 6. Historique des décisions
-- 2026-11-19 : préciser l'inventaire utilisateur : VXDIAG VCX Nano (utilisé sur Mazda/Ford) et Autocom avec logiciel annoncé en version 2021.24 (utilisé sur PSA ; référence matérielle à confirmer).
+- 2026-11-19 : préciser l'inventaire utilisateur : VXDIAG VCX Nano Ford/Mazda (distinct de la variante GM) et Autocom avec logiciel annoncé en version 2021.24 (utilisé sur PSA ; référence matérielle à confirmer).
+- 2026-11-19 : clarification de compatibilité VXDIAG : ne pas supposer qu'un firmware suffit à transformer le VCX Nano Ford/Mazda existant en GM. La documentation officielle indique que les Nano sont monomarque sans ajout de licence ; étudier une variante Nano GM dédiée ou les gammes FD/SE/PLUS, en vérifiant précisément référence matérielle, autorisation et protocoles avant toute prise en charge.
 - 2026-11-19 : compléter l'inventaire matériel avec l'interface Autocom utilisée sur PSA (modèle à identifier) et le VXDIAG Nano utilisé sur Mazda/Ford ; étudier leurs pilotes, transports et capacités réelles avant toute annonce de compatibilité CamaroDiag.
 - 2026-11-19 : ajouter le câble KKL USB multi-motos utilisé avec TuneECU/BHELI32 comme interface USB-série candidate via OTG/Windows ; étudier FTDI/K-Line et la compatibilité réelle avec le calculateur Camaro avant toute revendication, notamment pour la programmation calibration qui reste soumise à validation et garde-fous spécifiques.
 - 2026-11-19 : étendre le tableau de bord temps réel à un catalogue personnalisable multi-calculateurs (moteur, transmission, TPMS, carrosserie, éclairage, châssis et confort), avec découverte des données réellement disponibles, unités, états de disponibilité, courbes et enregistrement ; les données constructeur et limites d'interface doivent être explicites.
