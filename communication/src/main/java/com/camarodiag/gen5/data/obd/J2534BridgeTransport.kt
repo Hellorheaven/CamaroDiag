@@ -79,7 +79,7 @@ class J2534BridgeTransport(
         mutex.withLock {
             ensureOpen()
             require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
-            val boundedTimeout = timeoutMs.coerceIn(100L, 10_000L).toInt()
+            val boundedTimeout = J2534BridgeProtocol.boundedTimeoutMs(timeoutMs)
             socket?.soTimeout = boundedTimeout + 3000
             val response = request(
                 JSONObject()
@@ -176,6 +176,8 @@ class J2534BridgeTransport(
 /** Bounded framing helpers for the untrusted JSON-lines PC bridge stream. */
 internal object J2534BridgeProtocol {
     private const val MAX_RESPONSE_LINE_CHARS = 32 * 1024
+
+    fun boundedTimeoutMs(timeoutMs: Long): Int = timeoutMs.coerceIn(100L, 10_000L).toInt()
 
     fun readBoundedLine(input: BufferedReader): String? {
         val line = StringBuilder()
