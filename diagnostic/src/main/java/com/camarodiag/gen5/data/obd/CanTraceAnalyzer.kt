@@ -112,7 +112,8 @@ data class CanTraceAnalysisReport(
     val pidObservations: List<CanTracePidObservation>,
     val errors: List<String>,
     val incompleteIsoTpMessages: Int,
-    val flowControlObservations: List<CanTraceFlowControl> = emptyList()
+    val flowControlObservations: List<CanTraceFlowControl> = emptyList(),
+    val exchanges: List<UdsTraceExchange> = emptyList()
 ) {
     val observedCanIds: List<Int> = frames.map { it.canId }.distinct().sorted()
     val udsServices: List<Int> = messages.mapNotNull { it.service }.distinct().sorted()
@@ -173,7 +174,8 @@ object CanTraceAnalyzer {
             pidObservations = pidObservations,
             errors = allErrors,
             incompleteIsoTpMessages = incomplete,
-            flowControlObservations = parsed.frames.mapNotNull(::decodeFlowControl)
+            flowControlObservations = parsed.frames.mapNotNull(::decodeFlowControl),
+            exchanges = correlateExchanges(messages)
         )
     }
 
