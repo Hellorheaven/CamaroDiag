@@ -902,4 +902,29 @@ class CanTraceAnalyzerTest {
         assertEquals(0, report.incompleteIsoTpMessages)
     }
 
+
+    @Test
+    fun doesNotCorrelatePhysicalRequestWithUnrelatedEcuResponseId() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.025000 1 7E9 Rx d 8 07 62 F1 90 31 47 30 31"
+        ).joinToString("\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "unrelated-response-id.asc").exchanges.single()
+
+        assertEquals(UdsExchangeStatus.UNANSWERED, exchange.status)
+        assertTrue(exchange.responses.isEmpty())
+    }
+
+    @Test
+    fun correlatesFunctionalObdRequestWithStandardEcuResponseRange() {
+        val trace = listOf(
+            "0.000000 1 7DF Tx d 8 02 01 0C 00 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 04 41 0C 1A F8 00 00 00"
+        ).joinToString("\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "functional-obd-response.asc").exchanges.single()
+
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(0x7E8, exchange.responses.single().canId)
+    }
+
 }
