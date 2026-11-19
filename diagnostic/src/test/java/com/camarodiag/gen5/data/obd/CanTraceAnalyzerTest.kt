@@ -85,7 +85,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun decodesCanFdEscapedIsoTpSingleFrameLength() {
         val report = CanTraceAnalyzer.analyze(
-            "0.000000 1 7E8 Rx d 12 00 0A 62 F1 90 01 02 03 04 05 00",
+            "0.000000 1 7E8 Rx d 12 00 0A 62 F1 90 01 02 03 04 05 00 00",
             "can-fd.asc"
         )
 
