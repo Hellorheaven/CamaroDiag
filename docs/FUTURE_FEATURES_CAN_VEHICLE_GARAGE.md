@@ -1,125 +1,274 @@
-# Feuille de route — Sniffer CAN, émission encadrée et garage multi-véhicules
+# Feuille de route — CamaroDiag
 
-> Statut : fonctionnalités planifiées. Ce document décrit les exigences produit ; il ne signifie pas que ces fonctions sont déjà disponibles dans l'application.
+> **Règle générale :** ce document décrit le backlog et les critères attendus. Une fonctionnalité n'est pas considérée comme développée parce qu'elle est décrite ici. Elle passe « en cours » uniquement lorsqu'une PR dédiée est ouverte, et « terminée » après validation du code, des tests et des builds requis.
 
-## 1. Sniffer CAN passif et traduction en langage humain
+## Correspondance avec le suivi opérationnel GitHub
 
-Créer un écran dédié de capture CAN, utilisable lorsque l'interface et le réseau sélectionnés permettent réellement ce mode.
+Les exigences détaillées restent volontairement dans ce document pendant la période de vérification. Chaque élément possède désormais une Issue GitHub miroir ; les états dynamiques (ouvert/fermé, PR liées, commentaires) doivent être lus dans GitHub.
 
-Fonctions attendues :
-- Démarrer / mettre en pause / arrêter la capture, avec horodatage précis.
-- Afficher les trames brutes : bus, identifiant CAN, format 11 ou 29 bits, DLC, octets, direction si elle est connue et compteur de répétition.
-- Filtrer par bus, identifiant, plage d'identifiants, période et changements de valeur ; rechercher et épingler des trames.
-- Décoder les signaux connus en valeurs et libellés compréhensibles (par exemple vitesse véhicule, régime moteur, température), avec unité et état de validité.
-- Expliquer en langage humain les échanges de diagnostic connus : requête, réponse, calculateur répondant, service, DID ou DTC, et résultat.
-- Conserver côte à côte la trame brute et son interprétation afin que le décodage reste vérifiable.
-- Enregistrer, relire et exporter les captures (CSV et format de trace adapté, par exemple ASC lorsque son implémentation est validée).
-- Permettre une analyse hors véhicule d'un fichier de trace déjà enregistré.
+| Élément | Suivi GitHub |
+|---|---|
+| Sniffer / Console CAN | [PR #35](https://github.com/Hellorheaven/CamaroDiag/pull/35) — périmètre en cours, un seul module |
+| Couverture DTC Camaro Gen 5/Gen 6 et multi-ECU | [Issue #37](https://github.com/Hellorheaven/CamaroDiag/issues/37) |
+| Lot 1 — Adaptateurs et capacités | [Issue #41](https://github.com/Hellorheaven/CamaroDiag/issues/41) |
+| Lot 2 — Garage et profils véhicules | [Issue #42](https://github.com/Hellorheaven/CamaroDiag/issues/42) |
+| Lot 3 — Déconnexions et sessions | [Issue #43](https://github.com/Hellorheaven/CamaroDiag/issues/43) |
+| Lot 4 — Télémétrie temps réel multi-ECU | [Issue #44](https://github.com/Hellorheaven/CamaroDiag/issues/44) |
+| Lot 5 — Entretien et injecteurs | [Issue #45](https://github.com/Hellorheaven/CamaroDiag/issues/45) |
+| Lot 6 — Atelier calibration | [Issue #46](https://github.com/Hellorheaven/CamaroDiag/issues/46) |
+| Lot 7 — Extension multi-marques | [Issue #47](https://github.com/Hellorheaven/CamaroDiag/issues/47) |
+| Lot 8 — Cahier de recette Excel | [Issue #48](https://github.com/Hellorheaven/CamaroDiag/issues/48) |
+| Lot 9 — Langues UE et choix indépendant | [Issue #49](https://github.com/Hellorheaven/CamaroDiag/issues/49) |
+| Lot 10 — Tablettes 8/10/12 pouces | [Issue #40](https://github.com/Hellorheaven/CamaroDiag/issues/40) |
+| Socle transversal — compatibilité, déconnexion, CI | [Issue #50](https://github.com/Hellorheaven/CamaroDiag/issues/50) |
 
-Règles de fiabilité :
-- La capture doit être réellement passive (« listen-only ») lorsque le matériel le permet ; ne pas présenter une lecture périodique active comme un sniffer passif.
-- Indiquer clairement les limites de chaque adaptateur. Un ELM327 Bluetooth courant ne garantit pas la capture brute de toutes les trames du bus.
-- Ne traduire une trame que si son réseau, son protocole, son identifiant, son année/RPO et sa définition sont suffisamment documentés.
-- Afficher « trame inconnue » ou les octets bruts lorsqu'aucune définition fiable ne correspond. Ne jamais inventer une signification.
-- Afficher la provenance, la couverture véhicule et le niveau de confiance de chaque décodage.
-- Prévoir la gestion du débit, des pertes de trames, des débordements de tampon et de la charge CPU.
+Les Issues #38 et #39 sont des anomalies de stabilité distinctes et restent suivies séparément. Ne pas les confondre avec les lots fonctionnels ci-dessus.
 
-## 2. Émetteur CAN manuel
+## 1. Sniffer / Console CAN — périmètre de la PR #35
 
-Ajouter une zone de préparation et d'envoi de trame comprenant :
-- Sélection explicite du bus (HS-CAN / SW-CAN uniquement si le matériel et le câblage le supportent).
-- Identifiant CAN, format 11/29 bits, DLC et octets de données.
-- Validation stricte des champs, affichage de la trame complète avant envoi et retour du résultat réel de l'interface.
-- Confirmation explicite avant chaque émission et journal horodaté des trames envoyées.
-- Indication permanente du véhicule, du réseau et de l'adaptateur ciblés.
+La PR #35 est exclusivement consacrée à un seul module utilisateur **Sniffer / Console CAN**. Il regroupe capture entrante, analyse, décodage, journalisation, console de requêtes/réponses et émission lorsque l'interface le permet réellement.
 
-Garde-fous :
-- Ne jamais envoyer automatiquement une trame construite à partir d'une supposition ou d'une capture non vérifiée.
-- Refuser par défaut les identifiants, longueurs et formats incohérents, ainsi que les commandes de programmation, d'accès sécurité, d'effacement non autorisé, d'actionneur ou de fonction antivol.
-- Pas d'émission sur un véhicule en mouvement ; afficher un avertissement et exiger un véhicule immobilisé, contact et conditions de test appropriés.
-- Séparer strictement les requêtes de diagnostic documentées des commandes qui modifient l'état du véhicule.
-- Les actions critiques restent indisponibles tant qu'une procédure constructeur applicable au VIN/calculateur et une validation matérielle n'existent pas.
+### Capture et analyse
+- Démarrer, mettre en pause et arrêter une capture avec horodatage précis.
+- Afficher les trames brutes : bus, identifiant, format 11/29 bits, DLC, octets, direction si connue et compteur de répétition.
+- Filtrer par bus, identifiant/plage, période et changement de valeur ; rechercher et épingler des trames.
+- Décoder les signaux et échanges connus en langage humain, en conservant toujours la trame brute à côté de l'interprétation.
+- Enregistrer, relire et exporter les traces (CSV et formats spécialisés comme ASC uniquement lorsque leur prise en charge est réelle).
+- Permettre l'analyse hors véhicule de traces enregistrées.
 
-## 3. Boutons de commandes prédéfinies
+### Console et émission
+- Préparer et envoyer des trames ou requêtes avec sélection explicite du bus, identifiant, format, DLC et données.
+- Proposer les commandes prédéfinies documentées, avec explication, prérequis, calculateur ciblé et source technique.
+- Montrer exactement ce qui sera envoyé, demander confirmation et journaliser l'émission et le résultat réel de l'interface.
+- Permettre les émissions manuelles et répétées uniquement si l'adaptateur et son firmware exposent réellement ces capacités.
+- Ne pas limiter arbitrairement le module à la lecture seule, mais ne jamais annoncer une capacité non supportée ou non vérifiée.
 
-Ajouter une bibliothèque de boutons pour les opérations courantes et documentées, avec un libellé humain, une description de l'effet, les prérequis, le calculateur ciblé et la source technique.
+### Fiabilité et garde-fous
+- Distinguer une vraie capture passive d'une lecture périodique active. Un ELM327 courant ne garantit pas la capture brute de toutes les trames.
+- Ne jamais inventer le sens d'une trame. Afficher les octets bruts et « trame inconnue » en l'absence de définition fiable.
+- Afficher provenance, couverture véhicule et niveau de confiance des décodages.
+- Contrôler débit, pertes, débordements et charge CPU.
+- Valider les champs et refuser les formats incohérents ; ne jamais émettre automatiquement une trame supposée.
+- Distinguer requêtes diagnostiques documentées et commandes modifiant l'état du véhicule. Les opérations sensibles (programmation, accès sécurité, antivol, actionneurs, etc.) ne deviennent pas des raccourcis génériques.
+- Pas d'émission sur véhicule en mouvement ; afficher les prérequis et conditions de test appropriés.
+- Adapter les fonctions au bus, au véhicule, à l'adaptateur, au firmware et aux capacités réellement détectées.
 
-Exemples de catégories à étudier :
-- Requêtes de lecture standardisées et non destructives (identification, lecture de données ou lecture de défauts) lorsque le protocole et l'adressage sont compatibles.
-- Commandes de diagnostic de session ou de maintien de session uniquement lorsque leur usage et leur portée sont connus.
-- Filtres/raccourcis de capture pour afficher rapidement les familles de trames utiles.
+**Hors périmètre de la PR #35 :** tableau de bord télémétrie, garage, calibration, codage injecteurs, gestion globale des déconnexions, matrice générale des interfaces et extension multi-marques. Ces sujets restent dans les lots ci-dessous.
 
-Chaque bouton doit :
-- Montrer la trame exacte qui sera envoyée avant validation.
-- Vérifier la compatibilité année, RPO, transmission, calculateur, bus et interface.
-- Expliquer ce que la commande fait et ce qu'elle ne fait pas.
-- Demander confirmation pour toute émission.
-- Être désactivé si sa définition ou sa compatibilité n'est pas confirmée.
+## 2. Principes transverses applicables à tous les lots
 
-Aucune trame GM propriétaire ne doit être qualifiée de « standard » sans référence vérifiable. Les trames d'action carrosserie, d'actionneur, de sécurité, d'antidémarrage et de programmation ne doivent pas être ajoutées comme raccourcis génériques.
+### Compatibilité et parité véhicule
+- Ne pas limiter une fonction au seul véhicule de développement ou de validation, notamment la Camaro 2012 LFX.
+- Déterminer la disponibilité à partir d'une matrice explicite : génération, année, RPO/moteur, transmission, marché, équipements installés, calculateur, protocole, réseau, interface/firmware et version logicielle/calibration lorsque nécessaire.
+- Séparer la disponibilité d'une fonction de la disponibilité de ses définitions. Une fonction générique doit rester utilisable avec données brutes si le décodage constructeur manque.
+- Adapter automatiquement les fonctions aux calculateurs et équipements présents. L'absence d'un équipement ne doit pas bloquer les autres fonctions compatibles.
+- Désactiver uniquement l'opération réellement incompatible et expliquer pourquoi ; ne jamais présenter une fonction comme opérationnelle si le matériel ne sait pas l'exécuter.
+- Toute fonction doit préciser les configurations compatibles et les configurations non encore couvertes. Les essais simulés, sur traces et physiques doivent rester distincts.
 
-## 4. Garage : enregistrer et recharger les véhicules depuis Réglages
+### Déconnexions
+La règle fonctionnelle demandée est simple : en cas de déconnexion véhicule ou interface, arrêter immédiatement l'opération en cours, afficher un message court correspondant à la cause (« véhicule déconnecté », « Bluetooth déconnecté » ou « interface déconnectée ») et demander de relancer la session. Pas de reprise automatique ou de mécanisme de récupération complexe non demandé.
 
-Ajouter dans l'onglet **Réglages** une section « Véhicules enregistrés » avec des actions visibles :
-- **Enregistrer le véhicule actuel** : sauvegarder le profil sélectionné.
-- **Recharger un véhicule enregistré** : afficher la liste des profils, leur année, moteur/RPO, transmission, marché, VIN et nom personnalisé éventuel, puis charger le profil choisi.
-- Modifier le nom ou les caractéristiques d'un profil, supprimer un profil avec confirmation et gérer les doublons.
-- Proposer l'enregistrement après la création ou la modification d'un véhicule, sans écraser silencieusement un profil existant.
+### Qualité et CI
+- Un job marqué `skipped` ne constitue jamais un build réussi.
+- Les validations de livraison doivent exécuter réellement tests, lint, compilation et packaging concernés, et être rattachées au SHA testé.
+- Les workflows de release restent exclusivement liés à la branche principale.
 
-Données minimales d'un profil :
-- VIN lorsqu'il est connu et validé, année, génération calculée, moteur/RPO, transmission et marché.
-- Nom personnalisé facultatif, date de création et date de dernière utilisation.
-- Provenance et date de lecture du VIN, lorsqu'il vient d'un calculateur ; distinguer cette valeur d'un VIN saisi manuellement.
+## 3. Lots de développement différés — une PR par lot
 
-Comportement :
-- Conserver plusieurs véhicules localement, après fermeture et redémarrage de l'application.
-- Au chargement, revalider le VIN lu sur l'ECU à chaque nouvelle connexion OBD ; ne jamais supposer que le profil sélectionné correspond encore au véhicule branché.
-- Si le VIN lu diffère du profil, demander s'il s'agit d'un autre véhicule ou d'un ECU remplacé / VIN incohérent avant de basculer.
-- Isoler par véhicule les DTC, rapports, captures CAN, télémétries, sessions et interventions ; ne pas mélanger les historiques.
-- Le rechargement d'un profil ne doit pas réutiliser des données de diagnostic anciennes comme si elles venaient de la connexion actuelle.
-- Prévoir export/import de profils pour sauvegarde et transfert, avec validation des données importées.
+Les lots sont regroupés par responsabilité fonctionnelle. Leur ordre proposé tient compte des dépendances ; il pourra être ajusté si une dépendance technique réelle l'impose.
 
-## 5. Ordre de réalisation proposé
+### Lot 1 — Couche d'adaptation et matrice des capacités matérielles
 
-1. Persistance locale des profils et boutons Enregistrer / Recharger dans Réglages, avec tests de cycle de vie et d'isolation des historiques.
-2. Modèle de capture CAN, stockage horodaté et visualisation brute ; prise en charge passive uniquement sur les interfaces qui l'exposent réellement.
-3. Décodeur de trames fondé sur les catalogues documentés et enrichissement progressif en langage humain.
-4. Bibliothèque de requêtes prédéfinies strictement en lecture seule, après validation de chaque définition.
-5. Émetteur manuel sous garde-fous, d'abord limité aux requêtes de diagnostic documentées et compatibles ; aucune commande d'action non vérifiée.
+**Objectif :** disposer d'une description fiable et commune de ce que chaque interface peut réellement faire. Ce lot sert de fondation aux fonctions qui dépendent du matériel.
 
-## 6. Statut et critères d'acceptation
+- Gérer les familles ELM327, OBDLink, VXDIAG/VCX, Autocom, KKL USB et pont PC/J2534 selon modèle exact, firmware, transport et licences.
+- Séparer clairement transport USB/Bluetooth/Wi-Fi, pilote, protocole véhicule, transceiver physique, fonctions firmware et droits/licences.
+- Détecter ou déclarer explicitement les capacités : lecture OBD, diagnostic constructeur, CAN brut, capture passive, émission, programmation, etc.
+- Ne jamais déduire une capacité CAN/K-Line/J2534 ou une compatibilité GM du seul nom commercial ou de la présence d'un pilote USB.
+- Distinguer « pris en charge », « non pris en charge » et « inconnu/non vérifié ».
+- Intégrer l'installation, la configuration et les mises à jour du pont PC dans un parcours cohérent avec les mises à jour de l'application.
 
-Ces fonctions sont **planifiées et non implémentées** tant qu'elles ne sont pas présentes dans l'application, couvertes par des tests et validées sur les interfaces concernées.
+**Livrables :** modèle de capacités, matrice adaptateur/protocole/opération, détection et tests unitaires sur les profils d'interfaces. Aucune compatibilité physique ne doit être déclarée sans preuve correspondante.
 
-Une fonctionnalité de capture ou d'émission ne peut être déclarée « validée sur véhicule » qu'après un essai réel documenté avec véhicule, année/RPO, calculateur, interface, réseau, firmware et résultat. Les tests simulés et les traces importées doivent être identifiés comme tels.
+### Lot 2 — Garage et gestion des profils véhicules
 
-## 7. Exigence transverse : parité fonctionnelle sur tous les modèles compatibles
+**Objectif :** gérer plusieurs véhicules sans mélanger leurs données ni leurs historiques.
 
-Principe obligatoire pour toutes les prochaines versions et toutes les évolutions de CamaroDiag, y compris les fonctions déjà présentes dans l'application :
+- Ajouter dans Réglages une section « Véhicules enregistrés » avec **Enregistrer le véhicule actuel** et **Recharger un véhicule enregistré**.
+- Gérer plusieurs profils persistants : VIN, année, génération, moteur/RPO, transmission, marché, nom personnalisé, dates de création et dernière utilisation.
+- Distinguer VIN lu sur un ECU et VIN saisi manuellement, avec provenance et date de lecture.
+- Modifier, renommer, supprimer avec confirmation, détecter les doublons et éviter tout écrasement silencieux.
+- Exporter/importer les profils avec validation des données.
+- À chaque nouvelle connexion, relire le VIN disponible et le comparer au profil sélectionné.
+- En cas d'écart, demander si un autre véhicule est connecté ou si un ECU a été remplacé / présente un VIN incohérent ; ne pas changer de profil silencieusement.
+- Isoler par véhicule DTC, rapports, captures, télémétries, sessions et interventions. Un profil rechargé ne doit jamais faire passer des données anciennes pour des données de la session actuelle.
 
-- Une fonctionnalité doit être disponible et opérationnelle sur **tous les modèles Camaro, millésimes, motorisations/RPO, transmissions, calculateurs et marchés** pour lesquels les capacités techniques nécessaires existent et sont documentées.
-- Ne jamais limiter une fonction au seul véhicule de développement ou de validation (notamment une Camaro 2012 LFX), ni coder en dur un millésime ou un RPO lorsque la fonction peut être généralisée.
-- Déterminer la disponibilité à partir d'une matrice de capacités explicite : génération, année, RPO, transmission, équipement réellement installé, calculateur identifié, protocole, réseau, interface/firmware et version logicielle/calibration lorsque ces éléments sont requis.
-- Séparer la disponibilité de la fonction de la disponibilité de ses données : une fonction générique (par exemple lecture, capture, export ou affichage) doit rester utilisable sur les véhicules compatibles même si certaines interprétations GM spécifiques ne sont pas encore documentées. Dans ce cas, afficher les données brutes ou génériques et signaler précisément ce qui manque.
-- Adapter automatiquement le parcours et les commandes aux calculateurs et équipements présents. Un équipement optionnel absent ne doit pas bloquer les fonctions utilisables sur les autres calculateurs.
-- Si une limitation matérielle, protocolaire, logicielle, de sécurité ou de documentation est réelle, désactiver uniquement l'opération concernée, expliquer la raison et conserver accessibles les fonctions compatibles. Ne jamais afficher une fonction comme opérationnelle si l'interface ne sait pas l'exécuter.
-- Toute nouvelle fonction doit être accompagnée d'une matrice de compatibilité et de tests couvrant les profils concernés, y compris les frontières de millésime et les variantes moteur/transmission. Les profils non couverts doivent être explicitement identifiés, sans extrapolation.
-- Les critères de livraison doivent vérifier la parité sur l'ensemble des profils compatibles, et pas uniquement sur le véhicule de référence. Les essais simulés, les tests sur traces et les validations physiques doivent rester distingués.
+**Dépendance :** s'appuyer sur la couche d'adaptation du Lot 1 pour qualifier les capacités de lecture du VIN.
 
-Critère d'acceptation : pour chaque fonctionnalité, démontrer qu'elle fonctionne sur chaque configuration déclarée compatible ; lorsqu'une configuration ne la supporte pas, démontrer que seule cette fonction est indisponible et que le reste de l'application continue de fonctionner normalement.
+### Lot 3 — Robustesse commune des sessions et déconnexions
 
-## 8. Règle de construction périodique pendant le développement
+**Objectif :** appliquer la même règle de fin de session dans toute l'application.
 
-Objectif : détecter les régressions de compilation régulièrement sans imposer un build sur chaque commit intermédiaire potentiellement incomplet.
+- Centraliser la détection des déconnexions véhicule, Bluetooth, USB, Wi-Fi ou pont PC selon le transport utilisé.
+- Arrêter immédiatement la capture, la requête ou l'opération en cours.
+- Afficher un message bref identifiant la cause et demander à l'utilisateur de relancer.
+- Appliquer le comportement à tous les écrans, pas uniquement au Sniffer CAN.
+- Ne pas introduire de reconnexion silencieuse, reprise automatique ou procédure complexe.
+- Tester les déconnexions pendant lecture, capture, export, diagnostic et autres opérations longues.
 
-- Intervalle nominal : **50 commits de la PR depuis le dernier build complet réussi**.
-- L'intervalle doit être configurable (valeur par défaut 50), sans nécessiter de modifier le code applicatif.
-- Le seuil est un déclencheur minimal, pas une obligation de construire un commit manifestement intermédiaire. Si le cinquantième commit laisse volontairement un travail incomplet ou un état non constructible, le build est différé jusqu'au premier commit cohérent suivant.
-- Après le seuil, le contrôle de seuil est réévalué à chaque nouveau commit. Tant qu'aucun build complet ne réussit, le besoin de build reste en attente ; il ne repart pas à zéro et ne disparaît pas.
-- Dès qu'un build complet réussit, ce commit devient le nouveau point de départ du compteur.
-- Un build périodique de PR Draft doit au minimum exécuter les tests unitaires, lint et compilation/package Debug Android ainsi que compilation et packages Debug Windows x64/x86. Les artefacts et journaux doivent être conservés et rattachés au SHA exact.
-- Les builds périodiques Draft ne constituent pas une validation de livraison : le passage en Ready for review conserve une validation complète obligatoire, et chaque commit ultérieur en Ready relance cette validation.
-- Les workflows de release restent exclusivement liés à la branche principale et ne doivent jamais être déclenchés par ces builds de PR.
+**Dépendance :** couche d'adaptation du Lot 1 ; intégration avec les profils du Lot 2 lorsque l'identité du véhicule est concernée.
+
+### Lot 4 — Tableau de bord télémétrie temps réel personnalisable et multi-calculateurs
+
+**Objectif :** laisser l'utilisateur choisir toutes les données réellement accessibles, au lieu d'une courte liste fixe.
+
+- Créer un catalogue dynamique par calculateur, service/PID/DID, bus, unité, fréquence de rafraîchissement, protocole et compatibilité véhicule/interface.
+- Inclure les sondes lambda/O2 amont et aval par banc, STFT/LTFT, températures, pressions, débit d'air, ratés, paramètres moteur et transmission.
+- Ajouter les données châssis et carrosserie lorsqu'elles sont exposées : ABS, vitesses de roues, ESP/traction, TPMS par roue, portes, coffre, capot, vitres, ceintures et états d'éclairage.
+- Permettre recherche, sélection, ajout/retrait, organisation et sauvegarde de plusieurs tableaux de bord.
+- Proposer des rendus adaptés : valeur numérique, état, jauge et courbe temporelle ; afficher unité, source, calculateur, fréquence et validité.
+- Distinguer précisément « non supporté par le véhicule », « non exposé par le calculateur », « inaccessible avec l'interface actuelle » et « définition inconnue ».
+- Ne jamais inventer une donnée. Les valeurs propriétaires doivent avoir une définition et une provenance fiables.
+- Gérer les groupes et fréquences de requêtes pour éviter de saturer le bus ou de surcharger les calculateurs.
+- Enregistrer et exporter les mesures ; permettre leur consultation hors connexion.
+
+**Dépendances :** Lots 1, 2 et 3. Les données disponibles varieront selon véhicule, ECU et interface.
+
+### Lot 5 — Outils d'entretien et procédures de service
+
+**Objectif :** regrouper les opérations d'entretien et de remplacement qui ne relèvent ni du diagnostic courant ni de la calibration.
+
+- Étudier les fonctions de remplacement et de codage d'injecteurs pour chaque moteur et calculateur concerné.
+- Ne pas présumer qu'un moteur essence utilise le même mécanisme de codage qu'un diesel ; vérifier si le calculateur concerné exige réellement un code.
+- N'activer une procédure que si l'ECU, la motorisation et la procédure applicable sont identifiés et documentés.
+- Si un code injecteur est requis, fournir une aide visuelle pour localiser le code sur l'injecteur et l'associer au bon cylindre.
+- Montrer clairement l'orientation du moteur comme vue par une personne face au compartiment moteur ; distinguer gauche/droite côté véhicule et côté observateur.
+- Ajouter contrôles de cohérence, confirmation des valeurs, prérequis et journal d'intervention.
+- Étendre ensuite ce lot à d'autres procédures de service uniquement lorsqu'elles sont documentées et validées, sans transformer l'application en catalogue de commandes non vérifiées.
+
+**Dépendances :** Lots 1 et 2 ; matrice de compatibilité moteur/ECU obligatoire.
+
+### Lot 6 — Atelier de calibration professionnel
+
+**Objectif :** faire évoluer l'espace calibration vers un véritable atelier d'analyse et d'édition de cartographies, distinct du diagnostic standard.
+
+- Présenter les cartographies sous forme de tableaux avec cellules colorées, axes, unités, sélection et navigation cohérentes.
+- Ajouter comparaison de calibrations, recherche, graphiques 2D/3D et historique des modifications.
+- Ajouter les opérations de masse pertinentes : incréments, interpolation, lissage et normalisation, avec aperçu et annulation/rétablissement.
+- Gérer plusieurs calibrations/cartographies d'un même véhicule, notamment les configurations flexfuel.
+- Fiabiliser import/export et préserver les données non modifiées.
+- Étudier HP Tuners (.hpt) et EFILive (.coz/.ctz) ; ne déclarer un format pris en charge que si sa structure est réellement interprétée. Signaler pertes et incompatibilités. Importer un fichier ne signifie pas qu'il est flashable.
+- Distinguer sauvegarde partielle d'une zone de calibration et sauvegarde complète de la zone de calibration.
+- Exclure strictement firmware, OS, bootloader et mémoire non-calibration de ces opérations.
+- Toute écriture doit reposer sur une cartographie mémoire documentée et une compatibilité ECU/interface vérifiée. Si la zone de calibration ne peut pas être isolée avec certitude, désactiver l'écriture.
+- Prévoir validation statique, comparaison, simulation hors véhicule et procédure de récupération documentée. Une simulation ne garantit jamais à elle seule la sécurité mécanique du moteur.
+- Une interruption de communication pendant une programmation ne doit jamais déclencher de reprise ou de renvoi aveugle ; l'état doit être considéré comme inconnu jusqu'à identification et vérification adaptées.
+
+**Dépendances :** Lots 1, 2 et 3. Ce lot doit rester isolé des fonctions de diagnostic courant et suivre ses propres critères de sécurité et de validation.
+
+### Lot 7 — Extension des plateformes et couverture multi-marques
+
+**Objectif :** étendre progressivement l'application au-delà des Camaro, sans supposer que des marques différentes partagent la même architecture.
+
+- Consolider d'abord la couverture Camaro Gen 5 et Gen 6, moteurs et transmissions réellement documentés.
+- Étudier ensuite les véhicules GM apparentés retenus, par exemple Corvette, selon leurs calculateurs et architectures propres.
+- Étudier séparément Dodge Challenger, Charger et RAM : ce ne sont pas des véhicules GM et ils nécessitent des profils, protocoles et sources techniques propres.
+- Ajouter les Peugeot ciblées, notamment la 207 CC 1.6 VTi, dans un périmètre PSA distinct.
+- Réutiliser les fonctions génériques lorsque c'est pertinent, mais maintenir des profils, catalogues, procédures et matrices de compatibilité propres à chaque plateforme.
+- Ne déclarer aucune couverture véhicule sur la seule base d'une proximité de marque ou de génération.
+
+**Dépendances :** Lots 1 et 2, puis validation spécifique de chaque plateforme. Ce lot sera découpé en PR indépendantes par famille/plateforme si son volume le nécessite.
+
+### Lot 8 — Cahier de tests utilisateur complet
+
+**Objectif :** fournir un classeur Excel de recette que l'utilisateur pourra remplir avec ses véhicules et interfaces lorsque le périmètre sera suffisamment stabilisé.
+
+- Couvrir les parcours fonctionnels, calculateurs, interfaces, variantes véhicule, erreurs, exports/imports et régressions.
+- Pour chaque test : identifiant, lot/fonction, prérequis, matériel, véhicule/profil, étapes, résultat attendu, résultat constaté, statut, preuve/log et commentaire.
+- Distinguer tests unitaires/automatisés, tests hors véhicule, tests simulés, tests sur traces et essais physiques.
+- Prévoir des matrices de couverture par génération, année, moteur/RPO, transmission, calculateur et interface.
+- Inclure des tests négatifs : capacité non supportée, ECU absent, définition inconnue, mauvaise sélection de véhicule et déconnexion.
+- Préparer le classeur complet après stabilisation des fonctions ; le fournir à l'utilisateur pour exécution physique, puis intégrer les résultats et anomalies dans des PR de correction dédiées.
+
+**Dépendances :** construction progressive à partir des critères d'acceptation des Lots 1 à 7. La préparation du modèle de classeur peut commencer avant la fin, mais la recette complète ne peut être figée qu'une fois le périmètre stabilisé.
+
+
+### Lot 9 — Internationalisation complète et choix de langue indépendant du téléphone
+
+**Objectif :** proposer toutes les langues officielles de l'Union européenne, tout en conservant les langues supplémentaires déjà prévues.
+
+- Couvrir les 24 langues officielles de l'Union européenne : allemand, anglais, bulgare, croate, danois, espagnol, estonien, finnois, français, grec, hongrois, irlandais, italien, letton, lituanien, maltais, néerlandais, polonais, portugais, roumain, slovaque, slovène, suédois et tchèque.
+- Conserver également les langues hors UE déjà prévues ou présentes : hébreu, russe, chinois (simplifié), japonais, coréen et arabe.
+- Au premier lancement, suivre par défaut la langue du système si elle est intégralement prise en charge ; sinon utiliser l'anglais.
+- Ajouter dans les paramètres de l'application un sélecteur permettant de choisir explicitement une langue, indépendamment de celle du téléphone, ainsi qu'une option « Suivre la langue du téléphone ».
+- Mémoriser le choix manuel et le conserver après redémarrage, mise à jour et changement de langue du système ; le choix « suivre le téléphone » doit revenir automatiquement au comportement système.
+- Synchroniser la liste des langues disponibles avec la configuration Android des langues par application (Android 13+) et utiliser une solution compatible avec les versions antérieures ciblées (Android 10 à 12).
+- Prendre en charge correctement les langues RTL (arabe et hébreu), les formats régionaux, dates, nombres, unités et pluriels.
+- Ne jamais afficher une langue comme disponible si ses traductions sont absentes ou seulement partiellement vérifiées. Prévoir un contrôle automatisé de complétude des ressources et des clés manquantes.
+- Traduire tous les écrans, dialogues, erreurs, notifications, outils, contenus d'aide et chaînes ajoutées dans les PR ultérieures ; éviter les chaînes codées en dur.
+
+**Critères d'acceptation :** test du choix manuel sur Android 10 à 16 ; test du suivi système ; test du repli anglais ; persistance après redémarrage ; test RTL ; contrôle de couverture de toutes les chaînes pour chacune des langues annoncées.
+
+### Lot 10 — Adaptation réelle aux tablettes et grands écrans
+
+**Objectif :** offrir une interface pensée pour les tablettes, et pas simplement étirée depuis la disposition téléphone.
+
+- Détecter la largeur disponible de la fenêtre et adapter les compositions aux tailles compactes, moyennes et étendues, y compris en mode paysage et multi-fenêtre.
+- Prévoir une navigation adaptée aux grands écrans (navigation latérale ou rail lorsque pertinent) et conserver une navigation claire sur téléphone.
+- Exploiter l'espace disponible avec des dispositions multi-colonnes : liste à gauche et détail à droite, panneaux de diagnostic côte à côte, sans imposer une largeur excessive aux contenus.
+- Adapter particulièrement le Sniffer/Console CAN, les tableaux de données temps réel, les rapports et l'atelier de calibration.
+- Pour les cartographies, afficher des tableaux plus larges et lisibles, avec axes, en-têtes et commandes accessibles sans défilement horizontal permanent lorsque la largeur le permet.
+- Respecter les changements de taille, rotation, clavier/souris, tactile et fenêtres redimensionnables ; conserver l'état de l'écran lors des changements de configuration.
+- Garder des tailles tactiles suffisantes et une hiérarchie lisible ; ne pas simplement agrandir les contrôles téléphone.
+- Définir et tester des seuils de largeur en dp sur émulateur/téléphone/tablette, portrait/paysage et multi-fenêtre.
+
+#### Profils de recette écran de référence
+Les diagonales suivantes sont des cibles explicites de recette, pas des dimensions codées en dur :
+- **8 pouces — compact :** hiérarchiser les commandes essentielles, éviter les colonnes trop étroites et vérifier les écrans denses.
+- **10 pouces — référence :** disposition équilibrée, panneaux côte à côte lorsque cela améliore la lecture.
+- **12 pouces — grand format :** exploiter l'espace pour tableaux de bord, console et tableaux de calibration multi-panneaux.
+- Tester chaque profil en portrait et paysage, avec interaction tactile ; compléter par clavier/souris et redimensionnement lorsque le matériel/émulateur le permet.
+- L'interface doit réellement s'adapter à la largeur disponible en dp, à la densité et à la taille de fenêtre. La diagonale en pouces sert uniquement à choisir les appareils/profils de recette.
+
+**Critères d'acceptation supplémentaires :** recette documentée sur les profils 8", 10" et 12" (appareils réels ou émulateurs représentatifs), portrait/paysage, redimensionnement et multi-fenêtre ; aucune disposition ne doit dépendre uniquement de la diagonale physique.
+
+**État constaté lors de l'audit du 19 novembre 2026 :** le projet utilise Jetpack Compose, mais l'arborescence Android ne contient pas de layouts alternatifs sw600dp/w600dp ou de ressources spécifiques tablette. Les écrans consultés utilisent majoritairement des colonnes/listes pleine largeur. Aucune adaptation tablette complète n'est donc confirmée ; ce lot reste à développer et à tester.
+
+## 4. Règle de construction périodique pendant le développement
+
+- Intervalle nominal : **50 commits de la PR depuis le dernier build complet réussi**, configurable avec 50 comme valeur par défaut.
+- Le seuil est un déclencheur minimal, pas une obligation de construire un commit manifestement intermédiaire. Si le cinquantième commit est volontairement incomplet, différer jusqu'au premier commit cohérent suivant.
+- Après le seuil, réévaluer à chaque commit. Tant qu'aucun build complet ne réussit, le besoin de build reste en attente et le compteur ne repart pas à zéro.
+- Dès qu'un build complet réussit, ce commit devient le nouveau point de départ.
+- Un build périodique de PR Draft doit exécuter au minimum tests unitaires, lint et compilation/package Debug Android, ainsi que compilation et packages Debug Windows x64/x86.
+- Conserver artefacts et journaux, rattachés au SHA exact.
+- Le passage en Ready for review exige une validation complète ; chaque commit ultérieur en Ready relance cette validation.
+- Les releases restent exclusivement déclenchées depuis la branche principale.
 - Afficher explicitement les états « en attente du seuil », « différé car commit intermédiaire », « build en cours », « réussi » et « échoué ». Un job ignoré/skipped ne vaut jamais build réussi.
 
-Critère d'acceptation : aucun dépassement du seuil nominal ne doit être oublié ; un build échoué ou différé reste dû jusqu'à un build réussi sur un commit cohérent. L'intervalle nominal peut être augmenté ou réduit par configuration selon la durée des builds et la taille du chantier.
+## Politique de mise à jour documentaire
+
+### Utilisation des fonctions natives GitHub
+- Privilégier les outils natifs disponibles dans le dépôt : PR, Issues, labels, milestones, discussions, GitHub Actions/checks et releases ; utiliser GitHub Projects si cette fonctionnalité est accessible et pertinente.
+- Ne pas dupliquer dans le Markdown les informations dynamiques déjà maintenues par GitHub (état des PR, exécutions CI, checks, commentaires). Les documents gardent le contexte durable, les décisions, la décomposition du backlog et les consignes de reprise, avec des liens vers les objets GitHub utiles.
+- Avant de s'appuyer sur une fonction ou une automatisation, vérifier qu'elle existe et qu'elle est accessible. Ne jamais annoncer un tableau GitHub Project ou une automatisation comme configuré sans l'avoir réellement créé et vérifié.
+
+### Synchronisation du backlog avec les PR
+- Une fonctionnalité du backlog livrée par une PR doit être retirée des tâches futures dès que la PR est fusionnée dans `main` et que le contenu livré a été vérifié.
+- Avant fusion, l'élément reste visible dans le backlog avec le statut « en cours dans PR #… » : une branche de PR ne constitue pas encore une livraison intégrée.
+- Si la PR ne livre qu'une partie d'un lot, retirer uniquement la partie terminée et conserver le reste comme tâche future.
+- L'historique de la livraison reste dans le changelog propre à la PR ; le backlog ne doit pas accumuler les fonctionnalités déjà réalisées.
+
+
+- `docs/PROMPT_REPRISE.md` et `docs/FUTURE_FEATURES_CAN_VEHICLE_GARAGE.md` sont maintenus exclusivement sur `main`.
+- Un changelog propre à chaque PR, nommé `docs/CHANGELOG_PR<number>.md` (ex. `docs/CHANGELOG_PR35.md`), est maintenu sur la branche de cette PR et documente les changements réels, tests/builds et leur statut.
+- Le changelog d'une PR ne doit pas être écrit directement sur `main) avant fusion ; il rejoint `main` avec la PR.
+- Mettre à jour les documents au fil du travail, dans le même lot que le changement concerné. Ne jamais déclarer une validation réussie sans preuve ; distinguer réussi, échoué, ignoré (`skipped`) et non exécuté.
+
+## 5. Organisation des PR et suivi
+
+- **PR #35 :** uniquement le module unifié Sniffer / Console CAN décrit en section 1.
+- **Lots 1 à 8 :** PR distinctes, chacune limitée à son domaine fonctionnel. Un lot volumineux peut être divisé en sous-PR techniquement cohérentes, sans mélanger des domaines indépendants.
+- Respecter les dépendances indiquées ; ne pas ouvrir une PR d'implémentation avant que ses prérequis soient disponibles ou explicitement traités.
+- Une fonction ne passe en « terminée » qu'après code livré, tests pertinents réussis, builds réels réussis et limites de compatibilité documentées.
+- Ne pas confondre backlog, code présent, build CI, test simulé et validation sur véhicule.
