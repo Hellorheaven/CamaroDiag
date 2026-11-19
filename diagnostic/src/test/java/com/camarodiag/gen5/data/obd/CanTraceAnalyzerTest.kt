@@ -277,7 +277,7 @@ class CanTraceAnalyzerTest {
                 "0.000000 1 7E8 Rx d 8 10 0F 62 F1 90 AA BB CC",
                 "0.800000 1 7E8 Rx d 8 21 01 02 03 04 05 06 07",
                 "1.900000 1 7E8 Rx d 8 22 08 09 00 00 00 00 00"
-            ).joinToString("\\n"),
+            ).joinToString("\n"),
             "stale-isotp-session.asc"
         )
 
@@ -294,7 +294,7 @@ class CanTraceAnalyzerTest {
                 "0.000000 1 7E8 Rx d 8 10 0F 62 F1 90 AA BB CC",
                 "0.800000 1 7E8 Rx d 8 21 01 02 03 04 05 06 07",
                 "1.600000 1 7E8 Rx d 8 22 08 09 00 00 00 00 00"
-            ).joinToString("\\n"),
+            ).joinToString("\n"),
             "refreshed-isotp-session.asc"
         )
 
