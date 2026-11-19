@@ -56,6 +56,14 @@ class CanTraceFilterTest {
         assertFalse(
             CanTraceFilter(fromTimestampSeconds = 0.0).matches(unknownTime)
         )
+        val notANumber = rxFrame.copy(timestampSeconds = Double.NaN)
+        assertFalse(
+            CanTraceFilter(fromTimestampSeconds = 0.0).matches(notANumber)
+        )
+        val infiniteTime = rxFrame.copy(timestampSeconds = Double.POSITIVE_INFINITY)
+        assertFalse(
+            CanTraceFilter(toTimestampSeconds = 2.0).matches(infiniteTime)
+        )
     }
 
     @Test
