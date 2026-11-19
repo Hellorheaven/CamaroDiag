@@ -130,6 +130,9 @@ data class CanTraceAnalysisReport(
  * scaling rule, ECU identity or vehicle configuration to a verified catalogue entry.
  */
 object CanTraceAnalyzer {
+    // Bound hostile or accidental 32-bit ISO-TP lengths before buffering a trace payload.
+    private const val MAX_SUPPORTED_ISOTP_PAYLOAD_BYTES = 1_048_576
+
     private val ascFrameRegex = Regex(
         """^\s*(\d+(?:\.\d+)?)\s+\d+\s+([0-9A-Fa-f]{3,8})\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
         RegexOption.IGNORE_CASE
@@ -527,26 +530,42 @@ object CanTraceAnalyzer {
                     if (frame.data.size < 2) {
                         errors += "Line ${frame.lineNumber}: truncated ISO-TP first frame."
                     } else {
-                        val length = ((pci and 0x0F) shl 8) or frame.data[1]
-                        if (length <= 0 || length > 4095) {
-                            errors += "Line ${frame.lineNumber}: unsupported ISO-TP first-frame length."
+                        val shortLength = ((pci and 0x0F) shl 8) or frame.data[1]
+                        val usesExtendedLength = shortLength == 0
+                        val headerLength = if (usesExtendedLength) 6 else 2
+                        if (usesExtendedLength && frame.data.size < headerLength) {
+                            errors += "Line ${frame.lineNumber}: truncated ISO-TP extended first-frame length."
                         } else {
-                            val key = frame.canId to frame.direction
-                            if (pending.containsKey(key)) {
-                                errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
-                                discardedIncompleteMessages++
-                            }
-                            val bytes = frame.data.drop(2).take(length).toMutableList()
-                            if (bytes.size >= length) {
-                                messages += UdsTraceMessage(
-                                    frame.timestampSeconds, frame.canId, frame.direction, bytes.take(length)
-                                )
-                                pending.remove(key)
+                            val lengthLong = if (usesExtendedLength) {
+                                (frame.data[2].toLong() shl 24) or
+                                    (frame.data[3].toLong() shl 16) or
+                                    (frame.data[4].toLong() shl 8) or
+                                    frame.data[5].toLong()
+                            } else shortLength.toLong()
+                            if (lengthLong <= 0 ||
+                                lengthLong > MAX_SUPPORTED_ISOTP_PAYLOAD_BYTES ||
+                                (usesExtendedLength && lengthLong <= 4095)
+                            ) {
+                                errors += "Line ${frame.lineNumber}: unsupported ISO-TP first-frame length."
                             } else {
-                                pending[key] = PendingIsoTp(
-                                    frame.timestampSeconds, frame.canId, frame.direction,
-                                    length, bytes, nextSequence = 1
-                                )
+                                val length = lengthLong.toInt()
+                                val key = frame.canId to frame.direction
+                                if (pending.containsKey(key)) {
+                                    errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
+                                    discardedIncompleteMessages++
+                                }
+                                val bytes = frame.data.drop(headerLength).take(length).toMutableList()
+                                if (bytes.size >= length) {
+                                    messages += UdsTraceMessage(
+                                        frame.timestampSeconds, frame.canId, frame.direction, bytes.take(length)
+                                    )
+                                    pending.remove(key)
+                                } else {
+                                    pending[key] = PendingIsoTp(
+                                        frame.timestampSeconds, frame.canId, frame.direction,
+                                        length, bytes, nextSequence = 1
+                                    )
+                                }
                             }
                         }
                     }
