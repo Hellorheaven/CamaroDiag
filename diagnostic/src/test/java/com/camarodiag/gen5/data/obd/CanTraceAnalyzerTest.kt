@@ -196,6 +196,31 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun decodesStoredPendingAndPermanentObdTroubleCodesAndIgnoresPadding() {
+        val trace = listOf(
+            "0.000000 1 7E8 Rx d 8 05 43 01 33 40 23 00 00",
+            "0.010000 1 7E8 Rx d 8 03 47 C0 23 00 00 00 00",
+            "0.020000 1 7E8 Rx d 8 03 4A 80 45 00 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "obd-dtc-modes.asc")
+
+        assertEquals(listOf("P0133", "C0023", "U0023", "B0045"), report.dtcObservations.map { it.code })
+        assertEquals(listOf(0x03, 0x03, 0x07, 0x0A), report.dtcObservations.map { it.service })
+        assertEquals(listOf(0x01, 0x33), report.dtcObservations.first().rawBytes)
+    }
+
+    @Test
+    fun doesNotInterpretNonDtcOrNegativeResponsesAsTroubleCodes() {
+        val trace = listOf(
+            "0.000000 1 7E8 Rx d 8 03 7F 22 31 00 00 00 00",
+            "0.010000 1 7E8 Rx d 8 03 41 0C 1A 00 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "not-dtc.asc")
+
+        assertTrue(report.dtcObservations.isEmpty())
+    }
+
+    @Test
     fun decodesCanFdEscapedIsoTpSingleFrameLength() {
         val report = CanTraceAnalyzer.analyze(
             "0.000000 1 7E8 Rx d 12 00 0A 62 F1 90 01 02 03 04 05 00 00",
