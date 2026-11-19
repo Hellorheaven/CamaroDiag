@@ -46,3 +46,15 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Export déclenché via le sélecteur de document Android déjà câblé dans `CamaroDiagApp`.
 - Commit : `29513d72f4aca160be3f598fa261b7219afdef4a`.
 - Validation CI : en attente d'un résultat observable ; aucun build réussi n'est revendiqué à ce stade.
+
+### Corrélation UDS et durcissement ISO-TP / CAN FD — 2026-11-19
+- La corrélation UDS ne choisit plus arbitrairement une requête quand plusieurs demandes du même service sont en attente : une réponse n'est associée que si un seul candidat reste compatible.
+- Pour les services ReadDataByIdentifier (0x22) et WriteDataByIdentifier (0x2E), une réponse positive doit contenir et faire correspondre le DID attendu. Les NRC sans DID restent corrélables uniquement lorsque la requête est non ambiguë.
+- Les durées d'échange négatives dues à des horodatages incohérents ne sont plus présentées comme des mesures valides.
+- Prise en charge des Single Frames ISO-TP au format de longueur étendue CAN FD ; détection et abandon explicite d'une Consecutive Frame tronquée.
+- Le compteur des messages ISO-TP incomplets inclut maintenant les sessions remplacées, les séquences interrompues et les sessions encore ouvertes à la fin de la capture.
+- Les exports CSV à colonnes fixes acceptent maintenant les 64 octets CAN FD (data0 à data63), et non plus seulement data0 à data15.
+- Neuf tests de régression couvrent les réponses UDS ambiguës, les DID manquants/concurrents, la longueur CAN FD étendue, les trames tronquées, le bouclage du numéro de séquence, les sessions de directions opposées partageant un ID CAN, le remplacement d'une First Frame et les exports CSV 64 octets.
+- Commits de code : 2019c9a, f0728f3, 1a022f1, 827b758, 8c0170e. Commits de tests et correctifs des fixtures : 82fb72c, 9d71440, 87306ad, 7283076, 0ddc5e1, 4caf6ba.
+- Aucun build ni test automatisé n'a encore été lancé sur ce lot ; les tests sont ajoutés mais pas déclarés validés.
+- Synchronisation avec main : commit de merge e7aa7ad6e8ddf5b351dbb12666171d38284e3fbe. La branche n'est plus en retard sur main ; GitHub indique mergeable_state: clean.
