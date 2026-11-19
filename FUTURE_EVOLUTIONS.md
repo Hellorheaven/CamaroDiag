@@ -75,6 +75,19 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Ajouter des garde-fous, provenance et rapports pour chaque opération sur fichier.
 - [ ] Ne pas activer l'écriture ECU, flash, recovery, correction de checksum GM, accès mémoire direct ou Seed/Key sans spécifications fiables, tests matériels et validation dédiée.
 
+#### Évolution future — courbes de puissance, couple et gains avant/après
+- [ ] Ajouter dans l'atelier Cartographie un écran « Puissance & Couple » présentant les courbes en fonction du régime moteur (RPM), avec puissance et couple sur des axes clairement identifiés et unités sélectionnables (ch, kW, hp ; Nm, lb-ft).
+- [ ] Afficher sur le même graphique les courbes de référence/originale et modifiée, avec légende, couleurs distinctes, curseur de régime et lecture des valeurs au point sélectionné.
+- [ ] Calculer et afficher les écarts absolus et relatifs de puissance et de couple par régime, ainsi que les gains/pertes maximums, leur régime correspondant et les valeurs de puissance/couple de crête.
+- [ ] Permettre de comparer plusieurs versions de calibration et plusieurs sessions de mesure, en conservant véhicule, moteur, transmission, carburant, conditions d'essai, source et date.
+- [ ] Distinguer sans ambiguïté les courbes mesurées sur banc, les courbes estimées par un modèle et les simples courbes théoriques calculées à partir de données partielles ; afficher un badge/avertissement et la méthode/source dans le graphique et le rapport.
+- [ ] Ne jamais présenter une estimation issue des seules tables de calibration comme une mesure réelle ou comme une promesse de gain. Une cartographie seule ne suffit généralement pas à calculer avec fiabilité la puissance et le couple moteur.
+- [ ] Pour les courbes mesurées, permettre l'import de fichiers de banc et de logs compatibles, avec identification des canaux, unités, fréquence, régime, couple, puissance, corrections atmosphériques si disponibles et méthode de calcul ; rejeter ou signaler les données insuffisantes/incohérentes.
+- [ ] Pour les courbes calculées, dériver la puissance du couple et du régime uniquement avec les unités et conventions correctes (par exemple kW = Nm × RPM / 9549 ; hp mécaniques = lb-ft × RPM / 5252) et documenter l'origine du couple utilisé.
+- [ ] Pour les estimations avant/après, exiger un modèle moteur et des données d'entrée validés pour la variante concernée (moteur, carburant, air, charge, rendement, limites et conditions) ; si le modèle n'est pas disponible, désactiver l'estimation de puissance et afficher « données insuffisantes » plutôt qu'inventer une courbe.
+- [ ] Prévoir un rapport exportable comparant les courbes, les gains/pertes par plage de régime, les pics, les conditions de mesure et le niveau de confiance ; conserver les fichiers sources sans les modifier.
+- [ ] Ajouter des tests sur conversions d'unités, calcul puissance/couple, interpolation des courbes, synchronisation RPM, données manquantes, comparaison avant/après et distinction mesure/estimation.
+
 #### Évolution future — validation et simulation de cartographie sans écriture ECU
 - [ ] Ajouter un mode « Vérifier / Simuler » accessible depuis l'atelier Cartographie, strictement hors ligne et sans envoyer de commande d'écriture au véhicule.
 - [ ] Prévoir une validation statique du fichier : format et structure, taille, intégrité, sommes de contrôle lorsqu'elles sont documentées, cohérence des sections et présence des métadonnées attendues.
@@ -215,6 +228,7 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 
 ## 6. Historique des décisions
 
+- 2026-11-19 : ajouter les courbes de puissance et de couple avant/après cartographie, avec gains par régime, pics et rapports ; distinguer strictement mesures banc/logs, estimations fondées sur un modèle validé et calculs théoriques, sans déduire de gains fiables des seules tables.
 - 2026-11-19 : ajout d'un mode de validation et simulation hors ligne des cartographies, comparaison avant/après, contrôles statiques, simulation des tables lorsque les définitions sont connues et rejeu de logs ; aucune écriture ECU, et aucune prétention à remplacer un essai moteur sur banc/véhicule.
 - 2026-11-19 : préciser l'éditeur graphique de calibration de niveau professionnel (grilles colorées, vues 2D/3D, opérations sur cellules, interpolation/lissage, comparaison, historique, ergonomie tablette, définitions vérifiées et tests) ainsi que les exigences d'import/export multi-cartographies et HP Tuners ; ces éléments restent au backlog et ne sont pas déclarés implémentés.
 - 2026-11-18 : décision de conserver CamaroDiag comme priorité immédiate, tout en concevant progressivement une architecture extensible.
