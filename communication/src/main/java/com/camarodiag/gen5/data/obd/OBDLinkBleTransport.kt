@@ -34,6 +34,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
     private var mtuPayload = 20
     private val incoming = Channel<ByteArray>(Channel.UNLIMITED)
     private var pending = ByteArray(0)
+    @Volatile private var connectionFailure: Throwable? = null
 
     private var connectResult: CompletableDeferred<Unit>? = null
     private var writeResult: CompletableDeferred<Unit>? = null
@@ -42,7 +43,10 @@ internal class OBDLinkBleTransport(private val context: Context) {
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                connectResult?.completeExceptionally(IllegalStateException("BLE connection failed (status $status)"))
+                val failure = IllegalStateException("BLE connection failed (status $status)")
+                connectionFailure = failure
+                connectResult?.completeExceptionally(failure)
+                writeResult?.completeExceptionally(failure)
                 return
             }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
@@ -50,7 +54,12 @@ internal class OBDLinkBleTransport(private val context: Context) {
                     connectResult?.completeExceptionally(IllegalStateException("BLE service discovery could not start"))
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                connectResult?.completeExceptionally(IllegalStateException("OBDLink BLE disconnected"))
+                val failure = IllegalStateException("OBDLink BLE disconnected")
+                connectionFailure = failure
+                connectResult?.completeExceptionally(failure)
+                writeResult?.completeExceptionally(failure)
+                // Wake a reader waiting for notifications so it can surface the disconnect.
+                incoming.trySend(ByteArray(0))
             }
         }
 
@@ -122,6 +131,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
     suspend fun connect(device: BluetoothDevice): Result<Unit> {
         return try {
             close()
+            connectionFailure = null
             connectResult = CompletableDeferred()
             gatt = device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
                 ?: throw IllegalStateException("Unable to create BLE connection")
@@ -137,6 +147,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 
     suspend fun write(data: ByteArray) {
+        connectionFailure?.let { throw IllegalStateException("OBDLink BLE connection is unavailable", it) }
         val g = gatt ?: error("BLE transport not connected")
         val characteristic = writeCharacteristic ?: error("OBDLink BLE write characteristic unavailable")
         var offset = 0
@@ -176,8 +187,13 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 
     suspend fun read(buffer: ByteArray, timeoutMs: Int): Int {
+        connectionFailure?.let { throw IllegalStateException("OBDLink BLE disconnected while reading", it) }
         if (pending.isEmpty()) {
-            val packet = withTimeoutOrNull(timeoutMs.toLong()) { incoming.receive() } ?: return 0
+            val packet = withTimeoutOrNull(timeoutMs.toLong()) { incoming.receive() } ?: run {
+                connectionFailure?.let { throw IllegalStateException("OBDLink BLE disconnected while reading", it) }
+                return 0
+            }
+            connectionFailure?.let { throw IllegalStateException("OBDLink BLE disconnected while reading", it) }
             pending = packet
         }
         val count = minOf(buffer.size, pending.size)
@@ -195,6 +211,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         while (incoming.tryReceive().isSuccess) { }
         connectResult = null
         writeResult = null
+        connectionFailure = null
         mtuResult = null
     }
 }
