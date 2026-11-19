@@ -36,6 +36,15 @@ data class UdsTraceMessage(
     val serviceName: String
         get() = when (service) {
             0x01 -> "ShowCurrentData (OBD-II)"
+            0x02 -> "ShowFreezeFrameData (OBD-II)"
+            0x03 -> "ReadStoredDiagnosticTroubleCodes (OBD-II)"
+            0x04 -> "ClearDiagnosticTroubleCodes (OBD-II)"
+            0x05 -> "ReadOxygenSensorMonitoring (OBD-II)"
+            0x06 -> "ReadOnBoardMonitoringTestResults (OBD-II)"
+            0x07 -> "ReadPendingDiagnosticTroubleCodes (OBD-II)"
+            0x08 -> "ControlOnBoardSystems (OBD-II)"
+            0x09 -> "RequestVehicleInformation (OBD-II)"
+            0x0A -> "ReadPermanentDiagnosticTroubleCodes (OBD-II)"
             0x10 -> "DiagnosticSessionControl"
             0x11 -> "ECUReset"
             0x14 -> "ClearDiagnosticInformation"
@@ -243,7 +252,8 @@ object CanTraceAnalyzer {
                     }
                     return@forEach
                 }
-            } else if (service in 0x10..0x3E) {
+            } else if (service in 0x01..0x0A || service in 0x10..0x3E) {
+                // Include standard OBD-II modes as well as UDS services in the exchange history.
                 pending += PendingUdsRequest(message)
             }
         }
