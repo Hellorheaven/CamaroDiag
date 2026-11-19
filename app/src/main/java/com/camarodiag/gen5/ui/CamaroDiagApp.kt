@@ -1372,6 +1372,19 @@ fun CanSnifferScreen(
                 if (!filterInputValid) {
                     Text(stringResource(R.string.can_trace_filter_invalid), color = WarnRed, fontSize = 11.sp)
                 }
+                OutlinedButton(
+                    onClick = {
+                        frameSearch = ""
+                        canIdFilter = ""
+                        dataPrefixFilter = ""
+                        directionFilter = "ALL"
+                    },
+                    enabled = frameSearch.isNotBlank() || canIdFilter.isNotBlank() ||
+                        dataPrefixFilter.isNotBlank() || directionFilter != "ALL",
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.can_trace_clear_filters))
+                }
                 Text(
                     stringResource(R.string.can_sniffer_filtered_count, visibleFrames.size, report.frames.size),
                     color = TextMuted,
