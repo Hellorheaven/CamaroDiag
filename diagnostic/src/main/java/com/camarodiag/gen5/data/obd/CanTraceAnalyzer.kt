@@ -186,7 +186,9 @@ object CanTraceAnalyzer {
         fun toExchange(status: UdsExchangeStatus): UdsTraceExchange {
             val lastTimestamp = responses.lastOrNull()?.timestampSeconds
             val startTimestamp = request.timestampSeconds
-            val elapsed = if (lastTimestamp != null && startTimestamp != null) {
+            val elapsed = if (lastTimestamp != null && startTimestamp != null &&
+                lastTimestamp >= startTimestamp
+            ) {
                 (lastTimestamp - startTimestamp) * 1_000.0
             } else null
             return UdsTraceExchange(request, responses.toList(), status, elapsed)
@@ -215,7 +217,17 @@ object CanTraceAnalyzer {
                     request.direction != message.direction &&
                         request.canId != message.canId &&
                         request.service == service &&
-                        (request.did == null || message.did == null || request.did == message.did)
+                        when (service) {
+                            // Read/write DID responses must echo the requested identifier.
+                            // A negative response has no DID, so it is safe only when the
+                            // surrounding candidate set contains exactly one request.
+                            0x22, 0x2E -> request.did != null && (
+                                isNegativeResponse ||
+                                    (message.did != null && request.did == message.did)
+                                )
+                            else -> request.did == null || message.did == null ||
+                                request.did == message.did
+                        }
                 }
                 val matchIndex = matchingIndexes.singleOrNull()
                 if (matchIndex != null) {
