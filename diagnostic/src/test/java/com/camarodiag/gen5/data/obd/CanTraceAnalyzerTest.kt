@@ -51,6 +51,109 @@ class CanTraceAnalyzerTest {
 
 
     @Test
+    fun doesNotAttachAmbiguousNegativeResponseToOneOfSeveralSameServiceRequests() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.001000 1 7E0 Tx d 8 03 22 F1 91 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 03 7F 22 31 00 00 00 00"
+        ).joinToString("\\n")
+        val report = CanTraceAnalyzer.analyze(trace, "ambiguous.asc")
+
+        assertEquals(2, report.exchanges.size)
+        assertTrue(report.exchanges.all { it.status == UdsExchangeStatus.UNANSWERED })
+        assertTrue(report.exchanges.all { it.responses.isEmpty() })
+    }
+
+    @Test
+    fun matchesPositiveResponseToItsDidWhenSeveralSameServiceRequestsArePending() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.001000 1 7E0 Tx d 8 03 22 F1 91 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 04 62 F1 90 AA 00 00 00"
+        ).joinToString("\\n")
+        val report = CanTraceAnalyzer.analyze(trace, "did-match.asc")
+
+        assertEquals(2, report.exchanges.size)
+        val completed = report.exchanges.single { it.status == UdsExchangeStatus.COMPLETED }
+        val unanswered = report.exchanges.single { it.status == UdsExchangeStatus.UNANSWERED }
+        assertEquals(0xF190, completed.request.did)
+        assertEquals(0xF190, completed.responses.single().did)
+        assertEquals(0xF191, unanswered.request.did)
+        assertTrue(unanswered.responses.isEmpty())
+    }
+
+    @Test
+    fun decodesCanFdEscapedIsoTpSingleFrameLength() {
+        val report = CanTraceAnalyzer.analyze(
+            "0.000000 1 7E8 Rx d 12 00 0A 62 F1 90 01 02 03 04 05 00",
+            "can-fd.asc"
+        )
+
+        assertEquals(1, report.messages.size)
+        assertEquals(
+            listOf(0x62, 0xF1, 0x90, 0x01, 0x02, 0x03, 0x04, 0x05, 0x00, 0x00),
+            report.messages.single().payload
+        )
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
+    fun rejectsTruncatedIsoTpConsecutiveFrameAndDiscardsPartialMessage() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 8 10 08 62 F1 90 AA BB CC",
+                "7E8 1 21"
+            ).joinToString("\\n"),
+            "capture.txt"
+        )
+
+        assertTrue(report.messages.isEmpty())
+        assertEquals(0, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.any { it.contains("truncated ISO-TP consecutive frame") })
+    }
+
+    @Test
+    fun supportsIsoTpSequenceNumberWrapAfterFifteen() {
+        val frames = mutableListOf("7E8 8 10 76 62 F1 90 00 01 02")
+        for (sequence in 1..16) {
+            val bytes = listOf(0x20 or (sequence and 0x0F)) +
+                List(7) { index -> (sequence + index) and 0xFF }
+            val encoded = bytes.joinToString(" ") { value ->
+                value.toString(16).padStart(2, '0').uppercase()
+            }
+            frames += "7E8 8 $encoded"
+        }
+        val report = CanTraceAnalyzer.analyze(frames.joinToString("\\n"), "sequence-wrap.txt")
+
+        assertEquals(1, report.messages.size)
+        assertEquals(118, report.messages.single().payload.size)
+        assertEquals(0x22, report.messages.single().service)
+        assertEquals(0, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
+    fun reassemblesSameCanIdIsoTpSessionsIndependentlyByDirection() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "can_id,direction,data",
+                "7E8,TX,10 08 22 F1 90 AA BB CC",
+                "7E8,RX,10 08 62 F1 91 11 22 33",
+                "7E8,TX,21 DD EE",
+                "7E8,RX,21 44 55"
+            ).joinToString("\\n"),
+            "same-id-directions.csv"
+        )
+
+        assertEquals(2, report.messages.size)
+        assertEquals(CanTraceDirection.TX, report.messages[0].direction)
+        assertEquals(CanTraceDirection.RX, report.messages[1].direction)
+        assertEquals(listOf(0x22, 0xF1, 0x90, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE), report.messages[0].payload)
+        assertEquals(listOf(0x62, 0xF1, 0x91, 0x11, 0x22, 0x33, 0x44, 0x55), report.messages[1].payload)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
     fun parsesElmFramesAndDecodesStandardEngineSpeedPid() {
         val report = CanTraceAnalyzer.analyze(
             "7E8 5 04 41 0C 1A F8",
