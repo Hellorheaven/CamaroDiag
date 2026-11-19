@@ -841,4 +841,25 @@ class CanTraceAnalyzerTest {
         assertEquals(2, report.errors.size)
     }
 
+
+    @Test
+    fun rejectsTraceFramesContainingMoreBytesThanDeclaredDlc() {
+        val elm = CanTraceAnalyzer.analyze("7E8 2 02 41 0C", "capture.txt")
+        val asc = CanTraceAnalyzer.analyze(
+            "0.000000 1 7E8 Rx d 2 02 41 0C",
+            "capture.asc"
+        )
+        val csv = CanTraceAnalyzer.analyze(
+            "can_id,dlc,data\\n7E8,2,02 41 0C",
+            "capture.csv"
+        )
+
+        assertTrue(elm.frames.isEmpty())
+        assertTrue(asc.frames.isEmpty())
+        assertTrue(csv.frames.isEmpty())
+        assertTrue(elm.errors.isNotEmpty())
+        assertTrue(asc.errors.isNotEmpty())
+        assertTrue(csv.errors.isNotEmpty())
+    }
+
 }
