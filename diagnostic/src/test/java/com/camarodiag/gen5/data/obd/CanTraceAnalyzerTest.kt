@@ -12,7 +12,7 @@ class CanTraceAnalyzerTest {
         val trace = listOf(
             "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
             "0.025000 1 7E8 Rx d 8 07 62 F1 90 31 47 30 31"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val report = CanTraceAnalyzer.analyze(trace, "exchange.asc")
 
         assertEquals(1, report.exchanges.size)
@@ -30,7 +30,7 @@ class CanTraceAnalyzerTest {
             "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
             "0.010000 1 7E8 Rx d 8 03 7F 22 78 00 00 00 00",
             "0.090000 1 7E8 Rx d 8 03 7F 22 31 00 00 00 00"
-        ).joinToString("\\n")
+        ).joinToString("\n")
         val exchange = CanTraceAnalyzer.analyze(trace, "exchange.asc").exchanges.single()
 
         assertEquals(2, exchange.responses.size)
@@ -42,7 +42,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun doesNotGuessUdsCorrelationForUnknownDirectionElmFrames() {
         val report = CanTraceAnalyzer.analyze(
-            listOf("7E0 4 03 22 F1 90", "7E8 4 03 62 F1 90").joinToString("\\n"),
+            listOf("7E0 4 03 22 F1 90", "7E8 4 03 62 F1 90").joinToString("\n"),
             "capture.txt"
         )
         assertTrue(report.exchanges.isEmpty())
@@ -254,7 +254,7 @@ class CanTraceAnalyzerTest {
                 "7E8 3 31 00 F3",
                 "7E8 3 32 04 80",
                 "7E8 3 33 01 F0"
-            ).joinToString("\\n"),
+            ).joinToString("\n"),
             "capture.txt"
         )
 
