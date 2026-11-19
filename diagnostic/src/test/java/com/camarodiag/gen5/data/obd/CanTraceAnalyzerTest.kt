@@ -962,4 +962,36 @@ class CanTraceAnalyzerTest {
         assertTrue(report.errors.any { it.contains("no matching first frame") })
     }
 
+
+    @Test
+    fun acceptsIsoTpFlowControlWithStandardAndSubMillisecondStmin() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "0.000000 1 7E8 Rx d 8 30 00 00 00 00 00 00 00",
+                "0.001000 1 7E8 Rx d 8 31 08 F1 00 00 00 00 00",
+                "0.002000 1 7E8 Rx d 8 32 00 F9 00 00 00 00 00"
+            ).joinToString("\\n"),
+            "valid-flow-control.asc"
+        )
+
+        assertTrue(report.errors.isEmpty())
+        assertTrue(report.messages.isEmpty())
+    }
+
+    @Test
+    fun reportsMalformedIsoTpFlowControlStatusAndReservedStmin() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "0.000000 1 7E8 Rx d 8 33 00 00 00 00 00 00 00",
+                "0.001000 1 7E8 Rx d 8 30 00 80 00 00 00 00 00",
+                "0.002000 1 7E8 Rx d 8 30 00 FA 00 00 00 00 00"
+            ).joinToString("\\n"),
+            "invalid-flow-control.asc"
+        )
+
+        assertEquals(3, report.errors.size)
+        assertTrue(report.errors.all { it.contains("invalid ISO-TP flow-control frame") })
+        assertTrue(report.messages.isEmpty())
+    }
+
 }
