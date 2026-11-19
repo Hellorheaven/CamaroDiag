@@ -32,6 +32,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
     private var gatt: BluetoothGatt? = null
     private var writeCharacteristic: BluetoothGattCharacteristic? = null
     private var mtuPayload = 20
+    private var characteristicWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
     /** True only while the current GATT session has not reported a disconnect. */
     val isConnected: Boolean
         get() = gatt != null && connectionFailure == null
@@ -93,9 +94,15 @@ internal class OBDLinkBleTransport(private val context: Context) {
                     return
                 }
             }
-            if (write.properties and BluetoothGattCharacteristic.PROPERTY_WRITE == 0) {
-                connectResult?.completeExceptionally(IllegalStateException("OBDLink BLE transmit characteristic does not support acknowledged writes"))
-                return
+            characteristicWriteType = when {
+                write.properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0 ->
+                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                write.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0 ->
+                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                else -> {
+                    connectResult?.completeExceptionally(IllegalStateException("OBDLink BLE transmit characteristic does not support writes"))
+                    return
+                }
             }
             writeCharacteristic = write
             if (!g.setCharacteristicNotification(notify, true)) {
@@ -183,12 +190,14 @@ internal class OBDLinkBleTransport(private val context: Context) {
             val chunk = data.copyOfRange(offset, offset + count)
             writeResult = CompletableDeferred()
             val started = if (Build.VERSION.SDK_INT >= 33) {
-                g.writeCharacteristic(characteristic, chunk, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothStatusCodes.SUCCESS
+                g.writeCharacteristic(characteristic, chunk, characteristicWriteType) == BluetoothStatusCodes.SUCCESS
             } else {
                 writeLegacyCharacteristic(g, characteristic, chunk)
             }
             check(started) { "Unable to start OBDLink BLE write" }
-            withTimeout(4_000) { writeResult!!.await() }
+            if (characteristicWriteType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
+                withTimeout(4_000) { writeResult!!.await() }
+            }
             offset += count
         }
     }
@@ -208,7 +217,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         characteristic: BluetoothGattCharacteristic,
         chunk: ByteArray
     ): Boolean {
-        characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        characteristic.writeType = characteristicWriteType
         characteristic.value = chunk
         return bluetoothGatt.writeCharacteristic(characteristic)
     }
@@ -234,6 +243,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         try { gatt?.close() } catch (_: Exception) {}
         gatt = null
         writeCharacteristic = null
+        characteristicWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         pending = ByteArray(0)
         while (incoming.tryReceive().isSuccess) { }
         connectResult = null
