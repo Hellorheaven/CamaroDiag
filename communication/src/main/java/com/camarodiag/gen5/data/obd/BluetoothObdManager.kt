@@ -386,6 +386,8 @@ class BluetoothObdManager(context: Context) {
                         buffer.append(payloadChunk)
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
                         if (chunk.contains('>')) break
+                    } else if (n < 0) {
+                        throw java.io.EOFException("USB OBD adapter disconnected while reading")
                     } else delay(10)
                 }
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
@@ -415,6 +417,8 @@ class BluetoothObdManager(context: Context) {
                             buffer.append(payloadChunk)
                             if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
                             if (chunk.contains('>')) break
+                        } else if (n < 0) {
+                            throw java.io.EOFException("Wi-Fi OBD adapter closed the connection")
                         }
                     } catch (_: java.net.SocketTimeoutException) { }
                     delay(10)
