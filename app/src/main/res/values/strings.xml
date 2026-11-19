@@ -683,6 +683,7 @@
     <string name="can_trace_flow_stmin_us">%1$d µs</string>
     <string name="can_trace_flow_stmin_reserved">Reserved (0x%1$02X)</string>
     <string name="can_trace_exchange_heading">UDS request / response exchanges</string>
+    <string name="can_trace_exchange_parameter_id"> • ID 0x%1$02X</string>
     <string name="can_trace_exchange_completed">Completed</string>
     <string name="can_trace_exchange_pending">Response pending (NRC 0x78)</string>
     <string name="can_trace_exchange_unanswered">No response observed</string>
