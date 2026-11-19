@@ -226,6 +226,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         uri?.let { viewModel.exportLiveRecording(it) }
     }
 
+    val canTraceExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        uri?.let { viewModel.exportCanCapture(it) }
+    }
+
     val calibrationFileExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
@@ -482,7 +488,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isAvailable = viewModel.canMonitorAvailable(),
                     onStart = { viewModel.startCanMonitor() },
                     onStop = { viewModel.stopCanMonitor() },
-                    onSendRequest = { viewModel.sendSafeObdRequest(it) }
+                    onSendRequest = { viewModel.sendSafeObdRequest(it) },
+                    onExport = { canTraceExporter.launch("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") }
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
