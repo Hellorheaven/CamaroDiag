@@ -23,6 +23,7 @@ import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.toDiagnosticDtc
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
+import com.camarodiag.gen5.data.obd.ObdTransportFailurePolicy
 import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
@@ -128,8 +129,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun reportConnectionLoss(error: Throwable) {
-        // A missing ELM prompt is a command timeout, not proof that the adapter disconnected.
-        if (error !is IOException || error is java.net.SocketTimeoutException) return
+        if (!ObdTransportFailurePolicy.isConnectionLoss(error)) return
         stopCanMonitor()
         _isObdScanning.value = false
         val messageId = if (_lastConnectionProfile.value?.transport.equals("bluetooth", ignoreCase = true)) {
