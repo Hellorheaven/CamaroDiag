@@ -8,6 +8,49 @@ import org.junit.Test
 class CanTraceAnalyzerTest {
 
     @Test
+    fun correlatesUdsRequestAndPositiveResponseByDirectionServiceAndDid() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 07 62 F1 90 31 47 30 31"
+        ).joinToString("\\n")
+        val report = CanTraceAnalyzer.analyze(trace, "exchange.asc")
+
+        assertEquals(1, report.exchanges.size)
+        val exchange = report.exchanges.single()
+        assertEquals(0x7E0, exchange.request.canId)
+        assertEquals(1, exchange.responses.size)
+        assertEquals(0x7E8, exchange.responses.single().canId)
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(25.0, exchange.elapsedMilliseconds!!, 0.001)
+    }
+
+    @Test
+    fun keepsNrcResponsePendingOpenUntilFinalNegativeResponse() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.010000 1 7E8 Rx d 8 03 7F 22 78 00 00 00 00",
+            "0.090000 1 7E8 Rx d 8 03 7F 22 31 00 00 00 00"
+        ).joinToString("\\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "exchange.asc").exchanges.single()
+
+        assertEquals(2, exchange.responses.size)
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(90.0, exchange.elapsedMilliseconds!!, 0.001)
+        assertEquals(0x31, exchange.responses.last().negativeResponseCode)
+    }
+
+    @Test
+    fun doesNotGuessUdsCorrelationForUnknownDirectionElmFrames() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf("7E0 4 03 22 F1 90", "7E8 4 03 62 F1 90").joinToString("\\n"),
+            "capture.txt"
+        )
+        assertTrue(report.exchanges.isEmpty())
+    }
+
+
+
+    @Test
     fun parsesElmFramesAndDecodesStandardEngineSpeedPid() {
         val report = CanTraceAnalyzer.analyze(
             "7E8 5 04 41 0C 1A F8",
