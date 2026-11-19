@@ -335,6 +335,19 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun parsesAllSixtyFourFixedWidthCsvBytesForCanFd() {
+        val headers = (listOf("can_id", "dlc") + (0..63).map { "data$it" }).joinToString(",")
+        val byteValues = (0..63).map { value -> value.toString(16).padStart(2, '0') }
+        val row = (listOf("7E8", "64") + byteValues).joinToString(",")
+        val report = CanTraceAnalyzer.analyze("$headers\n$row", "can-fd.csv")
+
+        assertEquals(1, report.frames.size)
+        assertEquals((0..63).toList(), report.frames.single().data)
+        assertEquals(64, report.frames.single().data.size)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
     fun parsesFixedWidthCsvByteColumnsUsingDeclaredDlc() {
         val report = CanTraceAnalyzer.analyze(
             "can_id,dlc,data0,data1,data2,data3,data4,data5,data6,data7\n" +
