@@ -83,6 +83,20 @@ internal class OBDLinkBleTransport(private val context: Context) {
                 connectResult?.completeExceptionally(IllegalStateException("OBDLink BLE UART service FFF0/FFF1/FFF2 not found"))
                 return
             }
+            val notificationValue = when {
+                notify.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 ->
+                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                notify.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0 ->
+                    BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                else -> {
+                    connectResult?.completeExceptionally(IllegalStateException("OBDLink BLE receive characteristic does not support notifications or indications"))
+                    return
+                }
+            }
+            if (write.properties and BluetoothGattCharacteristic.PROPERTY_WRITE == 0) {
+                connectResult?.completeExceptionally(IllegalStateException("OBDLink BLE transmit characteristic does not support acknowledged writes"))
+                return
+            }
             writeCharacteristic = write
             if (!g.setCharacteristicNotification(notify, true)) {
                 connectResult?.completeExceptionally(IllegalStateException("Unable to enable OBDLink BLE notifications"))
@@ -94,10 +108,10 @@ internal class OBDLinkBleTransport(private val context: Context) {
                 return
             }
             val started = if (Build.VERSION.SDK_INT >= 33) {
-                g.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == BluetoothStatusCodes.SUCCESS
+                g.writeDescriptor(descriptor, notificationValue) == BluetoothStatusCodes.SUCCESS
             } else {
                 @Suppress("DEPRECATION")
-                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                descriptor.value = notificationValue
                 @Suppress("DEPRECATION")
                 g.writeDescriptor(descriptor)
             }
