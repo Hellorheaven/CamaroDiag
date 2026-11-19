@@ -5,6 +5,8 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 ## 2026-11-19
 
 ### Analyse des traces — cohérence DLC / données
+- Corrélation UDS : les réponses ne sont plus associées sur le seul critère « identifiant CAN différent ». Pour les identifiants OBD 11 bits conventionnels, une requête physique 7E0–7E7 doit correspondre à 7E8–7EF avec l'écart exact de 8 ; une requête fonctionnelle 7DF accepte la plage de réponses 7E8–7EF. Les autres plages restent non corrélées plutôt que devinées.
+- Tests ajoutés pour rejeter une réponse provenant d'un identifiant ECU non correspondant et accepter une réponse à une requête fonctionnelle 7DF.
 - ISO-TP : rejet des First Frames dont la longueur annoncée pourrait tenir dans une Single Frame de même capacité. Cela évite de transformer une trame de transport incohérente en message UDS complet. Tests de frontière ajoutés (First Frame invalide de 6 octets et séquence valide de 8 octets).
 - Tests CSV précédemment ajoutés : correction des séparateurs de lignes pour fournir de vrais enregistrements distincts aux parseurs.
 - Complément : les exports CSV à colonnes fixes `data0…data63` rejettent aussi les octets renseignés après le DLC, au lieu de les ignorer. Tests ajoutés pour les formats ELM, ASC, CSV en colonne `data` et CSV à colonnes fixes.
