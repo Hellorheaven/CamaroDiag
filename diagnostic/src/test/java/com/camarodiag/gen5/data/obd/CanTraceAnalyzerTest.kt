@@ -25,6 +25,20 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun retainsResponsePendingStatusWhenCaptureEndsAfterNrc78() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.010000 1 7E8 Rx d 8 03 7F 22 78 00 00 00 00"
+        ).joinToString("\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "pending-at-eof.asc").exchanges.single()
+
+        assertEquals(UdsExchangeStatus.RESPONSE_PENDING, exchange.status)
+        assertEquals(1, exchange.responses.size)
+        assertEquals(0x78, exchange.responses.single().negativeResponseCode)
+        assertEquals(10.0, exchange.elapsedMilliseconds!!, 0.001)
+    }
+
+    @Test
     fun correlatesStandardObdMode01RequestAndResponse() {
         val trace = listOf(
             "0.000000 1 7E0 Tx d 8 02 01 0C 00 00 00 00 00",
