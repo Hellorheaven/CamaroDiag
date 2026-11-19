@@ -743,4 +743,35 @@ class CanTraceAnalyzerTest {
         assertEquals(3, report.messages.size)
     }
 
+    @Test
+    fun distinguishesThrottleAndAcceleratorPedalPidsAndDecodesEngineTorque() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 4 03 41 47 80",
+                "7E8 4 03 41 48 40",
+                "7E8 4 03 41 49 A0",
+                "7E8 4 03 41 4A C0",
+                "7E8 4 03 41 4B FF",
+                "7E8 4 03 41 5A 80",
+                "7E8 4 03 41 61 85",
+                "7E8 4 03 41 62 7D",
+                "7E8 5 04 41 63 01 F4"
+            ).joinToString("\n"),
+            "throttle-pedal-torque-pids.txt"
+        )
+        val byPid = report.pidObservations.associateBy { it.pid }
+
+        assertEquals("Absolute throttle position B", byPid[0x47]?.name)
+        assertEquals("Absolute throttle position C", byPid[0x48]?.name)
+        assertEquals("Accelerator pedal position D", byPid[0x49]?.name)
+        assertEquals("Accelerator pedal position E", byPid[0x4A]?.name)
+        assertEquals("Accelerator pedal position F", byPid[0x4B]?.name)
+        assertEquals("Relative accelerator pedal position", byPid[0x5A]?.name)
+        assertEquals(8.0, byPid[0x61]?.value!!, 0.0)
+        assertEquals(0.0, byPid[0x62]?.value!!, 0.0)
+        assertEquals(500.0, byPid[0x63]?.value!!, 0.0)
+        assertEquals("Nm", byPid[0x63]?.unit)
+        assertTrue(report.errors.isEmpty())
+    }
+
 }\n
