@@ -790,7 +790,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun rejectsMalformedDeclaredCsvDlcInsteadOfInferringLength() {
         val report = CanTraceAnalyzer.analyze(
-            "can_id,dlc,data\\n7E8,invalid,02 41 0C",
+            "can_id,dlc,data\n7E8,invalid,02 41 0C",
             "invalid-dlc.csv"
         )
 
@@ -806,7 +806,7 @@ class CanTraceAnalyzerTest {
                 "NaN,7E8,RX,02 41 0C",
                 "Infinity,7E8,RX,02 41 0C",
                 "not-a-time,7E8,RX,02 41 0C"
-            ).joinToString("\\n"),
+            ).joinToString("\n"),
             "invalid-timestamps.csv"
         )
 
@@ -817,7 +817,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun allowsAnEmptyOptionalCsvTimestampAsUnknown() {
         val report = CanTraceAnalyzer.analyze(
-            "timestamp,can_id,direction,data\\n,7E8,RX,02 41 0C",
+            "timestamp,can_id,direction,data\n,7E8,RX,02 41 0C",
             "missing-timestamp.csv"
         )
 
@@ -832,7 +832,7 @@ class CanTraceAnalyzerTest {
             "NaN 1 7E8 Rx d 8 03 41 0C 00 00 00 00",
             "Infinity 1 7E8 Rx d 8 03 41 0C 00 00 00 00",
             "1.25e-3 1 7E8 Rx d 8 03 41 0C 00 00 00 00"
-        ).joinToString("\\n")
+        ).joinToString("\n")
 
         val report = CanTraceAnalyzer.analyze(trace, "timestamp-validation.asc")
 
@@ -850,7 +850,7 @@ class CanTraceAnalyzerTest {
             "capture.asc"
         )
         val csv = CanTraceAnalyzer.analyze(
-            "can_id,dlc,data\\n7E8,2,02 41 0C",
+            "can_id,dlc,data\n7E8,2,02 41 0C",
             "capture.csv"
         )
 
@@ -866,7 +866,7 @@ class CanTraceAnalyzerTest {
     @Test
     fun rejectsFixedWidthCsvBytesBeyondDeclaredDlc() {
         val report = CanTraceAnalyzer.analyze(
-            "can_id,dlc,data0,data1,data2\\n7E8,2,02,41,0C",
+            "can_id,dlc,data0,data1,data2\n7E8,2,02,41,0C",
             "fixed-width-extra-byte.csv"
         )
 
