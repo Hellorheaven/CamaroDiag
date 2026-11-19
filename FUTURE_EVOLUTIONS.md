@@ -232,6 +232,26 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Ajouter des tests unitaires pour les calculs, tests de parsing pour les fichiers pris en charge et tests d'interface pour l'affichage conditionnel selon le profil véhicule.
 - [ ] Maintenir les assistants mécaniques et calculatrices hors ligne et sans écriture ECU ; toute fonction de diagnostic actif ou de programmation doit rester dans son module dédié avec ses propres prérequis et verrous.
 
+### 2.9 Données moteur temps réel — catalogue complet et tableau de bord personnalisable
+
+**Priorité haute — à intégrer au périmètre Camaro Gen 5 / Gen 6 et à la page Live existante. Statut : demandé, non implémenté.**
+
+Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L'utilisateur doit pouvoir choisir parmi toutes les données temps réel réellement accessibles au véhicule et aux calculateurs identifiés, puis composer son propre tableau de bord.
+
+- [ ] Découvrir automatiquement les PID OBD-II Mode 01 annoncés par les bitmaps de support, parcourir toutes les pages normalisées disponibles et vérifier chaque réponse avant de déclarer le paramètre disponible.
+- [ ] Exploiter les décodeurs déjà présents, notamment les sondes O2/lambda (ratio d'équivalence, tension ou courant selon le type de sonde), les corrections carburant court et long terme des deux bancs, régime, charge, températures, pressions, débits, papillon, pédale, tension, EGR, purge, carburant et autres PID standard décodés.
+- [ ] Étendre les données aux paramètres GM/enhanced et aux autres calculateurs uniquement avec des profils véhicule/ECU/DID/adressages et formules vérifiés. Ne jamais inventer une mesure ni déduire qu'un PID est disponible uniquement parce qu'un décodeur existe.
+- [ ] Présenter un catalogue consultable et filtrable par catégorie, calculateur, banc/cylindre/capteur, nom, PID/DID et unité ; distinguer clairement « pris en charge », « réponse reçue », « indisponible » et « non testé ».
+- [ ] Permettre de sélectionner/désélectionner librement les paramètres, de les afficher ensemble et de sauvegarder plusieurs tableaux de bord/profils par véhicule (ex. ralenti, conduite, analyse lambda, température, préparation).
+- [ ] Proposer pour chaque mesure une tuile numérique, une jauge et/ou une courbe temporelle ; permettre de réorganiser les tuiles, choisir les unités, afficher min/max/moyenne et superposer des courbes compatibles.
+- [ ] Garder l'enregistrement CSV cohérent avec les paramètres sélectionnés, avec horodatage, unités, identité véhicule/ECU et métadonnées de source ; gérer les valeurs manquantes sans les remplacer par zéro.
+- [ ] Adapter la fréquence d'interrogation au nombre de paramètres, au débit réel de l'adaptateur et aux délais ECU ; afficher la fréquence effective et les données potentiellement ralenties. Éviter de saturer le bus ou de faire croire que toutes les mesures sont acquises à la même fréquence.
+- [ ] Préserver une séparation nette entre données réelles, simulations et valeurs indisponibles. Aucun affichage de valeurs de démonstration comme télémétrie réelle.
+- [ ] Ajouter des tests de découverte des bitmaps, décodage PID (dont familles O2 wideband/narrowband), conversion d'unités, sélection multi-paramètres, conservation des profils et export.
+- [ ] Conserver une architecture de catalogue/décodeurs extensible aux véhicules et calculateurs futurs, sans exposer des paramètres non vérifiés pour le véhicule sélectionné.
+
+**Point de départ constaté dans le code de la PR #35 :** `Obd2FeatureEngine` découvre déjà les bitmaps Mode 01 et décode plusieurs familles de PID lambda/O2 (notamment 0x24–0x2B et 0x34–0x3B). En revanche, la boucle Live de `MainViewModel` interroge actuellement une petite liste fixe de paramètres et l'écran `LiveDataScreen` affiche seulement les valeurs reçues, sans sélecteur de catalogue ni composition personnalisable. Le travail doit donc relier la découverte/décodage au flux Live et à son interface, pas réécrire inutilement les décodeurs existants.
+
 ### 3.1 Architecture multimarque future
 - [ ] Étudier une architecture commune de diagnostic avec modules/adaptateurs spécifiques à chaque constructeur.
 - [ ] Séparer le socle partagé (transport, sessions, journalisation, VIN, rapports, télémétrie, gestion des adaptateurs) des définitions constructeur (calculateurs, protocoles, DTC, DID, procédures et profils).
