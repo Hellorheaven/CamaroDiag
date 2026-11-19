@@ -177,6 +177,23 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun malformedFirstFrameInterruptsPreviouslyPendingIsoTpMessage() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 8 10 08 62 F1 90 AA BB CC",
+                "7E8 3 10 00 01",
+                "7E8 3 21 DD EE"
+            ).joinToString("\n"),
+            "interrupted-first-frame.txt"
+        )
+
+        assertTrue(report.messages.isEmpty())
+        assertEquals(1, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.any { it.contains("truncated ISO-TP extended first-frame length") })
+        assertTrue(report.errors.any { it.contains("consecutive frame has no matching first frame") })
+    }
+
+    @Test
     fun rejectsTruncatedAndExcessiveIsoTpExtendedLengths() {
         val truncated = CanTraceAnalyzer.analyze(
             "can_id,direction,data\n7E8,RX,10 00 00 00",
