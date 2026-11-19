@@ -1114,17 +1114,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        if (!obdManager.isObdCommandChannelAvailable || _liveCanMonitorState.value.isCapturing) {
-            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+        val currentState = _liveCanMonitorState.value
+        if (currentState.isSendingRequest) return
+        if (!obdManager.isObdCommandChannelAvailable ||
+            currentState.isCapturing ||
+            canMonitorJob?.isActive == true
+        ) {
+            _liveCanMonitorState.value = currentState.copy(
                 message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
             )
             return
         }
+        // Claim the request slot synchronously before dispatching to IO. This closes the
+        // double-tap race where two clicks could launch concurrent commands on one ELM socket.
+        _liveCanMonitorState.value = currentState.copy(
+            isSendingRequest = true,
+            message = null
+        )
         viewModelScope.launch(Dispatchers.IO) {
-            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
-                isSendingRequest = true,
-                message = null
-            )
             try {
                 val response = obdManager.sendAtCommand(request.elmCommand, 4_000L)
                 _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
