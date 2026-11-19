@@ -145,6 +145,36 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun reassemblesIsoTpThirtyTwoBitLengthPayloadAcrossSequenceWrap() {
+        val payload = listOf(0x62, 0xF1, 0x90) + (3 until 4096).map { it and 0xFF }
+        fun encode(bytes: List<Int>): String =
+            bytes.joinToString(" ") { value -> value.toString(16).padStart(2, '0') }
+
+        val lines = mutableListOf("can_id,direction,data")
+        val firstFrame = listOf(0x10, 0x00, 0x00, 0x00, 0x10, 0x00) + payload.take(58)
+        lines += "7E8,RX,\${encode(firstFrame)}"
+
+        var offset = 58
+        var sequence = 1
+        while (offset < payload.size) {
+            val chunk = payload.subList(offset, minOf(offset + 7, payload.size))
+            val frame = listOf(0x20 or (sequence and 0x0F)) + chunk + List(7 - chunk.size) { 0x00 }
+            lines += "7E8,RX,\${encode(frame)}"
+            offset += chunk.size
+            sequence = (sequence + 1) and 0x0F
+        }
+
+        val report = CanTraceAnalyzer.analyze(lines.joinToString("\n"), "extended-isotp.csv")
+
+        assertEquals(1, report.messages.size)
+        assertEquals(payload, report.messages.single().payload)
+        assertEquals(0x22, report.messages.single().service)
+        assertEquals(0xF190, report.messages.single().did)
+        assertEquals(0, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
     fun reassemblesSameCanIdIsoTpSessionsIndependentlyByDirection() {
         val report = CanTraceAnalyzer.analyze(
             listOf(
