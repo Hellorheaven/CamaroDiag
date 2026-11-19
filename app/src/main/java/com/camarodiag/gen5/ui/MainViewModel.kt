@@ -137,6 +137,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             R.string.connection_lost_vehicle
         }
         _connectionLossMessage.value = getApplication<Application>().getString(messageId)
+        // Reset the physical transport too; USB/Wi-Fi availability otherwise remains optimistic.
+        obdManager.disconnect()
         markAdapterDisconnected()
     }
 
