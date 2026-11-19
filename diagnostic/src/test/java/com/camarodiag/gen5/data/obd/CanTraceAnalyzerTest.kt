@@ -811,7 +811,7 @@ class CanTraceAnalyzerTest {
         )
 
         assertTrue(report.frames.isEmpty())
-        assertEquals(3, report.errors.size)
+        assertEquals(4, report.errors.size)
     }
 
     @Test
@@ -979,12 +979,13 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
-    fun reportsMalformedIsoTpFlowControlStatusAndReservedStmin() {
+    fun reportsMalformedIsoTpFlowControlFrames() {
         val report = CanTraceAnalyzer.analyze(
             listOf(
                 "0.000000 1 7E8 Rx d 8 33 00 00 00 00 00 00 00",
                 "0.001000 1 7E8 Rx d 8 30 00 80 00 00 00 00 00",
-                "0.002000 1 7E8 Rx d 8 30 00 FA 00 00 00 00 00"
+                "0.002000 1 7E8 Rx d 8 30 00 FA 00 00 00 00 00",
+                "0.003000 1 7E8 Rx d 2 30 00"
             ).joinToString("\n"),
             "invalid-flow-control.asc"
         )
