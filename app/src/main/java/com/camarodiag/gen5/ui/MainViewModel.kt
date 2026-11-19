@@ -2225,6 +2225,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             var tick = 0.0
             var consecutiveFailures = 0
+            var activeTelemetryBatch = 0
             val histories = mutableMapOf<String, ArrayDeque<Double>>()
 
             fun push(id: String, value: Double): List<Double> {
@@ -2237,6 +2238,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             suspend fun read(pid: String): IntArray? {
                 val pidValue = pid.toIntOrNull(16)
                     ?: throw IllegalArgumentException("PID OBD invalide : $pid")
+                // Spread the supported PID catalogue across four polling batches. This avoids
+                // flooding slower ELM327 adapters with every optional sensor on each refresh.
+                if (pidValue % 4 != activeTelemetryBatch) return null
                 val response = obdManager.readMode01PidIfSupported(pidValue) ?: return null
                 if (response.equals("NO_SOCKET", ignoreCase = true) ||
                     response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
@@ -2247,6 +2251,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             while (currentCoroutineContext().isActive) {
                 if (_isStreamingLive.value) {
+                    activeTelemetryBatch = (activeTelemetryBatch + 1) % 4
                     try {
                         when {
                             obdManager.isSimulationActive -> {
@@ -2407,8 +2412,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = (b[0] * 256 + b[1]) / 1000.0
                                     values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
                                 }
-                                _livePids.value = values
-                                _liveTelemetryMessage.value = if (values.isEmpty()) {
+                                val mergedValues = _livePids.value.associateBy { it.id }.toMutableMap()
+                                values.forEach { mergedValues[it.id] = it }
+                                _livePids.value = mergedValues.values.toList()
+                                _liveTelemetryMessage.value = if (_livePids.value.isEmpty()) {
                                     getApplication<Application>().getString(R.string.msg_live_no_pid_response)
                                 } else {
                                     null
