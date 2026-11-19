@@ -269,6 +269,10 @@ object CanTraceAnalyzer {
                     request.direction != message.direction &&
                         request.canId != message.canId &&
                         request.service == service &&
+                        // If both timestamps exist, never pair a response that predates
+                        // its request. Missing timestamps retain capture-order behavior.
+                        (request.timestampSeconds == null || message.timestampSeconds == null ||
+                            message.timestampSeconds >= request.timestampSeconds) &&
                         when {
                             // Read, write and I/O-control DID responses must echo the DID.
                             // A negative response has no DID, so it is safe only when the
