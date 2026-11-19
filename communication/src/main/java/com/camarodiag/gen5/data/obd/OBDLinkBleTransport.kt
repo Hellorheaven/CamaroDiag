@@ -32,6 +32,10 @@ internal class OBDLinkBleTransport(private val context: Context) {
     private var gatt: BluetoothGatt? = null
     private var writeCharacteristic: BluetoothGattCharacteristic? = null
     private var mtuPayload = 20
+    /** True only while the current GATT session has not reported a disconnect. */
+    val isConnected: Boolean
+        get() = gatt != null && connectionFailure == null
+
     private val incoming = Channel<ByteArray>(Channel.UNLIMITED)
     private var pending = ByteArray(0)
     @Volatile private var connectionFailure: Throwable? = null
@@ -42,6 +46,8 @@ internal class OBDLinkBleTransport(private val context: Context) {
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+            // Ignore callbacks from a GATT instance that was closed/replaced by a reconnect.
+            if (g !== gatt) return
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 val failure = IllegalStateException("BLE connection failed (status $status)")
                 connectionFailure = failure
