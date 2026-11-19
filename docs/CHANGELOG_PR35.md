@@ -86,3 +86,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Sept tests supplémentaires couvrent l'expiration et le renouvellement du délai ISO-TP, le NRC tronqué, les valeurs PID ajoutées, les longueurs requises et la distinction papillon/pédale/couple.
 - Commits : `a6f4694`, `40fdb5f`, `da97229`, `ad81382`, `ab2b88e`, `6f73059`, `3aa42ce`, `7d49d02`, `eca7c95`.
 - Ces tests ont été écrits et relus sur la branche ; aucun test Gradle, build Android ou validation sur véhicule n'a encore été exécuté sur ce lot.
+
+
+### Libellés PID localisés — 2026-11-19
+- Les 23 nouveaux libellés PID ajoutés à l'analyse des traces utilisent maintenant les ressources Android : anglais et français sont fournis ; les autres locales retombent sur l'anglais.
+- Les libellés papillon B/C et pédale D/E/F restent distincts dans les deux langues.
+- Commits : UI `1f66163`, ressources EN `f940717`, ressources FR `39cdaf3`.
+- Vérification statique : 23 références du helper, 23 clés anglaises et 23 clés françaises présentes, sans doublon sur ces clés. Aucun build ni test Gradle n'a été exécuté.
