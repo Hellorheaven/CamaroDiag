@@ -1512,6 +1512,9 @@ fun CanSnifferScreen(
                 items(report.exchanges.takeLast(30).asReversed()) { exchange ->
                     val request = exchange.request
                     val didLabel = request.did?.let { " • DID 0x${String.format(Locale.ROOT, "%04X", it)}" }.orEmpty()
+                    val parameterLabel = request.parameterId?.let {
+                        stringResource(R.string.can_trace_exchange_parameter_id, it)
+                    }.orEmpty()
                     val statusLabel = when (exchange.status) {
                         com.camarodiag.gen5.data.obd.UdsExchangeStatus.COMPLETED -> stringResource(R.string.can_trace_exchange_completed)
                         com.camarodiag.gen5.data.obd.UdsExchangeStatus.RESPONSE_PENDING -> stringResource(R.string.can_trace_exchange_pending)
@@ -1519,7 +1522,7 @@ fun CanSnifferScreen(
                     }
                     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("${request.serviceName}$didLabel", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text("${request.serviceName}$didLabel$parameterLabel", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                             Text(stringResource(R.string.can_trace_exchange_summary, request.direction.name, request.canId, statusLabel), color = TextPrimary, fontSize = 11.sp)
                             Text(stringResource(R.string.can_trace_exchange_request, request.payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) }), color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                             exchange.responses.forEach { response ->
