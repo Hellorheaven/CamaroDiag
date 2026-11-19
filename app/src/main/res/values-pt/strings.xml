@@ -648,4 +648,6 @@
     <string name="can_sniffer_request_failed">Falha no pedido só de leitura.</string>
     <string name="can_sniffer_bus_limit">Esta captura utiliza o perfil HS-CAN ativo de 11 bits e 500 kbit/s. O SW-CAN e outros barramentos exigem uma interface diferente.</string>
     <string name="can_sniffer_stn_filter_notice">Nos adaptadores STN, os filtros temporários são limpos para a captura bruta e a filtragem OBD automática é reativada depois. Os filtros personalizados definidos por outro software não são restaurados.</string>
+    <string name="can_sniffer_search">Pesquisar ID CAN ou bytes de dados</string>
+    <string name="can_sniffer_filtered_count">A mostrar %1$d de %2$d tramas</string>
 </resources>
