@@ -145,6 +145,23 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun rejectsTruncatedAndExcessiveIsoTpExtendedLengths() {
+        val truncated = CanTraceAnalyzer.analyze(
+            "can_id,direction,data\n7E8,RX,10 00 00 00",
+            "truncated-extended-length.csv"
+        )
+        val excessive = CanTraceAnalyzer.analyze(
+            "can_id,direction,data\n7E8,RX,10 00 00 10 00 01",
+            "excessive-extended-length.csv"
+        )
+
+        assertTrue(truncated.errors.any { it.contains("truncated ISO-TP extended first-frame length") })
+        assertTrue(excessive.errors.any { it.contains("unsupported ISO-TP first-frame length") })
+        assertEquals(0, truncated.incompleteIsoTpMessages)
+        assertEquals(0, excessive.incompleteIsoTpMessages)
+    }
+
+    @Test
     fun reassemblesIsoTpThirtyTwoBitLengthPayloadAcrossSequenceWrap() {
         val payload = listOf(0x62, 0xF1, 0x90) + (3 until 4096).map { it and 0xFF }
         fun encode(bytes: List<Int>): String =
