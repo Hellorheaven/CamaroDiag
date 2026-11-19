@@ -144,3 +144,9 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Le traitement commun d'une perte de transport ferme désormais aussi l'adaptateur physique et réinitialise son état interne. Cela évite qu'un canal USB/Wi-Fi reste déclaré disponible après une erreur d'E/S, alors que seul l'état visuel avait été réinitialisé.
 - Les callbacks GATT `STATE_DISCONNECTED` et les statuts de rupture de connexion sont également convertis en `ObdTransportDisconnectedException` ; une écriture en attente ne remonte donc plus une `IllegalStateException` ignorée par le suivi global.
 - Commit complémentaire : `ff1ddd8` (classification des callbacks GATT) et `0476497` (dernier chemin de lecture).
+### Classification des erreurs de transport — 2026-11-19
+- Les erreurs de déconnexion physique (exception dédiée BLE, EOF USB et erreurs d'E/S) déclenchent toujours la remise à zéro de l'adaptateur.
+- Un `SocketTimeoutException` lié à l'absence du prompt ELM est maintenant traité comme un échec de commande, pas comme une preuve de déconnexion : l'adaptateur reste sélectionné et l'utilisateur peut réessayer.
+- Ajout de cinq tests unitaires couvrant déconnexion BLE, EOF, timeout ELM, erreur non-E/S et erreur E/S générique.
+- Commits : `ca00d0b` (politique), `f623f56` (tests), `09397df` (intégration), `b404801` (nettoyage import).
+- Tests non exécutés dans cette session ; validation Gradle et CI encore requises.
