@@ -874,4 +874,32 @@ class CanTraceAnalyzerTest {
         assertTrue(report.errors.any { it.contains("invalid CSV CAN frame") })
     }
 
+
+    @Test
+    fun rejectsIsoTpFirstFrameWhenPayloadFitsSingleFrame() {
+        val report = CanTraceAnalyzer.analyze(
+            "7E8 8 10 06 62 F1 90 41 42 43",
+            "invalid-first-frame.txt"
+        )
+
+        assertTrue(report.messages.isEmpty())
+        assertEquals(0, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.any { it.contains("unsupported ISO-TP first-frame length") })
+    }
+
+    @Test
+    fun acceptsIsoTpFirstFrameWhenPayloadExceedsSingleFrameCapacity() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 8 10 08 62 F1 90 41 42 43",
+                "7E8 8 21 44 00 00 00 00 00"
+            ).joinToString("\n"),
+            "valid-first-frame.txt"
+        )
+
+        assertEquals(1, report.messages.size)
+        assertEquals(listOf(0x62, 0xF1, 0x90, 0x41, 0x42, 0x43, 0x44, 0x00), report.messages.single().payload)
+        assertEquals(0, report.incompleteIsoTpMessages)
+    }
+
 }
