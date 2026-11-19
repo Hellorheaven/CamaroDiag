@@ -375,18 +375,26 @@ object CanTraceAnalyzer {
             0x44 -> Triple("Commanded equivalence ratio", ((a * 256 + b) * 2.0) / 65535.0, "ratio")
             0x45 -> Triple("Relative throttle position", a * 100.0 / 255.0, "%")
             0x46 -> Triple("Ambient air temperature", (a - 40).toDouble(), "°C")
-            in 0x47..0x4B -> Triple("Absolute throttle position " + (pid - 0x46), a * 100.0 / 255.0, "%")
+            0x47 -> Triple("Absolute throttle position B", a * 100.0 / 255.0, "%")
+            0x48 -> Triple("Absolute throttle position C", a * 100.0 / 255.0, "%")
+            0x49 -> Triple("Accelerator pedal position D", a * 100.0 / 255.0, "%")
+            0x4A -> Triple("Accelerator pedal position E", a * 100.0 / 255.0, "%")
+            0x4B -> Triple("Accelerator pedal position F", a * 100.0 / 255.0, "%")
             0x4C -> Triple("Commanded throttle actuator", a * 100.0 / 255.0, "%")
             0x4D -> Triple("Time run with MIL on", (a * 256 + b).toDouble(), "min")
             0x4E -> Triple("Time since diagnostic codes cleared", (a * 256 + b).toDouble(), "min")
             0x5C -> Triple("Engine oil temperature", (a - 40).toDouble(), "°C")
             0x5D -> Triple("Fuel injection timing", (((a * 256 + b) - 26_880) / 128.0), "°")
+            0x5A -> Triple("Relative accelerator pedal position", a * 100.0 / 255.0, "%")
             0x5E -> Triple("Engine fuel rate", ((a * 256 + b) / 20.0), "L/h")
+            0x61 -> Triple("Driver demand engine torque", (a - 125).toDouble(), "%")
+            0x62 -> Triple("Actual engine torque", (a - 125).toDouble(), "%")
+            0x63 -> Triple("Engine reference torque", (a * 256 + b).toDouble(), "Nm")
             else -> return null
         }
         val requiredDataBytes = when (pid) {
             0x0C, 0x10, 0x1F, 0x21, 0x31, in 0x14..0x1B,
-            in 0x3C..0x3F, 0x42, 0x43, 0x44, 0x4D, 0x4E, 0x5D, 0x5E -> 2
+            in 0x3C..0x3F, 0x42, 0x43, 0x44, 0x4D, 0x4E, 0x5D, 0x5E, 0x63 -> 2
             in 0x24..0x2B, in 0x34..0x3B -> 4
             else -> 1
         }
