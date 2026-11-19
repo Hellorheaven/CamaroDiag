@@ -213,6 +213,36 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Toute nouvelle marque/modèle proposé ultérieurement doit être ajouté ici avec son groupe constructeur, génération, moteur et priorité.
 - [ ] Évaluer la faisabilité à partir des protocoles, interfaces, données vérifiables et possibilités de validation avant d'accepter un nouveau périmètre.
 
+### 2.7 Mode avancé — regroupement des fonctions expertes
+
+**Décision utilisateur — 2026-11-19 :** l'atelier Cartographie professionnel doit être accessible dans une zone dédiée « Mode avancé », séparée des fonctions de diagnostic courant. Ce mode regroupe les outils techniques destinés aux utilisateurs qui connaissent les calculateurs, les protocoles et les conséquences de leurs manipulations.
+
+- [ ] Ajouter un accès « Mode avancé » dans la navigation ou les paramètres, avec une présentation distincte des fonctions de diagnostic courant.
+- [ ] À la première activation, afficher un avertissement explicite et demander une confirmation. Permettre ensuite de retrouver cet avertissement depuis les informations du mode.
+- [ ] Employer le texte d'avertissement suivant, à ajuster avec les traductions de l'application :
+
+  > **Mode avancé — réservé aux utilisateurs avertis**
+  >
+  > Ce mode donne accès à des outils techniques pouvant modifier des données sensibles du véhicule. Une mauvaise manipulation, un fichier incompatible ou une opération interrompue peut endommager un calculateur, corrompre ses données, empêcher le démarrage du véhicule ou rendre certains systèmes inopérants.
+  >
+  > La modification des paramètres du véhicule peut également être soumise à des restrictions légales selon le pays, notamment lorsqu'elle affecte les émissions polluantes, les dispositifs antipollution, la sécurité ou l'homologation du véhicule. Il appartient à l'utilisateur de vérifier la réglementation applicable et de s'assurer que toute modification est autorisée pour l'usage prévu du véhicule.
+  >
+  > **N'utilisez ces fonctions que si vous maîtrisez leurs implications et disposez des fichiers, équipements et connaissances adaptés.** La présence de cet avertissement ne garantit ni la compatibilité ni l'absence de risque.
+
+- [ ] Présenter un rappel de prudence dans l'atelier Cartographie avant les opérations sensibles, sans répéter une boîte de dialogue à chaque simple consultation ou ouverture de table.
+- [ ] Classer les fonctions selon leur niveau de risque et leur état réel : lecture seule, modification hors ligne, fonction expérimentale, écriture ECU désactivée ou fonction validée. Le mode avancé ne doit jamais lever à lui seul un verrou de sécurité.
+- [ ] Placer dans cette zone l'atelier Cartographie professionnel : inspection, édition hors ligne, comparaison, import/export, simulation, analyse de logs et courbes Puissance & Couple.
+- [ ] Étudier également le regroupement des outils suivants, lorsqu'ils sont implémentés et clairement documentés :
+  - CAN Sniffer et visualisation avancée des trames, en lecture seule ;
+  - console de requêtes techniques OBD/UDS avec liste blanche et commandes autorisées uniquement ;
+  - identification détaillée des calculateurs, références matérielles/logicielles, CAL ID et CVN ;
+  - enregistrement et analyse avancée des données temps réel, avec rejeu de logs hors ligne ;
+  - diagnostics approfondis par calculateur et rapports techniques.
+- [ ] Conserver les fonctions courantes (lecture/effacement DTC autorisé, données standard, identification simple et état de connexion) dans l'expérience normale afin de ne pas rendre l'application inutilement complexe.
+- [ ] Ne pas ajouter au Mode avancé, même comme raccourci accessible, de fonctions d'antidémarrage, Seed/Key, désactivation de dispositifs antipollution/sécurité, programmation firmware ou écriture mémoire non-calibration.
+- [ ] Maintenir les écritures de calibration partielle/complète désactivées tant que les exigences de sécurité et de validation ECU décrites dans la section Cartographie ne sont pas satisfaites. L'activation du Mode avancé ne constitue jamais une autorisation d'écriture.
+- [ ] Ajouter des tests UI et d'accès : mode désactivé par défaut ou activation explicite, confirmation initiale, retour à l'expérience normale, et vérification qu'aucun accès au mode ne contourne les garde-fous techniques.
+
 ## 4. Qualité, traçabilité et éventuelle commercialisation — à préparer progressivement
 
 - [ ] Maintenir une architecture modulaire et testable sans introduire prématurément une couche commerciale.
