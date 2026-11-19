@@ -672,4 +672,13 @@
     <string name="can_trace_filter_invalid">Invalid CAN ID or payload prefix.</string>
     <string name="can_trace_clear_filters">Clear filters</string>
     <string name="can_trace_nrc_detail">NRC 0x%1$02X — %2$s</string>
+    <string name="can_trace_flow_control_heading">ISO-TP flow control</string>
+    <string name="can_trace_flow_control_detail">CAN %1$s • %2$s • BS %3$d • STmin %4$s</string>
+    <string name="can_trace_flow_status_cts">Continue to send</string>
+    <string name="can_trace_flow_status_wait">Wait</string>
+    <string name="can_trace_flow_status_overflow">Overflow</string>
+    <string name="can_trace_flow_status_reserved">Reserved status</string>
+    <string name="can_trace_flow_stmin_ms">%1$d ms</string>
+    <string name="can_trace_flow_stmin_us">%1$d µs</string>
+    <string name="can_trace_flow_stmin_reserved">Reserved (0x%1$02X)</string>
 </resources>
