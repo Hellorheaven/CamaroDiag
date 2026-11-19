@@ -53,6 +53,18 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Améliorer la détection des capacités, les diagnostics de connexion, les délais, la reprise après erreur et la gestion des sessions exclusives.
 - [ ] Maintenir une matrice de compatibilité adaptateur / protocole / fonction / OS / niveau de validation.
 
+#### Extension matérielle — câble KKL USB / FTDI via OTG
+- [ ] Ajouter à la matrice matérielle le câble USB KKL noir multi-motos utilisé avec TuneECU et BHELI32, comme interface série filaire candidate ; référence utilisateur : câble KKL USB spécial Aprilia/KTM/Triumph/Moto Guzzi/Ducati, connexion Android par USB OTG.
+- [ ] Concevoir une couche USB Host/OTG indépendante des applications tierces : détection/autorisation USB, identification VID/PID et chipset, ouverture/fermeture propre, gestion des permissions, déconnexion, délais et erreurs ; ne pas dépendre de TuneECU ou BHELI32.
+- [ ] Prévoir un transport USB-série modulaire (FTDI en premier si confirmé sur le câble réel, puis autres chipsets seulement après identification et tests). Les VID/PID FTDI connus peuvent aider à l'identification, mais ne doivent pas être considérés comme preuve suffisante du modèle, du câblage ou des capacités du câble.
+- [ ] Implémenter K-Line uniquement avec les protocoles d'initialisation, débits et paramètres explicitement documentés pour le calculateur ciblé ; séparer le transport série du protocole véhicule.
+- [ ] Ne pas présenter le KKL comme une interface CAN, J2534 ou comme compatible Camaro par défaut. Il ne pourra servir au CAN que si une interface distincte et un contrôleur CAN adaptés sont effectivement présents et identifiés.
+- [ ] Ajouter les variantes Android USB OTG et Windows 11 dans la matrice de test, avec essais de détection, ouverture, communication, déconnexion et stabilité.
+- [ ] Étudier séparément si ce câble peut communiquer avec l'ECU GM exact du Camaro 2012 LFX. Identifier d'abord ECU, connectique, couche physique, protocole, initialisation et fonctions réellement supportées ; aucune compatibilité ne doit être annoncée avant preuve.
+- [ ] Étudier la programmation de calibration par liaison filaire uniquement si le calculateur GM et le protocole le permettent. Une liaison USB peut réduire les aléas radio par rapport au Bluetooth, mais ne garantit ni compatibilité, ni fiabilité de flash, ni récupération après interruption.
+- [ ] Avant toute écriture, exiger une procédure spécifique et documentée, une interface explicitement compatible, l'identification matérielle/logicielle ECU, la vérification du fichier et de son intégrité, une alimentation stabilisée, des contrôles de transfert/readback et une récupération éprouvée. À défaut, conserver l'écriture désactivée.
+- [ ] Ne jamais utiliser un câble ou un protocole Ducati/TuneECU/BHELI32 pour tenter une programmation Camaro par analogie ; ne pas supposer que le fait qu'Android propose TuneECU/BHELI32 prouve la puce exacte ou la compatibilité automobile.
+
 ### 2.4 Véhicules, paramètres et interface
 - [ ] Finaliser un onglet Paramètres distinct de l'action/menu de navigation.
 - [ ] Permettre le choix manuel de la langue et la désactivation de la sélection automatique par langue système ; anglais par défaut si langue système non prise en charge.
@@ -367,6 +379,7 @@ Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L
 - Aucune plaque d'immatriculation ni donnée personnelle ne doit être conservée dans ce backlog.
 
 ## 6. Historique des décisions
+- 2026-11-19 : ajouter le câble KKL USB multi-motos utilisé avec TuneECU/BHELI32 comme interface USB-série candidate via OTG/Windows ; étudier FTDI/K-Line et la compatibilité réelle avec le calculateur Camaro avant toute revendication, notamment pour la programmation calibration qui reste soumise à validation et garde-fous spécifiques.
 - 2026-11-19 : étendre le tableau de bord temps réel à un catalogue personnalisable multi-calculateurs (moteur, transmission, TPMS, carrosserie, éclairage, châssis et confort), avec découverte des données réellement disponibles, unités, états de disponibilité, courbes et enregistrement ; les données constructeur et limites d'interface doivent être explicites.
 
 - 2026-11-19 : structurer l'atelier Cartographie professionnel en chantier prioritaire après PR #35, avec phases socle fichiers, éditeur graphique, simulation hors ligne, analyse puissance/couple, multi-cartographies/formats externes et programmation calibration-only strictement désactivée jusqu'à validation.
