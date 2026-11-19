@@ -123,3 +123,60 @@ Objectif : détecter les régressions de compilation régulièrement sans impose
 - Afficher explicitement les états « en attente du seuil », « différé car commit intermédiaire », « build en cours », « réussi » et « échoué ». Un job ignoré/skipped ne vaut jamais build réussi.
 
 Critère d'acceptation : aucun dépassement du seuil nominal ne doit être oublié ; un build échoué ou différé reste dû jusqu'à un build réussi sur un commit cohérent. L'intervalle nominal peut être augmenté ou réduit par configuration selon la durée des builds et la taille du chantier.
+
+## 9. Lots différés — hors périmètre de la PR Console CAN
+
+**Règle de gestion :** les éléments ci-dessous restent au backlog. Ils ne doivent pas être ajoutés à la PR #35. Chaque lot fera l'objet d'une PR dédiée, avec son propre périmètre, ses tests, ses critères d'acceptation et son état CI. Les lots pourront être réordonnés selon les dépendances et la priorité produit.
+
+### Lot A — Tableau de bord télémétrie temps réel multi-calculateurs
+- Permettre à l'utilisateur de choisir toutes les données réellement disponibles, plutôt que d'imposer une courte liste fixe.
+- Catalogue dynamique par calculateur, service/PID/DID, bus, unité, fréquence de rafraîchissement et compatibilité véhicule/interface.
+- Inclure les sondes lambda/O2 amont et aval, par banc, corrections carburant STFT/LTFT, températures, pressions, débit d'air, ratés, données moteur et transmission, ainsi que les données châssis, ABS, TPMS, carrosserie, portes, vitres, ceintures et éclairages lorsqu'elles sont réellement accessibles.
+- Recherche, sélection, retrait, organisation et sauvegarde de plusieurs tableaux de bord personnalisés ; affichages numériques, états, jauges et courbes temporelles.
+- Distinguer explicitement « non supporté par le véhicule », « non exposé par le calculateur », « inaccessible avec l'interface actuelle » et « définition inconnue ». Ne jamais inventer une valeur.
+- Gérer les fréquences et groupes de requêtes pour ne pas saturer le bus ni surcharger les calculateurs ; enregistrer et exporter les mesures.
+
+### Lot B — Atelier de calibration professionnel
+- Faire évoluer l'éditeur de calibration vers des vues tableaux/cartographies avec cellules colorées, axes, unités, sélection, comparaison, recherche, graphiques 2D/3D et historique des modifications.
+- Ajouter les opérations de masse pertinentes (interpolation, lissage, incréments, normalisation) avec aperçu et annulation/rétablissement.
+- Gérer plusieurs calibrations/cartographies d'un même véhicule, notamment les configurations flexfuel, et l'import/export avec préservation des données.
+- Étudier les formats HP Tuners (.hpt) et EFILive (.coz/.ctz) : ne déclarer un format pris en charge que si sa structure est réellement interprétée ; signaler les pertes et incompatibilités. Importer un fichier ne signifie pas qu'il est flashable.
+- Distinguer sauvegarde partielle d'une zone de calibration et sauvegarde complète de la zone de calibration. Ne jamais inclure firmware, OS, bootloader ou mémoire non-calibration dans ces opérations.
+- Toute écriture partielle ou complète doit être fondée sur une cartographie mémoire documentée et une compatibilité calculateur/outil vérifiée ; si la zone ne peut pas être isolée de façon fiable, désactiver l'écriture.
+- Prévoir validation statique, comparaison, simulation hors véhicule et procédures de récupération documentées. Aucune simulation ne garantit à elle seule la sécurité mécanique du moteur.
+
+### Lot C — Outils d'entretien et codage injecteurs
+- Étudier les fonctions de remplacement et codage d'injecteurs pour chaque moteur/ECU concerné, sans présumer qu'un moteur essence utilise le même mécanisme qu'un diesel.
+- N'activer le codage que si le calculateur et la procédure applicables le confirment.
+- Si un code injecteur est requis, fournir une aide visuelle pour localiser le code sur l'injecteur et l'associer au cylindre correct.
+- Illustrer clairement l'orientation du moteur vue par une personne placée face au compartiment moteur, et différencier gauche/droite côté véhicule de gauche/droite côté observateur.
+- Ajouter contrôles de cohérence, confirmation des valeurs et journal d'intervention.
+
+### Lot D — Matrice d'interfaces et capacités matérielles
+- Décrire les capacités réellement détectées de chaque adaptateur : ELM327, OBDLink, VXDIAG/VCX, Autocom, KKL USB et pont PC/J2534, selon modèle, firmware, transport et licences.
+- Séparer transport USB/Bluetooth/Wi-Fi, protocole véhicule, transceiver physique, fonctions exposées par le firmware et droits/licences.
+- Ne jamais déduire une capacité CAN/K-Line/J2534 ou une compatibilité GM du seul nom commercial ou de la présence d'un pilote USB.
+- Déclarer séparément les opérations possibles : lecture OBD, diagnostic constructeur, capture passive, émission, programmation, etc. Une capacité non vérifiée reste inconnue ou indisponible.
+- Traiter l'installation et les mises à jour du pont PC dans un parcours cohérent avec les mises à jour de l'application.
+
+### Lot E — Gestion uniforme des déconnexions et robustesse des écrans
+- Appliquer à tous les écrans et toutes les sessions la règle simple : en cas de déconnexion véhicule ou adaptateur Bluetooth/USB, arrêter immédiatement l'opération en cours.
+- Afficher un message court et explicite selon la cause (« véhicule déconnecté » ou « Bluetooth déconnecté » / interface déconnectée) et demander de relancer la session.
+- Ne pas ajouter de reprise automatique, de reconnexion silencieuse ou de logique de récupération complexe non demandée.
+- Couvrir les états de déconnexion par des tests unitaires et d'intégration.
+
+### Lot F — Cahier de tests utilisateur complet
+- Produire un classeur Excel de validation fonctionnelle couvrant l'application complète, les parcours, les calculateurs, les interfaces, les variantes véhicule, les erreurs, les exports/imports et les régressions.
+- Prévoir pour chaque test : identifiant, prérequis, matériel, véhicule/profil, étapes, résultat attendu, résultat constaté, statut, preuve/log et commentaire.
+- Distinguer tests hors véhicule, tests simulés, tests sur traces et essais physiques.
+- Le classeur sera préparé lorsque le périmètre fonctionnel sera suffisamment stabilisé, puis fourni à l'utilisateur pour exécution avec son véhicule et ses interfaces.
+
+### Lot G — Extension des profils véhicules et couverture multi-marques
+- Étendre progressivement la couverture au-delà des Camaro Gen 5/Gen 6, d'abord aux véhicules GM apparentés retenus (Corvette, Challenger/Charger/RAM uniquement après étude de leur architecture et de leur constructeur réel), puis aux véhicules Peugeot ciblés.
+- Ne pas regrouper sous « GM » des marques qui n'appartiennent pas à GM ; chaque plateforme doit avoir ses propres profils, protocoles et matrices de compatibilité.
+- Conserver la compatibilité des fonctions génériques et désactiver uniquement les fonctions spécifiques non prises en charge.
+
+### Organisation des PR
+- PR #35 : exclusivement le module unifié **Sniffer / Console CAN** (capture, analyse, décodage documenté, journalisation, console et émission manuelle/prédéfinie dans les limites réellement supportées par l'interface, avec garde-fous et tests). Aucun chantier télémétrie, calibration, garage, codage injecteur, gestion globale des déconnexions ou extension multi-marques ne doit y être ajouté.
+- Lots A à G : PR séparées, une par lot cohérent ou sous-lot techniquement indépendant ; ne pas mélanger plusieurs domaines sans dépendance explicite.
+- Le backlog est une feuille de route, pas une déclaration d'implémentation. Chaque lot passe en « en cours » seulement lorsqu'une PR dédiée est effectivement ouverte.
