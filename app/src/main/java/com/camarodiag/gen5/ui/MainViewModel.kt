@@ -486,6 +486,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun clearVehicleEvidence() {
         discardCanMonitor()
+        detachCanRequest()
         _liveCanMonitorState.value = LiveCanMonitorState()
         obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
@@ -519,6 +520,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _liveCanMonitorState = MutableStateFlow(LiveCanMonitorState())
     val liveCanMonitorState: StateFlow<LiveCanMonitorState> = _liveCanMonitorState.asStateFlow()
     private var canMonitorJob: Job? = null
+    private var canRequestJob: Job? = null
 
     private fun loadNativeCamaroSignalCatalog() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -738,8 +740,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnectJ2534Bridge() {
         viewModelScope.launch {
             val activeMonitor = canMonitorJob
+            val activeRequest = detachCanRequest()
             stopCanMonitor()
             activeMonitor?.join()
+            activeRequest?.join()
             obdManager.disconnect()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = false,
@@ -1113,6 +1117,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         activeJob?.cancel()
     }
 
+    /** Detaches and cancels a manual console request so its result cannot leak into a new vehicle context. */
+    private fun detachCanRequest(): Job? {
+        val activeJob = canRequestJob
+        canRequestJob = null
+        activeJob?.cancel()
+        return activeJob
+    }
+
     /** Cancels monitor capture; the transport sends ESC in a non-cancellable cleanup block. */
     fun stopCanMonitor() {
         canMonitorJob?.cancel()
@@ -1128,7 +1140,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val currentState = _liveCanMonitorState.value
-        if (currentState.isSendingRequest) return
+        if (currentState.isSendingRequest || canRequestJob?.isActive == true) return
         if (!obdManager.isObdCommandChannelAvailable ||
             currentState.isCapturing ||
             canMonitorJob?.isActive == true
@@ -1138,47 +1150,59 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        // Claim the request slot synchronously before dispatching to IO. This closes the
-        // double-tap race where two clicks could launch concurrent commands on one ELM socket.
+        // Claim the request slot synchronously before dispatching to IO. A lazy job lets
+        // us install its identity before it can complete, preventing duplicate sends and
+        // stale results from a request cancelled during vehicle/adapter changes.
         _liveCanMonitorState.value = currentState.copy(
             isSendingRequest = true,
             message = null
         )
-        viewModelScope.launch(Dispatchers.IO) {
+        lateinit var requestJob: Job
+        requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
                 val response = obdManager.sendAtCommand(request.elmCommand, 4_000L)
-                val current = _liveCanMonitorState.value
-                val historyEntry = CanConsoleRequestHistoryEntry(
-                    command = request.elmCommand,
-                    response = response.take(4_096),
-                    completedAtMillis = System.currentTimeMillis(),
-                    succeeded = true
-                )
-                _liveCanMonitorState.value = current.copy(
-                    isSendingRequest = false,
-                    requestResponse = response,
-                    requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
-                    message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
-                )
+                if (canRequestJob === requestJob) {
+                    val current = _liveCanMonitorState.value
+                    val historyEntry = CanConsoleRequestHistoryEntry(
+                        command = request.elmCommand,
+                        response = response.take(4_096),
+                        completedAtMillis = System.currentTimeMillis(),
+                        succeeded = true
+                    )
+                    _liveCanMonitorState.value = current.copy(
+                        isSendingRequest = false,
+                        requestResponse = response,
+                        requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
+                        message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
+                    )
+                }
             } catch (cancelled: CancellationException) {
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isSendingRequest = false)
+                if (canRequestJob === requestJob) {
+                    _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isSendingRequest = false)
+                }
                 throw cancelled
             } catch (error: Exception) {
-                reportConnectionLoss(error)
-                val current = _liveCanMonitorState.value
-                val historyEntry = CanConsoleRequestHistoryEntry(
-                    command = request.elmCommand,
-                    response = null,
-                    completedAtMillis = System.currentTimeMillis(),
-                    succeeded = false
-                )
-                _liveCanMonitorState.value = current.copy(
-                    isSendingRequest = false,
-                    requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
-                    message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
-                )
+                if (canRequestJob === requestJob) {
+                    reportConnectionLoss(error)
+                    val current = _liveCanMonitorState.value
+                    val historyEntry = CanConsoleRequestHistoryEntry(
+                        command = request.elmCommand,
+                        response = null,
+                        completedAtMillis = System.currentTimeMillis(),
+                        succeeded = false
+                    )
+                    _liveCanMonitorState.value = current.copy(
+                        isSendingRequest = false,
+                        requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
+                        message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
+                    )
+                }
+            } finally {
+                if (canRequestJob === requestJob) canRequestJob = null
             }
         }
+        canRequestJob = requestJob
+        requestJob.start()
     }
 
     /** Export the latest raw CAN capture without transforming adapter output. */
@@ -1764,8 +1788,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             beginBusyOperation()
             _connectionMessage.value = null
             val activeMonitor = canMonitorJob
+            val activeRequest = canRequestJob
             markAdapterDisconnected()
             activeMonitor?.join()
+            activeRequest?.join()
             try {
                 connect()
                     .onSuccess { capabilities ->
@@ -1835,8 +1861,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             beginBusyOperation()
             val activeMonitor = canMonitorJob
+            val activeRequest = canRequestJob
             markAdapterDisconnected()
             activeMonitor?.join()
+            activeRequest?.join()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 ecuVinResponse = "",
                 calibrationIdResponse = "",
@@ -2488,12 +2516,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        val activeMonitor = canMonitorJob
+        val activeJobs = listOfNotNull(canMonitorJob, canRequestJob)
+        canRequestJob = null
+        activeJobs.forEach(Job::cancel)
         stopCanMonitor()
-        if (activeMonitor != null) {
-            activeMonitor.invokeOnCompletion { obdManager.disconnect() }
-        } else {
+        if (activeJobs.isEmpty()) {
             obdManager.disconnect()
+        } else {
+            val remainingJobs = java.util.concurrent.atomic.AtomicInteger(activeJobs.size)
+            activeJobs.forEach { job ->
+                job.invokeOnCompletion {
+                    if (remainingJobs.decrementAndGet() == 0) obdManager.disconnect()
+                }
+            }
         }
         super.onCleared()
     }
