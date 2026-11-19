@@ -120,7 +120,7 @@ class CanTraceAnalyzerTest {
         )
 
         assertTrue(report.messages.isEmpty())
-        assertEquals(0, report.incompleteIsoTpMessages)
+        assertEquals(1, report.incompleteIsoTpMessages)
         assertTrue(report.errors.any { it.contains("truncated ISO-TP consecutive frame") })
     }
 
@@ -249,6 +249,21 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun countsPreviousIsoTpSessionWhenASecondFirstFrameReplacesIt() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 8 10 08 62 F1 90 AA BB CC",
+                "7E8 8 10 08 62 F1 91 11 22 33"
+            ).joinToString("\n"),
+            "replaced-first-frame.txt"
+        )
+
+        assertTrue(report.messages.isEmpty())
+        assertEquals(2, report.incompleteIsoTpMessages)
+        assertTrue(report.errors.any { it.contains("replaced an unfinished ISO-TP message") })
+    }
+
+    @Test
     fun rejectsMalformedElmFrameAndReportsParsingError() {
         val report = CanTraceAnalyzer.analyze(
             "7E8 9 10 08 62 F1 90 AA BB CC",
@@ -289,7 +304,7 @@ class CanTraceAnalyzerTest {
         )
 
         assertTrue(report.messages.isEmpty())
-        assertEquals(0, report.incompleteIsoTpMessages)
+        assertEquals(1, report.incompleteIsoTpMessages)
         assertTrue(report.errors.any { it.contains("ISO-TP sequence mismatch") })
     }
 
