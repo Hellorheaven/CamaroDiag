@@ -191,3 +191,6 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Ajout d'un test couvrant les deux valeurs non finies et une notation scientifique valide.
 - Commits : `b04682d` (parseur), `55383ba` (tests).
 - Tests Gradle/build Android non exécutés.
+
+### Transport BLE — cycle de vie GATT
+- Les callbacks BLE de découverte, abonnement, MTU, écriture et notifications ignorent désormais les événements provenant d'une ancienne session GATT après reconnexion. Cela évite qu'un callback tardif d'un ancien adaptateur valide une nouvelle connexion ou injecte des données périmées.
