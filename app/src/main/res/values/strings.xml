@@ -665,4 +665,9 @@
     <string name="live_sensor_count">Displayed sensors (%1$d/%2$d)</string>
     <string name="live_sensor_search">Search sensors</string>
     <string name="live_sensor_show_all">Show all sensors</string>
+    <string name="can_trace_id_filter">CAN ID filter (hex)</string>
+    <string name="can_trace_id_hint">7E8 or 18DAF110</string>
+    <string name="can_trace_data_prefix">Payload prefix (hex bytes)</string>
+    <string name="can_trace_data_hint">03 22 F1</string>
+    <string name="can_trace_filter_invalid">Invalid CAN ID or payload prefix.</string>
 </resources>
