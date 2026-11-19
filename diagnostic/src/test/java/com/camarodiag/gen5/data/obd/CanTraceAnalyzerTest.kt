@@ -990,7 +990,7 @@ class CanTraceAnalyzerTest {
             "invalid-flow-control.asc"
         )
 
-        assertEquals(3, report.errors.size)
+        assertEquals(4, report.errors.size)
         assertTrue(report.errors.all { it.contains("invalid ISO-TP flow-control frame") })
         assertTrue(report.messages.isEmpty())
     }
