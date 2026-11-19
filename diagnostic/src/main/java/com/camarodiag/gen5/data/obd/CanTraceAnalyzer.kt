@@ -667,6 +667,12 @@ object CanTraceAnalyzer {
             MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS
     }
 
+    private fun hasIsoTpTimestampMovedBackwards(
+        previousTimestampSeconds: Double?,
+        currentTimestampSeconds: Double?
+    ): Boolean = previousTimestampSeconds != null && currentTimestampSeconds != null &&
+        currentTimestampSeconds < previousTimestampSeconds
+
     private data class ReassemblyResult(
         val messages: List<UdsTraceMessage>,
         val errors: List<String>,
@@ -759,6 +765,14 @@ object CanTraceAnalyzer {
                     val state = pending[key]
                     if (state == null) {
                         errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame has no matching first frame."
+                    } else if (hasIsoTpTimestampMovedBackwards(
+                            state.lastFrameTimestampSeconds,
+                            frame.timestampSeconds
+                        )
+                    ) {
+                        errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame timestamp moved backwards."
+                        pending.remove(key)
+                        discardedIncompleteMessages++
                     } else if (hasIsoTpConsecutiveFrameTimedOut(
                             state.lastFrameTimestampSeconds,
                             frame.timestampSeconds
