@@ -1261,7 +1261,7 @@ fun CanSnifferScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = onStart,
-                            enabled = isAvailable && !state.isCapturing,
+                            enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(stringResource(R.string.can_sniffer_start))
@@ -1306,6 +1306,38 @@ fun CanSnifferScreen(
                     state.requestResponse?.let { response ->
                         Text(stringResource(R.string.can_sniffer_response_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
                         Text(response.ifBlank { "—" }, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        if (state.requestHistory.isNotEmpty()) {
+            item {
+                Text(stringResource(R.string.can_sniffer_request_history), color = CamaroAmber, fontWeight = FontWeight.Bold)
+            }
+            items(state.requestHistory.take(20)) { entry ->
+                val requestTime = java.text.DateFormat.getTimeInstance(
+                    java.text.DateFormat.SHORT,
+                    LocalConfiguration.current.locales[0]
+                ).format(java.util.Date(entry.completedAtMillis))
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            stringResource(R.string.can_sniffer_request_history_item, requestTime, entry.command),
+                            color = TextPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp
+                        )
+                        if (entry.succeeded) {
+                            Text(
+                                stringResource(R.string.can_sniffer_request_history_response, entry.response.orEmpty().ifBlank { "—" }),
+                                color = TextMuted,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                maxLines = 4
+                            )
+                        } else {
+                            Text(stringResource(R.string.can_sniffer_request_failed), color = WarnRed, fontSize = 10.sp)
+                        }
                     }
                 }
             }
