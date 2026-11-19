@@ -1250,13 +1250,6 @@ fun CanSnifferScreen(
                     singleLine = true,
                     label = { Text(stringResource(R.string.can_sniffer_search)) },
                     placeholder = { Text("7E8 or 41 0C") },
-                    trailingIcon = {
-                        if (frameSearch.isNotEmpty()) {
-                            IconButton(onClick = { frameSearch = "" }) {
-                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_clear))
-                            }
-                        }
-                    }
                 )
                 Text(
                     stringResource(R.string.can_sniffer_filtered_count, visibleFrames.size, report.frames.size),
