@@ -141,3 +141,4 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Les pertes de connexion OBDLink BLE pendant lecture/écriture remontent maintenant sous forme d'`IOException` (`ObdTransportDisconnectedException`), afin d'activer le traitement commun de perte de connexion dans le ViewModel au lieu de laisser l'état UI de l'adaptateur inchangé.
 - Ajout d'un test de classification de cette exception.
 - Validation Gradle/build Android : non exécutée dans cette session ; aucune validation matérielle BLE effectuée.
+- Le traitement commun d'une perte de transport ferme désormais aussi l'adaptateur physique et réinitialise son état interne. Cela évite qu'un canal USB/Wi-Fi reste déclaré disponible après une erreur d'E/S, alors que seul l'état visuel avait été réinitialisé.
