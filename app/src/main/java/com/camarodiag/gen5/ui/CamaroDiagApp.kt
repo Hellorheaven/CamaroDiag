@@ -1217,23 +1217,33 @@ fun CanSnifferScreen(
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
     var frameSearch by remember { mutableStateOf("") }
+    var canIdFilter by remember { mutableStateOf("") }
+    var dataPrefixFilter by remember { mutableStateOf("") }
     var directionFilter by remember { mutableStateOf("ALL") }
     val report = state.report
-    val searchToken = frameSearch.trim().uppercase(Locale.ROOT)
-    val normalizedSearch = searchToken.removePrefix("0X").filterNot(Char::isWhitespace)
-    val visibleFrames = report?.frames.orEmpty().asReversed().filter { frame ->
-        val directionMatches = when (directionFilter) {
-            "RX" -> frame.direction.name == "RX"
-            "TX" -> frame.direction.name == "TX"
-            else -> true
-        }
-        val textMatches = if (normalizedSearch.isBlank()) true else {
-            val canId = String.format(Locale.ROOT, "%03X", frame.canId)
-            val payload = frame.data.joinToString("") { String.format(Locale.ROOT, "%02X", it) }
-            canId.contains(normalizedSearch) || payload.contains(normalizedSearch)
-        }
-        directionMatches && textMatches
+    val parsedCanId = remember(canIdFilter) {
+        if (canIdFilter.isBlank()) null else CanTraceFilter.parseCanId(canIdFilter)
     }
+    val parsedDataPrefix = remember(dataPrefixFilter) {
+        CanTraceFilter.parseDataPrefix(dataPrefixFilter)
+    }
+    val filterInputValid = (canIdFilter.isBlank() || parsedCanId != null) &&
+        parsedDataPrefix != null
+    val traceFilter = remember(frameSearch, parsedCanId, parsedDataPrefix, directionFilter) {
+        CanTraceFilter(
+            canId = parsedCanId,
+            direction = when (directionFilter) {
+                "RX" -> CanTraceDirection.RX
+                "TX" -> CanTraceDirection.TX
+                else -> null
+            },
+            dataPrefix = parsedDataPrefix.orEmpty(),
+            searchText = frameSearch
+        )
+    }
+    val visibleFrames = if (filterInputValid) {
+        report?.frames.orEmpty().filterCanTrace(traceFilter).asReversed()
+    } else emptyList()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -1337,6 +1347,27 @@ fun CanSnifferScreen(
                     label = { Text(stringResource(R.string.can_sniffer_search)) },
                     placeholder = { Text("7E8 or 41 0C") },
                 )
+                OutlinedTextField(
+                    value = canIdFilter,
+                    onValueChange = { canIdFilter = it.take(8) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("CAN ID filter (hex)") },
+                    placeholder = { Text("7E8 or 18DAF110") },
+                    isError = canIdFilter.isNotBlank() && parsedCanId == null
+                )
+                OutlinedTextField(
+                    value = dataPrefixFilter,
+                    onValueChange = { dataPrefixFilter = it.take(48) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Payload prefix (hex bytes)") },
+                    placeholder = { Text("03 22 F1") },
+                    isError = parsedDataPrefix == null
+                )
+                if (!filterInputValid) {
+                    Text("Invalid CAN ID or payload prefix.", color = WarnRed, fontSize = 11.sp)
+                }
                 Text(
                     stringResource(R.string.can_sniffer_filtered_count, visibleFrames.size, report.frames.size),
                     color = TextMuted,
