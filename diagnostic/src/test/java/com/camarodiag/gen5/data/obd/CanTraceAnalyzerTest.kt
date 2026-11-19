@@ -970,7 +970,7 @@ class CanTraceAnalyzerTest {
                 "0.000000 1 7E8 Rx d 8 30 00 00 00 00 00 00 00",
                 "0.001000 1 7E8 Rx d 8 31 08 F1 00 00 00 00 00",
                 "0.002000 1 7E8 Rx d 8 32 00 F9 00 00 00 00 00"
-            ).joinToString("\\n"),
+            ).joinToString("\n"),
             "valid-flow-control.asc"
         )
 
@@ -985,7 +985,7 @@ class CanTraceAnalyzerTest {
                 "0.000000 1 7E8 Rx d 8 33 00 00 00 00 00 00 00",
                 "0.001000 1 7E8 Rx d 8 30 00 80 00 00 00 00 00",
                 "0.002000 1 7E8 Rx d 8 30 00 FA 00 00 00 00 00"
-            ).joinToString("\\n"),
+            ).joinToString("\n"),
             "invalid-flow-control.asc"
         )
 
