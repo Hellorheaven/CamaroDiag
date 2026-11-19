@@ -15,6 +15,16 @@ Commence par lire :
 
 Ne traite jamais les informations d'état ci-dessous comme éternellement actuelles : elles sont le dernier état connu à la rédaction. **Rafraîchis les données GitHub avant toute affirmation sur l'état actuel.** Ne prétends jamais avoir travaillé en arrière-plan entre deux conversations. Ne dis pas qu'un fichier, une PR ou un build est terminé sans preuve de l'action ou du résultat.
 
+## Synchronisation documentaire obligatoire
+
+Cette règle est prioritaire et s'applique en continu :
+- **Sur `main` uniquement :** maintenir `docs/PROMPT_REPRISE.md` et `docs/FUTURE_FEATURES_CAN_VEHICLE_GARAGE.md`. Le prompt de reprise conserve les décisions, contraintes et procédure de reprise ; le backlog conserve les demandes, lots, priorités, dépendances et statuts.
+- **Dans chaque PR :** maintenir `CHANGELOG.md` sur la branche de cette PR. Il trace les changements effectivement réalisés dans cette PR, corrections, décisions propres à son périmètre, tests et résultats de validation avec les SHA/runs pertinents.
+- Ne pas ajouter les entrées de changelog d'une PR directement sur `main` avant sa fusion. Le changelog entre dans `main` naturellement avec la PR fusionnée.
+- Mettre à jour ces fichiers dans le même lot de travail que le changement concerné, sans attendre la fin de la conversation. Une modification de périmètre ou une décision durable met à jour prompt/backlog sur `main` ; chaque évolution de code ou validation de PR met à jour le changelog de cette PR.
+- Ne jamais inscrire un test/build comme réussi sans résultat observable ; noter explicitement `en attente`, `skipped`, `échoué` ou `non exécuté` le cas échéant.
+- Si une modification du prompt ou du backlog sur `main` est nécessaire pendant une PR, effectuer ce commit documentaire séparément sur `main` et ne pas mélanger le contenu de la PR dans ces fichiers.
+
 ## Règles de collaboration non négociables
 
 - Répondre en français, de façon directe, avec un état concret et honnête.
@@ -29,7 +39,7 @@ Ne traite jamais les informations d'état ci-dessous comme éternellement actuel
 - Respecter le périmètre validé. Pas de dérive fonctionnelle dans une PR en cours.
 - L'utilisateur travaille souvent depuis Android et GitHub Actions ; privilégier les opérations directes dans le dépôt plutôt que de lui demander de téléverser des fichiers quand le dépôt suffit.
 - Fournir des fichiers complets lorsqu'il demande un fichier, pas des extraits incomplets.
-- Après chaque décision durable ou opération GitHub réussie, actualiser ce fichier et le changelog. Enregistrer le SHA de commit et les liens utiles. Si l'information est incertaine, la marquer comme telle au lieu de la transformer en fait.
+- Appliquer la synchronisation documentaire obligatoire décrite ci-dessus. Enregistrer les SHA et liens utiles ; marquer les incertitudes au lieu de les transformer en faits.
 
 ## Projet et objectifs
 
