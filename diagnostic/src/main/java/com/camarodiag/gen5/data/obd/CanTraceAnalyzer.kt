@@ -94,6 +94,16 @@ data class CanTraceFlowControl(
         }
 }
 
+enum class UdsExchangeStatus { COMPLETED, RESPONSE_PENDING, UNANSWERED }
+
+data class UdsTraceExchange(
+    val request: UdsTraceMessage,
+    val responses: List<UdsTraceMessage>,
+    val status: UdsExchangeStatus,
+    /** Elapsed time to the final response, in milliseconds; null when timestamps are unavailable. */
+    val elapsedMilliseconds: Double?
+)
+
 data class CanTraceAnalysisReport(
     val sourceName: String,
     val frames: List<CanTraceFrame>,
@@ -165,6 +175,62 @@ object CanTraceAnalyzer {
             incompleteIsoTpMessages = incomplete,
             flowControlObservations = parsed.frames.mapNotNull(::decodeFlowControl)
         )
+    }
+
+    private data class PendingUdsRequest(
+        val request: UdsTraceMessage,
+        val responses: MutableList<UdsTraceMessage> = mutableListOf()
+    ) {
+        fun toExchange(status: UdsExchangeStatus): UdsTraceExchange {
+            val lastTimestamp = responses.lastOrNull()?.timestampSeconds
+            val startTimestamp = request.timestampSeconds
+            val elapsed = if (lastTimestamp != null && startTimestamp != null) {
+                (lastTimestamp - startTimestamp) * 1_000.0
+            } else null
+            return UdsTraceExchange(request, responses.toList(), status, elapsed)
+        }
+    }
+
+    /**
+     * Correlates only explicit TX/RX traffic. Unknown-direction ELM captures remain unpaired
+     * rather than guessing which ECU sent a request or response. NRC 0x78 keeps the request open.
+     */
+    private fun correlateExchanges(messages: List<UdsTraceMessage>): List<UdsTraceExchange> {
+        val pending = mutableListOf<PendingUdsRequest>()
+        val exchanges = mutableListOf<UdsTraceExchange>()
+        messages.forEach { message ->
+            if (message.direction == CanTraceDirection.UNKNOWN) return@forEach
+            val rawService = message.responseService ?: return@forEach
+            val service = message.service ?: return@forEach
+            val isPositiveResponse = rawService == service + 0x40
+            val isNegativeResponse = rawService == 0x7F
+            if (isPositiveResponse || isNegativeResponse) {
+                val matchIndex = pending.indexOfFirst { candidate ->
+                    candidate.request.direction != message.direction &&
+                        candidate.request.canId != message.canId &&
+                        candidate.request.service == service &&
+                        (candidate.request.did == null || message.did == null || candidate.request.did == message.did)
+                }
+                if (matchIndex >= 0) {
+                    val candidate = pending[matchIndex]
+                    candidate.responses += message
+                    if (message.negativeResponseCode != 0x78) {
+                        pending.removeAt(matchIndex)
+                        exchanges += candidate.toExchange(UdsExchangeStatus.COMPLETED)
+                    }
+                    return@forEach
+                }
+            } else if (service in 0x10..0x3E) {
+                pending += PendingUdsRequest(message)
+            }
+        }
+        pending.forEach { candidate ->
+            val status = if (candidate.responses.lastOrNull()?.negativeResponseCode == 0x78) {
+                UdsExchangeStatus.RESPONSE_PENDING
+            } else UdsExchangeStatus.UNANSWERED
+            exchanges += candidate.toExchange(status)
+        }
+        return exchanges.sortedBy { it.request.timestampSeconds ?: Double.POSITIVE_INFINITY }
     }
 
     /** Decode ISO-TP Flow Control (PCI type 3) without treating it as a UDS payload. */
