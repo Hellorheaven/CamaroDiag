@@ -90,6 +90,21 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Garder les modifications hors ligne tant que l'utilisateur n'a pas explicitement exporté le fichier ; l'application des changements à un fichier ne déclenche jamais une écriture ECU.
 - [ ] Respecter strictement la règle calibration-only : aucune vue, transformation, importation ou exportation ne doit toucher le firmware, l'OS, le bootloader ou une région mémoire hors calibration.
 
+- [ ] Ajouter un navigateur de cartographies par calculateur et famille de fonctions (moteur, air/carburant, allumage, couple, transmission, limites, etc.) uniquement lorsque les définitions exactes existent pour le matériel/logiciel identifié.
+- [ ] Fournir une vue de calibration de type éditeur professionnel : tableau numérique avec cellules en grille, couleurs en heatmap paramétrable, légende, palette, seuils, surbrillance des cellules modifiées et distinction entre valeurs d'origine et valeurs courantes.
+- [ ] Afficher pour chaque table le nom et la description, les dimensions, les axes X/Y, les unités, la précision, le type de donnée, l'endianess, le facteur, l'offset, les limites et la plage valide lorsqu'ils sont connus.
+- [ ] Permettre le zoom, le défilement, le redimensionnement des colonnes, la sélection tactile précise et le basculement portrait/paysage ; adapter l'interface aux écrans de tablette sans supprimer les fonctions disponibles sur téléphone.
+- [ ] Ajouter des vues graphiques 2D et 3D synchronisées avec la grille : courbes, surface colorée, rotation, zoom et sélection de points/cellules ; désactiver l'édition graphique si la correspondance point/table n'est pas parfaitement déterminée.
+- [ ] Proposer les opérations de sélection et d'édition en lot : cellule, plage, ligne, colonne, table entière ; saisie directe, copier/coller, remplissage, ajout, soustraction, multiplication, division et remise à une valeur choisie.
+- [ ] Ajouter interpolation selon les axes, lissage horizontal/vertical et lissage global, avec aperçu avant application, contrôle des limites et annulation immédiate.
+- [ ] Fournir undo/redo, historique horodaté des modifications, comparaison avant/après et possibilité de revenir à une version précédente sans altérer le fichier source original.
+- [ ] Permettre l'ouverture simultanée de plusieurs tables et la comparaison de calibrations : valeurs d'origine, valeurs de destination, delta numérique et représentation colorée dédiée aux différences.
+- [ ] Ajouter recherche de paramètres, filtres par calculateur/catégorie, favoris et navigation rapide entre tables ; afficher clairement les tables indisponibles ou non documentées plutôt que fabriquer des définitions.
+- [ ] Mettre à jour simultanément la grille, les vues 2D/3D, les deltas et l'état non enregistré après chaque modification ; toute transformation doit rester explicite et réversible.
+- [ ] Permettre l'export d'une table isolée et d'un rapport de comparaison, en plus de l'export de la cartographie complète ; conserver unités, axes, précision et provenance dans les formats qui le permettent.
+- [ ] Prévoir une ergonomie de type outil professionnel sans recopier les éléments propriétaires d'interface ou de marque de HP Tuners/EFILive.
+- [ ] Ajouter des tests unitaires sur décodage/encodage, dimensions, axes, facteurs, offsets, arrondis, bornes, transformations, interpolation, lissage, undo/redo et synchronisation des vues ; utiliser des fichiers de référence documentés.
+
 #### Évolution future — import/export de cartographies et compatibilité HP Tuners
 - [ ] Permettre l'export d'une cartographie seule ou d'un ensemble de cartographies liées à un même véhicule/projet.
 - [ ] Gérer les projets multi-cartographies, notamment les configurations FlexFuel lorsqu'elles nécessitent plusieurs calibrations (par exemple cartographie essence, cartographie éthanol/flexfuel ou variantes associées) ; conserver explicitement le rôle, les dépendances et les conditions d'utilisation de chaque fichier, sans supposer qu'un véhicule utilise toujours deux fichiers.
@@ -183,6 +198,7 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 
 ## 6. Historique des décisions
 
+- 2026-11-19 : préciser l'éditeur graphique de calibration de niveau professionnel (grilles colorées, vues 2D/3D, opérations sur cellules, interpolation/lissage, comparaison, historique, ergonomie tablette, définitions vérifiées et tests) ainsi que les exigences d'import/export multi-cartographies et HP Tuners ; ces éléments restent au backlog et ne sont pas déclarés implémentés.
 - 2026-11-18 : décision de conserver CamaroDiag comme priorité immédiate, tout en concevant progressivement une architecture extensible.
 - 2026-11-18 : extensions GM (Corvette, Cadillac, GMC, Buick) et Stellantis (Dodge Challenger/Charger, RAM) classées en priorité basse.
 - 2026-11-18 : ajout de la Peugeot 207 CC Phase 1 1.6 VTi 120 (EP6 probable, année 2008 ou 2010 à confirmer) au backlog priorité basse.
