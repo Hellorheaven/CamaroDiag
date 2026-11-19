@@ -71,6 +71,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         }
 
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+            if (g !== gatt) return
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 connectResult?.completeExceptionally(IllegalStateException("BLE service discovery failed ($status)"))
                 return
@@ -106,21 +107,25 @@ internal class OBDLinkBleTransport(private val context: Context) {
         }
 
         override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            if (g !== gatt) return
             if (status == BluetoothGatt.GATT_SUCCESS) connectResult?.complete(Unit)
             else connectResult?.completeExceptionally(IllegalStateException("BLE notification subscription failed ($status)"))
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+            if (g !== gatt) return
             if (status == BluetoothGatt.GATT_SUCCESS) mtuPayload = (mtu - 3).coerceAtLeast(20)
             mtuResult?.complete(Unit)
         }
 
         override fun onCharacteristicWrite(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            if (g !== gatt) return
             if (status == BluetoothGatt.GATT_SUCCESS) writeResult?.complete(Unit)
             else writeResult?.completeExceptionally(IllegalStateException("BLE write failed ($status)"))
         }
 
         override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+            if (g !== gatt) return
             if (characteristic.uuid == notifyUuid) {
                 readLegacyNotificationValue(characteristic)?.let { incoming.trySend(it) }
             }
@@ -131,6 +136,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray
         ) {
+            if (g !== gatt) return
             if (characteristic.uuid == notifyUuid) incoming.trySend(value.copyOf())
         }
     }
