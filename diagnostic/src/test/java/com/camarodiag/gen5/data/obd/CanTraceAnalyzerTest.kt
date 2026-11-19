@@ -862,4 +862,16 @@ class CanTraceAnalyzerTest {
         assertTrue(csv.errors.isNotEmpty())
     }
 
+
+    @Test
+    fun rejectsFixedWidthCsvBytesBeyondDeclaredDlc() {
+        val report = CanTraceAnalyzer.analyze(
+            "can_id,dlc,data0,data1,data2\\n7E8,2,02,41,0C",
+            "fixed-width-extra-byte.csv"
+        )
+
+        assertTrue(report.frames.isEmpty())
+        assertTrue(report.errors.any { it.contains("invalid CSV CAN frame") })
+    }
+
 }
