@@ -668,4 +668,9 @@
     <string name="live_sensor_count">Capteurs affichés (%1$d/%2$d)</string>
     <string name="live_sensor_search">Rechercher un capteur</string>
     <string name="live_sensor_show_all">Afficher tous les capteurs</string>
+    <string name="can_trace_id_filter">Filtre ID CAN (hex)</string>
+    <string name="can_trace_id_hint">7E8 ou 18DAF110</string>
+    <string name="can_trace_data_prefix">Préfixe de données (octets hex)</string>
+    <string name="can_trace_data_hint">03 22 F1</string>
+    <string name="can_trace_filter_invalid">ID CAN ou préfixe de données invalide.</string>
 </resources>
