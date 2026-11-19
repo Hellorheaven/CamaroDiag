@@ -120,12 +120,22 @@ class J2534BridgeTransport(
         activeSocket.soTimeout = timeoutMs.coerceIn(1000, 15_000)
         val output = writer ?: error("Canal d'écriture du pont PC indisponible.")
         val input = reader ?: error("Canal de lecture du pont PC indisponible.")
-        output.write(json.toString())
-        output.newLine()
-        output.flush()
-        val line = J2534BridgeProtocol.readBoundedLine(input)
-            ?: error("Le pont PC a fermé la connexion.")
-        val response = JSONObject(line)
+        val line = try {
+            output.write(json.toString())
+            output.newLine()
+            output.flush()
+            J2534BridgeProtocol.readBoundedLine(input)
+                ?: throw java.io.EOFException("Le pont PC a fermé la connexion.")
+        } catch (error: Exception) {
+            closeInternal()
+            throw error
+        }
+        val response = try {
+            JSONObject(line)
+        } catch (error: Exception) {
+            closeInternal()
+            throw IllegalStateException("Le pont J2534 a retourné une réponse JSON invalide.", error)
+        }
         if (!response.optBoolean("ok", false)) {
             throw IllegalStateException(response.optString("error", "Erreur inconnue du pont J2534."))
         }
