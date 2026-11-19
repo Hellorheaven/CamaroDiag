@@ -499,6 +499,7 @@ object CanTraceAnalyzer {
         val messages = mutableListOf<UdsTraceMessage>()
         val errors = mutableListOf<String>()
         val pending = mutableMapOf<Pair<Int, CanTraceDirection>, PendingIsoTp>()
+        var discardedIncompleteMessages = 0
 
         frames.forEach { frame ->
             if (frame.data.isEmpty()) return@forEach
@@ -532,6 +533,7 @@ object CanTraceAnalyzer {
                             val key = frame.canId to frame.direction
                             if (pending.containsKey(key)) {
                                 errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
+                                discardedIncompleteMessages++
                             }
                             val bytes = frame.data.drop(2).take(length).toMutableList()
                             if (bytes.size >= length) {
@@ -556,11 +558,13 @@ object CanTraceAnalyzer {
                     } else if (frame.data.size < 2) {
                         errors += "Line ${frame.lineNumber}: truncated ISO-TP consecutive frame."
                         pending.remove(key)
+                        discardedIncompleteMessages++
                     } else {
                         val sequence = pci and 0x0F
                         if (sequence != state.nextSequence) {
                             errors += "Line ${frame.lineNumber}: ISO-TP sequence mismatch (expected ${state.nextSequence}, got $sequence)."
                             pending.remove(key)
+                            discardedIncompleteMessages++
                         } else {
                             state.payload += frame.data.drop(1).take(state.expectedLength - state.payload.size)
                             state.nextSequence = (state.nextSequence + 1) and 0x0F
@@ -578,6 +582,7 @@ object CanTraceAnalyzer {
                 else -> errors += "Line ${frame.lineNumber}: unsupported ISO-TP PCI type 0x${pci.toString(16).uppercase(Locale.ROOT)}."
             }
         }
-        return ReassemblyResult(messages, errors, pending.size)
+        // Include partial messages discarded mid-stream as well as sessions still open at EOF.
+        return ReassemblyResult(messages, errors, discardedIncompleteMessages + pending.size)
     }
 }
