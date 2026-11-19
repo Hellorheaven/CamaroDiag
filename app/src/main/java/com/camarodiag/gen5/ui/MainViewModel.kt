@@ -42,6 +42,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 import java.security.MessageDigest
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
@@ -110,6 +111,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _connectionMessage = MutableStateFlow<String?>(null)
     val connectionMessage: StateFlow<String?> = _connectionMessage.asStateFlow()
+
+    private val _connectionLossMessage = MutableStateFlow<String?>(null)
+    val connectionLossMessage: StateFlow<String?> = _connectionLossMessage.asStateFlow()
+
+    fun dismissConnectionLoss() {
+        _connectionLossMessage.value = null
+    }
+
+    private fun reportConnectionLoss(error: Throwable) {
+        if (error !is IOException) return
+        stopCanMonitor()
+        _isObdScanning.value = false
+        val messageId = if (_lastConnectionProfile.value?.transport.equals("bluetooth", ignoreCase = true)) {
+            R.string.connection_lost_bluetooth
+        } else {
+            R.string.connection_lost_vehicle
+        }
+        _connectionLossMessage.value = getApplication<Application>().getString(messageId)
+        markAdapterDisconnected()
+    }
 
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
@@ -1049,7 +1070,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _liveCanMonitorState.value = current.copy(isCapturing = false, rawText = raw)
                 }
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                reportConnectionLoss(error)
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
                     val raw = (current.rawText + pendingChunks).takeLast(131_072)
@@ -1113,7 +1135,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isSendingRequest = false)
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
                     isSendingRequest = false,
                     message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
