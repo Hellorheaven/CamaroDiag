@@ -520,6 +520,11 @@ object CanTraceAnalyzer {
             val pci = frame.data[0]
             when (pci and 0xF0) {
                 0x00 -> {
+                    val key = frame.canId to frame.direction
+                    if (pending.remove(key) != null) {
+                        errors += "Line ${frame.lineNumber}: single frame interrupted an unfinished ISO-TP message."
+                        discardedIncompleteMessages++
+                    }
                     // CAN FD permits the escaped Single Frame length form: SF_DL=0,
                     // followed by one byte containing the actual payload length.
                     val shortLength = pci and 0x0F
