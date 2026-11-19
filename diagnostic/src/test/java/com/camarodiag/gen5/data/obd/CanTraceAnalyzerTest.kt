@@ -551,6 +551,25 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun ignoresTruncatedNegativeUdsResponseWithoutLosingTheValidResponse() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+                "0.005000 1 7E8 Rx d 8 02 7F 22 00 00 00 00 00",
+                "0.025000 1 7E8 Rx d 8 04 62 F1 90 AA 00 00 00"
+            ).joinToString("\n"),
+            "truncated-negative-response.asc"
+        )
+
+        assertEquals(1, report.exchanges.size)
+        val exchange = report.exchanges.single()
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(1, exchange.responses.size)
+        assertEquals(0x62, exchange.responses.single().responseService)
+        assertEquals(null, exchange.responses.single().negativeResponseCode)
+    }
+
+    @Test
     fun recognizesNegativeUdsResponseWithoutInventingDidObservation() {
         val report = CanTraceAnalyzer.analyze(
             "7E8 4 03 7F 22 31",
