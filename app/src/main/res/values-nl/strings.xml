@@ -645,4 +645,6 @@
     <string name="can_sniffer_request_failed">Alleen-lezen verzoek mislukt.</string>
     <string name="can_sniffer_bus_limit">Deze opname gebruikt het actieve 11-bit, 500 kbit/s HS-CAN-profiel. Voor SW-CAN en andere bussen is een andere interface nodig.</string>
     <string name="can_sniffer_stn_filter_notice">Bij STN-adapters worden tijdelijke filters gewist voor ruwe opname en wordt automatische OBD-filtering daarna opnieuw ingeschakeld. Aangepaste filters van andere software worden niet hersteld.</string>
+    <string name="can_sniffer_search">CAN-ID of databytes zoeken</string>
+    <string name="can_sniffer_filtered_count">%1$d van %2$d frames weergegeven</string>
 </resources>
