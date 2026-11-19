@@ -184,4 +184,22 @@ class CanTraceAnalyzerTest {
         assertTrue(report.frames.isEmpty())
         assertTrue(report.errors.any { it.contains("invalid CSV CAN frame") })
     }
+
+    @Test
+    fun describesStandardNegativeResponseCodesInEnglishAndFrench() {
+        assertEquals("requestOutOfRange", UdsNegativeResponse.name(0x31))
+        assertEquals("Request out of range", UdsNegativeResponse.description(0x31, "en"))
+        assertEquals("Requête hors plage", UdsNegativeResponse.description(0x31, "fr"))
+        assertEquals("Request received; response pending", UdsNegativeResponse.description(0x78, "en"))
+        assertEquals("Requête reçue ; réponse en attente", UdsNegativeResponse.description(0x78, "fr"))
+    }
+
+    @Test
+    fun leavesUnknownAndManufacturerSpecificNegativeResponseCodesUnclassified() {
+        assertEquals(null, UdsNegativeResponse.name(0xF1))
+        assertEquals(
+            "Unknown or manufacturer-specific NRC 0xF1",
+            UdsNegativeResponse.description(0xF1)
+        )
+    }
 }
