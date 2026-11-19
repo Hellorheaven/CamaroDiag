@@ -653,6 +653,9 @@
     <string name="can_sniffer_dtc_heading">Observed OBD-II trouble codes</string>
     <string name="can_sniffer_dtc_service">Read from OBD-II Mode %1$02X</string>
     <string name="can_sniffer_pid_heading">Decoded standard OBD-II values</string>
+    <string name="can_sniffer_request_history">Manual request history</string>
+    <string name="can_sniffer_request_history_item">%1$s • %2$s</string>
+    <string name="can_sniffer_request_history_response">Response: %1$s</string>
     <string name="can_sniffer_response_heading">Last OBD-II response</string>
     <string name="can_sniffer_request_complete">Read-only request completed.</string>
     <string name="can_sniffer_request_failed">Read-only request failed.</string>
