@@ -674,4 +674,73 @@ class CanTraceAnalyzerTest {
         assertEquals(null, report.flowControlObservations[3].separationTimeMicros)
         assertTrue(report.messages.isEmpty())
     }
+    @Test
+    fun decodesAdditionalStandardObdRuntimeDistanceAndFuelPids() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 5 04 41 1F 01 2C",
+                "7E8 5 04 41 21 01 F4",
+                "7E8 4 03 41 2F 80",
+                "7E8 5 04 41 31 03 E8",
+                "7E8 4 03 41 33 64",
+                "7E8 5 04 41 4D 00 3C",
+                "7E8 5 04 41 4E 00 78"
+            ).joinToString("\n"),
+            "additional-standard-pids.txt"
+        )
+        val byPid = report.pidObservations.associateBy { it.pid }
+
+        assertEquals(300.0, byPid[0x1F]?.value!!, 0.0)
+        assertEquals("s", byPid[0x1F]?.unit)
+        assertEquals(500.0, byPid[0x21]?.value!!, 0.0)
+        assertEquals(128.0 * 100.0 / 255.0, byPid[0x2F]?.value!!, 0.0001)
+        assertEquals(1000.0, byPid[0x31]?.value!!, 0.0)
+        assertEquals(100.0, byPid[0x33]?.value!!, 0.0)
+        assertEquals(60.0, byPid[0x4D]?.value!!, 0.0)
+        assertEquals(120.0, byPid[0x4E]?.value!!, 0.0)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
+    fun decodesStandardCatalystOilAndFuelRatePids() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 5 04 41 3C 03 E8",
+                "7E8 5 04 41 3D 07 D0",
+                "7E8 5 04 41 3E 0B B8",
+                "7E8 5 04 41 3F 0F A0",
+                "7E8 4 03 41 5C 64",
+                "7E8 5 04 41 5D 69 80",
+                "7E8 5 04 41 5E 01 F4"
+            ).joinToString("\n"),
+            "catalyst-oil-fuel-pids.txt"
+        )
+        val byPid = report.pidObservations.associateBy { it.pid }
+
+        assertEquals(60.0, byPid[0x3C]?.value!!, 0.0)
+        assertEquals(160.0, byPid[0x3D]?.value!!, 0.0)
+        assertEquals(260.0, byPid[0x3E]?.value!!, 0.0)
+        assertEquals(360.0, byPid[0x3F]?.value!!, 0.0)
+        assertEquals(60.0, byPid[0x5C]?.value!!, 0.0)
+        assertEquals(1.0, byPid[0x5D]?.value!!, 0.0)
+        assertEquals(25.0, byPid[0x5E]?.value!!, 0.0)
+        assertEquals("L/h", byPid[0x5E]?.unit)
+        assertTrue(report.errors.isEmpty())
+    }
+
+    @Test
+    fun doesNotDecodeAdditionalStandardPidsWhenRequiredBytesAreMissing() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 4 03 41 1F 01",
+                "7E8 4 03 41 5E 10",
+                "7E8 4 03 41 3C 01"
+            ).joinToString("\n"),
+            "truncated-additional-pids.txt"
+        )
+
+        assertTrue(report.pidObservations.isEmpty())
+        assertEquals(3, report.messages.size)
+    }
+
 }\n
