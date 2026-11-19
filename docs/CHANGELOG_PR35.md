@@ -157,3 +157,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - La restauration reste exécutée dans `NonCancellable` et chaque commande est tentée indépendamment, même si une étape échoue.
 - Commit : `7f5033f`.
 - Contrôle documentaire des commandes ELM ; aucun test Gradle, build Android ni essai matériel n'a été exécuté.
+
+### Filtres temporels des traces CAN — 2026-11-19
+- Correction d'un cas limite : un horodatage `NaN` passait auparavant un filtre temporel borné, car les comparaisons avec `NaN` sont toutes fausses.
+- Les filtres temporels rejettent désormais explicitement les horodatages absents ou non finis (`NaN`, infinis) ; les traces sans critère temporel restent inchangées.
+- Ajout de tests pour `NaN` et l'infini positif.
+- Commits : `d6dba73` (correctif), `f983b9d` (tests).
+- Tests Gradle/build Android non exécutés.
