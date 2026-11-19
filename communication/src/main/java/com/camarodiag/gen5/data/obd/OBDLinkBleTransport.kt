@@ -49,7 +49,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
             // Ignore callbacks from a GATT instance that was closed/replaced by a reconnect.
             if (g !== gatt) return
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                val failure = IllegalStateException("BLE connection failed (status $status)")
+                val failure = ObdTransportDisconnectedException("OBDLink BLE connection failed (status $status)")
                 connectionFailure = failure
                 connectResult?.completeExceptionally(failure)
                 writeResult?.completeExceptionally(failure)
@@ -61,7 +61,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
                     connectResult?.completeExceptionally(IllegalStateException("BLE service discovery could not start"))
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                val failure = IllegalStateException("OBDLink BLE disconnected")
+                val failure = ObdTransportDisconnectedException("OBDLink BLE disconnected")
                 connectionFailure = failure
                 connectResult?.completeExceptionally(failure)
                 writeResult?.completeExceptionally(failure)
