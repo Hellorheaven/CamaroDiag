@@ -268,6 +268,7 @@ object CanTraceAnalyzer {
                     val request = pending[index].request
                     request.direction != message.direction &&
                         isCompatibleObdCanResponseId(request.canId, message.canId) &&
+                        pending[index].responses.none { it.canId == message.canId } &&
                         request.service == service &&
                         // If both timestamps exist, never pair a response that predates
                         // its request. Missing timestamps retain capture-order behavior.
@@ -297,7 +298,11 @@ object CanTraceAnalyzer {
                 if (matchIndex != null) {
                     val candidate = pending[matchIndex]
                     candidate.responses += message
-                    if (message.negativeResponseCode != 0x78) {
+                    // A functional 7DF request can receive one response from
+                    // several ECUs. Keep it pending for distinct responder IDs and
+                    // aggregate those replies into one exchange until capture end.
+                    val functionalRequest = candidate.request.canId == 0x7DF
+                    if (!functionalRequest && message.negativeResponseCode != 0x78) {
                         pending.removeAt(matchIndex)
                         exchanges += candidate.toExchange(UdsExchangeStatus.COMPLETED)
                     }
