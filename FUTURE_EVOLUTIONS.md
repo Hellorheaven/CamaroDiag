@@ -54,8 +54,8 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Maintenir une matrice de compatibilité adaptateur / protocole / fonction / OS / niveau de validation.
 
 #### Interfaces supplémentaires appartenant à l'utilisateur — inventaire et étude de compatibilité
-- [ ] Ajouter à la matrice matérielle l'interface Autocom utilisée pour les véhicules PSA. Modèle/référence exacte à identifier avant de choisir le pilote ou de revendiquer une compatibilité.
-- [ ] Ajouter le VXDIAG VCX Nano utilisé avec Mazda et Ford. Identifier la variante matérielle, le firmware, les pilotes disponibles, les protocoles et le mode de connexion réellement utilisés.
+- [ ] Ajouter à la matrice matérielle l'interface Autocom utilisée pour les véhicules PSA, avec logiciel annoncé en version 2021.24 (version exacte à confirmer). Identifier la référence matérielle de l'interface Autocom avant de choisir le pilote ou de revendiquer une compatibilité.
+- [ ] Ajouter le VXDIAG VCX Nano utilisé avec Mazda et Ford. Identifier la variante matérielle exacte, le firmware, les pilotes disponibles, les protocoles et le mode de connexion réellement utilisés. Étudier en priorité son intégration au pont Windows 11 et son éventuel accès J2534/PassThru, uniquement après vérification de la variante et des pilotes.
 - [ ] Étudier pour chaque interface les transports USB/USB OTG, Bluetooth ou pont PC disponibles, sans supposer qu'ils sont tous pris en charge par chaque modèle.
 - [ ] Distinguer les protocoles et fonctions réellement exposés : diagnostic constructeur, OBD générique, CAN, K-Line, J2534/PassThru, programmation et fonctions spécifiques à une marque. La présence d'un outil ou d'un pilote constructeur ne prouve pas que toutes ces fonctions sont accessibles à CamaroDiag.
 - [ ] Concevoir une architecture de pilotes/adaptateurs indépendante de la marque, avec profils de capacités déclarées et testées par modèle, firmware, système d'exploitation et protocole.
@@ -389,6 +389,7 @@ Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L
 - Aucune plaque d'immatriculation ni donnée personnelle ne doit être conservée dans ce backlog.
 
 ## 6. Historique des décisions
+- 2026-11-19 : préciser l'inventaire utilisateur : VXDIAG VCX Nano (utilisé sur Mazda/Ford) et Autocom avec logiciel annoncé en version 2021.24 (utilisé sur PSA ; référence matérielle à confirmer).
 - 2026-11-19 : compléter l'inventaire matériel avec l'interface Autocom utilisée sur PSA (modèle à identifier) et le VXDIAG Nano utilisé sur Mazda/Ford ; étudier leurs pilotes, transports et capacités réelles avant toute annonce de compatibilité CamaroDiag.
 - 2026-11-19 : ajouter le câble KKL USB multi-motos utilisé avec TuneECU/BHELI32 comme interface USB-série candidate via OTG/Windows ; étudier FTDI/K-Line et la compatibilité réelle avec le calculateur Camaro avant toute revendication, notamment pour la programmation calibration qui reste soumise à validation et garde-fous spécifiques.
 - 2026-11-19 : étendre le tableau de bord temps réel à un catalogue personnalisable multi-calculateurs (moteur, transmission, TPMS, carrosserie, éclairage, châssis et confort), avec découverte des données réellement disponibles, unités, états de disponibilité, courbes et enregistrement ; les données constructeur et limites d'interface doivent être explicites.
