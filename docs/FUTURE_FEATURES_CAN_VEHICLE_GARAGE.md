@@ -2,6 +2,28 @@
 
 > **Règle générale :** ce document décrit le backlog et les critères attendus. Une fonctionnalité n'est pas considérée comme développée parce qu'elle est décrite ici. Elle passe « en cours » uniquement lorsqu'une PR dédiée est ouverte, et « terminée » après validation du code, des tests et des builds requis.
 
+## Correspondance avec le suivi opérationnel GitHub
+
+Les exigences détaillées restent volontairement dans ce document pendant la période de vérification. Chaque élément possède désormais une Issue GitHub miroir ; les états dynamiques (ouvert/fermé, PR liées, commentaires) doivent être lus dans GitHub.
+
+| Élément | Suivi GitHub |
+|---|---|
+| Sniffer / Console CAN | [PR #35](https://github.com/Hellorheaven/CamaroDiag/pull/35) — périmètre en cours, un seul module |
+| Couverture DTC Camaro Gen 5/Gen 6 et multi-ECU | [Issue #37](https://github.com/Hellorheaven/CamaroDiag/issues/37) |
+| Lot 1 — Adaptateurs et capacités | [Issue #41](https://github.com/Hellorheaven/CamaroDiag/issues/41) |
+| Lot 2 — Garage et profils véhicules | [Issue #42](https://github.com/Hellorheaven/CamaroDiag/issues/42) |
+| Lot 3 — Déconnexions et sessions | [Issue #43](https://github.com/Hellorheaven/CamaroDiag/issues/43) |
+| Lot 4 — Télémétrie temps réel multi-ECU | [Issue #44](https://github.com/Hellorheaven/CamaroDiag/issues/44) |
+| Lot 5 — Entretien et injecteurs | [Issue #45](https://github.com/Hellorheaven/CamaroDiag/issues/45) |
+| Lot 6 — Atelier calibration | [Issue #46](https://github.com/Hellorheaven/CamaroDiag/issues/46) |
+| Lot 7 — Extension multi-marques | [Issue #47](https://github.com/Hellorheaven/CamaroDiag/issues/47) |
+| Lot 8 — Cahier de recette Excel | [Issue #48](https://github.com/Hellorheaven/CamaroDiag/issues/48) |
+| Lot 9 — Langues UE et choix indépendant | [Issue #49](https://github.com/Hellorheaven/CamaroDiag/issues/49) |
+| Lot 10 — Tablettes 8/10/12 pouces | [Issue #40](https://github.com/Hellorheaven/CamaroDiag/issues/40) |
+| Socle transversal — compatibilité, déconnexion, CI | [Issue #50](https://github.com/Hellorheaven/CamaroDiag/issues/50) |
+
+Les Issues #38 et #39 sont des anomalies de stabilité distinctes et restent suivies séparément. Ne pas les confondre avec les lots fonctionnels ci-dessus.
+
 ## 1. Sniffer / Console CAN — périmètre de la PR #35
 
 La PR #35 est exclusivement consacrée à un seul module utilisateur **Sniffer / Console CAN**. Il regroupe capture entrante, analyse, décodage, journalisation, console de requêtes/réponses et émission lorsque l'interface le permet réellement.
