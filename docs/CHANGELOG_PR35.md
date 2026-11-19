@@ -100,3 +100,11 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Ajout du test de régression `doesNotCorrelateResponseWhoseTimestampPredatesRequest`.
 - Commits : `774f6f9` (analyse), `cd108f5` (test initial), `bad6a31` (correction du séparateur de lignes du test).
 - Vérification statique du code et du test uniquement ; aucun test Gradle/build CI ni validation sur véhicule exécuté.
+
+### Transport BLE — gestion des déconnexions — 2026-11-19
+- Le transport OBDLink BLE mémorise maintenant les erreurs GATT et les déconnexions inattendues.
+- Une déconnexion pendant une écriture termine immédiatement l'attente d'écriture avec une erreur explicite.
+- Une déconnexion pendant une lecture réveille le lecteur en attente et remonte une erreur au lieu de laisser la commande se terminer comme une réponse vide ou un simple timeout.
+- La cause de déconnexion est réinitialisée lors d'une nouvelle connexion et à la fermeture du transport.
+- Commits : `1f15322` (état d'erreur BLE), `205fe6b` (réveil des lectures en attente).
+- Relecture statique uniquement ; aucun test Android/Gradle, build ou essai avec OBDLink CX exécuté.
