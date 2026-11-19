@@ -202,4 +202,29 @@ class CanTraceAnalyzerTest {
             UdsNegativeResponse.description(0xF1)
         )
     }
-}
+
+    @Test
+    fun decodesIsoTpFlowControlStatusAndSeparationTime() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "7E8 3 30 08 05",
+                "7E8 3 31 00 F3",
+                "7E8 3 32 04 80",
+                "7E8 3 33 01 F0"
+            ).joinToString("\\n"),
+            "capture.txt"
+        )
+
+        assertEquals(4, report.flowControlObservations.size)
+        assertEquals(IsoTpFlowStatus.CONTINUE_TO_SEND, report.flowControlObservations[0].status)
+        assertEquals(8, report.flowControlObservations[0].blockSize)
+        assertEquals(5_000, report.flowControlObservations[0].separationTimeMicros)
+        assertEquals(IsoTpFlowStatus.WAIT, report.flowControlObservations[1].status)
+        assertEquals(300, report.flowControlObservations[1].separationTimeMicros)
+        assertEquals(IsoTpFlowStatus.OVERFLOW, report.flowControlObservations[2].status)
+        assertEquals(null, report.flowControlObservations[2].separationTimeMicros)
+        assertEquals(IsoTpFlowStatus.RESERVED, report.flowControlObservations[3].status)
+        assertEquals(null, report.flowControlObservations[3].separationTimeMicros)
+        assertTrue(report.messages.isEmpty())
+    }
+}\n
