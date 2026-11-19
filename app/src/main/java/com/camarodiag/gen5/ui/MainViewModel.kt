@@ -1145,6 +1145,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Export the latest raw CAN capture without transforming adapter output. */
+    fun exportCanCapture(destinationUri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val raw = _liveCanMonitorState.value.rawText
+                require(raw.isNotBlank()) { "No CAN capture is available to export." }
+                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
+                    ?: error("Could not create the CAN capture file.")
+                output.use { it.write(raw.toByteArray(Charsets.UTF_8)) }
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                    message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                    message = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
+                )
+            }
+        }
+    }
+
     private fun localizedCanTraceError(message: String): String {
         val app = getApplication<Application>()
         val lineMatch = Regex("^Line (\\d+): (.*)$").matchEntire(message)
