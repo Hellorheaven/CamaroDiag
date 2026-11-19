@@ -226,6 +226,11 @@ Les diagonales suivantes sont des cibles explicites de recette, pas des dimensio
 
 ## Politique de mise à jour documentaire
 
+### Utilisation des fonctions natives GitHub
+- Privilégier les outils natifs disponibles dans le dépôt : PR, Issues, labels, milestones, discussions, GitHub Actions/checks et releases ; utiliser GitHub Projects si cette fonctionnalité est accessible et pertinente.
+- Ne pas dupliquer dans le Markdown les informations dynamiques déjà maintenues par GitHub (état des PR, exécutions CI, checks, commentaires). Les documents gardent le contexte durable, les décisions, la décomposition du backlog et les consignes de reprise, avec des liens vers les objets GitHub utiles.
+- Avant de s'appuyer sur une fonction ou une automatisation, vérifier qu'elle existe et qu'elle est accessible. Ne jamais annoncer un tableau GitHub Project ou une automatisation comme configuré sans l'avoir réellement créé et vérifié.
+
 ### Synchronisation du backlog avec les PR
 - Une fonctionnalité du backlog livrée par une PR doit être retirée des tâches futures dès que la PR est fusionnée dans `main` et que le contenu livré a été vérifié.
 - Avant fusion, l'élément reste visible dans le backlog avec le statut « en cours dans PR #… » : une branche de PR ne constitue pas encore une livraison intégrée.
