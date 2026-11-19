@@ -649,4 +649,5 @@
     <string name="can_sniffer_stn_filter_notice">במתאמי STN, מסננים זמניים נמחקים לצורך לכידה גולמית ולאחר מכן מופעל מחדש סינון OBD אוטומטי. מסננים מותאמים שהוגדרו בתוכנה אחרת אינם משוחזרים.</string>
     <string name="can_sniffer_search">חיפוש מזהה CAN או בתי נתונים</string>
     <string name="can_sniffer_filtered_count">מוצגות %1$d מתוך %2$d מסגרות</string>
+    <string name="connection_lost_bluetooth">חיבור ה-Bluetooth נותק. חבר מחדש את המתאם והפעל מחדש את הפעולה.</string>
 </resources>
