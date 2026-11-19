@@ -194,4 +194,5 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Tests Gradle/build Android non exécutés.
 
 ### Transport BLE — cycle de vie GATT
+- BLE OBDLink : validation des propriétés GATT des caractéristiques UART avant abonnement/émission. Le transport sélectionne maintenant notification ou indication selon les propriétés annoncées et prend en charge les caractéristiques d'écriture avec réponse ou sans réponse, sans attendre un callback d'écriture qui n'est pas garanti dans le second cas.
 - Les callbacks BLE de découverte, abonnement, MTU, écriture et notifications ignorent désormais les événements provenant d'une ancienne session GATT après reconnexion. Cela évite qu'un callback tardif d'un ancien adaptateur valide une nouvelle connexion ou injecte des données périmées.
