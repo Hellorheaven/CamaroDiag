@@ -178,6 +178,60 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Commencer par établir la matrice de compatibilité Gen 5 / Gen 6 (ECM/PCM et TCM), sans extrapoler les capacités d'une famille de calculateur à une autre.
 - [ ] Préparer des tests automatisés des états et scénarios d'interruption, puis des validations sur banc et sur véhicule avec alimentation stabilisée et matériel compatible avant toute activation réelle.
 
+### 2.8 Boîte à outils atelier — outils communs et outils dépendants du véhicule
+
+**Décision utilisateur — 2026-11-19 :** ajouter au backlog l'ensemble des outils proposés pour compléter CamaroDiag. La boîte à outils doit être commune aux marques lorsque la fonction est générique, et afficher automatiquement les fonctions spécifiques uniquement lorsque le véhicule, le moteur, la transmission et les calculateurs sélectionnés sont identifiés et pris en charge. Ces fonctions sont à concevoir après les priorités de fiabilité et le chantier actif ; elles ne sont pas déclarées implémentées.
+
+#### Diagnostic, analyse et acquisition
+- [ ] Ajouter un analyseur de fichiers de logs/captures : ouverture des formats documentés, affichage de plusieurs courbes simultanées, sélection des canaux, synchronisation temporelle, zoom, curseurs, unités, filtres et repérage des valeurs atypiques.
+- [ ] Permettre de comparer plusieurs sessions de capture (avant/après intervention), avec alignement temporel ou par régime lorsque les données le permettent, résumé des écarts et export d'un rapport.
+- [ ] Ajouter un analyseur CAN hors ligne pour décoder et filtrer les trames à partir de définitions vérifiées, rechercher les variations entre captures et relier les signaux à leur source ; conserver les fonctions de capture et de diagnostic en lecture seule dans leurs rubriques normales.
+- [ ] Ajouter une vue consolidée des DTC et de leurs contextes : calculateur, statut, fréquence si disponible, freeze frame, données associées, conditions d'apparition et historique ; ne pas inventer de définition constructeur.
+- [ ] Constituer une bibliothèque de formes d'onde de référence (vilebrequin, arbres à cames, sondes lambda, injecteurs et autres capteurs/actionneurs) avec moteur/variante, conditions de mesure, unités, source technique et niveau de confiance. Ne jamais présenter une forme d'onde générique comme référence universelle.
+- [ ] Permettre l'import et l'archivage de mesures issues d'oscilloscopes ou d'outils externes uniquement lorsque le format est documenté ; distinguer les données mesurées des illustrations pédagogiques.
+
+#### Outils moteur et mécanique — priorité élevée après le socle atelier
+- [ ] Ajouter un assistant de tests moteur pour consigner les mesures de compression, pression, température et autres contrôles pertinents, avec comparaison entre cylindres, conditions de mesure, unités, date et historique.
+- [ ] Ajouter un carnet de suivi des injecteurs : référence, cylindre, date de remplacement, kilométrage, opérations réalisées et codes de correction/calibration lorsque le moteur/ECU les utilise effectivement.
+- [ ] Relier le carnet injecteurs à l'assistant visuel déjà demandé : schéma spécifique au moteur, emplacement des injecteurs, marquage du code, numérotation des cylindres et orientation explicitement montrée du point de vue d'une personne debout à l'avant du véhicule et face au moteur. Distinguer gauche/droite du véhicule et gauche/droite de l'observateur ; afficher côté distribution, côté boîte, bancs et source documentaire. Bloquer toute affectation ou programmation si l'orientation et la numérotation exactes ne sont pas confirmées.
+- [ ] Ajouter une aide à la distribution moteur, particulièrement prioritaire : schémas de calage adaptés au code moteur exact, repères vilebrequin et arbres à cames, chaîne/courroie, tendeurs, guides, ordre et étapes de contrôle/remontage, couples de serrage et angles lorsque des données fiables sont disponibles.
+- [ ] Pour l'aide à la distribution, fournir des vues clairement orientées et légendées : avant du véhicule, personne face au moteur, côté distribution, côté boîte, bancs et numérotation des cylindres. Éviter toute ambiguïté entre gauche/droite du véhicule et gauche/droite de l'observateur.
+- [ ] Associer chaque procédure de distribution à la variante exacte (marque, modèle, année, code moteur, évolution technique) et afficher la source, la révision et les conditions d'applicabilité. Ne jamais extrapoler un schéma ou un couple de serrage d'un moteur voisin.
+- [ ] Ajouter des contrôles préalables et avertissements pour les moteurs interférentiels et les opérations présentant un risque de contact soupapes/pistons ; les avertissements ne remplacent pas la procédure constructeur.
+- [ ] Si les informations exactes de calage, couples, angles ou outils de maintien ne sont pas disponibles et vérifiables, afficher « procédure non documentée » plutôt que compléter par supposition. Aucune commande d'actionneur ou programmation ECU ne doit être déclenchée par ces assistants mécaniques.
+
+#### Préparation, calibration et comparaison
+- [ ] Ajouter un comparateur de cartographies dédié, distinct de l'éditeur : comparaison de deux ou plusieurs fichiers compatibles, affichage des tables modifiées, écarts absolus/relatifs et heatmaps, avec identification des données non décodées.
+- [ ] Relier le comparateur aux projets de calibration et à leur historique : fichier original préservé, versions successives, commentaires, date, véhicule/ECU/CAL ID/CVN et rapport des modifications.
+- [ ] Ajouter un gestionnaire de projets multi-calibrations, notamment pour les configurations FlexFuel : associer les fichiers, leur rôle, le carburant/configuration visés et les métadonnées. Ne jamais mélanger des calibrations incompatibles.
+- [ ] Ajouter un analyseur de logs avant/après calibration pour confronter les paramètres réellement enregistrés ; distinguer corrélation, mesure et causalité et ne pas promettre un gain de puissance sur la seule base des différences de tables.
+- [ ] Relier les outils de puissance/couple déjà prévus au comparateur et à l'analyseur de logs, sans dupliquer les calculs ni les rapports existants.
+
+#### Calculatrices et utilitaires d'atelier
+- [ ] Ajouter un calculateur de rapports de boîte : rapports de transmission, rapport de pont, régime moteur, vitesse véhicule et rapport engagé, avec unités configurables et paramètres explicitement saisis ou issus d'une source vérifiée.
+- [ ] Ajouter un calculateur de pneus : dimensions, diamètre, circonférence, différence de développement, écart de vitesse affichée/réelle et comparaison de montes.
+- [ ] Ajouter un calculateur de démultiplication combinant pneus, boîte et pont afin d'estimer le régime à une vitesse donnée ou la vitesse à un régime donné.
+- [ ] Ajouter un convertisseur d'unités automobiles (pression, température, débit, couple, puissance, vitesse, volume et consommation) avec conversions exactes et unités clairement affichées.
+- [ ] Ajouter un calculateur de débit carburant/consommation avec hypothèses et unités explicites ; ne pas présenter une estimation comme une mesure réelle.
+- [ ] Prévoir une architecture de calculateurs extensible, testée sur les conversions, arrondis, valeurs limites et unités incompatibles.
+
+#### Historique, pièces et rapports
+- [ ] Ajouter un carnet d'entretien/intervention par véhicule : date, kilométrage, description, symptômes, diagnostic, opérations, pièces, références, photos/fichiers joints et intervenant si renseigné.
+- [ ] Ajouter un suivi des pièces remplacées, notamment injecteurs, capteurs, bobines, bougies, modules et éléments de distribution, avec référence, emplacement, date et historique.
+- [ ] Permettre de rattacher les logs, captures, DTC, mesures, fichiers de calibration et rapports à une intervention, sans altérer les fichiers sources.
+- [ ] Ajouter un générateur de rapports PDF professionnels : identité du véhicule et VIN selon les données disponibles, calculateurs identifiés, défauts, freeze frames, mesures, captures, pièces et opérations effectuées, date, version de l'application et limites de validation.
+- [ ] Permettre l'export et l'archivage des rapports et données d'intervention ; protéger les données personnelles et permettre de masquer les identifiants avant partage.
+- [ ] Distinguer clairement dans les rapports les mesures réelles, données calculées, informations issues d'une base documentaire, résultats simulés et éléments non vérifiés.
+
+#### Architecture et règles d'affichage
+- [ ] Concevoir la boîte à outils comme un espace commun aux véhicules et constructeurs, sans dupliquer les calculs génériques dans chaque profil constructeur.
+- [ ] Afficher ou masquer les outils spécifiques selon le véhicule, le moteur, la transmission, les calculateurs, les capteurs disponibles et le niveau réel de prise en charge ; ne pas afficher une compatibilité supposée.
+- [ ] Conserver les outils génériques (convertisseurs, calculateurs de pneus/rapports, gestionnaire de rapports et d'interventions) indépendamment de la marque.
+- [ ] Relier les outils spécifiques aux données techniques exactes et à leurs sources ; indiquer « non disponible pour ce véhicule » lorsque les données ou procédures sont absentes.
+- [ ] Adapter les écrans à l'utilisation sur téléphone et tablette, avec navigation tactile, unités lisibles et conservation de l'état des projets.
+- [ ] Ajouter des tests unitaires pour les calculs, tests de parsing pour les fichiers pris en charge et tests d'interface pour l'affichage conditionnel selon le profil véhicule.
+- [ ] Maintenir les assistants mécaniques et calculatrices hors ligne et sans écriture ECU ; toute fonction de diagnostic actif ou de programmation doit rester dans son module dédié avec ses propres prérequis et verrous.
+
 ### 3.1 Architecture multimarque future
 - [ ] Étudier une architecture commune de diagnostic avec modules/adaptateurs spécifiques à chaque constructeur.
 - [ ] Séparer le socle partagé (transport, sessions, journalisation, VIN, rapports, télémétrie, gestion des adaptateurs) des définitions constructeur (calculateurs, protocoles, DTC, DID, procédures et profils).
