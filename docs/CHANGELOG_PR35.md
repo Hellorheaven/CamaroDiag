@@ -124,3 +124,11 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - La règle de complétude est isolée dans `ElmResponseCompletion` et couverte par trois tests unitaires : réponse complète, réponse incomplète et capture streaming sans prompt.
 - Commits : `a8b7f5d` (comportement), `6f7d42a` (helper), `afac1ef` (tests), `13bca42` (intégration aux quatre transports).
 - Relecture statique des quatre chemins et présence des trois cas de test vérifiées ; les tests Gradle n'ont pas encore été exécutés, aucun build CI ni essai sur véhicule réalisé.
+
+### Reconnexion BLE — isolation des sessions GATT — 2026-11-19
+- Le transport BLE expose maintenant un état de connexion dérivé de la session GATT active et de l'absence d'erreur de connexion.
+- Les callbacks Bluetooth tardifs provenant d'une ancienne instance GATT fermée ou remplacée sont ignorés ; ils ne peuvent plus marquer par erreur une nouvelle session comme déconnectée.
+- Le canal OBD signale désormais indisponible si la socket Bluetooth classique est fermée ou si la session BLE a signalé une déconnexion.
+- Les transports USB/Wi-Fi conservent la détection de fermeture au niveau des opérations de lecture/écriture ; aucune reconnexion automatique n'est prétendue.
+- Commits : `2f4205e` (callbacks GATT obsolètes), `d9e0a45` (état du canal OBD).
+- Relecture statique uniquement ; aucun test Gradle/build CI ni essai sur matériel exécuté.
