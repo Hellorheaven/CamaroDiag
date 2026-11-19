@@ -655,8 +655,8 @@
     <string name="can_sniffer_request_failed">Read-only request failed.</string>
     <string name="can_sniffer_bus_limit">This capture path uses the active 11-bit, 500 kbit/s HS-CAN profile. SW-CAN and other buses require a different interface.</string>
     <string name="can_sniffer_stn_filter_notice">On STN adapters, temporary filters are cleared for raw capture and automatic OBD filtering is re-enabled afterward. Custom filters set by other software are not restored.</string>
-    <string name="connection_lost_bluetooth">Bluetooth connection lost. Reconnect the adapter and restart the operation.</string>
-    <string name="connection_lost_vehicle">Vehicle connection lost. Reconnect to the vehicle and restart the operation.</string>
+    <string name="connection_lost_bluetooth" tools:ignore="MissingTranslation">Bluetooth connection lost. Reconnect the adapter and restart the operation.</string>
+    <string name="connection_lost_vehicle" tools:ignore="MissingTranslation">Vehicle connection lost. Reconnect to the vehicle and restart the operation.</string>
     <string name="can_sniffer_search">Search CAN ID or data bytes</string>
     <string name="can_sniffer_filtered_count">Showing %1$d of %2$d frames</string>
 </resources>
