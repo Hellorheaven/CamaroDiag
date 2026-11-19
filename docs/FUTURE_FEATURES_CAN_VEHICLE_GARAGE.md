@@ -226,6 +226,13 @@ Les diagonales suivantes sont des cibles explicites de recette, pas des dimensio
 
 ## Politique de mise à jour documentaire
 
+### Synchronisation du backlog avec les PR
+- Une fonctionnalité du backlog livrée par une PR doit être retirée des tâches futures dès que la PR est fusionnée dans `main` et que le contenu livré a été vérifié.
+- Avant fusion, l'élément reste visible dans le backlog avec le statut « en cours dans PR #… » : une branche de PR ne constitue pas encore une livraison intégrée.
+- Si la PR ne livre qu'une partie d'un lot, retirer uniquement la partie terminée et conserver le reste comme tâche future.
+- L'historique de la livraison reste dans le changelog propre à la PR ; le backlog ne doit pas accumuler les fonctionnalités déjà réalisées.
+
+
 - `docs/PROMPT_REPRISE.md` et `docs/FUTURE_FEATURES_CAN_VEHICLE_GARAGE.md` sont maintenus exclusivement sur `main`.
 - Un changelog propre à chaque PR, nommé `docs/CHANGELOG_PR<number>.md` (ex. `docs/CHANGELOG_PR35.md`), est maintenu sur la branche de cette PR et documente les changements réels, tests/builds et leur statut.
 - Le changelog d'une PR ne doit pas être écrit directement sur `main) avant fusion ; il rejoint `main` avec la PR.
