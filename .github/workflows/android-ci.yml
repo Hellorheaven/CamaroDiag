@@ -1,243 +1,53 @@
-name: Android CI
+name: Android validation (manual)
 
 on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
-      - converted_to_draft
-    branches:
-      - main
-
-concurrency:
-  group: android-debug-pr-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  workflow_dispatch:
 
 permissions:
-  actions: read
   contents: read
-  pull-requests: read
+
+concurrency:
+  group: android-manual-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  evaluate-build-checkpoint:
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
-    runs-on: ubuntu-latest
-    outputs:
-      android_changed: ${{ steps.android_changes.outputs.android_changed }}
-      current_android_changed: ${{ steps.android_changes.outputs.current_android_changed }}
-      build_required: ${{ steps.checkpoint.outputs.build_required }}
-      android_validation_applies: ${{ steps.checkpoint.outputs.validation_applies }}
-      commits_since_build: ${{ steps.checkpoint.outputs.commits_since_build }}
-      interval: ${{ steps.checkpoint.outputs.interval }}
-    steps:
-      - name: Checkout pull request history
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-
-      - name: Detect Android-relevant changes
-        id: android_changes
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          paths=(
-            'app/**' 'core/**' 'diagnostic/**' 'communication/**'
-            'control/**' 'mileageaudit/**' 'storage/**' 'third_party/**'
-            'build.gradle' 'build.gradle.kts' 'settings.gradle' 'settings.gradle.kts'
-            '*.gradle' '*.gradle.kts' 'gradle.properties' 'gradle/**'
-            'gradlew' 'gradlew.bat' 'version.properties'
-            '.github/workflows/android-ci.yml'
-          )
-          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"; then
-            echo "android_changed=false" >> "$GITHUB_OUTPUT"
-            echo "NOT APPLICABLE: no Android source, resource, module, or Gradle build changes."
-          else
-            echo "android_changed=true" >> "$GITHUB_OUTPUT"
-            echo "Android-relevant changes detected:"
-            git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
-          fi
-          if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- "${paths[@]}"; then
-            echo "current_android_changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "current_android_changed=true" >> "$GITHUB_OUTPUT"
-            echo "Current commit contains Android-relevant changes."
-          fi
-
-      - name: Find last successful Android Debug validation
-        id: previous_build
-        if: steps.android_changes.outputs.android_changed == 'true' && github.event.pull_request.draft
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-              owner: context.repo.owner, repo: context.repo.repo,
-              workflow_id: 'android-ci.yml', branch: pr.head.ref,
-              event: 'pull_request', status: 'completed', per_page: 100
-            });
-            const candidates = runs
-              .filter(run => run.conclusion === 'success' && run.head_sha !== pr.head.sha &&
-                (run.pull_requests || []).some(item => item.number === pr.number))
-              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            let previous = null;
-            for (const candidate of candidates) {
-              const jobs = await github.rest.actions.listJobsForWorkflowRun({
-                owner: context.repo.owner, repo: context.repo.repo,
-                run_id: candidate.id, per_page: 100
-              });
-              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.conclusion === 'success')) {
-                previous = candidate;
-                break;
-              }
-            }
-            core.setOutput('sha', previous ? previous.head_sha : '');
-            core.info(previous
-              ? 'Last successful Android Debug build: ' + previous.head_sha
-              : 'No previous successful Android Debug build; counting relevant commits from the PR base.');
-
-      - name: Evaluate Android-only periodic build checkpoint
-        id: checkpoint
-        shell: bash
-        env:
-          BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
-          ANDROID_CHANGED: ${{ steps.android_changes.outputs.android_changed }}
-          CURRENT_ANDROID_CHANGED: ${{ steps.android_changes.outputs.current_android_changed }}
-          EVENT_ACTION: ${{ github.event.action }}
-          PREVIOUS_BUILD_SHA: ${{ steps.previous_build.outputs.sha }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          IS_DRAFT: ${{ github.event.pull_request.draft }}
-        run: |
-          set -euo pipefail
-          configured="${BUILD_INTERVAL:-}"
-          if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
-          echo "interval=$interval" >> "$GITHUB_OUTPUT"
-          if [[ "$ANDROID_CHANGED" != "true" ]]; then
-            echo "validation_applies=false" >> "$GITHUB_OUTPUT"
-            echo "build_required=false" >> "$GITHUB_OUTPUT"
-            echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
-            echo "NOT APPLICABLE: this PR contains no Android-relevant changes."
-            exit 0
-          fi
-
-          count_base="$BASE_SHA"
-          if [[ -n "$PREVIOUS_BUILD_SHA" ]]; then count_base="$PREVIOUS_BUILD_SHA"; fi
-          paths=(
-            'app/**' 'core/**' 'diagnostic/**' 'communication/**'
-            'control/**' 'mileageaudit/**' 'storage/**' 'third_party/**'
-            'build.gradle' 'build.gradle.kts' 'settings.gradle' 'settings.gradle.kts'
-            '*.gradle' '*.gradle.kts' 'gradle.properties' 'gradle/**'
-            'gradlew' 'gradlew.bat' 'version.properties'
-            '.github/workflows/android-ci.yml'
-          )
-          commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
-          echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
-
-          # Force immediate tests/builds when tests or safety-critical protocol parsers changed
-          # anywhere since the last successful Android build, even if a later commit only changes UI.
-          current_files="$(git diff --name-only "$HEAD_SHA^" "$HEAD_SHA")"
-          validation_files="$(git diff --name-only "$count_base" "$HEAD_SHA")"
-          if grep -Eq 'src/test|CanTraceAnalyzer|SafeObdRequestPolicy' <<< "$validation_files"; then
-            echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-            echo "build_required=true" >> "$GITHUB_OUTPUT"
-            echo "Critical test/protocol parser changes since last successful build detected: forcing Android Debug validation."
-            exit 0
-          fi
-
-          # The checkpoint is cumulative: run the build as soon as the interval is reached,
-          # even when the commit that crosses the threshold changes documentation only.
-          if [[ "$IS_DRAFT" == "true" ]]; then
-            if (( commits_since_build >= interval )); then
-              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-              echo "build_required=true" >> "$GITHUB_OUTPUT"
-              echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
-            elif [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
-              echo "validation_applies=false" >> "$GITHUB_OUTPUT"
-              echo "build_required=false" >> "$GITHUB_OUTPUT"
-              echo "NOT APPLICABLE to this commit: no Android-relevant files changed and checkpoint not reached."
-            else
-              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-              if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/android-ci.yml'; then
-                echo "build_required=false" >> "$GITHUB_OUTPUT"
-                echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits."
-              else
-                echo "build_required=true" >> "$GITHUB_OUTPUT"
-                echo "Android CI workflow changed in this commit: forcing validation."
-              fi
-            fi
-          else
-            case "$EVENT_ACTION" in
-              ready_for_review|opened|reopened)
-                echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-                echo "build_required=true" >> "$GITHUB_OUTPUT"
-                echo "Initial Ready-for-review validation: Android changes exist in the PR."
-                ;;
-              *)
-                if [[ "$CURRENT_ANDROID_CHANGED" == "true" ]]; then
-                  echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-                  echo "build_required=true" >> "$GITHUB_OUTPUT"
-                  echo "Ready PR commit changes Android files: immediate Android Debug validation required."
-                else
-                  echo "validation_applies=false" >> "$GITHUB_OUTPUT"
-                  echo "build_required=false" >> "$GITHUB_OUTPUT"
-                  echo "NOT APPLICABLE to this Ready PR commit: no Android-relevant files changed."
-                fi
-                ;;
-            esac
-          fi
   test-and-build:
-    needs: evaluate-build-checkpoint
-    if: needs.evaluate-build-checkpoint.outputs.build_required == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout pull request commit
+      - name: Checkout selected branch
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
+          ref: ${{ github.ref }}
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
           java-version: '17'
           distribution: temurin
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.11.1'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: 14742923
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
-
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.11.1
-
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
-
       - name: Upload Android unit-test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-unit-tests-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: CamaroDiag-unit-tests-run-${{ github.run_number }}
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
           if-no-files-found: ignore
           retention-days: 14
-
-      - name: Run Android lint (Gradle warnings are errors)
+      - name: Run Android lint
         run: ./gradlew app:lintDebug --stacktrace --warning-mode=fail
-
       - name: Reject Android lint warnings
         shell: bash
         run: |
@@ -245,7 +55,6 @@ jobs:
           import pathlib
           import sys
           import xml.etree.ElementTree as ET
-
           report = pathlib.Path("app/build/reports/lint-results-debug.xml")
           if not report.is_file():
               print(f"Android lint report missing: {report}", file=sys.stderr)
@@ -256,64 +65,15 @@ jobs:
           if findings:
               for issue in findings:
                   print(f"{issue.get('severity')}: {issue.get('id')}: {issue.get('message')}")
-              print(f"Build rejected: {len(findings)} Android lint warning/error(s).", file=sys.stderr)
               sys.exit(1)
           print("Android lint clean: zero warnings and zero errors.")
           PY
-
-      - name: Upload Android lint report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: CamaroDiag-lint-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          path: |
-            app/build/reports/lint-results-debug.html
-            app/build/reports/lint-results-debug.xml
-            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Build debug APK
         run: ./gradlew app:assembleDebug --stacktrace --warning-mode=fail
-
-      - name: Upload debug APK for this PR commit
+      - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-debug-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: CamaroDiag-debug-run-${{ github.run_number }}
           path: app/build/outputs/apk/debug/CamaroDiag-debug.apk
           if-no-files-found: error
           retention-days: 30
-  android-debug-validation:
-    needs: [evaluate-build-checkpoint, test-and-build]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report Android Debug validation applicability
-        env:
-          EVALUATION_RESULT: ${{ needs.evaluate-build-checkpoint.result }}
-          ANDROID_CHANGED: ${{ needs.evaluate-build-checkpoint.outputs.android_changed }}
-          BUILD_REQUIRED: ${{ needs.evaluate-build-checkpoint.outputs.build_required }}
-          BUILD_RESULT: ${{ needs.test-and-build.result }}
-          COMMITS_SINCE_BUILD: ${{ needs.evaluate-build-checkpoint.outputs.commits_since_build }}
-          BUILD_INTERVAL: ${{ needs.evaluate-build-checkpoint.outputs.interval }}
-          VALIDATION_APPLIES: ${{ needs.evaluate-build-checkpoint.outputs.android_validation_applies }}
-        run: |
-          set -euo pipefail
-          if [[ "$EVALUATION_RESULT" != "success" ]]; then
-            echo "::error::Android applicability/checkpoint evaluation did not succeed."
-            exit 1
-          fi
-          if [[ "$VALIDATION_APPLIES" != "true" ]]; then
-            echo "NOT APPLICABLE: this PR event/commit does not change Android-relevant files."
-            exit 0
-          fi
-          if [[ "$BUILD_REQUIRED" != "true" ]]; then
-            echo "BUILD DEFERRED: $COMMITS_SINCE_BUILD/$BUILD_INTERVAL Android-relevant commits."
-            echo "This control is not a compilation and does not reset the checkpoint."
-            exit 0
-          fi
-          if [[ "$BUILD_RESULT" != "success" ]]; then
-            echo "::error::Android Debug validation was required but its result was $BUILD_RESULT."
-            exit 1
-          fi
-          echo "VALIDATED: Android unit tests, lint, and Debug APK build completed successfully."
