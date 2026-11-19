@@ -2311,6 +2311,98 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = b * 100.0 / 128.0 - 100.0
                                     values += LivePidValue("STFT", "Short Term Fuel Trim B1", "Correction carburant court terme B1", v, "%", v, "%", -100.0, 99.2, push("STFT", v))
                                 }
+                                read("07")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 128.0 - 100.0
+                                    values += LivePidValue("LTFT", "Long Term Fuel Trim B1", "Correction carburant long terme B1", v, "%", v, "%", -100.0, 99.2, push("LTFT", v))
+                                }
+                                read("08")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 128.0 - 100.0
+                                    values += LivePidValue("STFT_B2", "Short Term Fuel Trim B2", "Correction carburant court terme B2", v, "%", v, "%", -100.0, 99.2, push("STFT_B2", v))
+                                }
+                                read("09")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 128.0 - 100.0
+                                    values += LivePidValue("LTFT_B2", "Long Term Fuel Trim B2", "Correction carburant long terme B2", v, "%", v, "%", -100.0, 99.2, push("LTFT_B2", v))
+                                }
+                                read("0A")?.firstOrNull()?.let { b ->
+                                    val v = b * 3.0
+                                    values += LivePidValue("FUEL_PRESS", "Fuel Pressure", "Pression carburant", v, "kPa", v * 0.145038, "PSI", 0.0, 765.0, push("FUEL_PRESS", v))
+                                }
+                                read("0E")?.firstOrNull()?.let { b ->
+                                    val v = b / 2.0 - 64.0
+                                    values += LivePidValue("TIMING", "Ignition Timing Advance", "Avance à l'allumage", v, "°", v, "°", -64.0, 63.5, push("TIMING", v))
+                                }
+                                read("14")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = b[0] / 200.0
+                                    values += LivePidValue("O2_B1S1", "Oxygen Sensor B1S1 Voltage", "Sonde lambda B1S1 - tension", v, "V", v, "V", 0.0, 1.275, push("O2_B1S1", v))
+                                }
+                                read("15")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = b[0] / 200.0
+                                    values += LivePidValue("O2_B1S2", "Oxygen Sensor B1S2 Voltage", "Sonde lambda B1S2 - tension", v, "V", v, "V", 0.0, 1.275, push("O2_B1S2", v))
+                                }
+                                read("16")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = b[0] / 200.0
+                                    values += LivePidValue("O2_B1S3", "Oxygen Sensor B1S3 Voltage", "Sonde lambda B1S3 - tension", v, "V", v, "V", 0.0, 1.275, push("O2_B1S3", v))
+                                }
+                                read("17")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = b[0] / 200.0
+                                    values += LivePidValue("O2_B1S4", "Oxygen Sensor B1S4 Voltage", "Sonde lambda B1S4 - tension", v, "V", v, "V", 0.0, 1.275, push("O2_B1S4", v))
+                                }
+                                read("24")?.takeIf { it.size >= 4 }?.let { b ->
+                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
+                                    values += LivePidValue("WBO2_B1S1", "Wideband Lambda B1S1", "Sonde large bande B1S1 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B1S1", v))
+                                }
+                                read("25")?.takeIf { it.size >= 4 }?.let { b ->
+                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
+                                    values += LivePidValue("WBO2_B1S2", "Wideband Lambda B1S2", "Sonde large bande B1S2 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B1S2", v))
+                                }
+                                read("34")?.takeIf { it.size >= 4 }?.let { b ->
+                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
+                                    values += LivePidValue("WBO2_B2S1", "Wideband Lambda B2S1", "Sonde large bande B2S1 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B2S1", v))
+                                }
+                                read("35")?.takeIf { it.size >= 4 }?.let { b ->
+                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
+                                    values += LivePidValue("WBO2_B2S2", "Wideband Lambda B2S2", "Sonde large bande B2S2 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B2S2", v))
+                                }
+                                read("43")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = ((b[0] * 256 + b[1]) * 100.0) / 65535.0
+                                    values += LivePidValue("ABS_LOAD", "Absolute Engine Load", "Charge moteur absolue", v, "%", v, "%", 0.0, 100.0, push("ABS_LOAD", v))
+                                }
+                                read("44")?.takeIf { it.size >= 2 }?.let { b ->
+                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65535.0
+                                    values += LivePidValue("EQ_RATIO", "Commanded Equivalence Ratio", "Rapport d'équivalence demandé", v, "λ", v, "λ", 0.0, 2.0, push("EQ_RATIO", v))
+                                }
+                                read("45")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("REL_TPS", "Relative Throttle Position", "Position relative du papillon", v, "%", v, "%", 0.0, 100.0, push("REL_TPS", v))
+                                }
+                                read("46")?.firstOrNull()?.let { b ->
+                                    val v = (b - 40).toDouble()
+                                    values += LivePidValue("AMBIENT", "Ambient Air Temperature", "Température ambiante", v, "°C", v * 1.8 + 32.0, "°F", -40.0, 215.0, push("AMBIENT", v))
+                                }
+                                read("47")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("ABS_TPS_B", "Absolute Throttle Position B", "Position absolue papillon B", v, "%", v, "%", 0.0, 100.0, push("ABS_TPS_B", v))
+                                }
+                                read("48")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("ABS_TPS_C", "Absolute Throttle Position C", "Position absolue papillon C", v, "%", v, "%", 0.0, 100.0, push("ABS_TPS_C", v))
+                                }
+                                read("49")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("APP_D", "Accelerator Pedal Position D", "Position pédale accélérateur D", v, "%", v, "%", 0.0, 100.0, push("APP_D", v))
+                                }
+                                read("4A")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("APP_E", "Accelerator Pedal Position E", "Position pédale accélérateur E", v, "%", v, "%", 0.0, 100.0, push("APP_E", v))
+                                }
+                                read("4B")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("APP_F", "Accelerator Pedal Position F", "Position pédale accélérateur F", v, "%", v, "%", 0.0, 100.0, push("APP_F", v))
+                                }
+                                read("4C")?.firstOrNull()?.let { b ->
+                                    val v = b * 100.0 / 255.0
+                                    values += LivePidValue("CMD_TPS", "Commanded Throttle Actuator", "Commande actionneur papillon", v, "%", v, "%", 0.0, 100.0, push("CMD_TPS", v))
+                                }
                                 read("42")?.takeIf { it.size >= 2 }?.let { b ->
                                     val v = (b[0] * 256 + b[1]) / 1000.0
                                     values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
