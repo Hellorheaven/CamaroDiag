@@ -150,22 +150,22 @@ jobs:
             exit 0
           fi
 
-          # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
+          # The checkpoint is cumulative: run the build as soon as the interval is reached,
+          # even when the commit that crosses the threshold changes documentation only.
           if [[ "$IS_DRAFT" == "true" ]]; then
-            if [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
+            if (( commits_since_build >= interval )); then
+              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+              echo "build_required=true" >> "$GITHUB_OUTPUT"
+              echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
+            elif [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
               echo "validation_applies=false" >> "$GITHUB_OUTPUT"
               echo "build_required=false" >> "$GITHUB_OUTPUT"
-              echo "NOT APPLICABLE to this commit: no Android-relevant files changed."
+              echo "NOT APPLICABLE to this commit: no Android-relevant files changed and checkpoint not reached."
             else
               echo "validation_applies=true" >> "$GITHUB_OUTPUT"
               if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/android-ci.yml'; then
-                if (( commits_since_build >= interval )); then
-                  echo "build_required=true" >> "$GITHUB_OUTPUT"
-                  echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
-                else
-                  echo "build_required=false" >> "$GITHUB_OUTPUT"
-                  echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits."
-                fi
+                echo "build_required=false" >> "$GITHUB_OUTPUT"
+                echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits."
               else
                 echo "build_required=true" >> "$GITHUB_OUTPUT"
                 echo "Android CI workflow changed in this commit: forcing validation."
