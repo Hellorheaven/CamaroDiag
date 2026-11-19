@@ -673,6 +673,9 @@ object CanTraceAnalyzer {
     ): Boolean = previousTimestampSeconds != null && currentTimestampSeconds != null &&
         currentTimestampSeconds < previousTimestampSeconds
 
+    private fun isValidIsoTpSeparationTime(value: Int): Boolean =
+        value in 0x00..0x7F || value in 0xF1..0xF9
+
     private data class ReassemblyResult(
         val messages: List<UdsTraceMessage>,
         val errors: List<String>,
@@ -808,7 +811,17 @@ object CanTraceAnalyzer {
                         }
                     }
                 }
-                0x30 -> Unit // Flow-control frame; it is transport metadata, not a UDS payload.
+                0x30 -> {
+                    // ISO-TP Flow Control carries FlowStatus, BlockSize and STmin.
+                    // Validate metadata even though it is not exposed as a UDS payload.
+                    val flowStatus = pci and 0x0F
+                    val separationTime = frame.data.getOrNull(2)
+                    if (frame.data.size < 3 || flowStatus !in 0..2 ||
+                        separationTime == null || !isValidIsoTpSeparationTime(separationTime)
+                    ) {
+                        errors += "Line ${frame.lineNumber}: invalid ISO-TP flow-control frame."
+                    }
+                }
                 else -> errors += "Line ${frame.lineNumber}: unsupported ISO-TP PCI type 0x${pci.toString(16).uppercase(Locale.ROOT)}."
             }
         }
