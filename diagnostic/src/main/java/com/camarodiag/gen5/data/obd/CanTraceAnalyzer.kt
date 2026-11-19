@@ -111,6 +111,7 @@ data class CanTraceAnalysisReport(
     val didObservations: List<CanTraceDidObservation>,
     val pidObservations: List<CanTracePidObservation>,
     val errors: List<String>,
+    /** Multi-frame messages not completed, including sessions discarded before end of capture. */
     val incompleteIsoTpMessages: Int,
     val flowControlObservations: List<CanTraceFlowControl> = emptyList(),
     val exchanges: List<UdsTraceExchange> = emptyList()
