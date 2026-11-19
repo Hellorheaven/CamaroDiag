@@ -64,3 +64,15 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Extension ISO-TP First Frame : décodage de la longueur 32 bits lorsque FF_DL vaut zéro, reconstitution de charges utiles supérieures à 4095 octets et plafond d'analyse à 1 Mio. Les longueurs étendues tronquées ou hors plafond sont rejetées sans allocation de la charge annoncée.
 - Commits supplémentaires : code `cdebf21` et `226c7a4` ; tests `d3841a9`, `bf6d73c` et `2262dc9`.
 - Synchronisation avec main : commit de merge e7aa7ad6e8ddf5b351dbb12666171d38284e3fbe. La branche n'est plus en retard sur main ; GitHub indique mergeable_state: clean.
+
+
+### Corrélation avancée, console OBD et décodage DTC — 2026-11-19
+- L'historique des échanges corrèle maintenant les réponses positives OBD Mode 01/02/05/06/08/09 par PID ou identifiant de test, même si plusieurs requêtes du même service sont en attente et que les réponses arrivent dans le désordre.
+- Les DIDs des services UDS 0x22, 0x2E et 0x2F sont vérifiés sur la réponse positive. Les sous-fonctions des services UDS 0x10, 0x11, 0x19, 0x27, 0x28, 0x31 et 0x3E sont comparées ; RoutineControl vérifie également l'identifiant de routine 16 bits. Une réponse négative sans identifiant reste non associée lorsqu'il existe plusieurs candidats.
+- Ajout d'un décodage des réponses OBD-II 0x43, 0x47 et 0x4A en codes DTC standard à cinq caractères (familles P/C/B/U). Les couples 00 00 de remplissage sont ignorés ; le mode de lecture, l'ID CAN, la direction et les octets bruts restent attachés à chaque observation. Aucun libellé constructeur ou diagnostic spécifique au VIN n'est inventé.
+- La console accepte maintenant les demandes de lecture de défauts mémorisés (03), en attente (07) et permanents (0A), en complément des paires Mode 01/09 déjà autorisées. Le mode 04 d'effacement, les écritures UDS et les trames CAN arbitraires restent rejetés.
+- L'écran CAN affiche les identifiants PID/test et les codes DTC décodés. Les nouvelles chaînes sont fournies en anglais et en français ; les autres langues utilisent la ressource par défaut.
+- Le cycle d'envoi réserve maintenant son état avant le passage au dispatcher IO, empêchant deux clics rapides de lancer des commandes simultanées sur le même adaptateur. Le lancement est également refusé tant qu'un job de capture est actif.
+- Tests ajoutés pour les réponses Mode 01 hors ordre, DID 0x2F, sessions UDS concurrentes, RoutineControl avec RID distincts, décodage DTC 03/07/0A, padding et exclusion des réponses qui ne sont pas des DTC.
+- Commits de ce lot (19) : `89c1ff1`, `0ecbddf`, `848f622`, `cf20527`, `077408a`, `ff3d1f6`, `a8d542c`, `15ca4b7`, `801509f`, `d8444b8`, `7faafbe`, `5c2c582`, `1620efb`, `18ed064`, `79b3c5a`, `336f6ad`, `ef0593d`, `5dabb17`, `094cd77`.
+- Vérification de cohérence des fichiers et présence des cas de test effectuée par lecture du dépôt. Aucun build Android, test Gradle, CI ni essai sur véhicule n'a été exécuté pour ce lot ; ils ne sont donc pas déclarés réussis.
