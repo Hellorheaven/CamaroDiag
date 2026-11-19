@@ -704,9 +704,14 @@ object CanTraceAnalyzer {
                                     (frame.data[4].toLong() shl 8) or
                                     frame.data[5].toLong()
                             } else shortLength.toLong()
+                            // A First Frame is only valid when the payload cannot fit in
+                            // a Single Frame of the same CAN data length. Otherwise malformed
+                            // PCI data could be promoted to a complete UDS message.
+                            val maxSingleFramePayload = minOf(62, frame.data.size - 1)
                             if (lengthLong <= 0 ||
                                 lengthLong > MAX_SUPPORTED_ISOTP_PAYLOAD_BYTES.toLong() ||
-                                (usesExtendedLength && lengthLong <= 4095)
+                                (usesExtendedLength && lengthLong <= 4095) ||
+                                (!usesExtendedLength && lengthLong <= maxSingleFramePayload)
                             ) {
                                 errors += "Line ${frame.lineNumber}: unsupported ISO-TP first-frame length."
                             } else {
