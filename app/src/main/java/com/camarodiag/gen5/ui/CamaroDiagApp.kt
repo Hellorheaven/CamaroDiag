@@ -55,6 +55,34 @@ import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
+@Composable
+private fun canTracePidDisplayName(pid: Int, fallback: String): String = when (pid) {
+    0x1F -> stringResource(R.string.can_trace_pid_1f)
+    0x21 -> stringResource(R.string.can_trace_pid_21)
+    0x2F -> stringResource(R.string.can_trace_pid_2f)
+    0x31 -> stringResource(R.string.can_trace_pid_31)
+    0x33 -> stringResource(R.string.can_trace_pid_33)
+    0x3C -> stringResource(R.string.can_trace_pid_3c)
+    0x3D -> stringResource(R.string.can_trace_pid_3d)
+    0x3E -> stringResource(R.string.can_trace_pid_3e)
+    0x3F -> stringResource(R.string.can_trace_pid_3f)
+    0x47 -> stringResource(R.string.can_trace_pid_47)
+    0x48 -> stringResource(R.string.can_trace_pid_48)
+    0x49 -> stringResource(R.string.can_trace_pid_49)
+    0x4A -> stringResource(R.string.can_trace_pid_4a)
+    0x4B -> stringResource(R.string.can_trace_pid_4b)
+    0x4D -> stringResource(R.string.can_trace_pid_4d)
+    0x4E -> stringResource(R.string.can_trace_pid_4e)
+    0x5A -> stringResource(R.string.can_trace_pid_5a)
+    0x5C -> stringResource(R.string.can_trace_pid_5c)
+    0x5D -> stringResource(R.string.can_trace_pid_5d)
+    0x5E -> stringResource(R.string.can_trace_pid_5e)
+    0x61 -> stringResource(R.string.can_trace_pid_61)
+    0x62 -> stringResource(R.string.can_trace_pid_62)
+    0x63 -> stringResource(R.string.can_trace_pid_63)
+    else -> fallback
+}
+
 enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId: Int) {
     SETUP("Vehicle", "Véhicule", R.string.tab_vehicle),
     ADAPTER("Adapter", "Interface", R.string.tab_connect),
@@ -1509,7 +1537,7 @@ fun CanSnifferScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(observation.name, fontSize = 12.sp, color = TextMuted)
+                                Text(canTracePidDisplayName(observation.pid, observation.name), fontSize = 12.sp, color = TextMuted)
                                 Text("PID 0x${String.format(Locale.ROOT, "%02X", observation.pid)} • CAN 0x${String.format(Locale.ROOT, "%03X", observation.canId)}", fontSize = 10.sp, color = TextMuted)
                             }
                             Text(
