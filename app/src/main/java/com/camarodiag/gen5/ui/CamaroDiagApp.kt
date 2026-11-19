@@ -1165,7 +1165,17 @@ fun CanSnifferScreen(
     onSendRequest: (String) -> Unit
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
+    var frameSearch by remember { mutableStateOf("") }
     val report = state.report
+    val searchToken = frameSearch.trim().uppercase(Locale.ROOT)
+    val normalizedSearch = searchToken.removePrefix("0X").filterNot(Char::isWhitespace)
+    val visibleFrames = report?.frames.orEmpty().takeLast(100).asReversed().filter { frame ->
+        if (normalizedSearch.isBlank()) true else {
+            val canId = String.format(Locale.ROOT, "%03X", frame.canId)
+            val payload = frame.data.joinToString("") { String.format(Locale.ROOT, "%02X", it) }
+            canId.contains(normalizedSearch) || payload.contains(normalizedSearch)
+        }
+    }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -1233,8 +1243,28 @@ fun CanSnifferScreen(
         } else {
             item {
                 Text(stringResource(R.string.can_sniffer_frame_count, report.frames.size), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = frameSearch,
+                    onValueChange = { frameSearch = it.take(32) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.can_sniffer_search)) },
+                    placeholder = { Text("7E8 or 41 0C") },
+                    trailingIcon = {
+                        if (frameSearch.isNotEmpty()) {
+                            IconButton(onClick = { frameSearch = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_clear))
+                            }
+                        }
+                    }
+                )
+                Text(
+                    stringResource(R.string.can_sniffer_filtered_count, visibleFrames.size, report.frames.size),
+                    color = TextMuted,
+                    fontSize = 11.sp
+                )
             }
-            items(report.frames.takeLast(100).asReversed()) { frame ->
+            items(visibleFrames) { frame ->
                 Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(
