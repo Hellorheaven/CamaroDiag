@@ -9,7 +9,7 @@ class ObdTransportConnectionStateTest {
     @Test
     fun bleDisconnectIsReportedAsIoFailureToConnectionMonitor() {
         val error = ObdTransportDisconnectedException("BLE disconnected")
-        assertTrue(error is java.io.IOException)
+        assertTrue(java.io.IOException::class.java.isAssignableFrom(error.javaClass))
     }
 
     @Test
