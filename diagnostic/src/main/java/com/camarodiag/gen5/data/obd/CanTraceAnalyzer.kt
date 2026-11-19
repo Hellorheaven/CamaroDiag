@@ -358,9 +358,18 @@ object CanTraceAnalyzer {
             0x0F -> Triple("Intake air temperature", (a - 40).toDouble(), "°C")
             0x10 -> Triple("Mass air flow", ((a * 256) + b) / 100.0, "g/s")
             0x11 -> Triple("Throttle position", a * 100.0 / 255.0, "%")
+            0x1F -> Triple("Run time since engine start", (a * 256 + b).toDouble(), "s")
+            0x21 -> Triple("Distance traveled with MIL on", (a * 256 + b).toDouble(), "km")
+            0x2F -> Triple("Fuel tank level", a * 100.0 / 255.0, "%")
+            0x31 -> Triple("Distance since diagnostic codes cleared", (a * 256 + b).toDouble(), "km")
+            0x33 -> Triple("Barometric pressure", a.toDouble(), "kPa")
             in 0x14..0x1B -> Triple("Oxygen sensor " + (pid - 0x13) + " voltage", a / 200.0, "V")
             in 0x24..0x2B -> Triple("Wide-range oxygen sensor " + (pid - 0x23) + " equivalence ratio", ((a * 256 + b) * 2.0) / 65536.0, "ratio")
             in 0x34..0x3B -> Triple("Wide-range oxygen sensor " + (pid - 0x33) + " equivalence ratio", ((a * 256 + b) * 2.0) / 65536.0, "ratio")
+            0x3C -> Triple("Catalyst temperature Bank 1 Sensor 1", ((a * 256 + b) / 10.0) - 40.0, "°C")
+            0x3D -> Triple("Catalyst temperature Bank 2 Sensor 1", ((a * 256 + b) / 10.0) - 40.0, "°C")
+            0x3E -> Triple("Catalyst temperature Bank 1 Sensor 2", ((a * 256 + b) / 10.0) - 40.0, "°C")
+            0x3F -> Triple("Catalyst temperature Bank 2 Sensor 2", ((a * 256 + b) / 10.0) - 40.0, "°C")
             0x42 -> Triple("Control module voltage", (a * 256 + b) / 1000.0, "V")
             0x43 -> Triple("Absolute engine load", ((a * 256 + b) * 100.0) / 65535.0, "%")
             0x44 -> Triple("Commanded equivalence ratio", ((a * 256 + b) * 2.0) / 65535.0, "ratio")
@@ -368,10 +377,16 @@ object CanTraceAnalyzer {
             0x46 -> Triple("Ambient air temperature", (a - 40).toDouble(), "°C")
             in 0x47..0x4B -> Triple("Absolute throttle position " + (pid - 0x46), a * 100.0 / 255.0, "%")
             0x4C -> Triple("Commanded throttle actuator", a * 100.0 / 255.0, "%")
+            0x4D -> Triple("Time run with MIL on", (a * 256 + b).toDouble(), "min")
+            0x4E -> Triple("Time since diagnostic codes cleared", (a * 256 + b).toDouble(), "min")
+            0x5C -> Triple("Engine oil temperature", (a - 40).toDouble(), "°C")
+            0x5D -> Triple("Fuel injection timing", (((a * 256 + b) - 26_880) / 128.0), "°")
+            0x5E -> Triple("Engine fuel rate", ((a * 256 + b) / 20.0), "L/h")
             else -> return null
         }
         val requiredDataBytes = when (pid) {
-            0x0C, 0x10, in 0x14..0x1B, 0x42, 0x43, 0x44 -> 2
+            0x0C, 0x10, 0x1F, 0x21, 0x31, in 0x14..0x1B,
+            in 0x3C..0x3F, 0x42, 0x43, 0x44, 0x4D, 0x4E, 0x5D, 0x5E -> 2
             in 0x24..0x2B, in 0x34..0x3B -> 4
             else -> 1
         }
