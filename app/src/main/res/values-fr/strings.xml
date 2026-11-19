@@ -653,6 +653,8 @@
     <string name="can_sniffer_capture_failed">Échec de la capture CAN ou absence de réponse de l’adaptateur.</string>
     <string name="can_sniffer_invalid_request">Requête refusée. Seuls les modes OBD-II en lecture seule 01, 03, 07, 09 et 0A autorisés sont acceptés. L’effacement Mode 04 est bloqué.</string>
     <string name="can_sniffer_frame_count">Trames capturées : %1$d</string>
+    <string name="can_sniffer_dtc_heading">Codes défaut OBD-II observés</string>
+    <string name="can_sniffer_dtc_service">Lu via le mode OBD-II %1$02X</string>
     <string name="can_sniffer_pid_heading">Valeurs OBD-II standard décodées</string>
     <string name="can_sniffer_response_heading">Dernière réponse OBD-II</string>
     <string name="can_sniffer_request_complete">Requête en lecture seule terminée.</string>
