@@ -657,4 +657,7 @@
     <string name="can_sniffer_stn_filter_notice">Bei STN-Adaptern werden temporäre Filter für die Rohdaten-Erfassung gelöscht und die automatische OBD-Filterung danach wieder aktiviert. Benutzerdefinierte Filter anderer Software werden nicht wiederhergestellt.</string>
     <string name="can_sniffer_search">CAN-ID oder Datenbytes suchen</string>
     <string name="can_sniffer_filtered_count">%1$d von %2$d Frames werden angezeigt</string>
+    <string name="can_sniffer_direction_all">Alle</string>
+    <string name="can_sniffer_direction_rx">RX</string>
+    <string name="can_sniffer_direction_tx">TX</string>
 </resources>
