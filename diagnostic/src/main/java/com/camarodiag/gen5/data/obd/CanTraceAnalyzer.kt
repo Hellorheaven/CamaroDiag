@@ -537,6 +537,11 @@ object CanTraceAnalyzer {
                     }
                 }
                 0x10 -> {
+                    val key = frame.canId to frame.direction
+                    if (pending.remove(key) != null) {
+                        errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
+                        discardedIncompleteMessages++
+                    }
                     if (frame.data.size < 2) {
                         errors += "Line ${frame.lineNumber}: truncated ISO-TP first frame."
                     } else {
@@ -559,11 +564,6 @@ object CanTraceAnalyzer {
                                 errors += "Line ${frame.lineNumber}: unsupported ISO-TP first-frame length."
                             } else {
                                 val length = lengthLong.toInt()
-                                val key = frame.canId to frame.direction
-                                if (pending.containsKey(key)) {
-                                    errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
-                                    discardedIncompleteMessages++
-                                }
                                 val bytes = frame.data.drop(headerLength).take(length).toMutableList()
                                 if (bytes.size >= length) {
                                     messages += UdsTraceMessage(
