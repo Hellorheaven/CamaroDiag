@@ -267,7 +267,7 @@ object CanTraceAnalyzer {
                 val matchingIndexes = pending.indices.filter { index ->
                     val request = pending[index].request
                     request.direction != message.direction &&
-                        request.canId != message.canId &&
+                        isCompatibleObdCanResponseId(request.canId, message.canId) &&
                         request.service == service &&
                         // If both timestamps exist, never pair a response that predates
                         // its request. Missing timestamps retain capture-order behavior.
@@ -315,6 +315,19 @@ object CanTraceAnalyzer {
             exchanges += candidate.toExchange(status)
         }
         return exchanges.sortedBy { it.request.timestampSeconds ?: Double.POSITIVE_INFINITY }
+    }
+
+
+    /**
+     * Correlate only the conventional 11-bit OBD-II response ranges.
+     * For physical requests 7E0..7E7 the matching response is +8;
+     * functional request 7DF may be answered by 7E8..7EF.
+     * Unknown/29-bit addressing is deliberately left unpaired.
+     */
+    private fun isCompatibleObdCanResponseId(requestId: Int, responseId: Int): Boolean {
+        if (requestId == 0x7DF) return responseId in 0x7E8..0x7EF
+        if (requestId in 0x7E0..0x7E7) return responseId == requestId + 0x08
+        return false
     }
 
     /** Decode ISO-TP Flow Control (PCI type 3) without treating it as a UDS payload. */
