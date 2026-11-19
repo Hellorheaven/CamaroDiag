@@ -1166,15 +1166,22 @@ fun CanSnifferScreen(
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
     var frameSearch by remember { mutableStateOf("") }
+    var directionFilter by remember { mutableStateOf("ALL") }
     val report = state.report
     val searchToken = frameSearch.trim().uppercase(Locale.ROOT)
     val normalizedSearch = searchToken.removePrefix("0X").filterNot(Char::isWhitespace)
     val visibleFrames = report?.frames.orEmpty().takeLast(100).asReversed().filter { frame ->
-        if (normalizedSearch.isBlank()) true else {
+        val directionMatches = when (directionFilter) {
+            "RX" -> frame.direction.name == "RX"
+            "TX" -> frame.direction.name == "TX"
+            else -> true
+        }
+        val textMatches = if (normalizedSearch.isBlank()) true else {
             val canId = String.format(Locale.ROOT, "%03X", frame.canId)
             val payload = frame.data.joinToString("") { String.format(Locale.ROOT, "%02X", it) }
             canId.contains(normalizedSearch) || payload.contains(normalizedSearch)
         }
+        directionMatches && textMatches
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -1243,6 +1250,23 @@ fun CanSnifferScreen(
         } else {
             item {
                 Text(stringResource(R.string.can_sniffer_frame_count, report.frames.size), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = directionFilter == "ALL",
+                        onClick = { directionFilter = "ALL" },
+                        label = { Text(stringResource(R.string.can_sniffer_direction_all)) }
+                    )
+                    FilterChip(
+                        selected = directionFilter == "RX",
+                        onClick = { directionFilter = "RX" },
+                        label = { Text(stringResource(R.string.can_sniffer_direction_rx)) }
+                    )
+                    FilterChip(
+                        selected = directionFilter == "TX",
+                        onClick = { directionFilter = "TX" },
+                        label = { Text(stringResource(R.string.can_sniffer_direction_tx)) }
+                    )
+                }
                 OutlinedTextField(
                     value = frameSearch,
                     onValueChange = { frameSearch = it.take(32) },
@@ -1261,7 +1285,7 @@ fun CanSnifferScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(
-                            "#${frame.lineNumber} • 0x${String.format(Locale.ROOT, "%03X", frame.canId)} • DLC ${frame.data.size}",
+                            "#${frame.lineNumber} • ${frame.direction.name} • 0x${String.format(Locale.ROOT, "%03X", frame.canId)} • DLC ${frame.data.size}",
                             color = CamaroAmber,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
