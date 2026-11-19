@@ -673,4 +673,5 @@
     <string name="can_trace_data_prefix">Préfixe de données (octets hex)</string>
     <string name="can_trace_data_hint">03 22 F1</string>
     <string name="can_trace_filter_invalid">ID CAN ou préfixe de données invalide.</string>
+    <string name="can_trace_clear_filters">Effacer les filtres</string>
 </resources>
