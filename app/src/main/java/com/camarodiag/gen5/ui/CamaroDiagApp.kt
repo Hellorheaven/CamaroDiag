@@ -1431,6 +1431,18 @@ fun CanSnifferScreen(
                     }
                 }
             }
+            if (report.incompleteIsoTpMessages > 0) {
+                item {
+                    Text(
+                        stringResource(
+                            R.string.can_trace_iso_tp_incomplete_count,
+                            report.incompleteIsoTpMessages
+                        ),
+                        color = WarnRed,
+                        fontSize = 11.sp
+                    )
+                }
+            }
             if (report.pidObservations.isNotEmpty()) {
                 item {
                     Text(stringResource(R.string.can_sniffer_pid_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
