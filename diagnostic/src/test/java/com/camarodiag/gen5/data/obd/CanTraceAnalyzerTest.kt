@@ -51,6 +51,18 @@ class CanTraceAnalyzerTest {
 
 
     @Test
+    fun doesNotCompleteDidRequestWhenPositiveResponseOmitsTheDid() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.025000 1 7E8 Rx d 8 02 62 00 00 00 00 00 00"
+        ).joinToString("\\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "truncated-did-response.asc").exchanges.single()
+
+        assertEquals(UdsExchangeStatus.UNANSWERED, exchange.status)
+        assertTrue(exchange.responses.isEmpty())
+    }
+
+    @Test
     fun doesNotAttachAmbiguousNegativeResponseToOneOfSeveralSameServiceRequests() {
         val trace = listOf(
             "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
