@@ -75,6 +75,23 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Ajouter des garde-fous, provenance et rapports pour chaque opération sur fichier.
 - [ ] Ne pas activer l'écriture ECU, flash, recovery, correction de checksum GM, accès mémoire direct ou Seed/Key sans spécifications fiables, tests matériels et validation dédiée.
 
+#### Évolution future — validation et simulation de cartographie sans écriture ECU
+- [ ] Ajouter un mode « Vérifier / Simuler » accessible depuis l'atelier Cartographie, strictement hors ligne et sans envoyer de commande d'écriture au véhicule.
+- [ ] Prévoir une validation statique du fichier : format et structure, taille, intégrité, sommes de contrôle lorsqu'elles sont documentées, cohérence des sections et présence des métadonnées attendues.
+- [ ] Vérifier la compatibilité déclarée avec le véhicule et le calculateur identifiés : génération, année, moteur, transmission, référence matérielle, identifiants logiciel/calibration et version de définition ; signaler les éléments inconnus et bloquer toute conclusion de compatibilité non étayée.
+- [ ] Contrôler les tables décodées : dimensions, axes, unités, facteur/offset, plages et limites documentées, valeurs hors plage, valeurs constantes/anormales, cellules manquantes et incohérences entre tables liées. Ne pas inventer de seuils constructeur.
+- [ ] Comparer la cartographie d'origine et la cartographie modifiée : écarts absolus et relatifs, cellules modifiées, tables touchées, changements de limites et rapport détaillé exportable.
+- [ ] Ajouter des contrôles de cohérence croisée entre tables lorsqu'une relation technique est documentée (par exemple axes, limites de couple, demande conducteur, air/carburant ou allumage) ; présenter les alertes comme indicateurs et non comme preuve de sécurité moteur.
+- [ ] Fournir une simulation numérique des tables et de leurs interpolations pour des points d'entrée choisis (régime, charge, température, etc.) uniquement lorsque les axes, unités et règles de calcul sont connus ; afficher les valeurs interpolées et la provenance des données.
+- [ ] Prévoir des scénarios de simulation reproductibles avec jeux d'entrées modifiables, résultats avant/après, hypothèses explicites et export des rapports.
+- [ ] Distinguer visuellement les résultats : valide selon les contrôles disponibles, avertissement, erreur bloquante, ou non vérifiable faute de définition/données. Une absence d'alerte ne doit jamais être présentée comme une garantie de fonctionnement sûr.
+- [ ] Étudier ultérieurement une simulation moteur/plant simplifiée ou un modèle dynamique, uniquement si des modèles physiques et paramètres validés sont disponibles ; documenter les hypothèses, limites et incertitudes, sans prétendre remplacer un banc moteur.
+- [ ] Prévoir l'import de logs moteur enregistrés (CSV et formats documentés) pour rejouer les points de fonctionnement et comparer les valeurs mesurées aux tables/calibrations, sans modifier le calculateur.
+- [ ] Prévoir une analyse de logs en lecture seule après essai sur véhicule ou banc : synchronisation temporelle, unités, canaux manquants, valeurs hors plage documentée et comparaison avant/après.
+- [ ] Garantir techniquement que ce mode n'ouvre aucune session de programmation et n'appelle aucune API d'écriture ECU ; aucun test de simulation ne doit déclencher une écriture, un flash ou une adaptation véhicule.
+- [ ] Ajouter des tests automatisés avec cartographies de référence documentées, fichiers volontairement corrompus, calibrations incompatibles, tables limites et scénarios de simulation reproductibles.
+- [ ] Dans l'interface et les rapports, séparer explicitement « validation du fichier », « simulation mathématique des tables », « rejeu de logs » et « validation moteur sur banc/véhicule » : ces niveaux ne sont pas interchangeables.
+
 #### Évolution future — éditeur graphique de tables et cartes de calibration (style HP Tuners / EFILive)
 - [ ] Faire évoluer la grille actuelle en véritable éditeur graphique de calibration : cellules numériques colorées selon une échelle de valeurs configurable, avec légende, unités, précision et indication des valeurs modifiées.
 - [ ] Proposer les vues tableau, graphique 2D et surface 3D pour les tables compatibles ; permettre de basculer entre les vues et d'afficher le tableau et le graphique simultanément lorsque l'écran le permet.
@@ -198,6 +215,7 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 
 ## 6. Historique des décisions
 
+- 2026-11-19 : ajout d'un mode de validation et simulation hors ligne des cartographies, comparaison avant/après, contrôles statiques, simulation des tables lorsque les définitions sont connues et rejeu de logs ; aucune écriture ECU, et aucune prétention à remplacer un essai moteur sur banc/véhicule.
 - 2026-11-19 : préciser l'éditeur graphique de calibration de niveau professionnel (grilles colorées, vues 2D/3D, opérations sur cellules, interpolation/lissage, comparaison, historique, ergonomie tablette, définitions vérifiées et tests) ainsi que les exigences d'import/export multi-cartographies et HP Tuners ; ces éléments restent au backlog et ne sont pas déclarés implémentés.
 - 2026-11-18 : décision de conserver CamaroDiag comme priorité immédiate, tout en concevant progressivement une architecture extensible.
 - 2026-11-18 : extensions GM (Corvette, Cadillac, GMC, Buick) et Stellantis (Dodge Challenger/Charger, RAM) classées en priorité basse.
