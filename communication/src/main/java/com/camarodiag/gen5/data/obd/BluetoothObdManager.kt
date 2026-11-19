@@ -391,7 +391,7 @@ class BluetoothObdManager(context: Context) {
                         throw java.io.EOFException("USB OBD adapter disconnected while reading")
                     } else delay(10)
                 }
-                if (onChunk == null && !promptReceived) throw java.net.SocketTimeoutException("Timed out waiting for the ELM prompt after command: $command")
+                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else if (activeTransport == "BLE") {
                 bleTransport.write(payload)
@@ -407,7 +407,7 @@ class BluetoothObdManager(context: Context) {
                         if (chunk.contains('>')) { promptReceived = true; break }
                     } else delay(10)
                 }
-                if (onChunk == null && !promptReceived) throw java.net.SocketTimeoutException("Timed out waiting for the ELM prompt after command: $command")
+                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else if (activeTransport == "WIFI") {
                 wifiTransport.write(payload)
@@ -428,7 +428,7 @@ class BluetoothObdManager(context: Context) {
                     } catch (_: java.net.SocketTimeoutException) { }
                     delay(10)
                 }
-                if (onChunk == null && !promptReceived) throw java.net.SocketTimeoutException("Timed out waiting for the ELM prompt after command: $command")
+                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else {
                 val out = outputStream; val inp = inputStream
@@ -456,7 +456,7 @@ class BluetoothObdManager(context: Context) {
                     } else delay(15)
                 }
                 if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
-                if (onChunk == null && !promptReceived) throw java.net.SocketTimeoutException("Timed out waiting for the ELM prompt after command: $command")
+                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             }
         }
