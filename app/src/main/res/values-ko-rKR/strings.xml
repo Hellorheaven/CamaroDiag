@@ -643,4 +643,5 @@
     <string name="can_sniffer_stn_filter_notice">STN 어댑터에서는 원시 캡처를 위해 임시 필터를 지운 뒤 자동 OBD 필터링을 다시 활성화합니다. 다른 소프트웨어에서 설정한 사용자 지정 필터는 복원되지 않습니다.</string>
     <string name="can_sniffer_search">CAN ID 또는 데이터 바이트 검색</string>
     <string name="can_sniffer_filtered_count">전체 %2$d개 프레임 중 %1$d개 표시</string>
+    <string name="connection_lost_bluetooth">Bluetooth 연결이 끊어졌습니다. 어댑터를 다시 연결하고 작업을 다시 시작하세요.</string>
 </resources>
