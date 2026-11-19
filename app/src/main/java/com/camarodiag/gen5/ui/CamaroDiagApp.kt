@@ -1156,7 +1156,7 @@ fun LiveDataScreen(
                         onValueChange = { pidSearch = it.take(48) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("Rechercher un capteur") },
+                        label = { Text(stringResource(R.string.live_sensor_search)) },
                         placeholder = { Text("Lambda, pression, température…") }
                     )
                     Row(
@@ -1176,7 +1176,7 @@ fun LiveDataScreen(
                         }
                     }
                     TextButton(onClick = { selectedPidIds = null; pidSearch = "" }) {
-                        Text("Afficher tous les capteurs", color = CamaroBlue)
+                        Text(stringResource(R.string.live_sensor_show_all), color = CamaroBlue)
                     }
                 }
             }
