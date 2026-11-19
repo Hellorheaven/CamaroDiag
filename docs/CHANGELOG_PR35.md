@@ -76,3 +76,13 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Tests ajoutés pour les réponses Mode 01 hors ordre, DID 0x2F, sessions UDS concurrentes, RoutineControl avec RID distincts, décodage DTC 03/07/0A, padding et exclusion des réponses qui ne sont pas des DTC.
 - Commits de ce lot (19) : `89c1ff1`, `0ecbddf`, `848f622`, `cf20527`, `077408a`, `ff3d1f6`, `a8d542c`, `15ca4b7`, `801509f`, `d8444b8`, `7faafbe`, `5c2c582`, `1620efb`, `18ed064`, `79b3c5a`, `336f6ad`, `ef0593d`, `5dabb17`, `094cd77`.
 - Vérification de cohérence des fichiers et présence des cas de test effectuée par lecture du dépôt. Aucun build Android, test Gradle, CI ni essai sur véhicule n'a été exécuté pour ce lot ; ils ne sont donc pas déclarés réussis.
+
+
+### Durcissement temporel ISO-TP et extension des PID moteur standard — 2026-11-19
+- Le réassemblage ISO-TP rejette maintenant une session partielle lorsqu'une Consecutive Frame horodatée arrive plus d'une seconde après la précédente. Le délai est réinitialisé à chaque trame valide ; il n'est pas appliqué lorsque les horodatages sont absents ou non monotones. Ce seuil sert à écarter les fragments périmés dans les traces, pas à certifier les temporisations d'un calculateur réel.
+- Les réponses UDS négatives tronquées (0x7F sans code NRC) sont ignorées : elles ne ferment plus une requête en attente et ne sont pas reclassées comme de nouvelles requêtes.
+- Extension du décodage SAE J1979 Mode 01 : durée moteur, distance avec MIL, niveau carburant, distance depuis effacement DTC, pression barométrique, températures catalyseur B1/B2 S1/S2, temps MIL, temps depuis effacement, position pédale relative, température huile, avance d'injection, débit carburant et couple moteur (PID 0x1F, 0x21, 0x2F, 0x31, 0x33, 0x3C–0x3F, 0x4D, 0x4E, 0x5A, 0x5C–0x5E, 0x61–0x63).
+- Correction des libellés PID 0x47–0x4B : les PID 0x47/0x48 sont les positions papillon B/C ; les PID 0x49–0x4B sont les positions de pédale d'accélérateur D/E/F.
+- Sept tests supplémentaires couvrent l'expiration et le renouvellement du délai ISO-TP, le NRC tronqué, les valeurs PID ajoutées, les longueurs requises et la distinction papillon/pédale/couple.
+- Commits : `a6f4694`, `40fdb5f`, `da97229`, `ad81382`, `ab2b88e`, `6f73059`, `3aa42ce`, `7d49d02`, `eca7c95`.
+- Ces tests ont été écrits et relus sur la branche ; aucun test Gradle, build Android ou validation sur véhicule n'a encore été exécuté sur ce lot.
