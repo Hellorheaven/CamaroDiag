@@ -657,6 +657,9 @@
     <string name="can_sniffer_stn_filter_notice">On STN adapters, temporary filters are cleared for raw capture and automatic OBD filtering is re-enabled afterward. Custom filters set by other software are not restored.</string>
     <string name="connection_lost_bluetooth" tools:ignore="MissingTranslation">Bluetooth connection lost. Reconnect the adapter and restart the operation.</string>
     <string name="connection_lost_vehicle" tools:ignore="MissingTranslation">Vehicle connection lost. Reconnect to the vehicle and restart the operation.</string>
+    <string name="can_sniffer_direction_all">All</string>
+    <string name="can_sniffer_direction_rx">RX</string>
+    <string name="can_sniffer_direction_tx">TX</string>
     <string name="can_sniffer_search">Search CAN ID or data bytes</string>
     <string name="can_sniffer_filtered_count">Showing %1$d of %2$d frames</string>
 </resources>
