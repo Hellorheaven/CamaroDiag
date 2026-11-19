@@ -38,6 +38,18 @@ data class UdsTraceMessage(
                 if (responseService != 0x7F) payload.getOrNull(1) else null
             else -> null
         }
+    /** Echoed UDS sub-function for services whose positive responses repeat it. */
+    val subFunction: Int?
+        get() = when (service) {
+            0x10, 0x11, 0x19, 0x27, 0x28, 0x31, 0x3E ->
+                if (responseService != 0x7F) payload.getOrNull(1)?.and(0x7F) else null
+            else -> null
+        }
+    /** RoutineControl identifier (RID), echoed by positive 0x71 responses. */
+    val routineIdentifier: Int?
+        get() = if (service == 0x31 && responseService != 0x7F && payload.size >= 4) {
+            (payload[2] shl 8) or payload[3]
+        } else null
     val negativeResponseCode: Int?
         get() = if (payload.firstOrNull() == 0x7F) payload.getOrNull(2) else null
     val serviceName: String
@@ -247,6 +259,12 @@ object CanTraceAnalyzer {
                             // identifier when several requests of the same mode are in flight.
                             request.parameterId != null ->
                                 isNegativeResponse || message.parameterId == request.parameterId
+                            request.routineIdentifier != null ->
+                                isNegativeResponse ||
+                                    (message.subFunction == request.subFunction &&
+                                        message.routineIdentifier == request.routineIdentifier)
+                            request.subFunction != null ->
+                                isNegativeResponse || message.subFunction == request.subFunction
                             else -> request.did == null || message.did == null ||
                                 request.did == message.did
                         }
