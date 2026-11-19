@@ -643,4 +643,5 @@
     <string name="can_sniffer_stn_filter_notice">在 STN 适配器上，为捕获原始帧会清除临时筛选器，随后重新启用 OBD 自动筛选。其他软件设置的自定义筛选器不会恢复。</string>
     <string name="can_sniffer_search">搜索 CAN ID 或数据字节</string>
     <string name="can_sniffer_filtered_count">显示 %2$d 帧中的 %1$d 帧</string>
+    <string name="connection_lost_bluetooth">蓝牙连接已断开。请重新连接适配器并重新启动操作。</string>
 </resources>
