@@ -93,3 +93,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Les libellés papillon B/C et pédale D/E/F restent distincts dans les deux langues.
 - Commits : UI `1f66163`, ressources EN `f940717`, ressources FR `39cdaf3`.
 - Vérification statique : 23 références du helper, 23 clés anglaises et 23 clés françaises présentes, sans doublon sur ces clés. Aucun build ni test Gradle n'a été exécuté.
+
+### Corrélation UDS et horodatages — 2026-11-19
+- La corrélation d'une réponse UDS exige désormais que son horodatage ne précède pas celui de la requête lorsque les deux horodatages sont disponibles.
+- Les traces sans horodatage conservent le comportement basé sur l'ordre de capture ; aucune chronologie n'est inventée.
+- Ajout du test de régression `doesNotCorrelateResponseWhoseTimestampPredatesRequest`.
+- Commits : `774f6f9` (analyse), `cd108f5` (test initial), `bad6a31` (correction du séparateur de lignes du test).
+- Vérification statique du code et du test uniquement ; aucun test Gradle/build CI ni validation sur véhicule exécuté.
