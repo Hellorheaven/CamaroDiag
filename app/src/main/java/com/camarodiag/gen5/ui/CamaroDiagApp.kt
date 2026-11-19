@@ -1169,7 +1169,8 @@ fun CanSnifferScreen(
     isAvailable: Boolean,
     onStart: () -> Unit,
     onStop: () -> Unit,
-    onSendRequest: (String) -> Unit
+    onSendRequest: (String) -> Unit,
+    onExport: () -> Unit
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
     var frameSearch by remember { mutableStateOf("") }
@@ -1257,6 +1258,17 @@ fun CanSnifferScreen(
         } else {
             item {
                 Text(stringResource(R.string.can_sniffer_frame_count, report.frames.size), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(
+                        onClick = onExport,
+                        enabled = !state.isCapturing && report.frames.isNotEmpty()
+                    ) {
+                        Text(stringResource(R.string.live_export_csv))
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = directionFilter == "ALL",
