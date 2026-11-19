@@ -670,4 +670,5 @@
     <string name="can_trace_data_prefix">Payload prefix (hex bytes)</string>
     <string name="can_trace_data_hint">03 22 F1</string>
     <string name="can_trace_filter_invalid">Invalid CAN ID or payload prefix.</string>
+    <string name="can_trace_clear_filters">Clear filters</string>
 </resources>
