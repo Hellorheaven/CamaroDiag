@@ -56,9 +56,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Les exports CSV à colonnes fixes acceptent maintenant les 64 octets CAN FD (data0 à data63), et non plus seulement data0 à data15.
 - Prise en charge des First Frames ISO-TP à longueur 32 bits lorsque FF_DL vaut zéro, avec reconstitution de messages jusqu'à 1 Mio. Les longueurs tronquées et les annonces dépassant ce plafond sont rejetées.
 - Le nombre de messages ISO-TP incomplets/abandonnés est désormais affiché dans l'analyse Sniffer, avec les libellés anglais et français.
-- Onze tests de régression couvrent les réponses UDS ambiguës, les DID manquants/concurrents, les longueurs CAN FD étendues, la reconstitution ISO-TP 32 bits jusqu'à 4096 octets, les trames tronquées, le bouclage du numéro de séquence, les sessions de directions opposées partageant un ID CAN, le remplacement d'une First Frame et les exports CSV 64 octets.
+- L'historique d'échanges associe désormais aussi les requêtes/réponses OBD-II standard des modes 0x01 à 0x0A, en plus des services UDS ; les services OBD-II usuels disposent de libellés explicites.
+- Douze tests de régression couvrent les échanges OBD-II Mode 01, les réponses UDS ambiguës, les DID manquants/concurrents, les longueurs CAN FD étendues, la reconstitution ISO-TP 32 bits jusqu'à 4096 octets, les trames tronquées, le bouclage du numéro de séquence, les sessions de directions opposées partageant un ID CAN, le remplacement d'une First Frame et les exports CSV 64 octets.
 - Commits de code : 2019c9a, f0728f3, 1a022f1, 827b758, cdebf21, 8c0170e, 4b36a9e. Ressources : 44f9237, e24727b. Commits de tests et correctifs des fixtures : 82fb72c, 9d71440, 87306ad, 7283076, 0ddc5e1, 4caf6ba, d3841a9, bf6d73c, 6411bbd.
 - Aucun build ni test automatisé n'a encore été lancé sur ce lot ; les tests sont ajoutés mais pas déclarés validés.
 - Extension ISO-TP First Frame : décodage de la longueur 32 bits lorsque FF_DL vaut zéro, reconstitution de charges utiles supérieures à 4095 octets et plafond d'analyse à 1 Mio. Les longueurs étendues tronquées ou hors plafond sont rejetées sans allocation de la charge annoncée.
-- Commits supplémentaires : code `cdebf21` ; tests `d3841a9` et `bf6d73c`.
+- Commits supplémentaires : code `cdebf21` et `226c7a4` ; tests `d3841a9`, `bf6d73c` et `2262dc9`.
 - Synchronisation avec main : commit de merge e7aa7ad6e8ddf5b351dbb12666171d38284e3fbe. La branche n'est plus en retard sur main ; GitHub indique mergeable_state: clean.
