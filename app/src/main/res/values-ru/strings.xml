@@ -650,4 +650,6 @@
     <string name="can_sniffer_request_failed">Ошибка запроса только для чтения.</string>
     <string name="can_sniffer_bus_limit">Этот режим захвата использует активный профиль HS-CAN 11 бит, 500 кбит/с. Для SW-CAN и других шин требуется другой интерфейс.</string>
     <string name="can_sniffer_stn_filter_notice">На адаптерах STN временные фильтры очищаются для захвата необработанных кадров, после чего автоматическая фильтрация OBD включается снова. Пользовательские фильтры из другого ПО не восстанавливаются.</string>
+    <string name="can_sniffer_search">Поиск CAN ID или байтов данных</string>
+    <string name="can_sniffer_filtered_count">Показано кадров: %1$d из %2$d</string>
 </resources>
