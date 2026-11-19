@@ -25,6 +25,39 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun decodesFuelTrimAndNarrowBandOxygenSensorPids() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf("7E8 4 03 41 06 80", "7E8 5 04 41 14 80 40").joinToString("\n"),
+            "capture.txt"
+        )
+        assertEquals(2, report.pidObservations.size)
+        assertEquals("Short-term fuel trim Bank 1", report.pidObservations[0].name)
+        assertEquals(0.0, report.pidObservations[0].value, 0.0)
+        assertEquals("Oxygen sensor 1 voltage", report.pidObservations[1].name)
+        assertEquals(0.64, report.pidObservations[1].value, 0.0001)
+        assertEquals("V", report.pidObservations[1].unit)
+    }
+
+    @Test
+    fun decodesWideRangeOxygenSensorAndControlModuleVoltage() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf("7E8 7 06 41 24 80 00 40 00", "7E8 5 04 41 42 2E E0").joinToString("\n"),
+            "capture.txt"
+        )
+        assertEquals(2, report.pidObservations.size)
+        assertEquals("Wide-range oxygen sensor 1 equivalence ratio", report.pidObservations[0].name)
+        assertEquals(1.0, report.pidObservations[0].value, 0.0001)
+        assertEquals("Control module voltage", report.pidObservations[1].name)
+        assertEquals(12.0, report.pidObservations[1].value, 0.0001)
+    }
+
+    @Test
+    fun keepsTruncatedOxygenSensorResponsesOutOfDecodedValues() {
+        val report = CanTraceAnalyzer.analyze("7E8 4 03 41 24 80", "capture.txt")
+        assertTrue(report.pidObservations.isEmpty())
+        assertEquals(1, report.messages.size)
+    }
+    @Test
     fun reassemblesIsoTpResponseAndReportsObservedDidWithoutPromotingIt() {
         val report = CanTraceAnalyzer.analyze(
             listOf(
