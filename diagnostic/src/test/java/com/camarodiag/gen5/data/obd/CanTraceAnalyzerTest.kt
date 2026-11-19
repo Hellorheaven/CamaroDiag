@@ -787,4 +787,43 @@ class CanTraceAnalyzerTest {
         assertTrue(report.errors.isEmpty())
     }
 
-}\n
+    @Test
+    fun rejectsMalformedDeclaredCsvDlcInsteadOfInferringLength() {
+        val report = CanTraceAnalyzer.analyze(
+            "can_id,dlc,data\\n7E8,invalid,02 41 0C",
+            "invalid-dlc.csv"
+        )
+
+        assertTrue(report.frames.isEmpty())
+        assertTrue(report.errors.any { it.contains("invalid CSV CAN frame") })
+    }
+
+    @Test
+    fun rejectsMalformedAndNonFiniteCsvTimestamps() {
+        val report = CanTraceAnalyzer.analyze(
+            listOf(
+                "timestamp,can_id,direction,data",
+                "NaN,7E8,RX,02 41 0C",
+                "Infinity,7E8,RX,02 41 0C",
+                "not-a-time,7E8,RX,02 41 0C"
+            ).joinToString("\\n"),
+            "invalid-timestamps.csv"
+        )
+
+        assertTrue(report.frames.isEmpty())
+        assertEquals(3, report.errors.size)
+    }
+
+    @Test
+    fun allowsAnEmptyOptionalCsvTimestampAsUnknown() {
+        val report = CanTraceAnalyzer.analyze(
+            "timestamp,can_id,direction,data\\n,7E8,RX,02 41 0C",
+            "missing-timestamp.csv"
+        )
+
+        assertEquals(1, report.frames.size)
+        assertEquals(null, report.frames.single().timestampSeconds)
+        assertTrue(report.errors.isEmpty())
+    }
+
+}
