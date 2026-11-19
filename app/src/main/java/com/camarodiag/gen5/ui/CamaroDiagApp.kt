@@ -50,6 +50,7 @@ import com.camarodiag.gen5.data.obd.VxdiagProfiles
 import com.camarodiag.gen5.data.obd.CanTraceFilter
 import com.camarodiag.gen5.data.obd.CanTraceDirection
 import com.camarodiag.gen5.data.obd.filterCanTrace
+import com.camarodiag.gen5.data.obd.UdsNegativeResponse
 import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -1470,6 +1471,18 @@ fun CanSnifferScreen(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
                             )
+                            message.negativeResponseCode?.let { nrc ->
+                                val language = LocalConfiguration.current.locales[0].language
+                                Text(
+                                    stringResource(
+                                        R.string.can_trace_nrc_detail,
+                                        nrc,
+                                        UdsNegativeResponse.description(nrc, language)
+                                    ),
+                                    color = WarnRed,
+                                    fontSize = 11.sp
+                                )
+                            }
                             Text(
                                 message.payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) },
                                 color = TextPrimary,
