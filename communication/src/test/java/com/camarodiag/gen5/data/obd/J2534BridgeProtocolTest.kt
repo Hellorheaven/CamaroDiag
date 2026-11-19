@@ -33,4 +33,15 @@ class J2534BridgeProtocolTest {
             J2534BridgeProtocol.readBoundedLine(input)
         }
     }
+
+    @Test
+    fun acceptsMaximumAllowedResponseLineAndHandlesCrLf() {
+        val maximum = "x".repeat(32 * 1024)
+        val input = BufferedReader(StringReader(maximum + "\r\nnext\r\n"))
+
+        assertEquals(maximum, J2534BridgeProtocol.readBoundedLine(input))
+        assertEquals("next", J2534BridgeProtocol.readBoundedLine(input))
+        assertNull(J2534BridgeProtocol.readBoundedLine(input))
+    }
+
 }
