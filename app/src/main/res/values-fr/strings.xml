@@ -676,6 +676,7 @@
     <string name="can_trace_clear_filters">Effacer les filtres</string>
     <string name="can_trace_nrc_detail">NRC 0x%1$02X — %2$s</string>
     <string name="can_trace_flow_control_heading">Contrôle de flux ISO-TP</string>
+    <string name="can_trace_iso_tp_incomplete_count">Messages ISO-TP incomplets : %1$d</string>
     <string name="can_trace_flow_control_detail">CAN %1$s • %2$s • BS %3$d • STmin %4$s</string>
     <string name="can_trace_flow_status_cts">Continuer l’envoi</string>
     <string name="can_trace_flow_status_wait">Attendre</string>
