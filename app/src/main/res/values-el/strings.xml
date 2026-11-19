@@ -658,4 +658,7 @@
     <string name="can_sniffer_stn_filter_notice">Στους προσαρμογείς STN, τα προσωρινά φίλτρα διαγράφονται για την ακατέργαστη καταγραφή και στη συνέχεια ενεργοποιείται ξανά το αυτόματο φιλτράρισμα OBD. Τα προσαρμοσμένα φίλτρα άλλου λογισμικού δεν επαναφέρονται.</string>
     <string name="can_sniffer_search">Αναζήτηση ID CAN ή byte δεδομένων</string>
     <string name="can_sniffer_filtered_count">Εμφανίζονται %1$d από %2$d πλαίσια</string>
+    <string name="can_sniffer_direction_all">Όλα</string>
+    <string name="can_sniffer_direction_rx">RX</string>
+    <string name="can_sniffer_direction_tx">TX</string>
 </resources>
