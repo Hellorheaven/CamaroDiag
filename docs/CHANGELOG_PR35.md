@@ -4,6 +4,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 
 ## 2026-11-19
 
+### Analyse des traces — cohérence DLC / données
+- Les parseurs ELM327, Vector ASC et CSV rejettent maintenant une trame lorsque le nombre d'octets fournis ne correspond pas exactement au DLC déclaré. Les octets surnuméraires ne sont plus tronqués silencieusement, ce qui évite d'analyser une trame mal formée comme si elle était valide.
+- Ajout d'un test couvrant les trois formats. Exécution Gradle non disponible depuis cette session ; le test est ajouté mais non déclaré comme exécuté.
+
 ### Périmètre confirmé
 - Module utilisateur unique **Sniffer / Console CAN** : capture, analyse, décodage, console et émission lorsque les capacités réelles de l'interface, du firmware, du bus et du protocole le permettent.
 - La fonctionnalité ne doit pas être arbitrairement limitée à la lecture seule ; aucune capacité non vérifiée ne doit toutefois être annoncée.
