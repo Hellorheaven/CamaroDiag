@@ -684,4 +684,12 @@
     <string name="can_trace_flow_stmin_ms">%1$d ms</string>
     <string name="can_trace_flow_stmin_us">%1$d µs</string>
     <string name="can_trace_flow_stmin_reserved">Réservé (0x%1$02X)</string>
+    <string name="can_trace_exchange_heading">Échanges requête / réponse UDS</string>
+    <string name="can_trace_exchange_completed">Terminé</string>
+    <string name="can_trace_exchange_pending">Réponse en attente (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Aucune réponse observée</string>
+    <string name="can_trace_exchange_summary">Requête %1$s • CAN 0x%2$03X • %3$s</string>
+    <string name="can_trace_exchange_request">Requête : %1$s</string>
+    <string name="can_trace_exchange_response">Réponse CAN 0x%1$03X : %2$s</string>
+    <string name="can_trace_exchange_elapsed">Durée : %1$.1f ms</string>
 </resources>
