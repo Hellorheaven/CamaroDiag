@@ -21,6 +21,24 @@ class SafeObdRequestPolicyTest {
     }
 
     @Test
+    fun acceptsOnlyParameterlessReadOnlyDtcServices() {
+        listOf("03", "07", "0A").forEach { command ->
+            val request = SafeObdRequestPolicy.parse(command)
+            assertEquals(command.toInt(16), request?.service)
+            assertEquals(null, request?.parameter)
+            assertEquals(command, request?.elmCommand)
+        }
+        assertEquals("03", SafeObdRequestPolicy.parse("0x03")?.elmCommand)
+    }
+
+    @Test
+    fun rejectsParameterizedDtcCommandsAndClearCodesService() {
+        assertNull(SafeObdRequestPolicy.parse("03 01"))
+        assertNull(SafeObdRequestPolicy.parse("04"))
+        assertNull(SafeObdRequestPolicy.parse("04 00"))
+    }
+
+    @Test
     fun rejectsUdsWriteSecurityAndRoutineServices() {
         assertNull(SafeObdRequestPolicy.parse("2E F190"))
         assertNull(SafeObdRequestPolicy.parse("27 01"))
