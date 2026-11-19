@@ -658,4 +658,7 @@
     <string name="can_sniffer_stn_filter_notice">في محولات STN، تتم إزالة عوامل التصفية المؤقتة لالتقاط الإطارات الخام ثم يُعاد تفعيل تصفية OBD التلقائية. لا تتم استعادة عوامل التصفية المخصصة التي ضبطتها برامج أخرى.</string>
     <string name="can_sniffer_search">ابحث عن معرّف CAN أو بايتات البيانات</string>
     <string name="can_sniffer_filtered_count">عرض %1$d من أصل %2$d إطارًا</string>
+    <string name="can_sniffer_direction_all">الكل</string>
+    <string name="can_sniffer_direction_rx">RX</string>
+    <string name="can_sniffer_direction_tx">TX</string>
 </resources>
