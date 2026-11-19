@@ -194,6 +194,7 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Tests Gradle/build Android non exécutés.
 
 ### Transport BLE — cycle de vie GATT
+- Pont J2534 : la borne commune des délais d'opération (100 ms à 10 s) est maintenant centralisée et testée aux limites basse, nominale et haute.
 - Pont J2534 : `sendOnly` respecte maintenant le délai demandé par l'appelant au lieu d'utiliser un délai fixe. Une réponse UDS vide, non hexadécimale ou hors limite ferme la session, car le flux ne peut plus être considéré comme fiable.
 - Pont J2534 : une fermeture TCP distante, une ligne de réponse trop volumineuse ou un JSON illisible invalide désormais immédiatement la session locale et ferme ses ressources. Les erreurs métier explicitement renvoyées par le serveur restent distinctes et ne sont pas confondues avec une perte de transport.
 - Pont J2534 : limitation des lignes JSON reçues à 32 Kio et des charges UDS à 4095 octets ; validation stricte de l'hexadécimal et de la taille des réponses. Le lecteur de lignes est isolé et couvert par des tests (plusieurs réponses, EOF sans saut de ligne, dépassement de taille).
