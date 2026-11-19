@@ -75,6 +75,18 @@ Ces points sont à traiter avant l'élargissement multimarque. Leur statut doit 
 - [ ] Ajouter des garde-fous, provenance et rapports pour chaque opération sur fichier.
 - [ ] Ne pas activer l'écriture ECU, flash, recovery, correction de checksum GM, accès mémoire direct ou Seed/Key sans spécifications fiables, tests matériels et validation dédiée.
 
+#### Évolution future — import/export de cartographies et compatibilité HP Tuners
+- [ ] Permettre l'export d'une cartographie seule ou d'un ensemble de cartographies liées à un même véhicule/projet.
+- [ ] Gérer les projets multi-cartographies, notamment les configurations FlexFuel lorsqu'elles nécessitent plusieurs calibrations (par exemple cartographie essence, cartographie éthanol/flexfuel ou variantes associées) ; conserver explicitement le rôle, les dépendances et les conditions d'utilisation de chaque fichier, sans supposer qu'un véhicule utilise toujours deux fichiers.
+- [ ] Permettre l'import d'un fichier unique ou d'un paquet multi-cartographies, avec détection des fichiers manquants, doublons, versions incompatibles et associations incohérentes.
+- [ ] Ajouter la prise en charge des formats HP Tuners, notamment le format natif de calibration/projet `.hpt` lorsque sa structure peut être lue et interprétée de façon fiable ; identifier séparément les autres formats HP Tuners réellement rencontrés et ne pas les assimiler automatiquement à un fichier BIN.
+- [ ] Distinguer clairement l'ouverture native, l'import avec conversion et l'export compatible HP Tuners. Ne jamais annoncer une compatibilité aller-retour parfaite si certains champs, métadonnées ou données propriétaires ne peuvent pas être préservés.
+- [ ] Préserver les fichiers sources originaux et produire un rapport d'import/export indiquant format, version, véhicule/ECU ciblé, identifiants de calibration, conversions réalisées, éléments ignorés et éventuelles pertes d'information.
+- [ ] Avant toute comparaison ou utilisation, vérifier la cohérence véhicule, génération, moteur, transmission, référence matérielle ECU, identifiants logiciel/calibration et contenu des fichiers ; signaler ou bloquer les incompatibilités.
+- [ ] Pour un ensemble multi-cartographies, exporter les fichiers avec un manifeste décrivant leurs noms, rôles, liens, empreintes d'intégrité et métadonnées nécessaires à leur réimportation.
+- [ ] L'import/export et la conversion de fichiers restent des opérations hors ligne sur les données de calibration ; ils ne doivent jamais introduire ni modifier firmware, OS ECU, bootloader ou zones non-calibration.
+- [ ] Relier ces fonctions aux deux modes d'écriture calibration-only définis ci-dessous, sans confondre le format de fichier HP Tuners avec une autorisation ou une capacité d'écriture ECU.
+
 #### Évolution future — modes d'écriture de cartographie et récupération ECU (Camaro Gen 5 / Gen 6)
 - [ ] Ajouter au module Cartographie deux modes distincts, sur le modèle de HP Tuners, **tous deux limités aux données de calibration** :
   - **Write Calibration Only** : écrire uniquement la partie de cartographie sélectionnée/modifiée, lorsque le calculateur et le format le permettent.
