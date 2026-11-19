@@ -169,14 +169,14 @@ class CanTraceAnalyzerTest {
 
         val lines = mutableListOf("can_id,direction,data")
         val firstFrame = listOf(0x10, 0x00, 0x00, 0x00, 0x10, 0x00) + payload.take(58)
-        lines += "7E8,RX,\${encode(firstFrame)}"
+        lines += "7E8,RX," + encode(firstFrame)
 
         var offset = 58
         var sequence = 1
         while (offset < payload.size) {
             val chunk = payload.subList(offset, minOf(offset + 7, payload.size))
             val frame = listOf(0x20 or (sequence and 0x0F)) + chunk + List(7 - chunk.size) { 0x00 }
-            lines += "7E8,RX,\${encode(frame)}"
+            lines += "7E8,RX," + encode(frame)
             offset += chunk.size
             sequence = (sequence + 1) and 0x0F
         }
