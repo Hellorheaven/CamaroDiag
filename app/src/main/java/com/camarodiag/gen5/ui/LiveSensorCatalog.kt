@@ -5,7 +5,7 @@ package com.camarodiag.gen5.ui
  * not proof that a specific vehicle, ECU or adapter supports it.
  * A signal is only selectable after a value is actually reported this session.
  */
-internal data class LiveSensorDefinition(
+data class LiveSensorDefinition(
     val id: String,
     val labelEn: String,
     val labelFr: String
