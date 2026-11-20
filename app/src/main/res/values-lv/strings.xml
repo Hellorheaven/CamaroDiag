@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Faktiskais dzinēja griezes moments</string>
     <string name="can_trace_pid_63">Dzinēja atsauces griezes moments</string>
     <string name="live_pid_ethanol">Etanola saturs</string>
+    <string name="can_trace_flow_status_cts">Turpināt sūtīšanu</string>
+    <string name="can_trace_flow_status_wait">Gaidīt</string>
+    <string name="can_trace_flow_status_overflow">Pārpilde</string>
+    <string name="can_trace_flow_status_reserved">Rezervēts statuss</string>
+    <string name="can_trace_exchange_heading">UDS pieprasījumu un atbilžu apmaiņa</string>
+    <string name="can_trace_exchange_completed">Pabeigts</string>
+    <string name="can_trace_exchange_pending">Gaida atbildi (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Atbilde nav novērota</string>
+    <string name="can_console_raw_tx_confirm_title">Apstiprināt neapstrādāta CAN kadra sūtīšanu</string>
+    <string name="can_console_raw_tx_confirm_message">Šī darbība nosūta kadru tieši transportlīdzekļa CAN kopnei. Nepareizs kadrs var ietekmēt vadības blokus. Sūtiet tikai tad, ja zināt mērķa kopni un identifikatoru.</string>
+    <string name="can_console_tx_unverified">Neapstrādātu CAN kadru sūtīšana ir atspējota: tikai lasīšanas pārbaudes pieprasījumam netika novērota īsta ECU atbilde.</string>
+    <string name="can_trace_clear_filters">Notīrīt filtrus</string>
+    <string name="can_trace_filter_invalid">Nederīgs CAN ID vai datu prefikss.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP plūsmas vadība</string>
+    <string name="cal_expert_block_recovery">Šim konkrētajam mērķim atjaunošanas procedūra nav pārbaudīta.</string>
+    <string name="cal_expert_block_driver">Nav pievienots pārbaudīts aparatūras programmēšanas draiveris.</string>
+    <string name="cal_expert_identity_notice">Ievadītie nosaukumi un failu kontrolsummas ir novērojumi, nevis aparatūras saderības pierādījums.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULĀCIJA: šie ECU identifikatori nav nolasīti no īsta transportlīdzekļa un nevar apliecināt tā programmaparatūru.</string>
+    <string name="cal_expert_block_memory_map">Mērķa atmiņas karte un aizsargātie reģioni nav pārbaudīti.</string>
+    <string name="flexfuel_preflight_backup">Sākotnējā ECU dublējumkopija nav pārbaudīta.</string>
 </resources>
