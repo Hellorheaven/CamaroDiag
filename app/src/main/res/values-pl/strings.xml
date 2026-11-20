@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Diagnostyczne kody usterek</string>
     <string name="obd_adapter_voltage">Napięcie adaptera</string>
     <string name="obd_supported_pids">Obsługiwane PID-y</string>
+    <string name="obd_ecu_name">Nazwa ECU</string>
+    <string name="obd_none_identified">Nie zidentyfikowano</string>
+    <string name="obd_data_unavailable">Dane niedostępne</string>
+    <string name="obd_returned_live_data">Odebrane dane na żywo</string>
+    <string name="obd_pending">Oczekujące</string>
+    <string name="obd_permanent">Trwałe</string>
+    <string name="obd_confirmed">Potwierdzone</string>
+    <string name="obd_freeze_frame">Ramka zamrożona</string>
+    <string name="obd_raw_scan_log">Surowy dziennik skanowania</string>
+    <string name="obd_powertrain_ecm">Układ napędowy / ECM</string>
 </resources>
