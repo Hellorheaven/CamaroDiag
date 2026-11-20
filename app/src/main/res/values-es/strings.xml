@@ -669,4 +669,27 @@
     <string name="cal_ecu_response_addresses_label">Direcciones de respuesta OBD funcional observadas (sin asignación a módulos)</string>
     <string name="cal_ecu_identity_limits">Estas respuestas OBD estándar no confirman el RPO, la transmisión, la referencia de hardware del módulo ni el sistema operativo GM. Las direcciones de respuesta no identifican módulos. Los identificadores GM requieren documentación verificada específica del vehículo.</string>
     <string name="dtc_vehicle_identity_required">Los detalles específicos del vehículo se ocultan porque no se ha leído el VIN de la ECU conectada o no coincide con el vehículo seleccionado. Lee y verifica el VIN de la ECU antes de utilizar estas interpretaciones.</string>
+    <string name="live_pid_oil">Presión de aceite (solo simulación)</string>
+    <string name="live_pid_stft_b2">Ajuste de combustible a corto plazo banco 2</string>
+    <string name="live_pid_ltft_b2">Ajuste de combustible a largo plazo banco 2</string>
+    <string name="live_pid_rel_tps">Posición relativa del acelerador</string>
+    <string name="live_pid_cmd_tps">Posición ordenada de la mariposa</string>
+    <string name="live_pid_abs_tps_b">Posición absoluta de mariposa B</string>
+    <string name="live_pid_abs_tps_c">Posición absoluta de mariposa C</string>
+    <string name="live_pid_app_d">Posición del pedal acelerador D</string>
+    <string name="live_pid_app_e">Posición del pedal acelerador E</string>
+    <string name="live_pid_app_f">Posición del pedal acelerador F</string>
+    <string name="live_pid_abs_load">Carga absoluta del motor</string>
+    <string name="live_pid_ambient">Temperatura ambiente</string>
+    <string name="live_pid_fuel_press">Presión de combustible</string>
+    <string name="live_pid_timing">Avance de encendido</string>
+    <string name="live_pid_eq_ratio">Relación de equivalencia solicitada</string>
+    <string name="live_pid_o2_b1s1">Voltaje sonda de oxígeno B1S1</string>
+    <string name="live_pid_o2_b1s2">Voltaje sonda de oxígeno B1S2</string>
+    <string name="live_pid_o2_b1s3">Voltaje sonda de oxígeno B1S3</string>
+    <string name="live_pid_o2_b1s4">Voltaje sonda de oxígeno B1S4</string>
+    <string name="live_pid_wbo2_b1s1">Sonda lambda de banda ancha B1S1</string>
+    <string name="live_pid_wbo2_b1s2">Sonda lambda de banda ancha B1S2</string>
+    <string name="live_pid_wbo2_b2s1">Sonda lambda de banda ancha B2S1</string>
+    <string name="live_pid_wbo2_b2s2">Sonda lambda de banda ancha B2S2</string>
 </resources>
