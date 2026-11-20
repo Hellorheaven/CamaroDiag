@@ -95,6 +95,7 @@ fun CamaroAuthGate(
                     }
                     validatedAccountUid = targetUid
                     validatedUser = user
+                    latestOnAccountChanged(targetUid)
                 } else {
                     val lastValidated = validationPrefs.getLong("verified_$targetUid", 0L)
                     val offlineGrace = task.exception is FirebaseNetworkException &&
@@ -104,6 +105,7 @@ fun CamaroAuthGate(
                     if (offlineGrace) {
                         validatedAccountUid = targetUid
                         validatedUser = user
+                        latestOnAccountChanged(targetUid)
                     } else {
                         // Expired offline validation or a rejected Firebase token:
                         // revoke in-app access immediately and end OBD operations.
