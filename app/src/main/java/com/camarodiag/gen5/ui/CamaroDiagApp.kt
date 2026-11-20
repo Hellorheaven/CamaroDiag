@@ -49,6 +49,7 @@ import com.camarodiag.gen5.control.VehicleSignal
 import com.camarodiag.gen5.control.VehicleControlId
 import com.camarodiag.gen5.data.obd.VxdiagProfiles
 import com.camarodiag.gen5.data.obd.CanTraceFilter
+import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.CanTraceDirection
 import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.data.obd.UdsNegativeResponse
@@ -1250,6 +1251,7 @@ fun CanSnifferScreen(
     onExport: () -> Unit
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
+    var pendingRawFrameInput by remember { mutableStateOf<String?>(null) }
     var frameSearch by remember { mutableStateOf("") }
     var canIdFilter by remember { mutableStateOf("") }
     var dataPrefixFilter by remember { mutableStateOf("") }
@@ -1376,7 +1378,13 @@ fun CanSnifferScreen(
                     )
                     Text(stringResource(R.string.can_console_input_hint), color = TextMuted, fontSize = 10.sp)
                     Button(
-                        onClick = { onSendRequest(requestInput) },
+                        onClick = {
+                            if (RawCanFrameParser.parse(requestInput) != null) {
+                                pendingRawFrameInput = requestInput.trim()
+                            } else {
+                                onSendRequest(requestInput)
+                            }
+                        },
                         enabled = isAvailable && !state.isCapturing && !state.isSendingRequest &&
                             requestInput.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
@@ -1682,6 +1690,29 @@ fun CanSnifferScreen(
                 }
             }
         }
+    }
+    pendingRawFrameInput?.let { frame ->
+        AlertDialog(
+            onDismissRequest = { pendingRawFrameInput = null },
+            title = { Text(stringResource(R.string.can_console_raw_tx_confirm_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(frame, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.can_console_raw_tx_confirm_message))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onSendRequest(frame)
+                    pendingRawFrameInput = null
+                }) { Text(stringResource(android.R.string.ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRawFrameInput = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
     }
 }
 
