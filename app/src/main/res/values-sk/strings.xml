@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULÁCIA: tieto identifikátory ECU neboli načítané zo skutočného vozidla a nepotvrdzujú jeho firmvér.</string>
     <string name="cal_expert_block_memory_map">Pamäťová mapa cieľa a chránené oblasti nie sú overené.</string>
     <string name="flexfuel_preflight_backup">Pôvodná záloha ECU nebola overená.</string>
+    <string name="cal_expert_title">Expertný režim — ECU na stole / čip</string>
+    <string name="cal_expert_expand">Nastaviť expertný režim</string>
+    <string name="cal_expert_collapse">Skryť expertné nastavenia</string>
+    <string name="cal_expert_family">Rodina riadiacej jednotky (E39 alebo E39A)</string>
+    <string name="cal_expert_chip">Zistené označenie čipu</string>
+    <string name="cal_expert_programmer">Stolný programátor / rozhranie</string>
+    <string name="cal_expert_access_title">Spôsob prístupu</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Externá pamäť, vybratý čip</string>
+    <string name="cal_expert_region_title">Pamäťová oblasť</string>
+    <string name="cal_expert_region_pflash">Interná programová flash pamäť MCU</string>
+    <string name="cal_expert_region_dflash">Dátová flash pamäť MCU</string>
+    <string name="cal_expert_region_eeprom">Externá EEPROM</string>
+    <string name="cal_expert_blockers">Nevyriešené expertné kontroly</string>
+    <string name="cal_expert_block_controller">Overte presnú rodinu riadiacej jednotky (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Zistite fyzické označenie MCU alebo pamäťového čipu.</string>
+    <string name="cal_expert_block_programmer">Zistite kompatibilný stolný programátor.</string>
+    <string name="cal_expert_block_image_missing">Importujte neprázdny obraz firmvéru.</string>
+    <string name="cal_expert_block_image_format">Pre túto prípravu je potrebný surový binárny súbor.</string>
 </resources>
