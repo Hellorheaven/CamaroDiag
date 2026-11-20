@@ -1367,6 +1367,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         append(timestamp)
                         append(" [")
                         append(entry.direction)
+                        if (!entry.succeeded) append(" FAILED")
                         append("] ")
                         appendLine(entry.content)
                     }
