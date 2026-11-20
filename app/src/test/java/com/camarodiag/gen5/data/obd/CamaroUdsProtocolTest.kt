@@ -141,6 +141,7 @@ class CamaroUdsProtocolTest {
     fun acceptsCompletePid00ResponseWithOrWithoutCanHeader() {
         listOf(
             "41 00 BE 3E B8 13",
+            "06 41 00 BE 3E B8 13",
             "7E8 06 41 00 BE 3E B8 13",
             "18DAF110 06 41 00 BE 3E B8 13"
         ).forEach { response ->
