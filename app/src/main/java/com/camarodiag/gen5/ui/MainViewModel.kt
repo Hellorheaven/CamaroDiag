@@ -12,6 +12,7 @@ import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.google.firebase.auth.FirebaseAuth
+import com.camarodiag.gen5.auth.AccountStorageKeys
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationFileFormat
@@ -97,7 +98,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         ownerUid: String? = authenticatedAccountUid
     ): android.content.SharedPreferences =
         getApplication<Application>().getSharedPreferences(
-            "camarodiag_garage_" + (ownerUid ?: "no_account"),
+            AccountStorageKeys.garageName(ownerUid),
             Context.MODE_PRIVATE
         )
 
