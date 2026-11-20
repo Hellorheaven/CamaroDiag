@@ -116,6 +116,7 @@ jobs:
           ANDROID_CHANGED: ${{ steps.android_changes.outputs.android_changed }}
           CURRENT_ANDROID_CHANGED: ${{ steps.android_changes.outputs.current_android_changed }}
           EVENT_ACTION: ${{ github.event.action }}
+          EVENT_NAME: ${{ github.event_name }}
           PREVIOUS_BUILD_SHA: ${{ steps.previous_build.outputs.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -148,8 +149,13 @@ jobs:
           commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
           echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
 
+          # Manual dispatch is an explicit request for a complete validation, independent of the 50-commit draft checkpoint.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "Manual Android Debug validation explicitly requested."
           # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
-          if [[ "$IS_DRAFT" == "true" ]]; then
+          elif [[ "$IS_DRAFT" == "true" ]]; then
             if [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
               echo "validation_applies=false" >> "$GITHUB_OUTPUT"
               echo "build_required=false" >> "$GITHUB_OUTPUT"
