@@ -1157,6 +1157,12 @@ fun LiveDataScreen(
     }
     var choosingSensors by remember(storageKey) { mutableStateOf(false) }
     val allPidIds = pids.map { it.id }.toSet()
+    val liveCatalog = remember(pids) {
+        LiveSensorCatalog.entriesWithObserved(
+            pids.map { LiveSensorDefinition(it.id, it.labelEn, it.labelFr) }
+        )
+    }
+    val localeFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     val activePidIds = selectedPidIds ?: allPidIds
     val visiblePids = pids.filter { it.id in activePidIds }
 
@@ -1179,30 +1185,36 @@ fun LiveDataScreen(
                     )
                     LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
                         items(
-                            pids.distinctBy { it.id }.filter { pid ->
-                                sensorQuery.isBlank() || pid.id.contains(sensorQuery, true) ||
-                                    pid.labelEn.contains(sensorQuery, true) ||
-                                    pid.labelFr.contains(sensorQuery, true)
+                            liveCatalog.filter { signal ->
+                                sensorQuery.isBlank() || signal.id.contains(sensorQuery, true) ||
+                                    signal.labelEn.contains(sensorQuery, true) ||
+                                    signal.labelFr.contains(sensorQuery, true)
                             },
                             key = { it.id }
-                        ) { pid ->
+                        ) { signal ->
+                            val measured = LiveSensorCatalog.isMeasured(signal.id, allPidIds)
                             Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    pendingIds = if (pid.id in pendingIds) pendingIds - pid.id
-                                        else pendingIds + pid.id
+                                Modifier.fillMaxWidth().clickable(enabled = measured) {
+                                    pendingIds = if (signal.id in pendingIds) pendingIds - signal.id
+                                        else pendingIds + signal.id
                                 },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Checkbox(
-                                    checked = pid.id in pendingIds,
+                                    checked = signal.id in pendingIds,
+                                    enabled = measured,
                                     onCheckedChange = { checked ->
-                                        pendingIds = if (checked) pendingIds + pid.id
-                                            else pendingIds - pid.id
+                                        pendingIds = if (checked) pendingIds + signal.id
+                                            else pendingIds - signal.id
                                     }
                                 )
                                 Column {
-                                    Text(localizedLivePidLabel(pid))
-                                    Text(pid.id, color = TextMuted, fontSize = 11.sp)
+                                    Text(if (localeFrench) signal.labelFr else signal.labelEn)
+                                    Text(signal.id, color = TextMuted, fontSize = 11.sp)
+                                    if (!measured) {
+                                        Text(stringResource(R.string.obd_sensor_not_measured),
+                                            color = TextMuted, fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }
