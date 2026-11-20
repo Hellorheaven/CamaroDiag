@@ -42,13 +42,17 @@ object Lfx2012ControllerReferences {
      */
     private fun isMeaningfulIdentifier(raw: String?): Boolean {
         val value = raw?.trim()?.uppercase().orEmpty()
-        if (value.isEmpty() || value in setOf(
-                "UNKNOWN", "N/A", "NONE", "NULL", "NOT AVAILABLE", "NOT SUPPORTED",
-                "PENDING", "TBD", "TEST", "DEMO", "SIMULATED", "-"
-            )
-        ) return false
-        if (listOf("UNKNOWN", "DEMO", "SIMULATED", "SAMPLE").any(value::startsWith)) return false
-        val compact = value.removePrefix("0X").replace(" ", "")
+        if (value.isEmpty() || value in setOf("N/A", "NONE", "NULL", "-", "?")) return false
+        // ELM and diagnostic placeholders must never count as observed ECU evidence.
+        // Reject placeholder tokens even when the response prefixes them with "ECU:".
+        val placeholder = Regex(
+            "(?i)(?:^|[^A-Z0-9])(?:UNKNOWN|UNAVAILABLE|DEMO|SIMULATED|SAMPLE|" +
+                "INVALID|NOT AVAILABLE|NOT SUPPORTED|NO DATA|NO RESPONSE|PENDING|" +
+                "TBD|TEST|ERROR|STOPPED)(?:$|[^A-Z0-9])"
+        )
+        if (placeholder.containsMatchIn(value)) return false
+        // Some adapters format zero/FF responses with hex prefixes and separators.
+        val compact = value.removePrefix("0X").replace(Regex("[\\s:_-]"), "")
         if (compact.isEmpty()) return false
         if (compact.all { it == '0' } || compact.all { it == 'F' }) return false
         return true
