@@ -160,4 +160,33 @@ class EcuBackupArchiveTest {
         }.isFailure)
     }
 
+    @Test fun exportUsesFrozenBytesWhenCallerMutatesBufferDuringZipWrite() {
+        val initial = capture()
+        val destination = ByteArrayOutputStream()
+        var mutated = false
+        val interceptingOutput = object : java.io.FilterOutputStream(destination) {
+            override fun write(b: Int) {
+                if (!mutated) {
+                    initial.firstRead[0] = 99
+                    initial.independentRead!![0] = 99
+                    mutated = true
+                }
+                out.write(b)
+            }
+            override fun write(b: ByteArray, off: Int, len: Int) {
+                if (!mutated) {
+                    initial.firstRead[0] = 99
+                    initial.independentRead!![0] = 99
+                    mutated = true
+                }
+                out.write(b, off, len)
+            }
+        }
+        EcuBackupArchive.export(interceptingOutput, listOf(initial), setOf(initial.region))
+        assertTrue(mutated)
+        val restored = EcuBackupArchive.import(ByteArrayInputStream(destination.toByteArray()))
+        assertTrue(restored.verification.consistent)
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4), restored.captures.single().firstRead)
+    }
+
 }
