@@ -58,13 +58,14 @@ jobs:
           distribution: temurin
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.11.1'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
+          cmdline-tools-version: 14742923
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
 
       - name: Determine next release version
@@ -131,6 +132,28 @@ jobs:
           ./gradlew lintDebug lintRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
           ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
           ./gradlew app:assembleDebug -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
+
+      - name: Reject Android lint errors and warnings in every release variant
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+          modules = ("app", "core", "diagnostic", "communication", "storage", "control", "mileageaudit")
+          failures = []
+          for module in modules:
+              for variant in ("debug", "release"):
+                  report = Path(module) / f"build/reports/lint-results-{variant}.xml"
+                  if not report.is_file():
+                      failures.append(f"Missing {report}")
+                      continue
+                  for issue in ElementTree.parse(report).getroot().findall("issue"):
+                      if issue.get("severity", "").lower() in {"warning", "error", "fatal"}:
+                          failures.append(f"{report}: {issue.get('id')}: {issue.get('message')}")
+          if failures:
+              raise SystemExit("\\n".join(failures))
+          print("Android Release/Debug lint: zero warnings or errors in all modules.")
+          PY
 
       - name: Create Git tag
         env:
@@ -219,6 +242,9 @@ jobs:
 
             dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime $variant.Runtime --self-contained true --output $output -warnaserror "-p:Version=$env:VERSION_NAME" "-p:AssemblyVersion=$($env:VERSION_NAME).0" "-p:FileVersion=$($env:VERSION_NAME).0"
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
+            $publishedExe = Join-Path $output 'CamaroDiag.J2534Bridge.exe'
+            & $publishedExe --self-test
+            if ($LASTEXITCODE -ne 0) { throw "Published $($variant.Arch) bridge self-tests failed" }
 
             $installerLog = Join-Path $PWD "dist\$($variant.Name)-installer.log"
             $installerOutput = & $iscc "/DAppVersion=$env:VERSION_NAME" "/DBuildDir=$output" "/DChannel=release" "/DArch=$($variant.Arch)" "/DOutputName=CamaroDiag-J2534-Bridge-Setup-$($variant.Name)" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss" 2>&1
