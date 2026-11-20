@@ -104,4 +104,12 @@ class EcuBackupIntegrityTest {
         assertTrue(EcuBackupIntegrity.Problem.INVALID_COVERAGE in problems)
     }
 
+    @Test fun absentSecondReadCannotBeHiddenByAConsistentManifest() {
+        val captures = listOf(capture().copy(independentRead = null))
+        val generated = manifest(captures)
+        assertFalse(generated.entries.single().readsIdentical)
+        val problems = EcuBackupIntegrity.verify(generated, captures, required).problems
+        assertTrue(EcuBackupIntegrity.Problem.MISSING_INDEPENDENT_READ in problems)
+    }
+
 }
