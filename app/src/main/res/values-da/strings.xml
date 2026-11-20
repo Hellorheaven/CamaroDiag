@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Faktisk motormoment</string>
     <string name="can_trace_pid_63">Motorens referencemoment</string>
     <string name="live_pid_ethanol">Ethanolindhold</string>
+    <string name="can_trace_flow_status_cts">Fortsæt afsendelse</string>
+    <string name="can_trace_flow_status_wait">Vent</string>
+    <string name="can_trace_flow_status_overflow">Overløb</string>
+    <string name="can_trace_flow_status_reserved">Reserveret status</string>
+    <string name="can_trace_exchange_heading">UDS-udveksling af anmodninger og svar</string>
+    <string name="can_trace_exchange_completed">Fuldført</string>
+    <string name="can_trace_exchange_pending">Afventer svar (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Intet svar registreret</string>
+    <string name="can_console_raw_tx_confirm_title">Bekræft rå CAN-transmission</string>
+    <string name="can_console_raw_tx_confirm_message">Dette sender en ramme direkte på køretøjets CAN-bus. En forkert ramme kan påvirke køretøjets moduler. Send kun, hvis du kender målbussen og identifikatoren.</string>
+    <string name="can_console_tx_unverified">Rå CAN-afsendelse er deaktiveret: Der blev ikke registreret noget reelt ECU-svar på den skrivebeskyttede sendekontrol.</string>
+    <string name="can_trace_clear_filters">Ryd filtre</string>
+    <string name="can_trace_filter_invalid">Ugyldigt CAN-ID eller datapræfiks.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP-flowkontrol</string>
+    <string name="cal_expert_block_recovery">En gendannelsesprocedure for dette præcise mål er ikke verificeret.</string>
+    <string name="cal_expert_block_driver">Der er ikke tilsluttet nogen valideret driver til hardwareprogrammering.</string>
+    <string name="cal_expert_identity_notice">Indtastede navne og filhash er observationer, ikke dokumentation for hardwarekompatibilitet.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULERING: Disse ECU-identifikatorer er ikke læst fra et rigtigt køretøj og kan ikke validere dets firmware.</string>
+    <string name="cal_expert_block_memory_map">Målets hukommelseskort og beskyttede områder er ikke verificeret.</string>
+    <string name="flexfuel_preflight_backup">Den oprindelige ECU-sikkerhedskopi er ikke verificeret.</string>
 </resources>
