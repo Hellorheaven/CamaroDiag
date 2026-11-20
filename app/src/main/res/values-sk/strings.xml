@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Diagnostické chybové kódy</string>
     <string name="obd_adapter_voltage">Napätie adaptéra</string>
     <string name="obd_supported_pids">Podporované PID</string>
+    <string name="obd_ecu_name">Názov ECU</string>
+    <string name="obd_none_identified">Žiadny nebol identifikovaný</string>
+    <string name="obd_data_unavailable">Údaje nie sú dostupné</string>
+    <string name="obd_returned_live_data">Získané živé údaje</string>
+    <string name="obd_pending">Čakajúce</string>
+    <string name="obd_permanent">Trvalé</string>
+    <string name="obd_confirmed">Potvrdené</string>
+    <string name="obd_freeze_frame">Zmrazený snímok</string>
+    <string name="obd_raw_scan_log">Surový záznam skenovania</string>
+    <string name="obd_powertrain_ecm">Pohonné ústrojenstvo / ECM</string>
 </resources>
