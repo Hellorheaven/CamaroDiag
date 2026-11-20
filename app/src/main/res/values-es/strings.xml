@@ -750,4 +750,24 @@
     <string name="can_trace_pid_62">Par motor real</string>
     <string name="can_trace_pid_63">Par motor de referencia</string>
     <string name="live_pid_ethanol">Contenido de etanol</string>
+    <string name="can_trace_flow_status_cts">Continuar envío</string>
+    <string name="can_trace_flow_status_wait">Esperar</string>
+    <string name="can_trace_flow_status_overflow">Desbordamiento</string>
+    <string name="can_trace_flow_status_reserved">Estado reservado</string>
+    <string name="can_trace_exchange_heading">Intercambios de solicitud/respuesta UDS</string>
+    <string name="can_trace_exchange_completed">Completado</string>
+    <string name="can_trace_exchange_pending">Respuesta pendiente (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">No se ha observado respuesta</string>
+    <string name="can_console_raw_tx_confirm_title">Confirmar transmisión CAN sin procesar</string>
+    <string name="can_console_raw_tx_confirm_message">Esto envía una trama directamente al bus CAN del vehículo. Una trama incorrecta puede afectar a los módulos del vehículo. Envía solo si conoces el bus y el identificador de destino.</string>
+    <string name="can_console_tx_unverified">El envío CAN sin procesar está deshabilitado: no se observó una respuesta ECU real durante la comprobación de transmisión de solo lectura.</string>
+    <string name="can_trace_clear_filters">Borrar filtros</string>
+    <string name="can_trace_filter_invalid">ID CAN o prefijo de datos no válido.</string>
+    <string name="can_trace_flow_control_heading">Control de flujo ISO-TP</string>
+    <string name="cal_expert_block_recovery">No se ha verificado un procedimiento de recuperación para este destino exacto.</string>
+    <string name="cal_expert_block_driver">No hay conectado ningún controlador de programación de hardware validado.</string>
+    <string name="cal_expert_identity_notice">Las etiquetas introducidas y las huellas de los archivos son observaciones, no pruebas de compatibilidad del hardware.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULACIÓN: estos identificadores ECU no se leyeron de un vehículo real y no permiten validar su firmware.</string>
+    <string name="cal_expert_block_memory_map">No se han verificado el mapa de memoria de destino ni las regiones protegidas.</string>
+    <string name="flexfuel_preflight_backup">No se ha verificado la copia de seguridad original de la ECU.</string>
 </resources>
