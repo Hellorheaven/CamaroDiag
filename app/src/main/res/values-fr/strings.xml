@@ -832,4 +832,12 @@
     <string name="flexfuel_lfx2012_audit_title">LFX 2012 : contrôles avant/après programmation (lecture seule)</string>
     <string name="flexfuel_lfx2012_audit_summary">Contrôles relevés avant programmation : %1$d / %2$d. Les données absentes restent non vérifiées.</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Contrôles après programmation non réalisés. Aucune programmation ECU ni recette sur véhicule n’est validée.</string>
+    <string name="cal_expert_patch_title">Modifications ciblées ECU — secteurs concernés hors ligne</string>
+    <string name="cal_expert_patch_warning">Aperçu uniquement. Saisir la géométrie mémoire du calculateur cible. Ni la cartographie des secteurs ni la compatibilité ECU ne sont vérifiées, aucune écriture n’est activée.</string>
+    <string name="cal_expert_patch_address">Adresse de début de région mémoire (hexadécimal)</string>
+    <string name="cal_expert_patch_erase_bytes">Taille du secteur d’effacement (octets)</string>
+    <string name="cal_expert_patch_program_bytes">Taille de l’unité de programmation (octets)</string>
+    <string name="cal_expert_patch_preview_button">Prévisualiser les secteurs touchés par le BIN modifié</string>
+    <string name="cal_expert_patch_summary">Octets modifiés : %1$d. Secteurs d’effacement touchés : %2$d. Cartographie matérielle non vérifiée ; aucune écriture.</string>
+    <string name="cal_expert_patch_invalid">Aperçu indisponible : fichiers, plage ou géométrie mémoire invalides. Aucune écriture tentée.</string>
 </resources>
