@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Adresa IP a adaptorului</string>
     <string name="adapter_tcp_port">Port TCP (de obicei 35000 sau 23)</string>
     <string name="adapter_connect_wifi">Conectare prin Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Conectează un adaptor OBD real înainte de scanare. Modul demo nu inventează rezultate.</string>
+    <string name="obd_offline_simulation_notice">SIMULARE OFFLINE — VIN, CAL ID, CVN, DTC și măsurătorile de mai jos sunt sintetice și nu provin de la un Camaro real.</string>
+    <string name="obd_vehicle_ecu_identification">Identificare vehicul / ECU</string>
+    <string name="obd_no_live_data">Nu au fost returnate date PID în timp real utilizabile.</string>
+    <string name="obd_no_dtcs">Serviciile standard 03/07/0A nu au returnat niciun DTC.</string>
+    <string name="obd_no_freeze_frame">Nu există date de cadru înghețat utilizabile.</string>
+    <string name="obd_simulation_scope">Domeniu: doar date demonstrative deterministe. Nu se interoghează niciun adaptor, ECU sau vehicul real.</string>
+    <string name="vehicle_vin_hint">Introdu VIN-ul real; nu se generează un VIN demonstrativ.</string>
+    <string name="status_not_verified">NEVERIFICAT</string>
+    <string name="adapter_discovery_only">DOAR DETECTARE</string>
 </resources>
