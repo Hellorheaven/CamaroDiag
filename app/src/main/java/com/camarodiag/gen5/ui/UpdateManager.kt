@@ -306,11 +306,6 @@ fun AboutUpdateCard() {
                         )
                     }
                 }
-                if (downloadedApk != null) {
-                    Button(onClick = ::installDownloadedApk) {
-                        Text(stringResource(R.string.update_install))
-                    }
-                }
             }
         }
     }
