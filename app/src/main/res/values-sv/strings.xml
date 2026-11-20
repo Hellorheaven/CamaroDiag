@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Ange det riktiga VIN-numret; inget exempel-VIN skapas.</string>
     <string name="status_not_verified">INTE VERIFIERAT</string>
     <string name="adapter_discovery_only">ENDAST SÖKNING</string>
+    <string name="can_sniffer_raw_heading">Råutdata från CAN-adapter</string>
+    <string name="can_sniffer_export_raw">Exportera rålogg</string>
+    <string name="can_sniffer_dtc_heading">Observerade OBD-II-felkoder</string>
+    <string name="connection_lost_bluetooth">Bluetooth-anslutningen bröts. Anslut adaptern igen och starta om åtgärden.</string>
+    <string name="connection_lost_vehicle">Anslutningen till fordonet bröts. Anslut igen och starta om åtgärden.</string>
+    <string name="connection_lost_usb">USB-adaptern kopplades från. Anslut den igen och starta om åtgärden.</string>
+    <string name="connection_lost_wifi">OBD-anslutningen via Wi-Fi bröts. Anslut adaptern igen och starta om åtgärden.</string>
+    <string name="connection_lost_pc_bridge">Anslutningen till datorns diagnosbrygga bröts. Anslut bryggan igen och starta om åtgärden.</string>
+    <string name="live_sensor_search">Sök sensorer</string>
+    <string name="live_sensor_show_all">Visa alla sensorer</string>
+    <string name="can_console_history">Samlad historik för CAN-konsolen</string>
+    <string name="can_console_clear">Rensa historik</string>
+    <string name="can_console_empty">Ingen trafik ännu. Mottagna och skickade data visas här.</string>
+    <string name="can_console_tx">TX • SKICKAT</string>
+    <string name="can_console_rx">RX • MOTTAGET</string>
+    <string name="can_console_system">SYSTEM</string>
+    <string name="can_console_input_label">CAN-ram eller OBD-kommando</string>
+    <string name="can_console_sending">Skickar…</string>
+    <string name="obd_dtc_help_unavailable">Det finns ännu inga verifierade felsökningsråd för denna felkod och bil. Kontrollera tillverkarens serviceinformation före reparation.</string>
+    <string name="cal_expert_no_write">Programmering är inte tillgänglig förrän en kompatibel bänkdrivrutin har implementerats och verifierats.</string>
+    <string name="flexfuel_preflight_write">Skrivning av ECU-kalibrering har inte verifierats och förblir avaktiverad.</string>
+    <string name="status_not_implemented">INTE IMPLEMENTERAT</string>
 </resources>
