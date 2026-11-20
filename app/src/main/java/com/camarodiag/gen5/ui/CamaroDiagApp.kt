@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -511,6 +512,10 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isStreaming = isStreaming,
                     recording = liveRecording,
                     telemetryMessage = liveTelemetryMessage,
+                    vehicleIdentity = selectedSavedVehicleId?.let { "garage_$it" }
+                        ?: vehicle.vin.trim().uppercase(Locale.ROOT)
+                            .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                            ?.let { "vin_$it" },
                     onToggleStream = { viewModel.toggleLiveStream() },
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
@@ -1125,19 +1130,96 @@ fun LiveDataScreen(
     isStreaming: Boolean,
     recording: LiveRecordingState,
     telemetryMessage: String?,
+    vehicleIdentity: String?,
     onToggleStream: () -> Unit,
     onToggleUnits: () -> Unit,
     onToggleRecording: () -> Unit,
     onExportRecording: () -> Unit
 ) {
-    var pidSearch by remember { mutableStateOf("") }
-    var selectedPidIds by remember { mutableStateOf<Set<String>?>(null) }
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("live_sensor_selection", android.content.Context.MODE_PRIVATE)
+    }
+    val storageKey = vehicleIdentity?.let { "vehicle_$it" }
+    val storedSelection = remember(storageKey, preferences) {
+        storageKey?.let { key ->
+            preferences.getString(key, null)?.split(",")?.filter(String::isNotBlank)?.toSet()
+        }
+    }
+    var selectedPidIds by remember(storageKey) {
+        mutableStateOf<Set<String>?>(storedSelection)
+    }
+    var choosingSensors by remember(storageKey) { mutableStateOf(false) }
     val allPidIds = pids.map { it.id }.toSet()
     val activePidIds = selectedPidIds ?: allPidIds
-    val visiblePids = pids.filter { pid ->
-        pid.id in activePidIds &&
-            (pidSearch.isBlank() || pid.labelEn.contains(pidSearch, true) ||
-                pid.labelFr.contains(pidSearch, true) || pid.id.contains(pidSearch, true))
+    val visiblePids = pids.filter { it.id in activePidIds }
+
+    if (choosingSensors) {
+        var sensorQuery by remember(storageKey, choosingSensors) { mutableStateOf("") }
+        var pendingIds by remember(storageKey, choosingSensors) {
+            mutableStateOf(activePidIds)
+        }
+        AlertDialog(
+            onDismissRequest = { choosingSensors = false },
+            title = { Text(stringResource(R.string.obd_choose_sensors)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = sensorQuery,
+                        onValueChange = { sensorQuery = it.take(48) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.live_sensor_search)) },
+                        singleLine = true
+                    )
+                    LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
+                        items(
+                            pids.distinctBy { it.id }.filter { pid ->
+                                sensorQuery.isBlank() || pid.id.contains(sensorQuery, true) ||
+                                    pid.labelEn.contains(sensorQuery, true) ||
+                                    pid.labelFr.contains(sensorQuery, true)
+                            },
+                            key = { it.id }
+                        ) { pid ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    pendingIds = if (pid.id in pendingIds) pendingIds - pid.id
+                                        else pendingIds + pid.id
+                                },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = pid.id in pendingIds,
+                                    onCheckedChange = { checked ->
+                                        pendingIds = if (checked) pendingIds + pid.id
+                                            else pendingIds - pid.id
+                                    }
+                                )
+                                Column {
+                                    Text(localizedLivePidLabel(pid))
+                                    Text(pid.id, color = TextMuted, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedPidIds = pendingIds.toSet()
+                    storageKey?.let { key ->
+                        preferences.edit()
+                            .putString(key, pendingIds.sorted().joinToString(","))
+                            .apply()
+                    }
+                    choosingSensors = false
+                }) { Text(stringResource(R.string.obd_sensor_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { choosingSensors = false }) {
+                    Text(stringResource(R.string.obd_sensor_cancel))
+                }
+            }
+        )
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -1205,32 +1287,18 @@ fun LiveDataScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Capteurs affichés (${visiblePids.size}/${pids.size})", color = CamaroAmber, fontWeight = FontWeight.Bold)
-                    OutlinedTextField(
-                        value = pidSearch,
-                        onValueChange = { pidSearch = it.take(48) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text(stringResource(R.string.live_sensor_search)) },
-                        placeholder = { Text("Lambda, pression, température…") }
+                    Text(
+                        stringResource(R.string.live_selected_sensors, visiblePids.size, pids.size),
+                        color = CamaroAmber,
+                        fontWeight = FontWeight.Bold
                     )
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        pids.distinctBy { it.id }.forEach { pid ->
-                            FilterChip(
-                                selected = pid.id in activePidIds,
-                                onClick = {
-                                    val updated = activePidIds.toMutableSet()
-                                    if (!updated.add(pid.id)) updated.remove(pid.id)
-                                    selectedPidIds = if (updated.containsAll(allPidIds)) null else updated
-                                },
-                                label = { Text(pid.id) }
-                            )
-                        }
+                    Button(onClick = { choosingSensors = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.obd_choose_sensors))
                     }
-                    TextButton(onClick = { selectedPidIds = null; pidSearch = "" }) {
+                    TextButton(onClick = {
+                        selectedPidIds = null
+                        storageKey?.let { preferences.edit().remove(it).apply() }
+                    }) {
                         Text(stringResource(R.string.live_sensor_show_all), color = CamaroBlue)
                     }
                 }
