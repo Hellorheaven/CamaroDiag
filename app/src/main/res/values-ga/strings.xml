@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">INSAMHLADH: níor léadh na haitheantóirí ECU seo ó fheithicil fhíor agus ní féidir leo a firmware a bhailíochtú.</string>
     <string name="cal_expert_block_memory_map">Níor fíoraíodh léarscáil chuimhne na sprice ná na réigiúin chosanta.</string>
     <string name="flexfuel_preflight_backup">Níor fíoraíodh an cúltaca ECU bunaidh.</string>
+    <string name="cal_expert_title">Mód saineolaí — ECU ar bhinse / slis</string>
+    <string name="cal_expert_expand">Cumraigh mód saineolaí</string>
+    <string name="cal_expert_collapse">Folaigh socruithe saineolaí</string>
+    <string name="cal_expert_family">Teaghlach rialaitheora (E39 nó E39A)</string>
+    <string name="cal_expert_chip">Marcáil na slise a breathnaíodh</string>
+    <string name="cal_expert_programmer">Ríomhchláraitheoir binse / comhéadan</string>
+    <string name="cal_expert_access_title">Modh rochtana</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Cuimhne sheachtrach, slis bainte</string>
+    <string name="cal_expert_region_title">Réigiún cuimhne</string>
+    <string name="cal_expert_region_pflash">Flash cláir inmheánach MCU</string>
+    <string name="cal_expert_region_dflash">Flash sonraí MCU</string>
+    <string name="cal_expert_region_eeprom">EEPROM sheachtrach</string>
+    <string name="cal_expert_blockers">Seiceálacha saineolaí fós le déanamh</string>
+    <string name="cal_expert_block_controller">Fíoraigh an teaghlach rialaitheora cruinn (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Aithin marcáil fhisiciúil MCU nó na slise cuimhne.</string>
+    <string name="cal_expert_block_programmer">Aithin ríomhchláraitheoir binse comhoiriúnach.</string>
+    <string name="cal_expert_block_image_missing">Iompórtáil íomhá firmware nach bhfuil folamh.</string>
+    <string name="cal_expert_block_image_format">Tá comhad dénártha amh riachtanach don ullmhúchán seo.</string>
 </resources>
