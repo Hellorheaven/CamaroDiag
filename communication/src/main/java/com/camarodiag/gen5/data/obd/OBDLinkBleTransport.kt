@@ -186,6 +186,11 @@ internal class OBDLinkBleTransport(private val context: Context) {
         val characteristic = writeCharacteristic ?: error("OBDLink BLE write characteristic unavailable")
         var offset = 0
         while (offset < data.size) {
+            // A disconnect may arrive between BLE chunks, especially for writes without response.
+            connectionFailure?.let {
+                throw ObdTransportDisconnectedException("OBDLink BLE disconnected during write", it)
+            }
+            check(gatt === g) { "OBDLink BLE session was replaced during write" }
             val count = minOf(mtuPayload, data.size - offset)
             val chunk = data.copyOfRange(offset, offset + count)
             writeResult = CompletableDeferred()
