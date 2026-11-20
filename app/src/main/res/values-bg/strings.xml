@@ -226,4 +226,26 @@
     <string name="system_language_follow_phone">Следване на езика на телефона</string>
     <string name="settings_current_vehicle">Текущ автомобил</string>
     <string name="settings_current_adapter">OBD-II връзка</string>
+    <string name="can_sniffer_raw_heading">Необработен изход от CAN адаптера</string>
+    <string name="can_sniffer_export_raw">Експортиране на необработен журнал</string>
+    <string name="can_sniffer_dtc_heading">Наблюдавани кодове за грешки OBD-II</string>
+    <string name="connection_lost_bluetooth">Bluetooth връзката е загубена. Свържете адаптера отново и рестартирайте операцията.</string>
+    <string name="connection_lost_vehicle">Връзката с автомобила е загубена. Свържете се отново и рестартирайте операцията.</string>
+    <string name="connection_lost_usb">USB адаптерът е изключен. Свържете го отново и рестартирайте операцията.</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi връзката е загубена. Свържете адаптера отново и рестартирайте операцията.</string>
+    <string name="connection_lost_pc_bridge">Връзката с диагностичния мост на компютъра е загубена. Свържете го отново и рестартирайте операцията.</string>
+    <string name="live_sensor_search">Търсене на сензори</string>
+    <string name="live_sensor_show_all">Показване на всички сензори</string>
+    <string name="can_console_history">Обща хронология на CAN конзолата</string>
+    <string name="can_console_clear">Изчистване на хронологията</string>
+    <string name="can_console_empty">Все още няма трафик. Тук ще се показват получените и изпратените данни.</string>
+    <string name="can_console_tx">TX • ИЗПРАТЕНО</string>
+    <string name="can_console_rx">RX • ПОЛУЧЕНО</string>
+    <string name="can_console_system">СИСТЕМА</string>
+    <string name="can_console_input_label">CAN кадър или OBD команда</string>
+    <string name="can_console_sending">Изпращане…</string>
+    <string name="obd_dtc_help_unavailable">Все още няма проверени инструкции за диагностика на този код за грешка и автомобил. Проверете сервизната информация на производителя преди ремонт.</string>
+    <string name="cal_expert_no_write">Програмирането не е достъпно, докато не бъде внедрен и валидиран съвместим драйвер за работа на стенд.</string>
+    <string name="flexfuel_preflight_write">Записът на ECU калибрация не е валидиран и остава изключен.</string>
+    <string name="status_not_implemented">НЕ Е РЕАЛИЗИРАНО</string>
 </resources>
