@@ -70,4 +70,37 @@ class EcuBackupArchiveTest {
         assertEquals(EcuBackupCoverage.Status.PARTIAL, result.manifest.coverage.status)
         assertTrue(EcuBackupCoverage.Region.EXTERNAL_EEPROM in result.manifest.coverage.missingRegions)
     }
+    @Test fun malformedAndOverlappingSegmentsAreRejectedBeforeExport() {
+        val first = capture()
+        val overlap = first.copy(startAddress = first.startAddress + 2L)
+        val output = ByteArrayOutputStream()
+        val failure = runCatching {
+            EcuBackupArchive.export(output, listOf(first, overlap), setOf(first.region))
+        }
+        assertTrue(failure.isFailure)
+        assertEquals(0, output.size())
+    }
+
+    @Test fun importedArchiveRejectsAlteredPrimaryBytes() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val altered = ByteArrayOutputStream()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(original.toByteArray())).use { source ->
+            ZipOutputStream(altered).use { target ->
+                while (true) {
+                    val entry = source.nextEntry ?: break
+                    target.putNextEntry(ZipEntry(entry.name))
+                    val bytes = source.readBytes()
+                    if (entry.name.endsWith("first.bin")) bytes[0] = (bytes[0].toInt() xor 0x01).toByte()
+                    target.write(bytes)
+                    target.closeEntry()
+                    source.closeEntry()
+                }
+            }
+        }
+        assertTrue(runCatching {
+            EcuBackupArchive.import(ByteArrayInputStream(altered.toByteArray()))
+        }.isFailure)
+    }
+
 }
