@@ -675,4 +675,15 @@
     <string name="live_pid_wbo2_b1s2">広帯域ラムダセンサー B1S2</string>
     <string name="live_pid_wbo2_b2s1">広帯域ラムダセンサー B2S1</string>
     <string name="live_pid_wbo2_b2s2">広帯域ラムダセンサー B2S2</string>
+    <string name="about_title">CamaroDiagについて</string>
+    <string name="about_version">インストール済みバージョン: %1$s</string>
+    <string name="about_build">ビルド番号: %1$d</string>
+    <string name="about_check_updates">更新を確認</string>
+    <string name="about_checking">確認中…</string>
+    <string name="about_up_to_date">CamaroDiagは最新です。</string>
+    <string name="about_update_found">新しいバージョンが利用できます。</string>
+    <string name="about_channel_update_unavailable">新しいバージョンがありますが、このインストールチャネル向けの更新パッケージは公開されていません。</string>
+    <string name="about_check_failed">更新を確認できませんでした。インターネット接続を確認してください。</string>
+    <string name="update_install_update">更新をインストール</string>
+    <string name="update_version_available">利用可能なバージョン: %1$s</string>
 </resources>
