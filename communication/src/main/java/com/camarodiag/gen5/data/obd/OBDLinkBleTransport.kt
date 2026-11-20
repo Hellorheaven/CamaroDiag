@@ -16,6 +16,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.selects.onAwait
+import kotlinx.coroutines.selects.select
 import java.util.UUID
 
 /**
@@ -47,6 +49,9 @@ internal class OBDLinkBleTransport(private val context: Context) {
     private var writeResult: CompletableDeferred<Unit>? = null
     /** Serializes GATT writes so callbacks cannot complete the wrong operation. */
     private val writeMutex = Mutex()
+    /** Only one reader may consume the shared response buffer at a time. */
+    private val readMutex = Mutex()
+    private val readWakeup = ObdReadWakeup()
     private var mtuResult: CompletableDeferred<Unit>? = null
 
     private val callback = object : BluetoothGattCallback() {
@@ -58,7 +63,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
                 connectionFailure = failure
                 connectResult?.completeExceptionally(failure)
                 writeResult?.completeExceptionally(failure)
-                incoming.trySend(ByteArray(0))
+                readWakeup.signal(failure)
                 return
             }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
@@ -71,7 +76,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
                 connectResult?.completeExceptionally(failure)
                 writeResult?.completeExceptionally(failure)
                 // Wake a reader waiting for notifications so it can surface the disconnect.
-                incoming.trySend(ByteArray(0))
+                readWakeup.signal(failure)
             }
         }
 
@@ -247,7 +252,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
         characteristicWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         mtuPayload = 20
         pending = ByteArray(0)
-        incoming.trySend(ByteArray(0))
+        readWakeup.signal(cause)
 
         connectResult = null
         writeResult = null
@@ -277,25 +282,47 @@ internal class OBDLinkBleTransport(private val context: Context) {
         return bluetoothGatt.writeCharacteristic(characteristic)
     }
 
-    suspend fun read(buffer: ByteArray, timeoutMs: Int): Int {
+    suspend fun read(buffer: ByteArray, timeoutMs: Int): Int = readMutex.withLock {
         connectionFailure?.let { throw ObdTransportDisconnectedException("OBDLink BLE disconnected while reading", it) }
         if (pending.isEmpty()) {
-            val packet = withTimeoutOrNull(timeoutMs.toLong()) { incoming.receive() } ?: run {
-                connectionFailure?.let { throw ObdTransportDisconnectedException("OBDLink BLE disconnected while reading", it) }
-                return 0
+            val wakeup = readWakeup.beginWait()
+            try {
+                // Recheck after registering to close the race with a disconnect callback.
+                connectionFailure?.let(wakeup::complete)
+                val packet = withTimeoutOrNull(timeoutMs.toLong()) {
+                    select<ByteArray> {
+                        incoming.onReceive { it }
+                        wakeup.onAwait { cause ->
+                            throw ObdTransportDisconnectedException(
+                                "OBDLink BLE disconnected while reading",
+                                cause
+                            )
+                        }
+                    }
+                } ?: run {
+                    connectionFailure?.let {
+                        throw ObdTransportDisconnectedException("OBDLink BLE disconnected while reading", it)
+                    }
+                    return@withLock 0
+                }
+                connectionFailure?.let {
+                    throw ObdTransportDisconnectedException("OBDLink BLE disconnected while reading", it)
+                }
+                pending = packet
+            } finally {
+                readWakeup.endWait(wakeup)
             }
-            connectionFailure?.let { throw ObdTransportDisconnectedException("OBDLink BLE disconnected while reading", it) }
-            pending = packet
         }
         val count = minOf(buffer.size, pending.size)
         pending.copyInto(buffer, 0, 0, count)
         pending = pending.copyOfRange(count, pending.size)
-        return count
+        count
     }
 
     fun close() {
-        // Wake any coroutine still waiting for an operation on the session being closed.
+        // Wake readers without enqueuing a fake packet that a new session could consume.
         val closed = ObdTransportDisconnectedException("OBDLink BLE session was closed")
+        readWakeup.signal(closed)
         connectResult?.completeExceptionally(closed)
         writeResult?.completeExceptionally(closed)
         mtuResult?.completeExceptionally(closed)
@@ -312,5 +339,22 @@ internal class OBDLinkBleTransport(private val context: Context) {
         writeResult = null
         connectionFailure = null
         mtuResult = null
+    }
+}
+
+
+/** One-shot wakeup for the single active BLE reader; signals are never queued across sessions. */
+internal class ObdReadWakeup {
+    @Volatile private var waiting: CompletableDeferred<Throwable>? = null
+
+    fun beginWait(): CompletableDeferred<Throwable> =
+        CompletableDeferred<Throwable>().also { waiting = it }
+
+    fun signal(cause: Throwable) {
+        waiting?.complete(cause)
+    }
+
+    fun endWait(candidate: CompletableDeferred<Throwable>) {
+        if (waiting === candidate) waiting = null
     }
 }
