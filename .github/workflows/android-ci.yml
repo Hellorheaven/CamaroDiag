@@ -17,7 +17,7 @@ on:
         type: string
 
 concurrency:
-  group: android-debug-pr-${{ github.event.pull_request.number }}
+  group: android-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || inputs.target_ref || 'manual' }}
   cancel-in-progress: true
 
 permissions:
@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   evaluate-build-checkpoint:
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
     outputs:
       android_changed: ${{ steps.android_changes.outputs.android_changed }}
@@ -51,6 +51,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          BASE_SHA="${BASE_SHA:-$(git merge-base origin/main HEAD)}"
+          HEAD_SHA="${HEAD_SHA:-$(git rev-parse HEAD)}"
           paths=(
             'app/**' 'core/**' 'diagnostic/**' 'communication/**'
             'control/**' 'mileageaudit/**' 'storage/**' 'third_party/**'
@@ -188,7 +190,7 @@ jobs:
       - name: Checkout pull request commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
@@ -254,7 +256,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-lint-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: CamaroDiag-lint-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
           path: |
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.xml
@@ -268,7 +270,7 @@ jobs:
       - name: Upload debug APK for this PR commit
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-debug-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: CamaroDiag-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
           path: app/build/outputs/apk/debug/CamaroDiag-debug.apk
           if-no-files-found: error
           retention-days: 30
