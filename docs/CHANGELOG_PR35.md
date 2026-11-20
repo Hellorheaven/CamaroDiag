@@ -59,3 +59,4 @@
 - Les diagnostics enregistrés, les lectures DTC, l'identification ECU et l'audit kilométrique restent liés au compte utilisateur qui a lancé l'opération.
 - Une validation Firebase renouvelée pendant l'utilisation n'interrompt plus inutilement les diagnostics tant que la session reste autorisée.
 - Une réponse de validation de session arrivée trop tard ne peut plus remplacer une vérification plus récente.
+- Une nouvelle tentative de connexion à un adaptateur remplace la précédente, sans afficher ses résultats obsolètes.
