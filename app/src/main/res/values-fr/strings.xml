@@ -649,7 +649,7 @@
     <string name="can_sniffer_title">Moniteur CAN en direct</string>
     <string name="can_sniffer_description">Capture des trames CAN avec un adaptateur ELM ou STN réel et compatible. Chaque capture s’arrête automatiquement après une courte session.</string>
     <string name="can_sniffer_safety">Seules les requêtes OBD-II en lecture seule sont acceptées. Les trames CAN arbitraires et les écritures UDS sont bloquées.</string>
-    <string name="can_sniffer_start">Capturer pendant 10 secondes</string>
+    <string name="can_sniffer_start">Démarrer la capture</string>
     <string name="can_sniffer_stop">Arrêter la capture</string>
     <string name="can_sniffer_request_label">Requête OBD-II en lecture seule (hexadécimal)</string>
     <string name="can_sniffer_request_examples">Exemples : 01 0C (régime), 09 02 (VIN), 03 / 07 / 0A (lecture des défauts). L’effacement est interdit.</string>
