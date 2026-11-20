@@ -703,4 +703,5 @@
     <string name="about_check_failed">No se pudieron buscar actualizaciones. Comprueba tu conexión a Internet.</string>
     <string name="update_install_update">Instalar actualización</string>
     <string name="update_version_available">Versión disponible: %1$s</string>
+    <string name="system_language_follow_phone">Seguir el idioma del teléfono</string>
 </resources>
