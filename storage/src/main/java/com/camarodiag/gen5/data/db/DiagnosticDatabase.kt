@@ -25,6 +25,9 @@ interface DiagnosticSessionDao {
     @Query("SELECT * FROM diagnostic_sessions WHERE ownerUid = :ownerUid ORDER BY timestamp DESC")
     fun observeSessionsForOwner(ownerUid: String): Flow<List<SavedSessionEntity>>
 
+    @Query("SELECT COUNT(*) FROM diagnostic_sessions WHERE ownerUid = ''")
+    suspend fun countUnassignedSessions(): Int
+
     @Query("UPDATE diagnostic_sessions SET ownerUid = :ownerUid WHERE ownerUid = ''")
     suspend fun claimUnassignedSessions(ownerUid: String)
 
