@@ -110,6 +110,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onAccountSessionChanged(accountUid: String?) {
         if (authenticatedAccountUid == accountUid) return
         authenticatedAccountUid = accountUid
+        _savedSessions.value = emptyList()
         _activeAccountUid.value = accountUid
         stopCanMonitor()
         canRequestJob?.cancel()
@@ -292,13 +293,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isObdScanning = MutableStateFlow(false)
     val isObdScanning: StateFlow<Boolean> = _isObdScanning.asStateFlow()
 
-    val savedSessions: StateFlow<List<SavedSessionEntity>> = _activeAccountUid
-        .flatMapLatest { uid ->
-            if (uid == null) flowOf(emptyList()) else sessionDao.observeSessionsForOwner(uid)
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _savedSessions = MutableStateFlow<List<SavedSessionEntity>>(emptyList())
+    val savedSessions: StateFlow<List<SavedSessionEntity>> = _savedSessions.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            _activeAccountUid.collectLatest { uid ->
+                _savedSessions.value = emptyList()
+                if (uid != null) {
+                    sessionDao.observeSessionsForOwner(uid).collect { rows ->
+                        if (authenticatedAccountUid == uid) _savedSessions.value = rows
+                    }
+                }
+            }
+        }
         refreshTopologyAndDefaults()
         loadObdbSignalCatalog()
         loadNativeCamaroSignalCatalog()
