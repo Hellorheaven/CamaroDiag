@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Wprowadź rzeczywisty VIN; przykładowy VIN nie jest generowany.</string>
     <string name="status_not_verified">NIEZWERYFIKOWANO</string>
     <string name="adapter_discovery_only">TYLKO WYKRYWANIE</string>
+    <string name="can_sniffer_raw_heading">Surowe dane wyjściowe adaptera CAN</string>
+    <string name="can_sniffer_export_raw">Eksportuj surowy dziennik</string>
+    <string name="can_sniffer_dtc_heading">Zaobserwowane kody usterek OBD-II</string>
+    <string name="connection_lost_bluetooth">Utracono połączenie Bluetooth. Połącz adapter ponownie i uruchom operację od nowa.</string>
+    <string name="connection_lost_vehicle">Utracono połączenie z pojazdem. Połącz się ponownie i uruchom operację od nowa.</string>
+    <string name="connection_lost_usb">Odłączono adapter USB. Podłącz go ponownie i uruchom operację od nowa.</string>
+    <string name="connection_lost_wifi">Utracono połączenie OBD Wi-Fi. Połącz adapter ponownie i uruchom operację od nowa.</string>
+    <string name="connection_lost_pc_bridge">Utracono połączenie z mostkiem diagnostycznym PC. Połącz go ponownie i uruchom operację od nowa.</string>
+    <string name="live_sensor_search">Szukaj czujników</string>
+    <string name="live_sensor_show_all">Pokaż wszystkie czujniki</string>
+    <string name="can_console_history">Wspólna historia konsoli CAN</string>
+    <string name="can_console_clear">Wyczyść historię</string>
+    <string name="can_console_empty">Brak komunikacji. Odebrane i wysłane dane pojawią się tutaj.</string>
+    <string name="can_console_tx">TX • WYSŁANO</string>
+    <string name="can_console_rx">RX • ODEBRANO</string>
+    <string name="can_console_system">SYSTEM</string>
+    <string name="can_console_input_label">Ramka CAN lub polecenie OBD</string>
+    <string name="can_console_sending">Wysyłanie…</string>
+    <string name="obd_dtc_help_unavailable">Dla tego kodu usterki i pojazdu nie ma jeszcze zweryfikowanych wskazówek diagnostycznych. Przed naprawą sprawdź dokumentację serwisową producenta.</string>
+    <string name="cal_expert_no_write">Programowanie będzie dostępne dopiero po wdrożeniu i zatwierdzeniu obsługiwanego sterownika stanowiskowego.</string>
+    <string name="flexfuel_preflight_write">Zapis kalibracji ECU nie został zweryfikowany i pozostaje wyłączony.</string>
+    <string name="status_not_implemented">NIEZAIMPLEMENTOWANE</string>
 </resources>
