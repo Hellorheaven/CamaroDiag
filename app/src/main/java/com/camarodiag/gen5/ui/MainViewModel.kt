@@ -771,6 +771,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveTelemetryMessage.value = null
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             ecuVinResponse = "",
+            ecuIdentityFromSimulation = false,
             vinComparison = null,
             vinModelYear = null,
             ecuNameResponse = "",
@@ -1252,6 +1253,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("calibrationIds", lines(observation.calibrationIdResponse))
                     put("calibrationVerificationNumbers", lines(observation.cvnResponse))
                     put("respondingCanAddresses", JSONArray(observation.respondingEcuAddresses))
+                    put("observationFromSimulation", observation.ecuIdentityFromSimulation)
                     put(
                         "responderAttribution",
                         Lfx2012ControllerReferences
@@ -1262,6 +1264,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("calibrationIdCvnAttributionVerified", false)
                     put(
                         "observedFingerprintComplete",
+                        !observation.ecuIdentityFromSimulation &&
                         Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
                             Lfx2012ControllerReferences.ObservedIdentity(
                                 ecuName = reported(observation.ecuNameResponse),
@@ -1307,6 +1310,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
+                    ecuIdentityFromSimulation = false,
                     vinComparison = null,
                     vinModelYear = null,
                     ecuNameResponse = "",
@@ -1324,6 +1328,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isReading = true,
                 ecuVinResponse = "",
+                ecuIdentityFromSimulation = false,
                 vinComparison = null,
                 vinModelYear = null,
                 ecuNameResponse = "",
@@ -1342,6 +1347,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                    ecuIdentityFromSimulation = obdManager.isSimulationActive || obdManager.isDemoMode,
                     vinComparison = vinComparison,
                     vinModelYear = VehicleVinMatcher.modelYearFromVin(ecuVin),
                     ecuNameResponse = identity.ecuNames.joinToString("\n"),
@@ -1361,6 +1367,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
+                    ecuIdentityFromSimulation = false,
                     vinComparison = null,
                     vinModelYear = null,
                     ecuNameResponse = "",
@@ -2625,6 +2632,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (attempt != connectionAttemptGeneration) return@launch
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     ecuVinResponse = "",
+                    ecuIdentityFromSimulation = false,
                     calibrationIdResponse = "",
                     cvnResponse = ""
                 )
@@ -3062,6 +3070,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val comparison = VehicleVinMatcher.compare(_vehicle.value.vin, identity.vin)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = identity.vin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                        ecuIdentityFromSimulation = obdManager.isSimulationActive || obdManager.isDemoMode,
                         vinComparison = comparison,
                         vinModelYear = VehicleVinMatcher.modelYearFromVin(identity.vin),
                         ecuNameResponse = identity.ecuNames.joinToString("\n"),
@@ -3082,6 +3091,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (connectionLost) reportConnectionLoss(error)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = getApplication<Application>().getString(R.string.obd_not_available),
+                        ecuIdentityFromSimulation = false,
                         vinComparison = null,
                         vinModelYear = null,
                         ecuNameResponse = "",
