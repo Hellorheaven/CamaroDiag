@@ -693,4 +693,26 @@
     <string name="update_install_update">התקנת עדכון</string>
     <string name="update_version_available">גרסה זמינה: %1$s</string>
     <string name="system_language_follow_phone">השתמש בשפת הטלפון</string>
+    <string name="can_sniffer_raw_heading">פלט גולמי של מתאם CAN</string>
+    <string name="can_sniffer_export_raw">ייצוא יומן גולמי</string>
+    <string name="can_sniffer_dtc_heading">קודי תקלה OBD-II שנצפו</string>
+    <string name="connection_lost_bluetooth">חיבור Bluetooth אבד. חבר מחדש את המתאם והפעל מחדש את הפעולה.</string>
+    <string name="connection_lost_vehicle">החיבור לרכב אבד. התחבר שוב לרכב והפעל מחדש את הפעולה.</string>
+    <string name="connection_lost_usb">מתאם USB נותק. חבר אותו מחדש והפעל מחדש את הפעולה.</string>
+    <string name="connection_lost_wifi">חיבור OBD דרך Wi-Fi אבד. חבר מחדש את המתאם והפעל מחדש את הפעולה.</string>
+    <string name="connection_lost_pc_bridge">החיבור לגשר האבחון במחשב אבד. חבר אותו מחדש והפעל מחדש את הפעולה.</string>
+    <string name="live_sensor_search">חיפוש חיישנים</string>
+    <string name="live_sensor_show_all">הצגת כל החיישנים</string>
+    <string name="can_console_history">היסטוריה מאוחדת של מסוף CAN</string>
+    <string name="can_console_clear">ניקוי ההיסטוריה</string>
+    <string name="can_console_empty">עדיין אין תעבורה. נתונים שהתקבלו ונשלחו יופיעו כאן.</string>
+    <string name="can_console_tx">TX • נשלח</string>
+    <string name="can_console_rx">RX • התקבל</string>
+    <string name="can_console_system">מערכת</string>
+    <string name="can_console_input_label">מסגרת CAN או פקודת OBD</string>
+    <string name="can_console_sending">שולח…</string>
+    <string name="obd_dtc_help_unavailable">עדיין אין הנחיות אבחון מאומתות עבור קוד התקלה והרכב האלה. לפני תיקון יש לבדוק את הוראות השירות של היצרן.</string>
+    <string name="cal_expert_no_write">התכנות אינו זמין עד למימוש ואימות מנהל התקן תואם לעבודה על שולחן.</string>
+    <string name="flexfuel_preflight_write">כתיבת כיול ECU לא אומתה ונשארת מושבתת.</string>
+    <string name="status_not_implemented">טרם מומש</string>
 </resources>
