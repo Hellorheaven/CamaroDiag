@@ -208,10 +208,14 @@
     <string name="update_download_failed">ההורדה נכשלה.</string>
     <string name="update_download_invalid_signature">ההורדה או החתימה אינן תקינות. ההתקנה נחסמה; ייתכן שיהיה צורך בהתקנה מחדש באופן ידני.</string>
     <string name="update_download_complete">ההורדה הושלמה.</string>
+    <string name="update_ready_to_install">CamaroDiag – מוכן להתקנה</string>
     <string name="update_downloading">מוריד</string>
+    <string name="update_available">עדכון זמין</string>
+    <string name="update_channel_only">מוצע רק ערוץ %1$s. ערוץ Debug נשאר Debug וערוץ Release נשאר Release.</string>
     <string name="update_allow_unknown_sources">אפשר התקנות ממקור זה, חזור ולחץ על התקן.</string>
     <string name="update_install">התקן</string>
     <string name="update_download">הורד</string>
+    <string name="update_later">מאוחר יותר</string>
     <string name="vehicle_generation_label">דור %1$d</string>
     <string name="engine_llt">3.6L V6 SIDI ‏(2010–2011)</string>
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel ‏(2012–2015)</string>
@@ -610,6 +614,7 @@
     <string name="cal_vin_matches_profile">VIN של מחשב הרכב תואם לפרופיל הרכב שנבחר.</string>
     <string name="cal_vin_mismatch_detected">אי-התאמה ב-VIN — פרופיל: %1$s • ECU: %2$s</string>
     <string name="cal_vin_profile_not_set">בפרופיל הרכב שנבחר לא נשמר VIN תקין.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">שימוש ב-VIN של ECU בפרופיל הנוכחי</string>
     <string name="cal_vin_mismatch_title">זוהתה אי-התאמה ב-VIN</string>
     <string name="cal_vin_mismatch_confirmation">ה-VIN בפרופיל שנבחר הוא %1$s, אך מחשב הרכב החזיר %2$s. ייתכן שמדובר בכלי רכב שונים. צרו פרופיל נפרד כדי לשמור על הרכב שנבחר, או סנכרנו את ה-VIN רק לאחר אימות הרכב הפיזי.</string>
     <string name="cal_vin_create_vehicle">יצירת פרופיל רכב</string>
