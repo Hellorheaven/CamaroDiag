@@ -253,11 +253,16 @@ class BluetoothObdManager(context: Context) {
      * another diagnostic action to interleave adapter setup and response parsing.
      */
     suspend fun <T> withObdCommandSession(block: suspend (Obd2FeatureEngine) -> T): T {
+        val requestedEpoch = transportSessionEpoch.capture()
         check(isObdCommandChannelAvailable) {
             "No ELM/OBD-II command channel is available on the active transport."
         }
         commandSessionMutex.lock()
         try {
+            transportSessionEpoch.requireCurrent(requestedEpoch)
+            check(isObdCommandChannelAvailable) {
+                "OBD command channel disconnected while waiting for the previous operation."
+            }
             val engine = Obd2FeatureEngine(
                 ObdCommandChannel { command, timeoutMs ->
                     sendAtCommandInternal(command, timeoutMs)
@@ -458,12 +463,18 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
-    suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String =
-        withContext(Dispatchers.IO) {
+    suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String {
+        val requestedEpoch = transportSessionEpoch.capture()
+        return withContext(Dispatchers.IO) {
             commandSessionMutex.withLock {
+                transportSessionEpoch.requireCurrent(requestedEpoch)
+                check(isObdCommandChannelAvailable) {
+                    "OBD command channel unavailable after the previous operation."
+                }
                 sendAtCommandInternal(command, timeoutMs)
             }
         }
+    }
 
     private suspend fun sendAtCommandInternal(
         command: String,
