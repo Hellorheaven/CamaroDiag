@@ -3109,10 +3109,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        val activeJobs = listOfNotNull(canMonitorJob, canRequestJob)
+        connectionAttemptGeneration++
+        val activeJobs = listOfNotNull(canMonitorJob, canRequestJob, connectionAttemptJob)
+            .distinct()
+        canMonitorJob = null
         canRequestJob = null
+        connectionAttemptJob = null
         activeJobs.forEach(Job::cancel)
-        stopCanMonitor()
         if (activeJobs.isEmpty()) {
             obdManager.disconnect()
         } else {
