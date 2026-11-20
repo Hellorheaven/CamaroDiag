@@ -122,7 +122,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedSavedVehicleId.value = selectedVehiclePreference()
         _legacyVehicleImportAvailable.value = canImportLegacyVehicles()
         _vehicle.value = loadVehicleProfile()
-        _lastConnectionProfile.value = null
+        _lastConnectionProfile.value = loadLastConnectionProfile()
         _connectionMessage.value = null
         _connectionLossMessage.value = null
         _isObdScanning.value = false
@@ -324,6 +324,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadLastConnectionProfile(): SavedObdConnectionProfile? {
+        val settingsPreferences = accountVehiclePreferences()
         val transport = settingsPreferences.getString("last_connection_transport", null) ?: return null
         val adapterName = settingsPreferences.getString("last_connection_adapter", null) ?: return null
         val endpoint = settingsPreferences.getString("last_connection_endpoint", "").orEmpty()
@@ -487,7 +488,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun rememberConnectionProfile(transport: String, capabilities: AdapterCapabilities, endpoint: String) {
         val profile = SavedObdConnectionProfile(transport, capabilities.deviceName, endpoint)
         _lastConnectionProfile.value = profile
-        settingsPreferences.edit {
+        accountVehiclePreferences().edit {
             putString("last_connection_transport", profile.transport)
             putString("last_connection_adapter", profile.adapterName)
             putString("last_connection_endpoint", profile.endpoint)
@@ -562,7 +563,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (normalizedVin == _vehicle.value.vin) return
         markSavedVehicleSelectionDirty()
         _vehicle.value = _vehicle.value.copy(vin = normalizedVin)
-        settingsPreferences.edit { putString("vehicle_vin", normalizedVin) }
+        accountVehiclePreferences().edit { putString("vehicle_vin", normalizedVin) }
         invalidateLiveRecordingForVehicleChange()
         clearVehicleEvidence()
     }
