@@ -491,7 +491,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             0x5C -> "Engine oil temperature" to ((a - 40).toDouble() to "°C")
             0x5D -> "Fuel injection timing" to (((word() ?: return emptyList()) / 128.0) - 210.0 to "°")
             0x5E -> "Engine fuel rate" to ((word() ?: return emptyList()) / 20.0 to "L/h")
-            0x5F -> "Hybrid / alternate fuel system status" to (percent(a) to "%")
+            0x5F -> return raw("Emission requirements to which vehicle is designed")
             0x61 -> "Driver demand engine torque" to ((a - 125).toDouble() to "%")
             0x62 -> "Actual engine torque" to ((a - 125).toDouble() to "%")
             0x63 -> "Engine reference torque" to ((word() ?: return emptyList()).toDouble() to "Nm")
