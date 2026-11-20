@@ -769,4 +769,18 @@
     <string name="obd_sensor_cancel">Annuler</string>
     <string name="obd_sensor_not_measured">Non mesuré lors de ce diagnostic</string>
     <string name="live_selected_sensors">Capteurs affichés (%1$d/%2$d)</string>
+    <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012 : identification du calculateur (lecture seule)</string>
+    <string name="flexfuel_lfx2012_parts">Catalogue de pièces : calculateur %1$s, référence %2$s (remplace %3$s).</string>
+    <string name="flexfuel_lfx2012_parts_warning">Ces références ne prouvent pas quel calculateur équipe ce VIN et ne permettent pas de modifier sa calibration.</string>
+    <string name="flexfuel_lfx2012_calid_label">Identifiant de calibration communiqué par le calculateur : %1$s</string>
+    <string name="flexfuel_lfx2012_boot">Référence de fichier de démarrage du catalogue : %1$s (non vérifiée sur ce véhicule).</string>
+    <string name="flexfuel_lfx2012_checks">Conditions empêchant encore toute modification de calibration</string>
+    <string name="flexfuel_preflight_vehicle_missing">Aucun profil véhicule sélectionné</string>
+    <string name="flexfuel_preflight_wrong_vehicle">Véhicule différent de la Camaro LFX 2012</string>
+    <string name="flexfuel_preflight_vin">Le VIN doit être lu dans le calculateur et correspondre au véhicule enregistré</string>
+    <string name="flexfuel_preflight_ecu">La référence exacte du calculateur doit être identifiée</string>
+    <string name="flexfuel_preflight_firmware">Le micrologiciel exact du calculateur n\'est pas vérifié</string>
+    <string name="flexfuel_preflight_backup">La sauvegarde d\'origine du calculateur n\'est pas vérifiée</string>
+    <string name="flexfuel_preflight_recovery">La procédure de récupération n\'est pas vérifiée</string>
+    <string name="flexfuel_preflight_write">L\'écriture de calibration n\'est pas validée et reste désactivée</string>
 </resources>
