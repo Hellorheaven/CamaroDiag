@@ -661,4 +661,27 @@
     <string name="cal_ecu_response_addresses_label">Обнаруженные адреса ответов функционального OBD (не сопоставлены блокам)</string>
     <string name="cal_ecu_identity_limits">Эти стандартные ответы OBD не подтверждают RPO, трансмиссию, аппаратный номер блока или ОС GM. Адрес ответа не определяет блок управления. Для идентификаторов GM нужна проверенная документация именно для данного автомобиля.</string>
     <string name="dtc_vehicle_identity_required">Данные для конкретного автомобиля скрыты, поскольку VIN подключённого ЭБУ не считан или не совпадает с выбранным автомобилем. Считайте и проверьте VIN ЭБУ перед использованием этих интерпретаций.</string>
+    <string name="live_pid_oil">Давление масла (только симуляция)</string>
+    <string name="live_pid_stft_b2">Краткосрочная коррекция топлива банк 2</string>
+    <string name="live_pid_ltft_b2">Долгосрочная коррекция топлива банк 2</string>
+    <string name="live_pid_rel_tps">Относительное положение дросселя</string>
+    <string name="live_pid_cmd_tps">Заданное положение дросселя</string>
+    <string name="live_pid_abs_tps_b">Абсолютное положение дросселя B</string>
+    <string name="live_pid_abs_tps_c">Абсолютное положение дросселя C</string>
+    <string name="live_pid_app_d">Положение педали газа D</string>
+    <string name="live_pid_app_e">Положение педали газа E</string>
+    <string name="live_pid_app_f">Положение педали газа F</string>
+    <string name="live_pid_abs_load">Абсолютная нагрузка двигателя</string>
+    <string name="live_pid_ambient">Температура окружающего воздуха</string>
+    <string name="live_pid_fuel_press">Давление топлива</string>
+    <string name="live_pid_timing">Опережение зажигания</string>
+    <string name="live_pid_eq_ratio">Заданное соотношение эквивалентности</string>
+    <string name="live_pid_o2_b1s1">Напряжение датчика кислорода B1S1</string>
+    <string name="live_pid_o2_b1s2">Напряжение датчика кислорода B1S2</string>
+    <string name="live_pid_o2_b1s3">Напряжение датчика кислорода B1S3</string>
+    <string name="live_pid_o2_b1s4">Напряжение датчика кислорода B1S4</string>
+    <string name="live_pid_wbo2_b1s1">Широкополосный лямбда-зонд B1S1</string>
+    <string name="live_pid_wbo2_b1s2">Широкополосный лямбда-зонд B1S2</string>
+    <string name="live_pid_wbo2_b2s1">Широкополосный лямбда-зонд B2S1</string>
+    <string name="live_pid_wbo2_b2s2">Широкополосный лямбда-зонд B2S2</string>
 </resources>
