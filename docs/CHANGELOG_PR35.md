@@ -60,3 +60,7 @@
 - Une validation Firebase renouvelée pendant l'utilisation n'interrompt plus inutilement les diagnostics tant que la session reste autorisée.
 - Une réponse de validation de session arrivée trop tard ne peut plus remplacer une vérification plus récente.
 - Une nouvelle tentative de connexion à un adaptateur remplace la précédente, sans afficher ses résultats obsolètes.
+
+- Lors d'un changement de compte ou d'une perte de connexion, une nouvelle liaison attend maintenant la fermeture de la précédente.
+- La déconnexion du pont PC interrompt aussi une tentative de connexion encore en cours.
+- Lors d'un changement d'adaptateur, de simulateur ou de pont PC, une requête en cours dans la console CAN est arrêtée avant d'utiliser la nouvelle liaison.
