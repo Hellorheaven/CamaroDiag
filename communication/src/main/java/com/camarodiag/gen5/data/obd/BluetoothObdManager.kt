@@ -578,7 +578,7 @@ class BluetoothObdManager(context: Context) {
                     "An ELM command cannot be sent through the selected transport."
                 }
                 val out = outputStream; val inp = inputStream
-                if (out == null || inp == null || socket?.isConnected != true || socket?.isClosed == true) {
+                if (out == null || inp == null || socket?.isConnected != true) {
                     throw ObdTransportDisconnectedException("Bluetooth OBD adapter is not connected")
                 }
                 while (inp.available() > 0) {
