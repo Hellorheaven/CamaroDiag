@@ -54,6 +54,7 @@ object EcuBackupArchive {
             properties.setProperty(prefix + "second", (capture.independentRead != null).toString())
         }
         val metadata = ByteArrayOutputStream().also { properties.store(it, FORMAT) }.toByteArray()
+        require(metadata.size <= 64 * 1024) { "Manifest too large" }
         ZipOutputStream(output).use { zip ->
             fun write(name: String, bytes: ByteArray) {
                 zip.putNextEntry(ZipEntry(name))
@@ -82,12 +83,13 @@ object EcuBackupArchive {
                 require(entry.name !in files) { "Duplicate archive entry" }
                 require(files.size < 1 + 2 * MAX_ENTRIES) { "Too many archive entries" }
                 val data = ByteArrayOutputStream()
+                val entryLimit = if (entry.name == "manifest.properties") 64 * 1024 else MAX_REGION_BYTES
                 val buffer = ByteArray(8192)
                 while (true) {
                     val n = zip.read(buffer)
                     if (n < 0) break
                     total += n
-                    require(total <= MAX_ARCHIVE_BYTES && data.size() + n <= MAX_REGION_BYTES) {
+                    require(total <= MAX_ARCHIVE_BYTES && data.size() + n <= entryLimit) {
                         "Archive exceeds size limit"
                     }
                     data.write(buffer, 0, n)
