@@ -41,19 +41,28 @@ object EcuBackupArchive {
         require(captures.all { it.firstRead.size <= MAX_REGION_BYTES &&
             (it.independentRead?.size ?: 0) <= MAX_REGION_BYTES }) { "Segment too large" }
         require(captures.sumOf { it.firstRead.size.toLong() + (it.independentRead?.size?.toLong() ?: 0L) } <= MAX_ARCHIVE_BYTES) { "Archive data exceeds size limit" }
+        // Freeze mutable byte arrays before hashing and serialization. Otherwise
+        // a caller could change a ByteArray between checksum calculation and ZIP
+        // writing, producing an archive with mismatched metadata and payload.
+        val snapshots = captures.map { capture ->
+            capture.copy(
+                firstRead = capture.firstRead.copyOf(),
+                independentRead = capture.independentRead?.copyOf()
+            )
+        }
         // Reject inconsistent captures before writing any archive header or bytes.
         // In particular, two independent reads must agree, or the archive
         // would be rejected by the corresponding import validation.
-        val manifest = EcuBackupManifest.inspect(controllerLabel, createdAtUtcMillis, captures, requiredRegions)
-        val verification = EcuBackupIntegrity.verify(manifest, captures, requiredRegions)
+        val manifest = EcuBackupManifest.inspect(controllerLabel, createdAtUtcMillis, snapshots, requiredRegions)
+        val verification = EcuBackupIntegrity.verify(manifest, snapshots, requiredRegions)
         require(verification.consistent) { "Inconsistent backup captures: ${verification.problems}" }
         val properties = Properties()
         properties.setProperty("format", FORMAT)
         properties.setProperty("controller", manifest.controllerLabel.orEmpty())
         properties.setProperty("created", createdAtUtcMillis.toString())
-        properties.setProperty("count", captures.size.toString())
+        properties.setProperty("count", snapshots.size.toString())
         properties.setProperty("required", requiredRegions.joinToString(",") { it.name })
-        captures.forEachIndexed { index, capture ->
+        snapshots.forEachIndexed { index, capture ->
             val prefix = "capture.$index."
             properties.setProperty(prefix + "region", capture.region.name)
             properties.setProperty(prefix + "start", capture.startAddress.toString())
@@ -71,7 +80,7 @@ object EcuBackupArchive {
                 zip.closeEntry()
             }
             write("manifest.properties", metadata)
-            captures.forEachIndexed { index, capture ->
+            snapshots.forEachIndexed { index, capture ->
                 write("capture/$index/first.bin", capture.firstRead)
                 capture.independentRead?.let { write("capture/$index/second.bin", it) }
             }
