@@ -19,4 +19,14 @@
     <string name="tab_guide">Průvodce</string>
     <string name="tab_controls">Ovládání</string>
     <string name="tab_settings">Nastavení</string>
+    <string name="common_connect">Připojit</string>
+    <string name="common_refresh">Obnovit</string>
+    <string name="status_offline">Offline</string>
+    <string name="obd_not_available">Není k dispozici</string>
+    <string name="obd_run_full_scan">Spustit úplnou diagnostiku</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokol</string>
+    <string name="obd_dtc_title">Diagnostické chybové kódy</string>
+    <string name="obd_adapter_voltage">Napětí adaptéru</string>
+    <string name="obd_supported_pids">Podporované PIDy</string>
 </resources>
