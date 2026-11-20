@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
@@ -969,19 +970,19 @@ fun CalibrationWorkspaceScreen(
                                     color = TextMuted,
                                     fontSize = 10.sp
                                 )
-                                Row(
-                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                LazyRow(
+                                    modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Text("X", modifier = Modifier.width(48.dp), color = CamaroAmber, fontSize = 10.sp)
-                                    state.mapXAxisValues.forEach { axisValue ->
-                                        Text(
-                                            axisValue,
-                                            modifier = Modifier.width(88.dp),
+                                    item {
+                                        Text("X", modifier = Modifier.width(48.dp),
+                                            color = CamaroAmber, fontSize = 10.sp)
+                                    }
+                                    itemsIndexed(state.mapXAxisValues) { _, axisValue ->
+                                        Text(axisValue, modifier = Modifier.width(88.dp),
                                             color = CamaroAmber,
                                             fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp
-                                        )
+                                            fontSize = 10.sp)
                                     }
                                 }
                             }
@@ -990,19 +991,22 @@ fun CalibrationWorkspaceScreen(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 itemsIndexed(state.mapValues) { rowIndex, rowValues ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    LazyRow(
+                                        modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            state.mapYAxisValues.getOrNull(rowIndex) ?: "%02d".format(rowIndex),
-                                            modifier = Modifier.width(48.dp),
-                                            color = CamaroAmber,
-                                            fontSize = 10.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        rowValues.forEachIndexed { columnIndex, value ->
+                                        item {
+                                            Text(
+                                                state.mapYAxisValues.getOrNull(rowIndex)
+                                                    ?: "%02d".format(rowIndex),
+                                                modifier = Modifier.width(48.dp),
+                                                color = CamaroAmber,
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                        itemsIndexed(rowValues, key = { columnIndex, _ -> columnIndex }) { columnIndex, value ->
                                             OutlinedTextField(
                                                 value = value,
                                                 onValueChange = { onCellChange(rowIndex, columnIndex, it) },
