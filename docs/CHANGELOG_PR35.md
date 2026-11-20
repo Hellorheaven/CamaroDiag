@@ -34,3 +34,4 @@
 - Accès à CamaroDiag conditionné à la présence d'une session authentifiée ; configuration Firebase Release et Debug enregistrée.
 - Validation sur appareil et empreintes SHA Google encore nécessaires ; aucun build ni test d'authentification confirmé à ce stade.
 - Les commandes interrompues par une reconnexion rapide ne peuvent plus traiter une réponse de l'ancienne session comme celle du nouvel adaptateur, ni signaler à tort que cette nouvelle connexion est perdue.
+- Préparation de l'affichage des empreintes SHA-1/SHA-256 du certificat de signature lors d'une future publication, sans exposer les secrets de signature. Empreintes encore non récupérées.
