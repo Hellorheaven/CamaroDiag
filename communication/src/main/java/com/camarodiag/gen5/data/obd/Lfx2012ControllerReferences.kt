@@ -54,6 +54,13 @@ object Lfx2012ControllerReferences {
         return true
     }
 
+    /** Candidate E39/E39A family label, not proof of a specific physical ECU or firmware. */
+    fun hasCandidateE39FamilyLabel(ecuName: String?): Boolean =
+        ecuName?.let { name ->
+            hasMeaningfulComponent(name) &&
+                Regex("(?i)(?:^|[^A-Z0-9])E39A?(?:$|[^A-Z0-9])").containsMatchIn(name)
+        } ?: false
+
     fun describedServiceParts(): List<String> =
         listOf(currentServicePart, supersededServicePart)
 }
