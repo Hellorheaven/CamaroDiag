@@ -1347,15 +1347,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendAtCommand(request.elmCommand, 4_000L)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val rxEvent = CanConsoleHistoryEntry(
+                    val hasEcuResponse =
+                        Regex("(?i)(?:^|\\s)(?:41|43|47|49|4A|7F)(?:\\s|$)")
+                            .containsMatchIn(response) ||
+                            RawCanFrameParser.parseReceivedFrames(response).isNotEmpty()
+                    val responseEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
-                        direction = "RX",
+                        direction = if (hasEcuResponse) "RX" else "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = response.ifBlank { "—" }
+                        content = if (hasEcuResponse) {
+                            response
+                        } else {
+                            getApplication<Application>().getString(
+                                R.string.can_console_adapter_ack,
+                                response.ifBlank { "No adapter text returned" }
+                            )
+                        },
+                        succeeded = hasEcuResponse
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        consoleHistory = (current.consoleHistory + rxEvent).takeLast(300),
+                        consoleHistory = (current.consoleHistory + responseEvent).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
                 }
