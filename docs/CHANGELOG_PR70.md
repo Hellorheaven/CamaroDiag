@@ -88,3 +88,16 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - `d66f3cf` : test des nouveaux libellés pour les 30 langues.
 - **État CI** à la date de vérification : workflow PR unit tests #23 (run 44833602526), statut `pending`, aucun job disponible à ce stade ; workflows précédents annulés par les commits successifs. Le build n'est donc pas validé.
 - Couverture linguistique encore incomplète : 49 clés pour les 15 locales les moins couvertes, pour une base EN de 821 chaînes.
+
+
+## Passe du 20/11 — langue automatique, sauvegardes et contrôles CI
+- `e5cd76a`, `2f05028` : total de la taille décompressée d'une sauvegarde ZIP = données capturées + manifeste ; contrôle d'overflow et tests des limites sans fichiers volumineux.
+- `b9e7f82`, `ebcd496` : mode manuel et mode « Suivre la langue du téléphone » distincts, suppression du choix manuel à la réactivation du mode système, suivi du changement de configuration Android.
+- Traduction du nouveau choix dans les 30 langues déclarées ; tests de ressources `e1c631a`, résolution des 30 locales et repli EN `17d7a80`.
+- 150 traductions supplémentaires des libellés Bluetooth, USB, Wi-Fi et connexion dans les 15 locales de l'UE les moins couvertes, avec contrôle des 30 locales (`b19abb6`).
+- `e81e5f3` : déclenchement automatique du checkpoint Android sur les PR ; le précédent checkpoint est calculé depuis le dernier **build réussi**. Le paramètre GitHub observé est de 5 commits, malgré un défaut de 50 dans le YAML.
+- Résultat vérifié du run `44834907993` : **151 tests, 2 échecs**, couverture intégrale des locales et deux libellés bulgares absents. Le bulgare a été complété (`bb154f5`). Run `44835333996` : **151 tests, 1 échec**, uniquement la couverture intégrale des 30 langues.
+- `c673253` : CI poursuit lint et build après un échec de tests (diagnostic), mais l'étape finale conserve le statut d'échec.
+- Lint du run `44835334117` : 1 seul warning `TypographyDashes` sur la chaîne bulgare `cal_bridge_capabilities`, qui contient des identifiants de bus `HS-CAN` / `J2534-2`. `ea13192` applique une exception lint **sur cette chaîne uniquement**, sans modifier ces identifiants techniques.
+- Nouveau run Android CI `44836250219` démarré après correction ; résultat final non confirmé pendant cette passe.
+- **Non achevé :** 30 traductions intégrales (822 clés EN actuellement), builds sans avertissement, Windows et essais ECU matériels. Aucune fusion autorisée tant que les exigences ne sont pas validées.
