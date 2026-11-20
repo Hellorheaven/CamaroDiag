@@ -12,14 +12,30 @@ data class RawCanFrame(
  * "18DAF110 03 22 F1 90". Whitespace and optional 0x prefixes are accepted.
  */
 object RawCanFrameParser {
-    private val receivedFramePattern = Regex(
-        "(?i)(?<![0-9A-F])([0-9A-F]{3}|[0-9A-F]{8})\\s+((?:[0-9A-F]{2}\\s+){0,7}[0-9A-F]{2})(?![0-9A-F])"
-    )
-
     fun parseReceivedFrames(adapterOutput: String): List<RawCanFrame> =
-        receivedFramePattern.findAll(adapterOutput)
-            .mapNotNull { match -> parse(match.value.trim()) }
+        adapterOutput.lineSequence()
+            .mapNotNull(::parseAdapterFrameLine)
             .toList()
+
+    /**
+     * ELM raw-CAN output includes a DLC after the arbitration ID. Validate it and
+     * remove it: DLC is framing metadata, not the first byte of the ECU payload.
+     * Lines such as SEARCHING, OK, NO DATA and the ELM prompt are intentionally ignored.
+     */
+    private fun parseAdapterFrameLine(line: String): RawCanFrame? {
+        val tokens = line.trim()
+            .removeSuffix(">")
+            .trim()
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+        if (tokens.size < 3) return null
+        val frame = parse(tokens.first() + " " + tokens.drop(2).joinToString(" ")) ?: return null
+        val dlcToken = tokens[1]
+        if (dlcToken.length != 2 || !dlcToken.all { it.digitToIntOrNull(16) != null }) return null
+        val declaredLength = dlcToken.toInt(16)
+        if (declaredLength !in 1..8 || frame.data.size != declaredLength) return null
+        return frame
+    }
 
     fun parse(input: String): RawCanFrame? {
         val tokens = input.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
