@@ -256,3 +256,6 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Chaque fragment attend désormais le callback Android de fin d'opération GATT, y compris en mode `WRITE_TYPE_NO_RESPONSE`. Ce mode supprime l'accusé de réception ATT du périphérique, mais ne justifie pas d'empiler les appels Android avant la fin locale de l'opération.
 - Commit : `e35b426ee33f8af8225a56a3a2419aad9ac26e43`.
 - Relecture statique effectuée ; tests Gradle, build Android et essai avec OBDLink CX non exécutés.
+
+- Complément de fermeture BLE : `close()` termine maintenant explicitement les attentes de connexion, d'écriture et de négociation MTU avant de libérer la session GATT. Une fermeture externe ne laisse donc pas une écriture suspendue jusqu'à son timeout.
+- Commit : `edb2adb4529733e4f328ddfb94aa3e91aa74feae`.
