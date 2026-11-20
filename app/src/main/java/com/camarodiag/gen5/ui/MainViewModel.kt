@@ -1253,6 +1253,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("calibrationVerificationNumbers", lines(observation.cvnResponse))
                     put("respondingCanAddresses", JSONArray(observation.respondingEcuAddresses))
                     put(
+                        "responderAttribution",
+                        Lfx2012ControllerReferences
+                            .classifyResponderAttribution(observation.respondingEcuAddresses).name
+                    )
+                    // Mode 09 aggregated fields do not prove that each identifier
+                    // was returned by the same ECU, even with one responder address.
+                    put("calibrationIdCvnAttributionVerified", false)
+                    put(
                         "observedFingerprintComplete",
                         Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
                             Lfx2012ControllerReferences.ObservedIdentity(
