@@ -1213,6 +1213,71 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Reads only standardized OBD Mode 09 calibration identifiers; this is not a binary map read. */
+    /**
+     * Export SAE Mode 09 identification only; this is explicitly NOT an ECU-memory
+     * backup and never grants any permission to write calibrations.
+     */
+    fun exportEcuIdentification(destinationUri: Uri) {
+        val accountUid = authenticatedAccountUid ?: return
+        val profile = _vehicle.value
+        val observation = _calibrationWorkspace.value
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (authenticatedAccountUid != accountUid) return@launch
+                require(
+                    observation.ecuVinResponse.isNotBlank() ||
+                        observation.calibrationIdResponse.isNotBlank() ||
+                        observation.cvnResponse.isNotBlank()
+                ) { "No observed ECU identity can be exported." }
+                val missing = getApplication<Application>().getString(R.string.obd_not_available)
+                fun reported(value: String): String? = value.trim().takeIf {
+                    it.isNotBlank() && !it.equals(missing, ignoreCase = true)
+                }
+                fun lines(value: String): JSONArray = JSONArray().apply {
+                    value.lines().map(String::trim).filter(String::isNotBlank)
+                        .filterNot { it.equals(missing, ignoreCase = true) }
+                        .forEach(::put)
+                }
+                val report = JSONObject().apply {
+                    put("format", "CamaroDiag-ecu-identity-v1")
+                    put("source", "SAE-J1979-Mode09-read-only")
+                    put("exportedAtUtcMillis", System.currentTimeMillis())
+                    put("vehicleYear", profile.modelYear)
+                    put("vehicleEngine", profile.engine.rpo)
+                    put("selectedVehicleVin", profile.vin)
+                    put("observedEcuVin", reported(observation.ecuVinResponse) ?: JSONObject.NULL)
+                    put("ecuNames", lines(observation.ecuNameResponse))
+                    put("calibrationIds", lines(observation.calibrationIdResponse))
+                    put("calibrationVerificationNumbers", lines(observation.cvnResponse))
+                    put("respondingCanAddresses", JSONArray(observation.respondingEcuAddresses))
+                    put("ecuMemoryBackedUp", false)
+                    put("firmwareCompatibilityValidated", false)
+                    put("calibrationWritingPermitted", false)
+                }
+                if (authenticatedAccountUid != accountUid) return@launch
+                val output = getApplication<Application>().contentResolver
+                    .openOutputStream(destinationUri, "w")
+                    ?: error("Cannot create ECU identity report.")
+                output.use { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
+                if (authenticatedAccountUid == accountUid) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        message = getApplication<Application>()
+                            .getString(R.string.flexfuel_lfx2012_export_success)
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (authenticatedAccountUid == accountUid) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        message = getApplication<Application>()
+                            .getString(R.string.flexfuel_lfx2012_export_failed)
+                    )
+                }
+            }
+        }
+    }
+
     fun readCalibrationIdentification() {
         val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
