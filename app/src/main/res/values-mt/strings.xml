@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Indirizz IP tal-adapter</string>
     <string name="adapter_tcp_port">Port TCP (normalment 35000 jew 23)</string>
     <string name="adapter_connect_wifi">Qabbad permezz tal-Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Qabbad adapter OBD reali qabel l-iskan. Il-mod demo ma joħloqx riżultati foloz.</string>
+    <string name="obd_offline_simulation_notice">SIMULAZZJONI OFFLINE — il-VIN, CAL ID, CVN, DTCs u l-kejl hawn taħt huma sintetiċi u ma ġejjinx minn Camaro reali.</string>
+    <string name="obd_vehicle_ecu_identification">Identifikazzjoni tal-vettura / ECU</string>
+    <string name="obd_no_live_data">Ma nġabret l-ebda dejta PID diretta li tista\' tintuża.</string>
+    <string name="obd_no_dtcs">Is-servizzi standard 03/07/0A ma taw l-ebda DTC.</string>
+    <string name="obd_no_freeze_frame">L-ebda dejta ta\' qafas iffriżat li tista\' tintuża.</string>
+    <string name="obd_simulation_scope">Ambitu: dejta deterministika tad-demo biss. Ma jsir l-ebda kuntatt ma\' adapter, ECU jew vettura reali.</string>
+    <string name="vehicle_vin_hint">Daħħal il-VIN veru; ma jinħoloqx VIN tal-eżempju.</string>
+    <string name="status_not_verified">MHUX IVVERIFIKAT</string>
+    <string name="adapter_discovery_only">SKOPERTA BISS</string>
 </resources>
