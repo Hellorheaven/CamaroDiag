@@ -599,6 +599,9 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportTrace = { canTracePicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel", "*/*")) },
                     onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
+                    onPreviewPartialWrite = { start, eraseBytes, programBytes ->
+                        viewModel.previewPartialCalibrationWrite(start, eraseBytes, programBytes)
+                    },
                     onImportDefinitions = {
                         calibrationDefinitionsPicker.launch(arrayOf("text/*", "text/csv", "text/tab-separated-values", "*/*"))
                     },
