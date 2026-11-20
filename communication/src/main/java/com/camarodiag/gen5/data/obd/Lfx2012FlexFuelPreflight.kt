@@ -13,6 +13,7 @@ object Lfx2012FlexFuelPreflight {
         WRONG_VEHICLE,
         VIN_MISMATCH,
         ECU_IDENTITY_MISSING,
+        ECU_IDENTITY_UNVERIFIED,
         FIRMWARE_NOT_VERIFIED,
         ORIGINAL_BACKUP_MISSING,
         RECOVERY_NOT_VERIFIED,
@@ -55,6 +56,7 @@ object Lfx2012FlexFuelPreflight {
         if (evidence.controllerId.isNullOrBlank() || evidence.firmwareId.isNullOrBlank()) {
             problems += Status.ECU_IDENTITY_MISSING
         }
+        if (isPlaceholderIdentity(evidence.controllerId) || isPlaceholderIdentity(evidence.firmwareId)) problems += Status.ECU_IDENTITY_UNVERIFIED
         if (!evidence.verifiedFirmware) problems += Status.FIRMWARE_NOT_VERIFIED
         if (!evidence.originalBackupVerified) problems += Status.ORIGINAL_BACKUP_MISSING
         if (!evidence.recoveryVerified) problems += Status.RECOVERY_NOT_VERIFIED
@@ -65,6 +67,16 @@ object Lfx2012FlexFuelPreflight {
     /** No ECU writes are supported until a separately validated implementation exists. */
     fun canWriteCalibration(vehicle: Vehicle?, evidence: Evidence): Boolean =
         missingPreconditions(vehicle, evidence).isEmpty()
+
+    private fun isPlaceholderIdentity(value: String?): Boolean {
+        val normalized = value?.trim()?.lowercase().orEmpty()
+        return normalized.isEmpty() ||
+            normalized.startsWith("unknown") ||
+            normalized.startsWith("demo") ||
+            normalized.startsWith("sample") ||
+            normalized.startsWith("simulated") ||
+            normalized == "n/a" || normalized == "none" || normalized == "null"
+    }
 
     private fun isVin(value: String?): Boolean =
         value != null && value.length == 17 && value.all {
