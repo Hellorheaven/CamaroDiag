@@ -1086,30 +1086,70 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val captured = obdManager.captureCanMonitor(durationMs) { chunk ->
                     if (canMonitorJob === monitorJob) {
+                        // Keep the raw stream unchanged, but decode only complete lines:
+                        // Bluetooth/USB reads may split a CAN record at any character.
                         pendingChunks.append(chunk)
-                        val batch = pendingChunks.toString()
-                        pendingChunks.clear()
                         val current = _liveCanMonitorState.value
-                        val raw = (current.rawText + batch).takeLast(131_072)
-                        val event = CanConsoleHistoryEntry(
-                            id = System.nanoTime(),
-                            direction = "RX",
-                            timestampMillis = System.currentTimeMillis(),
-                            content = batch.take(4_096)
-                        )
-                        _liveCanMonitorState.value = current.copy(
-                            rawText = raw,
-                            consoleHistory = (current.consoleHistory + event).takeLast(300)
-                        )
+                        val raw = (current.rawText + chunk).takeLast(131_072)
+                        val pendingText = pendingChunks.toString()
+                        val lineEnd = maxOf(pendingText.lastIndexOf('\\n'), pendingText.lastIndexOf('\\r'))
+                        val completeBatch = if (lineEnd >= 0) {
+                            pendingText.substring(0, lineEnd + 1).also {
+                                pendingChunks.delete(0, lineEnd + 1)
+                            }
+                        } else ""
+                        val decodedFrames = RawCanFrameParser.parseReceivedFrames(completeBatch)
+                        val displayText = if (decodedFrames.isNotEmpty()) {
+                            decodedFrames.joinToString("\\n") { frame ->
+                                val id = frame.canId.toString(16).uppercase().padStart(if (frame.isExtended) 8 else 3, '0')
+                                val bytes = frame.data.joinToString(" ") {
+                                    (it.toInt() and 0xFF).toString(16).uppercase().padStart(2, '0')
+                                }
+                                "CAN ID=$id DLC=${frame.data.size} DATA=$bytes"
+                            }
+                        } else completeBatch.take(4_096)
+                        val history = if (completeBatch.isNotBlank()) {
+                            val event = CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = "RX",
+                                timestampMillis = System.currentTimeMillis(),
+                                content = displayText
+                            )
+                            (current.consoleHistory + event).takeLast(300)
+                        } else current.consoleHistory
+                        _liveCanMonitorState.value = current.copy(rawText = raw, consoleHistory = history)
                     }
                 }
                 if (canMonitorJob === monitorJob) {
                     val raw = captured.takeLast(131_072)
+                    val trailing = pendingChunks.toString()
+                    val currentBeforeReport = _liveCanMonitorState.value
+                    val trailingFrames = RawCanFrameParser.parseReceivedFrames(trailing)
+                    val trailingText = if (trailingFrames.isNotEmpty()) {
+                        trailingFrames.joinToString("\\n") { frame ->
+                            val id = frame.canId.toString(16).uppercase().padStart(if (frame.isExtended) 8 else 3, '0')
+                            val bytes = frame.data.joinToString(" ") {
+                                (it.toInt() and 0xFF).toString(16).uppercase().padStart(2, '0')
+                            }
+                            "CAN ID=$id DLC=${frame.data.size} DATA=$bytes"
+                        }
+                    } else trailing.take(4_096)
+                    val historyWithTrailing = if (trailing.isNotBlank()) {
+                        currentBeforeReport.consoleHistory + CanConsoleHistoryEntry(
+                            id = System.nanoTime(),
+                            direction = "RX",
+                            timestampMillis = System.currentTimeMillis(),
+                            content = trailingText
+                        )
+                    } else currentBeforeReport.consoleHistory
+                    pendingChunks.clear()
                     val report = CanTraceAnalyzer.analyze(
                         raw.replace("\r\n", "\n").replace('\r', '\n'),
                         "live-can-monitor.txt"
                     )
-                    val current = _liveCanMonitorState.value
+                    val current = _liveCanMonitorState.value.copy(
+                        consoleHistory = historyWithTrailing.takeLast(300)
+                    )
                     val completeEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
