@@ -737,4 +737,24 @@
     <string name="can_trace_pid_62">Werkelijk motorkoppel</string>
     <string name="can_trace_pid_63">Referentiemotorkoppel</string>
     <string name="live_pid_ethanol">Ethanolgehalte</string>
+    <string name="can_trace_flow_status_cts">Doorgaan met verzenden</string>
+    <string name="can_trace_flow_status_wait">Wachten</string>
+    <string name="can_trace_flow_status_overflow">Overloop</string>
+    <string name="can_trace_flow_status_reserved">Gereserveerde status</string>
+    <string name="can_trace_exchange_heading">UDS-verzoek-/antwoorduitwisselingen</string>
+    <string name="can_trace_exchange_completed">Voltooid</string>
+    <string name="can_trace_exchange_pending">Antwoord in afwachting (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Geen antwoord waargenomen</string>
+    <string name="can_console_raw_tx_confirm_title">Ruwe CAN-transmissie bevestigen</string>
+    <string name="can_console_raw_tx_confirm_message">Dit verzendt rechtstreeks een frame op de CAN-bus van het voertuig. Een onjuist frame kan voertuigmodules beïnvloeden. Verzend alleen als doelbus en identificatie bekend zijn.</string>
+    <string name="can_console_tx_unverified">Ruwe CAN-verzending is uitgeschakeld: er is geen echte ECU-reactie waargenomen op de alleen-lezen zendcontrole.</string>
+    <string name="can_trace_clear_filters">Filters wissen</string>
+    <string name="can_trace_filter_invalid">Ongeldige CAN-ID of gegevensprefix.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP-stroomregeling</string>
+    <string name="cal_expert_block_recovery">Voor dit exacte doel is geen herstelprocedure geverifieerd.</string>
+    <string name="cal_expert_block_driver">Er is geen gevalideerde programmeerdriver voor hardware aangesloten.</string>
+    <string name="cal_expert_identity_notice">Ingevoerde namen en bestandshashes zijn waarnemingen, geen bewijs van hardwarecompatibiliteit.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULATIE: deze ECU-identificaties zijn niet uit een echt voertuig gelezen en kunnen de firmware niet valideren.</string>
+    <string name="cal_expert_block_memory_map">Doelgeheugenindeling en beveiligde gebieden zijn niet geverifieerd.</string>
+    <string name="flexfuel_preflight_backup">De oorspronkelijke ECU-back-up is niet geverifieerd.</string>
 </resources>
