@@ -92,6 +92,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         started == accountSessionGeneration && authenticatedAccountUid != null
 
     private val _activeAccountUid = MutableStateFlow(authenticatedAccountUid)
+    val activeAccountUid: StateFlow<String?> = _activeAccountUid.asStateFlow()
 
     /**
      * Keep existing pre-authentication vehicles untouched in the legacy settings.
