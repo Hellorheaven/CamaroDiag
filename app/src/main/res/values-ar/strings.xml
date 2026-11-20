@@ -690,4 +690,15 @@
     <string name="live_pid_wbo2_b1s2">حساس لامبدا واسع النطاق B1S2</string>
     <string name="live_pid_wbo2_b2s1">حساس لامبدا واسع النطاق B2S1</string>
     <string name="live_pid_wbo2_b2s2">حساس لامبدا واسع النطاق B2S2</string>
+    <string name="about_title">حول CamaroDiag</string>
+    <string name="about_version">الإصدار المثبت: %1$s</string>
+    <string name="about_build">رقم البناء: %1$d</string>
+    <string name="about_check_updates">التحقق من التحديثات</string>
+    <string name="about_checking">جارٍ التحقق…</string>
+    <string name="about_up_to_date">CamaroDiag محدّث.</string>
+    <string name="about_update_found">يتوفر إصدار جديد.</string>
+    <string name="about_channel_update_unavailable">يوجد إصدار أحدث، لكن لم تُنشر حزمة تحديث لقناة التثبيت هذه.</string>
+    <string name="about_check_failed">تعذر التحقق من التحديثات. تحقق من اتصال الإنترنت.</string>
+    <string name="update_install_update">تثبيت التحديث</string>
+    <string name="update_version_available">الإصدار المتاح: %1$s</string>
 </resources>
