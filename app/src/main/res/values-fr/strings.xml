@@ -761,4 +761,6 @@
     <string name="update_later">Plus tard</string>
     <string name="update_ready_to_install">CamaroDiag – prêt à installer</string>
     <string name="update_version_channel">Version %1$s • %2$s</string>
+    <string name="obd_dtc_help_unavailable">Aucune aide au dépannage vérifiée n’est encore disponible pour ce code défaut et ce véhicule. Consultez les informations de réparation du constructeur.</string>
+    <string name="obd_dtc_help_close">Fermer</string>
 </resources>
