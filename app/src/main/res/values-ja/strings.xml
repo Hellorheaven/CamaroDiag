@@ -652,4 +652,27 @@
     <string name="cal_ecu_response_addresses_label">検出された機能OBD応答アドレス（ECUへの割り当てなし）</string>
     <string name="cal_ecu_identity_limits">これらの標準OBD応答では、RPO、トランスミッション、ECUハードウェア番号、GM OSは確認できません。応答アドレスだけではECUを特定できません。GM固有の識別情報には、車両別の検証済み資料が必要です。</string>
     <string name="dtc_vehicle_identity_required">接続されたECUのVINが読み取られていないか、選択した車両と一致しないため、車両固有の詳細は非表示です。これらの解釈を使用する前にECUのVINを読み取り、確認してください。</string>
+    <string name="live_pid_oil">油圧（シミュレーションのみ）</string>
+    <string name="live_pid_stft_b2">短期燃料補正 バンク2</string>
+    <string name="live_pid_ltft_b2">長期燃料補正 バンク2</string>
+    <string name="live_pid_rel_tps">相対スロットル開度</string>
+    <string name="live_pid_cmd_tps">指令スロットル開度</string>
+    <string name="live_pid_abs_tps_b">絶対スロットル開度 B</string>
+    <string name="live_pid_abs_tps_c">絶対スロットル開度 C</string>
+    <string name="live_pid_app_d">アクセルペダル位置 D</string>
+    <string name="live_pid_app_e">アクセルペダル位置 E</string>
+    <string name="live_pid_app_f">アクセルペダル位置 F</string>
+    <string name="live_pid_abs_load">絶対エンジン負荷</string>
+    <string name="live_pid_ambient">外気温</string>
+    <string name="live_pid_fuel_press">燃料圧力</string>
+    <string name="live_pid_timing">点火進角</string>
+    <string name="live_pid_eq_ratio">指令当量比</string>
+    <string name="live_pid_o2_b1s1">酸素センサー B1S1 電圧</string>
+    <string name="live_pid_o2_b1s2">酸素センサー B1S2 電圧</string>
+    <string name="live_pid_o2_b1s3">酸素センサー B1S3 電圧</string>
+    <string name="live_pid_o2_b1s4">酸素センサー B1S4 電圧</string>
+    <string name="live_pid_wbo2_b1s1">広帯域ラムダセンサー B1S1</string>
+    <string name="live_pid_wbo2_b1s2">広帯域ラムダセンサー B1S2</string>
+    <string name="live_pid_wbo2_b2s1">広帯域ラムダセンサー B2S1</string>
+    <string name="live_pid_wbo2_b2s2">広帯域ラムダセンサー B2S2</string>
 </resources>
