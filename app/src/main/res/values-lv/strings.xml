@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Ievadiet īsto VIN; parauga VIN netiek ģenerēts.</string>
     <string name="status_not_verified">NAV PĀRBAUDĪTS</string>
     <string name="adapter_discovery_only">TIKAI ATKLĀŠANA</string>
+    <string name="can_sniffer_raw_heading">CAN adaptera neapstrādātā izvade</string>
+    <string name="can_sniffer_export_raw">Eksportēt neapstrādāto žurnālu</string>
+    <string name="can_sniffer_dtc_heading">Novērotie OBD-II kļūdu kodi</string>
+    <string name="connection_lost_bluetooth">Bluetooth savienojums pārtrūka. Savienojiet adapteri atkārtoti un sāciet darbību no jauna.</string>
+    <string name="connection_lost_vehicle">Savienojums ar transportlīdzekli pārtrūka. Savienojiet to atkārtoti un sāciet darbību no jauna.</string>
+    <string name="connection_lost_usb">USB adapters tika atvienots. Pievienojiet to atkārtoti un sāciet darbību no jauna.</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi savienojums pārtrūka. Savienojiet adapteri atkārtoti un sāciet darbību no jauna.</string>
+    <string name="connection_lost_pc_bridge">Savienojums ar datora diagnostikas tiltu pārtrūka. Savienojiet tiltu atkārtoti un sāciet darbību no jauna.</string>
+    <string name="live_sensor_search">Meklēt sensorus</string>
+    <string name="live_sensor_show_all">Rādīt visus sensorus</string>
+    <string name="can_console_history">Vienota CAN konsoles vēsture</string>
+    <string name="can_console_clear">Notīrīt vēsturi</string>
+    <string name="can_console_empty">Pagaidām nav datu plūsmas. Saņemtie un nosūtītie dati parādīsies šeit.</string>
+    <string name="can_console_tx">TX • NOSŪTĪTS</string>
+    <string name="can_console_rx">RX • SAŅEMTS</string>
+    <string name="can_console_system">SISTĒMA</string>
+    <string name="can_console_input_label">CAN kadrs vai OBD komanda</string>
+    <string name="can_console_sending">Nosūta…</string>
+    <string name="obd_dtc_help_unavailable">Šim kļūdas kodam un transportlīdzeklim vēl nav pārbaudītu diagnostikas norādījumu. Pirms remonta skatiet ražotāja servisa informāciju.</string>
+    <string name="cal_expert_no_write">Programmēšana nav pieejama, kamēr nav izstrādāts un pārbaudīts saderīgs stenda draiveris.</string>
+    <string name="flexfuel_preflight_write">ECU kalibrācijas rakstīšana nav validēta un paliek atspējota.</string>
+    <string name="status_not_implemented">NAV ĪSTENOTS</string>
 </resources>
