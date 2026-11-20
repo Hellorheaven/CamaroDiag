@@ -20,8 +20,8 @@ class ElmUsbTransport(private val context: Context) {
     private val usbManager =
         context.getSystemService(Context.USB_SERVICE) as UsbManager
 
-    private var port: UsbSerialPort? = null
-    private var connection: android.hardware.usb.UsbDeviceConnection? = null
+    @Volatile private var port: UsbSerialPort? = null
+    @Volatile private var connection: android.hardware.usb.UsbDeviceConnection? = null
     @Volatile private var connectionLost = false
 
     val isConnected: Boolean
@@ -118,9 +118,14 @@ class ElmUsbTransport(private val context: Context) {
     }
 
     fun read(buffer: ByteArray, timeoutMs: Int): Int {
-        val activePort = port ?: return -1
+        val activePort = port ?: run {
+            connectionLost = true
+            return -1
+        }
         return try {
-            activePort.read(buffer, timeoutMs)
+            activePort.read(buffer, timeoutMs).also { count ->
+                if (count < 0) connectionLost = true
+            }
         } catch (error: java.io.IOException) {
             connectionLost = true
             throw error
@@ -147,11 +152,11 @@ class ElmUsbTransport(private val context: Context) {
 /** TCP transport for Wi-Fi ELM327 adapters; common defaults are configurable by the caller. */
 class ElmWifiTransport {
 
-    private var socket: Socket? = null
+    @Volatile private var socket: Socket? = null
     @Volatile private var connectionLost = false
 
     val isConnected: Boolean
-        get() = socket?.let { it.isConnected && !it.isClosed && !it.isInputShutdown && !connectionLost } == true
+        get() = socket?.let { it.isConnected && !it.isClosed && !it.isInputShutdown && !it.isOutputShutdown && !connectionLost } == true
 
     suspend fun connect(
         host: String,
@@ -187,9 +192,14 @@ class ElmWifiTransport {
     }
 
     fun read(buffer: ByteArray): Int {
-        val activeSocket = socket ?: return -1
+        val activeSocket = socket ?: run {
+            connectionLost = true
+            return -1
+        }
         return try {
-            activeSocket.getInputStream().read(buffer)
+            activeSocket.getInputStream().read(buffer).also { count ->
+                if (count < 0) connectionLost = true
+            }
         } catch (timeout: java.net.SocketTimeoutException) {
             // A read timeout is normal while waiting for the ELM prompt.
             throw timeout
