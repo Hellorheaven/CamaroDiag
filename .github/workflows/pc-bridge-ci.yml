@@ -274,7 +274,10 @@ jobs:
 
             dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --runtime $variant.Runtime --self-contained true --output $output -warnaserror "-p:Version=0.0.0" "-p:AssemblyVersion=0.0.0.0" "-p:FileVersion=0.0.0.0"
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
-            if (-not (Test-Path (Join-Path $output 'CamaroDiag.J2534Bridge.exe'))) { throw "Bridge missing from $output" }
+            $publishedExe = Join-Path $output 'CamaroDiag.J2534Bridge.exe'
+            if (-not (Test-Path $publishedExe)) { throw "Bridge missing from $output" }
+            & $publishedExe --self-test
+            if ($LASTEXITCODE -ne 0) { throw "$($variant.Arch) published bridge self-tests failed" }
 
             $outputName = "CamaroDiag-J2534-Bridge-Setup-debug-pr$env:PR_NUMBER-$($variant.Arch)"
             $installerLog = Join-Path $PWD "dist\$($variant.Name)-installer.log"
