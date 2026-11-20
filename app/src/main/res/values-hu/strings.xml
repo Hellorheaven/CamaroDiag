@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Diagnosztikai hibakódok</string>
     <string name="obd_adapter_voltage">Adapter feszültsége</string>
     <string name="obd_supported_pids">Támogatott PID-ek</string>
+    <string name="obd_ecu_name">ECU neve</string>
+    <string name="obd_none_identified">Nincs azonosított</string>
+    <string name="obd_data_unavailable">Az adat nem érhető el</string>
+    <string name="obd_returned_live_data">Visszaérkezett élő adatok</string>
+    <string name="obd_pending">Függőben</string>
+    <string name="obd_permanent">Állandó</string>
+    <string name="obd_confirmed">Megerősített</string>
+    <string name="obd_freeze_frame">Kimerevített adatok</string>
+    <string name="obd_raw_scan_log">Nyers vizsgálati napló</string>
+    <string name="obd_powertrain_ecm">Hajtáslánc / ECM</string>
 </resources>
