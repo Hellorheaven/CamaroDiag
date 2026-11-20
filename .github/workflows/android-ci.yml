@@ -30,6 +30,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
     outputs:
+      validated_sha: ${{ steps.resolve_revision.outputs.sha }}
       android_changed: ${{ steps.android_changes.outputs.android_changed }}
       current_android_changed: ${{ steps.android_changes.outputs.current_android_changed }}
       build_required: ${{ steps.checkpoint.outputs.build_required }}
@@ -42,6 +43,11 @@ jobs:
         with:
           ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      - name: Capture exact checked-out revision
+        id: resolve_revision
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Detect Android-relevant changes
         id: android_changes
@@ -198,7 +204,7 @@ jobs:
       - name: Checkout requested validation commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
+          ref: ${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
@@ -314,7 +320,7 @@ jobs:
       - name: Checkout the same validation revision
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
+          ref: ${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
