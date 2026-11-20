@@ -696,6 +696,9 @@
     <string name="can_sniffer_stn_filter_notice">Sur les adaptateurs STN, les filtres temporaires sont effacés pour la capture brute puis le filtrage OBD automatique est réactivé. Les filtres personnalisés définis par un autre logiciel ne sont pas restaurés.</string>
     <string name="connection_lost_bluetooth">Connexion Bluetooth perdue. Veuillez reconnecter l’adaptateur et relancer l’opération.</string>
     <string name="connection_lost_vehicle">Connexion avec le véhicule perdue. Veuillez vous reconnecter et relancer l’opération.</string>
+    <string name="connection_lost_usb">Connexion USB perdue. Rebranchez l’adaptateur et relancez l’opération.</string>
+    <string name="connection_lost_wifi">Connexion Wi-Fi OBD perdue. Reconnectez l’adaptateur et relancez l’opération.</string>
+    <string name="connection_lost_pc_bridge">Connexion au pont de diagnostic PC perdue. Reconnectez le pont PC et relancez l’opération.</string>
     <string name="can_sniffer_direction_all">Tout</string>
     <string name="can_sniffer_direction_rx">RX</string>
     <string name="can_sniffer_direction_tx">TX</string>
