@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SZIMULÁCIÓ: ezeket az ECU-azonosítókat nem valós járműből olvasták ki, ezért nem igazolják annak firmware-ét.</string>
     <string name="cal_expert_block_memory_map">A cél memóriaelrendezése és védett területei nincsenek ellenőrizve.</string>
     <string name="flexfuel_preflight_backup">Az eredeti ECU-mentés nincs ellenőrizve.</string>
+    <string name="cal_expert_title">Szakértői mód — ECU próbapadon / chip</string>
+    <string name="cal_expert_expand">Szakértői mód beállítása</string>
+    <string name="cal_expert_collapse">Szakértői beállítások elrejtése</string>
+    <string name="cal_expert_family">Vezérlőcsalád (E39 vagy E39A)</string>
+    <string name="cal_expert_chip">Megfigyelt chipjelölés</string>
+    <string name="cal_expert_programmer">Próbapadi programozó / interfész</string>
+    <string name="cal_expert_access_title">Hozzáférési mód</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Külső memória, eltávolított chip</string>
+    <string name="cal_expert_region_title">Memóriaterület</string>
+    <string name="cal_expert_region_pflash">MCU belső program-flash</string>
+    <string name="cal_expert_region_dflash">MCU adat-flash</string>
+    <string name="cal_expert_region_eeprom">Külső EEPROM</string>
+    <string name="cal_expert_blockers">Fennmaradó szakértői ellenőrzések</string>
+    <string name="cal_expert_block_controller">Ellenőrizze a pontos vezérlőcsaládot (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Azonosítsa az MCU vagy memóriachip fizikai jelölését.</string>
+    <string name="cal_expert_block_programmer">Azonosítson kompatibilis próbapadi programozót.</string>
+    <string name="cal_expert_block_image_missing">Importáljon nem üres firmware-képet.</string>
+    <string name="cal_expert_block_image_format">Ehhez az előkészítéshez nyers bináris fájl szükséges.</string>
 </resources>
