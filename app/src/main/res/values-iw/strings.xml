@@ -692,4 +692,5 @@
     <string name="about_check_failed">לא ניתן לבדוק עדכונים. יש לבדוק את החיבור לאינטרנט.</string>
     <string name="update_install_update">התקנת עדכון</string>
     <string name="update_version_available">גרסה זמינה: %1$s</string>
+    <string name="system_language_follow_phone">השתמש בשפת הטלפון</string>
 </resources>
