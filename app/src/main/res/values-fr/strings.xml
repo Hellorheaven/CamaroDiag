@@ -743,4 +743,14 @@
     <string name="can_console_input_label">Trame CAN ou commande OBD</string>
     <string name="can_console_input_hint">Trame brute : 7E0 02 01 0C ou 18DAF110 03 22 F1 90 • OBD : 01 0C</string>
     <string name="can_console_sending">Envoi vers l’interface connectée…</string>
+
+    <string name="can_console_history">Historique unique de la console CAN</string>
+    <string name="can_console_clear">Effacer l’historique</string>
+    <string name="can_console_empty">Aucun trafic pour le moment. Les données reçues et envoyées apparaîtront ici.</string>
+    <string name="can_console_tx">TX • ENVOYÉ</string>
+    <string name="can_console_rx">RX • REÇU</string>
+    <string name="can_console_system">SYSTÈME</string>
+    <string name="can_console_input_label">Trame ou commande OBD</string>
+    <string name="can_console_input_hint">Trame CAN : 7E0 02 01 0C • Requête OBD : 01 0C</string>
+    <string name="can_console_sending">Envoi en cours…</string>
 </resources>
