@@ -19,6 +19,7 @@ import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
+import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
@@ -2219,6 +2220,72 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 storedFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = getApplication<Application>().getString(R.string.msg_cal_comparison_failed)
+                )
+            }
+        }
+    }
+
+    /**
+     * Calculates a read-only preview of physical erase-sector impact.
+     * Geometry is user supplied and remains UNVERIFIED, even when the calculation succeeds.
+     */
+    fun previewPartialCalibrationWrite(
+        regionStartAddress: Long,
+        eraseBlockBytes: Int,
+        programBlockBytes: Int
+    ) {
+        val ownerGeneration = accountSessionGeneration
+        viewModelScope.launch(Dispatchers.IO) {
+            val snapshot = _calibrationWorkspace.value
+            try {
+                require(snapshot.inspectionFormat == "RAW_BINARY" &&
+                    snapshot.comparisonFilePath != null) { "Two raw BIN files are required." }
+                val original = File(
+                    snapshot.activeFilePath ?: snapshot.importedFilePath
+                    ?: error("No original image is available.")
+                )
+                val modified = File(snapshot.comparisonFilePath)
+                require(original.isFile && modified.isFile &&
+                    original.length() in 1..(32L * 1024 * 1024) &&
+                    modified.length() in 1..(32L * 1024 * 1024)
+                ) { "Unsupported or missing ECU image." }
+                val originalBytes = original.readBytes()
+                val modifiedBytes = modified.readBytes()
+                val plan = EcuPartialWritePlanner.preview(
+                    EcuPartialWritePlanner.Layout(
+                        regionStartAddress = regionStartAddress,
+                        regionSize = originalBytes.size.toLong(),
+                        eraseBlockBytes = eraseBlockBytes,
+                        programBlockBytes = programBlockBytes,
+                        mapVerifiedForTargetEcu = false
+                    ),
+                    originalBytes,
+                    modifiedBytes
+                )
+                if (!isCurrentAccountGeneration(ownerGeneration)) return@launch
+                if (_calibrationWorkspace.value.comparisonFilePath != snapshot.comparisonFilePath ||
+                    _calibrationWorkspace.value.importedFilePath != snapshot.importedFilePath
+                ) return@launch
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    partialWriteSummary = getApplication<Application>().getString(
+                        R.string.cal_expert_patch_summary,
+                        plan.changedBytes,
+                        plan.affectedSectors.size
+                    ),
+                    partialWriteChangedBytes = plan.changedBytes,
+                    partialWriteSectorAddresses = plan.affectedSectors.take(16).map {
+                        "0x" + it.absoluteAddress.toString(16).uppercase()
+                    }
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (!isCurrentAccountGeneration(ownerGeneration)) return@launch
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    partialWriteSummary = getApplication<Application>()
+                        .getString(R.string.cal_expert_patch_invalid),
+                    partialWriteChangedBytes = null,
+                    partialWriteSectorAddresses = emptyList()
                 )
             }
         }
