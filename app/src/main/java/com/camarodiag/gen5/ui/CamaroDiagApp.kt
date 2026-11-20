@@ -99,6 +99,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
     GUIDE("Guide", "Guide", R.string.tab_guide),
     CONTROL("Controls", "Pilotage", R.string.tab_controls),
+    ABOUT("About", "À propos", R.string.about_title),
     SETTINGS("Settings", "Réglages", R.string.tab_settings)
 }
 
@@ -373,6 +374,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
+                        DiagTab.ABOUT,
                         DiagTab.SETUP,
                         DiagTab.ADAPTER
                     ),
@@ -397,7 +399,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
-                        DiagTab.CONTROL
+                        DiagTab.CONTROL,
+                        DiagTab.ABOUT
                     ).forEach { tab ->
                         DropdownMenuItem(
                             text = {
@@ -537,6 +540,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.ABOUT -> LazyColumn {
+                    item { AboutUpdateCard() }
+                }
                 DiagTab.OBD_SCAN -> ObdScanScreen(
                     report = obdScanReport,
                     isScanning = isObdScanning,
@@ -2398,9 +2404,6 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
-        item {
-            AboutUpdateCard()
         }
     }
 }
