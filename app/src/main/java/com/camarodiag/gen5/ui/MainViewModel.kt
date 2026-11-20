@@ -1324,9 +1324,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentState.isCapturing ||
             canMonitorJob?.isActive == true
         ) {
-            _liveCanMonitorState.value = currentState.copy(
-                message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
-            )
+            val message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            appendCanConsoleSystemEvent(message, succeeded = false)
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
         }
         // Claim the request slot synchronously before dispatching to IO. A lazy job lets
