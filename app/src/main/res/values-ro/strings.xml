@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULARE: aceste identificatoare ECU nu au fost citite de pe un vehicul real și nu pot valida firmware-ul acestuia.</string>
     <string name="cal_expert_block_memory_map">Harta memoriei țintă și regiunile protejate nu sunt verificate.</string>
     <string name="flexfuel_preflight_backup">Copia de rezervă originală a ECU nu a fost verificată.</string>
+    <string name="cal_expert_title">Mod expert — ECU pe banc / cip</string>
+    <string name="cal_expert_expand">Configurează modul expert</string>
+    <string name="cal_expert_collapse">Ascunde configurarea expert</string>
+    <string name="cal_expert_family">Familie controler (E39 sau E39A)</string>
+    <string name="cal_expert_chip">Marcaj observat pe cip</string>
+    <string name="cal_expert_programmer">Programator de banc / interfață</string>
+    <string name="cal_expert_access_title">Metodă de acces</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Memorie externă, cip demontat</string>
+    <string name="cal_expert_region_title">Regiune de memorie</string>
+    <string name="cal_expert_region_pflash">Memorie flash internă de program MCU</string>
+    <string name="cal_expert_region_dflash">Memorie flash de date MCU</string>
+    <string name="cal_expert_region_eeprom">EEPROM externă</string>
+    <string name="cal_expert_blockers">Verificări expert restante</string>
+    <string name="cal_expert_block_controller">Verifică familia exactă a controlerului (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identifică marcajul fizic al MCU sau al cipului de memorie.</string>
+    <string name="cal_expert_block_programmer">Identifică un programator de banc compatibil.</string>
+    <string name="cal_expert_block_image_missing">Importă o imagine firmware nevidă.</string>
+    <string name="cal_expert_block_image_format">Pentru această pregătire este necesar un fișier binar brut.</string>
 </resources>
