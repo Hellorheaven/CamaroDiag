@@ -147,10 +147,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isJ2534BridgeConnecting = false,
             isJ2534BridgeConnected = false
         )
-        val messageId = if (_lastConnectionProfile.value?.transport.equals("bluetooth", ignoreCase = true)) {
-            R.string.connection_lost_bluetooth
-        } else {
-            R.string.connection_lost_vehicle
+        val messageId = when (obdManager.currentTransportKind) {
+            "BLUETOOTH", "BLE" -> R.string.connection_lost_bluetooth
+            "USB" -> R.string.connection_lost_usb
+            "WIFI" -> R.string.connection_lost_wifi
+            "J2534_BRIDGE" -> R.string.connection_lost_pc_bridge
+            else -> R.string.connection_lost_vehicle
         }
         _connectionLossMessage.value = getApplication<Application>().getString(messageId)
         // Reset the physical transport too; USB/Wi-Fi availability otherwise remains optimistic.
