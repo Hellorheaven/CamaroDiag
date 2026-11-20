@@ -76,6 +76,41 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun doesNotConfuseCanHeaderSupportWithPhysicalTransmitCapability() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "ELM327 Bluetooth",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "ELM327 v1.5",
+            stiResp = "?",
+            atalResp = "OK",
+            stp61Resp = "?",
+            headersResp = "OK",
+            protocolResp = "OK"
+        )
+
+        assertTrue(capabilities.supportsCanHeaders)
+        assertFalse(capabilities.supportsCanTransmit)
+    }
+
+    @Test
+    fun enablesCanTransmitOnlyAfterARealStandardObdResponse() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "ELM327 Bluetooth",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "ELM327 v1.5",
+            stiResp = "?",
+            atalResp = "OK",
+            stp61Resp = "?",
+            headersResp = "OK",
+            protocolResp = "OK",
+            transmitProbeResp = "SEARCHING...\\r\\n7E8 06 41 00 BE 3E B8 13"
+        )
+
+        assertTrue(capabilities.supportsCanHeaders)
+        assertTrue(capabilities.supportsCanTransmit)
+    }
+
+    @Test
     fun genericElmCloneCanUseStandardCanWithoutClaimingUdsCapabilities() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "ELM327 Bluetooth",
@@ -156,6 +191,7 @@ class CamaroUdsProtocolTest {
         val adapter = AdapterCapabilities()
         assertEquals(AdapterTier.DISCONNECTED, adapter.tier)
         assertFalse(adapter.supportsCanHeaders)
+        assertFalse(adapter.supportsCanTransmit)
         assertFalse(adapter.supportsLongFrames)
         assertFalse(adapter.supportsSwCan)
     }
