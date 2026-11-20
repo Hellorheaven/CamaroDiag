@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Vikakoodit</string>
     <string name="obd_adapter_voltage">Sovittimen jännite</string>
     <string name="obd_supported_pids">Tuetut PID-tunnukset</string>
+    <string name="obd_ecu_name">ECU:n nimi</string>
+    <string name="obd_none_identified">Ei tunnistettuja</string>
+    <string name="obd_data_unavailable">Tietoja ei saatavilla</string>
+    <string name="obd_returned_live_data">Vastaanotetut reaaliaikatiedot</string>
+    <string name="obd_pending">Odottava</string>
+    <string name="obd_permanent">Pysyvä</string>
+    <string name="obd_confirmed">Vahvistettu</string>
+    <string name="obd_freeze_frame">Pysäytyskuva</string>
+    <string name="obd_raw_scan_log">Raakaskannausloki</string>
+    <string name="obd_powertrain_ecm">Voimansiirto / ECM</string>
 </resources>
