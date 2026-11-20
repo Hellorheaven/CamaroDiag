@@ -8,14 +8,16 @@ internal object ObdTransportConnectionState {
         activeTransport: String,
         classicSocketConnected: Boolean = false,
         classicSocketClosed: Boolean = true,
-        bleConnected: Boolean = false
+        bleConnected: Boolean = false,
+        usbConnected: Boolean = false,
+        wifiConnected: Boolean = false
     ): Boolean {
         if (isDemoMode || isSimulationActive) return false
         return when (activeTransport) {
             "BLUETOOTH" -> classicSocketConnected && !classicSocketClosed
             "BLE" -> bleConnected
-            // USB and Wi-Fi report physical disconnects through read/write failures.
-            "USB", "WIFI" -> true
+            "USB" -> usbConnected
+            "WIFI" -> wifiConnected
             else -> false
         }
     }
