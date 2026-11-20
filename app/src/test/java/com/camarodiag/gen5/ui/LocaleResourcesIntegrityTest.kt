@@ -202,4 +202,21 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    /** Offline/simulation warnings must be explicit in every advertised language. */
+    @Test fun safetyCriticalOfflineAndUnverifiedLabelsExistInEveryLocale() {
+        val keys = setOf(
+            "obd_connect_adapter_notice", "obd_offline_simulation_notice",
+            "obd_vehicle_ecu_identification", "obd_no_live_data",
+            "obd_no_dtcs", "obd_no_freeze_frame", "obd_simulation_scope",
+            "vehicle_vin_hint", "status_not_verified", "adapter_discovery_only"
+        )
+        for (locale in locales) {
+            val translated = strings(locale)
+            assertTrue("Missing simulation/safety labels in $locale: ${keys - translated.keys}",
+                translated.keys.containsAll(keys))
+            assertTrue("Empty simulation/safety label in $locale",
+                keys.all { translated.getValue(it).isNotBlank() })
+        }
+    }
+
 }
