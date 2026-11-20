@@ -741,4 +741,5 @@
     <string name="can_console_input_hint">CAN frame: 7E0 02 01 0C • OBD request: 01 0C</string>
     <string name="can_console_sending">Sending…</string>
 
+    <string name="can_console_adapter_ack">Adapter acknowledgement (not an ECU RX frame): %1$s</string>
 </resources>
