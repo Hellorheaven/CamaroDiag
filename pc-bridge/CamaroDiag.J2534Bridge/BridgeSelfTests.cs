@@ -21,6 +21,7 @@ internal static class BridgeSelfTests
         Assert(BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("172.16.0.1")), "172.16 LAN");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("172.15.255.255")), "172 public edge");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("8.8.8.8")), "Public IPv4 denied");
+        Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("100.64.0.10")), "Carrier-grade NAT denied");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("2001:4860:4860::8888")), "Public IPv6 denied");
 
         using (var valid = JsonDocument.Parse("{\"payloadHex\":\"22 F1 90\",\"requestCanId\":\"0x7e0\"}"))
