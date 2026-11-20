@@ -24,6 +24,7 @@ import com.camarodiag.gen5.data.obd.toDiagnosticDtc
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.ObdTransportFailurePolicy
+import com.camarodiag.gen5.data.obd.ObdSupersededSessionException
 import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
@@ -130,6 +131,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun reportConnectionLoss(error: Throwable) {
+        // An operation from an earlier connection may fail after a new one
+        // succeeds. Never tear down the replacement adapter for that old error.
+        if (error is ObdSupersededSessionException) return
         if (!ObdTransportFailurePolicy.isConnectionLoss(error)) return
         stopCanMonitor()
         canRequestJob?.cancel()
