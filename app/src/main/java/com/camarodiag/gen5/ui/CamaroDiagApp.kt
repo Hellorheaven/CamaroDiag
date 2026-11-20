@@ -163,6 +163,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
     val savedVehicles by viewModel.savedVehicles.collectAsState()
+    val accountUid by viewModel.activeAccountUid.collectAsState()
     val legacyVehicleImportAvailable by viewModel.legacyVehicleImportAvailable.collectAsState()
     val selectedSavedVehicleId by viewModel.selectedSavedVehicleId.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
@@ -526,6 +527,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     isStreaming = isStreaming,
                     recording = liveRecording,
                     telemetryMessage = liveTelemetryMessage,
+                    accountUid = accountUid,
                     vehicleIdentity = selectedSavedVehicleId?.let { "garage_$it" }
                         ?: vehicle.vin.trim().uppercase(Locale.ROOT)
                             .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
@@ -567,6 +569,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     isConnected = adapter.tier != AdapterTier.DISCONNECTED &&
                         !adapter.deviceName.contains("Demo", ignoreCase = true),
                     vehicle = vehicle,
+                    accountUid = accountUid,
                     savedVehicleId = selectedSavedVehicleId,
                     onRunScan = { viewModel.runFullObdScan() }
                 )
@@ -1162,6 +1165,7 @@ fun LiveDataScreen(
     recording: LiveRecordingState,
     telemetryMessage: String?,
     vehicleIdentity: String?,
+    accountUid: String?,
     catalogSignals: List<LiveSensorDefinition>,
     onToggleStream: () -> Unit,
     onToggleUnits: () -> Unit,
@@ -1172,7 +1176,7 @@ fun LiveDataScreen(
     val preferences = remember(context) {
         context.getSharedPreferences("live_sensor_selection", android.content.Context.MODE_PRIVATE)
     }
-    val storageKey = vehicleIdentity?.let { "vehicle_$it" }
+    val storageKey = SensorSelectionScope.key(accountUid, vehicleIdentity)
     val storedSelection = remember(storageKey, preferences) {
         storageKey?.let { key ->
             preferences.getString(key, null)?.split(",")?.filter(String::isNotBlank)?.toSet()
