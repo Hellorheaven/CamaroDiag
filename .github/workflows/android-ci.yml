@@ -1,4 +1,5 @@
 name: Android CI
+# Force one complete validation after the transport compile fix; normal draft builds remain checkpointed.
 
 on:
   pull_request:
