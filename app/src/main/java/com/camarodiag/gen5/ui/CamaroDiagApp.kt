@@ -1916,6 +1916,11 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
         val explanation = if (mayApply) {
             CamaroDtcCatalog.find(selected.code.substringBefore('-'), vehicle)
         } else null
+        // GM monitor details are shown only for an identified, matching vehicle/ECU.
+        val gmMonitor = if (mayApply) {
+            GmEngineMonitorCatalog.find(selected.code.substringBefore('-'), vehicle)
+        } else null
+        val gmSourceLabel = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
         AlertDialog(
             onDismissRequest = { selectedDtc = null },
             title = { Text(selected.code) },
@@ -1923,7 +1928,7 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(localizedDtcDescription(selected))
                     if (explanation == null) {
-                        Text(stringResource(R.string.obd_dtc_help_unavailable))
+                        if (gmMonitor == null) Text(stringResource(R.string.obd_dtc_help_unavailable))
                         if (!mayApply) Text(stringResource(R.string.dtc_vehicle_identity_required))
                     } else {
                         Text(if (isFrench) explanation.meaningFr else explanation.meaningEn)
@@ -1939,6 +1944,23 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                         }
                         val applicability = if (isFrench) explanation.applicabilityFr else explanation.applicabilityEn
                         if (!applicability.isNullOrBlank()) Text(applicability, color = WarnRed)
+                    }
+                    if (gmMonitor != null) {
+                        HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
+                        Text(stringResource(R.string.dtc_gm_monitor_title, gmSourceLabel),
+                            fontWeight = FontWeight.Bold, color = CamaroAmber)
+                        Text(if (isFrench) gmMonitor.componentFr else gmMonitor.componentEn,
+                            fontWeight = FontWeight.SemiBold)
+                        Text(if (isFrench) gmMonitor.strategyFr else gmMonitor.strategyEn)
+                        Text(stringResource(R.string.dtc_gm_monitor_criteria,
+                            if (isFrench) gmMonitor.malfunctionCriteriaFr else gmMonitor.malfunctionCriteriaEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_enable,
+                            if (isFrench) gmMonitor.enableConditionsFr else gmMonitor.enableConditionsEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_failure,
+                            if (isFrench) gmMonitor.failureCriteriaFr else gmMonitor.failureCriteriaEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_mil, gmMonitor.milClassification))
+                        Text(stringResource(R.string.dtc_gm_monitor_source, gmSourceLabel, gmMonitor.sourcePage),
+                            color = TextMuted, fontSize = 10.sp)
                     }
                 }
             },
@@ -1996,93 +2018,13 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                             Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
                         }
                         Text(localizedDtcDescription(dtc))
-                        val moduleCatalogue = DtcCatalogRegistry.catalogueFor(dtc.module, vehicle)
-                        val mayApplyVehicleSpecific = DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, dtc.module, ecuVinComparison)
-                        val applicabilityNotice = if (mayApplyVehicleSpecific) {
-                            CamaroDtcCatalog.applicabilityNotice(dtc.code.substringBefore('-'), vehicle)
-                        } else {
-                            null
-                        }
-                        if (applicabilityNotice != null) {
-                            Text(
-                                if (isFrench) applicabilityNotice.first else applicabilityNotice.second,
-                                color = WarnRed,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp
+                        val mayApplyVehicleSpecific =
+                            DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(
+                                vehicle, dtc.module, ecuVinComparison
                             )
-                        }
-                        else if (!mayApplyVehicleSpecific) {
-                            Text(
-                                stringResource(R.string.dtc_vehicle_identity_required),
-                                color = WarnRed,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        if (!moduleCatalogue.hasVehicleSpecificDefinitions) {
-                            Text(
-                                if (isFrench) moduleCatalogue.noteFr else moduleCatalogue.noteEn,
-                                color = TextMuted,
-                                fontSize = 11.sp
-                            )
-                        }
-                        val vehicleExplanation = if (mayApplyVehicleSpecific) {
-                            CamaroDtcCatalog.find(dtc.code.substringBefore('-'), vehicle)
-                        } else {
-                            null
-                        }
-                        if (vehicleExplanation != null) {
-                            HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
-                            Text(stringResource(R.string.dtc_vehicle_interpretation), fontWeight = FontWeight.Bold, color = CamaroAmber)
-                            Text(if (isFrench) vehicleExplanation.meaningFr else vehicleExplanation.meaningEn)
-                            Text(
-                                stringResource(R.string.dtc_severity) + ": " +
-                                    if (isFrench) vehicleExplanation.severityFr else vehicleExplanation.severityEn,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(stringResource(R.string.dtc_possible_causes), fontWeight = FontWeight.Bold)
-                            (if (isFrench) vehicleExplanation.causesFr else vehicleExplanation.causesEn).forEach { cause ->
-                                Text("• $cause")
-                            }
-                            Text(stringResource(R.string.dtc_recommended_checks), fontWeight = FontWeight.Bold)
-                            (if (isFrench) vehicleExplanation.checksFr else vehicleExplanation.checksEn).forEachIndexed { index, check ->
-                                Text("${index + 1}. $check")
-                            }
-                            val applicability = if (isFrench) vehicleExplanation.applicabilityFr else vehicleExplanation.applicabilityEn
-                            if (!applicability.isNullOrBlank()) {
-                                Text(applicability, color = WarnRed)
-                            }
-                        }
-                        val gmMonitor = if (mayApplyVehicleSpecific) {
-                            GmEngineMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
-                        } else {
-                            null
-                        }
-                        val gmSourceLabel = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
-                        if (gmMonitor != null) {
-                            HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
-                            Text(
-                                stringResource(R.string.dtc_gm_monitor_title, gmSourceLabel),
-                                fontWeight = FontWeight.Bold,
-                                color = CamaroAmber
-                            )
-                            Text(if (isFrench) gmMonitor.componentFr else gmMonitor.componentEn, fontWeight = FontWeight.SemiBold)
-                            Text(if (isFrench) gmMonitor.strategyFr else gmMonitor.strategyEn)
-                            Text(stringResource(R.string.dtc_gm_monitor_criteria, if (isFrench) gmMonitor.malfunctionCriteriaFr else gmMonitor.malfunctionCriteriaEn))
-                            Text(stringResource(R.string.dtc_gm_monitor_enable, if (isFrench) gmMonitor.enableConditionsFr else gmMonitor.enableConditionsEn))
-                            Text(stringResource(R.string.dtc_gm_monitor_failure, if (isFrench) gmMonitor.failureCriteriaFr else gmMonitor.failureCriteriaEn))
-                            Text(stringResource(R.string.dtc_gm_monitor_mil, gmMonitor.milClassification))
-                            Text(
-                                stringResource(R.string.dtc_gm_monitor_source, gmSourceLabel, gmMonitor.sourcePage),
-                                color = TextMuted,
-                                fontSize = 10.sp
-                            )
-                        } else if (vehicleExplanation == null && moduleCatalogue.hasVehicleSpecificDefinitions) {
-                            Text(
-                                stringResource(R.string.dtc_vehicle_specific_not_documented),
-                                color = TextMuted,
-                                fontSize = 12.sp
-                            )
+                        if (!mayApplyVehicleSpecific) {
+                            Text(stringResource(R.string.dtc_vehicle_identity_required),
+                                color = TextMuted, fontSize = 11.sp)
                         }
                     }
                 }
