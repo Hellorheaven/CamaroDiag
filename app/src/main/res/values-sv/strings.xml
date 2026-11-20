@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Diagnostiska felkoder</string>
     <string name="obd_adapter_voltage">Adapterspänning</string>
     <string name="obd_supported_pids">PID-koder som stöds</string>
+    <string name="obd_ecu_name">ECU-namn</string>
+    <string name="obd_none_identified">Ingen identifierad</string>
+    <string name="obd_data_unavailable">Data saknas</string>
+    <string name="obd_returned_live_data">Mottagen livedata</string>
+    <string name="obd_pending">Väntande</string>
+    <string name="obd_permanent">Permanenta</string>
+    <string name="obd_confirmed">Bekräftade</string>
+    <string name="obd_freeze_frame">Frysram</string>
+    <string name="obd_raw_scan_log">Rå skanningslogg</string>
+    <string name="obd_powertrain_ecm">Drivlina / ECM</string>
 </resources>
