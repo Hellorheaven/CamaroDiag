@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Coduri de eroare de diagnostic</string>
     <string name="obd_adapter_voltage">Tensiunea adaptorului</string>
     <string name="obd_supported_pids">PID-uri acceptate</string>
+    <string name="obd_ecu_name">Nume ECU</string>
+    <string name="obd_none_identified">Niciunul identificat</string>
+    <string name="obd_data_unavailable">Date indisponibile</string>
+    <string name="obd_returned_live_data">Date în timp real primite</string>
+    <string name="obd_pending">În așteptare</string>
+    <string name="obd_permanent">Permanent</string>
+    <string name="obd_confirmed">Confirmat</string>
+    <string name="obd_freeze_frame">Cadru înghețat</string>
+    <string name="obd_raw_scan_log">Jurnal brut de scanare</string>
+    <string name="obd_powertrain_ecm">Grup motopropulsor / ECM</string>
 </resources>
