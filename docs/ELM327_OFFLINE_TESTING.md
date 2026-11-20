@@ -1,75 +1,61 @@
-# ELM327 — diagnostic standard et validation hors véhicule
+# Guide utilisateur — Adaptateur ELM327 et diagnostic OBD-II
 
-## Profil de développement
+## Compatibilité
 
-Le profil par défaut de l'application correspond maintenant à une Camaro Gen 5 2012 V6 LFX avec boîte manuelle. Les fonctions Mode 01 restent génériques SAE J1979 : elles ne supposent pas que chaque PID existe sur le LFX.
+CamaroDiag prend en charge les adaptateurs ELM327 utilisant une liaison Bluetooth classique (Bluetooth SPP) pour le diagnostic OBD-II standard, sous réserve de la qualité réelle de l’adaptateur et de son firmware.
 
-## Initialisation ELM327
+Les adaptateurs ELM327 génériques et les clones n’offrent pas tous les mêmes fonctions. Un boîtier qui s’annonce « ELM327 compatible » ne garantit pas une communication fiable.
 
-Le moteur OBD-II envoie les commandes d'initialisation suivantes :
+La présence du Bluetooth LE (BLE) ne signifie pas que le boîtier est compatible avec la liaison Bluetooth classique utilisée par ce profil. Les adaptateurs BLE doivent être considérés comme non vérifiés tant que leur modèle précis n’est pas indiqué comme pris en charge.
 
-- `ATZ` — reset de l'adaptateur
-- `ATE0`, `ATL0`, `ATS0`, `ATH0` — format de sortie stable
-- `ATSP6` — ISO 15765-4 CAN 11 bits / 500 kbit/s, profil OBD-II courant de la Camaro Gen 5
-- `ATI` et `AT@1` — identification et description retournées par le firmware
-- `ATDP` — protocole détecté
-- `ATRV` — tension lue par l'adaptateur
+## Première connexion
 
-Les commandes de diagnostic ne doivent être envoyées qu'après une connexion Bluetooth SPP réelle. Le test unitaire utilise un canal simulé et ne constitue pas une preuve de compatibilité d'un clone particulier.
+1. Stationner le véhicule dans un endroit sûr.
+2. Brancher l’ELM327 sur la prise diagnostic OBD-II.
+3. Mettre le contact conformément aux indications du véhicule et de l’adaptateur.
+4. Sur Android, associer l’adaptateur dans les réglages Bluetooth lorsqu’un appairage est nécessaire.
+5. Dans CamaroDiag, sélectionner l’adaptateur Bluetooth correspondant.
+6. Lancer d’abord l’identification du véhicule, puis un diagnostic OBD-II standard.
 
-## Décodage Mode 01 ajouté
+CamaroDiag fonctionne sur Android 10 ou version ultérieure. Le nom affiché par l’adaptateur et la qualité de la liaison dépendent du fabricant.
 
-Le moteur interroge uniquement les PIDs annoncés par les bitmaps de support de l'ECU. Le bit 31 de chaque bitmap sert uniquement à signaler la page suivante (PID 20, 40, etc.) et n'est pas comptabilisé comme un PID de données. L'audit kilométrique suit la même règle pour A6 (odomètre) et D3 (odomètre moteur) : aucun PID non annoncé n'est envoyé.
+## Informations et fonctions accessibles
 
-- `22` : pression de rail relative à la dépression collecteur, `AB × 0,079 kPa`.
-- `24–2B` : rapport lambda et tension des sondes O2 large bande.
-- `2D` : erreur EGR.
-- `2E` : commande de purge EVAP.
-- `34–3B` : rapport lambda et courant des sondes O2 large bande.
-- `3C–3F` : températures catalyseur des banques 1/2, capteurs 1/2.
-- `52` : pourcentage d'éthanol, si exposé.
-- `59` : pression absolue du rail d'injection, utile sur les systèmes injection directe lorsqu'elle est annoncée.
-- `5A` : position relative de la pédale d'accélérateur.
-- `5B` : durée de vie batterie hybride, si exposée.
+Lorsque le calculateur et l’adaptateur répondent correctement, le diagnostic standard peut fournir :
 
-Les PIDs hybrides ou diesel peuvent exister dans le standard sans être pertinents pour le LFX. Ils ne seront affichés que si le calculateur les annonce et répond ; leur présence dans le décodeur ne signifie pas que le véhicule est équipé de cette fonction.
+- Le VIN et certaines informations d’identification du calculateur.
+- Les paramètres moteur normalisés annoncés par le véhicule, par exemple régime, températures, pressions et données de sondes lorsqu’elles sont disponibles.
+- Les codes défauts confirmés, en attente et permanents.
+- Les informations d’état des systèmes antipollution (« readiness »).
+- Les données figées associées à un défaut, lorsque le véhicule les fournit.
+- Certains résultats de tests embarqués.
 
-## Freeze frame — Mode 02
+CamaroDiag interroge les paramètres annoncés par le calculateur. Si un paramètre n’est pas pris en charge ou si le calculateur ne le retourne pas, aucune valeur n’est inventée.
 
-Le DTC déclencheur est lu séparément avec la requête `020200`. Si un DTC est présent, le logiciel lit ensuite la bitmap Mode 02 PID 00, distincte de la bitmap Mode 01. Une réponse Mode 02 contient le PID, le numéro de trame, puis les octets de mesure : seul le numéro de trame est retiré avant le décodage des valeurs. Les autres PIDs ne sont demandés que s'ils figurent dans cette bitmap Mode 02. Si le DTC déclencheur vaut `0000` ou si PID 02 ne répond pas, aucune autre donnée de freeze frame n'est demandée.
+## Comprendre les résultats
 
-## Messages d'erreur ELM
+- **Aucune donnée :** le calculateur ne fournit pas ce paramètre dans les conditions présentes, ou la communication n’a pas abouti.
+- **Défaut présent :** lire le code et son contexte avant toute intervention. L’effacement d’un code ne répare pas la cause.
+- **Valeur indisponible :** cela ne prouve pas une panne du capteur ou du calculateur.
+- **Connexion instable :** vérifier l’alimentation de l’adaptateur, l’appairage Bluetooth, le contact et la qualité de l’ELM327.
 
-Les réponses textuelles telles que `BUFFER FULL`, `DATA ERROR`, `BUS ERROR`, `CAN ERROR`, `NO DATA`, `STOPPED` et `UNABLE TO CONNECT` sont écartées du flux hexadécimal. Elles ne doivent jamais être transformées en valeurs de capteur.
+Les valeurs affichées dépendent du calculateur, de l’année, du moteur, de la transmission, de la calibration et de l’interface utilisée.
 
-## Validation simulée
+## Simulation sans véhicule
 
-Les scans multi-commandes utilisent une session exclusive : les commandes de télémétrie et les autres actions attendent la fin du scan, afin de ne pas mélanger les réponses ou les réglages ELM.
+Le mode de démonstration permet de découvrir certains écrans et résultats sans voiture ni adaptateur. Les données affichées dans ce mode sont artificielles et signalées comme telles.
 
-Les tests unitaires utilisent `ObdCommandChannel` pour injecter des réponses déterministes, notamment :
+Elles ne doivent jamais servir à diagnostiquer, régler ou réparer un véhicule.
 
-- RPM, VIN, CAL ID et CVN ;
-- identification ELM327 ;
-- réponses O2 large bande avec ratio, tension et courant ;
-- pression de rail relative ;
-- température catalyseur ;
-- absence de données et buffer saturé ;
-- statut de readiness et codes défauts.
+## Limites de l’ELM327
 
-Aucun de ces tests ne prouve une réponse réelle de la Camaro. Les données simulées restent exclusivement dans les tests.
+Un ELM327 Bluetooth classique permet le diagnostic OBD-II standard lorsqu’il est correctement implémenté. Il ne fournit pas, à lui seul :
 
-## Simulation OBD-II sans matériel
+- Un accès garanti aux fonctions propriétaires GM ou à tous les calculateurs.
+- Un diagnostic exhaustif du BCM, TCM, ABS/EBCM, IPC ou SDM.
+- Une interface J2534 ou un accès de programmation.
+- Une garantie de capture CAN brute complète ou d’émission sur tous les réseaux du véhicule.
 
-Le profil adaptateur simulé peut maintenant lancer un scan OBD-II complet via `CamaroLfxObdSimulator`. Il retourne des bitmaps de PIDs, des valeurs moteur, des DTC, un VIN de démonstration, un CAL ID/CVN synthétiques et des réponses d'identification. L'écran affiche un avertissement permanent indiquant que ces données sont artificielles. Aucune commande n'est envoyée à un adaptateur ou à un véhicule.
+Les fonctions UDS et les signaux spécifiques Camaro nécessitent une interface et un profil explicitement compatibles. L’utilisation d’un ELM327 ne débloque pas ces fonctions.
 
-Le simulateur sert à vérifier le parcours UI, le décodage SAE J1979, les listes DTC et le journal brut. Il ne constitue pas une référence de valeurs réelles du LFX et ne doit jamais être utilisé pour diagnostiquer un véhicule.
-
-## Références de décodage
-
-Les formules des PIDs normalisés sont alignées sur SAE J1979, notamment les tableaux publics de référence : https://law.resource.org/pub/us/cfr/ibr/005/sae.j1979.2002.pdf et https://www.dashlogic.com/docs/technical/obdii_pids. Ces références définissent les services et échelles standard, pas les données spécifiques au calculateur LFX.
-
-## Limites matérielles
-
-Un ELM327 Bluetooth classique donne accès à l'OBD-II standard lorsqu'il est correctement implémenté. Il ne devient pas une interface J2534, ne garantit pas le diagnostic UDS propriétaire GM, ne fournit pas une capture CAN brute complète et n'autorise pas le diagnostic exhaustif BCM/TCM/EBCM/IPC/SDM.
-
-Les fonctions propriétaires GM restent séparées et désactivées en l'absence d'adresses, DID et formats documentés puis vérifiés.
+CamaroDiag est un outil indépendant et ne remplace pas les procédures de réparation constructeur. Ne pas lancer de diagnostic nécessitant une intervention sur les commandes du véhicule pendant la conduite.
