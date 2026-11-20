@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag huwa aġġornat.</string>
     <string name="obd_choose_sensors">Agħżel is-sensuri</string>
     <string name="obd_sensor_cancel">Ikkanċella</string>
+    <string name="tab_vehicle">Vettura</string>
+    <string name="tab_connect">Qabbad</string>
+    <string name="tab_live">Dejta diretta</string>
+    <string name="tab_dtcs">Kodiċijiet tal-ħsara</string>
+    <string name="tab_more">Aktar</string>
+    <string name="tab_modules">Moduli</string>
+    <string name="tab_mileage">Kilometraġġ</string>
+    <string name="tab_calibration">ECU / Mapep</string>
+    <string name="tab_obd_scan">Skan OBD sħiħ</string>
+    <string name="tab_guide">Gwida</string>
+    <string name="tab_controls">Kontrolli</string>
+    <string name="tab_settings">Settings</string>
 </resources>
