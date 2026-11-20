@@ -652,4 +652,27 @@
     <string name="cal_ecu_response_addresses_label">检测到的功能 OBD 响应地址（未映射到控制模块）</string>
     <string name="cal_ecu_identity_limits">这些标准 OBD 响应无法确认 RPO、变速箱、控制模块硬件编号或 GM 操作系统。响应地址不能用于识别控制模块。GM 专用标识需要经过验证的车辆专属技术资料。</string>
     <string name="dtc_vehicle_identity_required">由于尚未读取连接的 ECU VIN，或该 VIN 与所选车辆不匹配，因此已隐藏车辆专属详情。使用这些解释前，请读取并核对 ECU VIN。</string>
+    <string name="live_pid_oil">机油压力（仅模拟）</string>
+    <string name="live_pid_stft_b2">短期燃油修正 第2组</string>
+    <string name="live_pid_ltft_b2">长期燃油修正 第2组</string>
+    <string name="live_pid_rel_tps">相对节气门位置</string>
+    <string name="live_pid_cmd_tps">指令节气门位置</string>
+    <string name="live_pid_abs_tps_b">绝对节气门位置 B</string>
+    <string name="live_pid_abs_tps_c">绝对节气门位置 C</string>
+    <string name="live_pid_app_d">油门踏板位置 D</string>
+    <string name="live_pid_app_e">油门踏板位置 E</string>
+    <string name="live_pid_app_f">油门踏板位置 F</string>
+    <string name="live_pid_abs_load">发动机绝对负荷</string>
+    <string name="live_pid_ambient">环境温度</string>
+    <string name="live_pid_fuel_press">燃油压力</string>
+    <string name="live_pid_timing">点火提前角</string>
+    <string name="live_pid_eq_ratio">指令当量比</string>
+    <string name="live_pid_o2_b1s1">氧传感器 B1S1 电压</string>
+    <string name="live_pid_o2_b1s2">氧传感器 B1S2 电压</string>
+    <string name="live_pid_o2_b1s3">氧传感器 B1S3 电压</string>
+    <string name="live_pid_o2_b1s4">氧传感器 B1S4 电压</string>
+    <string name="live_pid_wbo2_b1s1">宽带氧传感器 B1S1</string>
+    <string name="live_pid_wbo2_b1s2">宽带氧传感器 B1S2</string>
+    <string name="live_pid_wbo2_b2s1">宽带氧传感器 B2S1</string>
+    <string name="live_pid_wbo2_b2s2">宽带氧传感器 B2S2</string>
 </resources>
