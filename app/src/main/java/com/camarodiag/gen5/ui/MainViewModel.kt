@@ -1155,6 +1155,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return activeJob
     }
 
+    /** Clears the single chronological console history and its raw capture buffer. */
+    fun clearCanConsoleHistory() {
+        val current = _liveCanMonitorState.value
+        _liveCanMonitorState.value = current.copy(
+            rawText = "",
+            report = null,
+            requestResponse = null,
+            requestHistory = emptyList(),
+            consoleHistory = emptyList()
+        )
+    }
+
     /** Cancels monitor capture; the transport sends ESC in a non-cancellable cleanup block. */
     fun stopCanMonitor() {
         canMonitorJob?.cancel()
