@@ -87,6 +87,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsPreferences = application.getSharedPreferences("camarodiag_settings", Context.MODE_PRIVATE)
     private val obdManager = BluetoothObdManager(application)
     private var authenticatedAccountUid: String? = FirebaseAuth.getInstance().currentUser?.uid
+    private var accountSessionGeneration: Long = 0L
+    private fun isCurrentAccountGeneration(started: Long): Boolean =
+        started == accountSessionGeneration && authenticatedAccountUid != null
+
     private val _activeAccountUid = MutableStateFlow(authenticatedAccountUid)
 
     /**
@@ -113,6 +117,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onAccountSessionChanged(accountUid: String?) {
         if (authenticatedAccountUid == accountUid) return
         authenticatedAccountUid = accountUid
+        accountSessionGeneration++
         _savedSessions.value = emptyList()
         _activeAccountUid.value = accountUid
         stopCanMonitor()
@@ -2641,7 +2646,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Executes a complete, standards-based read-only OBD-II scan on the connected Camaro. */
     fun runFullObdScan() {
+        val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
+            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
             if (!obdManager.isSimulationActive && !obdManager.isObdCommandChannelAvailable) {
                 _obdScanReport.value = null
                 _obdScanMessage.value = if (obdManager.isJ2534BridgeConnected())
@@ -2659,6 +2666,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         engine.fullReadOnlyScan()
                     }
                 }
+                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                 _obdScanReport.value = report
                 _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
                     topology = _modules.value,
@@ -2678,8 +2686,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                reportConnectionLoss(error)
-                _obdScanMessage.value = getApplication<Application>().getString(R.string.msg_full_scan_failed)
+                if (isCurrentAccountGeneration(startedGeneration)) {
+                    reportConnectionLoss(error)
+                    _obdScanMessage.value = getApplication<Application>().getString(R.string.msg_full_scan_failed)
+                }
             } finally {
                 _isObdScanning.value = false
             }
