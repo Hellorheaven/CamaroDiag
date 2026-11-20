@@ -119,6 +119,20 @@ class Lfx2012ControllerReferencesTest {
         assertEquals(multiple, classify(listOf("18DAF110", "18DAF118")))
     }
 
+    @Test fun syntheticEcuResponsesNeverCountAsCompleteIdentity() {
+        val fields = Lfx2012ControllerReferences.ObservedIdentity(
+            ecuName = "ACDelco E39",
+            calibrationIds = listOf("12612345"),
+            calibrationVerificationNumbers = listOf("1234ABCD")
+        )
+        assertTrue(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(fields))
+        assertFalse(
+            Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+                fields.copy(simulated = true)
+            )
+        )
+    }
+
     @Test fun aCompleteReadOnlyFingerprintNeverAuthorizesAWrite() {
         val vehicle = Lfx2012FlexFuelPreflight.Vehicle(
             2012, "LFX", 5, "2G1FF3D36C9104199", "2G1FF3D36C9104199"
