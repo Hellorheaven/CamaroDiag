@@ -829,4 +829,12 @@
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: before/after programming audit (read only)</string>
     <string name="flexfuel_lfx2012_audit_summary">Observed before-programming checks: %1$d / %2$d. Missing data remain unverified.</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">After-programming audit not performed. No ECU programming or post-flash vehicle test has been validated.</string>
+    <string name="cal_expert_patch_title">Targeted ECU changes — offline sector impact</string>
+    <string name="cal_expert_patch_warning">Preview only. Enter the target ECU memory-map geometry. No sector layout or ECU compatibility is verified, and no programming is enabled.</string>
+    <string name="cal_expert_patch_address">Memory region start address (hex)</string>
+    <string name="cal_expert_patch_erase_bytes">Erase sector size (bytes)</string>
+    <string name="cal_expert_patch_program_bytes">Programming unit size (bytes)</string>
+    <string name="cal_expert_patch_preview_button">Preview sectors impacted by modified BIN</string>
+    <string name="cal_expert_patch_summary">Changed bytes: %1$d. Erase sectors affected: %2$d. Hardware map not verified; no write.</string>
+    <string name="cal_expert_patch_invalid">Offline preview unavailable: files, region range or erase/programming geometry invalid. No write attempted.</string>
 </resources>
