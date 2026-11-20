@@ -50,4 +50,14 @@
     <string name="obd_readiness">Ullmhacht OBD</string>
     <string name="obd_mode06_results">Torthaí mhód 06</string>
     <string name="system_language_follow_phone">Lean teanga an ghutháin</string>
+    <string name="settings_current_vehicle">Feithicil reatha</string>
+    <string name="settings_current_adapter">Ceangal OBD-II</string>
+    <string name="adapter_section_title">Oiriúnaitheoir Bluetooth OBD-II agus tóireadóir CAN</string>
+    <string name="paired_bluetooth_devices">Gléasanna Bluetooth péireáilte</string>
+    <string name="usb_devices_detected">Gléasanna USB aimsithe</string>
+    <string name="usb_none_detected">Níor aimsíodh oiriúnaitheoir sraitheach USB.</string>
+    <string name="wifi_connection_title">Ceangal Wi-Fi ELM327</string>
+    <string name="adapter_ip_address">Seoladh IP an oiriúnaitheora</string>
+    <string name="adapter_tcp_port">Port TCP (35000 nó 23 de ghnáth)</string>
+    <string name="adapter_connect_wifi">Ceangail trí Wi-Fi</string>
 </resources>
