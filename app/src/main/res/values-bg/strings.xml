@@ -42,4 +42,16 @@
     <string name="obd_freeze_frame">Стоп-кадър (режим 02)</string>
     <string name="obd_pending">Изчакващи</string>
     <string name="obd_permanent">Постоянни</string>
+    <string name="obd_offline_simulation_notice">ОФЛАЙН СИМУЛАЦИЯ — VIN, CAL ID, CVN, DTC и измерванията по-долу са синтетични и не са получени от реален Camaro.</string>
+    <string name="obd_can_id_limit_explanation">CAN идентификаторите са отговори, наблюдавани при функционалната OBD заявка 0100. Те не са достатъчни за идентифициране на модул (BCM, TCM, ABS, IPC, SDM) или за разрешаване на разширени GM услуги.</string>
+    <string name="obd_no_dtcs">Стандартните услуги 03/07/0A не върнаха диагностични кодове за грешки.</string>
+    <string name="obd_trigger_dtc">DTC, задействал записа</string>
+    <string name="obd_no_freeze_frame">Няма използваеми данни от стоп-кадър.</string>
+    <string name="obd_mode06_results">Резултати от мониторите в режим 06</string>
+    <string name="obd_raw_scan_log">Необработен дневник на сканирането</string>
+    <string name="obd_simulation_scope">Обхват: само детерминистични демонстрационни данни. Не се отправят заявки към реален адаптер, ECU или автомобил.</string>
+    <string name="obd_real_scan_scope">Обхват: резултатите са само от действително получени отговори от ECU, достъпен чрез OBD-II. Това сканиране не запитва BCM, IPC, ABS, SDM или други GM модули и не изпълнява команди за задвижване или програмиране.</string>
+    <string name="obd_confirmed">Потвърдени</string>
+    <string name="obd_powertrain_ecm">Силово предаване / ECM</string>
+    <string name="status_offline">Без връзка</string>
 </resources>
