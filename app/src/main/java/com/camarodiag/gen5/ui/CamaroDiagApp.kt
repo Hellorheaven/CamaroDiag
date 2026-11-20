@@ -181,7 +181,6 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
-    UpdateManagerDialog()
 
     val btPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -2199,6 +2198,9 @@ fun SettingsScreen(
                     }
                 }
             }
+        }
+        item {
+            AboutUpdateCard()
         }
     }
 }
