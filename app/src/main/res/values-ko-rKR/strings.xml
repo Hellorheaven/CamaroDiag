@@ -675,4 +675,15 @@
     <string name="live_pid_wbo2_b1s2">광대역 람다 센서 B1S2</string>
     <string name="live_pid_wbo2_b2s1">광대역 람다 센서 B2S1</string>
     <string name="live_pid_wbo2_b2s2">광대역 람다 센서 B2S2</string>
+    <string name="about_title">CamaroDiag 정보</string>
+    <string name="about_version">설치된 버전: %1$s</string>
+    <string name="about_build">빌드 번호: %1$d</string>
+    <string name="about_check_updates">업데이트 확인</string>
+    <string name="about_checking">확인 중…</string>
+    <string name="about_up_to_date">CamaroDiag가 최신 버전입니다.</string>
+    <string name="about_update_found">새 버전을 사용할 수 있습니다.</string>
+    <string name="about_channel_update_unavailable">최신 버전이 있지만 이 설치 채널용 업데이트 패키지가 게시되지 않았습니다.</string>
+    <string name="about_check_failed">업데이트를 확인할 수 없습니다. 인터넷 연결을 확인하세요.</string>
+    <string name="update_install_update">업데이트 설치</string>
+    <string name="update_version_available">사용 가능한 버전: %1$s</string>
 </resources>
