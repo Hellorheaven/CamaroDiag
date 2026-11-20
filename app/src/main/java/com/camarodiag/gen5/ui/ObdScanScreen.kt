@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -67,9 +68,9 @@ fun ObdScanScreen(
     val storedPids = remember(preferenceKey, preferences) {
         preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
     }
-    val sensorNames = report?.liveData?.associate { it.pid to localizedObdPidName(it) }.orEmpty()
-    val knownPids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42, 0x52)
+    val knownPids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42, 0x52)
     val catalogPids = (knownPids + report?.supportedPids.orEmpty() + report?.liveData.orEmpty().map { it.pid }).distinct().sorted()
+    val sensorNames = catalogPids.associateWith { localizedObdPidName(it) }
     val measuredPids = report?.liveData.orEmpty().map { it.pid }.toSet()
     var choosingSensors by rememberSaveable(preferenceKey) { mutableStateOf(false) }
     var sensorQuery by rememberSaveable(preferenceKey) { mutableStateOf("") }
@@ -90,7 +91,7 @@ fun ObdScanScreen(
                         label = { Text(stringResource(R.string.obd_filter_sensors)) },
                         singleLine = true
                     )
-                    LazyColumn {
+                    LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
                         items(catalogPids.filter { pid ->
                             pid.toString(16).contains(sensorQuery, ignoreCase = true) ||
                                 sensorNames[pid].orEmpty().contains(sensorQuery, ignoreCase = true)
@@ -306,19 +307,24 @@ private fun InfoLine(label: String, value: String) {
 }
 
 @Composable
-private fun localizedObdPidName(value: ObdValue): String = when (value.pid) {
+private fun localizedObdPidName(value: ObdValue): String = localizedObdPidName(value.pid)
+
+@Composable
+private fun localizedObdPidName(pid: Int): String = when (pid) {
     0x03 -> stringResource(R.string.live_pid_fuel_system_status)
     0x04 -> stringResource(R.string.live_pid_load)
     0x05 -> stringResource(R.string.live_pid_ect)
     0x06 -> stringResource(R.string.live_pid_stft)
     0x07 -> stringResource(R.string.live_pid_ltft)
+    0x0B -> stringResource(R.string.live_pid_map)
     0x0C -> stringResource(R.string.live_pid_rpm)
     0x0D -> stringResource(R.string.live_pid_speed)
     0x0F -> stringResource(R.string.live_pid_iat)
     0x10 -> stringResource(R.string.live_pid_maf)
     0x11 -> stringResource(R.string.live_pid_throttle)
     0x42 -> stringResource(R.string.live_pid_bat)
-    else -> stringResource(R.string.obd_pid_generic, value.pid)
+    0x52 -> stringResource(R.string.live_pid_ethanol)
+    else -> stringResource(R.string.obd_pid_generic, pid)
 }
 
 @Composable
