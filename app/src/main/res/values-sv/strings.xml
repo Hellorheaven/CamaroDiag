@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag är uppdaterad.</string>
     <string name="obd_choose_sensors">Välj sensorer</string>
     <string name="obd_sensor_cancel">Avbryt</string>
+    <string name="tab_vehicle">Fordon</string>
+    <string name="tab_connect">Anslut</string>
+    <string name="tab_live">Livedata</string>
+    <string name="tab_dtcs">Felkoder</string>
+    <string name="tab_more">Mer</string>
+    <string name="tab_modules">Styrenheter</string>
+    <string name="tab_mileage">Mätarställning</string>
+    <string name="tab_calibration">ECU / Kartor</string>
+    <string name="tab_obd_scan">Fullständig OBD-skanning</string>
+    <string name="tab_guide">Guide</string>
+    <string name="tab_controls">Styrning</string>
+    <string name="tab_settings">Inställningar</string>
 </resources>
