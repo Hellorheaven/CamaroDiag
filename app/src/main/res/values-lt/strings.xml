@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULIACIJA: šie ECU identifikatoriai nenuskaityti iš tikros transporto priemonės ir negali patvirtinti jos programinės įrangos.</string>
     <string name="cal_expert_block_memory_map">Tikslinė atminties schema ir apsaugotos sritys nepatikrintos.</string>
     <string name="flexfuel_preflight_backup">Originali ECU atsarginė kopija nepatikrinta.</string>
+    <string name="cal_expert_title">Eksperto režimas — ECU ant stendo / lustas</string>
+    <string name="cal_expert_expand">Konfigūruoti eksperto režimą</string>
+    <string name="cal_expert_collapse">Slėpti eksperto nustatymus</string>
+    <string name="cal_expert_family">Valdiklio šeima (E39 arba E39A)</string>
+    <string name="cal_expert_chip">Pastebėtas lusto žymėjimas</string>
+    <string name="cal_expert_programmer">Stendinis programuoklis / sąsaja</string>
+    <string name="cal_expert_access_title">Prieigos metodas</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Išorinė atmintis, išimtas lustas</string>
+    <string name="cal_expert_region_title">Atminties sritis</string>
+    <string name="cal_expert_region_pflash">MCU vidinė programų atmintis (flash)</string>
+    <string name="cal_expert_region_dflash">MCU duomenų atmintis (flash)</string>
+    <string name="cal_expert_region_eeprom">Išorinė EEPROM</string>
+    <string name="cal_expert_blockers">Neužbaigtos eksperto patikros</string>
+    <string name="cal_expert_block_controller">Patikrinkite tikslią valdiklio šeimą (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Nustatykite fizinį MCU arba atminties lusto žymėjimą.</string>
+    <string name="cal_expert_block_programmer">Nustatykite suderinamą stendinį programuoklį.</string>
+    <string name="cal_expert_block_image_missing">Importuokite netuščią programinės įrangos atvaizdą.</string>
+    <string name="cal_expert_block_image_format">Šiam pasiruošimui būtinas neapdorotas dvejetainis failas.</string>
 </resources>
