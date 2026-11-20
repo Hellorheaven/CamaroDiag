@@ -85,6 +85,21 @@ class CanTraceAnalyzerTest {
     }
 
     @Test
+    fun correlatesFinalPositiveResponseAfterNrc78FromSameEcu() {
+        val trace = listOf(
+            "0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.010000 1 7E8 Rx d 8 03 7F 22 78 00 00 00 00",
+            "0.090000 1 7E8 Rx d 8 04 62 F1 90 01 00 00 00"
+        ).joinToString("\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "pending-then-positive.asc").exchanges.single()
+
+        assertEquals(2, exchange.responses.size)
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(0x62, exchange.responses.last().responseService)
+        assertEquals(90.0, exchange.elapsedMilliseconds!!, 0.001)
+    }
+
+    @Test
     fun doesNotGuessUdsCorrelationForUnknownDirectionElmFrames() {
         val report = CanTraceAnalyzer.analyze(
             listOf("7E0 4 03 22 F1 90", "7E8 4 03 62 F1 90").joinToString("\n"),
