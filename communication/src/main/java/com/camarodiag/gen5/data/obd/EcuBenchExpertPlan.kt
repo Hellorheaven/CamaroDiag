@@ -85,7 +85,7 @@ object EcuBenchExpertPlan {
      * read from this specific ECU or authorize flashing them.
      */
     fun verifyCandidateImage(image: CandidateImage?, rawBytes: ByteArray?): Boolean {
-        if (image == null || rawBytes.isNullOrEmpty()) return false
+        if (image == null || rawBytes == null || rawBytes.isEmpty()) return false
         if (image.fileName.isNullOrBlank() || image.format != "RAW_BINARY") return false
         if (image.sizeBytes != rawBytes.size.toLong() || !isSha256(image.sha256)) return false
         return sha256Hex(rawBytes).equals(image.sha256, ignoreCase = true)
