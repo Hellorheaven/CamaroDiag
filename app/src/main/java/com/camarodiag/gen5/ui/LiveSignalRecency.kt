@@ -1,7 +1,7 @@
 package com.camarodiag.gen5.ui
 
 /** Avoid showing a previously observed PID as currently measured forever. */
-internal class LiveSignalRecency(private val maxAgeMillis: Long = 30_000L) {
+internal class LiveSignalRecency(private val maxAgeMillis: Long = 120_000L) {
     init {
         require(maxAgeMillis > 0L)
     }
