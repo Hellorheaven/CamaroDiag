@@ -78,26 +78,23 @@ class ElmUsbTransport(private val context: Context) {
                 ?: return@withContext Result.failure(
                     IllegalStateException("Unable to open USB OBD device")
                 )
+            // Track ownership before subsequent setup so every failure releases
+            // the USB device handle, including missing-port and serial-open errors.
+            connection = conn
 
             val serial = driver.ports.firstOrNull()
-                ?: run {
-                    conn.close()
-                    return@withContext Result.failure(
-                        IllegalStateException("No USB serial port")
-                    )
-                }
+                ?: return@withContext Result.failure(
+                    IllegalStateException("No USB serial port")
+                ).also { close() }
 
+            port = serial
             serial.open(conn)
-
             serial.setParameters(
                 baudRate,
                 8,
                 UsbSerialPort.STOPBITS_1,
                 UsbSerialPort.PARITY_NONE
             )
-
-            connection = conn
-            port = serial
             connectionLost = false
 
             Result.success(Unit)
