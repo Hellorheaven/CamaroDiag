@@ -57,4 +57,16 @@ class Lfx2012FlexFuelPreflightTest {
             ).contains(Lfx2012FlexFuelPreflight.Status.WRONG_VEHICLE)
         )
     }
+    @Test fun zeroFilledAndUnavailableIdentitiesAreRejected() {
+        val invalidIds = listOf("00000000", "0x000000", "FFFFFFFF", "0xFFFFFF", "N/A", "TBD", "pending", "not supported", "test")
+        invalidIds.forEach { invalid ->
+            val problems = Lfx2012FlexFuelPreflight.missingPreconditions(
+                vehicle,
+                evidence.copy(controllerId = invalid, firmwareId = invalid)
+            )
+            assertTrue("Must reject placeholder: $invalid", problems.contains(Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_UNVERIFIED))
+            assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(vehicle, evidence.copy(controllerId = invalid, firmwareId = invalid)))
+        }
+    }
+
 }
