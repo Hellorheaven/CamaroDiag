@@ -433,6 +433,9 @@ class BluetoothObdManager(context: Context) {
                 // Return to the app's configured 11-bit HS-CAN / automatic-format state.
                 withContext(NonCancellable) {
                     runCatching { sendAtCommandInternal("ATSP6", 1_500L) }
+                    // Restore the app's standard functional OBD request header as well
+                    // as formatting; otherwise later requests could remain physically addressed.
+                    runCatching { sendAtCommandInternal("ATSH 7DF", 1_500L) }
                     runCatching { sendAtCommandInternal("ATCAF1", 1_500L) }
                     runCatching { sendAtCommandInternal("ATH1", 1_000L) }
                     runCatching { sendAtCommandInternal("ATS0", 1_000L) }
