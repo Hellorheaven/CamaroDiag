@@ -15,6 +15,7 @@ on:
 permissions:
   contents: read
   actions: write
+  issues: write
 
 concurrency:
   group: pr54-validation-kickoff
@@ -39,3 +40,29 @@ jobs:
           gh workflow run pr35-release-preflight.yml --repo "$GITHUB_REPOSITORY" --ref feat/flexfuel-lfx-2012 \
             -f target_ref="$TARGET_SHA"
           echo "Android Debug + Windows Debug + signed Android/Windows Release checkpoints dispatched for $TARGET_SHA"
+          # Expose concrete run IDs to the PR, so the exact SHA can be checked
+          # without pretending that dispatch equals a successful validation.
+          REPORT="PR54 validation checkpoint requested on commit $TARGET_SHA"
+          for WORKFLOW in android-ci.yml pc-bridge-ci.yml pr35-release-preflight.yml; do
+            RUN_ID=""
+            for ATTEMPT in $(seq 1 12); do
+              RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" \
+                --workflow "$WORKFLOW" --branch feat/flexfuel-lfx-2012 \
+                --event workflow_dispatch --limit 30 \
+                --json databaseId,headSha \
+                --jq ".[] | select(.headSha == \"$TARGET_SHA\") | .databaseId" | head -n 1)"
+              if [[ -n "$RUN_ID" ]]; then break; fi
+              sleep 5
+            done
+            if [[ -n "$RUN_ID" ]]; then
+              REPORT="$REPORT
+          - $WORKFLOW: https://github.com/$GITHUB_REPOSITORY/actions/runs/$RUN_ID"
+            else
+              REPORT="$REPORT
+          - $WORKFLOW: run not yet listed; check Actions manually"
+            fi
+          done
+          REPORT="$REPORT
+          
+          Runs were dispatched, not yet confirmed successful. Inspect all jobs, lint warnings and test results before merging."
+          gh pr comment 54 --repo "$GITHUB_REPOSITORY" --body "$REPORT"
