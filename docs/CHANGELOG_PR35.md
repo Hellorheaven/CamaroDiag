@@ -224,3 +224,9 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Stopping or failing a capture no longer appends the pending line-framing buffer a second time: every received chunk was already copied into the raw capture buffer, so the previous behavior duplicated an unterminated final line.
 - Commits: `52b8c72` (DLC parser), `138290f` (DLC regression test), `1a62228` (capture lifecycle).
 - Tests and Android builds have not yet been executed; these changes are code-reviewed only.
+
+### Synchronisation de branche — 2026-11-20
+- Synchronisation de `feat/live-can-monitor` avec le dernier `main` par un commit de merge à deux parents, en conservant les changements de la branche CAN et en intégrant le nouvel état de `main`.
+- Commit de synchronisation : `67643563116fbf3245f6e2d92d2f0f8a19a4c628`.
+- Vérification GitHub après synchronisation : `behind_by = 0`, `mergeable = true`, `mergeable_state = clean`. La PR reste ouverte et en Draft.
+- Aucun workflow de validation n'a été déclenché sur ce commit ; les validations précédemment affichées « success » avaient les jobs de build/test en `skipped`.
