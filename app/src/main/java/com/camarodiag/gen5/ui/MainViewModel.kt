@@ -88,6 +88,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var authenticatedAccountUid: String? = FirebaseAuth.getInstance().currentUser?.uid
 
     /**
+     * Keep existing pre-authentication vehicles untouched in the legacy settings.
+     * Each authenticated Firebase UID receives a distinct local garage. Old data
+     * can only be imported through an explicit user action.
+     */
+    private fun accountVehiclePreferences(): android.content.SharedPreferences =
+        getApplication<Application>().getSharedPreferences(
+            "camarodiag_garage_" + (authenticatedAccountUid ?: "no_account"),
+            Context.MODE_PRIVATE
+        )
+
+    private fun selectedVehiclePreference(): String? =
+        accountVehiclePreferences().getString("selected_vehicle_id", null)
+
+
+    /**
      * A login change must never leave an OBD operation running in the background,
      * including when the Firebase SDK revokes a previously valid session.
      */
@@ -136,7 +151,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _savedVehicles = MutableStateFlow(loadSavedVehicleProfiles())
     val savedVehicles: StateFlow<List<SavedVehicleProfile>> = _savedVehicles.asStateFlow()
 
-    private val _selectedSavedVehicleId = MutableStateFlow(settingsPreferences.getString("selected_vehicle_id", null))
+    private val _selectedSavedVehicleId = MutableStateFlow(selectedVehiclePreference())
     val selectedSavedVehicleId: StateFlow<String?> = _selectedSavedVehicleId.asStateFlow()
 
     private val _pairedDevices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
@@ -244,6 +259,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadVehicleProfile(): VehicleProfile {
+        val settingsPreferences = accountVehiclePreferences()
         val year = settingsPreferences.getInt("vehicle_year", 2012).coerceIn(2010, 2024)
         val savedEngine = runCatching {
             CamaroEngine.valueOf(settingsPreferences.getString("vehicle_engine", CamaroEngine.LFX.name)!!)
@@ -261,7 +277,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun persistVehicleProfile(profile: VehicleProfile) {
-        settingsPreferences.edit {
+        accountVehiclePreferences().edit {
             putInt("vehicle_year", profile.modelYear)
             putString("vehicle_engine", profile.engine.name)
             putString("vehicle_transmission", profile.transmission.name)
@@ -278,7 +294,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadSavedVehicleProfiles(): List<SavedVehicleProfile> = runCatching {
-        val source = settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
+        val source = accountVehiclePreferences().getString("saved_vehicle_profiles", "[]").orEmpty()
         val array = JSONArray(source)
         buildList {
             for (index in 0 until array.length()) {
@@ -326,7 +342,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
         }
-        settingsPreferences.edit { putString("saved_vehicle_profiles", array.toString()) }
+        accountVehiclePreferences().edit { putString("saved_vehicle_profiles", array.toString()) }
     }
 
     fun saveCurrentVehicle(name: String) {
@@ -355,7 +371,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _savedVehicles.value = updated
         persistSavedVehicleProfiles(updated)
         _selectedSavedVehicleId.value = profile.id
-        settingsPreferences.edit { putString("selected_vehicle_id", profile.id) }
+        accountVehiclePreferences().edit { putString("selected_vehicle_id", profile.id) }
         _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_profile_saved)
     }
 
@@ -369,7 +385,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         updateVin(saved.vehicle.vin)
         _selectedSavedVehicleId.value = saved.id
-        settingsPreferences.edit { putString("selected_vehicle_id", saved.id) }
+        accountVehiclePreferences().edit { putString("selected_vehicle_id", saved.id) }
         _connectionMessage.value = if (saved.requiresReview) {
             getApplication<Application>().getString(R.string.msg_vehicle_profile_review_required)
         } else {
@@ -384,7 +400,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         persistSavedVehicleProfiles(updated)
         if (_selectedSavedVehicleId.value == id) {
             _selectedSavedVehicleId.value = null
-            settingsPreferences.edit { remove("selected_vehicle_id") }
+            accountVehiclePreferences().edit { remove("selected_vehicle_id") }
         }
     }
 
@@ -403,7 +419,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _savedVehicles.value = updated
             persistSavedVehicleProfiles(updated)
             _selectedSavedVehicleId.value = selectedId
-            settingsPreferences.edit { putString("selected_vehicle_id", selectedId) }
+            accountVehiclePreferences().edit { putString("selected_vehicle_id", selectedId) }
         }
     }
 
@@ -426,7 +442,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         persistSavedVehicleProfiles(updated)
         updateVin(normalizedVin)
         _selectedSavedVehicleId.value = saved.id
-        settingsPreferences.edit { putString("selected_vehicle_id", saved.id) }
+        accountVehiclePreferences().edit { putString("selected_vehicle_id", saved.id) }
         _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_profile_review_required)
     }
 
@@ -475,7 +491,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun markSavedVehicleSelectionDirty() {
         if (_selectedSavedVehicleId.value == null) return
         _selectedSavedVehicleId.value = null
-        settingsPreferences.edit { remove("selected_vehicle_id") }
+        accountVehiclePreferences().edit { remove("selected_vehicle_id") }
     }
 
     fun updateVehicle(
