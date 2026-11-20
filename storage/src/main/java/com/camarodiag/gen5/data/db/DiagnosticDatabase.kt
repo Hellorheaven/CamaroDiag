@@ -46,7 +46,7 @@ abstract class DiagnosticDatabase : RoomDatabase() {
     abstract fun sessionDao(): DiagnosticSessionDao
 
     companion object {
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Preserve old history without assigning it silently to a new user.
                 db.execSQL("ALTER TABLE diagnostic_sessions ADD COLUMN ownerUid TEXT NOT NULL DEFAULT ''")
