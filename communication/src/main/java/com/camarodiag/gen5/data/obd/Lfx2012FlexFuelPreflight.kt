@@ -75,7 +75,12 @@ object Lfx2012FlexFuelPreflight {
             normalized.startsWith("demo") ||
             normalized.startsWith("sample") ||
             normalized.startsWith("simulated") ||
-            normalized == "n/a" || normalized == "none" || normalized == "null"
+            normalized == "n/a" || normalized == "none" || normalized == "null" ||
+            normalized == "not available" || normalized == "not supported" ||
+            normalized == "pending" || normalized == "tbd" || normalized == "test" ||
+            normalized == "0x" || normalized == "-" ||
+            normalized.all { it == '0' || it == 'x' } ||
+            normalized.all { it == 'f' || it == 'x' }
     }
 
     private fun isVin(value: String?): Boolean =
