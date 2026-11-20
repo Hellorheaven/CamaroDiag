@@ -760,4 +760,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULAÇÃO: estes identificadores ECU não foram lidos de um veículo real e não validam o seu firmware.</string>
     <string name="cal_expert_block_memory_map">O mapa de memória de destino e as regiões protegidas não estão verificados.</string>
     <string name="flexfuel_preflight_backup">A cópia de segurança original da ECU não foi verificada.</string>
+    <string name="cal_expert_title">Modo especialista — ECU em bancada / chip</string>
+    <string name="cal_expert_expand">Configurar modo especialista</string>
+    <string name="cal_expert_collapse">Ocultar configuração avançada</string>
+    <string name="cal_expert_family">Família do controlador (E39 ou E39A)</string>
+    <string name="cal_expert_chip">Marcação do chip observada</string>
+    <string name="cal_expert_programmer">Programador de bancada / interface</string>
+    <string name="cal_expert_access_title">Método de acesso</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Memória externa, chip removido</string>
+    <string name="cal_expert_region_title">Região de memória</string>
+    <string name="cal_expert_region_pflash">Flash de programa interna do MCU</string>
+    <string name="cal_expert_region_dflash">Flash de dados do MCU</string>
+    <string name="cal_expert_region_eeprom">EEPROM externa</string>
+    <string name="cal_expert_blockers">Verificações avançadas pendentes</string>
+    <string name="cal_expert_block_controller">Verifique a família exata do controlador (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identifique a marcação física do MCU ou chip de memória.</string>
+    <string name="cal_expert_block_programmer">Identifique um programador de bancada compatível.</string>
+    <string name="cal_expert_block_image_missing">Importe uma imagem de firmware não vazia.</string>
+    <string name="cal_expert_block_image_format">É necessário um ficheiro binário bruto para este fluxo.</string>
 </resources>
