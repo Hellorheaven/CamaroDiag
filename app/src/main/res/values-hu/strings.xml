@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Adapter IP-címe</string>
     <string name="adapter_tcp_port">TCP-port (általában 35000 vagy 23)</string>
     <string name="adapter_connect_wifi">Csatlakozás Wi-Fi-n</string>
+    <string name="obd_connect_adapter_notice">Csatlakoztasson valódi OBD-adaptert a vizsgálat előtt. A demó mód nem gyárt fiktív eredményeket.</string>
+    <string name="obd_offline_simulation_notice">OFFLINE SZIMULÁCIÓ — az alábbi VIN, CAL ID, CVN, DTC-k és mérések szintetikusak, nem valódi Camaróból származnak.</string>
+    <string name="obd_vehicle_ecu_identification">Jármű / ECU azonosítása</string>
+    <string name="obd_no_live_data">Nem érkezett használható élő PID-adat.</string>
+    <string name="obd_no_dtcs">A 03/07/0A szabványos szolgáltatások nem adtak vissza DTC-kódot.</string>
+    <string name="obd_no_freeze_frame">Nincs használható kimerevített adat.</string>
+    <string name="obd_simulation_scope">Hatókör: csak előre meghatározott bemutató adatok. Valódi adaptert, ECU-t vagy járművet nem kérdez le.</string>
+    <string name="vehicle_vin_hint">Adja meg a valódi VIN-t; mintaszám nem keletkezik.</string>
+    <string name="status_not_verified">NINCS ELLENŐRIZVE</string>
+    <string name="adapter_discovery_only">CSAK FELDERÍTÉS</string>
 </resources>
