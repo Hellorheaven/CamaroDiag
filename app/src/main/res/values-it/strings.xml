@@ -692,4 +692,15 @@
     <string name="live_pid_wbo2_b1s2">Sonda lambda a banda larga B1S2</string>
     <string name="live_pid_wbo2_b2s1">Sonda lambda a banda larga B2S1</string>
     <string name="live_pid_wbo2_b2s2">Sonda lambda a banda larga B2S2</string>
+    <string name="about_title">Informazioni su CamaroDiag</string>
+    <string name="about_version">Versione installata: %1$s</string>
+    <string name="about_build">Numero build: %1$d</string>
+    <string name="about_check_updates">Controlla aggiornamenti</string>
+    <string name="about_checking">Controllo in corso…</string>
+    <string name="about_up_to_date">CamaroDiag è aggiornato.</string>
+    <string name="about_update_found">È disponibile una nuova versione.</string>
+    <string name="about_channel_update_unavailable">Esiste una versione più recente, ma non è disponibile un pacchetto di aggiornamento per questo canale di installazione.</string>
+    <string name="about_check_failed">Impossibile verificare gli aggiornamenti. Controlla la connessione Internet.</string>
+    <string name="update_install_update">Installa aggiornamento</string>
+    <string name="update_version_available">Versione disponibile: %1$s</string>
 </resources>
