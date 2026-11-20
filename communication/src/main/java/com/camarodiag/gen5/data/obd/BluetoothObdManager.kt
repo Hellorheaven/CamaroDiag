@@ -140,6 +140,11 @@ class BluetoothObdManager(context: Context) {
                 outputStream = btSocket.outputStream
             }
             probeConnectedAdapter(device.name ?: "Bluetooth OBD-II", macAddress)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            // Propagate cancellation after cleanup: a replacement connection
+            // must not race the teardown of this handshake.
+            disconnect()
+            throw cancelled
         } catch (error: Exception) {
             disconnect()
             Result.failure(error)
@@ -156,6 +161,11 @@ class BluetoothObdManager(context: Context) {
             }
             activeTransport = "WIFI"
             probeConnectedAdapter("ELM327 Wi-Fi ($host:$port)", host)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            // Propagate cancellation after cleanup: a replacement connection
+            // must not race the teardown of this handshake.
+            disconnect()
+            throw cancelled
         } catch (error: Exception) {
             disconnect()
             Result.failure(error)
@@ -172,6 +182,11 @@ class BluetoothObdManager(context: Context) {
             }
             activeTransport = "USB"
             probeConnectedAdapter("ELM327 USB #$deviceId", "USB:$deviceId")
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            // Propagate cancellation after cleanup: a replacement connection
+            // must not race the teardown of this handshake.
+            disconnect()
+            throw cancelled
         } catch (error: Exception) {
             disconnect()
             Result.failure(error)
