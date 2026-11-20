@@ -208,14 +208,10 @@
     <string name="update_download_failed">فشل التنزيل.</string>
     <string name="update_download_invalid_signature">التنزيل أو التوقيع غير صالح. تم حظر التثبيت؛ وقد يلزم إعادة التثبيت يدويًا.</string>
     <string name="update_download_complete">اكتمل التنزيل.</string>
-    <string name="update_ready_to_install">CamaroDiag — جاهز للتثبيت</string>
     <string name="update_downloading">جارٍ التنزيل…</string>
-    <string name="update_available">يتوفر تحديث</string>
-    <string name="update_channel_only">يتم تقديم قناة %1$s فقط. يظل Debug هو Debug ويظل Release هو Release.</string>
     <string name="update_allow_unknown_sources">اسمح بالتثبيت من هذا المصدر، ثم عُد واضغط «تثبيت».</string>
     <string name="update_install">تثبيت</string>
     <string name="update_download">تنزيل</string>
-    <string name="update_later">لاحقًا</string>
     <string name="vehicle_generation_label">الجيل %1$d</string>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel (2012–2015)</string>
@@ -623,7 +619,6 @@
     <string name="cal_vin_matches_profile">يتطابق VIN لوحدة التحكم مع ملف المركبة المحدد.</string>
     <string name="cal_vin_mismatch_detected">عدم تطابق VIN — الملف: %1$s • ECU: %2$s</string>
     <string name="cal_vin_profile_not_set">لا يحتوي ملف المركبة المحدد على VIN صالح.</string>
-    <string name="cal_use_ecu_vin_for_current_profile">استخدام VIN لوحدة التحكم للملف الحالي</string>
     <string name="cal_vin_mismatch_title">تم اكتشاف اختلاف في VIN</string>
     <string name="cal_vin_mismatch_confirmation">VIN في الملف المحدد هو %1$s، لكن وحدة التحكم أعادت %2$s. قد تكون المركبتان مختلفتين. أنشئ ملفًا منفصلًا للحفاظ على المركبة المحددة، أو زامن VIN فقط بعد التحقق من المركبة الفعلية.</string>
     <string name="cal_vin_create_vehicle">إنشاء ملف مركبة</string>
