@@ -219,4 +219,48 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    /**
+     * Three production localization batches: console/disconnects, standard
+     * OBD signal names and safety-critical CAN / ECU programming notices.
+     * Ensure no language silently loses these explicitly translated resources.
+     */
+    @Test fun massTranslatedConsoleSensorsAndSafetyKeysExistInEveryLocale() {
+        val keys = setOf(
+            "can_sniffer_raw_heading", "can_sniffer_export_raw", "can_sniffer_dtc_heading", "connection_lost_bluetooth",
+            "connection_lost_vehicle", "connection_lost_usb", "connection_lost_wifi", "connection_lost_pc_bridge",
+            "live_sensor_search", "live_sensor_show_all", "can_console_history", "can_console_clear",
+            "can_console_empty", "can_console_tx", "can_console_rx", "can_console_system",
+            "can_console_input_label", "can_console_sending", "obd_dtc_help_unavailable", "cal_expert_no_write",
+            "flexfuel_preflight_write", "status_not_implemented", "can_trace_pid_1f", "can_trace_pid_21",
+            "can_trace_pid_2f", "can_trace_pid_31", "can_trace_pid_33", "can_trace_pid_3c",
+            "can_trace_pid_3d", "can_trace_pid_3e", "can_trace_pid_3f", "can_trace_pid_47",
+            "can_trace_pid_48", "can_trace_pid_49", "can_trace_pid_4a", "can_trace_pid_4b",
+            "can_trace_pid_4d", "can_trace_pid_4e", "can_trace_pid_5a", "can_trace_pid_5c",
+            "can_trace_pid_5d", "can_trace_pid_5e", "can_trace_pid_61", "can_trace_pid_62",
+            "can_trace_pid_63", "live_pid_ethanol", "can_trace_flow_status_cts", "can_trace_flow_status_wait",
+            "can_trace_flow_status_overflow", "can_trace_flow_status_reserved", "can_trace_exchange_heading", "can_trace_exchange_completed",
+            "can_trace_exchange_pending", "can_trace_exchange_unanswered", "can_console_raw_tx_confirm_title", "can_console_raw_tx_confirm_message",
+            "can_console_tx_unverified", "can_trace_clear_filters", "can_trace_filter_invalid", "can_trace_flow_control_heading",
+            "cal_expert_block_recovery", "cal_expert_block_driver", "cal_expert_identity_notice", "flexfuel_lfx2012_simulation_warning",
+            "cal_expert_block_memory_map", "flexfuel_preflight_backup"
+        )
+        assertEquals("Unexpected mass-translation catalogue size", 66, keys.size)
+        val source = strings("en")
+        for (locale in locales) {
+            val translated = strings(locale)
+            val missing = keys - translated.keys
+            assertTrue("Mass translation missing in $locale: ${missing.sorted()}", missing.isEmpty())
+            assertTrue("Blank mass translation in $locale",
+                keys.all { translated.getValue(it).isNotBlank() })
+            if (locale != "en") {
+                val warnings = listOf(
+                    "connection_lost_vehicle", "cal_expert_no_write",
+                    "flexfuel_preflight_write", "can_console_raw_tx_confirm_message"
+                )
+                assertTrue("Safety notices must not silently reuse English in $locale",
+                    warnings.all { translated.getValue(it) != source.getValue(it) })
+            }
+        }
+    }
+
 }
