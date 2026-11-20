@@ -57,6 +57,7 @@ fun CamaroAuthGate(
     var validatedUser by remember { mutableStateOf<com.google.firebase.auth.FirebaseUser?>(null) }
     var validationError by remember { mutableStateOf<String?>(null) }
     var retryValidation by remember { mutableIntStateOf(0) }
+    var validationGeneration by remember { mutableIntStateOf(0) }
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
     // Delay diagnostic UI until the old user's active connection and transient
     // diagnostic results have been cleared by the ViewModel.
@@ -70,6 +71,9 @@ fun CamaroAuthGate(
         }
     }
     LaunchedEffect(user, retryValidation) {
+        // A late callback from the previous FirebaseUser instance or retry may
+        // never authenticate a different validation attempt with the same UID.
+        val attempt = ++validationGeneration
         // Refreshing the current user's token must not unmount the diagnostic
         // screen every five minutes. Only an identity change hides old data.
         val identityChanged = readyAccountUid != user?.uid ||
@@ -84,9 +88,8 @@ fun CamaroAuthGate(
         validationError = null
         if (user != null) {
             val targetUid = user.uid
-            val targetAttempt = retryValidation
             user.getIdToken(true).addOnCompleteListener { task ->
-                if (auth.currentUser?.uid != targetUid || retryValidation != targetAttempt) {
+                if (auth.currentUser?.uid != targetUid || validationGeneration != attempt) {
                     return@addOnCompleteListener
                 }
                 if (task.isSuccessful) {
