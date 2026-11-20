@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
+import androidx.credentials.exceptions.NoCredentialException
 import android.content.Context
 import androidx.core.content.edit
 import com.google.firebase.FirebaseNetworkException
@@ -245,6 +246,10 @@ fun CamaroAuthGate(
                                                 }
                                             }
                                         }
+                                    } catch (_: NoCredentialException) {
+                                        linking = false
+                                        linkMessage = if (french) "Aucun compte Google disponible pour la liaison."
+                                        else "No Google account available to link."
                                     } catch (_: Exception) {
                                         linking = false
                                         linkMessage = if (french) "Liaison Google annulée ou indisponible."
@@ -475,6 +480,10 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
                             busy = false
                             message = if (french) "Compte Google non reconnu." else "Google account not recognized."
                         }
+                    } catch (_: NoCredentialException) {
+                        busy = false
+                        message = if (french) "Aucun compte Google disponible."
+                        else "No Google account is available."
                     } catch (_: Exception) {
                         busy = false
                         message = if (french) "Connexion Google annulée ou indisponible."
