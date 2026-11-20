@@ -18,6 +18,7 @@ import com.camarodiag.gen5.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -67,6 +68,12 @@ fun CamaroAuthGate(
         var deleteConfirm by remember(user.uid) { mutableStateOf(false) }
         var deleting by remember(user.uid) { mutableStateOf(false) }
         var deleteError by remember(user.uid) { mutableStateOf(false) }
+        var linking by remember(user.uid) { mutableStateOf(false) }
+        var linkPassword by remember(user.uid) { mutableStateOf("") }
+        var linkMessage by remember(user.uid) { mutableStateOf("") }
+        var accountRevision by remember(user.uid) { mutableIntStateOf(0) }
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
         val french = remember { Locale.getDefault().language == "fr" }
         Box {
             content()
@@ -76,10 +83,16 @@ fun CamaroAuthGate(
             ) { Text(if (french) "Mon compte" else "My account") }
         }
         if (accountOpen) {
+            val googleLinked = remember(user, accountRevision) {
+                user.providerData.any { it.providerId == "google.com" }
+            }
+            val passwordLinked = remember(user, accountRevision) {
+                user.providerData.any { it.providerId == "password" }
+            }
             val provider = when {
-                user.providerData.any { it.providerId == "google.com" } -> "Google"
-                user.providerData.any { it.providerId == "password" } ->
-                    if (french) "E-mail / mot de passe" else "Email / password"
+                googleLinked && passwordLinked -> if (french) "Google et e-mail" else "Google and email"
+                googleLinked -> "Google"
+                passwordLinked -> if (french) "E-mail / mot de passe" else "Email / password"
                 else -> if (french) "Autre fournisseur" else "Other provider"
             }
             AlertDialog(
@@ -94,7 +107,85 @@ fun CamaroAuthGate(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(12.dp))
-                        TextButton(enabled = !deleting, onClick = { deleteConfirm = true }) {
+                        if (passwordLinked && !googleLinked && user.isEmailVerified) {
+                            TextButton(enabled = !linking, onClick = {
+                                linking = true
+                                linkMessage = ""
+                                scope.launch {
+                                    try {
+                                        val option = GetGoogleIdOption.Builder()
+                                            .setServerClientId(context.getString(R.string.default_web_client_id))
+                                            .setFilterByAuthorizedAccounts(false)
+                                            .build()
+                                        val request = GetCredentialRequest.Builder()
+                                            .addCredentialOption(option).build()
+                                        val credential = CredentialManager.create(context)
+                                            .getCredential(context, request).credential
+                                        if (credential !is CustomCredential ||
+                                            credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                                        ) {
+                                            linking = false
+                                            linkMessage = if (french) "Compte Google non reconnu." else "Google account not recognized."
+                                        } else {
+                                            val google = GoogleIdTokenCredential.createFrom(credential.data)
+                                            if (!google.id.equals(user.email, ignoreCase = true)) {
+                                                linking = false
+                                                linkMessage = if (french) "L'adresse Google doit correspondre au compte existant."
+                                                else "Google email must match the existing account."
+                                            } else {
+                                                user.linkWithCredential(
+                                                    GoogleAuthProvider.getCredential(google.idToken, null)
+                                                ).addOnCompleteListener { result ->
+                                                    linking = false
+                                                    if (result.isSuccessful) accountRevision++
+                                                    linkMessage = if (result.isSuccessful) {
+                                                        if (french) "Compte Google lié." else "Google account linked."
+                                                    } else {
+                                                        if (french) "Liaison refusée. Ce compte Google peut déjà être utilisé."
+                                                        else "Could not link Google. This Google account may already be in use."
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } catch (_: Exception) {
+                                        linking = false
+                                        linkMessage = if (french) "Liaison Google annulée ou indisponible."
+                                        else "Google account linking cancelled or unavailable."
+                                    }
+                                }
+                            }) { Text(if (french) "Lier mon compte Google" else "Link my Google account") }
+                        }
+                        if (googleLinked && !passwordLinked && !user.email.isNullOrBlank()) {
+                            OutlinedTextField(
+                                value = linkPassword,
+                                onValueChange = { linkPassword = it },
+                                singleLine = true,
+                                label = { Text(if (french) "Créer un mot de passe" else "Create a password") },
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+                            TextButton(enabled = !linking && linkPassword.length >= 6, onClick = {
+                                linking = true
+                                linkMessage = ""
+                                val credential = EmailAuthProvider.getCredential(user.email!!, linkPassword)
+                                user.linkWithCredential(credential).addOnCompleteListener { result ->
+                                    linking = false
+                                    linkPassword = ""
+                                    if (result.isSuccessful) accountRevision++
+                                    linkMessage = if (result.isSuccessful) {
+                                        if (french) "Connexion e-mail ajoutée." else "Email sign-in added."
+                                    } else {
+                                        if (french) "Impossible d'ajouter ce mot de passe."
+                                        else "Unable to add email password sign-in."
+                                    }
+                                }
+                            }) { Text(if (french) "Ajouter la connexion e-mail" else "Add email sign-in") }
+                        }
+                        if (linkMessage.isNotEmpty()) Text(linkMessage)
+                        Spacer(Modifier.height(12.dp))
+                        TextButton(enabled = !deleting && !linking, onClick = {
+                            accountOpen = false
+                            deleteConfirm = true
+                        }) {
                             Text(if (french) "Supprimer mon compte" else "Delete my account")
                         }
                         if (deleteError) Text(
@@ -119,7 +210,7 @@ fun CamaroAuthGate(
         }
         if (deleteConfirm) {
             AlertDialog(
-                onDismissRequest = { if (!deleting) deleteConfirm = false },
+                onDismissRequest = { if (!deleting) { deleteConfirm = false; accountOpen = true } },
                 title = { Text(if (french) "Supprimer définitivement le compte ?" else "Permanently delete account?") },
                 text = {
                     Text(
@@ -142,13 +233,17 @@ fun CamaroAuthGate(
                                 signOut()
                             } else {
                                 deleteConfirm = false
+                                accountOpen = true
                                 deleteError = true
                             }
                         }
                     }) { Text(if (french) "Supprimer" else "Delete") }
                 },
                 dismissButton = {
-                    TextButton(enabled = !deleting, onClick = { deleteConfirm = false }) {
+                    TextButton(enabled = !deleting, onClick = {
+                        deleteConfirm = false
+                        accountOpen = true
+                    }) {
                         Text(if (french) "Annuler" else "Cancel")
                     }
                 }
