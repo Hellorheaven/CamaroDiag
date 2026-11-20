@@ -216,9 +216,9 @@
     <string name="vm_no_obd_data_read">Demo mode or no OBD adapter connected: no real ECU data was read.</string>
     <string name="update_download_failed">Download failed.</string>
     <string name="update_download_invalid_signature">Download or signature invalid. Installation blocked; manual reinstall may be needed.</string>
-    <string name="update_download_complete">Download complete.</string>
+    <string name="update_download_complete">Update downloaded. Opening installer…</string>
     <string name="update_downloading">Downloading</string>
-    <string name="update_allow_unknown_sources">Allow installs from this source, return and press Install.</string>
+    <string name="update_allow_unknown_sources">Allow installs from CamaroDiag. The installer will open automatically when you return.</string>
     <string name="update_install">Install</string>
     <string name="update_download">Download</string>
     <string name="vehicle_generation_label">Generation %1$d</string>
@@ -471,7 +471,7 @@
     <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
     <string name="cal_mode09_cvn_label">CVN • 09 06</string>
     <string name="cal_file_hash_label">SHA-256</string>
-    <string name="update_version_channel">Version %1$s • %2$s</string>
+    <string name="update_version_available">Available version: %1$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
     <plurals name="vm_native_catalog_loaded">
         <item quantity="one">First-party Camaro profile: %1$d for model year %2$d. Live reads require vehicle evidence.</item>
