@@ -72,6 +72,15 @@ class Lfx2012ControllerReferencesTest {
         ))
     }
 
+    @Test fun e39FamilyMatchingAvoidsSubstringFalsePositives() {
+        assertTrue(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel("ACDelco E39 ECM"))
+        assertTrue(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel("E39A / ECM"))
+        assertFalse(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel("E390"))
+        assertFalse(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel("XXE39"))
+        assertFalse(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel("DEMO E39"))
+        assertFalse(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel(null))
+    }
+
     @Test fun aCompleteReadOnlyFingerprintNeverAuthorizesAWrite() {
         val vehicle = Lfx2012FlexFuelPreflight.Vehicle(
             2012, "LFX", 5, "2G1FF3D36C9104199", "2G1FF3D36C9104199"
