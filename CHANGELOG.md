@@ -2,7 +2,20 @@
 
 Toutes les dates sont en UTC sauf indication contraire. Ce journal conserve les décisions et changements confirmés. Il ne remplace pas l'état GitHub en temps réel : consulter les PR, commits et workflows pour connaître la situation actuelle.
 
-## 2026-11-19
+## 2026-11-20
+
+## 2026-11-20
+
+### Application — À propos et mises à jour
+- Ajout d'une rubrique « À propos » dans les réglages avec affichage du nom, de la version installée et du numéro de build Android.
+- Ajout d'une vérification manuelle des releases GitHub, avec distinction entre les canaux Debug et Release.
+- Téléchargement de l'APK correspondant au canal installé, puis proposition d'installation Android.
+- Vérification du nom de package et de la signature APK avant d'autoriser l'installation ; aucun APK de canal différent n'est proposé.
+- La vérification n'est plus déclenchée automatiquement à l'ouverture de l'application : elle est lancée depuis la rubrique « À propos ».
+- Traductions anglaise et française ajoutées ; les autres langues utilisent les ressources anglaises par défaut.
+- Version Android actuelle issue de `version.properties` : 2.0.0 (versionCode 17). Aucun numéro de version n'a été incrémenté pour cette modification.
+
+# 2026-11-19
 
 ### Documentation de continuité
 - Création de `docs/PROMPT_REPRISE.md` comme point d'entrée pour reprendre le projet dans un nouveau chat sans perdre les décisions, contraintes, contexte matériel, périmètres de PR et procédure de reprise.
