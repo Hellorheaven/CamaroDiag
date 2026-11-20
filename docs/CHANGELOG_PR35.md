@@ -28,3 +28,8 @@
 - L'historique chronologique RX/TX et le texte déjà capturé restent consultables après une déconnexion ou un changement d'adaptateur ; seul l'effacement demandé par l'utilisateur les supprime.
 - Les échanges Bluetooth classiques signalent explicitement une connexion fermée ou une fin de flux, au lieu de traiter ces situations comme une réponse valide.
 - Le message de connexion perdue précise désormais si la liaison concernée est Bluetooth, USB, Wi-Fi ou pont PC.
+
+- Ajout de la connexion utilisateur avec Google ou e-mail/mot de passe (évolution #53, intégration en cours).
+- Ajout de la création de compte, du lien de vérification e-mail, de la récupération du mot de passe et de la déconnexion.
+- Accès à CamaroDiag conditionné à la présence d'une session authentifiée ; configuration Firebase Release et Debug enregistrée.
+- Validation sur appareil et empreintes SHA Google encore nécessaires ; aucun build ni test d'authentification confirmé à ce stade.
