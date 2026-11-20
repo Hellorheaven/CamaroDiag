@@ -1,5 +1,5 @@
 name: PR35 manual validation kickoff
-# Checkpoint 7: validate CAN TX cancellation, J2534 disconnect and account-switch connection cleanup.
+# Checkpoint 8: validate detached CAN capture/TX cleanup and connection lifecycle after checkpoint 7.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
