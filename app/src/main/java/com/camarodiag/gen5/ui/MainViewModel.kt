@@ -314,8 +314,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // succeeds. Never tear down the replacement adapter for that old error.
         if (error is ObdSupersededSessionException) return
         if (!ObdTransportFailurePolicy.isConnectionLoss(error)) return
-        stopCanMonitor()
-        canRequestJob?.cancel()
+        discardCanMonitor()
+        detachCanRequest()
+        _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+            isCapturing = false,
+            isSendingRequest = false
+        )
         _isStreamingLive.value = false
         _livePids.value = emptyList()
         if (_liveRecordingState.value.isRecording) {
