@@ -826,4 +826,7 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULATION: these ECU identifiers were not read from a real vehicle and cannot validate its firmware.</string>
     <string name="cal_expert_access_obd">OBD diagnostics / in-vehicle access (not a bench programmer)</string>
     <string name="cal_expert_access_bench">BENCH / removed ECU power and signal connection</string>
+    <string name="flexfuel_lfx2012_audit_title">LFX 2012: before/after programming audit (read only)</string>
+    <string name="flexfuel_lfx2012_audit_summary">Observed before-programming checks: %1$d / %2$d. Missing data remain unverified.</string>
+    <string name="flexfuel_lfx2012_audit_post_not_performed">After-programming audit not performed. No ECU programming or post-flash vehicle test has been validated.</string>
 </resources>
