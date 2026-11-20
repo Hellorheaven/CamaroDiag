@@ -318,6 +318,7 @@ class BluetoothObdManager(context: Context) {
         durationMs: Long = 10_000L,
         onChunk: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
+        val requestedEpoch = transportSessionEpoch.capture()
         check(isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive) {
             "Live CAN monitoring requires a connected physical OBD command adapter."
         }
@@ -331,6 +332,8 @@ class BluetoothObdManager(context: Context) {
         }
 
         commandSessionMutex.withLock {
+            transportSessionEpoch.requireCurrent(requestedEpoch)
+            check(isObdCommandChannelAvailable) { "CAN monitor connection changed while waiting." }
             val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
             // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
             // STM uses the current filter table, so clear it for this bounded session and restore
@@ -396,6 +399,7 @@ class BluetoothObdManager(context: Context) {
      * path never routes through the demo adapter or the ISO-TP-only J2534 bridge.
      */
     suspend fun sendRawCanFrame(frame: RawCanFrame): String = withContext(Dispatchers.IO) {
+        val requestedEpoch = transportSessionEpoch.capture()
         check(isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive) {
             "Raw CAN transmission requires a connected physical adapter."
         }
@@ -416,6 +420,8 @@ class BluetoothObdManager(context: Context) {
         }
 
         commandSessionMutex.withLock {
+            transportSessionEpoch.requireCurrent(requestedEpoch)
+            check(isObdCommandChannelAvailable) { "CAN transmission connection changed while waiting." }
             val protocol = if (frame.isExtended) "7" else "6"
             val header = if (frame.isExtended) {
                 frame.canId.toString(16).uppercase().padStart(8, '0')
