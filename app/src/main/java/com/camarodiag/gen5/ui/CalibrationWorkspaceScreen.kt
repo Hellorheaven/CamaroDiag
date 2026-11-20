@@ -271,6 +271,14 @@ fun CalibrationWorkspaceScreen(
                     .takeIf { it.isNotBlank() && it != unavailable && it.contains("E39", ignoreCase = true) }
                 val reportedCalibrationId = state.calibrationIdResponse.trim()
                     .takeIf { it.isNotBlank() && it != unavailable }
+                val completeReadOnlyFingerprint =
+                    Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+                        Lfx2012ControllerReferences.ObservedIdentity(
+                            ecuName = recognizedEcuName,
+                            calibrationIds = listOf(state.calibrationIdResponse),
+                            calibrationVerificationNumbers = listOf(state.cvnResponse)
+                        )
+                    )
                 val ecuVin = state.ecuVinResponse.trim().uppercase()
                     .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                 val evidence = Lfx2012FlexFuelPreflight.Evidence(
@@ -305,6 +313,10 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(R.string.flexfuel_lfx2012_calid_label,
                             reportedCalibrationId ?: unavailable),
                             color = TextMuted, fontSize = 11.sp)
+                        if (!completeReadOnlyFingerprint) {
+                            Text(stringResource(R.string.flexfuel_lfx2012_fingerprint_incomplete),
+                                color = WarnRed, fontSize = 11.sp)
+                        }
                         Text(stringResource(R.string.flexfuel_lfx2012_boot,
                             Lfx2012ControllerReferences.associatedMainBootFile),
                             color = TextMuted, fontSize = 11.sp)
