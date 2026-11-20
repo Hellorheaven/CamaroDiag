@@ -1191,6 +1191,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Clears the single chronological console history and its raw capture buffer. */
     fun clearCanConsoleHistory() {
         val current = _liveCanMonitorState.value
+        // Keep an in-flight TX paired with its eventual RX/SYSTEM result.
+        // The UI disables Clear while sending; this guard protects other callers too.
+        if (current.isSendingRequest) return
         _liveCanMonitorState.value = current.copy(
             rawText = "",
             report = null,
