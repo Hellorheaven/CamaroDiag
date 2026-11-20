@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class DiagnosticDatabaseMigrationTest {
     @Test
-    fun versionOneHistorySurvivesAccountOwnershipMigration() = runBlocking {
+    fun versionOneHistorySurvivesAccountOwnershipMigration(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "camarodiag-migration-test.db"
         context.deleteDatabase(name)
@@ -49,14 +49,16 @@ class DiagnosticDatabaseMigrationTest {
             val migrated = Room.databaseBuilder(context, DiagnosticDatabase::class.java, name)
                 .addMigrations(DiagnosticDatabase.MIGRATION_1_2)
                 .build()
-            migrated.use { db ->
-                assertEquals(1, db.sessionDao().countUnassignedSessions())
-                assertTrue(db.sessionDao().observeSessionsForOwner("account-A").first().isEmpty())
-                db.sessionDao().claimUnassignedSessions("account-A")
+            try {
+                assertEquals(1, migrated.sessionDao().countUnassignedSessions())
+                assertTrue(migrated.sessionDao().observeSessionsForOwner("account-A").first().isEmpty())
+                migrated.sessionDao().claimUnassignedSessions("account-A")
                 assertEquals(
                     listOf("LEGACY-VIN"),
-                    db.sessionDao().observeSessionsForOwner("account-A").first().map { it.vin }
+                    migrated.sessionDao().observeSessionsForOwner("account-A").first().map { it.vin }
                 )
+            } finally {
+                migrated.close()
             }
         } finally {
             context.deleteDatabase(name)
