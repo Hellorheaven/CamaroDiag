@@ -19,4 +19,14 @@
     <string name="tab_guide">Rokasgrāmata</string>
     <string name="tab_controls">Vadība</string>
     <string name="tab_settings">Iestatījumi</string>
+    <string name="common_connect">Savienot</string>
+    <string name="common_refresh">Atsvaidzināt</string>
+    <string name="status_offline">Bezsaistē</string>
+    <string name="obd_not_available">Nav pieejams</string>
+    <string name="obd_run_full_scan">Sākt pilnu skenēšanu</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokols</string>
+    <string name="obd_dtc_title">Diagnostikas kļūdu kodi</string>
+    <string name="obd_adapter_voltage">Adaptera spriegums</string>
+    <string name="obd_supported_pids">Atbalstītie PID</string>
 </resources>
