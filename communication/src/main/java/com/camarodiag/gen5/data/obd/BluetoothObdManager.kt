@@ -487,6 +487,7 @@ class BluetoothObdManager(context: Context) {
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     ensureSameSession()
                     val n = usbTransport.read(bytes, 100)
+                    ensureSameSession()
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                         val payloadChunk = chunk.substringBefore('>')
@@ -508,6 +509,7 @@ class BluetoothObdManager(context: Context) {
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     ensureSameSession()
                     val n = bleTransport.read(bytes, 100)
+                    ensureSameSession()
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                         val payloadChunk = chunk.substringBefore('>')
@@ -528,6 +530,7 @@ class BluetoothObdManager(context: Context) {
                     ensureSameSession()
                     try {
                         val n = wifiTransport.read(bytes)
+                        ensureSameSession()
                         if (n > 0) {
                             val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                             val payloadChunk = chunk.substringBefore('>')
@@ -553,8 +556,10 @@ class BluetoothObdManager(context: Context) {
                     throw ObdTransportDisconnectedException("Bluetooth OBD adapter is not connected")
                 }
                 while (inp.available() > 0) {
+                    ensureSameSession()
                     if (inp.read() < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
                 }
+                ensureSameSession()
                 out.write(payload); out.flush()
                 val buffer = StringBuilder()
                 val callbackBuffer = StringBuilder()
@@ -564,6 +569,7 @@ class BluetoothObdManager(context: Context) {
                     ensureSameSession()
                     if (inp.available() > 0) {
                         val received = inp.read()
+                        ensureSameSession()
                         if (received < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
                         val char = received.toChar()
                         if (char == '>') {
