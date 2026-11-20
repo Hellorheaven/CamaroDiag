@@ -29,6 +29,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
+      validated_sha: ${{ steps.resolve_revision.outputs.sha }}
       windows_changed: ${{ steps.windows_changes.outputs.windows_changed }}
       current_windows_changed: ${{ steps.windows_changes.outputs.current_windows_changed }}
       build_required: ${{ steps.checkpoint.outputs.build_required }}
@@ -41,6 +42,11 @@ jobs:
         with:
           ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      - name: Capture exact checked-out revision
+        id: resolve_revision
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Detect Windows-relevant changes
         id: windows_changes
@@ -203,7 +209,7 @@ jobs:
       - name: Checkout pull request commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
+          ref: ${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v6
