@@ -174,7 +174,7 @@ Respecter les dépendances précisées dans ce document et ouvrir une PR distinc
 - État observé : **Open, Draft, non fusionnée**. Ne pas fusionner sans autorisation explicite de l'utilisateur.
 - Branche de travail : `feat/live-can-monitor`.
 - Branches existantes vérifiées : uniquement `main` et `feat/live-can-monitor`. Conserver strictement ces deux branches et une seule PR ; ne créer ni branche ni PR supplémentaire sans accord explicite.
-- Dernière photographie GitHub vérifiée le 20 novembre 2026, avant la présente mise à jour du prompt sur `main` : PR head `5fb56de19ac5c36780bbfb439577256544058b4c`, 560 commits d'avance sur `main`, 0 en retard, 63 fichiers modifiés. Le SHA changera lors des prochains commits ; toujours rafraîchir ces données au démarrage d'un nouveau chat. Ces chiffres sont une photographie et doivent être rafraîchis au démarrage de tout nouveau chat.
+- Dernière photographie GitHub vérifiée le 20 novembre 2026, avant la présente synchronisation : PR head `59f850e6960b2bdbc0b8cb240d52cf02fb809842`, 583 commits d'avance sur `main`, 1 en retard, 63 fichiers modifiés. Le SHA changera lors des prochains commits ; toujours rafraîchir ces données au démarrage d'un nouveau chat. Ces chiffres sont une photographie et doivent être rafraîchis au démarrage de tout nouveau chat.
 - PR : https://github.com/Hellorheaven/CamaroDiag/pull/35
 - Le périmètre reste le module unifié Sniffer / Console CAN. L'envoi de commandes/trames est autorisé dans l'interface uniquement lorsque les capacités réelles du matériel et du réseau le permettent.
 - Aucun merge n'a été effectué.
@@ -189,6 +189,13 @@ Respecter les dépendances précisées dans ce document et ouvrir une PR distinc
 - Test unitaire ajouté : `communication/src/test/java/com/camarodiag/gen5/data/obd/ObdReadWakeupTest.kt`.
 - Ces changements sont **codés mais pas encore validés par exécution**. Le test ciblé, la suite des tests, lint et builds Android/Windows doivent encore être exécutés sur un SHA précis. Aucun essai physique BLE n'a été possible.
 
+**Connexions et écrans : jalon de travail du 20 novembre**
+- La PR #35 comprend maintenant des corrections additionnelles sur les reconnexions USB/Wi-Fi et Bluetooth classique, le suivi du pont PC J2534 et la fermeture immédiate des lectures/écritures après coupure.
+- Le ViewModel propage les pertes physiques détectées aux lectures UDS/OBDb, scans DTC/OBD, identification ECU, audit kilométrique et télémétrie. Le flux/son enregistrement s'arrêtent à la coupure, sans reprise silencieuse.
+- La console CAN conserve l'historique RX/TX après une coupure ou changement d'adaptateur.
+- Les messages de déconnexion distinguent Bluetooth, USB, Wi-Fi et pont PC, avec chaînes FR/EN.
+- Le suivi de l'issue #43 et le changelog de la PR ont été mis à jour. **Toutes ces évolutions restent non validées par compilation, tests, lint ou essais physiques sur le dernier head.**
+
 **Documentation utilisateur**
 - Guides réécrits : analyse de traces CAN/UDS, utilisation ELM327, disponibilité des signaux Camaro et matrice de compatibilité Camaro/adaptateurs.
 - README complété avec des liens vers les guides.
@@ -202,7 +209,7 @@ Respecter les dépendances précisées dans ce document et ouvrir une PR distinc
 - Ne fermer aucune issue avant intégration à `main`, tests/builds réels, documentation et accord utilisateur.
 
 **Validation**
-- Sur le head `5fb56de19ac5c36780bbfb439577256544058b4c`, aucun workflow PR n'a été retourné par la vérification GitHub effectuée le 20 novembre.
+- Sur le head `59f850e6960b2bdbc0b8cb240d52cf02fb809842`, aucun workflow PR n'a été retourné par la vérification GitHub effectuée le 20 novembre.
 - Pas de preuve d'exécution du nouveau test unitaire, de la suite complète, de lint, d'un APK Debug/Release ou des packages Windows sur ce head.
 - Aucun test sur une Camaro ou un adaptateur physique n'a été réalisé. Le véhicule et l'adaptateur ne doivent pas être déclarés validés sur cette base.
 
