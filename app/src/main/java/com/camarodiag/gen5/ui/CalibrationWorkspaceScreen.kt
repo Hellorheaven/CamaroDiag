@@ -283,12 +283,12 @@ fun CalibrationWorkspaceScreen(
                 val reportedCalibrationId = state.calibrationIdResponse.trim()
                     .takeIf { it.isNotBlank() && it != unavailable }
                 val completeReadOnlyFingerprint =
-                    !state.ecuIdentityFromSimulation &&
                     Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
                         Lfx2012ControllerReferences.ObservedIdentity(
                             ecuName = recognizedEcuName,
                             calibrationIds = listOf(state.calibrationIdResponse),
-                            calibrationVerificationNumbers = listOf(state.cvnResponse)
+                            calibrationVerificationNumbers = listOf(state.cvnResponse),
+                            simulated = state.ecuIdentityFromSimulation
                         )
                     )
                 val responderAttribution =
