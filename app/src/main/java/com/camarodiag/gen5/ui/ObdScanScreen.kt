@@ -1,5 +1,6 @@
 package com.camarodiag.gen5.ui
 
+import androidx.core.content.edit
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -127,7 +128,7 @@ fun ObdScanScreen(
                     chosenPids = pendingPids.distinct()
                     selectionApplied = true
                     preferenceKey?.let { key ->
-                        preferences.edit().putString(key, chosenPids.joinToString(",")).apply()
+                        preferences.edit { putString(key, chosenPids.joinToString(",")) }
                     }
                     choosingSensors = false
                 }) { Text(stringResource(R.string.obd_sensor_ok)) }
