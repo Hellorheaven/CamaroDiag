@@ -49,4 +49,5 @@
     <string name="obd_scan_title">PILNA OBD-II SKENĒŠANA</string>
     <string name="obd_readiness">OBD gatavība</string>
     <string name="obd_mode06_results">06. režīma rezultāti</string>
+    <string name="system_language_follow_phone">Sekot tālruņa valodai</string>
 </resources>
