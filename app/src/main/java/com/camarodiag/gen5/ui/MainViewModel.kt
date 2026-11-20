@@ -121,8 +121,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // A connection started under another Firebase account must never
         // complete after the garage and session ownership have changed.
         connectionAttemptGeneration++
+        // Retain the cancelled job until the next connection can join its
+        // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
-        connectionAttemptJob = null
         _savedSessions.value = emptyList()
         _activeAccountUid.value = accountUid
         discardCanMonitor()
@@ -322,8 +323,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (error is ObdSupersededSessionException) return
         if (!ObdTransportFailurePolicy.isConnectionLoss(error)) return
         connectionAttemptGeneration++
+        // Retain the cancelled job until the next connection can join its
+        // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
-        connectionAttemptJob = null
         discardCanMonitor()
         detachCanRequest()
         _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
