@@ -1387,8 +1387,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
     fun startCanMonitor(durationMs: Long = Long.MAX_VALUE) {
-        if (canMonitorJob?.isActive == true || detachedCanMonitorJob?.isActive == true ||
-            canRequestJob?.isActive == true || detachedCanRequestJob?.isActive == true
+        if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
+            canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
         ) return
         if (!obdManager.isObdCommandChannelAvailable || !_adapter.value.supportsCanHeaders) {
             val unavailable = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
@@ -1584,9 +1584,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun stopCanMonitor() {
         val activeJob = canMonitorJob ?: return
         activeJob.cancel()
-        _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isCapturing = false)
-        // Do not detach here: the capture cleanup must send ESC before a
-        // new request is allowed to take over the adapter command channel.
+        // Leave capture marked active until ESC cleanup and the file writer have closed.
+        // If the lazy job was cancelled before entering its body, no finally block runs:
+        // the join fallback clears that case without enabling export too early.
+        viewModelScope.launch {
+            activeJob.join()
+            if (canMonitorJob === activeJob) {
+                canMonitorJob = null
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isCapturing = false)
+            }
+        }
+        // Do not detach: a later request must not overtake the adapter cleanup.
     }
 
     /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
