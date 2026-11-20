@@ -15,6 +15,7 @@ object EcuBenchExpertPlan {
     enum class Blocker {
         CONTROLLER_NOT_IDENTIFIED,
         CHIP_NOT_IDENTIFIED,
+        ACCESS_REGION_INCOMPATIBLE,
         PROGRAMMER_NOT_IDENTIFIED,
         IMAGE_MISSING,
         IMAGE_NOT_RAW_BINARY,
@@ -58,6 +59,9 @@ object EcuBenchExpertPlan {
         if (target.chipMarking.isNullOrBlank() ||
             target.chipMarking.trim().equals("unknown", ignoreCase = true)
         ) missing += Blocker.CHIP_NOT_IDENTIFIED
+        if ((target.accessMethod == AccessMethod.EXTERNAL_CHIP_OFF) !=
+            (target.region == MemoryRegion.EXTERNAL_EEPROM)
+        ) missing += Blocker.ACCESS_REGION_INCOMPATIBLE
         if (target.programmerName.isNullOrBlank()) missing += Blocker.PROGRAMMER_NOT_IDENTIFIED
         if (image?.fileName.isNullOrBlank() || (image?.sizeBytes ?: 0L) <= 0L) {
             missing += Blocker.IMAGE_MISSING
