@@ -29,22 +29,25 @@ class EcuBackupArchiveTest {
 
     @Test fun missingIndependentReadIsRejected() {
         val archive = ByteArrayOutputStream()
-        EcuBackupArchive.export(archive, listOf(capture().copy(independentRead = null)),
-            setOf(EcuBackupCoverage.Region.CALIBRATION))
-        val failure = runCatching { EcuBackupArchive.import(ByteArrayInputStream(archive.toByteArray())) }
+        val failure = runCatching {
+            EcuBackupArchive.export(archive, listOf(capture().copy(independentRead = null)),
+                setOf(EcuBackupCoverage.Region.CALIBRATION))
+        }
         assertTrue(failure.isFailure)
+        assertEquals(0, archive.size())
     }
 
     @Test fun conflictingIndependentReadIsRejected() {
         val archive = ByteArrayOutputStream()
-        EcuBackupArchive.export(
-            archive,
-            listOf(capture().copy(independentRead = byteArrayOf(1, 2, 3, 9))),
-            setOf(EcuBackupCoverage.Region.CALIBRATION)
-        )
-        assertTrue(runCatching {
-            EcuBackupArchive.import(ByteArrayInputStream(archive.toByteArray()))
-        }.isFailure)
+        val failure = runCatching {
+            EcuBackupArchive.export(
+                archive,
+                listOf(capture().copy(independentRead = byteArrayOf(1, 2, 3, 9))),
+                setOf(EcuBackupCoverage.Region.CALIBRATION)
+            )
+        }
+        assertTrue(failure.isFailure)
+        assertEquals(0, archive.size())
     }
 
     @Test fun unexpectedArchiveEntryIsRejected() {
