@@ -701,4 +701,26 @@
     <string name="update_install_update">Update installieren</string>
     <string name="update_version_available">Verfügbare Version: %1$s</string>
     <string name="system_language_follow_phone">Sprache des Telefons verwenden</string>
+    <string name="can_sniffer_raw_heading">Rohausgabe des CAN-Adapters</string>
+    <string name="can_sniffer_export_raw">Rohprotokoll exportieren</string>
+    <string name="can_sniffer_dtc_heading">Erkannte OBD-II-Fehlercodes</string>
+    <string name="connection_lost_bluetooth">Bluetooth-Verbindung unterbrochen. Adapter erneut verbinden und Vorgang neu starten.</string>
+    <string name="connection_lost_vehicle">Fahrzeugverbindung unterbrochen. Erneut mit dem Fahrzeug verbinden und Vorgang neu starten.</string>
+    <string name="connection_lost_usb">USB-Adapter getrennt. Adapter erneut verbinden und Vorgang neu starten.</string>
+    <string name="connection_lost_wifi">OBD-WLAN-Verbindung unterbrochen. Adapter erneut verbinden und Vorgang neu starten.</string>
+    <string name="connection_lost_pc_bridge">Verbindung zur PC-Diagnosebrücke unterbrochen. PC-Brücke erneut verbinden und Vorgang neu starten.</string>
+    <string name="live_sensor_search">Sensoren suchen</string>
+    <string name="live_sensor_show_all">Alle Sensoren anzeigen</string>
+    <string name="can_console_history">Gemeinsamer CAN-Konsolenverlauf</string>
+    <string name="can_console_clear">Verlauf löschen</string>
+    <string name="can_console_empty">Noch keine Datenübertragung. Empfangene und gesendete Daten erscheinen hier.</string>
+    <string name="can_console_tx">TX • GESENDET</string>
+    <string name="can_console_rx">RX • EMPFANGEN</string>
+    <string name="can_console_system">SYSTEM</string>
+    <string name="can_console_input_label">CAN-Frame oder OBD-Befehl</string>
+    <string name="can_console_sending">Wird gesendet…</string>
+    <string name="obd_dtc_help_unavailable">Für diesen Fehlercode und dieses Fahrzeug liegen noch keine verifizierten Reparaturhinweise vor. Vor Reparaturen die Serviceinformationen des Herstellers prüfen.</string>
+    <string name="cal_expert_no_write">Programmierung erst nach Implementierung und Validierung eines unterstützten Prüfstandtreibers verfügbar.</string>
+    <string name="flexfuel_preflight_write">Das Schreiben der ECU-Kalibrierung ist nicht validiert und bleibt deaktiviert.</string>
+    <string name="status_not_implemented">NICHT IMPLEMENTIERT</string>
 </resources>
