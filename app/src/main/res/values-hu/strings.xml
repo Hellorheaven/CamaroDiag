@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Tényleges motornyomaték</string>
     <string name="can_trace_pid_63">Motor referencia-nyomatéka</string>
     <string name="live_pid_ethanol">Etanoltartalom</string>
+    <string name="can_trace_flow_status_cts">Küldés folytatása</string>
+    <string name="can_trace_flow_status_wait">Várakozás</string>
+    <string name="can_trace_flow_status_overflow">Túlcsordulás</string>
+    <string name="can_trace_flow_status_reserved">Fenntartott állapot</string>
+    <string name="can_trace_exchange_heading">UDS-kérések és válaszok váltása</string>
+    <string name="can_trace_exchange_completed">Befejezve</string>
+    <string name="can_trace_exchange_pending">Válaszra vár (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Nem érkezett válasz</string>
+    <string name="can_console_raw_tx_confirm_title">Nyers CAN-átvitel megerősítése</string>
+    <string name="can_console_raw_tx_confirm_message">Ez a művelet közvetlenül a jármű CAN-buszára küld egy keretet. A hibás keret befolyásolhatja a vezérlőegységeket. Csak akkor küldjön, ha ismeri a célbuszt és az azonosítót.</string>
+    <string name="can_console_tx_unverified">A nyers CAN-küldés le van tiltva: az írásmentes ellenőrző kérésre nem érkezett valódi ECU-válasz.</string>
+    <string name="can_trace_clear_filters">Szűrők törlése</string>
+    <string name="can_trace_filter_invalid">Érvénytelen CAN-azonosító vagy adat-előtag.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP áramlásvezérlés</string>
+    <string name="cal_expert_block_recovery">Ehhez a pontos célhoz nincs ellenőrzött helyreállítási eljárás.</string>
+    <string name="cal_expert_block_driver">Nincs csatlakoztatva ellenőrzött hardverprogramozó illesztőprogram.</string>
+    <string name="cal_expert_identity_notice">A beírt címkék és fájlkivonatok megfigyelések, nem bizonyítják a hardver kompatibilitását.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SZIMULÁCIÓ: ezeket az ECU-azonosítókat nem valós járműből olvasták ki, ezért nem igazolják annak firmware-ét.</string>
+    <string name="cal_expert_block_memory_map">A cél memóriaelrendezése és védett területei nincsenek ellenőrizve.</string>
+    <string name="flexfuel_preflight_backup">Az eredeti ECU-mentés nincs ellenőrizve.</string>
 </resources>
