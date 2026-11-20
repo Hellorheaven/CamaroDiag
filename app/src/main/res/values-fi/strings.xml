@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Pysäytyskuva</string>
     <string name="obd_raw_scan_log">Raakaskannausloki</string>
     <string name="obd_powertrain_ecm">Voimansiirto / ECM</string>
+    <string name="vehicle_setup_header">Ajoneuvon asetukset</string>
+    <string name="vehicle_generation">Sukupolvi</string>
+    <string name="vehicle_model_year">Mallivuosi</string>
+    <string name="vehicle_engine">Moottori</string>
+    <string name="vehicle_transmission">Vaihteisto</string>
+    <string name="vehicle_market_region">Markkina-alue</string>
+    <string name="vehicle_vin">Ajoneuvon VIN</string>
+    <string name="obd_scan_title">TÄYSI OBD-II-SKANNAUS</string>
+    <string name="obd_readiness">OBD-valmius</string>
+    <string name="obd_mode06_results">Tilan 06 tulokset</string>
 </resources>
