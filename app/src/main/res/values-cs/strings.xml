@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Skutečný točivý moment motoru</string>
     <string name="can_trace_pid_63">Referenční točivý moment motoru</string>
     <string name="live_pid_ethanol">Obsah ethanolu</string>
+    <string name="can_trace_flow_status_cts">Pokračovat v odesílání</string>
+    <string name="can_trace_flow_status_wait">Čekat</string>
+    <string name="can_trace_flow_status_overflow">Přetečení</string>
+    <string name="can_trace_flow_status_reserved">Vyhrazený stav</string>
+    <string name="can_trace_exchange_heading">Výměny požadavků a odpovědí UDS</string>
+    <string name="can_trace_exchange_completed">Dokončeno</string>
+    <string name="can_trace_exchange_pending">Čeká se na odpověď (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Nebyla zaznamenána odpověď</string>
+    <string name="can_console_raw_tx_confirm_title">Potvrdit odeslání surového rámce CAN</string>
+    <string name="can_console_raw_tx_confirm_message">Tímto se rámec odešle přímo na sběrnici CAN vozidla. Nesprávný rámec může ovlivnit řídicí jednotky. Odesílejte pouze tehdy, pokud znáte cílovou sběrnici a identifikátor.</string>
+    <string name="can_console_tx_unverified">Odesílání surových rámců CAN je zakázáno: při testu přenosu pouze pro čtení nebyla zjištěna skutečná odpověď ECU.</string>
+    <string name="can_trace_clear_filters">Vymazat filtry</string>
+    <string name="can_trace_filter_invalid">Neplatné ID CAN nebo předpona dat.</string>
+    <string name="can_trace_flow_control_heading">Řízení toku ISO-TP</string>
+    <string name="cal_expert_block_recovery">Pro tento konkrétní cíl nebyl ověřen postup obnovy.</string>
+    <string name="cal_expert_block_driver">Není připojen ověřený ovladač hardwarového programování.</string>
+    <string name="cal_expert_identity_notice">Zadané názvy a otisky souborů jsou pozorování, nikoliv důkaz kompatibility hardwaru.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULACE: tyto identifikátory ECU nebyly načteny ze skutečného vozidla a nemohou ověřit jeho firmware.</string>
+    <string name="cal_expert_block_memory_map">Paměťová mapa cíle a chráněné oblasti nejsou ověřeny.</string>
+    <string name="flexfuel_preflight_backup">Původní záloha ECU nebyla ověřena.</string>
 </resources>
