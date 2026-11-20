@@ -137,4 +137,27 @@ class EcuBackupArchiveTest {
         }.isFailure)
     }
 
+    @Test fun duplicateManifestPropertiesAreRejected() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val altered = ByteArrayOutputStream()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(original.toByteArray())).use { source ->
+            ZipOutputStream(altered).use { target ->
+                while (true) {
+                    val entry = source.nextEntry ?: break
+                    target.putNextEntry(ZipEntry(entry.name))
+                    target.write(source.readBytes())
+                    if (entry.name == "manifest.properties") {
+                        target.write("\ncount=1\n".toByteArray())
+                    }
+                    target.closeEntry()
+                    source.closeEntry()
+                }
+            }
+        }
+        assertTrue(runCatching {
+            EcuBackupArchive.import(ByteArrayInputStream(altered.toByteArray()))
+        }.isFailure)
+    }
+
 }
