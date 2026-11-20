@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Adapterio IP adresas</string>
     <string name="adapter_tcp_port">TCP prievadas (dažniausiai 35000 arba 23)</string>
     <string name="adapter_connect_wifi">Prisijungti per Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Prieš nuskaitymą prijunkite tikrą OBD adapterį. Demonstracinis režimas nekuria išgalvotų rezultatų.</string>
+    <string name="obd_offline_simulation_notice">NEPRISIJUNGUS VEIKIANTI SIMULIACIJA — toliau pateikti VIN, CAL ID, CVN, DTC ir matavimai yra sintetiniai, ne iš tikro Camaro.</string>
+    <string name="obd_vehicle_ecu_identification">Transporto priemonės / ECU atpažinimas</string>
+    <string name="obd_no_live_data">Negauta tinkamų tiesioginių PID duomenų.</string>
+    <string name="obd_no_dtcs">Standartinės paslaugos 03/07/0A negrąžino DTC kodų.</string>
+    <string name="obd_no_freeze_frame">Nėra tinkamų užfiksuoto kadro duomenų.</string>
+    <string name="obd_simulation_scope">Apimtis: tik iš anksto nustatyti demonstraciniai duomenys. Tikras adapteris, ECU ar transporto priemonė neužklausiami.</string>
+    <string name="vehicle_vin_hint">Įveskite tikrą VIN; pavyzdinis VIN negeneruojamas.</string>
+    <string name="status_not_verified">NEPATIKRINTA</string>
+    <string name="adapter_discovery_only">TIK APTIKIMAS</string>
 </resources>
