@@ -1006,13 +1006,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disconnectJ2534Bridge() {
+        val attempt = ++connectionAttemptGeneration
+        val pendingConnection = connectionAttemptJob
+        pendingConnection?.cancel()
+        // Keep the cancelled handshake joinable by a subsequent connection.
         viewModelScope.launch {
             val activeMonitor = canMonitorJob
             val activeRequest = detachCanRequest()
             stopCanMonitor()
+            pendingConnection?.join()
             activeMonitor?.join()
             activeRequest?.join()
+            // A replacement adapter may have been requested while we waited.
+            if (attempt != connectionAttemptGeneration) return@launch
             obdManager.disconnect()
+            markAdapterDisconnected()
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = false,
                 isJ2534BridgeConnected = false,
