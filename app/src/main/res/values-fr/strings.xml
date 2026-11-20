@@ -785,7 +785,7 @@
     <string name="flexfuel_preflight_write">L\'écriture de calibration n\'est pas validée et reste désactivée</string>
     <string name="status_not_implemented">NON IMPLÉMENTÉ</string>
     <string name="app_account_action">Mon compte</string>
-    <string name="flexfuel_lfx2012_export_fingerprint">Exporter l'identification ECU (pas une sauvegarde de calibration)</string>
-    <string name="flexfuel_lfx2012_export_success">Fiche d'identification exportée. Aucune mémoire ECU n'a été sauvegardée.</string>
-    <string name="flexfuel_lfx2012_export_failed">Impossible d'exporter la fiche d'identification ECU.</string>
+    <string name="flexfuel_lfx2012_export_fingerprint">Exporter l’identification ECU (pas une sauvegarde de calibration)</string>
+    <string name="flexfuel_lfx2012_export_success">Fiche d’identification exportée. Aucune mémoire ECU n’a été sauvegardée.</string>
+    <string name="flexfuel_lfx2012_export_failed">Impossible d’exporter la fiche d’identification ECU.</string>
 </resources>
