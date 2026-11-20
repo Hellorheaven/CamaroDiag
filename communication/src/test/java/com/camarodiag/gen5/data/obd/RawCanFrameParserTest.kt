@@ -30,4 +30,24 @@ class RawCanFrameParserTest {
         val frame = RawCanFrameParser.parse("  7e0   0a   ff  ")!!
         assertArrayEquals(byteArrayOf(0x0A, 0xFF.toByte()), frame.data)
     }
+
+    @Test fun decodesReceivedStandardAndExtendedFramesFromAdapterOutput() {
+        val frames = RawCanFrameParser.parseReceivedFrames(
+            "SEARCHING...\\r\\n7E8 03 41 0C 1A F8\\r\\n18DAF110 03 7F 22 31"
+        )
+        assertEquals(2, frames.size)
+        assertEquals(0x7E8L, frames[0].canId)
+        assertFalse(frames[0].isExtended)
+        assertArrayEquals(byteArrayOf(0x03, 0x41, 0x0C, 0x1A, 0xF8.toByte()), frames[0].data)
+        assertEquals(0x18DAF110L, frames[1].canId)
+        assertTrue(frames[1].isExtended)
+    }
+
+    @Test fun ignoresAdapterStatusAndMalformedReceivedLines() {
+        val frames = RawCanFrameParser.parseReceivedFrames(
+            "OK\\r\\nNO DATA\\r\\n7E8 03 41 0C\\r\\nNOT A FRAME"
+        )
+        assertEquals(1, frames.size)
+        assertEquals(0x7E8L, frames.single().canId)
+    }
 }
