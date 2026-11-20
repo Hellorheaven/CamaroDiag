@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Adapterns IP-adress</string>
     <string name="adapter_tcp_port">TCP-port (vanligtvis 35000 eller 23)</string>
     <string name="adapter_connect_wifi">Anslut via Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Anslut en riktig OBD-adapter före skanning. Demoläget hittar inte på resultat.</string>
+    <string name="obd_offline_simulation_notice">OFFLINE-SIMULERING — VIN, CAL ID, CVN, DTC och mätningarna nedan är syntetiska och kommer inte från en verklig Camaro.</string>
+    <string name="obd_vehicle_ecu_identification">Identifiering av fordon / ECU</string>
+    <string name="obd_no_live_data">Inga användbara PID-data i realtid returnerades.</string>
+    <string name="obd_no_dtcs">Standardtjänsterna 03/07/0A returnerade inga DTC-koder.</string>
+    <string name="obd_no_freeze_frame">Inga användbara frysramdata finns.</string>
+    <string name="obd_simulation_scope">Omfattning: endast deterministiska demonstrationsdata. Ingen riktig adapter, ECU eller bil tillfrågas.</string>
+    <string name="vehicle_vin_hint">Ange det riktiga VIN-numret; inget exempel-VIN skapas.</string>
+    <string name="status_not_verified">INTE VERIFIERAT</string>
+    <string name="adapter_discovery_only">ENDAST SÖKNING</string>
 </resources>
