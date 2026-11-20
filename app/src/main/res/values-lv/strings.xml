@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Adaptera IP adrese</string>
     <string name="adapter_tcp_port">TCP ports (parasti 35000 vai 23)</string>
     <string name="adapter_connect_wifi">Savienot ar Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Pirms skenēšanas pievienojiet īstu OBD adapteri. Demonstrācijas režīms neizdomā rezultātus.</string>
+    <string name="obd_offline_simulation_notice">BEZSAISTES SIMULĀCIJA — tālāk norādītais VIN, CAL ID, CVN, DTC un mērījumi ir sintētiski un nav iegūti no īsta Camaro.</string>
+    <string name="obd_vehicle_ecu_identification">Transportlīdzekļa / ECU identifikācija</string>
+    <string name="obd_no_live_data">Nav saņemti izmantojami reāllaika PID dati.</string>
+    <string name="obd_no_dtcs">Standarta pakalpojumi 03/07/0A neatgrieza nevienu DTC.</string>
+    <string name="obd_no_freeze_frame">Nav izmantojamu iesaldētā kadra datu.</string>
+    <string name="obd_simulation_scope">Tvērums: tikai deterministiski demonstrācijas dati. Netiek vaicāts īsts adapters, ECU vai transportlīdzeklis.</string>
+    <string name="vehicle_vin_hint">Ievadiet īsto VIN; parauga VIN netiek ģenerēts.</string>
+    <string name="status_not_verified">NAV PĀRBAUDĪTS</string>
+    <string name="adapter_discovery_only">TIKAI ATKLĀŠANA</string>
 </resources>
