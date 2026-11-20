@@ -240,6 +240,29 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Require complete French and English resource coverage
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          def keys(path):
+              content = pathlib.Path(path).read_text(encoding="utf-8")
+              return set(re.findall(r'<string\\s+name="([^"]+)"', content))
+
+          english = keys("app/src/main/res/values/strings.xml")
+          french = keys("app/src/main/res/values-fr/strings.xml")
+          missing = sorted(english - french)
+          extra = sorted(french - english)
+          if missing or extra:
+              print("Missing French strings:", ", ".join(missing), file=sys.stderr)
+              print("Orphan French strings:", ", ".join(extra), file=sys.stderr)
+              sys.exit(1)
+          print(f"FR/EN parity verified for {len(english)} strings.")
+          PY
+
       - name: Run Android lint across every Android module
         run: ./gradlew lintDebug --stacktrace --warning-mode=fail
 
