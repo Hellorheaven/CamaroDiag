@@ -268,7 +268,7 @@ fun CalibrationWorkspaceScreen(
             item {
                 val unavailable = stringResource(R.string.obd_not_available)
                 val recognizedEcuName = state.ecuNameResponse.trim()
-                    .takeIf { it.isNotBlank() && it != unavailable && it.contains("E39", ignoreCase = true) }
+                    .takeIf { it != unavailable && Lfx2012ControllerReferences.hasCandidateE39FamilyLabel(it) }
                 val reportedCalibrationId = state.calibrationIdResponse.trim()
                     .takeIf { it.isNotBlank() && it != unavailable }
                 val completeReadOnlyFingerprint =
