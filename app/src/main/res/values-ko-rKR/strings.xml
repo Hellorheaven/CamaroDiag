@@ -652,4 +652,27 @@
     <string name="cal_ecu_response_addresses_label">관찰된 기능 OBD 응답 주소(모듈에 매핑되지 않음)</string>
     <string name="cal_ecu_identity_limits">이 표준 OBD 응답만으로는 RPO, 변속기, ECU 하드웨어 번호 또는 GM OS를 확인할 수 없습니다. 응답 주소는 모듈 식별자가 아닙니다. GM 전용 식별 정보에는 차량별로 검증된 문서가 필요합니다.</string>
     <string name="dtc_vehicle_identity_required">연결된 ECU의 VIN을 읽지 못했거나 선택한 차량과 일치하지 않아 차량별 세부 정보가 숨겨져 있습니다. 이 해석을 사용하기 전에 ECU VIN을 읽고 확인하세요.</string>
+    <string name="live_pid_oil">오일 압력(시뮬레이션 전용)</string>
+    <string name="live_pid_stft_b2">단기 연료 보정 뱅크 2</string>
+    <string name="live_pid_ltft_b2">장기 연료 보정 뱅크 2</string>
+    <string name="live_pid_rel_tps">상대 스로틀 위치</string>
+    <string name="live_pid_cmd_tps">명령 스로틀 위치</string>
+    <string name="live_pid_abs_tps_b">절대 스로틀 위치 B</string>
+    <string name="live_pid_abs_tps_c">절대 스로틀 위치 C</string>
+    <string name="live_pid_app_d">가속 페달 위치 D</string>
+    <string name="live_pid_app_e">가속 페달 위치 E</string>
+    <string name="live_pid_app_f">가속 페달 위치 F</string>
+    <string name="live_pid_abs_load">절대 엔진 부하</string>
+    <string name="live_pid_ambient">외기 온도</string>
+    <string name="live_pid_fuel_press">연료 압력</string>
+    <string name="live_pid_timing">점화 진각</string>
+    <string name="live_pid_eq_ratio">명령 공연비 당량비</string>
+    <string name="live_pid_o2_b1s1">산소 센서 B1S1 전압</string>
+    <string name="live_pid_o2_b1s2">산소 센서 B1S2 전압</string>
+    <string name="live_pid_o2_b1s3">산소 센서 B1S3 전압</string>
+    <string name="live_pid_o2_b1s4">산소 센서 B1S4 전압</string>
+    <string name="live_pid_wbo2_b1s1">광대역 람다 센서 B1S1</string>
+    <string name="live_pid_wbo2_b1s2">광대역 람다 센서 B1S2</string>
+    <string name="live_pid_wbo2_b2s1">광대역 람다 센서 B2S1</string>
+    <string name="live_pid_wbo2_b2s2">광대역 람다 센서 B2S2</string>
 </resources>
