@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_language_title">Rakenduse keel</string>
+    <string name="system_language_hint">Valige CamaroDiagi keel.</string>
+    <string name="about_title">Teave CamaroDiagi kohta</string>
+    <string name="about_check_updates">Kontrolli uuendusi</string>
+    <string name="about_up_to_date">CamaroDiag on ajakohane.</string>
+    <string name="obd_choose_sensors">Vali andurid</string>
+    <string name="obd_sensor_cancel">Tühista</string>
+</resources>
