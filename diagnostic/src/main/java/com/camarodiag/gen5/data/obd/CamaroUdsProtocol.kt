@@ -15,7 +15,8 @@ object CamaroUdsProtocol {
         stp61Resp: String,
         headersResp: String = "OK",
         protocolResp: String = "OK",
-        swCanWiringVerified: Boolean = false
+        swCanWiringVerified: Boolean = false,
+        transmitProbeResp: String = ""
     ): AdapterCapabilities {
         val logs = listOf(
             "> ATZ  -> $atzResp",
@@ -23,7 +24,8 @@ object CamaroUdsProtocol {
             "> ATAL -> $atalResp",
             "> STP 61 -> $stp61Resp",
             "> ATH1 -> $headersResp",
-            "> ATSP 6 -> $protocolResp"
+            "> ATSP 6 -> $protocolResp",
+            "> 0100 (physical TX verification) -> $transmitProbeResp"
         )
 
         // Select STN-only monitor commands only when the adapter's firmware response
@@ -55,7 +57,9 @@ object CamaroUdsProtocol {
             supportsSwCan = supportsSwCan,
             supportsCanHeaders = headersResp.contains("OK", ignoreCase = true) &&
                 protocolResp.contains("OK", ignoreCase = true),
-            rawProbeLog = logs
+            rawProbeLog = logs,
+            supportsCanTransmit = Regex("4100", RegexOption.IGNORE_CASE)
+                .containsMatchIn(transmitProbeResp.replace(Regex("[^0-9A-Fa-f]"), ""))
         )
     }
 
