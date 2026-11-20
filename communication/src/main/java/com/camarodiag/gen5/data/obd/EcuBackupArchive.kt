@@ -40,7 +40,12 @@ object EcuBackupArchive {
         require(captures.all { it.firstRead.size <= MAX_REGION_BYTES &&
             (it.independentRead?.size ?: 0) <= MAX_REGION_BYTES }) { "Segment too large" }
         require(captures.sumOf { it.firstRead.size.toLong() + (it.independentRead?.size?.toLong() ?: 0L) } <= MAX_ARCHIVE_BYTES) { "Archive data exceeds size limit" }
+        // Reject inconsistent captures before writing any archive header or bytes.
+        // In particular, two independent reads must agree, or the archive
+        // would be rejected by the corresponding import validation.
         val manifest = EcuBackupManifest.inspect(controllerLabel, createdAtUtcMillis, captures, requiredRegions)
+        val verification = EcuBackupIntegrity.verify(manifest, captures, requiredRegions)
+        require(verification.consistent) { "Inconsistent backup captures: ${verification.problems}" }
         val properties = Properties()
         properties.setProperty("format", FORMAT)
         properties.setProperty("controller", manifest.controllerLabel.orEmpty())
