@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">IP adresa adaptéra</string>
     <string name="adapter_tcp_port">Port TCP (zvyčajne 35000 alebo 23)</string>
     <string name="adapter_connect_wifi">Pripojiť cez Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Pred skenovaním pripojte skutočný adaptér OBD. Režim ukážky nevytvára vymyslené výsledky.</string>
+    <string name="obd_offline_simulation_notice">OFFLINE SIMULÁCIA — nižšie uvedené VIN, CAL ID, CVN, DTC a merania sú syntetické a nepochádzajú zo skutočného Camara.</string>
+    <string name="obd_vehicle_ecu_identification">Identifikácia vozidla / ECU</string>
+    <string name="obd_no_live_data">Neboli prijaté použiteľné živé údaje PID.</string>
+    <string name="obd_no_dtcs">Štandardné služby 03/07/0A nevrátili žiadny DTC.</string>
+    <string name="obd_no_freeze_frame">Nie sú dostupné použiteľné údaje zmrazeného snímku.</string>
+    <string name="obd_simulation_scope">Rozsah: iba deterministické ukážkové údaje. Skutočný adaptér, ECU ani vozidlo sa nedotazujú.</string>
+    <string name="vehicle_vin_hint">Zadajte skutočný VIN; vzorový VIN sa nevytvára.</string>
+    <string name="status_not_verified">NEOVERENÉ</string>
+    <string name="adapter_discovery_only">LEN VYHĽADÁVANIE</string>
 </resources>
