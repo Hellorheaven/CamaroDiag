@@ -790,4 +790,37 @@
     <string name="flexfuel_lfx2012_responder_unknown">No usable ECU response address was recorded. CAL IDs and CVNs cannot be attributed to one controller.</string>
     <string name="flexfuel_lfx2012_responder_single">One ECU response address was observed. The origin of each CAL ID and CVN is still unverified.</string>
     <string name="flexfuel_lfx2012_responder_multiple">Multiple ECU addresses responded. CAL IDs and CVNs may belong to different controllers; do not infer firmware compatibility.</string>
+
+    <!-- Direct chip/bench programming: expert preparation; no hardware driver available yet. -->
+    <string name="cal_expert_title">Expert mode — ECU bench / chip</string>
+    <string name="cal_expert_intro">Prepare direct ECU memory work with a removed controller: BOOT/BAM, Nexus/JTAG or external EEPROM. This checklist does not program the ECU.</string>
+    <string name="cal_expert_expand">Configure expert mode</string>
+    <string name="cal_expert_collapse">Hide expert configuration</string>
+    <string name="cal_expert_family">Controller family (E39 or E39A)</string>
+    <string name="cal_expert_chip">Observed chip marking</string>
+    <string name="cal_expert_programmer">Bench programmer / interface</string>
+    <string name="cal_expert_access_title">Access method</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">External memory, chip off</string>
+    <string name="cal_expert_region_title">Memory region</string>
+    <string name="cal_expert_region_pflash">MCU internal program flash</string>
+    <string name="cal_expert_region_dflash">MCU data flash</string>
+    <string name="cal_expert_region_eeprom">External EEPROM</string>
+    <string name="cal_expert_image_none">Import a raw binary from the file section above; an import is not a verified ECU backup.</string>
+    <string name="cal_expert_image_selected">Imported file: %1$s</string>
+    <string name="cal_expert_blockers">Expert preflight checks outstanding</string>
+    <string name="cal_expert_no_write">Programming is unavailable until an actual supported bench driver is implemented and validated.</string>
+    <string name="cal_expert_block_controller">Verify the exact controller family (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identify the physical MCU or memory chip marking.</string>
+    <string name="cal_expert_block_access_region">The chosen access method cannot address the selected memory region.</string>
+    <string name="cal_expert_block_programmer">Identify a compatible bench programmer.</string>
+    <string name="cal_expert_block_image_missing">Import a nonempty firmware image.</string>
+    <string name="cal_expert_block_image_format">A raw binary is required for this preparation flow.</string>
+    <string name="cal_expert_block_image_integrity">File SHA-256 evidence is missing or invalid.</string>
+    <string name="cal_expert_block_readback">Original chip/flash readback has not been independently verified.</string>
+    <string name="cal_expert_block_recovery">A recovery path for this exact target has not been verified.</string>
+    <string name="cal_expert_block_memory_map">Target memory map and protected regions are not verified.</string>
+    <string name="cal_expert_block_driver">No validated hardware programming driver is connected.</string>
+    <string name="cal_expert_identity_notice">Entered labels and file hashes are observations, not proof of hardware compatibility.</string>
 </resources>
