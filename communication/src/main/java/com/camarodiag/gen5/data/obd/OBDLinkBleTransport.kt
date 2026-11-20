@@ -12,6 +12,8 @@ import android.content.Context
 import android.os.Build
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
@@ -43,6 +45,8 @@ internal class OBDLinkBleTransport(private val context: Context) {
 
     private var connectResult: CompletableDeferred<Unit>? = null
     private var writeResult: CompletableDeferred<Unit>? = null
+    /** Serializes GATT writes so callbacks cannot complete the wrong operation. */
+    private val writeMutex = Mutex()
     private var mtuResult: CompletableDeferred<Unit>? = null
 
     private val callback = object : BluetoothGattCallback() {
@@ -180,29 +184,33 @@ internal class OBDLinkBleTransport(private val context: Context) {
         }
     }
 
-    suspend fun write(data: ByteArray) {
+    suspend fun write(data: ByteArray) = writeMutex.withLock {
         connectionFailure?.let { throw ObdTransportDisconnectedException("OBDLink BLE connection is unavailable", it) }
         val g = gatt ?: error("BLE transport not connected")
         val characteristic = writeCharacteristic ?: error("OBDLink BLE write characteristic unavailable")
         var offset = 0
         while (offset < data.size) {
-            // A disconnect may arrive between BLE chunks, especially for writes without response.
+            // A disconnect may arrive between BLE chunks.
             connectionFailure?.let {
                 throw ObdTransportDisconnectedException("OBDLink BLE disconnected during write", it)
             }
-            check(gatt === g) { "OBDLink BLE session was replaced during write" }
+            check(gatt === g) { "BLE transport session was replaced during write" }
             val count = minOf(mtuPayload, data.size - offset)
             val chunk = data.copyOfRange(offset, offset + count)
-            writeResult = CompletableDeferred()
+            val result = CompletableDeferred<Unit>()
+            writeResult = result
             val started = if (Build.VERSION.SDK_INT >= 33) {
                 g.writeCharacteristic(characteristic, chunk, characteristicWriteType) == BluetoothStatusCodes.SUCCESS
             } else {
                 writeLegacyCharacteristic(g, characteristic, chunk)
             }
             check(started) { "Unable to start OBDLink BLE write" }
-            if (characteristicWriteType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
-                withTimeout(4_000) { writeResult!!.await() }
-            }
+            // Also wait for WRITE_TYPE_NO_RESPONSE: it skips the peer's ATT
+            // acknowledgement, but Android still reports local GATT completion.
+            // Sending the next chunk before this callback can make Android reject
+            // it as GATT_BUSY and silently truncate an ELM command.
+            withTimeout(4_000) { result.await() }
+            check(gatt === g) { "BLE transport session was replaced during write" }
             offset += count
         }
     }
