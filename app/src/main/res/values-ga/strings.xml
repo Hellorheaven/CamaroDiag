@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Seoladh IP an oiriúnaitheora</string>
     <string name="adapter_tcp_port">Port TCP (35000 nó 23 de ghnáth)</string>
     <string name="adapter_connect_wifi">Ceangail trí Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Ceangail fíoroiriúnaitheoir OBD roimh scanadh. Ní chruthaíonn an modh taispeána torthaí bréige.</string>
+    <string name="obd_offline_simulation_notice">INSAMHLADH AS LÍNE — is sonraí sintéiseacha iad an VIN, CAL ID, CVN, DTCanna agus tomhais thíos; ní thagann siad ó Camaro fíor.</string>
+    <string name="obd_vehicle_ecu_identification">Aitheantas feithicle / ECU</string>
+    <string name="obd_no_live_data">Níor fuarthas aon sonraí beo PID inúsáidte.</string>
+    <string name="obd_no_dtcs">Níor fhill seirbhísí caighdeánacha 03/07/0A aon DTC.</string>
+    <string name="obd_no_freeze_frame">Níl sonraí reoite inúsáidte ann.</string>
+    <string name="obd_simulation_scope">Raon feidhme: sonraí taispeána cinntitheacha amháin. Ní dhéantar fiosrú ar fhíoroiriúnaitheoir, ECU ná feithicil.</string>
+    <string name="vehicle_vin_hint">Iontráil an VIN fíor; ní chruthaítear VIN samplach.</string>
+    <string name="status_not_verified">NEAMHFHÍORAITHE</string>
+    <string name="adapter_discovery_only">FIONNACHTAIN AMHÁIN</string>
 </resources>
