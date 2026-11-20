@@ -208,10 +208,14 @@
     <string name="update_download_failed">Download fallito.</string>
     <string name="update_download_invalid_signature">Download o firma non validi. Installazione bloccata; potrebbe essere necessaria una reinstallazione manuale.</string>
     <string name="update_download_complete">Download completato.</string>
+    <string name="update_ready_to_install">CamaroDiag – pronto per l\'installazione</string>
     <string name="update_downloading">Download in corso</string>
+    <string name="update_available">Aggiornamento disponibile</string>
+    <string name="update_channel_only">Viene proposto solo il canale %1$s. Debug resta Debug e Release resta Release.</string>
     <string name="update_allow_unknown_sources">Consenti le installazioni da questa origine, torna indietro e premi Installa.</string>
     <string name="update_install">Installa</string>
     <string name="update_download">Scarica</string>
+    <string name="update_later">Più tardi</string>
     <string name="vehicle_generation_label">Generazione %1$d</string>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel (2012–2015)</string>
@@ -621,6 +625,7 @@
     <string name="cal_vin_matches_profile">Il VIN della centralina corrisponde al profilo veicolo selezionato.</string>
     <string name="cal_vin_mismatch_detected">VIN DIVERSO — profilo: %1$s • ECU: %2$s</string>
     <string name="cal_vin_profile_not_set">Il profilo veicolo selezionato non contiene un VIN valido.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">Usa il VIN ECU per il profilo corrente</string>
     <string name="cal_vin_mismatch_title">Rilevata discordanza del VIN</string>
     <string name="cal_vin_mismatch_confirmation">Il VIN del profilo selezionato è %1$s, ma la centralina ha restituito %2$s. Potrebbero essere veicoli diversi. Crea un profilo separato per conservare il veicolo selezionato oppure sincronizza il VIN solo dopo aver verificato il veicolo fisico.</string>
     <string name="cal_vin_create_vehicle">Crea profilo veicolo</string>
