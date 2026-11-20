@@ -8,6 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -234,13 +241,26 @@ private fun ObdValueCard(value: ObdValue) {
 
 @Composable
 private fun DtcResultCard(dtc: ObdDtc) {
+    var showHelp by remember(dtc.code) { mutableStateOf(false) }
+    if (showHelp) {
+        AlertDialog(
+            onDismissRequest = { showHelp = false },
+            title = { Text(dtc.code) },
+            text = { Text(stringResource(R.string.obd_dtc_help_unavailable)) },
+            confirmButton = {
+                TextButton(onClick = { showHelp = false }) {
+                    Text(stringResource(R.string.obd_dtc_help_close))
+                }
+            }
+        )
+    }
     val status = when (dtc.status) {
         "pending" -> stringResource(R.string.obd_pending)
         "permanent" -> stringResource(R.string.obd_permanent)
         else -> stringResource(R.string.obd_confirmed)
     }
     val statusColor = if (dtc.status == "confirmed") WarnRed else CamaroAmber
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+    Card(modifier = Modifier.clickable { showHelp = true }, colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(dtc.code, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
