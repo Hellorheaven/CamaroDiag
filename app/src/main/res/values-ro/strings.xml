@@ -50,4 +50,14 @@
     <string name="obd_readiness">Pregătire OBD</string>
     <string name="obd_mode06_results">Rezultate mod 06</string>
     <string name="system_language_follow_phone">Folosește limba telefonului</string>
+    <string name="settings_current_vehicle">Vehicul curent</string>
+    <string name="settings_current_adapter">Conexiune OBD-II</string>
+    <string name="adapter_section_title">Adaptor Bluetooth OBD-II și sondă CAN</string>
+    <string name="paired_bluetooth_devices">Dispozitive Bluetooth asociate</string>
+    <string name="usb_devices_detected">Dispozitive USB detectate</string>
+    <string name="usb_none_detected">Nu a fost detectat niciun adaptor serial USB.</string>
+    <string name="wifi_connection_title">Conexiune Wi-Fi ELM327</string>
+    <string name="adapter_ip_address">Adresa IP a adaptorului</string>
+    <string name="adapter_tcp_port">Port TCP (de obicei 35000 sau 23)</string>
+    <string name="adapter_connect_wifi">Conectare prin Wi-Fi</string>
 </resources>
