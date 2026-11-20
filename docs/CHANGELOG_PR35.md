@@ -215,3 +215,12 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - USB serial and Wi-Fi TCP transports mark the session unavailable after EOF or I/O failure; Wi-Fi read timeouts remain normal while waiting for an ELM prompt.
 - Wrapped socket timeouts are distinguished from genuine I/O disconnects by inspecting the exception cause chain.
 - Added unit coverage for USB/Wi-Fi connection-state gating and wrapped timeout/disconnect causes.
+
+## 2026-11-20 — ELM monitor DLC and capture-stop integrity
+
+- The live ELM/STN console now accepts both one- and two-character hexadecimal DLC output (for example, `8` and `08`). The declared DLC is still checked against the exact number of payload bytes; malformed or mismatched lines remain rejected.
+- Added regression coverage for single-digit DLC on both 11-bit and 29-bit CAN identifiers.
+- Starting a new monitor capture now clears the previous capture buffer and analysis report while preserving the chronological console history.
+- Stopping or failing a capture no longer appends the pending line-framing buffer a second time: every received chunk was already copied into the raw capture buffer, so the previous behavior duplicated an unterminated final line.
+- Commits: `52b8c72` (DLC parser), `138290f` (DLC regression test), `1a62228` (capture lifecycle).
+- Tests and Android builds have not yet been executed; these changes are code-reviewed only.
