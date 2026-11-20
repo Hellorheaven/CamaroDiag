@@ -25,7 +25,7 @@ object RawCanFrameParser {
         val tokens = input.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         if (tokens.size < 2) return null
         val idToken = tokens.first().removePrefix("0x").removePrefix("0X")
-        if (idToken.length !in 3..8 || !idToken.all { it.digitToIntOrNull(16) != null }) return null
+        if (idToken.length !in setOf(3, 8) || !idToken.all { it.digitToIntOrNull(16) != null }) return null
         val id = idToken.toLongOrNull(16) ?: return null
         val extended = idToken.length > 3
         if ((!extended && id > 0x7FFL) || (extended && id > 0x1FFFFFFFL)) return null
