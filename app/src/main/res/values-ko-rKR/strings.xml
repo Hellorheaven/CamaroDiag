@@ -687,4 +687,26 @@
     <string name="update_install_update">업데이트 설치</string>
     <string name="update_version_available">사용 가능한 버전: %1$s</string>
     <string name="system_language_follow_phone">휴대전화 언어 따르기</string>
+    <string name="can_sniffer_raw_heading">CAN 어댑터 원시 출력</string>
+    <string name="can_sniffer_export_raw">원시 로그 내보내기</string>
+    <string name="can_sniffer_dtc_heading">확인된 OBD-II 고장 코드</string>
+    <string name="connection_lost_bluetooth">Bluetooth 연결이 끊어졌습니다. 어댑터를 다시 연결하고 작업을 다시 시작하세요.</string>
+    <string name="connection_lost_vehicle">차량 연결이 끊어졌습니다. 차량에 다시 연결하고 작업을 다시 시작하세요.</string>
+    <string name="connection_lost_usb">USB 어댑터가 분리되었습니다. 다시 연결하고 작업을 다시 시작하세요.</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi 연결이 끊어졌습니다. 어댑터를 다시 연결하고 작업을 다시 시작하세요.</string>
+    <string name="connection_lost_pc_bridge">PC 진단 브리지 연결이 끊어졌습니다. 다시 연결하고 작업을 다시 시작하세요.</string>
+    <string name="live_sensor_search">센서 검색</string>
+    <string name="live_sensor_show_all">모든 센서 표시</string>
+    <string name="can_console_history">통합 CAN 콘솔 기록</string>
+    <string name="can_console_clear">기록 지우기</string>
+    <string name="can_console_empty">아직 통신 기록이 없습니다. 송수신 데이터가 여기에 표시됩니다.</string>
+    <string name="can_console_tx">TX • 전송됨</string>
+    <string name="can_console_rx">RX • 수신됨</string>
+    <string name="can_console_system">시스템</string>
+    <string name="can_console_input_label">CAN 프레임 또는 OBD 명령</string>
+    <string name="can_console_sending">전송 중…</string>
+    <string name="obd_dtc_help_unavailable">이 고장 코드와 차량에 대해 검증된 진단 지침이 아직 없습니다. 수리 전에 제조업체 정비 자료를 확인하세요.</string>
+    <string name="cal_expert_no_write">지원되는 벤치 드라이버를 구현하고 검증하기 전에는 프로그래밍할 수 없습니다.</string>
+    <string name="flexfuel_preflight_write">ECU 보정 쓰기는 검증되지 않아 비활성 상태입니다.</string>
+    <string name="status_not_implemented">미구현</string>
 </resources>
