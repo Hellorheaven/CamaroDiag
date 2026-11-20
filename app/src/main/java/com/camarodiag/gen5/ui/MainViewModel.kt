@@ -132,7 +132,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun reportConnectionLoss(error: Throwable) {
         if (!ObdTransportFailurePolicy.isConnectionLoss(error)) return
         stopCanMonitor()
+        canRequestJob?.cancel()
+        _isStreamingLive.value = false
+        _livePids.value = emptyList()
+        if (_liveRecordingState.value.isRecording) {
+            stopLiveRecording()
+        }
+        _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_recording_channel_lost)
         _isObdScanning.value = false
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isReading = false,
+            isUdsReading = false,
+            isObdbSignalReading = false,
+            isJ2534BridgeConnecting = false,
+            isJ2534BridgeConnected = false
+        )
         val messageId = if (_lastConnectionProfile.value?.transport.equals("bluetooth", ignoreCase = true)) {
             R.string.connection_lost_bluetooth
         } else {
@@ -670,6 +684,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isObdbSignalReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isObdbSignalReading = false,
                     obdbSignalValue = "",
@@ -813,6 +828,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDidResponse = "",
@@ -895,6 +911,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
                 throw cancelled
             } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = "",
@@ -960,6 +977,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
@@ -2265,6 +2283,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_scan_failed)
             } finally {
                 endBusyOperation()
@@ -2329,6 +2348,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_clear_failed)
             } finally {
                 endBusyOperation()
@@ -2399,6 +2419,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
                 _connectionMessage.value = getApplication<Application>().getString(R.string.msg_mileage_audit_failed)
             } finally {
@@ -2446,6 +2467,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                reportConnectionLoss(error)
                 _obdScanMessage.value = getApplication<Application>().getString(R.string.msg_full_scan_failed)
             } finally {
                 _isObdScanning.value = false
@@ -2519,7 +2541,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    val connectionLost = ObdTransportFailurePolicy.isConnectionLoss(error)
+                    if (connectionLost) reportConnectionLoss(error)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = getApplication<Application>().getString(R.string.obd_not_available),
                         vinComparison = null,
@@ -2529,8 +2553,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         calibrationIdResponse = "",
                         cvnResponse = ""
                     )
-                    scanDtcs()
-                    runMileageAudit()
+                    if (!connectionLost) {
+                        scanDtcs()
+                        runMileageAudit()
+                    }
                 }
             }
         }
@@ -2762,6 +2788,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
+                        reportConnectionLoss(error)
                         consecutiveFailures++
                         _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_read_failed)
                         if (_liveRecordingState.value.isRecording) {
