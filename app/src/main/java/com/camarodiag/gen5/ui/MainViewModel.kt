@@ -1236,7 +1236,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 fun lines(value: String): JSONArray = JSONArray().apply {
                     value.lines().map(String::trim).filter(String::isNotBlank)
                         .filterNot { it.equals(missing, ignoreCase = true) }
-                        .forEach(::put)
+                        .forEach { put(it) }
                 }
                 val report = JSONObject().apply {
                     put("format", "CamaroDiag-ecu-identity-v1")
