@@ -48,3 +48,6 @@
 - Une capture CAN, un envoi manuel ou une opération OBD composée déjà en attente lors d'une reconnexion ne peut plus envoyer de commandes sur la nouvelle liaison, y compris pendant le retour de l'adaptateur en mode normal.
 - Après validation de l'adresse e-mail, l'accès au diagnostic se débloque dès que Firebase confirme le nouveau statut du compte.
 - Lors de la création d'un compte, CamaroDiag indique maintenant si l'envoi de l'e-mail de vérification a réellement réussi.
+- L'écran « Mon compte » permet de voir l'adresse e-mail et le fournisseur de connexion avant de se déconnecter.
+- En cas de déconnexion du compte, les captures et mesures en cours sont arrêtées et les résultats temporaires masqués avant de rouvrir le diagnostic sur un autre compte.
+- La déconnexion Google demande aussi à Android de réinitialiser sa sélection de compte pour éviter une reconnexion involontaire.
