@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Zadejte skutečný VIN; ukázkový VIN se nevytváří.</string>
     <string name="status_not_verified">NEOVĚŘENO</string>
     <string name="adapter_discovery_only">POUZE VYHLEDÁVÁNÍ</string>
+    <string name="can_sniffer_raw_heading">Nezpracovaný výstup adaptéru CAN</string>
+    <string name="can_sniffer_export_raw">Exportovat surový protokol</string>
+    <string name="can_sniffer_dtc_heading">Zjištěné chybové kódy OBD-II</string>
+    <string name="connection_lost_bluetooth">Připojení Bluetooth bylo ztraceno. Znovu připojte adaptér a spusťte operaci.</string>
+    <string name="connection_lost_vehicle">Spojení s vozidlem bylo ztraceno. Znovu se připojte a spusťte operaci.</string>
+    <string name="connection_lost_usb">Adaptér USB byl odpojen. Znovu jej připojte a spusťte operaci.</string>
+    <string name="connection_lost_wifi">Připojení OBD přes Wi-Fi bylo ztraceno. Znovu připojte adaptér a spusťte operaci.</string>
+    <string name="connection_lost_pc_bridge">Spojení s diagnostickým mostem PC bylo ztraceno. Znovu jej připojte a spusťte operaci.</string>
+    <string name="live_sensor_search">Hledat senzory</string>
+    <string name="live_sensor_show_all">Zobrazit všechny senzory</string>
+    <string name="can_console_history">Společná historie konzole CAN</string>
+    <string name="can_console_clear">Vymazat historii</string>
+    <string name="can_console_empty">Zatím žádný provoz. Přijatá i odeslaná data se zobrazí zde.</string>
+    <string name="can_console_tx">TX • ODESLÁNO</string>
+    <string name="can_console_rx">RX • PŘIJATO</string>
+    <string name="can_console_system">SYSTÉM</string>
+    <string name="can_console_input_label">Rámec CAN nebo příkaz OBD</string>
+    <string name="can_console_sending">Odesílání…</string>
+    <string name="obd_dtc_help_unavailable">Pro tento chybový kód a vozidlo zatím nejsou k dispozici ověřené diagnostické pokyny. Před opravou si prostudujte servisní dokumentaci výrobce.</string>
+    <string name="cal_expert_no_write">Programování není dostupné, dokud nebude implementován a ověřen kompatibilní ovladač pro práci na stole.</string>
+    <string name="flexfuel_preflight_write">Zápis kalibrace ECU nebyl ověřen a zůstává vypnutý.</string>
+    <string name="status_not_implemented">NENÍ IMPLEMENTOVÁNO</string>
 </resources>
