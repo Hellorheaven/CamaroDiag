@@ -1383,8 +1383,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-    /** Starts a bounded, passive monitor session on a real header-capable ELM/STN adapter. */
-    fun startCanMonitor(durationMs: Long = 10_000L) {
+    /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
+    fun startCanMonitor(durationMs: Long = Long.MAX_VALUE) {
         if (canMonitorJob?.isActive == true || detachedCanMonitorJob?.isActive == true ||
             canRequestJob?.isActive == true || detachedCanRequestJob?.isActive == true
         ) return
@@ -1421,6 +1421,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         // Keep the raw stream unchanged, but decode only complete lines:
                         // Bluetooth/USB reads may split a CAN record at any character.
                         pendingChunks.append(chunk)
+                        // Protect long-running sessions from a malformed stream without line breaks.
+                        if (pendingChunks.length > 4096) pendingChunks.delete(0, pendingChunks.length - 4096)
                         val current = _liveCanMonitorState.value
                         val raw = (current.rawText + chunk).takeLast(131_072)
                         val pendingText = pendingChunks.toString()
@@ -1477,9 +1479,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         timestampMillis = System.currentTimeMillis(),
                         content = getApplication<Application>().getString(R.string.can_sniffer_stop)
                     )
+                    val report = runCatching {
+                        CanTraceAnalyzer.analyze(
+                            raw.replace("\r\n", "\n").replace('\r', '\n'),
+                            "live-can-monitor.txt"
+                        )
+                    }.getOrNull()
                     _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
                         rawText = raw,
+                        report = report,
+                        message = stoppedEvent.content,
                         consoleHistory = (current.consoleHistory + stoppedEvent).takeLast(300)
                     )
                 }
