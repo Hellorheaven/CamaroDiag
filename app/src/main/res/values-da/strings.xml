@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag er opdateret.</string>
     <string name="obd_choose_sensors">Vælg sensorer</string>
     <string name="obd_sensor_cancel">Annuller</string>
+    <string name="tab_vehicle">Køretøj</string>
+    <string name="tab_connect">Forbind</string>
+    <string name="tab_live">Live-data</string>
+    <string name="tab_dtcs">Fejlkoder</string>
+    <string name="tab_more">Mere</string>
+    <string name="tab_modules">Moduler</string>
+    <string name="tab_mileage">Kilometertal</string>
+    <string name="tab_calibration">ECU / Kort</string>
+    <string name="tab_obd_scan">Fuld OBD-scanning</string>
+    <string name="tab_guide">Vejledning</string>
+    <string name="tab_controls">Styring</string>
+    <string name="tab_settings">Indstillinger</string>
 </resources>
