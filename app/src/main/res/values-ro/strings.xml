@@ -49,4 +49,5 @@
     <string name="obd_scan_title">SCANARE OBD-II COMPLETĂ</string>
     <string name="obd_readiness">Pregătire OBD</string>
     <string name="obd_mode06_results">Rezultate mod 06</string>
+    <string name="system_language_follow_phone">Folosește limba telefonului</string>
 </resources>
