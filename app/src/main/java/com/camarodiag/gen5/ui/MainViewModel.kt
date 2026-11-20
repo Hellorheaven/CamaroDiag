@@ -221,9 +221,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** The unassigned garage remains untouched until the user claims it. */
+    private var legacyImportInProgress = false
+
     fun importLegacyVehicles() {
         val uid = authenticatedAccountUid ?: return
-        if (settingsPreferences.contains("legacy_vehicles_claimed_uid")) return
+        if (legacyImportInProgress || settingsPreferences.contains("legacy_vehicles_claimed_uid")) return
+        legacyImportInProgress = true
+        _legacyVehicleImportAvailable.value = false
         val legacy = loadSavedVehicleProfiles(
             settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
         )
@@ -271,6 +275,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (_: Exception) {
                 _connectionMessage.value =
                     getApplication<Application>().getString(R.string.msg_session_save_failed)
+            } finally {
+                legacyImportInProgress = false
+                if (authenticatedAccountUid == uid &&
+                    !settingsPreferences.contains("legacy_vehicles_claimed_uid")
+                ) {
+                    refreshLegacyImportAvailability()
+                }
             }
         }
     }
