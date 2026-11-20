@@ -702,4 +702,26 @@
     <string name="update_install_update">Εγκατάσταση ενημέρωσης</string>
     <string name="update_version_available">Διαθέσιμη έκδοση: %1$s</string>
     <string name="system_language_follow_phone">Χρήση γλώσσας τηλεφώνου</string>
+    <string name="can_sniffer_raw_heading">Ανεπεξέργαστη έξοδος προσαρμογέα CAN</string>
+    <string name="can_sniffer_export_raw">Εξαγωγή ανεπεξέργαστου αρχείου καταγραφής</string>
+    <string name="can_sniffer_dtc_heading">Κωδικοί βλαβών OBD-II που εντοπίστηκαν</string>
+    <string name="connection_lost_bluetooth">Η σύνδεση Bluetooth χάθηκε. Συνδέστε ξανά τον προσαρμογέα και επανεκκινήστε τη διαδικασία.</string>
+    <string name="connection_lost_vehicle">Η σύνδεση με το όχημα χάθηκε. Συνδεθείτε ξανά και επανεκκινήστε τη διαδικασία.</string>
+    <string name="connection_lost_usb">Ο προσαρμογέας USB αποσυνδέθηκε. Συνδέστε τον ξανά και επανεκκινήστε τη διαδικασία.</string>
+    <string name="connection_lost_wifi">Η σύνδεση OBD μέσω Wi-Fi χάθηκε. Συνδέστε ξανά τον προσαρμογέα και επανεκκινήστε τη διαδικασία.</string>
+    <string name="connection_lost_pc_bridge">Η σύνδεση με τη διαγνωστική γέφυρα υπολογιστή χάθηκε. Συνδέστε τη ξανά και επανεκκινήστε τη διαδικασία.</string>
+    <string name="live_sensor_search">Αναζήτηση αισθητήρων</string>
+    <string name="live_sensor_show_all">Εμφάνιση όλων των αισθητήρων</string>
+    <string name="can_console_history">Ενιαίο ιστορικό κονσόλας CAN</string>
+    <string name="can_console_clear">Εκκαθάριση ιστορικού</string>
+    <string name="can_console_empty">Δεν υπάρχει ακόμη κίνηση. Τα ληφθέντα και απεσταλμένα δεδομένα θα εμφανιστούν εδώ.</string>
+    <string name="can_console_tx">TX • ΑΠΕΣΤΑΛΜΕΝΟ</string>
+    <string name="can_console_rx">RX • ΛΗΦΘΗΚΕ</string>
+    <string name="can_console_system">ΣΥΣΤΗΜΑ</string>
+    <string name="can_console_input_label">Πλαίσιο CAN ή εντολή OBD</string>
+    <string name="can_console_sending">Αποστολή…</string>
+    <string name="obd_dtc_help_unavailable">Δεν υπάρχουν ακόμη επαληθευμένες οδηγίες διάγνωσης για αυτόν τον κωδικό βλάβης και όχημα. Ελέγξτε τις οδηγίες συντήρησης του κατασκευαστή πριν από επισκευή.</string>
+    <string name="cal_expert_no_write">Ο προγραμματισμός δεν είναι διαθέσιμος μέχρι να υλοποιηθεί και να επικυρωθεί συμβατός οδηγός πάγκου.</string>
+    <string name="flexfuel_preflight_write">Η εγγραφή βαθμονόμησης ECU δεν έχει επικυρωθεί και παραμένει απενεργοποιημένη.</string>
+    <string name="status_not_implemented">ΔΕΝ ΕΧΕΙ ΥΛΟΠΟΙΗΘΕΙ</string>
 </resources>
