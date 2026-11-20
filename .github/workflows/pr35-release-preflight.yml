@@ -1,6 +1,11 @@
 name: PR54 Release size and compatibility checkpoint
 on:
   workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Exact branch or commit to validate"
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
@@ -8,6 +13,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.target_ref }}
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
@@ -23,6 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.target_ref }}
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
