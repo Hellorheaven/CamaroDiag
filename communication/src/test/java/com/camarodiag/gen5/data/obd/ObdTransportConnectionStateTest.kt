@@ -46,7 +46,7 @@ class ObdTransportConnectionStateTest {
             false, false, "WIFI", wifiConnected = true
         ))
         assertFalse(ObdTransportConnectionState.isCommandChannelAvailable(
-            false, false, "USB", usbConnected = true, isSimulationActive = true
+            false, true, "USB", usbConnected = true
         ))
     }
 
