@@ -279,6 +279,8 @@ fun CalibrationWorkspaceScreen(
                             calibrationVerificationNumbers = listOf(state.cvnResponse)
                         )
                     )
+                val responderAttribution =
+                    Lfx2012ControllerReferences.classifyResponderAttribution(state.respondingEcuAddresses)
                 val ecuVin = state.ecuVinResponse.trim().uppercase()
                     .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                 val evidence = Lfx2012FlexFuelPreflight.Evidence(
@@ -316,6 +318,23 @@ fun CalibrationWorkspaceScreen(
                         if (!completeReadOnlyFingerprint) {
                             Text(stringResource(R.string.flexfuel_lfx2012_fingerprint_incomplete),
                                 color = WarnRed, fontSize = 11.sp)
+                        }
+                        if (state.respondingEcuAddresses.isNotEmpty() || completeReadOnlyFingerprint) {
+                            val responderNotice = when (responderAttribution) {
+                                Lfx2012ControllerReferences.ResponderAttribution.NO_VALID_CAN_ADDRESS ->
+                                    R.string.flexfuel_lfx2012_responder_unknown
+                                Lfx2012ControllerReferences.ResponderAttribution.SINGLE_ADDRESS_OBSERVED ->
+                                    R.string.flexfuel_lfx2012_responder_single
+                                Lfx2012ControllerReferences.ResponderAttribution.MULTIPLE_ADDRESSES_OBSERVED ->
+                                    R.string.flexfuel_lfx2012_responder_multiple
+                            }
+                            Text(
+                                stringResource(responderNotice),
+                                color = if (responderAttribution ==
+                                    Lfx2012ControllerReferences.ResponderAttribution.SINGLE_ADDRESS_OBSERVED)
+                                    TextMuted else WarnRed,
+                                fontSize = 11.sp
+                            )
                         }
                         Text(stringResource(R.string.flexfuel_lfx2012_boot,
                             Lfx2012ControllerReferences.associatedMainBootFile),
