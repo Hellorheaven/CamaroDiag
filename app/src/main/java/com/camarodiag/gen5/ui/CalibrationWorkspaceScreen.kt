@@ -56,6 +56,8 @@ import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
+import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
+import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
@@ -258,6 +260,85 @@ fun CalibrationWorkspaceScreen(
                     } ?: stringResource(R.string.cal_engine_profile_missing),
                     color = CamaroAmber, fontSize = 12.sp
                 )
+            }
+        }
+        if (vehicle.modelYear == 2012 && vehicle.engine.rpo == "LFX") {
+            item {
+                val unavailable = stringResource(R.string.obd_not_available)
+                val recognizedEcuName = state.ecuNameResponse.trim()
+                    .takeIf { it.isNotBlank() && it != unavailable && it.contains("E39", ignoreCase = true) }
+                val reportedCalibrationId = state.calibrationIdResponse.trim()
+                    .takeIf { it.isNotBlank() && it != unavailable }
+                val ecuVin = state.ecuVinResponse.trim().uppercase()
+                    .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                val evidence = Lfx2012FlexFuelPreflight.Evidence(
+                    controllerId = recognizedEcuName,
+                    firmwareId = reportedCalibrationId,
+                    verifiedFirmware = false,
+                    originalBackupVerified = false,
+                    recoveryVerified = false
+                )
+                val missing = Lfx2012FlexFuelPreflight.missingPreconditions(
+                    vehicle = Lfx2012FlexFuelPreflight.Vehicle(
+                        modelYear = vehicle.modelYear,
+                        engineCode = vehicle.engine.rpo,
+                        generation = 5,
+                        selectedVin = vehicle.vin,
+                        ecuVin = ecuVin
+                    ),
+                    evidence = evidence
+                )
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.flexfuel_lfx2012_title),
+                            color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.flexfuel_lfx2012_parts,
+                            Lfx2012ControllerReferences.controllerFamily,
+                            Lfx2012ControllerReferences.currentServicePart,
+                            Lfx2012ControllerReferences.supersededServicePart),
+                            color = TextPrimary, fontSize = 12.sp)
+                        Text(stringResource(R.string.flexfuel_lfx2012_parts_warning),
+                            color = TextMuted, fontSize = 11.sp)
+                        Text(stringResource(R.string.flexfuel_lfx2012_calid_label,
+                            reportedCalibrationId ?: unavailable),
+                            color = TextMuted, fontSize = 11.sp)
+                        Text(stringResource(R.string.flexfuel_lfx2012_boot,
+                            Lfx2012ControllerReferences.associatedMainBootFile),
+                            color = TextMuted, fontSize = 11.sp)
+                        Text(stringResource(R.string.flexfuel_lfx2012_checks),
+                            color = CamaroAmber, fontWeight = FontWeight.SemiBold)
+                        missing.forEach { missingRequirement ->
+                            val labelId = when (missingRequirement) {
+                                Lfx2012FlexFuelPreflight.Status.VEHICLE_NOT_SELECTED ->
+                                    R.string.flexfuel_preflight_vehicle_missing
+                                Lfx2012FlexFuelPreflight.Status.WRONG_VEHICLE ->
+                                    R.string.flexfuel_preflight_wrong_vehicle
+                                Lfx2012FlexFuelPreflight.Status.VIN_MISMATCH ->
+                                    R.string.flexfuel_preflight_vin
+                                Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_MISSING ->
+                                    R.string.flexfuel_preflight_ecu
+                                Lfx2012FlexFuelPreflight.Status.FIRMWARE_NOT_VERIFIED ->
+                                    R.string.flexfuel_preflight_firmware
+                                Lfx2012FlexFuelPreflight.Status.ORIGINAL_BACKUP_MISSING ->
+                                    R.string.flexfuel_preflight_backup
+                                Lfx2012FlexFuelPreflight.Status.RECOVERY_NOT_VERIFIED ->
+                                    R.string.flexfuel_preflight_recovery
+                                Lfx2012FlexFuelPreflight.Status.WRITE_NOT_VALIDATED ->
+                                    R.string.flexfuel_preflight_write
+                            }
+                            Text("• " + stringResource(labelId),
+                                color = WarnRed, fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = onReadIdentification,
+                            enabled = isConnected && !state.isReading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.cal_read_ecu_ids))
+                        }
+                    }
+                }
             }
         }
         item {
