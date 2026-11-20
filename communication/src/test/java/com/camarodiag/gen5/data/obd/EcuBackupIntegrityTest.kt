@@ -75,4 +75,33 @@ class EcuBackupIntegrityTest {
         assertFalse(result.consistent)
         assertTrue(EcuBackupIntegrity.Problem.UNVERIFIABLE_HARDWARE_PROVENANCE in result.problems)
     }
+    @Test fun mutationOfOriginalByteArrayAfterManifestCreationIsDetected() {
+        val bytes = byteArrayOf(1, 2, 3)
+        val captures = listOf(capture(bytes))
+        val savedManifest = manifest(captures)
+        bytes[0] = 9
+        val result = EcuBackupIntegrity.verify(savedManifest, captures, required)
+        assertTrue(EcuBackupIntegrity.Problem.DIGEST_MISMATCH in result.problems)
+    }
+
+    @Test fun missingRequiredRegionCannotBePassedOffAsComplete() {
+        val captures = listOf(capture())
+        val savedManifest = manifest(captures)
+        val expandedRequirements = required + EcuBackupCoverage.Region.DATA_FLASH
+        val problems = EcuBackupIntegrity.verify(
+            savedManifest, captures, expandedRequirements
+        ).problems
+        assertTrue(EcuBackupIntegrity.Problem.COVERAGE_MISMATCH in problems)
+    }
+
+    @Test fun malformedAndOverlappingCapturesAreNotRestorableProof() {
+        val first = capture()
+        val second = capture(byteArrayOf(4, 5, 6)).copy(startAddress = 2L)
+        val captures = listOf(first, second)
+        val savedManifest = manifest(captures)
+        assertTrue(savedManifest.coverage.status == EcuBackupCoverage.Status.INCONSISTENT)
+        // Consistency is distinct from completeness and eligibility for restoration.
+        assertTrue(EcuBackupIntegrity.verify(savedManifest, captures, required).consistent)
+    }
+
 }
