@@ -26,9 +26,28 @@ object Lfx2012ControllerReferences {
      * number; an ECU name mentioning E39 does not validate memory layout or recovery.
      */
     fun hasCompleteReadOnlyFingerprint(observed: ObservedIdentity): Boolean =
-        !observed.ecuName.isNullOrBlank() &&
-            observed.calibrationIds.any(String::isNotBlank) &&
-            observed.calibrationVerificationNumbers.any(String::isNotBlank)
+        isMeaningfulIdentifier(observed.ecuName) &&
+            observed.calibrationIds.any(::isMeaningfulIdentifier) &&
+            observed.calibrationVerificationNumbers.any(::isMeaningfulIdentifier)
+
+    /**
+     * Reject demo/placeholder diagnostic fields before presenting an ECU
+     * identification as complete. A complete fingerprint is still informational;
+     * it never establishes a safe firmware, memory layout or flash procedure.
+     */
+    private fun isMeaningfulIdentifier(raw: String?): Boolean {
+        val value = raw?.trim()?.uppercase().orEmpty()
+        if (value.isEmpty() || value in setOf(
+                "UNKNOWN", "N/A", "NONE", "NULL", "NOT AVAILABLE", "NOT SUPPORTED",
+                "PENDING", "TBD", "TEST", "DEMO", "SIMULATED", "-"
+            )
+        ) return false
+        if (listOf("UNKNOWN", "DEMO", "SIMULATED", "SAMPLE").any(value::startsWith)) return false
+        val compact = value.removePrefix("0X").replace(" ", "")
+        if (compact.isEmpty()) return false
+        if (compact.all { it == '0' } || compact.all { it == 'F' }) return false
+        return true
+    }
 
     fun describedServiceParts(): List<String> =
         listOf(currentServicePart, supersededServicePart)
