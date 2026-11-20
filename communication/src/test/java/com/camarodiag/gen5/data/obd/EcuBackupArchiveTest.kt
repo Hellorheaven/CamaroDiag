@@ -189,4 +189,61 @@ class EcuBackupArchiveTest {
         assertArrayEquals(byteArrayOf(1, 2, 3, 4), restored.captures.single().firstRead)
     }
 
+    @Test fun importRejectsEmptyPrimaryReadEvenWithMatchingChecksum() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val altered = ByteArrayOutputStream()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(original.toByteArray())).use { source ->
+            ZipOutputStream(altered).use { target ->
+                while (true) {
+                    val entry = source.nextEntry ?: break
+                    target.putNextEntry(ZipEntry(entry.name))
+                    val bytes = source.readBytes()
+                    if (entry.name == "manifest.properties") {
+                        val text = String(bytes, Charsets.ISO_8859_1)
+                        val originalHash = EcuBenchExpertPlan.sha256Hex(capture().firstRead)
+                        val emptyHash = EcuBenchExpertPlan.sha256Hex(byteArrayOf())
+                        target.write(text.replace(originalHash, emptyHash).toByteArray(Charsets.ISO_8859_1))
+                    } else if (entry.name != "capture/0/first.bin") {
+                        target.write(bytes)
+                    }
+                    target.closeEntry()
+                    source.closeEntry()
+                }
+            }
+        }
+        assertTrue(runCatching {
+            EcuBackupArchive.import(ByteArrayInputStream(altered.toByteArray()))
+        }.isFailure)
+    }
+
+    @Test fun importRejectsMissingSecondReadEvenIfManifestSaysAbsent() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val altered = ByteArrayOutputStream()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(original.toByteArray())).use { source ->
+            ZipOutputStream(altered).use { target ->
+                while (true) {
+                    val entry = source.nextEntry ?: break
+                    val bytes = source.readBytes()
+                    if (entry.name != "capture/0/second.bin") {
+                        target.putNextEntry(ZipEntry(entry.name))
+                        if (entry.name == "manifest.properties") {
+                            target.write(String(bytes, Charsets.ISO_8859_1)
+                                .replace("capture.0.second=true", "capture.0.second=false")
+                                .toByteArray(Charsets.ISO_8859_1))
+                        } else {
+                            target.write(bytes)
+                        }
+                        target.closeEntry()
+                    }
+                    source.closeEntry()
+                }
+            }
+        }
+        assertTrue(runCatching {
+            EcuBackupArchive.import(ByteArrayInputStream(altered.toByteArray()))
+        }.isFailure)
+    }
+
 }
