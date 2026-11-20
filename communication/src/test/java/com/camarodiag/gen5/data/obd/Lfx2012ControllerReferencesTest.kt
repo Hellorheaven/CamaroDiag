@@ -59,16 +59,16 @@ class Lfx2012ControllerReferencesTest {
             calibrationVerificationNumbers = listOf("12A4")
         )
         assertFalse(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
-            valid.copy(ecuName = "UNKNOWN\\nSIMULATED")
+            valid.copy(ecuName = "UNKNOWN\nSIMULATED")
         ))
         assertFalse(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
-            valid.copy(calibrationIds = listOf("N/A\\n00000000"))
+            valid.copy(calibrationIds = listOf("N/A\n00000000"))
         ))
         assertFalse(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
-            valid.copy(calibrationVerificationNumbers = listOf("FFFFFFFF\\nTBD"))
+            valid.copy(calibrationVerificationNumbers = listOf("FFFFFFFF\nTBD"))
         ))
         assertTrue(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
-            valid.copy(calibrationIds = listOf("N/A\\n12612345"))
+            valid.copy(calibrationIds = listOf("N/A\n12612345"))
         ))
     }
 
