@@ -1,5 +1,5 @@
 name: PR35 manual validation kickoff
-# Final validation checkpoint: Android lint, unit tests, instrumentation, build and Windows bridge.
+# Final validation checkpoint retry: clear two SharedPreferences UseKtx lint warnings.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
