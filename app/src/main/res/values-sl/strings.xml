@@ -49,4 +49,5 @@
     <string name="obd_scan_title">CELOTEN PREGLED OBD-II</string>
     <string name="obd_readiness">Pripravljenost OBD</string>
     <string name="obd_mode06_results">Rezultati načina 06</string>
+    <string name="system_language_follow_phone">Uporabi jezik telefona</string>
 </resources>
