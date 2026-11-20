@@ -27,6 +27,7 @@ import com.camarodiag.gen5.data.obd.ObdTransportFailurePolicy
 import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
+import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
@@ -67,6 +68,14 @@ data class CanConsoleRequestHistoryEntry(
     val succeeded: Boolean
 )
 
+data class CanConsoleHistoryEntry(
+    val id: Long,
+    val direction: String,
+    val timestampMillis: Long,
+    val content: String,
+    val succeeded: Boolean = true
+)
+
 data class LiveCanMonitorState(
     val isCapturing: Boolean = false,
     val rawText: String = "",
@@ -74,6 +83,7 @@ data class LiveCanMonitorState(
     val isSendingRequest: Boolean = false,
     val requestResponse: String? = null,
     val requestHistory: List<CanConsoleRequestHistoryEntry> = emptyList(),
+    val consoleHistory: List<CanConsoleHistoryEntry> = emptyList(),
     val message: String? = null
 )
 
@@ -1071,14 +1081,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val captured = obdManager.captureCanMonitor(durationMs) { chunk ->
                     if (canMonitorJob === monitorJob) {
                         pendingChunks.append(chunk)
-                        // Avoid publishing/analyzing every tiny transport read. A bounded batch
-                        // keeps UI updates responsive without repeatedly re-parsing the full trace.
-                        if (pendingChunks.length >= 512) {
-                            val current = _liveCanMonitorState.value
-                            val raw = (current.rawText + pendingChunks).takeLast(131_072)
-                            pendingChunks.clear()
-                            _liveCanMonitorState.value = current.copy(rawText = raw)
-                        }
+                        val batch = pendingChunks.toString()
+                        pendingChunks.clear()
+                        val current = _liveCanMonitorState.value
+                        val raw = (current.rawText + batch).takeLast(131_072)
+                        val event = CanConsoleHistoryEntry(
+                            id = System.nanoTime(),
+                            direction = "RX",
+                            timestampMillis = System.currentTimeMillis(),
+                            content = batch.take(4_096)
+                        )
+                        _liveCanMonitorState.value = current.copy(
+                            rawText = raw,
+                            consoleHistory = (current.consoleHistory + event).takeLast(300)
+                        )
                     }
                 }
                 if (canMonitorJob === monitorJob) {
@@ -1144,6 +1160,87 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         canMonitorJob?.cancel()
     }
 
+    /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
+    fun sendCanConsoleInput(input: String) {
+        val frame = RawCanFrameParser.parse(input)
+        if (frame == null) {
+            sendSafeObdRequest(input)
+            return
+        }
+        sendRawCanConsoleFrame(input, frame)
+    }
+
+    private fun sendRawCanConsoleFrame(input: String, frame: com.camarodiag.gen5.data.obd.RawCanFrame) {
+        val currentState = _liveCanMonitorState.value
+        if (currentState.isSendingRequest || canRequestJob?.isActive == true) return
+        if (!obdManager.isObdCommandChannelAvailable ||
+            currentState.isCapturing || canMonitorJob?.isActive == true
+        ) {
+            _liveCanMonitorState.value = currentState.copy(
+                message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            )
+            return
+        }
+        val txEvent = CanConsoleHistoryEntry(
+            id = System.nanoTime(),
+            direction = "TX",
+            timestampMillis = System.currentTimeMillis(),
+            content = input.trim()
+        )
+        _liveCanMonitorState.value = currentState.copy(
+            isSendingRequest = true,
+            message = null,
+            consoleHistory = (currentState.consoleHistory + txEvent).takeLast(300)
+        )
+        lateinit var requestJob: Job
+        requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            try {
+                val response = obdManager.sendRawCanFrame(frame)
+                if (canRequestJob === requestJob) {
+                    val current = _liveCanMonitorState.value
+                    val rxEvent = CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "RX",
+                        timestampMillis = System.currentTimeMillis(),
+                        content = response.ifBlank { "No response text returned by adapter." }
+                    )
+                    _liveCanMonitorState.value = current.copy(
+                        isSendingRequest = false,
+                        requestResponse = response,
+                        consoleHistory = (current.consoleHistory + rxEvent).takeLast(300),
+                        message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                if (canRequestJob === requestJob) {
+                    _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isSendingRequest = false)
+                }
+                throw cancelled
+            } catch (error: Exception) {
+                if (canRequestJob === requestJob) {
+                    reportConnectionLoss(error)
+                    val current = _liveCanMonitorState.value
+                    val errorEvent = CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "SYSTEM",
+                        timestampMillis = System.currentTimeMillis(),
+                        content = error.message ?: getApplication<Application>().getString(R.string.can_sniffer_request_failed),
+                        succeeded = false
+                    )
+                    _liveCanMonitorState.value = current.copy(
+                        isSendingRequest = false,
+                        consoleHistory = (current.consoleHistory + errorEvent).takeLast(300),
+                        message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
+                    )
+                }
+            } finally {
+                if (canRequestJob === requestJob) canRequestJob = null
+            }
+        }
+        canRequestJob = requestJob
+        requestJob.start()
+    }
+
     /** Sends only a whitelisted, read-only SAE J1979 request; arbitrary CAN/UDS payloads are rejected. */
     fun sendSafeObdRequest(input: String) {
         val request = SafeObdRequestPolicy.parse(input)
@@ -1167,9 +1264,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Claim the request slot synchronously before dispatching to IO. A lazy job lets
         // us install its identity before it can complete, preventing duplicate sends and
         // stale results from a request cancelled during vehicle/adapter changes.
+        val txEvent = CanConsoleHistoryEntry(
+            id = System.nanoTime(),
+            direction = "TX",
+            timestampMillis = System.currentTimeMillis(),
+            content = request.elmCommand
+        )
         _liveCanMonitorState.value = currentState.copy(
             isSendingRequest = true,
-            message = null
+            message = null,
+            consoleHistory = (currentState.consoleHistory + txEvent).takeLast(300)
         )
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
@@ -1183,10 +1287,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         completedAtMillis = System.currentTimeMillis(),
                         succeeded = true
                     )
+                    val rxEvent = CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "RX",
+                        timestampMillis = System.currentTimeMillis(),
+                        content = response.ifBlank { "—" }
+                    )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         requestResponse = response,
                         requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
+                        consoleHistory = (current.consoleHistory + rxEvent).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
                 }
@@ -1205,9 +1316,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         completedAtMillis = System.currentTimeMillis(),
                         succeeded = false
                     )
+                    val errorEvent = CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "SYSTEM",
+                        timestampMillis = System.currentTimeMillis(),
+                        content = getApplication<Application>().getString(R.string.can_sniffer_request_failed),
+                        succeeded = false
+                    )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
+                        consoleHistory = (current.consoleHistory + errorEvent).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
                     )
                 }
