@@ -788,7 +788,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val liveCanMonitorState: StateFlow<LiveCanMonitorState> = _liveCanMonitorState.asStateFlow()
     private var canMonitorJob: Job? = null
     /** Complete raw recording on private storage; rawText is only a bounded UI preview. */
-    private var activeCanCaptureFile: File? = null
+    @Volatile private var activeCanCaptureFile: File? = null
     private var canRequestJob: Job? = null
 
     private fun loadNativeCamaroSignalCatalog() {
@@ -1462,6 +1462,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         if (_liveCanMonitorState.value.isSendingRequest) return
+        // A cancelled-before-start session must not leave an earlier session's
+        // archive exportable as if it belonged to this recording.
+        activeCanCaptureFile?.delete()
+        activeCanCaptureFile = null
         val previousState = _liveCanMonitorState.value
         val startEvent = CanConsoleHistoryEntry(
             id = System.nanoTime(),
