@@ -2788,14 +2788,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
-                        reportConnectionLoss(error)
-                        consecutiveFailures++
-                        _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_read_failed)
-                        if (_liveRecordingState.value.isRecording) {
-                            stopLiveRecording()
-                            _liveRecordingState.value = _liveRecordingState.value.copy(
-                                message = getApplication<Application>().getString(R.string.msg_live_recording_stopped)
-                            )
+                        val connectionLost = ObdTransportFailurePolicy.isConnectionLoss(error)
+                        if (connectionLost) {
+                            // A physical disconnect stops polling; retain the dedicated
+                            // connection-loss message instead of displaying a generic PID error.
+                            reportConnectionLoss(error)
+                        } else {
+                            consecutiveFailures++
+                            _liveTelemetryMessage.value =
+                                getApplication<Application>().getString(R.string.msg_live_read_failed)
+                            if (_liveRecordingState.value.isRecording) {
+                                stopLiveRecording()
+                                _liveRecordingState.value = _liveRecordingState.value.copy(
+                                    message = getApplication<Application>().getString(R.string.msg_live_recording_stopped)
+                                )
+                            }
                         }
                     }
                 }
