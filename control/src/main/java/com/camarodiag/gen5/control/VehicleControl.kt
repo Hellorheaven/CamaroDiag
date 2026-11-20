@@ -8,13 +8,13 @@ import com.camarodiag.gen5.domain.model.VehicleProfile
  * command definition has been verified and supplied by a validated profile.
  */
 enum class VehicleControlId { WINDOWS, SUNROOF, DOOR_LOCKS, LIGHTS, HORN, MIRRORS, TRUNK, REMOTE_START }
-enum class ControlAvailability { NOT_VERIFIED, AVAILABLE, NOT_EQUIPPED }
+enum class ControlAvailability { NOT_IMPLEMENTED, NOT_VERIFIED, AVAILABLE, NOT_EQUIPPED }
 
 data class VehicleControlCapability(
     val id: VehicleControlId,
     val titleFr: String,
     val titleEn: String,
-    val availability: ControlAvailability = ControlAvailability.NOT_VERIFIED,
+    val availability: ControlAvailability = ControlAvailability.NOT_IMPLEMENTED,
     val explanationFr: String,
     val explanationEn: String,
     val vehicleContext: String = ""
