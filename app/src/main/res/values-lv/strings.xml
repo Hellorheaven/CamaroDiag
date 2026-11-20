@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Diagnostikas kļūdu kodi</string>
     <string name="obd_adapter_voltage">Adaptera spriegums</string>
     <string name="obd_supported_pids">Atbalstītie PID</string>
+    <string name="obd_ecu_name">ECU nosaukums</string>
+    <string name="obd_none_identified">Nav identificēts neviens</string>
+    <string name="obd_data_unavailable">Dati nav pieejami</string>
+    <string name="obd_returned_live_data">Saņemtie reāllaika dati</string>
+    <string name="obd_pending">Gaidošs</string>
+    <string name="obd_permanent">Pastāvīgs</string>
+    <string name="obd_confirmed">Apstiprināts</string>
+    <string name="obd_freeze_frame">Iesaldētais kadrs</string>
+    <string name="obd_raw_scan_log">Neapstrādāts skenēšanas žurnāls</string>
+    <string name="obd_powertrain_ecm">Piedziņa / ECM</string>
 </resources>
