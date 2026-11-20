@@ -28,6 +28,7 @@ import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
+import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
@@ -1061,34 +1062,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * records remain SYSTEM entries instead of being presented as ECU traffic.
      */
     private fun parseCanConsoleReceiveEvents(output: String): List<CanConsoleHistoryEntry> =
-        output.lineSequence().mapNotNull { rawLine ->
-            val line = rawLine.trim().removeSuffix(">").trim()
-            if (line.isEmpty()) return@mapNotNull null
-            val frame = RawCanFrameParser.parseReceivedFrames(line).singleOrNull()
-            if (frame == null) {
-                CanConsoleHistoryEntry(
-                    id = System.nanoTime(),
-                    direction = "SYSTEM",
-                    timestampMillis = System.currentTimeMillis(),
-                    content = line.take(4_096),
-                    succeeded = !Regex("(?i)\\b(ERROR|CAN ERROR|BUS ERROR|UNABLE|BUFFER FULL)\\b")
-                        .containsMatchIn(line)
-                )
-            } else {
-                val identifier = frame.canId.toString(16).uppercase().padStart(
-                    if (frame.isExtended) 8 else 3, '0'
-                )
-                val payload = frame.data.joinToString(" ") {
-                    "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
-                }
-                CanConsoleHistoryEntry(
-                    id = System.nanoTime(),
-                    direction = "RX",
-                    timestampMillis = System.currentTimeMillis(),
-                    content = "CAN ID=$identifier DLC=${frame.data.size} DATA=$payload"
-                )
-            }
-        }.toList()
+        CanConsoleRecordParser.parse(output).map { record ->
+            CanConsoleHistoryEntry(
+                id = System.nanoTime(),
+                direction = record.direction,
+                timestampMillis = System.currentTimeMillis(),
+                content = record.content,
+                succeeded = record.succeeded
+            )
+        }
 
     /** Starts a bounded, passive monitor session on a real header-capable ELM/STN adapter. */
     fun startCanMonitor(durationMs: Long = 10_000L) {
