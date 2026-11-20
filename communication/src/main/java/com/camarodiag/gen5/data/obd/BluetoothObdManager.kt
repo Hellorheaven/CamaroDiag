@@ -371,6 +371,64 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /**
+     * Transmits one explicitly addressed Classical CAN frame through a physical ELM/STN
+     * adapter. Receive/header support is checked separately from simulation state; this
+     * path never routes through the demo adapter or the ISO-TP-only J2534 bridge.
+     */
+    suspend fun sendRawCanFrame(frame: RawCanFrame): String = withContext(Dispatchers.IO) {
+        check(isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive) {
+            "Raw CAN transmission requires a connected physical adapter."
+        }
+        val capabilities = activeAdapterCapabilities
+            ?: error("The connected adapter has not been identified.")
+        check(capabilities.supportsCanHeaders) {
+            "The connected adapter has not confirmed CAN header support."
+        }
+        check(activeTransport in setOf("BLUETOOTH", "BLE", "USB", "WIFI")) {
+            "Raw CAN transmission is not available on this transport."
+        }
+        require(frame.data.size in 1..8) { "Classical CAN payloads must contain 1 to 8 bytes." }
+        require(if (frame.isExtended) frame.canId in 0..0x1FFFFFFFL else frame.canId in 0..0x7FFL) {
+            "CAN identifier is outside the selected 11-bit/29-bit range."
+        }
+
+        commandSessionMutex.withLock {
+            val protocol = if (frame.isExtended) "7" else "6"
+            val header = if (frame.isExtended) {
+                frame.canId.toString(16).uppercase().padStart(8, '0')
+            } else {
+                frame.canId.toString(16).uppercase().padStart(3, '0')
+            }
+            try {
+                val protocolResponse = sendAtCommandInternal("ATSP$protocol", 1_500L)
+                check(!protocolResponse.contains("?")) {
+                    "The adapter rejected the selected CAN protocol."
+                }
+                val formattingResponse = sendAtCommandInternal("ATCAF0", 1_500L)
+                check(!formattingResponse.contains("?")) {
+                    "The adapter cannot enter raw CAN formatting mode."
+                }
+                val headerResponse = sendAtCommandInternal("ATSH $header", 1_500L)
+                check(!headerResponse.contains("?")) {
+                    "The adapter rejected CAN header $header."
+                }
+                val payload = frame.data.joinToString(" ") {
+                    "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+                }
+                sendAtCommandInternal(payload, 4_000L)
+            } finally {
+                // Return to the app's configured 11-bit HS-CAN / automatic-format state.
+                withContext(NonCancellable) {
+                    runCatching { sendAtCommandInternal("ATSP6", 1_500L) }
+                    runCatching { sendAtCommandInternal("ATCAF1", 1_500L) }
+                    runCatching { sendAtCommandInternal("ATH1", 1_000L) }
+                    runCatching { sendAtCommandInternal("ATS0", 1_000L) }
+                }
+            }
+        }
+    }
+
     suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String =
         withContext(Dispatchers.IO) {
             commandSessionMutex.withLock {
