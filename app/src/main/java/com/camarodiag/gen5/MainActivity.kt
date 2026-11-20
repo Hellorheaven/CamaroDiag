@@ -17,7 +17,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             CamaroDiagTheme {
                 CamaroAuthGate(
-                    onAccountChanged = viewModel::onAccountSessionChanged
+                    onAccountChanged = viewModel::onAccountSessionChanged,
+                    onAccountDeleted = viewModel::onAccountDeleted
                 ) { CamaroDiagApp(viewModel = viewModel) }
             }
         }
