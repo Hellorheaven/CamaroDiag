@@ -787,4 +787,7 @@
     <string name="flexfuel_lfx2012_export_failed">ECU identity report could not be exported.</string>
     <string name="flexfuel_preflight_ecu_unverified">ECU identity is missing, simulated or not independently verified</string>
     <string name="flexfuel_lfx2012_fingerprint_incomplete">ECU identification incomplete: a real ECU name, calibration ID and verification number are needed. This is not firmware approval.</string>
+    <string name="flexfuel_lfx2012_responder_unknown">No usable ECU response address was recorded. CAL IDs and CVNs cannot be attributed to one controller.</string>
+    <string name="flexfuel_lfx2012_responder_single">One ECU response address was observed. The origin of each CAL ID and CVN is still unverified.</string>
+    <string name="flexfuel_lfx2012_responder_multiple">Multiple ECU addresses responded. CAL IDs and CVNs may belong to different controllers; do not infer firmware compatibility.</string>
 </resources>
