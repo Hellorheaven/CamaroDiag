@@ -1,9 +1,27 @@
 name: Android CI
-# Manual full validation is available on demand; draft validation remains checkpointed.
-
-# Intentionally no push or pull_request trigger.
-# Validation is started manually at the 50-commit checkpoint, not per commit.
+# Full Android validation remains available manually. For draft PRs,
+# evaluate the configurable 50-Android-commit checkpoint automatically.
 on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'app/**'
+      - 'communication/**'
+      - 'core/**'
+      - 'diagnostic/**'
+      - 'control/**'
+      - 'mileageaudit/**'
+      - 'storage/**'
+      - 'third_party/**'
+      - '**/*.gradle'
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'version.properties'
+      - '.github/workflows/android-ci.yml'
   workflow_dispatch:
     inputs:
       target_ref:
@@ -82,7 +100,7 @@ jobs:
             echo "Current commit contains Android-relevant changes."
           fi
 
-      - name: Find last completed Android Debug validation attempt
+      - name: Find last successful Android Debug validation attempt
         id: previous_build
         if: steps.android_changes.outputs.android_changed == 'true' && github.event.pull_request.draft
         uses: actions/github-script@v8
@@ -104,15 +122,15 @@ jobs:
                 owner: context.repo.owner, repo: context.repo.repo,
                 run_id: candidate.id, per_page: 100
               });
-              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.status === 'completed')) {
+              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.conclusion === 'success')) {
                 previous = candidate;
                 break;
               }
             }
             core.setOutput('sha', previous ? previous.head_sha : '');
             core.info(previous
-              ? 'Last completed Android Debug validation attempt: ' + previous.head_sha
-              : 'No previous completed Android Debug validation attempt; counting relevant commits from the PR base.');
+              ? 'Last successful Android Debug validation attempt: ' + previous.head_sha
+              : 'No previous successful Android Debug validation attempt; counting relevant commits from the PR base.');
 
       - name: Evaluate Android-only periodic build checkpoint
         id: checkpoint
