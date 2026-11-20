@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Moottorin todellinen vääntömomentti</string>
     <string name="can_trace_pid_63">Moottorin viitevääntömomentti</string>
     <string name="live_pid_ethanol">Etanolipitoisuus</string>
+    <string name="can_trace_flow_status_cts">Jatka lähetystä</string>
+    <string name="can_trace_flow_status_wait">Odota</string>
+    <string name="can_trace_flow_status_overflow">Ylivuoto</string>
+    <string name="can_trace_flow_status_reserved">Varattu tila</string>
+    <string name="can_trace_exchange_heading">UDS-pyyntöjen ja vastausten vaihto</string>
+    <string name="can_trace_exchange_completed">Valmis</string>
+    <string name="can_trace_exchange_pending">Vastausta odotetaan (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Vastausta ei havaittu</string>
+    <string name="can_console_raw_tx_confirm_title">Vahvista raaka CAN-lähetys</string>
+    <string name="can_console_raw_tx_confirm_message">Tämä lähettää kehyksen suoraan ajoneuvon CAN-väylään. Väärä kehys voi vaikuttaa ohjainlaitteisiin. Lähetä vain, jos tunnet kohdeväylän ja tunnisteen.</string>
+    <string name="can_console_tx_unverified">Raaka CAN-lähetys on poistettu käytöstä: vain lukua koskevaan lähetyksen tarkistukseen ei havaittu todellista ECU-vastausta.</string>
+    <string name="can_trace_clear_filters">Tyhjennä suodattimet</string>
+    <string name="can_trace_filter_invalid">Virheellinen CAN-tunnus tai tietojen etuliite.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP-virtauksenhallinta</string>
+    <string name="cal_expert_block_recovery">Tämän täsmällisen kohteen palautusmenettelyä ei ole vahvistettu.</string>
+    <string name="cal_expert_block_driver">Vahvistettua laitteisto-ohjelmoinnin ajuria ei ole yhdistetty.</string>
+    <string name="cal_expert_identity_notice">Syötetyt tunnisteet ja tiedostotiivisteet ovat havaintoja, eivät todisteita laitteiston yhteensopivuudesta.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULOINTI: näitä ECU-tunnisteita ei ole luettu oikeasta ajoneuvosta eikä niillä voi vahvistaa laiteohjelmistoa.</string>
+    <string name="cal_expert_block_memory_map">Kohteen muistikarttaa ja suojattuja alueita ei ole vahvistettu.</string>
+    <string name="flexfuel_preflight_backup">Alkuperäistä ECU-varmuuskopiota ei ole vahvistettu.</string>
 </resources>
