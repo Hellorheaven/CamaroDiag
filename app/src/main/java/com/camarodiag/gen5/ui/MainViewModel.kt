@@ -2257,34 +2257,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isObdScanning.value = false
     }
 
+    private var connectionAttemptGeneration: Long = 0L
+    private var connectionAttemptJob: Job? = null
+
     private fun connectWithResult(
         connect: suspend () -> Result<AdapterCapabilities>,
         fallbackMessage: String,
         transport: String,
         endpoint: String
     ) {
-        viewModelScope.launch {
+        val attempt = ++connectionAttemptGeneration
+        connectionAttemptJob?.cancel()
+        connectionAttemptJob = viewModelScope.launch {
             beginBusyOperation()
-            _connectionMessage.value = null
-            val activeMonitor = canMonitorJob
-            val activeRequest = canRequestJob
-            markAdapterDisconnected()
-            activeMonitor?.join()
-            activeRequest?.join()
             try {
+                if (attempt != connectionAttemptGeneration) return@launch
+                _connectionMessage.value = null
+                val activeMonitor = canMonitorJob
+                val activeRequest = canRequestJob
+                markAdapterDisconnected()
+                activeMonitor?.join()
+                activeRequest?.join()
+                if (attempt != connectionAttemptGeneration) return@launch
                 connect()
                     .onSuccess { capabilities ->
-                        _adapter.value = capabilities
-                        rememberConnectionProfile(transport, capabilities, endpoint)
-                        refreshTopologyAndDefaults(runInitialScans = true)
+                        if (attempt == connectionAttemptGeneration) {
+                            _adapter.value = capabilities
+                            rememberConnectionProfile(transport, capabilities, endpoint)
+                            refreshTopologyAndDefaults(runInitialScans = true)
+                        }
                     }
-                    .onFailure { error ->
-                        _connectionMessage.value = fallbackMessage
+                    .onFailure {
+                        if (attempt == connectionAttemptGeneration) {
+                            _connectionMessage.value = fallbackMessage
+                        }
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = fallbackMessage
+                if (attempt == connectionAttemptGeneration) {
+                    _connectionMessage.value = fallbackMessage
+                }
             } finally {
                 endBusyOperation()
             }
