@@ -487,3 +487,21 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 - #67 Planification ciblée : `EcuPartialWritePlanner` calcule hors ligne les octets et secteurs modifiés, refuse géométrie invalide et zones protégées ; tests des frontières de secteur et préservation des octets voisins. L'écran Expert FR/EN accepte les dimensions mémoire saisies par l'utilisateur et affiche un aperçu de l'impact pour deux BIN. Géométrie et compatibilité matérielles **non vérifiées**, aucune écriture.
 - **Étape immédiate** : lancer une CI de checkpoint sur HEAD via le workflow de lancement dédié, lire les journaux Android/Windows/Release, corriger toute erreur et avertissement de code. Pas de fusion si tests non terminés. La validation matériel/firmware/ECU reste impossible sans équipement.
 - Maintenir les issues matérielles #52/#63/#64/#65/#67 ouvertes ; éviter d'étendre la PR à de nouveaux pilotes sans matériel vérifié. Le périmètre livrable immédiat est le logiciel préparatoire et le diagnostic lecture seule.
+
+
+## FEUILLE DE ROUTE DES FUTURES PR — classement validé le 20/11/2026
+**Référence de planification : 29 issues ouvertes examinées.** Les lots ci-dessous sont des **lots prévisionnels**, pas des numéros de PR déjà créées. Une seule PR de développement active : #54 sur feat/flexfuel-lfx-2012 ; ne pas créer les autres branches/PR avant sa fusion, fermeture et suppression de branche.
+
+| Ordre | Lot futur | Priorité | Issues | Dépendances et objectif |
+|---|---|---|---|---|
+| 1 | **A — Sauvegarde et programmation ECU ciblée** | P0 | #63 #67 #64 #65 | Conserver les fondations déjà commitées ; construire sauvegarde vérifiée partielle/complète, diff secteurs, pilotes, readback et récupération ; banc réel requis pour annoncer l'écriture |
+| 2 | **B — Programmation multi-modules** | P1 | #68 #66 #46 | Après A ; BCM/TPMS, ABS, SDM, HVAC, FPCM, IPC et atelier de calibration, inventaire selon VIN/RPO |
+| 3 | **C — Interfaces et robustesse** | P1 | #41 #43 #50 | Matrice VCX/OBDLink/ELM/J2534, déconnexions et CI ; peut être avancé avant A si blocage technique |
+| 4 | **D — Garage, comptes et télémétrie** | P1 | #42 #53 #44 | Isolation véhicule/compte et temps réel multi-ECU |
+| 5 | **E — FlexFuel autres moteurs** | P2 | #55 #37 | Gen 5/Gen 6 V6/V8, matrice ECU/firmware distincte, après base LFX |
+| 6 | **F — Service et actionneurs** | P2 | #45 #60 | Fonctions de service documentées et commandes sécurisées réellement supportées |
+| 7 | **G — Ergonomie, recette, extensions** | P2/P3 | #40 #48 #49 #47 | Tablettes, cahier Excel, langues futures, plateformes étendues ; FR/EN uniquement tant que décidé |
+
+**PR #54 à finir sans extension** : P0 #56/#57/#58, FlexFuel LFX 2012 #52 en lecture seule/contrôles vérifiés, correctifs déjà engagés #38/#59/#61, tests et build. #62/#63/#64/#65/#66/#67 ont déjà du code préparatoire dans #54 : conserver s'il est stable mais **ne pas en déduire que les fonctionnalités physiques sont terminées**. #68 et fonctionnalités complètes de #67 passent après #54. #53 et les autres lots ne doivent pas bloquer la livraison de #54.
+
+**Règle universelle** : toujours proposer la meilleure sauvegarde effectivement accessible avant une modification ; afficher explicitement sauvegarde partielle, régions non lisibles, restauration non démontrée. Aucun flash ECU non validé. Pour chaque lot, créer sa branche/PR **seulement après clôture du lot précédent**, associer les issues, tests Android/Windows sans erreurs ni avertissements, puis merge et suppression de branche après validation. Ce tableau remplace les priorités historiques contradictoires sans effacer leur historique.
