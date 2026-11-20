@@ -287,7 +287,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           foreach ($arch in @('x64', 'x86')) {
-            $installer = ".\\dist\\CamaroDiag-J2534-Bridge-Setup-debug-pr$env:PR_NUMBER-$arch.exe"
+            $installer = Join-Path $PWD ("dist/CamaroDiag-J2534-Bridge-Setup-debug-pr{0}-{1}.exe" -f $env:PR_NUMBER, $arch)
             if (-not (Test-Path $installer)) { throw "Missing $arch Windows installer: $installer" }
             if ((Get-Item $installer).Length -lt 4096) { throw "Invalid $arch Windows installer size" }
           }
