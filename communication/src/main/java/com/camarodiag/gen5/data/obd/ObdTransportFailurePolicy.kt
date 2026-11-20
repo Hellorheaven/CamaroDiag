@@ -18,6 +18,9 @@ object ObdTransportFailurePolicy {
         var current: Throwable? = error
         var hasIoFailure = false
         while (current != null && visited.add(current)) {
+            // A late failure from an already replaced connection is not a
+            // failure of the currently connected physical adapter.
+            if (current is ObdSupersededSessionException) return false
             if (current is SocketTimeoutException) return false
             if (current is IOException) hasIoFailure = true
             current = current.cause
