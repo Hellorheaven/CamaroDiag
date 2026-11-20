@@ -77,4 +77,23 @@ class LocaleResourcesIntegrityTest {
             }
         }
     }
+    @Test fun allDeclaredLocalesTranslatePrimaryNavigation() {
+        val navigationKeys = setOf(
+            "tab_vehicle", "tab_connect", "tab_live", "tab_dtcs", "tab_more",
+            "tab_modules", "tab_mileage", "tab_calibration", "tab_obd_scan",
+            "tab_guide", "tab_controls", "tab_settings"
+        )
+        for (locale in locales) {
+            val translated = strings(locale)
+            assertTrue(
+                "Missing navigation translations for $locale: ${navigationKeys - translated.keys}",
+                translated.keys.containsAll(navigationKeys)
+            )
+            assertTrue(
+                "Blank navigation label in $locale",
+                navigationKeys.all { translated.getValue(it).isNotBlank() }
+            )
+        }
+    }
+
 }
