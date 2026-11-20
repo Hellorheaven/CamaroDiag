@@ -39,6 +39,13 @@ import androidx.compose.ui.unit.sp
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.ObdValue
+import com.camarodiag.gen5.domain.model.CamaroDtcCatalog
+import com.camarodiag.gen5.domain.model.DtcCatalogRegistry
+import com.camarodiag.gen5.domain.model.GmEngineMonitorCatalog
+import com.camarodiag.gen5.domain.model.VehicleProfile
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.camarodiag.gen5.ui.theme.CamaroAmber
 import com.camarodiag.gen5.ui.theme.OkGreen
 import com.camarodiag.gen5.ui.theme.SurfaceDark
@@ -52,6 +59,7 @@ fun ObdScanScreen(
     isScanning: Boolean,
     message: String?,
     isConnected: Boolean,
+    vehicle: VehicleProfile,
     savedVehicleId: String?,
     onRunScan: () -> Unit
 ) {
@@ -238,8 +246,13 @@ fun ObdScanScreen(
             if (allCodes.isEmpty()) {
                 item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
             } else {
+                val reportVin = report.vin?.trim()?.uppercase()
+                val matchesVehicle = !isSimulated &&
+                    reportVin != null && reportVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) &&
+                    reportVin == vehicle.vin.trim().uppercase() &&
+                    report.respondingEcuAddresses.size == 1
                 items(allCodes.distinctBy { it.code to it.status }, key = { "${it.code}-${it.status}" }) { dtc ->
-                    DtcResultCard(dtc)
+                    DtcResultCard(dtc, vehicle, matchesVehicle)
                 }
             }
 
@@ -342,13 +355,67 @@ private fun ObdValueCard(value: ObdValue) {
 }
 
 @Composable
-private fun DtcResultCard(dtc: ObdDtc) {
+private fun DtcResultCard(
+    dtc: ObdDtc,
+    vehicle: VehicleProfile,
+    vehicleEcuIdentityConfirmed: Boolean
+) {
+    val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+    val normalizedCode = dtc.code.substringBefore('-')
+    val generic = DtcCatalogRegistry.genericDescription(normalizedCode)
+    val specific = if (vehicleEcuIdentityConfirmed) {
+        CamaroDtcCatalog.find(normalizedCode, vehicle)
+    } else null
+    val monitor = if (vehicleEcuIdentityConfirmed) {
+        GmEngineMonitorCatalog.find(normalizedCode, vehicle)
+    } else null
+    val gmSource = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
     var showHelp by remember(dtc.code, dtc.status) { mutableStateOf(false) }
     if (showHelp) {
         AlertDialog(
             onDismissRequest = { showHelp = false },
             title = { Text(dtc.code) },
-            text = { Text(stringResource(R.string.obd_dtc_help_unavailable)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (generic != null) Text(if (isFrench) generic.first else generic.second)
+                    if (specific == null && monitor == null && generic == null) {
+                        Text(stringResource(R.string.obd_dtc_help_unavailable))
+                    }
+                    if (!vehicleEcuIdentityConfirmed) {
+                        Text(stringResource(R.string.dtc_vehicle_identity_required),
+                            color = WarnRed, fontSize = 12.sp)
+                    }
+                    if (specific != null) {
+                        Text(if (isFrench) specific.meaningFr else specific.meaningEn)
+                        Text(stringResource(R.string.dtc_severity), fontWeight = FontWeight.Bold)
+                        Text(if (isFrench) specific.severityFr else specific.severityEn)
+                        Text(stringResource(R.string.dtc_possible_causes), fontWeight = FontWeight.Bold)
+                        (if (isFrench) specific.causesFr else specific.causesEn).forEach {
+                            Text("• $it")
+                        }
+                        Text(stringResource(R.string.dtc_recommended_checks), fontWeight = FontWeight.Bold)
+                        (if (isFrench) specific.checksFr else specific.checksEn).forEachIndexed { index, check ->
+                            Text("${index + 1}. $check")
+                        }
+                    }
+                    if (monitor != null) {
+                        HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
+                        Text(stringResource(R.string.dtc_gm_monitor_title, gmSource),
+                            fontWeight = FontWeight.Bold, color = CamaroAmber)
+                        Text(if (isFrench) monitor.componentFr else monitor.componentEn)
+                        Text(if (isFrench) monitor.strategyFr else monitor.strategyEn)
+                        Text(stringResource(R.string.dtc_gm_monitor_criteria,
+                            if (isFrench) monitor.malfunctionCriteriaFr else monitor.malfunctionCriteriaEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_enable,
+                            if (isFrench) monitor.enableConditionsFr else monitor.enableConditionsEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_failure,
+                            if (isFrench) monitor.failureCriteriaFr else monitor.failureCriteriaEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_source, gmSource, monitor.sourcePage),
+                            color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = { showHelp = false }) {
                     Text(stringResource(R.string.obd_dtc_help_close))
@@ -362,11 +429,15 @@ private fun DtcResultCard(dtc: ObdDtc) {
         else -> stringResource(R.string.obd_confirmed)
     }
     val statusColor = if (dtc.status == "confirmed") WarnRed else CamaroAmber
-    Card(modifier = Modifier.clickable { showHelp = true }, colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Card(modifier = Modifier.clickable { showHelp = true },
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Row(Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(dtc.code, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(stringResource(R.string.obd_powertrain_ecm), color = TextMuted, fontSize = 10.sp)
+                Text(stringResource(R.string.obd_powertrain_ecm),
+                    color = TextMuted, fontSize = 10.sp)
             }
             Text(status, color = statusColor, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
         }
