@@ -342,7 +342,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [29, 33, 36]
+        # Validate every supported Android major API from Android 10 through 16.
+        api-level: [29, 30, 31, 32, 33, 34, 35, 36]
     steps:
       - name: Checkout the same validation revision
         uses: actions/checkout@v7
