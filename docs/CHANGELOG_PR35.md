@@ -247,3 +247,6 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Cela évite de réutiliser la taille négociée sur un adaptateur précédent si la connexion suivante ne répond pas à la demande de MTU.
 - Commit : `f077a2756a990e6622e7596c4e57de2596108c89`.
 - Relecture statique effectuée ; tests Gradle, build Android et essai avec OBDLink CX non exécutés.
+
+- Complément BLE : chaque fragment d'une écriture multi-paquets revérifie l'état de la connexion et l'identité de la session GATT. Une déconnexion ou un remplacement de session entre deux fragments interrompt donc l'envoi au lieu de tenter les fragments restants sur une session périmée.
+- Commit complémentaire : `e108377db9c1633dbf67e741e235aed63dc8f512`.
