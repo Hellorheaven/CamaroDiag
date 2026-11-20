@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULOINTI: näitä ECU-tunnisteita ei ole luettu oikeasta ajoneuvosta eikä niillä voi vahvistaa laiteohjelmistoa.</string>
     <string name="cal_expert_block_memory_map">Kohteen muistikarttaa ja suojattuja alueita ei ole vahvistettu.</string>
     <string name="flexfuel_preflight_backup">Alkuperäistä ECU-varmuuskopiota ei ole vahvistettu.</string>
+    <string name="cal_expert_title">Asiantuntijatila — ECU penkillä / siru</string>
+    <string name="cal_expert_expand">Määritä asiantuntijatila</string>
+    <string name="cal_expert_collapse">Piilota asiantuntija-asetukset</string>
+    <string name="cal_expert_family">Ohjainlaiteperhe (E39 tai E39A)</string>
+    <string name="cal_expert_chip">Havaittu sirun merkintä</string>
+    <string name="cal_expert_programmer">Penkkiohjelmointilaite / liitäntä</string>
+    <string name="cal_expert_access_title">Käyttötapa</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Ulkoinen muisti, irrotettu siru</string>
+    <string name="cal_expert_region_title">Muistialue</string>
+    <string name="cal_expert_region_pflash">MCU:n sisäinen ohjelmaflash</string>
+    <string name="cal_expert_region_dflash">MCU:n dataflash</string>
+    <string name="cal_expert_region_eeprom">Ulkoinen EEPROM</string>
+    <string name="cal_expert_blockers">Asiantuntijan ennakkotarkistusten puutteet</string>
+    <string name="cal_expert_block_controller">Varmista tarkka ohjainlaiteperhe (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Tunnista MCU:n tai muistisirun fyysinen merkintä.</string>
+    <string name="cal_expert_block_programmer">Tunnista yhteensopiva penkkiohjelmointilaite.</string>
+    <string name="cal_expert_block_image_missing">Tuo ei-tyhjä laiteohjelmistokuva.</string>
+    <string name="cal_expert_block_image_format">Tätä valmistelua varten tarvitaan raaka binaaritiedosto.</string>
 </resources>
