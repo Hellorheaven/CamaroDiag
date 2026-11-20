@@ -747,4 +747,24 @@
     <string name="can_trace_pid_62">Tatsächliches Motordrehmoment</string>
     <string name="can_trace_pid_63">Referenzdrehmoment des Motors</string>
     <string name="live_pid_ethanol">Ethanolgehalt</string>
+    <string name="can_trace_flow_status_cts">Senden fortsetzen</string>
+    <string name="can_trace_flow_status_wait">Warten</string>
+    <string name="can_trace_flow_status_overflow">Überlauf</string>
+    <string name="can_trace_flow_status_reserved">Reservierter Status</string>
+    <string name="can_trace_exchange_heading">UDS-Anfrage-/Antwortaustausch</string>
+    <string name="can_trace_exchange_completed">Abgeschlossen</string>
+    <string name="can_trace_exchange_pending">Antwort ausstehend (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Keine Antwort beobachtet</string>
+    <string name="can_console_raw_tx_confirm_title">Rohe CAN-Übertragung bestätigen</string>
+    <string name="can_console_raw_tx_confirm_message">Dieser Befehl sendet einen Frame direkt auf den CAN-Bus des Fahrzeugs. Ein falscher Frame kann Fahrzeugsteuergeräte beeinträchtigen. Nur senden, wenn Zielbus und Kennung bekannt sind.</string>
+    <string name="can_console_tx_unverified">Senden roher CAN-Frames ist deaktiviert: Es wurde keine echte ECU-Antwort auf die schreibgeschützte Sendeprüfung beobachtet.</string>
+    <string name="can_trace_clear_filters">Filter löschen</string>
+    <string name="can_trace_filter_invalid">Ungültige CAN-ID oder Nutzdatenpräfix.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP-Flusskontrolle</string>
+    <string name="cal_expert_block_recovery">Für dieses genaue Ziel wurde kein Wiederherstellungsweg verifiziert.</string>
+    <string name="cal_expert_block_driver">Kein validierter Hardware-Programmiertreiber verbunden.</string>
+    <string name="cal_expert_identity_notice">Eingegebene Bezeichnungen und Datei-Hashes sind Beobachtungen, kein Nachweis der Hardwarekompatibilität.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULATION: Diese ECU-Kennungen wurden nicht aus einem echten Fahrzeug gelesen und können dessen Firmware nicht validieren.</string>
+    <string name="cal_expert_block_memory_map">Zielspeicherbelegung und geschützte Bereiche wurden nicht verifiziert.</string>
+    <string name="flexfuel_preflight_backup">Die ursprüngliche ECU-Sicherung wurde nicht verifiziert.</string>
 </resources>
