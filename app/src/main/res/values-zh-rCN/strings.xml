@@ -733,4 +733,24 @@
     <string name="can_trace_pid_62">发动机实际扭矩</string>
     <string name="can_trace_pid_63">发动机参考扭矩</string>
     <string name="live_pid_ethanol">乙醇含量</string>
+    <string name="can_trace_flow_status_cts">继续发送</string>
+    <string name="can_trace_flow_status_wait">等待</string>
+    <string name="can_trace_flow_status_overflow">溢出</string>
+    <string name="can_trace_flow_status_reserved">保留状态</string>
+    <string name="can_trace_exchange_heading">UDS 请求/响应交互</string>
+    <string name="can_trace_exchange_completed">已完成</string>
+    <string name="can_trace_exchange_pending">等待响应 (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">未观察到响应</string>
+    <string name="can_console_raw_tx_confirm_title">确认发送原始 CAN 帧</string>
+    <string name="can_console_raw_tx_confirm_message">此操作将帧直接发送到车辆 CAN 总线。错误的帧可能影响车辆模块。只有明确目标总线和标识符时才发送。</string>
+    <string name="can_console_tx_unverified">原始 CAN 发送已禁用：只读发送检查未收到真实 ECU 响应。</string>
+    <string name="can_trace_clear_filters">清除过滤条件</string>
+    <string name="can_trace_filter_invalid">CAN 标识符或数据前缀无效。</string>
+    <string name="can_trace_flow_control_heading">ISO-TP 流量控制</string>
+    <string name="cal_expert_block_recovery">尚未验证针对该具体目标的恢复方法。</string>
+    <string name="cal_expert_block_driver">尚未连接经过验证的硬件编程驱动程序。</string>
+    <string name="cal_expert_identity_notice">输入的标签及文件哈希仅为观察记录，不能证明硬件兼容性。</string>
+    <string name="flexfuel_lfx2012_simulation_warning">模拟：这些 ECU 标识符并非从真实车辆读取，不能验证其固件。</string>
+    <string name="cal_expert_block_memory_map">尚未验证目标内存布局及受保护区域。</string>
+    <string name="flexfuel_preflight_backup">尚未验证原始 ECU 备份。</string>
 </resources>
