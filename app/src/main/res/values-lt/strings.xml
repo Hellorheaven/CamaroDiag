@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_language_title">Programėlės kalba</string>
+    <string name="system_language_hint">Pasirinkite CamaroDiag kalbą.</string>
+    <string name="about_title">Apie CamaroDiag</string>
+    <string name="about_check_updates">Tikrinti naujinimus</string>
+    <string name="about_up_to_date">CamaroDiag yra atnaujinta.</string>
+    <string name="obd_choose_sensors">Pasirinkti jutiklius</string>
+    <string name="obd_sensor_cancel">Atšaukti</string>
+</resources>
