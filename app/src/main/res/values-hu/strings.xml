@@ -7,4 +7,16 @@
     <string name="about_up_to_date">A CamaroDiag naprakész.</string>
     <string name="obd_choose_sensors">Érzékelők kiválasztása</string>
     <string name="obd_sensor_cancel">Mégse</string>
+    <string name="tab_vehicle">Jármű</string>
+    <string name="tab_connect">Csatlakozás</string>
+    <string name="tab_live">Élő adatok</string>
+    <string name="tab_dtcs">Hibakódok</string>
+    <string name="tab_more">Továbbiak</string>
+    <string name="tab_modules">Vezérlőegységek</string>
+    <string name="tab_mileage">Kilométeróra</string>
+    <string name="tab_calibration">ECU / Térképek</string>
+    <string name="tab_obd_scan">Teljes OBD-vizsgálat</string>
+    <string name="tab_guide">Útmutató</string>
+    <string name="tab_controls">Vezérlés</string>
+    <string name="tab_settings">Beállítások</string>
 </resources>
