@@ -29,6 +29,8 @@ import java.util.Locale
 fun CamaroAuthGate(content: @Composable () -> Unit) {
     val auth = remember { FirebaseAuth.getInstance() }
     var currentUser by remember { mutableStateOf(auth.currentUser) }
+    // Recompose after an explicit Firebase email verification reload.
+    var verificationRevision by remember { mutableIntStateOf(0) }
     DisposableEffect(auth) {
         val listener = FirebaseAuth.AuthStateListener { currentUser = it.currentUser }
         auth.addAuthStateListener(listener)
@@ -37,8 +39,10 @@ fun CamaroAuthGate(content: @Composable () -> Unit) {
     val user = currentUser
     if (user == null) {
         CamaroLoginScreen(auth)
-    } else if (user.providerData.any { it.providerId == "password" } && !user.isEmailVerified) {
-        EmailVerificationScreen(auth)
+    } else if (user.providerData.any { it.providerId == "password" } &&
+        !remember(user, verificationRevision) { user.isEmailVerified }
+    ) {
+        EmailVerificationScreen(auth, onVerified = { verificationRevision++ })
     } else {
         Box {
             content()
@@ -175,11 +179,10 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
 }
 
 @Composable
-private fun EmailVerificationScreen(auth: FirebaseAuth) {
+private fun EmailVerificationScreen(auth: FirebaseAuth, onVerified: () -> Unit) {
     val french = remember { Locale.getDefault().language == "fr" }
     var message by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var checked by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -190,15 +193,19 @@ private fun EmailVerificationScreen(auth: FirebaseAuth) {
         Text(auth.currentUser?.email.orEmpty())
         Spacer(Modifier.height(16.dp))
         Button(enabled = !busy, onClick = {
+            val pendingUser = auth.currentUser ?: return@Button
             busy = true
-            auth.currentUser?.reload()?.addOnCompleteListener { task ->
+            pendingUser.reload().addOnCompleteListener { task ->
                 busy = false
-                checked = !checked
-                message = if (task.isSuccessful && auth.currentUser?.isEmailVerified == true) {
+                val verified = task.isSuccessful &&
+                    auth.currentUser?.uid == pendingUser.uid &&
+                    auth.currentUser?.isEmailVerified == true
+                message = if (verified) {
                     if (french) "Adresse vérifiée." else "Email verified."
                 } else {
                     if (french) "Vérification non confirmée." else "Verification not confirmed."
                 }
+                if (verified) onVerified()
             }
         }) { Text(if (french) "J'ai vérifié mon adresse" else "I've verified my email") }
         TextButton(enabled = !busy, onClick = {
@@ -214,10 +221,5 @@ private fun EmailVerificationScreen(auth: FirebaseAuth) {
             Text(if (french) "Se déconnecter" else "Sign out")
         }
         if (message.isNotBlank()) Text(message)
-        if (checked && auth.currentUser?.isEmailVerified == true) {
-            LaunchedEffect(checked) {
-                auth.currentUser?.let { auth.updateCurrentUser(it) }
-            }
-        }
     }
 }
