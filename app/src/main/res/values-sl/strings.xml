@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Zamrznjen okvir</string>
     <string name="obd_raw_scan_log">Surovi dnevnik pregleda</string>
     <string name="obd_powertrain_ecm">Pogonski sklop / ECM</string>
+    <string name="vehicle_setup_header">Nastavitev vozila</string>
+    <string name="vehicle_generation">Generacija</string>
+    <string name="vehicle_model_year">Modelsko leto</string>
+    <string name="vehicle_engine">Motor</string>
+    <string name="vehicle_transmission">Menjalnik</string>
+    <string name="vehicle_market_region">Tržna regija</string>
+    <string name="vehicle_vin">VIN vozila</string>
+    <string name="obd_scan_title">CELOTEN PREGLED OBD-II</string>
+    <string name="obd_readiness">Pripravljenost OBD</string>
+    <string name="obd_mode06_results">Rezultati načina 06</string>
 </resources>
