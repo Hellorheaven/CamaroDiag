@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
+import com.google.firebase.auth.FirebaseAuth
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationFileFormat
@@ -84,6 +85,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settingsPreferences = application.getSharedPreferences("camarodiag_settings", Context.MODE_PRIVATE)
     private val obdManager = BluetoothObdManager(application)
+    private var authenticatedAccountUid: String? = FirebaseAuth.getInstance().currentUser?.uid
+
+    /**
+     * A login change must never leave an OBD operation running in the background,
+     * including when the Firebase SDK revokes a previously valid session.
+     */
+    fun onAccountSessionChanged(accountUid: String?) {
+        if (authenticatedAccountUid == accountUid) return
+        authenticatedAccountUid = accountUid
+        stopCanMonitor()
+        canRequestJob?.cancel()
+        _isStreamingLive.value = false
+        if (_liveRecordingState.value.isRecording) stopLiveRecording()
+        recordedLiveSamples.clear()
+        _liveRecordingState.value = LiveRecordingState()
+        obdManager.disconnect()
+        clearVehicleEvidence()
+        _calibrationWorkspace.value = CalibrationWorkspaceState()
+        _connectionMessage.value = null
+        _connectionLossMessage.value = null
+        _isObdScanning.value = false
+    }
+
     @Volatile private var obdbCamaroSignalSet: ObdbCamaroSignalSet? = null
     @Volatile private var camaroSignalCatalog: CamaroSignalCatalog? = null
     private val sessionDao = DiagnosticDatabase.getInstance(application).sessionDao()
