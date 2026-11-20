@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULERING: dessa ECU-identifierare har inte lästs från ett verkligt fordon och kan inte verifiera dess firmware.</string>
     <string name="cal_expert_block_memory_map">Målets minneskarta och skyddade områden är inte verifierade.</string>
     <string name="flexfuel_preflight_backup">Den ursprungliga ECU-säkerhetskopian har inte verifierats.</string>
+    <string name="cal_expert_title">Expertläge — ECU på testbänk / krets</string>
+    <string name="cal_expert_expand">Konfigurera expertläge</string>
+    <string name="cal_expert_collapse">Dölj expertinställningar</string>
+    <string name="cal_expert_family">Styrenhetsfamilj (E39 eller E39A)</string>
+    <string name="cal_expert_chip">Observerad kretsmärkning</string>
+    <string name="cal_expert_programmer">Bänkprogrammerare / gränssnitt</string>
+    <string name="cal_expert_access_title">Åtkomstmetod</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Externt minne, borttagen krets</string>
+    <string name="cal_expert_region_title">Minnesområde</string>
+    <string name="cal_expert_region_pflash">Internt programflashminne i MCU</string>
+    <string name="cal_expert_region_dflash">Dataflashminne i MCU</string>
+    <string name="cal_expert_region_eeprom">Externt EEPROM</string>
+    <string name="cal_expert_blockers">Kvarstående expertkontroller</string>
+    <string name="cal_expert_block_controller">Verifiera den exakta styrenhetsfamiljen (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identifiera den fysiska märkningen på MCU eller minneskretsen.</string>
+    <string name="cal_expert_block_programmer">Identifiera en kompatibel bänkprogrammerare.</string>
+    <string name="cal_expert_block_image_missing">Importera en firmwareavbild som inte är tom.</string>
+    <string name="cal_expert_block_image_format">En rå binärfil krävs för denna förberedelse.</string>
 </resources>
