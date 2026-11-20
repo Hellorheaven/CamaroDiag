@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import androidx.credentials.exceptions.NoCredentialException
 import android.content.Context
+import android.os.Build
 import androidx.core.content.edit
 import com.google.firebase.FirebaseNetworkException
 import androidx.credentials.ClearCredentialStateRequest
@@ -178,7 +179,12 @@ fun CamaroAuthGate(
             content()
             TextButton(
                 onClick = { accountOpen = true },
-                modifier = Modifier.align(Alignment.TopEnd)
+                modifier = Modifier.align(Alignment.TopEnd).then(
+                    // Android 15+ can enforce edge-to-edge even with decorFitsSystemWindows.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        Modifier.statusBarsPadding()
+                    } else Modifier
+                )
             ) { Text(if (french) "Mon compte" else "My account") }
         }
         if (accountOpen) {
