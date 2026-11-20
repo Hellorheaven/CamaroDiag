@@ -133,6 +133,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isObdScanning.value = false
     }
 
+    /** Invoked only after Firebase confirms the remote account was deleted. */
+    fun onAccountDeleted(deletedUid: String) {
+        if (deletedUid.isBlank()) return
+        val prefs = accountVehiclePreferences(deletedUid)
+        prefs.edit { clear() }
+        if (settingsPreferences.getString("legacy_vehicles_claimed_uid", null) == deletedUid) {
+            settingsPreferences.edit {
+                remove("saved_vehicle_profiles")
+                remove("selected_vehicle_id")
+                remove("vehicle_year")
+                remove("vehicle_engine")
+                remove("vehicle_transmission")
+                remove("vehicle_market")
+                remove("vehicle_vin")
+                remove("last_connection_transport")
+                remove("last_connection_adapter")
+                remove("last_connection_endpoint")
+                // Do not offer deleted pre-login records to another account.
+                putString("legacy_vehicles_claimed_uid", "deleted")
+            }
+        }
+        viewModelScope.launch {
+            sessionDao.deleteAllForOwner(deletedUid)
+        }
+        if (authenticatedAccountUid == deletedUid) {
+            onAccountSessionChanged(null)
+        }
+    }
+
     @Volatile private var obdbCamaroSignalSet: ObdbCamaroSignalSet? = null
     @Volatile private var camaroSignalCatalog: CamaroSignalCatalog? = null
     private val sessionDao = DiagnosticDatabase.getInstance(application).sessionDao()
