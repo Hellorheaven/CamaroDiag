@@ -35,6 +35,18 @@ class EcuBackupArchiveTest {
         assertTrue(failure.isFailure)
     }
 
+    @Test fun conflictingIndependentReadIsRejected() {
+        val archive = ByteArrayOutputStream()
+        EcuBackupArchive.export(
+            archive,
+            listOf(capture().copy(independentRead = byteArrayOf(1, 2, 3, 9))),
+            setOf(EcuBackupCoverage.Region.CALIBRATION)
+        )
+        assertTrue(runCatching {
+            EcuBackupArchive.import(ByteArrayInputStream(archive.toByteArray()))
+        }.isFailure)
+    }
+
     @Test fun unexpectedArchiveEntryIsRejected() {
         val archive = ByteArrayOutputStream()
         ZipOutputStream(archive).use { zip ->
