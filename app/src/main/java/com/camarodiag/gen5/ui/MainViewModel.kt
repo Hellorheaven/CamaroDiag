@@ -1550,7 +1550,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (currentState.isSendingRequest || canRequestJob?.isActive == true ||
             detachedCanRequestJob?.isActive == true
         ) return
-        if (!obdManager.isObdCommandChannelAvailable ||
+        // Raw CAN transmission requires a verified header-capable adapter, not
+        // merely an open OBD command channel (which may support OBD only).
+        if (!obdManager.isObdCommandChannelAvailable || !_adapter.value.supportsCanHeaders ||
             currentState.isCapturing || canMonitorJob?.isActive == true ||
             detachedCanMonitorJob?.isActive == true
         ) {
