@@ -1354,11 +1354,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun exportCanCapture(destinationUri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val raw = _liveCanMonitorState.value.rawText
-                require(raw.isNotBlank()) { "No CAN capture is available to export." }
+                val snapshot = _liveCanMonitorState.value
+                val history = snapshot.consoleHistory
+                require(history.isNotEmpty() || snapshot.rawText.isNotBlank()) {
+                    "No CAN console history is available to export."
+                }
+                val outputText = buildString {
+                    appendLine("# CamaroDiag unified CAN console")
+                    appendLine("# TX = transmitted • RX = received • SYSTEM = application event")
+                    history.sortedBy { it.timestampMillis }.forEach { entry ->
+                        val timestamp = java.text.SimpleDateFormat(
+                            "yyyy-MM-dd HH:mm:ss.SSS",
+                            java.util.Locale.ROOT
+                        ).format(java.util.Date(entry.timestampMillis))
+                        append(timestamp)
+                        append(" [")
+                        append(entry.direction)
+                        append("] ")
+                        appendLine(entry.content)
+                    }
+                    if (history.isEmpty() && snapshot.rawText.isNotBlank()) {
+                        appendLine("# Raw adapter capture (direction not decoded by the adapter)")
+                        append(snapshot.rawText)
+                    }
+                }
                 val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                    ?: error("Could not create the CAN capture file.")
-                output.use { it.write(raw.toByteArray(Charsets.UTF_8)) }
+                    ?: error("Could not create the CAN console history file.")
+                output.use { it.write(outputText.toByteArray(Charsets.UTF_8)) }
                 _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
                     message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
                 )
