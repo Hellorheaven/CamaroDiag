@@ -70,12 +70,18 @@ fun CamaroAuthGate(
         }
     }
     LaunchedEffect(user, retryValidation) {
-        readyAccountUid = null
-        validatedAccountUid = null
-        validatedUser = null
+        // Refreshing the current user's token must not unmount the diagnostic
+        // screen every five minutes. Only an identity change hides old data.
+        val identityChanged = readyAccountUid != user?.uid ||
+            (validatedUser != null && validatedUser !== user)
+        if (identityChanged) {
+            readyAccountUid = null
+            validatedAccountUid = null
+            validatedUser = null
+            latestOnAccountChanged(user?.uid)
+            readyAccountUid = user?.uid
+        }
         validationError = null
-        latestOnAccountChanged(user?.uid)
-        readyAccountUid = user?.uid
         if (user != null) {
             val targetUid = user.uid
             val targetAttempt = retryValidation
@@ -99,6 +105,11 @@ fun CamaroAuthGate(
                         validatedAccountUid = targetUid
                         validatedUser = user
                     } else {
+                        // Expired offline validation or a rejected Firebase token:
+                        // revoke in-app access immediately and end OBD operations.
+                        validatedAccountUid = null
+                        validatedUser = null
+                        latestOnAccountChanged(null)
                         validationError = if (task.exception is FirebaseNetworkException) {
                             "offline"
                         } else {
