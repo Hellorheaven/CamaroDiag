@@ -81,3 +81,10 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Ces 15 langues disposent désormais de **49 clés** chacune sur 821 clés anglaises ; la traduction exhaustive reste très incomplète.
 - `d66f3cf` : test de ressources obligatoire pour ces 10 clés dans les 30 langues.
 - Tests Android/Windows/lint à faire réellement sur HEAD. CI non confirmée et PR non fusionnable à ce stade.
+
+## Dernière séquence — import ZIP et configuration véhicule
+- `e6f3c32`, `7b6f71c`, `f0f1df5` : les captures importées doivent contenir un premier flux non vide et une seconde lecture identique ; deux tests de ZIP falsifiés ajoutés.
+- Troisième lot de 150 traductions pour 15 langues : configuration véhicule, année, moteur, transmission, VIN, readiness et mode 06.
+- `d66f3cf` : test des nouveaux libellés pour les 30 langues.
+- **État CI** à la date de vérification : workflow PR unit tests #23 (run 44833602526), statut `pending`, aucun job disponible à ce stade ; workflows précédents annulés par les commits successifs. Le build n'est donc pas validé.
+- Couverture linguistique encore incomplète : 49 clés pour les 15 locales les moins couvertes, pour une base EN de 821 chaînes.
