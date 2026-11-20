@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Įveskite tikrą VIN; pavyzdinis VIN negeneruojamas.</string>
     <string name="status_not_verified">NEPATIKRINTA</string>
     <string name="adapter_discovery_only">TIK APTIKIMAS</string>
+    <string name="can_sniffer_raw_heading">Neapdorota CAN adapterio išvestis</string>
+    <string name="can_sniffer_export_raw">Eksportuoti neapdorotą žurnalą</string>
+    <string name="can_sniffer_dtc_heading">Pastebėti OBD-II gedimų kodai</string>
+    <string name="connection_lost_bluetooth">Bluetooth ryšys nutrūko. Iš naujo prijunkite adapterį ir pakartokite operaciją.</string>
+    <string name="connection_lost_vehicle">Ryšys su transporto priemone nutrūko. Prisijunkite iš naujo ir pakartokite operaciją.</string>
+    <string name="connection_lost_usb">USB adapteris atjungtas. Prijunkite jį iš naujo ir pakartokite operaciją.</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi ryšys nutrūko. Iš naujo prijunkite adapterį ir pakartokite operaciją.</string>
+    <string name="connection_lost_pc_bridge">Ryšys su kompiuterio diagnostikos tiltu nutrūko. Prisijunkite iš naujo ir pakartokite operaciją.</string>
+    <string name="live_sensor_search">Ieškoti jutiklių</string>
+    <string name="live_sensor_show_all">Rodyti visus jutiklius</string>
+    <string name="can_console_history">Bendra CAN konsolės istorija</string>
+    <string name="can_console_clear">Išvalyti istoriją</string>
+    <string name="can_console_empty">Kol kas nėra ryšio duomenų. Gauti ir išsiųsti duomenys bus rodomi čia.</string>
+    <string name="can_console_tx">TX • IŠSIŲSTA</string>
+    <string name="can_console_rx">RX • GAUTA</string>
+    <string name="can_console_system">SISTEMA</string>
+    <string name="can_console_input_label">CAN kadras arba OBD komanda</string>
+    <string name="can_console_sending">Siunčiama…</string>
+    <string name="obd_dtc_help_unavailable">Šiam gedimo kodui ir transporto priemonei dar nėra patvirtintų diagnostikos nurodymų. Prieš remontą peržiūrėkite gamintojo techninę informaciją.</string>
+    <string name="cal_expert_no_write">Programavimas nepasiekiamas, kol neįdiegtas ir nepatikrintas suderinamas stendo tvarkyklės sprendimas.</string>
+    <string name="flexfuel_preflight_write">ECU kalibravimo įrašymas nepatikrintas ir lieka išjungtas.</string>
+    <string name="status_not_implemented">NEĮGYVENDINTA</string>
 </resources>
