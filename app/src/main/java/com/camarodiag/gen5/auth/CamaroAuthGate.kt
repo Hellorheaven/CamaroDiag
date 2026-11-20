@@ -53,6 +53,7 @@ fun CamaroAuthGate(
     val user = currentUser
     var readyAccountUid by remember { mutableStateOf<String?>(null) }
     var validatedAccountUid by remember { mutableStateOf<String?>(null) }
+    var validatedUser by remember { mutableStateOf<com.google.firebase.auth.FirebaseUser?>(null) }
     var validationError by remember { mutableStateOf<String?>(null) }
     var retryValidation by remember { mutableIntStateOf(0) }
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
@@ -61,6 +62,7 @@ fun CamaroAuthGate(
     LaunchedEffect(user?.uid, retryValidation) {
         readyAccountUid = null
         validatedAccountUid = null
+        validatedUser = null
         validationError = null
         latestOnAccountChanged(user?.uid)
         readyAccountUid = user?.uid
@@ -76,6 +78,7 @@ fun CamaroAuthGate(
                         putLong("verified_$targetUid", System.currentTimeMillis())
                     }
                     validatedAccountUid = targetUid
+                    validatedUser = user
                 } else {
                     val lastValidated = validationPrefs.getLong("verified_$targetUid", 0L)
                     val offlineGrace = task.exception is FirebaseNetworkException &&
@@ -84,6 +87,7 @@ fun CamaroAuthGate(
                         )
                     if (offlineGrace) {
                         validatedAccountUid = targetUid
+                        validatedUser = user
                     } else {
                         validationError = if (task.exception is FirebaseNetworkException) {
                             "offline"
@@ -101,7 +105,9 @@ fun CamaroAuthGate(
         !remember(user, verificationRevision) { user.isEmailVerified }
     ) {
         EmailVerificationScreen(auth, onVerified = { verificationRevision++ })
-    } else if (readyAccountUid != user.uid || validatedAccountUid != user.uid) {
+    } else if (readyAccountUid != user.uid || validatedAccountUid != user.uid ||
+        validatedUser !== user
+    ) {
         val french = remember { Locale.getDefault().language == "fr" }
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
