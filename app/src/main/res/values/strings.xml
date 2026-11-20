@@ -782,4 +782,7 @@
     <string name="flexfuel_preflight_write">ECU calibration writing is not validated and remains disabled</string>
     <string name="status_not_implemented">NOT IMPLEMENTED</string>
     <string name="app_account_action">My account</string>
+    <string name="flexfuel_lfx2012_export_fingerprint">Export ECU identification (not a calibration backup)</string>
+    <string name="flexfuel_lfx2012_export_success">ECU identity report exported. No ECU memory was backed up.</string>
+    <string name="flexfuel_lfx2012_export_failed">ECU identity report could not be exported.</string>
 </resources>
