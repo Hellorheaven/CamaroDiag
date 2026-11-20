@@ -59,6 +59,7 @@ import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
+import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
@@ -221,6 +222,14 @@ fun CalibrationWorkspaceScreen(
     var j2534Host by remember { mutableStateOf("192.168.1.100") }
     var j2534Port by remember { mutableStateOf("35001") }
     var j2534Token by remember { mutableStateOf("") }
+    var expertExpanded by remember { mutableStateOf(false) }
+    var expertControllerFamily by remember { mutableStateOf("") }
+    var expertChipMarking by remember { mutableStateOf("") }
+    var expertProgrammerName by remember { mutableStateOf("") }
+    var expertAccessMethod by remember { mutableStateOf(EcuBenchExpertPlan.AccessMethod.BOOT_BAM) }
+    var expertMemoryRegion by remember { mutableStateOf(EcuBenchExpertPlan.MemoryRegion.PFLASH) }
+    var expertAccessMenuExpanded by remember { mutableStateOf(false) }
+    var expertRegionMenuExpanded by remember { mutableStateOf(false) }
     var obdbSignalSearch by remember { mutableStateOf("") }
     var obdbSignalMenuExpanded by remember { mutableStateOf(false) }
     var showVinMismatchDialog by remember { mutableStateOf(false) }
@@ -1096,6 +1105,136 @@ fun CalibrationWorkspaceScreen(
                         stringResource(R.string.cal_no_calibration_write),
                         color = CamaroAmber, fontSize = 12.sp
                     )
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.Icon(Icons.Default.Memory, contentDescription = null, tint = CamaroAmber)
+                        Text(stringResource(R.string.cal_expert_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    }
+                    Text(stringResource(R.string.cal_expert_intro), color = TextMuted, fontSize = 12.sp)
+                    OutlinedButton(onClick = { expertExpanded = !expertExpanded }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (expertExpanded) R.string.cal_expert_collapse else R.string.cal_expert_expand))
+                    }
+                    if (expertExpanded) {
+                        OutlinedTextField(
+                            value = expertControllerFamily,
+                            onValueChange = { expertControllerFamily = it.uppercase().take(24) },
+                            label = { Text(stringResource(R.string.cal_expert_family)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = expertChipMarking,
+                            onValueChange = { expertChipMarking = it.take(64) },
+                            label = { Text(stringResource(R.string.cal_expert_chip)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = expertProgrammerName,
+                            onValueChange = { expertProgrammerName = it.take(64) },
+                            label = { Text(stringResource(R.string.cal_expert_programmer)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(stringResource(R.string.cal_expert_access_title), color = TextPrimary)
+                        Box {
+                            OutlinedButton(onClick = { expertAccessMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(when (expertAccessMethod) {
+                                    EcuBenchExpertPlan.AccessMethod.BOOT_BAM -> R.string.cal_expert_access_boot
+                                    EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG -> R.string.cal_expert_access_nexus
+                                    EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF -> R.string.cal_expert_access_chipoff
+                                }))
+                            }
+                            DropdownMenu(
+                                expanded = expertAccessMenuExpanded,
+                                onDismissRequest = { expertAccessMenuExpanded = false }
+                            ) {
+                                listOf(
+                                    EcuBenchExpertPlan.AccessMethod.BOOT_BAM to R.string.cal_expert_access_boot,
+                                    EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG to R.string.cal_expert_access_nexus,
+                                    EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF to R.string.cal_expert_access_chipoff
+                                ).forEach { (method, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(label)) },
+                                        onClick = { expertAccessMethod = method; expertAccessMenuExpanded = false }
+                                    )
+                                }
+                            }
+                        }
+                        Text(stringResource(R.string.cal_expert_region_title), color = TextPrimary)
+                        Box {
+                            OutlinedButton(onClick = { expertRegionMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(when (expertMemoryRegion) {
+                                    EcuBenchExpertPlan.MemoryRegion.PFLASH -> R.string.cal_expert_region_pflash
+                                    EcuBenchExpertPlan.MemoryRegion.DFLASH -> R.string.cal_expert_region_dflash
+                                    EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM -> R.string.cal_expert_region_eeprom
+                                }))
+                            }
+                            DropdownMenu(
+                                expanded = expertRegionMenuExpanded,
+                                onDismissRequest = { expertRegionMenuExpanded = false }
+                            ) {
+                                listOf(
+                                    EcuBenchExpertPlan.MemoryRegion.PFLASH to R.string.cal_expert_region_pflash,
+                                    EcuBenchExpertPlan.MemoryRegion.DFLASH to R.string.cal_expert_region_dflash,
+                                    EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM to R.string.cal_expert_region_eeprom
+                                ).forEach { (region, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(label)) },
+                                        onClick = { expertMemoryRegion = region; expertRegionMenuExpanded = false }
+                                    )
+                                }
+                            }
+                        }
+                        val expertTarget = EcuBenchExpertPlan.Target(
+                            controllerFamily = expertControllerFamily.trim(),
+                            chipMarking = expertChipMarking.trim(),
+                            programmerName = expertProgrammerName.trim(),
+                            accessMethod = expertAccessMethod,
+                            region = expertMemoryRegion
+                        )
+                        val candidateImage = state.importedFileName?.let {
+                            EcuBenchExpertPlan.CandidateImage(
+                                fileName = it,
+                                format = state.inspectionFormat,
+                                sizeBytes = state.importedFileSize,
+                                sha256 = state.importedFileSha256
+                            )
+                        }
+                        Text(
+                            candidateImage?.let { stringResource(R.string.cal_expert_image_selected, it.fileName.orEmpty()) }
+                                ?: stringResource(R.string.cal_expert_image_none),
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                        Text(stringResource(R.string.cal_expert_identity_notice), color = CamaroAmber, fontSize = 11.sp)
+                        Text(stringResource(R.string.cal_expert_blockers), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        EcuBenchExpertPlan.blockers(expertTarget, candidateImage).forEach { blocker ->
+                            val label = when (blocker) {
+                                EcuBenchExpertPlan.Blocker.CONTROLLER_NOT_IDENTIFIED -> R.string.cal_expert_block_controller
+                                EcuBenchExpertPlan.Blocker.CHIP_NOT_IDENTIFIED -> R.string.cal_expert_block_chip
+                                EcuBenchExpertPlan.Blocker.ACCESS_REGION_INCOMPATIBLE -> R.string.cal_expert_block_access_region
+                                EcuBenchExpertPlan.Blocker.PROGRAMMER_NOT_IDENTIFIED -> R.string.cal_expert_block_programmer
+                                EcuBenchExpertPlan.Blocker.IMAGE_MISSING -> R.string.cal_expert_block_image_missing
+                                EcuBenchExpertPlan.Blocker.IMAGE_NOT_RAW_BINARY -> R.string.cal_expert_block_image_format
+                                EcuBenchExpertPlan.Blocker.IMAGE_INTEGRITY_MISSING -> R.string.cal_expert_block_image_integrity
+                                EcuBenchExpertPlan.Blocker.ORIGINAL_READBACK_NOT_VERIFIED -> R.string.cal_expert_block_readback
+                                EcuBenchExpertPlan.Blocker.RECOVERY_PATH_NOT_VERIFIED -> R.string.cal_expert_block_recovery
+                                EcuBenchExpertPlan.Blocker.MEMORY_MAP_NOT_VERIFIED -> R.string.cal_expert_block_memory_map
+                                EcuBenchExpertPlan.Blocker.HARDWARE_PROGRAMMING_DRIVER_UNAVAILABLE -> R.string.cal_expert_block_driver
+                            }
+                            Text("• " + stringResource(label), color = WarnRed, fontSize = 11.sp)
+                        }
+                    }
+                    Text(stringResource(R.string.cal_expert_no_write), color = CamaroAmber, fontSize = 11.sp)
                 }
             }
         }
