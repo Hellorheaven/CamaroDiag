@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Cuplu motor real</string>
     <string name="can_trace_pid_63">Cuplu motor de referință</string>
     <string name="live_pid_ethanol">Conținut de etanol</string>
+    <string name="can_trace_flow_status_cts">Continuă trimiterea</string>
+    <string name="can_trace_flow_status_wait">Așteaptă</string>
+    <string name="can_trace_flow_status_overflow">Depășire capacitate</string>
+    <string name="can_trace_flow_status_reserved">Stare rezervată</string>
+    <string name="can_trace_exchange_heading">Schimburi de solicitări și răspunsuri UDS</string>
+    <string name="can_trace_exchange_completed">Finalizat</string>
+    <string name="can_trace_exchange_pending">Răspuns în așteptare (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Nu s-a observat niciun răspuns</string>
+    <string name="can_console_raw_tx_confirm_title">Confirmă transmiterea CAN brută</string>
+    <string name="can_console_raw_tx_confirm_message">Acest lucru trimite un cadru direct pe magistrala CAN a vehiculului. Un cadru greșit poate afecta modulele. Trimite doar dacă știi magistrala și identificatorul țintă.</string>
+    <string name="can_console_tx_unverified">Transmiterea CAN brută este dezactivată: nu s-a observat un răspuns ECU real la verificarea transmisiei doar pentru citire.</string>
+    <string name="can_trace_clear_filters">Șterge filtrele</string>
+    <string name="can_trace_filter_invalid">ID CAN sau prefix de date invalid.</string>
+    <string name="can_trace_flow_control_heading">Controlul fluxului ISO-TP</string>
+    <string name="cal_expert_block_recovery">Nu a fost verificată o procedură de recuperare pentru această țintă exactă.</string>
+    <string name="cal_expert_block_driver">Nu este conectat niciun driver validat pentru programarea hardware.</string>
+    <string name="cal_expert_identity_notice">Etichetele introduse și amprentele fișierelor sunt observații, nu dovezi ale compatibilității hardware.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULARE: aceste identificatoare ECU nu au fost citite de pe un vehicul real și nu pot valida firmware-ul acestuia.</string>
+    <string name="cal_expert_block_memory_map">Harta memoriei țintă și regiunile protejate nu sunt verificate.</string>
+    <string name="flexfuel_preflight_backup">Copia de rezervă originală a ECU nu a fost verificată.</string>
 </resources>
