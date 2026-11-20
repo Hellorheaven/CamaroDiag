@@ -55,10 +55,12 @@ class J2534BridgeTransport(
             }
             try {
                 val connected = Socket()
+                // Track the descriptor before connect: the failure path must
+                // close it even when TCP establishment never completes.
+                socket = connected
                 connected.tcpNoDelay = true
                 connected.connect(InetSocketAddress(host, port), 5000)
                 connected.soTimeout = 12_000
-                socket = connected
                 reader = BufferedReader(InputStreamReader(connected.getInputStream(), Charsets.UTF_8))
                 writer = BufferedWriter(OutputStreamWriter(connected.getOutputStream(), Charsets.UTF_8))
                 val response = request(
