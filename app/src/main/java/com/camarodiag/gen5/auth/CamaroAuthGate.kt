@@ -299,6 +299,9 @@ fun CamaroAuthGate(
                         user.delete().addOnCompleteListener { result ->
                             deleting = false
                             if (result.isSuccessful) {
+                                // The deleted account must not retain an offline
+                                // authentication grace if it is later recreated.
+                                validationPrefs.edit { remove("verified_$accountToDelete") }
                                 onAccountDeleted(accountToDelete)
                                 deleteConfirm = false
                                 accountOpen = false
