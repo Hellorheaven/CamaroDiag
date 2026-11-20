@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Diagnostikos klaidų kodai</string>
     <string name="obd_adapter_voltage">Adapterio įtampa</string>
     <string name="obd_supported_pids">Palaikomi PID</string>
+    <string name="obd_ecu_name">ECU pavadinimas</string>
+    <string name="obd_none_identified">Nieko nenustatyta</string>
+    <string name="obd_data_unavailable">Duomenys nepasiekiami</string>
+    <string name="obd_returned_live_data">Gauti tiesioginiai duomenys</string>
+    <string name="obd_pending">Laukiantis</string>
+    <string name="obd_permanent">Nuolatinis</string>
+    <string name="obd_confirmed">Patvirtintas</string>
+    <string name="obd_freeze_frame">Užfiksuotas kadras</string>
+    <string name="obd_raw_scan_log">Neapdoroto nuskaitymo žurnalas</string>
+    <string name="obd_powertrain_ecm">Jėgos pavara / ECM</string>
 </resources>
