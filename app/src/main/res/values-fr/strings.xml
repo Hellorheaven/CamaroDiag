@@ -793,4 +793,37 @@
     <string name="flexfuel_lfx2012_responder_unknown">Aucune adresse de réponse ECU exploitable n’a été relevée. Impossible d’attribuer les CAL ID et CVN à un seul calculateur.</string>
     <string name="flexfuel_lfx2012_responder_single">Une adresse de réponse ECU a été observée. L’origine de chaque CAL ID et CVN reste à vérifier.</string>
     <string name="flexfuel_lfx2012_responder_multiple">Plusieurs adresses ECU ont répondu. Les CAL ID et CVN peuvent provenir de calculateurs différents ; la compatibilité du firmware n’est pas établie.</string>
+
+    <!-- Programmation directe sur puce/banc : préparation expert, pilote matériel non disponible. -->
+    <string name="cal_expert_title">Mode Expert — ECU sur banc / puce</string>
+    <string name="cal_expert_intro">Préparer une intervention sur calculateur démonté : BOOT/BAM, Nexus/JTAG ou EEPROM externe. Cette liste ne programme pas encore le calculateur.</string>
+    <string name="cal_expert_expand">Configurer le mode Expert</string>
+    <string name="cal_expert_collapse">Masquer la configuration Expert</string>
+    <string name="cal_expert_family">Famille du calculateur (E39 ou E39A)</string>
+    <string name="cal_expert_chip">Marquage observé sur la puce</string>
+    <string name="cal_expert_programmer">Programmateur / interface de banc</string>
+    <string name="cal_expert_access_title">Méthode de connexion</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Mémoire externe, puce dessoudée</string>
+    <string name="cal_expert_region_title">Zone mémoire</string>
+    <string name="cal_expert_region_pflash">Flash programme interne du MCU</string>
+    <string name="cal_expert_region_dflash">Flash de données du MCU</string>
+    <string name="cal_expert_region_eeprom">EEPROM externe</string>
+    <string name="cal_expert_image_none">Importer un binaire brut dans les fichiers ci-dessus. Un import ne constitue pas une sauvegarde ECU vérifiée.</string>
+    <string name="cal_expert_image_selected">Fichier importé : %1$s</string>
+    <string name="cal_expert_blockers">Contrôles Expert restant à satisfaire</string>
+    <string name="cal_expert_no_write">La programmation sera disponible après réalisation et validation du pilote de programmateur compatible.</string>
+    <string name="cal_expert_block_controller">Vérifier la famille exacte du calculateur (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identifier le marquage physique du MCU ou de la mémoire.</string>
+    <string name="cal_expert_block_access_region">La méthode choisie ne donne pas accès à cette zone mémoire.</string>
+    <string name="cal_expert_block_programmer">Identifier un programmateur de banc compatible.</string>
+    <string name="cal_expert_block_image_missing">Importer une image de firmware non vide.</string>
+    <string name="cal_expert_block_image_format">Cette préparation demande un fichier binaire brut.</string>
+    <string name="cal_expert_block_image_integrity">La preuve SHA-256 du fichier est absente ou incorrecte.</string>
+    <string name="cal_expert_block_readback">La relecture de la mémoire originale reste à vérifier.</string>
+    <string name="cal_expert_block_recovery">La procédure de récupération de cette cible reste à vérifier.</string>
+    <string name="cal_expert_block_memory_map">La carte mémoire et les zones protégées ne sont pas vérifiées.</string>
+    <string name="cal_expert_block_driver">Aucun pilote matériel de programmation validé.</string>
+    <string name="cal_expert_identity_notice">Les libellés et hash saisis sont des observations, pas des preuves de compatibilité matérielle.</string>
 </resources>
