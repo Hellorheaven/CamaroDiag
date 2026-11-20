@@ -786,4 +786,5 @@
     <string name="flexfuel_lfx2012_export_success">ECU identity report exported. No ECU memory was backed up.</string>
     <string name="flexfuel_lfx2012_export_failed">ECU identity report could not be exported.</string>
     <string name="flexfuel_preflight_ecu_unverified">ECU identity is missing, simulated or not independently verified</string>
+    <string name="flexfuel_lfx2012_fingerprint_incomplete">ECU identification incomplete: a real ECU name, calibration ID and verification number are needed. This is not firmware approval.</string>
 </resources>
