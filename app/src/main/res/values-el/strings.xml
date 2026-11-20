@@ -667,4 +667,27 @@
     <string name="cal_ecu_response_addresses_label">Παρατηρημένες διευθύνσεις απόκρισης λειτουργικού OBD (χωρίς αντιστοίχιση σε μονάδες)</string>
     <string name="cal_ecu_identity_limits">Οι τυπικές αυτές αποκρίσεις OBD δεν επιβεβαιώνουν το RPO, το κιβώτιο, τον αριθμό υλικού της μονάδας ή το GM OS. Οι διευθύνσεις απόκρισης δεν ταυτοποιούν μονάδες. Τα ειδικά αναγνωριστικά GM απαιτούν επαληθευμένη τεκμηρίωση για το συγκεκριμένο όχημα.</string>
     <string name="dtc_vehicle_identity_required">Οι λεπτομέρειες για το συγκεκριμένο όχημα αποκρύπτονται επειδή δεν έχει διαβαστεί το VIN της συνδεδεμένης ECU ή δεν ταιριάζει με το επιλεγμένο όχημα. Διαβάστε και επαληθεύστε το VIN της ECU πριν χρησιμοποιήσετε αυτές τις ερμηνείες.</string>
+    <string name="live_pid_oil">Πίεση λαδιού (μόνο προσομοίωση)</string>
+    <string name="live_pid_stft_b2">Βραχυπρόθεσμη διόρθωση καυσίμου τράπεζα 2</string>
+    <string name="live_pid_ltft_b2">Μακροπρόθεσμη διόρθωση καυσίμου τράπεζα 2</string>
+    <string name="live_pid_rel_tps">Σχετική θέση πεταλούδας</string>
+    <string name="live_pid_cmd_tps">Εντολή θέσης πεταλούδας</string>
+    <string name="live_pid_abs_tps_b">Απόλυτη θέση πεταλούδας B</string>
+    <string name="live_pid_abs_tps_c">Απόλυτη θέση πεταλούδας C</string>
+    <string name="live_pid_app_d">Θέση πεντάλ γκαζιού D</string>
+    <string name="live_pid_app_e">Θέση πεντάλ γκαζιού E</string>
+    <string name="live_pid_app_f">Θέση πεντάλ γκαζιού F</string>
+    <string name="live_pid_abs_load">Απόλυτο φορτίο κινητήρα</string>
+    <string name="live_pid_ambient">Θερμοκρασία περιβάλλοντος</string>
+    <string name="live_pid_fuel_press">Πίεση καυσίμου</string>
+    <string name="live_pid_timing">Προπορεία ανάφλεξης</string>
+    <string name="live_pid_eq_ratio">Εντολή λόγου ισοδυναμίας</string>
+    <string name="live_pid_o2_b1s1">Τάση αισθητήρα οξυγόνου B1S1</string>
+    <string name="live_pid_o2_b1s2">Τάση αισθητήρα οξυγόνου B1S2</string>
+    <string name="live_pid_o2_b1s3">Τάση αισθητήρα οξυγόνου B1S3</string>
+    <string name="live_pid_o2_b1s4">Τάση αισθητήρα οξυγόνου B1S4</string>
+    <string name="live_pid_wbo2_b1s1">Ευρυζωνικός αισθητήρας λάμδα B1S1</string>
+    <string name="live_pid_wbo2_b1s2">Ευρυζωνικός αισθητήρας λάμδα B1S2</string>
+    <string name="live_pid_wbo2_b2s1">Ευρυζωνικός αισθητήρας λάμδα B2S1</string>
+    <string name="live_pid_wbo2_b2s2">Ευρυζωνικός αισθητήρας λάμδα B2S2</string>
 </resources>
