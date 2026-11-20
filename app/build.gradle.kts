@@ -97,6 +97,13 @@ android {
         jvmTarget = "17"
     }
 
+    lint {
+        // FR and EN are the maintained locales for this development phase.
+        // Older bundled languages intentionally fall back to English for new keys.
+        // CI separately verifies complete French/default resource key parity.
+        disable += setOf("MissingTranslation", "ExtraTranslation")
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
