@@ -693,4 +693,5 @@
     <string name="about_check_failed">Não foi possível verificar atualizações. Verifique a conexão com a Internet.</string>
     <string name="update_install_update">Instalar atualização</string>
     <string name="update_version_available">Versão disponível: %1$s</string>
+    <string name="system_language_follow_phone">Seguir o idioma do telefone</string>
 </resources>
