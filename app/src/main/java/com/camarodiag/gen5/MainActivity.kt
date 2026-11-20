@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
                 CamaroAuthGate(
                     onAccountChanged = viewModel::onAccountSessionChanged,
                     onAccountDeleted = viewModel::onAccountDeleted
-                ) { CamaroDiagApp(viewModel = viewModel) }
+                ) { openAccount -> CamaroDiagApp(viewModel = viewModel, onOpenAccount = openAccount) }
             }
         }
     }
