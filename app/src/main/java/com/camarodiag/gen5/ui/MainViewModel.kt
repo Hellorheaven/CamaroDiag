@@ -86,6 +86,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsPreferences = application.getSharedPreferences("camarodiag_settings", Context.MODE_PRIVATE)
     private val obdManager = BluetoothObdManager(application)
     private var authenticatedAccountUid: String? = FirebaseAuth.getInstance().currentUser?.uid
+    private val _activeAccountUid = MutableStateFlow(authenticatedAccountUid)
 
     /**
      * Keep existing pre-authentication vehicles untouched in the legacy settings.
@@ -109,6 +110,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onAccountSessionChanged(accountUid: String?) {
         if (authenticatedAccountUid == accountUid) return
         authenticatedAccountUid = accountUid
+        _activeAccountUid.value = accountUid
         stopCanMonitor()
         canRequestJob?.cancel()
         _isStreamingLive.value = false
@@ -188,6 +190,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         persistSavedVehicleProfiles(combined)
         _savedVehicles.value = combined
         settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
+        viewModelScope.launch {
+            // Historical sessions are imported only as part of the same explicit
+            // legacy garage claim. The old Room records are not deleted.
+            sessionDao.claimUnassignedSessions(uid)
+        }
         _legacyVehicleImportAvailable.value = false
     }
 
@@ -285,7 +292,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isObdScanning = MutableStateFlow(false)
     val isObdScanning: StateFlow<Boolean> = _isObdScanning.asStateFlow()
 
-    val savedSessions: StateFlow<List<SavedSessionEntity>> = sessionDao.observeAllSessions()
+    val savedSessions: StateFlow<List<SavedSessionEntity>> = _activeAccountUid
+        .flatMapLatest { uid ->
+            if (uid == null) flowOf(emptyList()) else sessionDao.observeSessionsForOwner(uid)
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
@@ -2582,7 +2592,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val v = _vehicle.value
                 val report = _mileageReport.value
+                val ownerUid = authenticatedAccountUid ?: return@launch
                 val entity = SavedSessionEntity(
+                    ownerUid = ownerUid,
                     timestamp = System.currentTimeMillis(),
                     vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} (${v.market.code})",
                     vin = v.vin,
@@ -2607,7 +2619,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteSavedSession(session: SavedSessionEntity) {
         viewModelScope.launch {
             try {
-                sessionDao.deleteSession(session)
+                val ownerUid = authenticatedAccountUid ?: return@launch
+                sessionDao.deleteSessionForOwner(session.id, ownerUid)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
