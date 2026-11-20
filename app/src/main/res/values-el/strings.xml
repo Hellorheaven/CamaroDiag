@@ -748,4 +748,24 @@
     <string name="can_trace_pid_62">Πραγματική ροπή κινητήρα</string>
     <string name="can_trace_pid_63">Ροπή αναφοράς κινητήρα</string>
     <string name="live_pid_ethanol">Περιεκτικότητα σε αιθανόλη</string>
+    <string name="can_trace_flow_status_cts">Συνέχεια αποστολής</string>
+    <string name="can_trace_flow_status_wait">Αναμονή</string>
+    <string name="can_trace_flow_status_overflow">Υπερχείλιση</string>
+    <string name="can_trace_flow_status_reserved">Δεσμευμένη κατάσταση</string>
+    <string name="can_trace_exchange_heading">Ανταλλαγές αιτημάτων/απαντήσεων UDS</string>
+    <string name="can_trace_exchange_completed">Ολοκληρώθηκε</string>
+    <string name="can_trace_exchange_pending">Εκκρεμεί απάντηση (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Δεν παρατηρήθηκε απάντηση</string>
+    <string name="can_console_raw_tx_confirm_title">Επιβεβαίωση απευθείας μετάδοσης CAN</string>
+    <string name="can_console_raw_tx_confirm_message">Αυτό στέλνει πλαίσιο απευθείας στον δίαυλο CAN του οχήματος. Λανθασμένο πλαίσιο μπορεί να επηρεάσει τις μονάδες του οχήματος. Στείλτε μόνο εάν γνωρίζετε τον δίαυλο και το αναγνωριστικό προορισμού.</string>
+    <string name="can_console_tx_unverified">Η απευθείας αποστολή CAN είναι απενεργοποιημένη: δεν παρατηρήθηκε πραγματική απόκριση ECU στον έλεγχο μετάδοσης μόνο για ανάγνωση.</string>
+    <string name="can_trace_clear_filters">Εκκαθάριση φίλτρων</string>
+    <string name="can_trace_filter_invalid">Μη έγκυρο αναγνωριστικό CAN ή πρόθεμα δεδομένων.</string>
+    <string name="can_trace_flow_control_heading">Έλεγχος ροής ISO-TP</string>
+    <string name="cal_expert_block_recovery">Δεν έχει επαληθευτεί διαδικασία ανάκτησης για τον συγκεκριμένο στόχο.</string>
+    <string name="cal_expert_block_driver">Δεν έχει συνδεθεί επικυρωμένος οδηγός προγραμματισμού υλικού.</string>
+    <string name="cal_expert_identity_notice">Οι καταχωρισμένες ονομασίες και τα αποτυπώματα αρχείων είναι παρατηρήσεις, όχι απόδειξη συμβατότητας υλικού.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">ΠΡΟΣΟΜΟΙΩΣΗ: αυτά τα αναγνωριστικά ECU δεν διαβάστηκαν από πραγματικό όχημα και δεν μπορούν να επικυρώσουν το υλικολογισμικό του.</string>
+    <string name="cal_expert_block_memory_map">Δεν έχει επαληθευτεί ο χάρτης μνήμης στόχου και οι προστατευμένες περιοχές.</string>
+    <string name="flexfuel_preflight_backup">Το αρχικό αντίγραφο ασφαλείας ECU δεν έχει επαληθευτεί.</string>
 </resources>
