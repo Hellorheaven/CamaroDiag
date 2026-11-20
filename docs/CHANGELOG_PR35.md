@@ -24,3 +24,4 @@
 - Une coupure pendant les diagnostics, la lecture des défauts, les informations ECU ou la télémétrie interrompt désormais les opérations concernées et remonte l'alerte de connexion perdue.
 - La télémétrie n'efface plus cette alerte par un simple message d'échec de lecture et ne relance pas automatiquement les mesures après déconnexion.
 - Le statut du pont PC est également remis à zéro lors d'un changement d'adaptateur pour éviter un affichage de connexion périmée.
+- Les commandes USB et Wi-Fi sont désormais immédiatement refusées après une coupure détectée, sans tenter de continuer sur une liaison perdue.
