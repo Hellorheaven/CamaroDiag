@@ -121,6 +121,7 @@ jobs:
           WINDOWS_CHANGED: ${{ steps.windows_changes.outputs.windows_changed }}
           CURRENT_WINDOWS_CHANGED: ${{ steps.windows_changes.outputs.current_windows_changed }}
           EVENT_ACTION: ${{ github.event.action }}
+          EVENT_NAME: ${{ github.event_name }}
           PREVIOUS_BUILD_SHA: ${{ steps.previous_build.outputs.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
