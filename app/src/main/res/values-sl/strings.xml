@@ -50,4 +50,14 @@
     <string name="obd_readiness">Pripravljenost OBD</string>
     <string name="obd_mode06_results">Rezultati načina 06</string>
     <string name="system_language_follow_phone">Uporabi jezik telefona</string>
+    <string name="settings_current_vehicle">Trenutno vozilo</string>
+    <string name="settings_current_adapter">Povezava OBD-II</string>
+    <string name="adapter_section_title">Vmesnik Bluetooth OBD-II in sonda CAN</string>
+    <string name="paired_bluetooth_devices">Seznanjene naprave Bluetooth</string>
+    <string name="usb_devices_detected">Zaznane naprave USB</string>
+    <string name="usb_none_detected">Serijski vmesnik USB ni zaznan.</string>
+    <string name="wifi_connection_title">Povezava Wi-Fi ELM327</string>
+    <string name="adapter_ip_address">Naslov IP vmesnika</string>
+    <string name="adapter_tcp_port">Vrata TCP (običajno 35000 ali 23)</string>
+    <string name="adapter_connect_wifi">Poveži prek Wi-Fi</string>
 </resources>
