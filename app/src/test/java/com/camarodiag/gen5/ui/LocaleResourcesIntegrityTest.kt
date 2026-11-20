@@ -263,4 +263,22 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun expertBenchModeHasLocalizedLabelsInEveryLanguage() {
+        val labels = setOf(
+            "cal_expert_title", "cal_expert_expand", "cal_expert_collapse", "cal_expert_family",
+            "cal_expert_chip", "cal_expert_programmer", "cal_expert_access_title", "cal_expert_access_boot",
+            "cal_expert_access_nexus", "cal_expert_access_chipoff", "cal_expert_region_title", "cal_expert_region_pflash",
+            "cal_expert_region_dflash", "cal_expert_region_eeprom", "cal_expert_blockers", "cal_expert_block_controller",
+            "cal_expert_block_chip", "cal_expert_block_programmer", "cal_expert_block_image_missing", "cal_expert_block_image_format"
+        )
+        assertEquals(20, labels.size)
+        for (locale in locales) {
+            val translated = strings(locale)
+            assertTrue("Missing expert bench labels in $locale: ${labels - translated.keys}",
+                translated.keys.containsAll(labels))
+            assertTrue("Empty expert bench label in $locale",
+                labels.all { translated.getValue(it).isNotBlank() })
+        }
+    }
+
 }
