@@ -764,4 +764,5 @@
     <string name="obd_filter_sensors">Filter by PID</string>
     <string name="obd_sensor_ok">OK</string>
     <string name="obd_sensor_cancel">Cancel</string>
+    <string name="obd_sensor_not_measured">Not measured in this scan</string>
 </resources>
