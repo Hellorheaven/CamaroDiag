@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Anna todellinen VIN; esimerkkitunnusta ei luoda.</string>
     <string name="status_not_verified">EI VAHVISTETTU</string>
     <string name="adapter_discovery_only">VAIN ETSINTÄ</string>
+    <string name="can_sniffer_raw_heading">CAN-sovittimen raakatuloste</string>
+    <string name="can_sniffer_export_raw">Vie raakaloki</string>
+    <string name="can_sniffer_dtc_heading">Havaitut OBD-II-vikakoodit</string>
+    <string name="connection_lost_bluetooth">Bluetooth-yhteys katkesi. Yhdistä sovitin uudelleen ja aloita toiminto uudelleen.</string>
+    <string name="connection_lost_vehicle">Ajoneuvoyhteys katkesi. Yhdistä ajoneuvo uudelleen ja aloita toiminto uudelleen.</string>
+    <string name="connection_lost_usb">USB-sovitin irrotettiin. Yhdistä se uudelleen ja aloita toiminto uudelleen.</string>
+    <string name="connection_lost_wifi">OBD:n Wi-Fi-yhteys katkesi. Yhdistä sovitin uudelleen ja aloita toiminto uudelleen.</string>
+    <string name="connection_lost_pc_bridge">PC-diagnostiikkasillan yhteys katkesi. Yhdistä silta uudelleen ja aloita toiminto uudelleen.</string>
+    <string name="live_sensor_search">Hae antureita</string>
+    <string name="live_sensor_show_all">Näytä kaikki anturit</string>
+    <string name="can_console_history">Yhdistetty CAN-konsolin historia</string>
+    <string name="can_console_clear">Tyhjennä historia</string>
+    <string name="can_console_empty">Liikennettä ei vielä ole. Vastaanotetut ja lähetetyt tiedot näkyvät tässä.</string>
+    <string name="can_console_tx">TX • LÄHETETTY</string>
+    <string name="can_console_rx">RX • VASTAANOTETTU</string>
+    <string name="can_console_system">JÄRJESTELMÄ</string>
+    <string name="can_console_input_label">CAN-kehys tai OBD-komento</string>
+    <string name="can_console_sending">Lähetetään…</string>
+    <string name="obd_dtc_help_unavailable">Tälle vikakoodille ja ajoneuvolle ei vielä ole vahvistettuja vianmääritysohjeita. Tarkista valmistajan huolto-ohjeet ennen korjausta.</string>
+    <string name="cal_expert_no_write">Ohjelmointi ei ole käytettävissä ennen yhteensopivan penkkiajurin toteutusta ja vahvistusta.</string>
+    <string name="flexfuel_preflight_write">ECU-kalibroinnin kirjoitusta ei ole vahvistettu, ja se pysyy poissa käytöstä.</string>
+    <string name="status_not_implemented">EI TOTEUTETTU</string>
 </resources>
