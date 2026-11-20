@@ -23,10 +23,16 @@ class J2534BridgeTransport(
     private val pairingToken: String
 ) : UdsPayloadTransport {
     private val mutex = Mutex()
-    private var socket: Socket? = null
+    @Volatile private var socket: Socket? = null
     private var reader: BufferedReader? = null
     private var writer: BufferedWriter? = null
-    private var opened = false
+    @Volatile private var opened = false
+
+    /** Reflects a live TCP session rather than just an allocated transport object. */
+    val isConnected: Boolean
+        get() = opened && socket?.let {
+            it.isConnected && !it.isClosed && !it.isInputShutdown && !it.isOutputShutdown
+        } == true
 
     suspend fun connect(
         requestCanId: Int,
@@ -145,7 +151,7 @@ class J2534BridgeTransport(
     }
 
     private fun ensureOpen() {
-        check(opened && socket?.isConnected == true && socket?.isClosed == false) {
+        check(isConnected) {
             "Connecte d'abord le pont PC J2534."
         }
     }
