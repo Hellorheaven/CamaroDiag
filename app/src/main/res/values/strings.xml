@@ -837,4 +837,27 @@
     <string name="cal_expert_patch_preview_button">Preview sectors impacted by modified BIN</string>
     <string name="cal_expert_patch_summary">Changed bytes: %1$d. Erase sectors affected: %2$d. Hardware map not verified; no write.</string>
     <string name="cal_expert_patch_invalid">Offline preview unavailable: files, region range or erase/programming geometry invalid. No write attempted.</string>
+    <string name="live_pid_oil">Oil pressure (simulation only)</string>
+    <string name="live_pid_stft_b2">Short-term fuel trim bank 2</string>
+    <string name="live_pid_ltft_b2">Long-term fuel trim bank 2</string>
+    <string name="live_pid_rel_tps">Relative throttle position</string>
+    <string name="live_pid_cmd_tps">Commanded throttle position</string>
+    <string name="live_pid_abs_tps_b">Absolute throttle position B</string>
+    <string name="live_pid_abs_tps_c">Absolute throttle position C</string>
+    <string name="live_pid_app_d">Accelerator pedal position D</string>
+    <string name="live_pid_app_e">Accelerator pedal position E</string>
+    <string name="live_pid_app_f">Accelerator pedal position F</string>
+    <string name="live_pid_abs_load">Absolute engine load</string>
+    <string name="live_pid_ambient">Ambient air temperature</string>
+    <string name="live_pid_fuel_press">Fuel pressure</string>
+    <string name="live_pid_timing">Ignition timing advance</string>
+    <string name="live_pid_eq_ratio">Commanded equivalence ratio</string>
+    <string name="live_pid_o2_b1s1">Oxygen sensor B1S1 voltage</string>
+    <string name="live_pid_o2_b1s2">Oxygen sensor B1S2 voltage</string>
+    <string name="live_pid_o2_b1s3">Oxygen sensor B1S3 voltage</string>
+    <string name="live_pid_o2_b1s4">Oxygen sensor B1S4 voltage</string>
+    <string name="live_pid_wbo2_b1s1">Wideband lambda B1S1</string>
+    <string name="live_pid_wbo2_b1s2">Wideband lambda B1S2</string>
+    <string name="live_pid_wbo2_b2s1">Wideband lambda B2S1</string>
+    <string name="live_pid_wbo2_b2s2">Wideband lambda B2S2</string>
 </resources>
