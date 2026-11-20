@@ -10,7 +10,7 @@ import java.security.MessageDigest
  * is registered in CamaroDiag yet; these checks must never enable a write.
  */
 object EcuBenchExpertPlan {
-    enum class AccessMethod { BOOT_BAM, NEXUS_JTAG, EXTERNAL_CHIP_OFF }
+    enum class AccessMethod { OBD, BENCH, BOOT_BAM, NEXUS_JTAG, EXTERNAL_CHIP_OFF }
     enum class MemoryRegion { PFLASH, DFLASH, EXTERNAL_EEPROM }
     enum class Blocker {
         CONTROLLER_NOT_IDENTIFIED,
