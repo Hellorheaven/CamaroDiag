@@ -2378,31 +2378,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectSimulatedAdapter(preset: String) {
-        connectionAttemptGeneration++
-        connectionAttemptJob?.cancel()
-        connectionAttemptJob = null
-        viewModelScope.launch {
+        val attempt = ++connectionAttemptGeneration
+        val previousAttempt = connectionAttemptJob
+        previousAttempt?.cancel()
+        connectionAttemptJob = viewModelScope.launch {
             beginBusyOperation()
-            val activeMonitor = canMonitorJob
-            val activeRequest = canRequestJob
-            markAdapterDisconnected()
-            activeMonitor?.join()
-            activeRequest?.join()
-            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                ecuVinResponse = "",
-                calibrationIdResponse = "",
-                cvnResponse = ""
-            )
             try {
+                // Do not activate the simulator while a cancelled physical
+                // handshake is still closing its transport.
+                previousAttempt?.join()
+                if (attempt != connectionAttemptGeneration) return@launch
+                val activeMonitor = canMonitorJob
+                val activeRequest = canRequestJob
+                markAdapterDisconnected()
+                activeMonitor?.join()
+                activeRequest?.join()
+                if (attempt != connectionAttemptGeneration) return@launch
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    ecuVinResponse = "",
+                    calibrationIdResponse = "",
+                    cvnResponse = ""
+                )
                 val caps = obdManager.activateSimulatedAdapter(preset)
+                if (attempt != connectionAttemptGeneration) return@launch
                 _adapter.value = caps
                 _connectionMessage.value = null
                 refreshTopologyAndDefaults()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_simulation_activation_failed)
+                if (attempt == connectionAttemptGeneration) {
+                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_simulation_activation_failed)
+                }
             } finally {
+                if (attempt == connectionAttemptGeneration) {
+                    connectionAttemptJob = null
+                }
                 endBusyOperation()
             }
         }
