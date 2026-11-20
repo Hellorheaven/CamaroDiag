@@ -24,6 +24,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 /**
@@ -59,6 +60,15 @@ fun CamaroAuthGate(
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
     // Delay diagnostic UI until the old user's active connection and transient
     // diagnostic results have been cleared by the ViewModel.
+    // Reconfirm authorization periodically, even when the app remains open.
+    // This also enforces the bounded offline grace without needing a restart.
+    LaunchedEffect(user?.uid) {
+        if (user == null) return@LaunchedEffect
+        while (true) {
+            delay(5L * 60L * 1000L)
+            retryValidation++
+        }
+    }
     LaunchedEffect(user, retryValidation) {
         readyAccountUid = null
         validatedAccountUid = null
