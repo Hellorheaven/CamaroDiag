@@ -217,14 +217,10 @@
     <string name="update_download_failed">Download failed.</string>
     <string name="update_download_invalid_signature">Download or signature invalid. Installation blocked; manual reinstall may be needed.</string>
     <string name="update_download_complete">Download complete.</string>
-    <string name="update_ready_to_install">CamaroDiag – ready to install</string>
     <string name="update_downloading">Downloading</string>
-    <string name="update_available">Update available</string>
-    <string name="update_channel_only">Only the %1$s channel is offered. Debug remains Debug, and Release remains Release.</string>
     <string name="update_allow_unknown_sources">Allow installs from this source, return and press Install.</string>
     <string name="update_install">Install</string>
     <string name="update_download">Download</string>
-    <string name="update_later">Later</string>
     <string name="vehicle_generation_label">Generation %1$d</string>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel (2012–2015)</string>
@@ -631,7 +627,6 @@
     <string name="cal_vin_matches_profile">ECU VIN matches the selected vehicle profile.</string>
     <string name="cal_vin_mismatch_detected">VIN MISMATCH — profile: %1$s • ECU: %2$s</string>
     <string name="cal_vin_profile_not_set">The selected vehicle profile does not contain a valid VIN.</string>
-    <string name="cal_use_ecu_vin_for_current_profile">Use ECU VIN for current profile</string>
     <string name="cal_vin_mismatch_title">Vehicle VIN mismatch detected</string>
     <string name="cal_vin_mismatch_confirmation">The selected profile VIN is %1$s, but the ECU returned %2$s. These may be different vehicles. Create a separate profile to preserve the selected vehicle, or synchronize only after verifying the physical vehicle.</string>
     <string name="cal_vin_create_vehicle">Create vehicle profile</string>
@@ -702,7 +697,6 @@
     <string name="can_sniffer_direction_tx">TX</string>
     <string name="can_sniffer_search">Search CAN ID or data bytes</string>
     <string name="can_sniffer_filtered_count">Showing %1$d of %2$d frames</string>
-    <string name="live_sensor_count">Displayed sensors (%1$d/%2$d)</string>
     <string name="live_sensor_search">Search sensors</string>
     <string name="live_sensor_show_all">Show all sensors</string>
     <string name="can_trace_id_filter">CAN ID filter (hex)</string>
