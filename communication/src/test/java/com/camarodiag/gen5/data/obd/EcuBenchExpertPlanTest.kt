@@ -103,7 +103,7 @@ class EcuBenchExpertPlanTest {
     }
 
     @Test fun accessMethodsAndMemoryRegionsAreDistinct() {
-        assertEquals(3, EcuBenchExpertPlan.AccessMethod.values().size)
+        assertEquals(5, EcuBenchExpertPlan.AccessMethod.values().size)
         assertEquals(3, EcuBenchExpertPlan.MemoryRegion.values().size)
     }
 }
