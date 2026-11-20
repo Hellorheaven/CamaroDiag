@@ -59,3 +59,11 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - `74959a5` : test de parité des clés de `strings.xml` sur les 30 locales déclarées. Toute clé anglaise manquante provoque un échec explicite avec les 20 premières clés absentes.
 - Le test est volontairement **non satisfait actuellement** : plusieurs locales sont incomplètes. Ne pas maquiller cette situation en recopiant le texte anglais comme traduction.
 - Priorité : traduire réellement les valeurs manquantes et valider la cohérence des placeholders et le rendu RTL avant fusion.
+
+## Nouvelle passe : cohérence des données, traductions et CI
+- `da7eaa4` : copie figée des tableaux d'octets avant le calcul du manifeste et l'export ZIP, pour empêcher une mutation du tampon source de produire un fichier corrompu.
+- `a2314d7` : test d'injection d'une modification du tampon source pendant l'écriture de l'archive ; l'archive doit préserver les octets initiaux.
+- Ajout de **150 traductions de libellés de connexion/diagnostic** (10 clés × 15 locales) dans les langues de l'UE précédemment réduites au strict minimum. Elles disposent désormais de 29 clés traduites (sur 821 anglaises).
+- `6e85d10` : test de présence des 10 libellés de diagnostic dans toutes les 30 locales.
+- `8a575ec` : workflow `.github/workflows/pr-unit-tests.yml` pour lancer les tests unitaires Android lors des mises à jour de PR, en gardant le workflow de validation complète séparé. Résultat d'exécution non confirmé lors de la création.
+- **Reste bloquant** : traductions complètes (dont locales historiques), tests réels Android 10–16, lint, builds Android/Windows et vérification des résultats. Aucune fusion tant que les critères ne sont pas remplis.
