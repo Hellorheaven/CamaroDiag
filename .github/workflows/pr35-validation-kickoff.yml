@@ -1,4 +1,5 @@
 name: PR35 manual validation kickoff
+# Checkpoint 2: rerun after first live run exposed and fixed CI/Kotlin errors.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
