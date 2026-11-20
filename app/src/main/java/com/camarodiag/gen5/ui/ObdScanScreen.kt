@@ -59,22 +59,20 @@ fun ObdScanScreen(
         context.getSharedPreferences("obd_sensor_selection", android.content.Context.MODE_PRIVATE)
     }
     val vehicleKey = report?.vin?.trim()?.uppercase()?.takeIf { it.length == 17 }
-    val preferenceKey = vehicleKey?.let { "vehicle_$it" }
-    val storedPids = remember(preferenceKey) {
-        preferenceKey?.let { key ->
-            preferences.getString(key, null)?.split(",")?.mapNotNull(String::toIntOrNull)
-        }
+    val preferenceKey = vehicleKey?.let { "vehicle_$it" } ?: "vehicle_unidentified"
+    val storedPids = remember(preferenceKey, preferences) {
+        preferences.getString(preferenceKey, null)?.split(",")?.mapNotNull(String::toIntOrNull)
     }
     val sensorNames = report?.liveData?.associate { it.pid to localizedObdPidName(it) }.orEmpty()
     val knownPids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42, 0x52)
     val catalogPids = (knownPids + report?.supportedPids.orEmpty() + report?.liveData.orEmpty().map { it.pid }).distinct().sorted()
     val measuredPids = report?.liveData.orEmpty().map { it.pid }.toSet()
-    var choosingSensors by rememberSaveable(vehicleKey) { mutableStateOf(false) }
-    var sensorQuery by rememberSaveable(vehicleKey) { mutableStateOf("") }
-    var chosenPids by rememberSaveable(vehicleKey) { mutableStateOf(storedPids.orEmpty()) }
-    var selectionApplied by rememberSaveable(vehicleKey) { mutableStateOf(storedPids != null) }
+    var choosingSensors by rememberSaveable(preferenceKey) { mutableStateOf(false) }
+    var sensorQuery by rememberSaveable(preferenceKey) { mutableStateOf("") }
+    var chosenPids by rememberSaveable(preferenceKey) { mutableStateOf(storedPids.orEmpty()) }
+    var selectionApplied by rememberSaveable(preferenceKey) { mutableStateOf(storedPids != null) }
     if (choosingSensors && report != null) {
-        var pendingPids by remember(report, choosingSensors) {
+        var pendingPids by remember(preferenceKey, choosingSensors) {
             mutableStateOf(if (selectionApplied) chosenPids else report.liveData.map { it.pid })
         }
         AlertDialog(
@@ -123,9 +121,7 @@ fun ObdScanScreen(
                 TextButton(onClick = {
                     chosenPids = pendingPids.distinct()
                     selectionApplied = true
-                    preferenceKey?.let { key ->
-                        preferences.edit().putString(key, chosenPids.joinToString(",")).apply()
-                    }
+                    preferences.edit().putString(preferenceKey, chosenPids.joinToString(",")).apply()
                     choosingSensors = false
                 }) { Text(stringResource(R.string.obd_sensor_ok)) }
             },
@@ -334,7 +330,7 @@ private fun ObdValueCard(value: ObdValue) {
 
 @Composable
 private fun DtcResultCard(dtc: ObdDtc) {
-    var showHelp by remember(dtc.code) { mutableStateOf(false) }
+    var showHelp by remember(dtc.code, dtc.status) { mutableStateOf(false) }
     if (showHelp) {
         AlertDialog(
             onDismissRequest = { showHelp = false },
