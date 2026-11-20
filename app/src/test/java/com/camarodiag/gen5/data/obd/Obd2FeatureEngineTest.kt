@@ -329,6 +329,20 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun keepsEmissionRequirementsPidAsAnEncodedValue() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "015F") "415F10" else "NO DATA"
+        })
+
+        val value = engine.readLiveData(setOf(0x5F)).single()
+
+        assertEquals("Emission requirements to which vehicle is designed", value.name)
+        assertEquals("10", value.value)
+        assertEquals("raw", value.unit)
+        assertEquals(listOf(0x10), value.raw)
+    }
+
+    @Test
     fun decodesCatalystTemperature() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             if (command == "013C") "413C 0320" else "NO DATA"
