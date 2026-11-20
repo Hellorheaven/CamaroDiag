@@ -1122,7 +1122,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Reads only standardized OBD Mode 09 calibration identifiers; this is not a binary map read. */
     fun readCalibrationIdentification() {
+        val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
+            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
             if (!obdManager.isObdCommandChannelAvailable) {
                 val bridgeOnly = obdManager.isJ2534BridgeConnected()
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -1155,6 +1157,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             try {
                 val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
+                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                 val ecuVin = identity.vin
                 val validCal = identity.calibrationIds.isNotEmpty()
                 val validCvn = identity.calibrationVerificationNumbers.isNotEmpty()
@@ -1176,6 +1179,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                 reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
@@ -2475,7 +2479,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun scanDtcs() {
+        val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
+            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
             beginBusyOperation()
             try {
                 if (obdManager.isSimulationActive) {
@@ -2493,14 +2499,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
                         engine.readDtcs()
                     }
+                    if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                     _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } +
                         mapObdDtcs(confirmed + pending + permanent)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                reportConnectionLoss(error)
-                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_scan_failed)
+                if (isCurrentAccountGeneration(startedGeneration)) {
+                    reportConnectionLoss(error)
+                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_scan_failed)
+                }
             } finally {
                 endBusyOperation()
             }
