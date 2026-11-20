@@ -35,7 +35,7 @@ class RawCanFrameParserTest {
 
     @Test fun stripsDlcWhenDecodingReceivedAdapterFrames() {
         val frames = RawCanFrameParser.parseReceivedFrames(
-            "SEARCHING...\\r\\n7E8 05 41 0C 1A F8 00\\r\\n18DAF110 03 7F 22 31"
+            "SEARCHING...\r\n7E8 05 41 0C 1A F8 00\r\n18DAF110 03 7F 22 31"
         )
         assertEquals(2, frames.size)
         assertEquals(0x7E8L, frames[0].canId)
@@ -48,7 +48,7 @@ class RawCanFrameParserTest {
 
     @Test fun acceptsSingleDigitElmDlcForStandardAndExtendedIdentifiers() {
         val frames = RawCanFrameParser.parseReceivedFrames(
-            "7E8 8 07 62 F1 90 31 47 30 31\\r\\n18DAF110 3 7F 22 31"
+            "7E8 8 07 62 F1 90 31 47 30 31\r\n18DAF110 3 7F 22 31"
         )
         assertEquals(2, frames.size)
         assertEquals(0x7E8L, frames[0].canId)
@@ -62,14 +62,14 @@ class RawCanFrameParserTest {
 
     @Test fun ignoresAdapterStatusAndMalformedReceivedLines() {
         val frames = RawCanFrameParser.parseReceivedFrames(
-            "OK\\r\\nNO DATA\\r\\n7E8 03 41 0C\\r\\n7E8 04 41 0C\\r\\n7E8 09 01 02 03 04 05 06 07 08 09\\r\\nNOT A FRAME"
+            "OK\r\nNO DATA\r\n7E8 03 41 0C\r\n7E8 04 41 0C\r\n7E8 09 01 02 03 04 05 06 07 08 09\r\nNOT A FRAME"
         )
         assertTrue(frames.isEmpty())
     }
 
     @Test fun keepsOnlyFramesWhoseDlcMatchesPayloadLength() {
         val frames = RawCanFrameParser.parseReceivedFrames(
-            "7E8 03 41 0C 1A\\r\\n7E8 02 41 0C 1A\\r\\n7E8 00"
+            "7E8 03 41 0C 1A\r\n7E8 02 41 0C 1A\r\n7E8 00"
         )
         assertEquals(1, frames.size)
         assertArrayEquals(byteArrayOf(0x41, 0x0C, 0x1A), frames.single().data)
