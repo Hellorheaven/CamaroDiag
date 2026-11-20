@@ -44,8 +44,8 @@ class BluetoothObdManager(context: Context) {
     private var j2534BridgeResponseCanId: Int? = null
     private var j2534BridgeProtocolNumber: Int? = null
     @Volatile private var activeTransport: String = "BLUETOOTH"
-    /** Incremented on every teardown so an old command cannot cross into a new session. */
-    @Volatile private var transportEpoch: Long = 0L
+    /** Atomic, testable identity for transport work across disconnect/reconnect. */
+    private val transportSessionEpoch = ObdTransportSessionEpoch()
     private var activeAdapterCapabilities: AdapterCapabilities? = null
 
     /** Capture the active transport before disconnect() resets its identity. */
@@ -471,10 +471,11 @@ class BluetoothObdManager(context: Context) {
         onChunk: ((String) -> Unit)? = null
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
-            val sessionEpoch = transportEpoch
+            val sessionEpoch = transportSessionEpoch.capture()
             val sessionTransport = activeTransport
             fun ensureSameSession() {
-                if (transportEpoch != sessionEpoch || activeTransport != sessionTransport) {
+                transportSessionEpoch.requireCurrent(sessionEpoch)
+                if (activeTransport != sessionTransport) {
                     throw ObdTransportDisconnectedException("OBD connection changed during command")
                 }
             }
@@ -693,7 +694,7 @@ class BluetoothObdManager(context: Context) {
     fun disconnect() {
         // Publish teardown before sockets are closed: in-flight commands must not
         // attach their remaining read/write steps to the next adapter session.
-        transportEpoch++
+        transportSessionEpoch.invalidate()
         // Close every transport independently: one failing close must not leak the others.
         runCatching { usbTransport.close() }
         runCatching { wifiTransport.close() }
