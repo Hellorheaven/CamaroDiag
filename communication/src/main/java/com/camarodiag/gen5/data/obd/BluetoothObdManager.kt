@@ -183,13 +183,7 @@ class BluetoothObdManager(context: Context) {
             val protocolResp = sendAtCommand("ATSP 6")
             // A real 0100 response proves that the connected physical command path
             // transmitted a request and received an ECU reply; AT header support alone does not.
-            val transmitProbeResp = try {
-                sendAtCommand("0100", 2_500L)
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                ""
-            }
+            val transmitProbeResp = sendAtCommand("0100", 2_500L)
 
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = deviceName,
