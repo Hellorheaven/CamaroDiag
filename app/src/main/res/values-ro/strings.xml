@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Cadru înghețat</string>
     <string name="obd_raw_scan_log">Jurnal brut de scanare</string>
     <string name="obd_powertrain_ecm">Grup motopropulsor / ECM</string>
+    <string name="vehicle_setup_header">Configurare vehicul</string>
+    <string name="vehicle_generation">Generație</string>
+    <string name="vehicle_model_year">An model</string>
+    <string name="vehicle_engine">Motor</string>
+    <string name="vehicle_transmission">Transmisie</string>
+    <string name="vehicle_market_region">Regiune de piață</string>
+    <string name="vehicle_vin">VIN vehicul</string>
+    <string name="obd_scan_title">SCANARE OBD-II COMPLETĂ</string>
+    <string name="obd_readiness">Pregătire OBD</string>
+    <string name="obd_mode06_results">Rezultate mod 06</string>
 </resources>
