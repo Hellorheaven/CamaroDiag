@@ -691,4 +691,26 @@
     <string name="update_install_update">Update installeren</string>
     <string name="update_version_available">Beschikbare versie: %1$s</string>
     <string name="system_language_follow_phone">Telefoontaal volgen</string>
+    <string name="can_sniffer_raw_heading">Ruwe uitvoer van CAN-adapter</string>
+    <string name="can_sniffer_export_raw">Ruw logboek exporteren</string>
+    <string name="can_sniffer_dtc_heading">Waargenomen OBD-II-foutcodes</string>
+    <string name="connection_lost_bluetooth">Bluetooth-verbinding verbroken. Verbind de adapter opnieuw en start de bewerking opnieuw.</string>
+    <string name="connection_lost_vehicle">Voertuigverbinding verbroken. Verbind opnieuw met het voertuig en start de bewerking opnieuw.</string>
+    <string name="connection_lost_usb">USB-adapter losgekoppeld. Sluit de adapter opnieuw aan en start de bewerking opnieuw.</string>
+    <string name="connection_lost_wifi">OBD-wifiverbinding verbroken. Verbind de adapter opnieuw en start de bewerking opnieuw.</string>
+    <string name="connection_lost_pc_bridge">Verbinding met pc-diagnosebrug verbroken. Verbind de brug opnieuw en start de bewerking opnieuw.</string>
+    <string name="live_sensor_search">Sensoren zoeken</string>
+    <string name="live_sensor_show_all">Alle sensoren tonen</string>
+    <string name="can_console_history">Gecombineerde CAN-consolegeschiedenis</string>
+    <string name="can_console_clear">Geschiedenis wissen</string>
+    <string name="can_console_empty">Nog geen verkeer. Ontvangen en verzonden gegevens verschijnen hier.</string>
+    <string name="can_console_tx">TX • VERZONDEN</string>
+    <string name="can_console_rx">RX • ONTVANGEN</string>
+    <string name="can_console_system">SYSTEEM</string>
+    <string name="can_console_input_label">CAN-frame of OBD-opdracht</string>
+    <string name="can_console_sending">Verzenden…</string>
+    <string name="obd_dtc_help_unavailable">Voor deze foutcode en dit voertuig is nog geen geverifieerd reparatieadvies beschikbaar. Raadpleeg vóór reparatie de service-informatie van de fabrikant.</string>
+    <string name="cal_expert_no_write">Programmeren is niet beschikbaar totdat een ondersteunde werkbankdriver is geïmplementeerd en gevalideerd.</string>
+    <string name="flexfuel_preflight_write">Schrijven van de ECU-kalibratie is niet gevalideerd en blijft uitgeschakeld.</string>
+    <string name="status_not_implemented">NIET GEÏMPLEMENTEERD</string>
 </resources>
