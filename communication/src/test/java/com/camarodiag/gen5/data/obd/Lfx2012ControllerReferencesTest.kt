@@ -30,6 +30,28 @@ class Lfx2012ControllerReferencesTest {
         ))
     }
 
+    @Test fun placeholdersCannotMasqueradeAsACompleteEcuFingerprint() {
+        val identity = Lfx2012ControllerReferences.ObservedIdentity(
+            ecuName = "ECM E39",
+            calibrationIds = listOf("12612345"),
+            calibrationVerificationNumbers = listOf("FABC")
+        )
+        listOf("unknown", "DEMO E39", "simulated ECU", "N/A", "00000000", "FFFFFFFF").forEach { fake ->
+            assertFalse("ECU name: $fake", Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(identity.copy(ecuName = fake)))
+            assertFalse("CAL ID: $fake", Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(identity.copy(calibrationIds = listOf(fake))))
+            assertFalse("CVN: $fake", Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(identity.copy(calibrationVerificationNumbers = listOf(fake))))
+        }
+    }
+
+    @Test fun anyValidEntryIsEnoughWhenOtherEcusReturnPlaceholders() {
+        val identity = Lfx2012ControllerReferences.ObservedIdentity(
+            ecuName = "ECM E39",
+            calibrationIds = listOf("N/A", "12612345"),
+            calibrationVerificationNumbers = listOf("00000000", "12A4")
+        )
+        assertTrue(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(identity))
+    }
+
     @Test fun aCompleteReadOnlyFingerprintNeverAuthorizesAWrite() {
         val vehicle = Lfx2012FlexFuelPreflight.Vehicle(
             2012, "LFX", 5, "2G1FF3D36C9104199", "2G1FF3D36C9104199"
