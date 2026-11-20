@@ -1041,26 +1041,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun canMonitorAvailable(): Boolean =
         obdManager.isObdCommandChannelAvailable && _adapter.value.supportsCanHeaders
 
+    private fun appendCanConsoleSystemEvent(message: String, succeeded: Boolean = true) {
+        val current = _liveCanMonitorState.value
+        val event = CanConsoleHistoryEntry(
+            id = System.nanoTime(),
+            direction = "SYSTEM",
+            timestampMillis = System.currentTimeMillis(),
+            content = message,
+            succeeded = succeeded
+        )
+        _liveCanMonitorState.value = current.copy(
+            consoleHistory = (current.consoleHistory + event).takeLast(300)
+        )
+    }
+
     /** Starts a bounded, passive monitor session on a real header-capable ELM/STN adapter. */
     fun startCanMonitor(durationMs: Long = 10_000L) {
         if (canMonitorJob?.isActive == true) return
-        if (!obdManager.isObdCommandChannelAvailable) {
-            _liveCanMonitorState.value = LiveCanMonitorState(
-                message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
-            )
-            return
-        }
-        if (!_adapter.value.supportsCanHeaders) {
-            _liveCanMonitorState.value = LiveCanMonitorState(
-                message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
-            )
+        if (!obdManager.isObdCommandChannelAvailable || !_adapter.value.supportsCanHeaders) {
+            val unavailable = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            appendCanConsoleSystemEvent(unavailable, succeeded = false)
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = unavailable)
             return
         }
         if (_liveCanMonitorState.value.isSendingRequest) return
         val previousState = _liveCanMonitorState.value
+        val startEvent = CanConsoleHistoryEntry(
+            id = System.nanoTime(),
+            direction = "SYSTEM",
+            timestampMillis = System.currentTimeMillis(),
+            content = getApplication<Application>().getString(R.string.can_sniffer_start)
+        )
         _liveCanMonitorState.value = previousState.copy(
             isCapturing = true,
-            message = null
+            message = null,
+            consoleHistory = (previousState.consoleHistory + startEvent).takeLast(300)
         )
         // Install the job reference before it can execute. A lazy start also lets the
         // finally block compare its identity, so an older cancelled capture cannot clear
@@ -1094,18 +1109,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         raw.replace("\r\n", "\n").replace('\r', '\n'),
                         "live-can-monitor.txt"
                     )
-                    _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+                    val current = _liveCanMonitorState.value
+                    val completeEvent = CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "SYSTEM",
+                        timestampMillis = System.currentTimeMillis(),
+                        content = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
+                    )
+                    _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
                         rawText = raw,
                         report = report,
-                        message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
+                        message = completeEvent.content,
+                        consoleHistory = (current.consoleHistory + completeEvent).takeLast(300)
                     )
                 }
             } catch (cancelled: CancellationException) {
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
                     val raw = (current.rawText + pendingChunks).takeLast(131_072)
-                    _liveCanMonitorState.value = current.copy(isCapturing = false, rawText = raw)
+                    val stoppedEvent = CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "SYSTEM",
+                        timestampMillis = System.currentTimeMillis(),
+                        content = getApplication<Application>().getString(R.string.can_sniffer_stop)
+                    )
+                    _liveCanMonitorState.value = current.copy(
+                        isCapturing = false,
+                        rawText = raw,
+                        consoleHistory = (current.consoleHistory + stoppedEvent).takeLast(300)
+                    )
                 }
                 throw cancelled
             } catch (error: Exception) {
@@ -1113,10 +1146,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
                     val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                    val failureMessage = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
+                    val failureEvent = CanConsoleHistoryEntry(
+                        id = System.nanoTime(),
+                        direction = "SYSTEM",
+                        timestampMillis = System.currentTimeMillis(),
+                        content = error.message ?: failureMessage,
+                        succeeded = false
+                    )
                     _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
                         rawText = raw,
-                        message = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
+                        message = failureMessage,
+                        consoleHistory = (current.consoleHistory + failureEvent).takeLast(300)
                     )
                 }
             } finally {
