@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Introdu VIN-ul real; nu se generează un VIN demonstrativ.</string>
     <string name="status_not_verified">NEVERIFICAT</string>
     <string name="adapter_discovery_only">DOAR DETECTARE</string>
+    <string name="can_sniffer_raw_heading">Ieșire brută a adaptorului CAN</string>
+    <string name="can_sniffer_export_raw">Exportă jurnalul brut</string>
+    <string name="can_sniffer_dtc_heading">Coduri de eroare OBD-II observate</string>
+    <string name="connection_lost_bluetooth">Conexiunea Bluetooth s-a pierdut. Reconectează adaptorul și repornește operația.</string>
+    <string name="connection_lost_vehicle">Conexiunea la vehicul s-a pierdut. Reconectează vehiculul și repornește operația.</string>
+    <string name="connection_lost_usb">Adaptorul USB a fost deconectat. Reconectează-l și repornește operația.</string>
+    <string name="connection_lost_wifi">Conexiunea OBD prin Wi-Fi s-a pierdut. Reconectează adaptorul și repornește operația.</string>
+    <string name="connection_lost_pc_bridge">Conexiunea la puntea de diagnosticare PC s-a pierdut. Reconecteaz-o și repornește operația.</string>
+    <string name="live_sensor_search">Caută senzori</string>
+    <string name="live_sensor_show_all">Afișează toți senzorii</string>
+    <string name="can_console_history">Istoric unificat al consolei CAN</string>
+    <string name="can_console_clear">Șterge istoricul</string>
+    <string name="can_console_empty">Încă nu există trafic. Datele primite și transmise vor apărea aici.</string>
+    <string name="can_console_tx">TX • TRIMIS</string>
+    <string name="can_console_rx">RX • PRIMIT</string>
+    <string name="can_console_system">SISTEM</string>
+    <string name="can_console_input_label">Cadru CAN sau comandă OBD</string>
+    <string name="can_console_sending">Se trimite…</string>
+    <string name="obd_dtc_help_unavailable">Nu sunt încă disponibile instrucțiuni de diagnosticare verificate pentru acest cod de eroare și vehicul. Consultă documentația de service a producătorului înainte de reparații.</string>
+    <string name="cal_expert_no_write">Programarea nu este disponibilă până la implementarea și validarea unui driver de banc compatibil.</string>
+    <string name="flexfuel_preflight_write">Scrierea calibrării ECU nu a fost validată și rămâne dezactivată.</string>
+    <string name="status_not_implemented">NEIMPLEMENTAT</string>
 </resources>
