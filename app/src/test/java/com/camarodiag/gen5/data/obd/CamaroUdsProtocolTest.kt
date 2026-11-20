@@ -117,6 +117,9 @@ class CamaroUdsProtocolTest {
             "SEARCHING...\r\nNO DATA",
             "ELM327 v4.100",
             "7E8 03 41 00 BE",
+            "7E8 05 41 00 BE 3E B8 13",
+            "7E8 08 41 00 BE 3E B8 13",
+            "18DAF110 07 41 00 BE 3E B8 13",
             "NOPE4100BE3EB813"
         ).forEach { response ->
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
