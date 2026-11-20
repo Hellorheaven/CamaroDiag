@@ -19,6 +19,15 @@ object EcuBackupArchive {
     private const val MAX_REGION_BYTES = 64 * 1024 * 1024
     private const val MAX_ARCHIVE_BYTES = 256L * 1024 * 1024
 
+    /**
+     * The import limit includes decompressed manifest bytes, not just payloads.
+     * Keep the same ceiling at export to guarantee that our own ZIP is readable.
+     */
+    internal fun fitsUncompressedLimit(payloadBytes: Long, manifestBytes: Long): Boolean =
+        payloadBytes >= 0L && manifestBytes >= 0L &&
+            payloadBytes <= MAX_ARCHIVE_BYTES &&
+            manifestBytes <= MAX_ARCHIVE_BYTES - payloadBytes
+
     data class Imported(
         val manifest: EcuBackupManifest.Manifest,
         val captures: List<EcuBackupManifest.Capture>,
@@ -73,6 +82,11 @@ object EcuBackupArchive {
         }
         val metadata = ByteArrayOutputStream().also { properties.store(it, FORMAT) }.toByteArray()
         require(metadata.size <= 64 * 1024) { "Manifest too large" }
+        val payloadBytes = snapshots.sumOf { it.firstRead.size.toLong() +
+            (it.independentRead?.size?.toLong() ?: 0L) }
+        require(fitsUncompressedLimit(payloadBytes, metadata.size.toLong())) {
+            "Archive payload and manifest together exceed the uncompressed size limit"
+        }
         ZipOutputStream(output).use { zip ->
             fun write(name: String, bytes: ByteArray) {
                 zip.putNextEntry(ZipEntry(name))
