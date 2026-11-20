@@ -36,8 +36,8 @@ object Lfx2012FlexFuelPreflight {
     )
 
     /**
-     * Return all missing preconditions; an empty list is deliberately NOT
-     * permission to flash: a separate, validated write implementation is needed.
+     * Return all missing preconditions. WRITE_NOT_VALIDATED is always present
+     * until a separate, vehicle-verified calibration implementation exists.
      */
     fun missingPreconditions(vehicle: Vehicle?, evidence: Evidence): List<Status> {
         if (vehicle == null) return listOf(Status.VEHICLE_NOT_SELECTED)
@@ -58,11 +58,13 @@ object Lfx2012FlexFuelPreflight {
         if (!evidence.verifiedFirmware) problems += Status.FIRMWARE_NOT_VERIFIED
         if (!evidence.originalBackupVerified) problems += Status.ORIGINAL_BACKUP_MISSING
         if (!evidence.recoveryVerified) problems += Status.RECOVERY_NOT_VERIFIED
+        problems += Status.WRITE_NOT_VALIDATED
         return problems
     }
 
     /** No ECU writes are supported until a separately validated implementation exists. */
-    fun canWriteCalibration(vehicle: Vehicle?, evidence: Evidence): Boolean = false
+    fun canWriteCalibration(vehicle: Vehicle?, evidence: Evidence): Boolean =
+        missingPreconditions(vehicle, evidence).isEmpty()
 
     private fun isVin(value: String?): Boolean =
         value != null && value.length == 17 && value.all {
