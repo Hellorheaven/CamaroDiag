@@ -739,4 +739,24 @@
     <string name="can_trace_pid_62">מומנט מנוע בפועל</string>
     <string name="can_trace_pid_63">מומנט ייחוס של המנוע</string>
     <string name="live_pid_ethanol">תכולת אתנול</string>
+    <string name="can_trace_flow_status_cts">המשך שליחה</string>
+    <string name="can_trace_flow_status_wait">המתן</string>
+    <string name="can_trace_flow_status_overflow">גלישה</string>
+    <string name="can_trace_flow_status_reserved">מצב שמור</string>
+    <string name="can_trace_exchange_heading">חילופי בקשות ותשובות UDS</string>
+    <string name="can_trace_exchange_completed">הושלם</string>
+    <string name="can_trace_exchange_pending">ממתין לתגובה (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">לא התקבלה תגובה</string>
+    <string name="can_console_raw_tx_confirm_title">אישור שידור CAN גולמי</string>
+    <string name="can_console_raw_tx_confirm_message">פעולה זו שולחת מסגרת ישירות לאפיק CAN של הרכב. מסגרת שגויה עלולה להשפיע על מודולי הרכב. שלח רק כאשר ידועים האפיק ומזהה היעד.</string>
+    <string name="can_console_tx_unverified">שידור CAN גולמי מושבת: לא נצפתה תגובת ECU אמיתית לבדיקת השידור לקריאה בלבד.</string>
+    <string name="can_trace_clear_filters">נקה מסננים</string>
+    <string name="can_trace_filter_invalid">מזהה CAN או קידומת נתונים לא תקינים.</string>
+    <string name="can_trace_flow_control_heading">בקרת זרימה ISO-TP</string>
+    <string name="cal_expert_block_recovery">לא אומת הליך התאוששות עבור יעד מדויק זה.</string>
+    <string name="cal_expert_block_driver">לא מחובר מנהל התקן חומרה מאומת לתכנות.</string>
+    <string name="cal_expert_identity_notice">התוויות וערכי הגיבוב שהוזנו הם תצפיות, לא הוכחה לתאימות חומרה.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">סימולציה: מזהי ECU אלה לא נקראו מרכב אמיתי ואינם יכולים לאמת את הקושחה שלו.</string>
+    <string name="cal_expert_block_memory_map">מפת הזיכרון ואזורי ההגנה של היעד לא אומתו.</string>
+    <string name="flexfuel_preflight_backup">גיבוי ECU המקורי לא אומת.</string>
 </resources>
