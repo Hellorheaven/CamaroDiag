@@ -166,7 +166,7 @@ Respecter les dépendances précisées dans ce document et ouvrir une PR distinc
 - État observé : **Open, Draft, non fusionnée**. Ne pas fusionner sans autorisation explicite de l'utilisateur.
 - Branche de travail : `feat/live-can-monitor`.
 - Branches existantes vérifiées : uniquement `main` et `feat/live-can-monitor`. Conserver strictement ces deux branches et une seule PR ; ne créer ni branche ni PR supplémentaire sans accord explicite.
-- Dernier état GitHub vérifié avant cette mise à jour documentaire : head `c0c306f0c4f5298af9fd83baa2b801a032e7dc03`, 554 commits d'avance sur `main`, 0 en retard, 63 fichiers modifiés. Ces chiffres sont une photographie et doivent être rafraîchis au démarrage de tout nouveau chat.
+- Dernière photographie GitHub vérifiée le 20 novembre 2026 après synchronisation du prompt : PR head `3a31a319b7dfd06a36dea2fbfcce1fbe6ac69c2b`, 556 commits d'avance sur `main`, 0 en retard, 63 fichiers modifiés. Le SHA changera lors des prochains commits ; toujours rafraîchir ces données au démarrage d'un nouveau chat. Ces chiffres sont une photographie et doivent être rafraîchis au démarrage de tout nouveau chat.
 - PR : https://github.com/Hellorheaven/CamaroDiag/pull/35
 - Le périmètre reste le module unifié Sniffer / Console CAN. L'envoi de commandes/trames est autorisé dans l'interface uniquement lorsque les capacités réelles du matériel et du réseau le permettent.
 - Aucun merge n'a été effectué.
@@ -193,7 +193,7 @@ Respecter les dépendances précisées dans ce document et ouvrir une PR distinc
 - Ne fermer aucune issue avant intégration à `main`, tests/builds réels, documentation et accord utilisateur.
 
 **Validation**
-- Sur le head `c0c306f0c4f5298af9fd83baa2b801a032e7dc03`, aucun workflow PR n'a été retourné par la vérification GitHub effectuée le 20 novembre.
+- Sur le head `3a31a319b7dfd06a36dea2fbfcce1fbe6ac69c2b`, aucun workflow PR n'a été retourné par la vérification GitHub effectuée le 20 novembre.
 - Pas de preuve d'exécution du nouveau test unitaire, de la suite complète, de lint, d'un APK Debug/Release ou des packages Windows sur ce head.
 - Aucun test sur une Camaro ou un adaptateur physique n'a été réalisé. Le véhicule et l'adaptateur ne doivent pas être déclarés validés sur cette base.
 
