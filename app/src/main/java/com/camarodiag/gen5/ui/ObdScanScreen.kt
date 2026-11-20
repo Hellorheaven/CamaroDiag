@@ -11,6 +11,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -49,6 +52,66 @@ fun ObdScanScreen(
     onRunScan: () -> Unit
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
+
+    val vehicleKey = report?.vin ?: "unidentified"
+    var choosingSensors by rememberSaveable(vehicleKey) { mutableStateOf(false) }
+    var sensorQuery by rememberSaveable(vehicleKey) { mutableStateOf("") }
+    var chosenPids by rememberSaveable(vehicleKey) { mutableStateOf(listOf<Int>()) }
+    var selectionApplied by rememberSaveable(vehicleKey) { mutableStateOf(false) }
+    if (choosingSensors && report != null) {
+        var pendingPids by remember(report, choosingSensors) {
+            mutableStateOf(if (selectionApplied) chosenPids else report.liveData.map { it.pid })
+        }
+        AlertDialog(
+            onDismissRequest = { choosingSensors = false },
+            title = { Text(stringResource(R.string.obd_choose_sensors)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = sensorQuery,
+                        onValueChange = { sensorQuery = it },
+                        label = { Text(stringResource(R.string.obd_filter_sensors)) },
+                        singleLine = true
+                    )
+                    LazyColumn {
+                        items(report.liveData.filter {
+                            it.pid.toString(16).contains(sensorQuery, ignoreCase = true)
+                        }, key = { it.pid }) { sensor ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    pendingPids = if (sensor.pid in pendingPids)
+                                        pendingPids - sensor.pid else pendingPids + sensor.pid
+                                },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = sensor.pid in pendingPids,
+                                    onCheckedChange = { checked ->
+                                        pendingPids = if (checked) pendingPids + sensor.pid
+                                            else pendingPids - sensor.pid
+                                    }
+                                )
+                                Text(stringResource(R.string.obd_pid_generic, sensor.pid))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    chosenPids = pendingPids
+                    selectionApplied = true
+                    choosingSensors = false
+                }) { Text(stringResource(R.string.obd_sensor_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { choosingSensors = false }) {
+                    Text(stringResource(R.string.obd_sensor_cancel))
+                }
+            }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -126,10 +189,15 @@ fun ObdScanScreen(
             item {
                 SectionTitle(stringResource(R.string.obd_returned_live_data))
             }
+            item {
+                Button(onClick = { choosingSensors = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.obd_choose_sensors))
+                }
+            }
             if (report.liveData.isEmpty()) {
                 item { Text(stringResource(R.string.obd_no_live_data), color = TextMuted) }
             } else {
-                items(report.liveData, key = { it.pid }) { value ->
+                items(report.liveData.filter { !selectionApplied || it.pid in chosenPids }, key = { it.pid }) { value ->
                     ObdValueCard(value)
                 }
             }
