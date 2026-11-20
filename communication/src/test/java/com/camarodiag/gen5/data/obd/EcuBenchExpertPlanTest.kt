@@ -65,6 +65,22 @@ class EcuBenchExpertPlanTest {
         )
     }
 
+    @Test fun chipOffCannotProgramAnMcuInternalFlash() {
+        val invalid = EcuBenchExpertPlan.blockers(
+            target.copy(accessMethod = EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF),
+            image
+        )
+        assertTrue(EcuBenchExpertPlan.Blocker.ACCESS_REGION_INCOMPATIBLE in invalid)
+        val valid = EcuBenchExpertPlan.blockers(
+            target.copy(
+                accessMethod = EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF,
+                region = EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM
+            ),
+            image
+        )
+        assertFalse(EcuBenchExpertPlan.Blocker.ACCESS_REGION_INCOMPATIBLE in valid)
+    }
+
     @Test fun accessMethodsAndMemoryRegionsAreDistinct() {
         assertEquals(3, EcuBenchExpertPlan.AccessMethod.values().size)
         assertEquals(3, EcuBenchExpertPlan.MemoryRegion.values().size)
