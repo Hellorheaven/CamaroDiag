@@ -694,4 +694,26 @@
     <string name="update_install_update">Instalar atualização</string>
     <string name="update_version_available">Versão disponível: %1$s</string>
     <string name="system_language_follow_phone">Seguir o idioma do telefone</string>
+    <string name="can_sniffer_raw_heading">Saída bruta do adaptador CAN</string>
+    <string name="can_sniffer_export_raw">Exportar registo bruto</string>
+    <string name="can_sniffer_dtc_heading">Códigos de avaria OBD-II observados</string>
+    <string name="connection_lost_bluetooth">Ligação Bluetooth perdida. Volte a ligar o adaptador e reinicie a operação.</string>
+    <string name="connection_lost_vehicle">Ligação ao veículo perdida. Volte a ligar ao veículo e reinicie a operação.</string>
+    <string name="connection_lost_usb">Adaptador USB desligado. Volte a ligar o adaptador e reinicie a operação.</string>
+    <string name="connection_lost_wifi">Ligação OBD por Wi-Fi perdida. Volte a ligar o adaptador e reinicie a operação.</string>
+    <string name="connection_lost_pc_bridge">Ligação à ponte de diagnóstico do PC perdida. Volte a ligar a ponte e reinicie a operação.</string>
+    <string name="live_sensor_search">Pesquisar sensores</string>
+    <string name="live_sensor_show_all">Mostrar todos os sensores</string>
+    <string name="can_console_history">Histórico unificado da consola CAN</string>
+    <string name="can_console_clear">Limpar histórico</string>
+    <string name="can_console_empty">Ainda sem tráfego. Os dados recebidos e transmitidos serão apresentados aqui.</string>
+    <string name="can_console_tx">TX • ENVIADO</string>
+    <string name="can_console_rx">RX • RECEBIDO</string>
+    <string name="can_console_system">SISTEMA</string>
+    <string name="can_console_input_label">Trama CAN ou comando OBD</string>
+    <string name="can_console_sending">A enviar…</string>
+    <string name="obd_dtc_help_unavailable">Ainda não existem instruções de diagnóstico verificadas para este código de avaria e veículo. Consulte as informações de assistência do fabricante antes de reparar.</string>
+    <string name="cal_expert_no_write">A programação não está disponível até ser implementado e validado um controlador de bancada compatível.</string>
+    <string name="flexfuel_preflight_write">A escrita da calibração ECU não foi validada e permanece desativada.</string>
+    <string name="status_not_implemented">NÃO IMPLEMENTADO</string>
 </resources>
