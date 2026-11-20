@@ -760,4 +760,8 @@
     <string name="update_version_channel">Version %1$s • %2$s</string>
     <string name="obd_dtc_help_unavailable">No verified troubleshooting guidance is available for this fault code and vehicle yet. Check the manufacturer service information before repairs.</string>
     <string name="obd_dtc_help_close">Close</string>
+    <string name="obd_choose_sensors">Choose sensors</string>
+    <string name="obd_filter_sensors">Filter by PID</string>
+    <string name="obd_sensor_ok">OK</string>
+    <string name="obd_sensor_cancel">Cancel</string>
 </resources>
