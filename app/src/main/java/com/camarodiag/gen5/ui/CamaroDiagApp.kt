@@ -807,6 +807,7 @@ fun AdapterScreen(
                     Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
+                        BadgeChip("CAN TX", adapter.supportsCanTransmit)
                         BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
                         BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
                     }
