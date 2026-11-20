@@ -113,4 +113,24 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun diagnosticCoreLabelsAreTranslatedInEveryLocale() {
+        val required = setOf(
+            "common_connect", "common_refresh", "status_offline",
+            "obd_not_available", "obd_run_full_scan", "obd_vin",
+            "obd_protocol", "obd_dtc_title", "obd_adapter_voltage",
+            "obd_supported_pids"
+        )
+        for (locale in locales) {
+            val localized = strings(locale)
+            assertTrue(
+                "Missing localized diagnostic labels in $locale: ${required - localized.keys}",
+                localized.keys.containsAll(required)
+            )
+            assertTrue(
+                "Empty localized diagnostic label in $locale",
+                required.all { localized.getValue(it).isNotBlank() }
+            )
+        }
+    }
+
 }
