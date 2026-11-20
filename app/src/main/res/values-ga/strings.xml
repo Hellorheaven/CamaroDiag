@@ -7,4 +7,16 @@
     <string name="about_up_to_date">Tá CamaroDiag cothrom le dáta.</string>
     <string name="obd_choose_sensors">Roghnaigh braiteoirí</string>
     <string name="obd_sensor_cancel">Cealaigh</string>
+    <string name="tab_vehicle">Feithicil</string>
+    <string name="tab_connect">Ceangail</string>
+    <string name="tab_live">Sonraí beo</string>
+    <string name="tab_dtcs">Cóid locht</string>
+    <string name="tab_more">Tuilleadh</string>
+    <string name="tab_modules">Modúil</string>
+    <string name="tab_mileage">Míleáiste</string>
+    <string name="tab_calibration">ECU / Léarscáileanna</string>
+    <string name="tab_obd_scan">Scanadh OBD iomlán</string>
+    <string name="tab_guide">Treoir</string>
+    <string name="tab_controls">Rialuithe</string>
+    <string name="tab_settings">Socruithe</string>
 </resources>
