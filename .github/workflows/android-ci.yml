@@ -70,7 +70,7 @@ jobs:
             echo "Current commit contains Android-relevant changes."
           fi
 
-      - name: Find last successful Android Debug validation
+      - name: Find last completed Android Debug validation attempt
         id: previous_build
         if: steps.android_changes.outputs.android_changed == 'true' && github.event.pull_request.draft
         uses: actions/github-script@v8
@@ -83,7 +83,7 @@ jobs:
               event: 'pull_request', status: 'completed', per_page: 100
             });
             const candidates = runs
-              .filter(run => run.conclusion === 'success' && run.head_sha !== pr.head.sha &&
+              .filter(run => run.head_sha !== pr.head.sha &&
                 (run.pull_requests || []).some(item => item.number === pr.number))
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             let previous = null;
@@ -92,15 +92,15 @@ jobs:
                 owner: context.repo.owner, repo: context.repo.repo,
                 run_id: candidate.id, per_page: 100
               });
-              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.conclusion === 'success')) {
+              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.status === 'completed')) {
                 previous = candidate;
                 break;
               }
             }
             core.setOutput('sha', previous ? previous.head_sha : '');
             core.info(previous
-              ? 'Last successful Android Debug build: ' + previous.head_sha
-              : 'No previous successful Android Debug build; counting relevant commits from the PR base.');
+              ? 'Last completed Android Debug validation attempt: ' + previous.head_sha
+              : 'No previous completed Android Debug validation attempt; counting relevant commits from the PR base.');
 
       - name: Evaluate Android-only periodic build checkpoint
         id: checkpoint
@@ -148,17 +148,12 @@ jobs:
               echo "NOT APPLICABLE to this commit: no Android-relevant files changed."
             else
               echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-              if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/android-ci.yml'; then
-                if (( commits_since_build >= interval )); then
-                  echo "build_required=true" >> "$GITHUB_OUTPUT"
-                  echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
-                else
-                  echo "build_required=false" >> "$GITHUB_OUTPUT"
-                  echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits."
-                fi
-              else
+              if (( commits_since_build >= interval )); then
                 echo "build_required=true" >> "$GITHUB_OUTPUT"
-                echo "Android CI workflow changed in this commit: forcing validation."
+                echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
+              else
+                echo "build_required=false" >> "$GITHUB_OUTPUT"
+                echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits since the last completed attempt."
               fi
             fi
           else
