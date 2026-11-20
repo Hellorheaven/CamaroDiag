@@ -222,17 +222,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** The unassigned garage remains untouched until the user claims it. */
     fun importLegacyVehicles() {
         val uid = authenticatedAccountUid ?: return
-        if (!canImportLegacyVehicles()) return
+        if (settingsPreferences.contains("legacy_vehicles_claimed_uid")) return
         val legacy = loadSavedVehicleProfiles(
             settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
         )
         viewModelScope.launch {
-            val historyCount = sessionDao.countUnassignedSessions()
-            if (legacy.isEmpty() && historyCount == 0 &&
-                !settingsPreferences.contains("vehicle_vin") &&
-                !settingsPreferences.contains("vehicle_year")
-            ) return@launch
             try {
+                val historyCount = sessionDao.countUnassignedSessions()
+                val hasLegacyCurrentVehicle = settingsPreferences.contains("vehicle_vin") ||
+                    settingsPreferences.contains("vehicle_year")
+                if (legacy.isEmpty() && historyCount == 0 && !hasLegacyCurrentVehicle) return@launch
                 // Commit the historical session ownership before marking the
                 // migration complete; retry stays possible if Room fails.
                 sessionDao.claimUnassignedSessions(uid)
@@ -244,7 +243,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (ids.add(profile.id)) profile
                     else profile.copy(id = UUID.randomUUID().toString())
                 }
-                val merged = existing + imported
+                val oldCurrent = if (hasLegacyCurrentVehicle) {
+                    loadVehicleProfile(settingsPreferences)
+                } else null
+                val missingCurrent = oldCurrent?.takeUnless { vehicle ->
+                    (existing + imported).any { it.vehicle.vin.isNotBlank() &&
+                        it.vehicle.vin.equals(vehicle.vin, ignoreCase = true) }
+                }
+                val currentProfile = missingCurrent?.let { vehicle ->
+                    SavedVehicleProfile(
+                        id = UUID.randomUUID().toString(),
+                        name = getApplication<Application>().getString(R.string.saved_vehicle_legacy_default_name),
+                        vehicle = vehicle,
+                        requiresReview = true
+                    )
+                }
+                val merged = existing + imported + listOfNotNull(currentProfile)
                 persistSavedVehicleProfiles(merged, ownerUid = uid)
                 settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
                 if (authenticatedAccountUid == uid) {
@@ -375,8 +389,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         startLiveTelemetryLoop()
     }
 
-    private fun loadVehicleProfile(): VehicleProfile {
-        val settingsPreferences = accountVehiclePreferences()
+    private fun loadVehicleProfile(
+        settingsPreferences: android.content.SharedPreferences = accountVehiclePreferences()
+    ): VehicleProfile {
         val year = settingsPreferences.getInt("vehicle_year", 2012).coerceIn(2010, 2024)
         val savedEngine = runCatching {
             CamaroEngine.valueOf(settingsPreferences.getString("vehicle_engine", CamaroEngine.LFX.name)!!)
