@@ -670,6 +670,9 @@ class BluetoothObdManager(context: Context) {
             isDemoMode = false
             isSimulationActive = false
             Result.success(info)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            bridge.close()
+            throw cancelled
         } catch (error: Exception) {
             bridge.close()
             Result.failure(error)
