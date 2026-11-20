@@ -111,6 +111,52 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun rejectsAdapterChatterAndIncompletePid00FragmentsAsTransmitProof() {
+        listOf(
+            "0100",
+            "SEARCHING...\\r\\nNO DATA",
+            "ELM327 v4.100",
+            "7E8 03 41 00 BE",
+            "ABC4100BE3EB813"
+        ).forEach { response ->
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "ELM327 Bluetooth",
+                macAddress = "00:00:00:00:00:00",
+                atzResp = "ELM327 v1.5",
+                stiResp = "?",
+                atalResp = "OK",
+                stp61Resp = "?",
+                headersResp = "OK",
+                protocolResp = "OK",
+                transmitProbeResp = response
+            )
+            assertFalse("Must not trust response: $response", capabilities.supportsCanTransmit)
+        }
+    }
+
+    @Test
+    fun acceptsCompletePid00ResponseWithOrWithoutCanHeader() {
+        listOf(
+            "41 00 BE 3E B8 13",
+            "7E8 06 41 00 BE 3E B8 13",
+            "18DAF110 06 41 00 BE 3E B8 13"
+        ).forEach { response ->
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "ELM327 Bluetooth",
+                macAddress = "00:00:00:00:00:00",
+                atzResp = "ELM327 v1.5",
+                stiResp = "?",
+                atalResp = "OK",
+                stp61Resp = "?",
+                headersResp = "OK",
+                protocolResp = "OK",
+                transmitProbeResp = response
+            )
+            assertTrue("Expected a complete ECU response: $response", capabilities.supportsCanTransmit)
+        }
+    }
+
+    @Test
     fun genericElmCloneCanUseStandardCanWithoutClaimingUdsCapabilities() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "ELM327 Bluetooth",
