@@ -44,6 +44,25 @@ class EcuBackupCoverageTest {
             EcuBackupCoverage.inspect(listOf(p, d)).status)
     }
 
+    @Test fun missingRequiredRegionPreventsMisleadingCompleteBackup() {
+        val report = EcuBackupCoverage.inspect(
+            segments = listOf(segment(0, 64)),
+            requiredRegions = setOf(
+                EcuBackupCoverage.Region.PROGRAM_FLASH,
+                EcuBackupCoverage.Region.DATA_FLASH,
+                EcuBackupCoverage.Region.EXTERNAL_EEPROM
+            )
+        )
+        assertEquals(EcuBackupCoverage.Status.PARTIAL, report.status)
+        assertEquals(
+            setOf(EcuBackupCoverage.Region.DATA_FLASH, EcuBackupCoverage.Region.EXTERNAL_EEPROM),
+            report.missingRegions
+        )
+        assertEquals(EcuBackupCoverage.Status.PARTIAL,
+            EcuBackupCoverage.inspect(emptyList(), setOf(EcuBackupCoverage.Region.PROGRAM_FLASH)).status
+        )
+    }
+
     @Test fun checksumMustBeWellFormedAndVerified() {
         assertEquals(EcuBackupCoverage.Status.PARTIAL,
             EcuBackupCoverage.inspect(listOf(segment(0, 64).copy(sha256 = "unknown"))).status)
