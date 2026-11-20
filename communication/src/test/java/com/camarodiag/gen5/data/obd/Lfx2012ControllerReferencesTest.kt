@@ -72,6 +72,30 @@ class Lfx2012ControllerReferencesTest {
         ))
     }
 
+    @Test fun elmErrorsAndFormattedPlaceholdersNeverValidateAnEcuFingerprint() {
+        val base = Lfx2012ControllerReferences.ObservedIdentity(
+            ecuName = "ACDelco E39",
+            calibrationIds = listOf("12612345"),
+            calibrationVerificationNumbers = listOf("1234ABCD")
+        )
+        val invalid = listOf(
+            "NO DATA", "NO RESPONSE", "ERROR", "UNAVAILABLE", "ECU: UNKNOWN",
+            "ECU: DEMO E39", "SIMULATED E39", "0x00 00 00", "0xFF FF FF",
+            "00:00:00", "FF-FF-FF"
+        )
+        invalid.forEach { value ->
+            assertFalse("ECU name $value", Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+                base.copy(ecuName = value)
+            ))
+            assertFalse("Calibration ID $value", Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+                base.copy(calibrationIds = listOf(value))
+            ))
+            assertFalse("CVN $value", Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+                base.copy(calibrationVerificationNumbers = listOf(value))
+            ))
+        }
+    }
+
     @Test fun e39FamilyMatchingAvoidsSubstringFalsePositives() {
         assertTrue(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel("ACDelco E39 ECM"))
         assertTrue(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel("E39A / ECM"))
