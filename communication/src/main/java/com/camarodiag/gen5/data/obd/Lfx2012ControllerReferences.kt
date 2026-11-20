@@ -18,7 +18,8 @@ object Lfx2012ControllerReferences {
     data class ObservedIdentity(
         val ecuName: String?,
         val calibrationIds: List<String>,
-        val calibrationVerificationNumbers: List<String>
+        val calibrationVerificationNumbers: List<String>,
+        val simulated: Boolean = false
     )
 
     /**
@@ -26,7 +27,8 @@ object Lfx2012ControllerReferences {
      * number; an ECU name mentioning E39 does not validate memory layout or recovery.
      */
     fun hasCompleteReadOnlyFingerprint(observed: ObservedIdentity): Boolean =
-        hasMeaningfulComponent(observed.ecuName.orEmpty()) &&
+        !observed.simulated &&
+            hasMeaningfulComponent(observed.ecuName.orEmpty()) &&
             observed.calibrationIds.any(::hasMeaningfulComponent) &&
             observed.calibrationVerificationNumbers.any(::hasMeaningfulComponent)
 
