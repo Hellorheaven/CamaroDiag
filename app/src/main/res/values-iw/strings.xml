@@ -658,4 +658,27 @@
     <string name="cal_ecu_response_addresses_label">כתובות תגובה פונקציונליות של OBD שנצפו (ללא שיוך למודולים)</string>
     <string name="cal_ecu_identity_limits">תגובות OBD תקניות אלה אינן מאשרות RPO, תיבת הילוכים, מספר חומרה של יחידת הבקרה או מערכת הפעלה של GM. כתובות תגובה אינן מזהות מודולים. מזהי GM דורשים תיעוד מאומת המותאם לרכב.</string>
     <string name="dtc_vehicle_identity_required">הפרטים הייחודיים לרכב מוסתרים משום שמספר ה‑VIN של יחידת הבקרה המחוברת לא נקרא או שאינו תואם לרכב שנבחר. יש לקרוא ולאמת את VIN של ה‑ECU לפני השימוש בפרשנויות אלה.</string>
+    <string name="live_pid_oil">לחץ שמן (הדמיה בלבד)</string>
+    <string name="live_pid_stft_b2">תיקון דלק לטווח קצר בנק 2</string>
+    <string name="live_pid_ltft_b2">תיקון דלק לטווח ארוך בנק 2</string>
+    <string name="live_pid_rel_tps">מיקום מצערת יחסי</string>
+    <string name="live_pid_cmd_tps">מיקום מצערת מבוקש</string>
+    <string name="live_pid_abs_tps_b">מיקום מצערת מוחלט B</string>
+    <string name="live_pid_abs_tps_c">מיקום מצערת מוחלט C</string>
+    <string name="live_pid_app_d">מיקום דוושת תאוצה D</string>
+    <string name="live_pid_app_e">מיקום דוושת תאוצה E</string>
+    <string name="live_pid_app_f">מיקום דוושת תאוצה F</string>
+    <string name="live_pid_abs_load">עומס מנוע מוחלט</string>
+    <string name="live_pid_ambient">טמפרטורת סביבה</string>
+    <string name="live_pid_fuel_press">לחץ דלק</string>
+    <string name="live_pid_timing">קידום הצתה</string>
+    <string name="live_pid_eq_ratio">יחס שקילות מבוקש</string>
+    <string name="live_pid_o2_b1s1">מתח חיישן חמצן B1S1</string>
+    <string name="live_pid_o2_b1s2">מתח חיישן חמצן B1S2</string>
+    <string name="live_pid_o2_b1s3">מתח חיישן חמצן B1S3</string>
+    <string name="live_pid_o2_b1s4">מתח חיישן חמצן B1S4</string>
+    <string name="live_pid_wbo2_b1s1">חיישן למבדה רחב סרט B1S1</string>
+    <string name="live_pid_wbo2_b1s2">חיישן למבדה רחב סרט B1S2</string>
+    <string name="live_pid_wbo2_b2s1">חיישן למבדה רחב סרט B2S1</string>
+    <string name="live_pid_wbo2_b2s2">חיישן למבדה רחב סרט B2S2</string>
 </resources>
