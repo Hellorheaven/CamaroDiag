@@ -655,4 +655,10 @@
     <string name="can_sniffer_direction_all">Все</string>
     <string name="can_sniffer_direction_rx">RX</string>
     <string name="can_sniffer_direction_tx">TX</string>
+    <string name="cal_vin_model_year">Год модели по VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">VIN указывает на модельный год %1$d, а выбранный профиль — %2$d. Проверьте профиль автомобиля перед диагностикой.</string>
+    <string name="cal_ecu_name_label">Имя ЭБУ (стандартный OBD, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Обнаруженные адреса ответов функционального OBD (не сопоставлены блокам)</string>
+    <string name="cal_ecu_identity_limits">Эти стандартные ответы OBD не подтверждают RPO, трансмиссию, аппаратный номер блока или ОС GM. Адрес ответа не определяет блок управления. Для идентификаторов GM нужна проверенная документация именно для данного автомобиля.</string>
+    <string name="dtc_vehicle_identity_required">Данные для конкретного автомобиля скрыты, поскольку VIN подключённого ЭБУ не считан или не совпадает с выбранным автомобилем. Считайте и проверьте VIN ЭБУ перед использованием этих интерпретаций.</string>
 </resources>

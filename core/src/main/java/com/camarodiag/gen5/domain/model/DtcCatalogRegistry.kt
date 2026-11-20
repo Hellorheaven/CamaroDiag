@@ -376,6 +376,26 @@ object DtcCatalogRegistry {
     fun evidenceStatus(vehicle: VehicleProfile, moduleId: String): DtcEvidenceStatus =
         catalogueFor(moduleId, vehicle).evidenceStatus
 
+    /**
+     * Vehicle-specific explanations are withheld until the VIN read from the
+     * connected ECU matches the selected vehicle profile. A missing VIN is
+     * unknown, not a match. CAL ID/CVN and hardware/software compatibility are
+     * still shown as unverified until exact source mappings are available.
+     */
+    fun mayApplyVehicleSpecificDefinitions(
+        vehicle: VehicleProfile,
+        moduleId: String,
+        ecuVinComparison: VehicleVinComparison?
+    ): Boolean {
+        if (!catalogueFor(moduleId, vehicle).hasVehicleSpecificDefinitions) return false
+        val comparison = ecuVinComparison ?: return false
+        val selectedVin = VehicleVinMatcher.normalize(vehicle.vin) ?: return false
+        return comparison.matches == true &&
+            comparison.selectedVehicleVin == selectedVin &&
+            comparison.ecuVin == selectedVin
+    }
+
+
     fun catalogueFor(moduleId: String, vehicle: VehicleProfile): DtcModuleCatalogue {
         val id = moduleId.trim().uppercase(Locale.ROOT)
         val known = moduleFamilies.any { it.id == id }

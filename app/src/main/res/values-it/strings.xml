@@ -663,4 +663,10 @@
     <string name="can_sniffer_direction_all">Tutte</string>
     <string name="can_sniffer_direction_rx">RX</string>
     <string name="can_sniffer_direction_tx">TX</string>
+    <string name="cal_vin_model_year">Anno modello ricavato dal VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">Il VIN indica l’anno modello %1$d, mentre il profilo selezionato è %2$d. Verifica il profilo del veicolo prima della diagnosi.</string>
+    <string name="cal_ecu_name_label">Nome ECU (OBD standard, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Indirizzi di risposta OBD funzionali rilevati (non associati a centraline)</string>
+    <string name="cal_ecu_identity_limits">Queste risposte OBD standard non confermano RPO, trasmissione, codice hardware della centralina o sistema operativo GM. Gli indirizzi di risposta non identificano le centraline. Gli identificativi GM richiedono documentazione verificata specifica del veicolo.</string>
+    <string name="dtc_vehicle_identity_required">I dettagli specifici del veicolo sono nascosti perché il VIN della centralina collegata non è stato letto o non corrisponde al veicolo selezionato. Leggi e verifica il VIN della ECU prima di utilizzare queste interpretazioni.</string>
 </resources>

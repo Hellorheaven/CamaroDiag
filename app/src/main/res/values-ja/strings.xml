@@ -646,4 +646,10 @@
     <string name="can_sniffer_direction_all">すべて</string>
     <string name="can_sniffer_direction_rx">RX</string>
     <string name="can_sniffer_direction_tx">TX</string>
+    <string name="cal_vin_model_year">VINから判定したモデル年式: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">VINはモデル年式%1$dを示していますが、選択中のプロファイルは%2$dです。診断前に車両プロファイルを確認してください。</string>
+    <string name="cal_ecu_name_label">ECU名（標準OBD、Mode 09 PID 0A）</string>
+    <string name="cal_ecu_response_addresses_label">検出された機能OBD応答アドレス（ECUへの割り当てなし）</string>
+    <string name="cal_ecu_identity_limits">これらの標準OBD応答では、RPO、トランスミッション、ECUハードウェア番号、GM OSは確認できません。応答アドレスだけではECUを特定できません。GM固有の識別情報には、車両別の検証済み資料が必要です。</string>
+    <string name="dtc_vehicle_identity_required">接続されたECUのVINが読み取られていないか、選択した車両と一致しないため、車両固有の詳細は非表示です。これらの解釈を使用する前にECUのVINを読み取り、確認してください。</string>
 </resources>

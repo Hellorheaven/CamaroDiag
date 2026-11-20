@@ -68,6 +68,9 @@ data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
     val ecuVinResponse: String = "",
     val vinComparison: VehicleVinComparison? = null,
+    val vinModelYear: Int? = null,
+    val ecuNameResponse: String = "",
+    val respondingEcuAddresses: List<String> = emptyList(),
     val calibrationIdResponse: String = "",
     val cvnResponse: String = "",
     val message: String = "",
@@ -464,7 +467,7 @@ fun CalibrationWorkspaceScreen(
                             color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.udsDtcResponse, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                     }
-                    if (state.ecuVinResponse.isNotBlank() || state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank()) {
+                    if (state.ecuVinResponse.isNotBlank() || state.calibrationIdResponse.isNotBlank() || state.cvnResponse.isNotBlank() || state.ecuNameResponse.isNotBlank() || state.respondingEcuAddresses.isNotEmpty() || state.vinModelYear != null) {
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(stringResource(R.string.cal_mode09_vin_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.ecuVinResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
@@ -493,6 +496,20 @@ fun CalibrationWorkspaceScreen(
                                 )
                             }
                         }
+                        state.vinModelYear?.let { year ->
+                            val generation = if (year <= 2015) "Gen 5" else "Gen 6"
+                            Text(stringResource(R.string.cal_vin_model_year, year, generation),
+                                color = TextPrimary, fontSize = 12.sp)
+                            if (year != vehicle.modelYear) {
+                                Text(stringResource(R.string.cal_vin_model_year_mismatch, year, vehicle.modelYear),
+                                    color = WarnRed, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        Text(stringResource(R.string.cal_ecu_name_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(state.ecuNameResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text(stringResource(R.string.cal_ecu_response_addresses_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(state.respondingEcuAddresses.joinToString(", ").ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text(stringResource(R.string.cal_ecu_identity_limits), color = TextMuted, fontSize = 10.sp)
                         Text(stringResource(R.string.cal_mode09_calid_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(state.calibrationIdResponse.ifBlank { "—" }, color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         Text(stringResource(R.string.cal_mode09_cvn_label), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)

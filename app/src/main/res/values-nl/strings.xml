@@ -650,4 +650,10 @@
     <string name="can_sniffer_direction_all">Alle</string>
     <string name="can_sniffer_direction_rx">RX</string>
     <string name="can_sniffer_direction_tx">TX</string>
+    <string name="cal_vin_model_year">Modeljaar afgeleid uit VIN: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">De VIN geeft modeljaar %1$d aan, maar het geselecteerde profiel is %2$d. Controleer het voertuigprofiel vóór de diagnose.</string>
+    <string name="cal_ecu_name_label">ECU-naam (standaard OBD, Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Waargenomen functionele OBD-responsadressen (niet aan modules gekoppeld)</string>
+    <string name="cal_ecu_identity_limits">Deze standaard OBD-responsen bevestigen geen RPO, transmissie, hardwareonderdeelnummer van de regeleenheid of GM-besturingssysteem. Responsadressen identificeren geen modules. GM-specifieke identificatie vereist geverifieerde voertuigspecifieke documentatie.</string>
+    <string name="dtc_vehicle_identity_required">Voertuigspecifieke details zijn verborgen omdat het VIN van de aangesloten ECU niet is gelezen of niet overeenkomt met het geselecteerde voertuig. Lees en controleer het ECU-VIN voordat u deze interpretaties gebruikt.</string>
 </resources>

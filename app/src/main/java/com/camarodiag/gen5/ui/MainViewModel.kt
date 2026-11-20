@@ -508,6 +508,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             ecuVinResponse = "",
             vinComparison = null,
+            vinModelYear = null,
+            ecuNameResponse = "",
+            respondingEcuAddresses = emptyList(),
             calibrationIdResponse = "",
             cvnResponse = "",
             udsDidResponse = "",
@@ -908,6 +911,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isReading = false,
                     ecuVinResponse = "",
                     vinComparison = null,
+                    vinModelYear = null,
+                    ecuNameResponse = "",
+                    respondingEcuAddresses = emptyList(),
                     calibrationIdResponse = "",
                     cvnResponse = "",
                     message = if (bridgeOnly) {
@@ -922,27 +928,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isReading = true,
                 ecuVinResponse = "",
                 vinComparison = null,
+                vinModelYear = null,
+                ecuNameResponse = "",
+                respondingEcuAddresses = emptyList(),
                 calibrationIdResponse = "",
                 cvnResponse = "",
                 message = ""
             )
             try {
-                val (ecuVin, calIds, cvns) = obdManager.withObdCommandSession { engine ->
-                    Triple(
-                        engine.readVin(),
-                        engine.readCalibrationIds(),
-                        engine.readCalibrationVerificationNumbers()
-                    )
-                }
-                val validCal = calIds.isNotEmpty()
-                val validCvn = cvns.isNotEmpty()
+                val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
+                val ecuVin = identity.vin
+                val validCal = identity.calibrationIds.isNotEmpty()
+                val validCvn = identity.calibrationVerificationNumbers.isNotEmpty()
                 val vinComparison = VehicleVinMatcher.compare(_vehicle.value.vin, ecuVin)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
                     vinComparison = vinComparison,
-                    calibrationIdResponse = calIds.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
-                    cvnResponse = cvns.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
+                    vinModelYear = VehicleVinMatcher.modelYearFromVin(ecuVin),
+                    ecuNameResponse = identity.ecuNames.joinToString("\n"),
+                    respondingEcuAddresses = identity.respondingEcuAddresses,
+                    calibrationIdResponse = identity.calibrationIds.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
+                    cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
                     message = getApplication<Application>().getString(
                         if (validCal || validCvn) R.string.msg_cal_identifiers_read
                         else R.string.msg_cal_identifiers_unavailable
@@ -2261,11 +2268,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Keep this request ahead of the initial scans to avoid competing for the ELM channel.
             viewModelScope.launch {
                 try {
-                    val ecuVin = obdManager.withObdCommandSession { engine -> engine.readVin() }
-                    val comparison = VehicleVinMatcher.compare(_vehicle.value.vin, ecuVin)
+                    val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
+                    val comparison = VehicleVinMatcher.compare(_vehicle.value.vin, identity.vin)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
-                        vinComparison = comparison
+                        ecuVinResponse = identity.vin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                        vinComparison = comparison,
+                        vinModelYear = VehicleVinMatcher.modelYearFromVin(identity.vin),
+                        ecuNameResponse = identity.ecuNames.joinToString("\n"),
+                        respondingEcuAddresses = identity.respondingEcuAddresses,
+                        calibrationIdResponse = identity.calibrationIds.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
+                        cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) }
                     )
                     // Do not automatically interpret or audit data against the wrong saved vehicle.
                     // The user can resolve the mismatch first, then start diagnostics explicitly.

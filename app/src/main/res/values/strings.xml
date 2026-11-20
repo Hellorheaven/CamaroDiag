@@ -729,4 +729,10 @@
     <string name="can_trace_exchange_request">Request: %1$s</string>
     <string name="can_trace_exchange_response">Response CAN 0x%1$03X: %2$s</string>
     <string name="can_trace_exchange_elapsed">Elapsed: %1$.1f ms</string>
+    <string name="cal_vin_model_year">VIN model year: %1$d (%2$s)</string>
+    <string name="cal_vin_model_year_mismatch">VIN indicates model year %1$d, but the selected profile is %2$d. Verify the vehicle profile before diagnosis.</string>
+    <string name="cal_ecu_name_label">ECU name (standard OBD Mode 09 PID 0A)</string>
+    <string name="cal_ecu_response_addresses_label">Observed functional OBD response IDs (not mapped to modules)</string>
+    <string name="cal_ecu_identity_limits">RPO, transmission, controller hardware number and GM OS are not confirmed by these standard OBD responses. Response IDs are not module identities. GM-specific identifiers require verified, vehicle-specific documentation.</string>
+    <string name="dtc_vehicle_identity_required">Vehicle-specific details are withheld because the connected ECU VIN has not been read or does not match the selected vehicle. Read and verify the ECU VIN before using these interpretations.</string>
 </resources>

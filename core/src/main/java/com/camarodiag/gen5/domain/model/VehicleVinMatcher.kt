@@ -32,4 +32,16 @@ object VehicleVinMatcher {
             matches = normalizedSelectedVin?.let { it == normalizedEcuVin }
         )
     }
+
+    /**
+     * Decodes the VIN model-year character for the Camaro Gen 5/Gen 6 model-year
+     * range supported by this app. It does not infer RPO, transmission or market.
+     */
+    fun modelYearFromVin(vin: String?): Int? {
+        val normalized = normalize(vin) ?: return null
+        val yearIndex = CAMARO_MODEL_YEAR_CODES.indexOf(normalized[9])
+        return yearIndex.takeIf { it >= 0 }?.let { 2010 + it }
+    }
+
+    private const val CAMARO_MODEL_YEAR_CODES = "ABCDEFGHJKLMNPR"
 }
