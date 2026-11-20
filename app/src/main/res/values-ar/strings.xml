@@ -701,4 +701,5 @@
     <string name="about_check_failed">تعذر التحقق من التحديثات. تحقق من اتصال الإنترنت.</string>
     <string name="update_install_update">تثبيت التحديث</string>
     <string name="update_version_available">الإصدار المتاح: %1$s</string>
+    <string name="system_language_follow_phone">استخدام لغة الهاتف</string>
 </resources>
