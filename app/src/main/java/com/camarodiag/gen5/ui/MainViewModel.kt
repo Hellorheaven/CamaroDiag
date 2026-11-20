@@ -242,6 +242,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun importLegacyVehicles() {
         val uid = authenticatedAccountUid ?: return
+        val importGeneration = accountSessionGeneration
         if (legacyImportInProgress || settingsPreferences.contains("legacy_vehicles_claimed_uid")) return
         legacyImportInProgress = true
         _legacyVehicleImportAvailable.value = false
@@ -251,6 +252,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val historyCount = sessionDao.countUnassignedSessions()
+                // A sign-out or account switch while Room is loading must not
+                // assign unclaimed legacy data to a stale identity.
+                if (authenticatedAccountUid != uid ||
+                    accountSessionGeneration != importGeneration
+                ) return@launch
                 val hasLegacyCurrentVehicle = settingsPreferences.contains("vehicle_vin") ||
                     settingsPreferences.contains("vehicle_year")
                 if (legacy.isEmpty() && historyCount == 0 && !hasLegacyCurrentVehicle) return@launch
@@ -280,6 +286,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 persistSavedVehicleProfiles(merged, ownerUid = uid)
                 // Claim the historical Room rows only after the destination garage
                 // is persisted; a failure remains retryable without duplicates.
+                // Do not claim history if the account changed during preparation.
+                if (authenticatedAccountUid != uid ||
+                    accountSessionGeneration != importGeneration
+                ) return@launch
                 sessionDao.claimUnassignedSessions(uid)
                 settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
                 if (authenticatedAccountUid == uid) {
