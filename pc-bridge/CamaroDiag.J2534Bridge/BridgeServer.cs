@@ -149,8 +149,7 @@ internal sealed class BridgeServer
             return bytes[0] == 10 ||
                    (bytes[0] == 172 && bytes[1] is >= 16 and <= 31) ||
                    (bytes[0] == 192 && bytes[1] == 168) ||
-                   (bytes[0] == 169 && bytes[1] == 254) ||
-                   (bytes[0] == 100 && bytes[1] is >= 64 and <= 127);
+                   (bytes[0] == 169 && bytes[1] == 254);
         }
 
         if (address.AddressFamily == AddressFamily.InterNetworkV6)
