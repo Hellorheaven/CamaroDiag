@@ -14,6 +14,9 @@ data class SafeObdRequest(
 )
 
 object SafeObdRequestPolicy {
+    // Accepted commands are tiny; reject oversized text before allocating token lists.
+    private const val MAX_INPUT_LENGTH = 32
+
     private val allowedParametersByService = mapOf(
         // SAE J1979 current data and supported-PID bitmap requests.
         0x01 to setOf(
@@ -32,6 +35,7 @@ object SafeObdRequestPolicy {
      * Explicit byte prefixes are supported; extra tokens and misplaced prefixes are rejected.
      */
     fun parse(input: String): SafeObdRequest? {
+        if (input.length > MAX_INPUT_LENGTH) return null
         val tokens = input.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val compact = when (tokens.size) {
             1 -> {
