@@ -21,3 +21,5 @@
 - Les échecs d'ouverture ou de configuration d'un adaptateur USB libèrent également son accès au périphérique.
 - Un échec de connexion Bluetooth classique libère désormais la connexion créée pour la tentative.
 - Le statut du pont PC J2534 reflète la connexion réseau réelle après une interruption.
+- Une coupure pendant les diagnostics, la lecture des défauts, les informations ECU ou la télémétrie interrompt désormais les opérations concernées et remonte l'alerte de connexion perdue.
+- La télémétrie n'efface plus cette alerte par un simple message d'échec de lecture et ne relance pas automatiquement les mesures après déconnexion.
