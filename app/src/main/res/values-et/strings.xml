@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag on ajakohane.</string>
     <string name="obd_choose_sensors">Vali andurid</string>
     <string name="obd_sensor_cancel">Tühista</string>
+    <string name="tab_vehicle">Sõiduk</string>
+    <string name="tab_connect">Ühenda</string>
+    <string name="tab_live">Reaalaja andmed</string>
+    <string name="tab_dtcs">Veakoodid</string>
+    <string name="tab_more">Veel</string>
+    <string name="tab_modules">Moodulid</string>
+    <string name="tab_mileage">Läbisõit</string>
+    <string name="tab_calibration">ECU / Kaardid</string>
+    <string name="tab_obd_scan">Täielik OBD skannimine</string>
+    <string name="tab_guide">Juhend</string>
+    <string name="tab_controls">Juhtimine</string>
+    <string name="tab_settings">Seaded</string>
 </resources>
