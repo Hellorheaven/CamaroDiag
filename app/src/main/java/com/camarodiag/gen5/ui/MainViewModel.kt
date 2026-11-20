@@ -120,8 +120,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         accountSessionGeneration++
         _savedSessions.value = emptyList()
         _activeAccountUid.value = accountUid
-        stopCanMonitor()
-        canRequestJob?.cancel()
+        discardCanMonitor()
+        detachCanRequest()
+        _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+            isCapturing = false,
+            isSendingRequest = false
+        )
         _isStreamingLive.value = false
         if (_liveRecordingState.value.isRecording) stopLiveRecording()
         recordedLiveSamples.clear()
