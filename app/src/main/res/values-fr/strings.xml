@@ -220,6 +220,7 @@
     <string name="update_downloading">Téléchargement</string>
     <string name="update_allow_unknown_sources">Autorisez les installations depuis CamaroDiag. L’installateur s’ouvrira automatiquement à votre retour.</string>
     <string name="update_install">Installer</string>
+    <string name="update_install_update">Installer la mise à jour</string>
     <string name="update_download">Télécharger</string>
     <string name="vehicle_generation_label">Génération %1$d</string>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
