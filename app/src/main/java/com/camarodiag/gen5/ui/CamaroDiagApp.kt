@@ -2332,6 +2332,13 @@ fun SettingsScreen(
 ) {
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
     var languageExpanded by remember { mutableStateOf(false) }
+    val languageFlags = mapOf(
+        AppLanguage.EN to "🇬🇧", AppLanguage.FR to "🇫🇷", AppLanguage.DE to "🇩🇪",
+        AppLanguage.IT to "🇮🇹", AppLanguage.ES to "🇪🇸", AppLanguage.HE to "🇮🇱",
+        AppLanguage.RU to "🇷🇺", AppLanguage.ZH to "🇨🇳", AppLanguage.JA to "🇯🇵",
+        AppLanguage.KO to "🇰🇷", AppLanguage.AR to "🇸🇦", AppLanguage.PT to "🇵🇹",
+        AppLanguage.NL to "🇳🇱", AppLanguage.EL to "🇬🇷"
+    )
     val currentVehicle = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.transmission.code} • ${vehicle.market.code} • ${vehicle.vin.ifBlank { "VIN —" }}"
     val currentAdapter = if (adapter.tier == AdapterTier.DISCONNECTED) {
         stringResource(R.string.settings_adapter_not_connected)
@@ -2374,10 +2381,10 @@ fun SettingsScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.system_language_current, lang.label), color = CamaroAmber)
+                    Text(stringResource(R.string.system_language_current, "${languageFlags[lang].orEmpty()} ${lang.label}"), color = CamaroAmber)
                     Box {
                         OutlinedButton(onClick = { languageExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(lang.label)
+                            Text("${languageFlags[lang].orEmpty()} ${lang.label}")
                         }
                         DropdownMenu(
                             expanded = languageExpanded,
@@ -2385,7 +2392,7 @@ fun SettingsScreen(
                         ) {
                             AppLanguage.entries.forEach { option ->
                                 DropdownMenuItem(
-                                    text = { Text(option.label) },
+                                    text = { Text("${languageFlags[option].orEmpty()} ${option.label}") },
                                     onClick = {
                                         onLang(option)
                                         languageExpanded = false
