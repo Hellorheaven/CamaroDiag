@@ -41,3 +41,4 @@
 - Après récupération ponctuelle des empreintes, suppression de leur affichage dans les futures publications. Le workflow dédié a été retiré de `main` ; l'exécution GitHub #44712915798 doit être supprimée manuellement pour masquer ses journaux historiques.
 - Une ancienne lecture du pont PC, interrompue par une fermeture volontaire, ne provoque plus une fausse alerte de perte du pont reconnecté.
 - Les trames CAN reçues sans octet de données (DLC 0) sont désormais conservées et identifiées comme RX dans l'historique, sans assouplir les règles d'envoi.
+- Configuration Firebase actualisée pour les versions normale et Debug après ajout des certificats Google ; l'authentification doit encore être validée sur un APK.
