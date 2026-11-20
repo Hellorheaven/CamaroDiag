@@ -744,7 +744,7 @@
     <string name="can_console_input_hint">Trame CAN : 7E0 02 01 0C • Requête OBD : 01 0C</string>
     <string name="can_console_sending">Envoi en cours…</string>
 
-    <string name="can_console_adapter_ack">Accusé de réception de l’interface (pas une trame RX ECU) : %1$s</string>
+    <string name="can_console_adapter_ack">Réponse de l’interface (pas une trame RX ECU) : %1$s</string>
     <string name="can_console_tx_unverified">Envoi CAN brut désactivé : aucune réponse réelle du calculateur au contrôle de transmission en lecture seule.</string>
     <string name="can_console_raw_tx_confirm_title">Confirmer l’envoi CAN brut</string>
     <string name="can_console_raw_tx_confirm_message">Cette action envoie directement une trame sur le bus CAN du véhicule. Une trame incorrecte peut affecter les calculateurs. N’envoyez que si vous connaissez le bus et l’identifiant ciblés.</string>
