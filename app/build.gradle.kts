@@ -7,6 +7,7 @@ plugins {
     id("org.jetbrains.kotlin.android") 
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
 }
 
 val appVersionProperties = Properties().apply {
@@ -122,6 +123,11 @@ dependencies {
     implementation(project(":control"))
     implementation(project(":mileageaudit"))
     implementation("androidx.core:core-ktx:1.16.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
     implementation("androidx.activity:activity-compose:1.10.1")
