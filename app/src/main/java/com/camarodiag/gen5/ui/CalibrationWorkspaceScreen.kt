@@ -320,6 +320,8 @@ fun CalibrationWorkspaceScreen(
                                     R.string.flexfuel_preflight_vin
                                 Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_MISSING ->
                                     R.string.flexfuel_preflight_ecu
+                                Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_UNVERIFIED ->
+                                    R.string.flexfuel_preflight_ecu_unverified
                                 Lfx2012FlexFuelPreflight.Status.FIRMWARE_NOT_VERIFIED ->
                                     R.string.flexfuel_preflight_firmware
                                 Lfx2012FlexFuelPreflight.Status.ORIGINAL_BACKUP_MISSING ->
