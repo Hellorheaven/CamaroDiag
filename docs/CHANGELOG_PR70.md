@@ -48,3 +48,9 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - `7149284` : tests unitaires correspondants.
 - Vérification des statuts GitHub et workflows sur `7149284` : aucun statut ni workflow PR retourné. **Aucun build exécuté ou réussi n'est confirmé**.
 - La PR reste ouverte et non fusionnée ; internationalisation exhaustive et validation Android/Windows encore incomplètes.
+
+## Nouvelle passe — durcissement du manifeste
+- `75dccef` : import ZIP refuse les clés dupliquées dans `manifest.properties` au lieu d'accepter silencieusement la dernière valeur.
+- `0031586` : test de régression sur un manifeste modifié contenant une deuxième propriété `count`.
+- Vérification locale isolée avec le compilateur Kotlin : la surcharge de `Properties.put` compile et rejette effectivement une clé dupliquée. Cela **n'est pas** un build Android/Windows ni une exécution de la suite Gradle.
+- Périmètre non terminé : parité et traduction de l'ensemble des chaînes UI dans les 30 langues, builds complets et recette matérielle.
