@@ -22,10 +22,11 @@ CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5
 
 - Pour un nouveau compte e-mail, confirmer l'adresse avec le message reçu. L'écran de vérification permet de contrôler la confirmation et de demander un nouvel envoi.
 - En cas d'oubli, demander la réinitialisation du mot de passe depuis l'écran de connexion.
-- Une fois connecté, ouvrir **Mon compte** pour consulter l'adresse et le fournisseur de connexion, ou se déconnecter.
-- La première connexion nécessite un accès à Internet. Une session existante peut rester mémorisée, mais l'application ne garantit pas un accès hors ligne illimité si la session est révoquée.
+- Une fois connecté, ouvrir **Mon compte** pour voir l'adresse, le fournisseur, ajouter l'autre mode de connexion lorsqu'il utilise la même adresse, se déconnecter ou demander la suppression du compte.
+- La première connexion nécessite Internet. Une session déjà vérifiée en ligne sur cet appareil peut poursuivre le diagnostic sans réseau pendant **7 jours maximum** après la dernière validation réussie. Passé ce délai, l'application demande une connexion Internet. La révocation par Firebase ne peut être vérifiée tant que l'appareil est hors ligne.
+- Les véhicules et historiques enregistrés sont séparés localement par compte Firebase. Les anciennes données enregistrées avant l'ajout des comptes ne sont pas affectées automatiquement à un utilisateur : leur importation se demande explicitement dans les paramètres du véhicule.
 
-**Limites actuelles :** les véhicules, historiques et fichiers sauvegardés restent locaux à l'appareil. Ils ne sont pas encore synchronisés entre téléphones ni isolés par compte utilisateur. Sur un appareil partagé, éviter d'enregistrer des informations confidentielles tant que cette séparation n'est pas disponible. La liaison de plusieurs modes de connexion et la suppression complète du compte avec gestion des données locales ne sont pas encore proposées.
+**Limites actuelles :** aucune synchronisation automatique des véhicules ou historiques entre appareils. Les fichiers exportés hors de CamaroDiag et les copies conservées par l'utilisateur ne sont pas supprimés lors de la suppression du compte. Firebase peut demander une connexion récente pour autoriser la suppression. Les opérations de diagnostic sensibles restent soumises à leurs contrôles propres, indépendamment du compte.
 
 ## Matrice des fonctions par interface
 
