@@ -33,6 +33,7 @@ object EcuBackupArchive {
         controllerLabel: String? = null,
         createdAtUtcMillis: Long = System.currentTimeMillis()
     ) {
+        require(captures.isNotEmpty()) { "Cannot export an empty ECU backup" }
         require(captures.size <= MAX_ENTRIES) { "Too many memory segments" }
         require(captures.all { it.firstRead.isNotEmpty() && it.expectedBytes > 0 &&
             it.startAddress >= 0 && it.startAddress <= Long.MAX_VALUE - it.expectedBytes &&
@@ -111,7 +112,7 @@ object EcuBackupArchive {
         val properties = Properties().apply { load(ByteArrayInputStream(metadata)) }
         require(properties.getProperty("format") == FORMAT) { "Unsupported archive format" }
         val count = properties.getProperty("count")?.toIntOrNull()
-        require(count != null && count in 0..MAX_ENTRIES) { "Invalid segment count" }
+        require(count != null && count in 1..MAX_ENTRIES) { "Invalid segment count" }
         val required = properties.getProperty("required", "").takeIf { it.isNotBlank() }
             ?.split(",")?.map { EcuBackupCoverage.Region.valueOf(it) }?.toSet().orEmpty()
         val captures = (0 until count).map { index ->
@@ -140,6 +141,13 @@ object EcuBackupArchive {
             )
         }
         require(files.isEmpty()) { "Unreferenced archive data" }
+        require(properties.stringPropertyNames().all { key ->
+            key in setOf("format", "controller", "created", "count", "required") ||
+                (0 until count).any { index ->
+                    key in setOf("region", "start", "expected", "origin", "sha256", "second")
+                        .map { "capture.$index.$it" }
+                }
+        }) { "Unknown archive manifest property" }
         val created = properties.getProperty("created")?.toLongOrNull()
             ?: throw IllegalArgumentException("Invalid creation timestamp")
         val manifest = EcuBackupManifest.inspect(
