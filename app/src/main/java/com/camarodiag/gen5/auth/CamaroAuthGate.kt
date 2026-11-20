@@ -1,6 +1,5 @@
 package com.camarodiag.gen5.auth
 
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,11 +34,18 @@ fun CamaroAuthGate(content: @Composable () -> Unit) {
         auth.addAuthStateListener(listener)
         onDispose { auth.removeAuthStateListener(listener) }
     }
-    if (currentUser == null) {
+    val user = currentUser
+    if (user == null) {
         CamaroLoginScreen(auth)
+    } else if (user.providerData.any { it.providerId == "password" } && !user.isEmailVerified) {
+        EmailVerificationScreen(auth)
     } else {
         Box {
             content()
+            TextButton(
+                onClick = { auth.signOut() },
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) { Text("Sign out / Déconnexion") }
         }
     }
 }
@@ -55,7 +61,7 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
     var message by remember { mutableStateOf("") }
     var register by remember { mutableStateOf(false) }
 
-    fun finishError(error: Exception?) {
+    fun finishError() {
         busy = false
         message = if (french) "Échec de l'authentification. Vérifiez vos informations et votre connexion."
         else "Authentication failed. Check your details and your connection."
@@ -93,13 +99,13 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
                                 auth.currentUser?.sendEmailVerification()
                                 message = if (french) "Compte créé. Vérifiez votre boîte e-mail."
                                 else "Account created. Check your email for verification."
-                            } else finishError(task.exception)
+                            } else finishError()
                         }
                 } else {
                     auth.signInWithEmailAndPassword(normalizedEmail, password)
                         .addOnCompleteListener { task ->
                             busy = false
-                            if (!task.isSuccessful) finishError(task.exception)
+                            if (!task.isSuccessful) finishError()
                         }
                 }
             },
@@ -146,7 +152,7 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
                             auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))
                                 .addOnCompleteListener { task ->
                                     busy = false
-                                    if (!task.isSuccessful) finishError(task.exception)
+                                    if (!task.isSuccessful) finishError()
                                 }
                         } else {
                             busy = false
@@ -164,6 +170,54 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
         if (message.isNotBlank()) {
             Spacer(Modifier.height(16.dp))
             Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun EmailVerificationScreen(auth: FirebaseAuth) {
+    val french = remember { Locale.getDefault().language == "fr" }
+    var message by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var checked by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(if (french) "Vérifiez votre adresse e-mail" else "Verify your email address",
+            style = MaterialTheme.typography.headlineSmall)
+        Text(auth.currentUser?.email.orEmpty())
+        Spacer(Modifier.height(16.dp))
+        Button(enabled = !busy, onClick = {
+            busy = true
+            auth.currentUser?.reload()?.addOnCompleteListener { task ->
+                busy = false
+                checked = !checked
+                message = if (task.isSuccessful && auth.currentUser?.isEmailVerified == true) {
+                    if (french) "Adresse vérifiée." else "Email verified."
+                } else {
+                    if (french) "Vérification non confirmée." else "Verification not confirmed."
+                }
+            }
+        }) { Text(if (french) "J'ai vérifié mon adresse" else "I've verified my email") }
+        TextButton(enabled = !busy, onClick = {
+            auth.currentUser?.sendEmailVerification()?.addOnCompleteListener { task ->
+                message = if (task.isSuccessful) {
+                    if (french) "E-mail de vérification envoyé." else "Verification email sent."
+                } else {
+                    if (french) "Envoi impossible." else "Unable to send email."
+                }
+            }
+        }) { Text(if (french) "Renvoyer l'e-mail" else "Resend email") }
+        TextButton(onClick = { auth.signOut() }) {
+            Text(if (french) "Se déconnecter" else "Sign out")
+        }
+        if (message.isNotBlank()) Text(message)
+        if (checked && auth.currentUser?.isEmailVerified == true) {
+            LaunchedEffect(checked) {
+                auth.currentUser?.let { auth.updateCurrentUser(it) }
+            }
         }
     }
 }
