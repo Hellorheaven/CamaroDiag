@@ -920,7 +920,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         responseCanIdHex: String,
         protocolNumberText: String
     ) {
-        viewModelScope.launch {
+        val attempt = ++connectionAttemptGeneration
+        val previousAttempt = connectionAttemptJob
+        previousAttempt?.cancel()
+        connectionAttemptJob = viewModelScope.launch {
+            try {
+                previousAttempt?.join()
+                if (attempt != connectionAttemptGeneration) return@launch
+                val activeMonitor = canMonitorJob
+                val activeRequest = canRequestJob
+                markAdapterDisconnected()
+                activeMonitor?.join()
+                activeRequest?.join()
+                if (attempt != connectionAttemptGeneration) return@launch
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            }
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = true,
                 isJ2534BridgeConnected = false,
@@ -964,14 +979,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_j2534_connected, result)
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
+                if (attempt == connectionAttemptGeneration) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
+                }
                 throw cancelled
             } catch (error: Exception) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    isJ2534BridgeConnecting = false,
-                    isJ2534BridgeConnected = false,
-                    j2534BridgeMessage = getApplication<Application>().getString(R.string.msg_j2534_bridge_connect_failed)
-                )
+                if (attempt == connectionAttemptGeneration) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        isJ2534BridgeConnecting = false,
+                        isJ2534BridgeConnected = false,
+                        j2534BridgeMessage = getApplication<Application>().getString(R.string.msg_j2534_bridge_connect_failed)
+                    )
+                }
+            } finally {
+                if (attempt == connectionAttemptGeneration) {
+                    connectionAttemptJob = null
+                }
             }
         }
     }
