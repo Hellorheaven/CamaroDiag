@@ -1,5 +1,5 @@
 name: PR54 manual checkpoint validation
-# PR54 checkpoint after grouped development commits. No per-source-commit runs.
+# PR54 follow-up checkpoint: 3 UseKtx lint findings fixed; include DTC, account and ECU UI.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
