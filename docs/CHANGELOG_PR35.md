@@ -208,3 +208,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Only records with a valid CAN arbitration ID, DLC, and matching payload length are shown as ECU RX frames.
 - Adapter acknowledgements and status text remain SYSTEM events; explicit adapter error states are marked failed.
 - Added focused unit tests for standard/extended CAN records, malformed or empty lines, monitor prompts, and adapter error messages.
+
+## 2026-11-20 — Physical transport disconnect reporting
+
+- USB and Wi-Fi command-channel availability now depends on the transport's live state instead of assuming that a previously opened transport is still connected.
+- USB serial and Wi-Fi TCP transports mark the session unavailable after EOF or I/O failure; Wi-Fi read timeouts remain normal while waiting for an ELM prompt.
+- Wrapped socket timeouts are distinguished from genuine I/O disconnects by inspecting the exception cause chain.
+- Added unit coverage for USB/Wi-Fi connection-state gating and wrapped timeout/disconnect causes.
