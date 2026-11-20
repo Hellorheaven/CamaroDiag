@@ -133,4 +133,24 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun ecuIdentityAndDtcStatusLabelsExistInEveryLocale() {
+        val keys = setOf(
+            "obd_ecu_name", "obd_none_identified", "obd_data_unavailable",
+            "obd_returned_live_data", "obd_pending", "obd_permanent",
+            "obd_confirmed", "obd_freeze_frame", "obd_raw_scan_log",
+            "obd_powertrain_ecm"
+        )
+        for (locale in locales) {
+            val translations = strings(locale)
+            assertTrue(
+                "Missing ECU/DTC labels in $locale: ${keys - translations.keys}",
+                translations.keys.containsAll(keys)
+            )
+            assertTrue(
+                "Blank ECU/DTC label in $locale",
+                keys.all { translations.getValue(it).isNotBlank() }
+            )
+        }
+    }
+
 }
