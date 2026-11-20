@@ -23,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -1072,7 +1073,13 @@ fun ModulesScreen(modules: List<EcuModule>) {
                 ModuleStatus.NOT_EQUIPPED -> stringResource(R.string.module_not_equipped)
                 ModuleStatus.DISCOVERY_REQUIRED -> stringResource(R.string.module_discovery_required)
             }
-            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+            // Always show the complete ECU topology. Unsupported, unverified
+            // and unequipped modules remain visible but visually disabled.
+            val unavailable = mod.status != ModuleStatus.ACCESSIBLE
+            Card(
+                modifier = Modifier.alpha(if (unavailable) 0.48f else 1f),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+            ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${mod.shortName} • ${localizedBusName(mod.bus)}", fontWeight = FontWeight.Bold, color = CamaroBlue)
