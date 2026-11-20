@@ -26,7 +26,7 @@ object Lfx2012ControllerReferences {
      * number; an ECU name mentioning E39 does not validate memory layout or recovery.
      */
     fun hasCompleteReadOnlyFingerprint(observed: ObservedIdentity): Boolean =
-        isMeaningfulIdentifier(observed.ecuName) &&
+        hasMeaningfulComponent(observed.ecuName.orEmpty()) &&
             observed.calibrationIds.any(::hasMeaningfulComponent) &&
             observed.calibrationVerificationNumbers.any(::hasMeaningfulComponent)
 
