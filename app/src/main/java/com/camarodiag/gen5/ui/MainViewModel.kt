@@ -1253,7 +1253,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        consoleHistory = (current.consoleHistory + errorEvent).takeLast(300),
+                        consoleHistory = (current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = false) else it } + errorEvent).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
                     )
                 }
@@ -1335,7 +1335,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        consoleHistory = (current.consoleHistory + errorEvent).takeLast(300),
+                        consoleHistory = (current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = false) else it } + errorEvent).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
                     )
                 }
