@@ -1159,6 +1159,8 @@ fun CalibrationWorkspaceScreen(
                         Box {
                             OutlinedButton(onClick = { expertAccessMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(when (expertAccessMethod) {
+                                    EcuBenchExpertPlan.AccessMethod.OBD -> R.string.cal_expert_access_obd
+                                    EcuBenchExpertPlan.AccessMethod.BENCH -> R.string.cal_expert_access_bench
                                     EcuBenchExpertPlan.AccessMethod.BOOT_BAM -> R.string.cal_expert_access_boot
                                     EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG -> R.string.cal_expert_access_nexus
                                     EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF -> R.string.cal_expert_access_chipoff
@@ -1169,6 +1171,8 @@ fun CalibrationWorkspaceScreen(
                                 onDismissRequest = { expertAccessMenuExpanded = false }
                             ) {
                                 listOf(
+                                    EcuBenchExpertPlan.AccessMethod.OBD to R.string.cal_expert_access_obd,
+                                    EcuBenchExpertPlan.AccessMethod.BENCH to R.string.cal_expert_access_bench,
                                     EcuBenchExpertPlan.AccessMethod.BOOT_BAM to R.string.cal_expert_access_boot,
                                     EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG to R.string.cal_expert_access_nexus,
                                     EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF to R.string.cal_expert_access_chipoff
