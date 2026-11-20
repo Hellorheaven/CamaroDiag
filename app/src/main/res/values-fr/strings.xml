@@ -784,4 +784,5 @@
     <string name="flexfuel_preflight_recovery">La procédure de récupération n\'est pas vérifiée</string>
     <string name="flexfuel_preflight_write">L\'écriture de calibration n\'est pas validée et reste désactivée</string>
     <string name="status_not_implemented">NON IMPLÉMENTÉ</string>
+    <string name="app_account_action">Mon compte</string>
 </resources>
