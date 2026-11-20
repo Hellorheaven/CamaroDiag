@@ -1330,6 +1330,13 @@ fun CanSnifferScreen(
                     ) {
                         Text(stringResource(R.string.can_console_history), color = CamaroAmber, fontWeight = FontWeight.Bold)
                         TextButton(
+                            onClick = onExport,
+                            enabled = !state.isCapturing &&
+                                (state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank())
+                        ) {
+                            Text(stringResource(R.string.can_sniffer_export_raw), color = CamaroBlue)
+                        }
+                        TextButton(
                             onClick = onClearHistory,
                             enabled = !state.isSendingRequest &&
                                 (state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank())
@@ -1416,17 +1423,6 @@ fun CanSnifferScreen(
         } else {
             item {
                 Text(stringResource(R.string.can_sniffer_frame_count, report.frames.size), color = CamaroAmber, fontWeight = FontWeight.Bold)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    OutlinedButton(
-                        onClick = onExport,
-                        enabled = !state.isCapturing && report.frames.isNotEmpty()
-                    ) {
-                        Text(stringResource(R.string.live_export_csv))
-                    }
-                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = directionFilter == "ALL",
