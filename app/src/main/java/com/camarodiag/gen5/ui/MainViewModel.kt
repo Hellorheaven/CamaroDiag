@@ -1292,7 +1292,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        requestResponse = response,
                         consoleHistory = (current.consoleHistory + rxEvent).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
