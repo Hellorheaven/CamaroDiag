@@ -19,4 +19,14 @@
     <string name="tab_guide">Treoir</string>
     <string name="tab_controls">Rialuithe</string>
     <string name="tab_settings">Socruithe</string>
+    <string name="common_connect">Ceangail</string>
+    <string name="common_refresh">Athnuaigh</string>
+    <string name="status_offline">As líne</string>
+    <string name="obd_not_available">Níl sé ar fáil</string>
+    <string name="obd_run_full_scan">Rith scanadh iomlán</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Prótacal</string>
+    <string name="obd_dtc_title">Cóid locht diagnóiseacha</string>
+    <string name="obd_adapter_voltage">Voltas an oiriúnaitheora</string>
+    <string name="obd_supported_pids">PIDanna tacaithe</string>
 </resources>
