@@ -61,13 +61,6 @@ data class SavedVehicleProfile(
     val requiresReview: Boolean = false
 )
 
-data class CanConsoleRequestHistoryEntry(
-    val command: String,
-    val response: String?,
-    val completedAtMillis: Long,
-    val succeeded: Boolean
-)
-
 data class CanConsoleHistoryEntry(
     val id: Long,
     val direction: String,
@@ -81,8 +74,6 @@ data class LiveCanMonitorState(
     val rawText: String = "",
     val report: CanTraceAnalysisReport? = null,
     val isSendingRequest: Boolean = false,
-    val requestResponse: String? = null,
-    val requestHistory: List<CanConsoleRequestHistoryEntry> = emptyList(),
     val consoleHistory: List<CanConsoleHistoryEntry> = emptyList(),
     val message: String? = null
 )
@@ -1161,8 +1152,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveCanMonitorState.value = current.copy(
             rawText = "",
             report = null,
-            requestResponse = null,
-            requestHistory = emptyList(),
             consoleHistory = emptyList()
         )
     }
@@ -1221,7 +1210,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        requestResponse = response,
                         consoleHistory = (current.consoleHistory + adapterAck).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
@@ -1296,12 +1284,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendAtCommand(request.elmCommand, 4_000L)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val historyEntry = CanConsoleRequestHistoryEntry(
-                        command = request.elmCommand,
-                        response = response.take(4_096),
-                        completedAtMillis = System.currentTimeMillis(),
-                        succeeded = true
-                    )
                     val rxEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "RX",
@@ -1311,7 +1293,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         requestResponse = response,
-                        requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
                         consoleHistory = (current.consoleHistory + rxEvent).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
@@ -1325,12 +1306,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (canRequestJob === requestJob) {
                     reportConnectionLoss(error)
                     val current = _liveCanMonitorState.value
-                    val historyEntry = CanConsoleRequestHistoryEntry(
-                        command = request.elmCommand,
-                        response = null,
-                        completedAtMillis = System.currentTimeMillis(),
-                        succeeded = false
-                    )
                     val errorEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
@@ -1340,7 +1315,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        requestHistory = (listOf(historyEntry) + current.requestHistory).take(20),
                         consoleHistory = (current.consoleHistory + errorEvent).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
                     )
