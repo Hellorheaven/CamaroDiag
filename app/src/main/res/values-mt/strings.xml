@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Daħħal il-VIN veru; ma jinħoloqx VIN tal-eżempju.</string>
     <string name="status_not_verified">MHUX IVVERIFIKAT</string>
     <string name="adapter_discovery_only">SKOPERTA BISS</string>
+    <string name="can_sniffer_raw_heading">Ħruġ mhux ipproċessat tal-adapter CAN</string>
+    <string name="can_sniffer_export_raw">Esporta r-reġistru mhux ipproċessat</string>
+    <string name="can_sniffer_dtc_heading">Kodiċijiet ta\' ħsara OBD-II osservati</string>
+    <string name="connection_lost_bluetooth">Il-konnessjoni Bluetooth intilfet. Erġa\' qabbad l-adapter u erġa\' ibda l-operazzjoni.</string>
+    <string name="connection_lost_vehicle">Il-konnessjoni mal-vettura intilfet. Erġa\' qabbad il-vettura u erġa\' ibda l-operazzjoni.</string>
+    <string name="connection_lost_usb">L-adapter USB inqata\'. Erġa\' qabbdu u erġa\' ibda l-operazzjoni.</string>
+    <string name="connection_lost_wifi">Il-konnessjoni OBD Wi-Fi intilfet. Erġa\' qabbad l-adapter u erġa\' ibda l-operazzjoni.</string>
+    <string name="connection_lost_pc_bridge">Il-konnessjoni mal-pont tad-dijanjostika tal-PC intilfet. Erġa\' qabbdu u erġa\' ibda l-operazzjoni.</string>
+    <string name="live_sensor_search">Fittex sensuri</string>
+    <string name="live_sensor_show_all">Uri s-sensuri kollha</string>
+    <string name="can_console_history">Storja unifikata tal-console CAN</string>
+    <string name="can_console_clear">Ħassar l-istorja</string>
+    <string name="can_console_empty">Għad m\'hemmx traffiku. Id-dejta riċevuta u mibgħuta tidher hawn.</string>
+    <string name="can_console_tx">TX • MIBGĦUT</string>
+    <string name="can_console_rx">RX • RIĊEVUT</string>
+    <string name="can_console_system">SISTEMA</string>
+    <string name="can_console_input_label">Qafas CAN jew kmand OBD</string>
+    <string name="can_console_sending">Qed jibgħat…</string>
+    <string name="obd_dtc_help_unavailable">Għad m\'hemmx gwida dijanjostika verifikata għal dan il-kodiċi tal-ħsara u din il-vettura. Iċċekkja l-informazzjoni tas-servizz tal-manifattur qabel it-tiswija.</string>
+    <string name="cal_expert_no_write">L-ipprogrammar mhux disponibbli sakemm jiġi implimentat u vvalidat driver ta\' bank kompatibbli.</string>
+    <string name="flexfuel_preflight_write">Il-kitba tal-kalibrazzjoni tal-ECU mhix validata u tibqa\' diżattivata.</string>
+    <string name="status_not_implemented">GĦADU MHUX IMPLIMENTAT</string>
 </resources>
