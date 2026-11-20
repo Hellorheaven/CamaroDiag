@@ -126,6 +126,7 @@
     <string name="about_checking">Checking…</string>
     <string name="about_up_to_date">CamaroDiag is up to date.</string>
     <string name="about_update_found">A new version is available.</string>
+    <string name="about_channel_update_unavailable">A newer version exists, but no update package is published for this installation channel.</string>
     <string name="about_check_failed">Could not check for updates. Check your Internet connection.</string>
     <string name="settings_title">Settings &amp; Saved Reports</string>
     <string name="settings_unit_system">Measurement Units</string>
