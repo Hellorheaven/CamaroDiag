@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag yra atnaujinta.</string>
     <string name="obd_choose_sensors">Pasirinkti jutiklius</string>
     <string name="obd_sensor_cancel">Atšaukti</string>
+    <string name="tab_vehicle">Transporto priemonė</string>
+    <string name="tab_connect">Prisijungti</string>
+    <string name="tab_live">Tiesioginiai duomenys</string>
+    <string name="tab_dtcs">Klaidų kodai</string>
+    <string name="tab_more">Daugiau</string>
+    <string name="tab_modules">Valdymo blokai</string>
+    <string name="tab_mileage">Rida</string>
+    <string name="tab_calibration">ECU / Žemėlapiai</string>
+    <string name="tab_obd_scan">Visas OBD nuskaitymas</string>
+    <string name="tab_guide">Vadovas</string>
+    <string name="tab_controls">Valdymas</string>
+    <string name="tab_settings">Nustatymai</string>
 </resources>
