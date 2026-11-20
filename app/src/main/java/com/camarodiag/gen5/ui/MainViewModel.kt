@@ -1264,12 +1264,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("calibrationIdCvnAttributionVerified", false)
                     put(
                         "observedFingerprintComplete",
-                        !observation.ecuIdentityFromSimulation &&
                         Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
                             Lfx2012ControllerReferences.ObservedIdentity(
                                 ecuName = reported(observation.ecuNameResponse),
                                 calibrationIds = observation.calibrationIdResponse.lines(),
-                                calibrationVerificationNumbers = observation.cvnResponse.lines()
+                                calibrationVerificationNumbers = observation.cvnResponse.lines(),
+                                simulated = observation.ecuIdentityFromSimulation
                             )
                         )
                     )
