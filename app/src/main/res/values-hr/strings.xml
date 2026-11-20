@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag je ažuriran.</string>
     <string name="obd_choose_sensors">Odaberi senzore</string>
     <string name="obd_sensor_cancel">Odustani</string>
+    <string name="tab_vehicle">Vozilo</string>
+    <string name="tab_connect">Povezivanje</string>
+    <string name="tab_live">Podaci uživo</string>
+    <string name="tab_dtcs">Kodovi grešaka</string>
+    <string name="tab_more">Više</string>
+    <string name="tab_modules">Moduli</string>
+    <string name="tab_mileage">Kilometraža</string>
+    <string name="tab_calibration">ECU / Mape</string>
+    <string name="tab_obd_scan">Potpuna OBD provjera</string>
+    <string name="tab_guide">Vodič</string>
+    <string name="tab_controls">Kontrole</string>
+    <string name="tab_settings">Postavke</string>
 </resources>
