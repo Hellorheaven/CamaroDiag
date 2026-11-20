@@ -298,9 +298,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     accountSessionGeneration != importGeneration
                 ) return@launch
                 sessionDao.claimUnassignedSessions(uid)
-                if (!settingsPreferences.edit(commit = true) { putString("legacy_vehicles_claimed_uid", uid) }) {
-                    throw IllegalStateException("Unable to finalize legacy import")
-                }
+                settingsPreferences.edit(commit = true) { putString("legacy_vehicles_claimed_uid", uid) }
                 if (authenticatedAccountUid == uid) {
                     _savedVehicles.value = merged
                     _legacyVehicleImportAvailable.value = false
