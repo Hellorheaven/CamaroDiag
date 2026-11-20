@@ -173,7 +173,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         ).isNotEmpty()
     }
 
-    /** The user must explicitly claim the unassigned, pre-login garage. */
+    /** The unassigned garage remains untouched until the user claims it. */
     fun importLegacyVehicles() {
         val uid = authenticatedAccountUid ?: return
         if (!canImportLegacyVehicles()) return
@@ -181,22 +181,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
         )
         if (legacy.isEmpty()) return
-        val existing = _savedVehicles.value
-        val existingIds = existing.mapTo(mutableSetOf()) { it.id }
-        val imported = legacy.map { profile ->
-            if (existingIds.add(profile.id)) profile
-            else profile.copy(id = UUID.randomUUID().toString())
-        }
-        val combined = existing + imported
-        persistSavedVehicleProfiles(combined)
-        _savedVehicles.value = combined
-        settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
         viewModelScope.launch {
-            // Historical sessions are imported only as part of the same explicit
-            // legacy garage claim. The old Room records are not deleted.
-            sessionDao.claimUnassignedSessions(uid)
+            try {
+                // Commit the historical session ownership before marking the
+                // migration complete; retry stays possible if Room fails.
+                sessionDao.claimUnassignedSessions(uid)
+                if (authenticatedAccountUid != uid) return@launch
+                val existing = _savedVehicles.value
+                val ids = existing.mapTo(mutableSetOf()) { it.id }
+                val imported = legacy.map { profile ->
+                    if (ids.add(profile.id)) profile
+                    else profile.copy(id = UUID.randomUUID().toString())
+                }
+                val merged = existing + imported
+                persistSavedVehicleProfiles(merged)
+                _savedVehicles.value = merged
+                settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
+                _legacyVehicleImportAvailable.value = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _connectionMessage.value =
+                    getApplication<Application>().getString(R.string.msg_session_save_failed)
+            }
         }
-        _legacyVehicleImportAvailable.value = false
     }
 
     private val _pairedDevices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
