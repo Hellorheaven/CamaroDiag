@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Adapteri IP-aadress</string>
     <string name="adapter_tcp_port">TCP-port (tavaliselt 35000 või 23)</string>
     <string name="adapter_connect_wifi">Ühenda Wi-Fi kaudu</string>
+    <string name="obd_connect_adapter_notice">Enne skannimist ühendage päris OBD-adapter. Demorežiim ei loo väljamõeldud tulemusi.</string>
+    <string name="obd_offline_simulation_notice">VÕRGUÜHENDUSETA SIMULATSIOON — allpool olevad VIN, CAL ID, CVN, DTC-d ja mõõtmised on sünteetilised ega pärine päris Camarost.</string>
+    <string name="obd_vehicle_ecu_identification">Sõiduki / ECU tuvastamine</string>
+    <string name="obd_no_live_data">Kasutatavaid reaalaja PID-andmeid ei saadud.</string>
+    <string name="obd_no_dtcs">Standardteenused 03/07/0A ei tagastanud ühtegi DTC-d.</string>
+    <string name="obd_no_freeze_frame">Kasutatavaid külmutatud kaadri andmeid pole.</string>
+    <string name="obd_simulation_scope">Ulatus: ainult määratud demonstratsiooniandmed. Päris adapteri, ECU ega sõidukiga ei suhelda.</string>
+    <string name="vehicle_vin_hint">Sisestage tegelik VIN; näidis-VIN-i ei looda.</string>
+    <string name="status_not_verified">KONTROLLIMATA</string>
+    <string name="adapter_discovery_only">AINULT OTSING</string>
 </resources>
