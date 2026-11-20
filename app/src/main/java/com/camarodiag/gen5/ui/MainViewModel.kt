@@ -1288,7 +1288,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             id = System.nanoTime(),
             direction = "TX",
             timestampMillis = System.currentTimeMillis(),
-            content = input.trim()
+            content = input.trim(),
+            succeeded = false // Pending until the adapter operation completes.
         )
         _liveCanMonitorState.value = currentState.copy(
             isSendingRequest = true,
@@ -1316,7 +1317,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        consoleHistory = (current.consoleHistory + receivedEvents).takeLast(300),
+                        consoleHistory = (
+                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
+                                receivedEvents
+                        ).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
                 }
@@ -1379,7 +1383,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             id = System.nanoTime(),
             direction = "TX",
             timestampMillis = System.currentTimeMillis(),
-            content = request.elmCommand
+            content = request.elmCommand,
+            succeeded = false // Pending until a response is received.
         )
         _liveCanMonitorState.value = currentState.copy(
             isSendingRequest = true,
@@ -1412,7 +1417,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        consoleHistory = (current.consoleHistory + responseEvent).takeLast(300),
+                        consoleHistory = (
+                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
+                                responseEvent
+                        ).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
                 }
