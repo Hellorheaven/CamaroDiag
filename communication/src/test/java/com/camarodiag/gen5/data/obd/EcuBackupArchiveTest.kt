@@ -103,4 +103,38 @@ class EcuBackupArchiveTest {
         }.isFailure)
     }
 
+    @Test fun emptyBackupIsRejectedBeforeWritingOutput() {
+        val output = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(output, emptyList(), emptySet())
+        }.isFailure)
+        assertEquals(0, output.size())
+    }
+
+    @Test fun unknownManifestMetadataIsRejected() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val altered = ByteArrayOutputStream()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(original.toByteArray())).use { source ->
+            ZipOutputStream(altered).use { target ->
+                while (true) {
+                    val entry = source.nextEntry ?: break
+                    target.putNextEntry(ZipEntry(entry.name))
+                    val bytes = source.readBytes()
+                    if (entry.name == "manifest.properties") {
+                        target.write(bytes)
+                        target.write("\nunknown.option=1\n".toByteArray())
+                    } else {
+                        target.write(bytes)
+                    }
+                    target.closeEntry()
+                    source.closeEntry()
+                }
+            }
+        }
+        assertTrue(runCatching {
+            EcuBackupArchive.import(ByteArrayInputStream(altered.toByteArray()))
+        }.isFailure)
+    }
+
 }
