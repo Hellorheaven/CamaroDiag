@@ -748,4 +748,24 @@
     <string name="can_trace_pid_62">عزم المحرك الفعلي</string>
     <string name="can_trace_pid_63">عزم المحرك المرجعي</string>
     <string name="live_pid_ethanol">نسبة الإيثانول</string>
+    <string name="can_trace_flow_status_cts">متابعة الإرسال</string>
+    <string name="can_trace_flow_status_wait">انتظار</string>
+    <string name="can_trace_flow_status_overflow">تجاوز السعة</string>
+    <string name="can_trace_flow_status_reserved">حالة محجوزة</string>
+    <string name="can_trace_exchange_heading">تبادل طلبات واستجابات UDS</string>
+    <string name="can_trace_exchange_completed">اكتمل</string>
+    <string name="can_trace_exchange_pending">الاستجابة قيد الانتظار (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">لم تُرصد أي استجابة</string>
+    <string name="can_console_raw_tx_confirm_title">تأكيد إرسال إطار CAN خام</string>
+    <string name="can_console_raw_tx_confirm_message">يرسل هذا الأمر إطارًا مباشرة إلى ناقل CAN في المركبة. قد يؤثر الإطار غير الصحيح في وحدات المركبة. أرسل فقط عندما تعرف الناقل ومعرّف الوجهة.</string>
+    <string name="can_console_tx_unverified">إرسال CAN الخام معطّل: لم تُرصد استجابة حقيقية من ECU لفحص الإرسال للقراءة فقط.</string>
+    <string name="can_trace_clear_filters">مسح المرشحات</string>
+    <string name="can_trace_filter_invalid">معرّف CAN أو بادئة البيانات غير صالحة.</string>
+    <string name="can_trace_flow_control_heading">التحكم بتدفق ISO-TP</string>
+    <string name="cal_expert_block_recovery">لم يتم التحقق من مسار استعادة لهذه الوجهة المحددة.</string>
+    <string name="cal_expert_block_driver">لا يوجد برنامج تشغيل موثّق لبرمجة العتاد متصل.</string>
+    <string name="cal_expert_identity_notice">التسميات وبصمات الملفات المدخلة مجرد ملاحظات ولا تثبت توافق العتاد.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">محاكاة: لم تُقرأ معرّفات ECU هذه من مركبة حقيقية ولا يمكنها التحقق من برنامجها الثابت.</string>
+    <string name="cal_expert_block_memory_map">لم يتم التحقق من خريطة ذاكرة الهدف والمناطق المحمية.</string>
+    <string name="flexfuel_preflight_backup">لم يتم التحقق من النسخة الاحتياطية الأصلية لوحدة ECU.</string>
 </resources>
