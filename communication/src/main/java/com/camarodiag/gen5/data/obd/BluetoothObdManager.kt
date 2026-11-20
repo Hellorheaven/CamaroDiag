@@ -358,7 +358,7 @@ class BluetoothObdManager(context: Context) {
             // STM uses the current filter table, so clear it for this session and restore
             // automatic OBD filtering after the capture.
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
-            val captured = StringBuilder()
+            val captured = CanCaptureTextBuffer()
             try {
                 boundCommand("ATE0", 1_000L)
                 boundCommand("ATL0", 1_000L)
@@ -381,9 +381,7 @@ class BluetoothObdManager(context: Context) {
                     }
                 }
                 val monitorResponse = boundCommand(monitorCommand, durationMs) { chunk ->
-                    // Keep a rolling tail instead of stopping a long recording at 128 KiB.
                     captured.append(chunk)
-                    if (captured.length > 131_072) captured.delete(0, captured.length - 131_072)
                     onChunk(chunk)
                 }
                 check(monitorResponse.trim() != "?") {
@@ -407,7 +405,7 @@ class BluetoothObdManager(context: Context) {
                     runCatching { boundCommand("ATCAF1", 1_000L) }
                 }
             }
-            captured.toString()
+            captured.snapshot()
         }
     }
 
