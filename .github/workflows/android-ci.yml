@@ -234,8 +234,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Run Android lint (Gradle warnings are errors)
-        run: ./gradlew app:lintDebug --stacktrace --warning-mode=fail
+      - name: Run Android lint across every Android module
+        run: ./gradlew lintDebug --stacktrace --warning-mode=fail
 
       - name: Reject Android lint warnings
         shell: bash
@@ -245,19 +245,25 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
 
-          report = pathlib.Path("app/build/reports/lint-results-debug.xml")
-          if not report.is_file():
-              print(f"Android lint report missing: {report}", file=sys.stderr)
-              sys.exit(1)
-          root = ET.parse(report).getroot()
-          findings = [issue for issue in root.findall("issue")
-                      if issue.get("severity", "").lower() in {"warning", "error"}]
-          if findings:
-              for issue in findings:
-                  print(f"{issue.get('severity')}: {issue.get('id')}: {issue.get('message')}")
-              print(f"Build rejected: {len(findings)} Android lint warning/error(s).", file=sys.stderr)
-              sys.exit(1)
-          print("Android lint clean: zero warnings and zero errors.")
+          modules = ("app", "core", "diagnostic", "communication", "storage", "control", "mileageaudit")
+          findings = []
+          missing = []
+          for module in modules:
+              report = pathlib.Path(module) / "build/reports/lint-results-debug.xml"
+              if not report.is_file():
+                  missing.append(str(report))
+                  continue
+              root = ET.parse(report).getroot()
+              for issue in root.findall("issue"):
+                  if issue.get("severity", "").lower() in {"warning", "error", "fatal"}:
+                      findings.append((module, issue))
+          for module, issue in findings:
+              print(f"{module}: {issue.get('severity')}: {issue.get('id')}: {issue.get('message')}")
+          for report in missing:
+              print(f"Missing Android lint report: {report}", file=sys.stderr)
+          if findings or missing:
+              sys.exit(f"Android lint rejected: {len(findings)} finding(s), {len(missing)} missing report(s).")
+          print("All seven Android modules: zero lint warnings/errors.")
           PY
 
       - name: Upload Android lint report
@@ -266,14 +272,32 @@ jobs:
         with:
           name: CamaroDiag-lint-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
           path: |
-            app/build/reports/lint-results-debug.html
-            app/build/reports/lint-results-debug.xml
-            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            **/build/reports/lint-results-debug.html
+            **/build/reports/lint-results-debug.xml
+            **/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Compile Android instrumentation test APK
+        run: ./gradlew :app:assembleDebugAndroidTest --stacktrace --warning-mode=fail
+
       - name: Build debug APK
         run: ./gradlew app:assembleDebug --stacktrace --warning-mode=fail
+
+      - name: Verify generated Android APK and test reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s app/build/outputs/apk/debug/CamaroDiag-debug.apk
+          test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          python3 - <<'PY'
+          import pathlib
+          import sys
+          reports = list(pathlib.Path(".").glob("*/build/test-results/testDebugUnitTest/TEST-*.xml"))
+          if not reports:
+              sys.exit("No Android unit test result reports found.")
+          print(f"Verified {len(reports)} Android unit-test result files.")
+          PY
 
       - name: Upload debug APK for this PR commit
         uses: actions/upload-artifact@v7
