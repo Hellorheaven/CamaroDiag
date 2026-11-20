@@ -95,19 +95,6 @@ jobs:
           printf "%s" "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
           test -s app/release.jks
 
-      - name: Display public signing certificate fingerprints
-        env:
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-        run: |
-          set -euo pipefail
-          test -s app/release.jks
-          keytool -list -v -keystore app/release.jks \
-            -storepass:env SIGNING_STORE_PASSWORD \
-            -alias "$SIGNING_KEY_ALIAS" |
-            grep -E '^[[:space:]]*(SHA1|SHA256):'
-          echo "Register both public fingerprints in Firebase for both Android app IDs."
-
       - name: Generate Gradle wrapper, test and build release APK
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
