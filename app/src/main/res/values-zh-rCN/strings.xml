@@ -753,4 +753,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">模拟：这些 ECU 标识符并非从真实车辆读取，不能验证其固件。</string>
     <string name="cal_expert_block_memory_map">尚未验证目标内存布局及受保护区域。</string>
     <string name="flexfuel_preflight_backup">尚未验证原始 ECU 备份。</string>
+    <string name="cal_expert_title">专家模式 — ECU 台架 / 芯片</string>
+    <string name="cal_expert_expand">配置专家模式</string>
+    <string name="cal_expert_collapse">隐藏专家设置</string>
+    <string name="cal_expert_family">控制器系列（E39 或 E39A）</string>
+    <string name="cal_expert_chip">观察到的芯片标记</string>
+    <string name="cal_expert_programmer">台架编程器 / 接口</string>
+    <string name="cal_expert_access_title">访问方法</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">外部存储器，芯片已拆下</string>
+    <string name="cal_expert_region_title">存储区域</string>
+    <string name="cal_expert_region_pflash">MCU 内部程序闪存</string>
+    <string name="cal_expert_region_dflash">MCU 数据闪存</string>
+    <string name="cal_expert_region_eeprom">外部 EEPROM</string>
+    <string name="cal_expert_blockers">专家模式尚未通过的预检</string>
+    <string name="cal_expert_block_controller">核实准确的控制器系列（E39/E39A）。</string>
+    <string name="cal_expert_block_chip">识别 MCU 或存储芯片上的实际标记。</string>
+    <string name="cal_expert_block_programmer">识别兼容的台架编程器。</string>
+    <string name="cal_expert_block_image_missing">导入非空固件镜像。</string>
+    <string name="cal_expert_block_image_format">此准备流程需要原始二进制文件。</string>
 </resources>
