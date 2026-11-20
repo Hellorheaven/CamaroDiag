@@ -1,5 +1,14 @@
 # Nouveautés — CamaroDiag
 
+## En préparation — PR #54 (non publié)
+
+- Capture CAN commandée par Play/Stop, avec export de la capture complète.
+- Choix des capteurs en temps réel par cases à cocher, recherche et sélection par véhicule.
+- Aide au dépannage affichée au clic sur un code défaut, lorsque des informations fiables existent.
+- Accès au compte depuis l’en-tête ; « À propos » disponible depuis le menu Actions.
+- Camaro LFX 2012 : lecture et export des identifiants ECU. **Aucune modification ou programmation du calculateur.**
+- Le pilotage des équipements reste non implémenté ; les commandes concernées sont signalées comme telles.
+
 ## 20 novembre 2026
 
 ### Console CAN
