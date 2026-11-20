@@ -1,15 +1,9 @@
 name: PC J2534 Bridge CI
 
+# Intentionally no push or pull_request trigger.
+# Validation is started manually at the 50-commit checkpoint, not per commit.
 on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
-      - converted_to_draft
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   actions: read
