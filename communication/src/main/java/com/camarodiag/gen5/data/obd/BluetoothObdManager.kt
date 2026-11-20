@@ -334,6 +334,8 @@ class BluetoothObdManager(context: Context) {
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(isObdCommandChannelAvailable) { "CAN monitor connection changed while waiting." }
+            suspend fun boundCommand(command: String, timeoutMs: Long, onChunk: ((String) -> Unit)? = null): String =
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk)
             val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
             // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
             // STM uses the current filter table, so clear it for this bounded session and restore
@@ -341,18 +343,18 @@ class BluetoothObdManager(context: Context) {
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = StringBuilder()
             try {
-                sendAtCommandInternal("ATE0", 1_000L)
-                sendAtCommandInternal("ATL0", 1_000L)
-                sendAtCommandInternal("ATS1", 1_000L)
-                sendAtCommandInternal("ATH1", 1_000L)
-                val formattingResponse = sendAtCommandInternal("ATCAF0", 1_000L)
+                boundCommand("ATE0", 1_000L)
+                boundCommand("ATL0", 1_000L)
+                boundCommand("ATS1", 1_000L)
+                boundCommand("ATH1", 1_000L)
+                val formattingResponse = boundCommand("ATCAF0", 1_000L)
                 check(!formattingResponse.contains("?")) {
                     "The connected adapter cannot switch to raw CAN formatting."
                 }
                 if (isStnAdapter) {
-                    val canFilterResponse = sendAtCommandInternal("ATCF 000", 1_000L)
-                    val canMaskResponse = sendAtCommandInternal("ATCM 000", 1_000L)
-                    val filterResponse = sendAtCommandInternal("STFAC", 1_000L)
+                    val canFilterResponse = boundCommand("ATCF 000", 1_000L)
+                    val canMaskResponse = boundCommand("ATCM 000", 1_000L)
+                    val filterResponse = boundCommand("STFAC", 1_000L)
                     check(
                         !canFilterResponse.contains("?") &&
                             !canMaskResponse.contains("?") &&
@@ -361,7 +363,7 @@ class BluetoothObdManager(context: Context) {
                         "The STN adapter could not clear its temporary CAN filters."
                     }
                 }
-                val monitorResponse = sendAtCommandInternal(monitorCommand, durationMs) { chunk ->
+                val monitorResponse = boundCommand(monitorCommand, durationMs) { chunk ->
                     check(captured.length + chunk.length <= 131_072) {
                         "CAN monitor capture exceeded the 128 KiB safety limit."
                     }
@@ -375,18 +377,18 @@ class BluetoothObdManager(context: Context) {
                 // ELM/STN monitor mode has no normal prompt; ESC returns the adapter
                 // to command mode even when the caller cancels the capture.
                 withContext(NonCancellable) {
-                    runCatching { sendAtCommandInternal("\u001B", 1_000L) }
+                    runCatching { boundCommand("\u001B", 1_000L) }
                     if (isStnAdapter) {
-                        runCatching { sendAtCommandInternal("ATAR", 1_000L) }
+                        runCatching { boundCommand("ATAR", 1_000L) }
                     }
                     // Restore the command-channel formatting established during adapter probing.
                     // A bare "AT" is not an ELM reset command; ATD would reset protocol and
                     // other settings that the app relies on, so restore each changed setting.
-                    runCatching { sendAtCommandInternal("ATE0", 1_000L) }
-                    runCatching { sendAtCommandInternal("ATL0", 1_000L) }
-                    runCatching { sendAtCommandInternal("ATH1", 1_000L) }
-                    runCatching { sendAtCommandInternal("ATS0", 1_000L) }
-                    runCatching { sendAtCommandInternal("ATCAF1", 1_000L) }
+                    runCatching { boundCommand("ATE0", 1_000L) }
+                    runCatching { boundCommand("ATL0", 1_000L) }
+                    runCatching { boundCommand("ATH1", 1_000L) }
+                    runCatching { boundCommand("ATS0", 1_000L) }
+                    runCatching { boundCommand("ATCAF1", 1_000L) }
                 }
             }
             captured.toString()
@@ -422,6 +424,8 @@ class BluetoothObdManager(context: Context) {
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(isObdCommandChannelAvailable) { "CAN transmission connection changed while waiting." }
+            suspend fun boundCommand(command: String, timeoutMs: Long): String =
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
             val protocol = if (frame.isExtended) "7" else "6"
             val header = if (frame.isExtended) {
                 frame.canId.toString(16).uppercase().padStart(8, '0')
@@ -429,27 +433,27 @@ class BluetoothObdManager(context: Context) {
                 frame.canId.toString(16).uppercase().padStart(3, '0')
             }
             try {
-                val protocolResponse = sendAtCommandInternal("ATSP$protocol", 1_500L)
+                val protocolResponse = boundCommand("ATSP$protocol", 1_500L)
                 check(!protocolResponse.contains("?")) {
                     "The adapter rejected the selected CAN protocol."
                 }
-                val formattingResponse = sendAtCommandInternal("ATCAF0", 1_500L)
+                val formattingResponse = boundCommand("ATCAF0", 1_500L)
                 check(!formattingResponse.contains("?")) {
                     "The adapter cannot enter raw CAN formatting mode."
                 }
-                val headerResponse = sendAtCommandInternal("ATSH $header", 1_500L)
+                val headerResponse = boundCommand("ATSH $header", 1_500L)
                 check(!headerResponse.contains("?")) {
                     "The adapter rejected CAN header $header."
                 }
-                val headersResponse = sendAtCommandInternal("ATH1", 1_000L)
-                val spacesResponse = sendAtCommandInternal("ATS1", 1_000L)
+                val headersResponse = boundCommand("ATH1", 1_000L)
+                val spacesResponse = boundCommand("ATS1", 1_000L)
                 check(!headersResponse.contains("?") && !spacesResponse.contains("?")) {
                     "The adapter cannot expose received CAN identifiers and byte boundaries."
                 }
                 val payload = frame.data.joinToString(" ") {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
-                val frameResponse = sendAtCommandInternal(payload, 4_000L)
+                val frameResponse = boundCommand(payload, 4_000L)
                 check(!frameResponse.contains("?")) {
                     "The adapter rejected the raw CAN frame."
                 }
@@ -457,13 +461,13 @@ class BluetoothObdManager(context: Context) {
             } finally {
                 // Return to the app's configured 11-bit HS-CAN / automatic-format state.
                 withContext(NonCancellable) {
-                    runCatching { sendAtCommandInternal("ATSP6", 1_500L) }
+                    runCatching { boundCommand("ATSP6", 1_500L) }
                     // Restore the app's standard functional OBD request header as well
                     // as formatting; otherwise later requests could remain physically addressed.
-                    runCatching { sendAtCommandInternal("ATSH 7DF", 1_500L) }
-                    runCatching { sendAtCommandInternal("ATCAF1", 1_500L) }
-                    runCatching { sendAtCommandInternal("ATH1", 1_000L) }
-                    runCatching { sendAtCommandInternal("ATS0", 1_000L) }
+                    runCatching { boundCommand("ATSH 7DF", 1_500L) }
+                    runCatching { boundCommand("ATCAF1", 1_500L) }
+                    runCatching { boundCommand("ATH1", 1_000L) }
+                    runCatching { boundCommand("ATS0", 1_000L) }
                 }
             }
         }
