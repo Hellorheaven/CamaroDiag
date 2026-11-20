@@ -19,4 +19,14 @@
     <string name="tab_guide">Przewodnik</string>
     <string name="tab_controls">Sterowanie</string>
     <string name="tab_settings">Ustawienia</string>
+    <string name="common_connect">Połącz</string>
+    <string name="common_refresh">Odśwież</string>
+    <string name="status_offline">Offline</string>
+    <string name="obd_not_available">Niedostępne</string>
+    <string name="obd_run_full_scan">Uruchom pełne skanowanie</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokół</string>
+    <string name="obd_dtc_title">Diagnostyczne kody usterek</string>
+    <string name="obd_adapter_voltage">Napięcie adaptera</string>
+    <string name="obd_supported_pids">Obsługiwane PID-y</string>
 </resources>
