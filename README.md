@@ -16,6 +16,17 @@ CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5
 - Pont Windows J2534 facultatif pour certains adaptateurs Pass-Thru, notamment VXDIAG VCX SE et VCX Nano avec pilote compatible.
 - Les commandes carrosserie non validées et les fonctions de programmation restent verrouillées.
 
+## Compte utilisateur et connexion
+
+À l'ouverture de CamaroDiag, un compte est demandé avant d'accéder au diagnostic. Deux méthodes de connexion sont proposées : **Google** ou **adresse e-mail et mot de passe**.
+
+- Pour un nouveau compte e-mail, confirmer l'adresse avec le message reçu. L'écran de vérification permet de contrôler la confirmation et de demander un nouvel envoi.
+- En cas d'oubli, demander la réinitialisation du mot de passe depuis l'écran de connexion.
+- Une fois connecté, ouvrir **Mon compte** pour consulter l'adresse et le fournisseur de connexion, ou se déconnecter.
+- La première connexion nécessite un accès à Internet. Une session existante peut rester mémorisée, mais l'application ne garantit pas un accès hors ligne illimité si la session est révoquée.
+
+**Limites actuelles :** les véhicules, historiques et fichiers sauvegardés restent locaux à l'appareil. Ils ne sont pas encore synchronisés entre téléphones ni isolés par compte utilisateur. Sur un appareil partagé, éviter d'enregistrer des informations confidentielles tant que cette séparation n'est pas disponible. La liaison de plusieurs modes de connexion et la suppression complète du compte avec gestion des données locales ne sont pas encore proposées.
+
 ## Matrice des fonctions par interface
 
 | Interface | Liaison | OBD-II standard | UDS / signaux Camaro | SW-CAN / GMLAN | État et conditions |
