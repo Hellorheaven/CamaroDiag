@@ -762,4 +762,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">СИМУЛЯЦИЯ: эти идентификаторы ECU не были считаны с реального автомобиля и не могут подтвердить его прошивку.</string>
     <string name="cal_expert_block_memory_map">Карта памяти целевого устройства и защищённые области не проверены.</string>
     <string name="flexfuel_preflight_backup">Исходная резервная копия ECU не проверена.</string>
+    <string name="cal_expert_title">Режим эксперта — ECU на стенде / микросхема</string>
+    <string name="cal_expert_expand">Настроить режим эксперта</string>
+    <string name="cal_expert_collapse">Скрыть экспертные настройки</string>
+    <string name="cal_expert_family">Семейство контроллера (E39 или E39A)</string>
+    <string name="cal_expert_chip">Обнаруженная маркировка микросхемы</string>
+    <string name="cal_expert_programmer">Стендовый программатор / интерфейс</string>
+    <string name="cal_expert_access_title">Способ доступа</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Внешняя память, снятая микросхема</string>
+    <string name="cal_expert_region_title">Область памяти</string>
+    <string name="cal_expert_region_pflash">Внутренняя программная flash-память MCU</string>
+    <string name="cal_expert_region_dflash">Flash-память данных MCU</string>
+    <string name="cal_expert_region_eeprom">Внешняя EEPROM</string>
+    <string name="cal_expert_blockers">Невыполненные проверки режима эксперта</string>
+    <string name="cal_expert_block_controller">Проверьте точное семейство контроллера (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Определите физическую маркировку MCU или микросхемы памяти.</string>
+    <string name="cal_expert_block_programmer">Определите совместимый стендовый программатор.</string>
+    <string name="cal_expert_block_image_missing">Импортируйте непустой образ прошивки.</string>
+    <string name="cal_expert_block_image_format">Для этого режима подготовки нужен необработанный двоичный файл.</string>
 </resources>
