@@ -29,3 +29,9 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Le sélecteur de capteurs utilise les ressources Android déjà existantes pour 12 capteurs usuels ; la recherche prend en compte leur libellé dans la langue active (`32536c5`). Les identifiants PID restent inchangés.
 - **Non terminé :** extraction des autres libellés codés en dur, audit des écrans et ressources de toutes les locales, tests de placeholders/changement de langue/RTL, vérification des builds Android et Windows. Ne pas fusionner #70 ni fermer #63/#71.
 - **CI :** aucun workflow sur la branche #70 n'a été trouvé dans la liste des exécutions interrogée pendant ce passage. Aucun build ou lint réussi n'est revendiqué.
+
+## Renforcement supplémentaire — double lecture et export
+- Refus explicite des lectures indépendantes divergentes, même si un manifeste les signale toutes deux comme non identiques (`4f9f7c9`, `6891b87`).
+- Validation préalable à l'export d'archive, avant d'écrire le moindre octet : absence de seconde lecture et divergences provoquent un rejet (`71cc462`, `29a7685`).
+- Tests d'export adaptés pour confirmer le rejet et la sortie vide.
+- Builds/tests CI du dernier HEAD toujours à confirmer avant toute fusion.
