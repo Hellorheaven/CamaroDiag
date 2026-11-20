@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Adres IP adaptera</string>
     <string name="adapter_tcp_port">Port TCP (zwykle 35000 lub 23)</string>
     <string name="adapter_connect_wifi">Połącz przez Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Przed skanowaniem podłącz prawdziwy adapter OBD. Tryb demonstracyjny nie tworzy fikcyjnych wyników.</string>
+    <string name="obd_offline_simulation_notice">SYMULACJA OFFLINE — poniższe VIN, CAL ID, CVN, DTC i pomiary są syntetyczne i nie pochodzą z prawdziwego Camaro.</string>
+    <string name="obd_vehicle_ecu_identification">Identyfikacja pojazdu / ECU</string>
+    <string name="obd_no_live_data">Nie otrzymano użytecznych danych PID na żywo.</string>
+    <string name="obd_no_dtcs">Standardowe usługi 03/07/0A nie zwróciły kodów DTC.</string>
+    <string name="obd_no_freeze_frame">Brak użytecznych danych zamrożonej ramki.</string>
+    <string name="obd_simulation_scope">Zakres: wyłącznie deterministyczne dane demonstracyjne. Nie jest odpytywany prawdziwy adapter, ECU ani pojazd.</string>
+    <string name="vehicle_vin_hint">Wprowadź rzeczywisty VIN; przykładowy VIN nie jest generowany.</string>
+    <string name="status_not_verified">NIEZWERYFIKOWANO</string>
+    <string name="adapter_discovery_only">TYLKO WYKRYWANIE</string>
 </resources>
