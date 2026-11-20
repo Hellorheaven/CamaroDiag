@@ -766,4 +766,18 @@
     <string name="obd_sensor_cancel">Cancel</string>
     <string name="obd_sensor_not_measured">Not measured in this scan</string>
     <string name="live_selected_sensors">Displayed sensors (%1$d/%2$d)</string>
+    <string name="flexfuel_lfx2012_title">2012 LFX FlexFuel: ECU identification (read-only)</string>
+    <string name="flexfuel_lfx2012_parts">Parts catalog: %1$s controller, service part %2$s (replaces %3$s).</string>
+    <string name="flexfuel_lfx2012_parts_warning">These part numbers are references only, not proof of the ECU fitted to this VIN or permission to change its calibration.</string>
+    <string name="flexfuel_lfx2012_calid_label">ECU-reported calibration ID: %1$s</string>
+    <string name="flexfuel_lfx2012_boot">Catalog boot-file reference: %1$s (not verified on this vehicle).</string>
+    <string name="flexfuel_lfx2012_checks">Conditions still preventing calibration changes</string>
+    <string name="flexfuel_preflight_vehicle_missing">No vehicle profile selected</string>
+    <string name="flexfuel_preflight_wrong_vehicle">Vehicle is not a 2012 Camaro LFX</string>
+    <string name="flexfuel_preflight_vin">VIN must be read from the ECU and match the saved vehicle</string>
+    <string name="flexfuel_preflight_ecu">Actual ECU controller reference must be identified</string>
+    <string name="flexfuel_preflight_firmware">Exact ECU firmware has not been verified</string>
+    <string name="flexfuel_preflight_backup">Original ECU backup has not been verified</string>
+    <string name="flexfuel_preflight_recovery">Recovery procedure has not been verified</string>
+    <string name="flexfuel_preflight_write">ECU calibration writing is not validated and remains disabled</string>
 </resources>
