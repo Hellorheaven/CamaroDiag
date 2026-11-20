@@ -50,4 +50,14 @@
     <string name="obd_readiness">OBD-valmius</string>
     <string name="obd_mode06_results">Tilan 06 tulokset</string>
     <string name="system_language_follow_phone">Käytä puhelimen kieltä</string>
+    <string name="settings_current_vehicle">Nykyinen ajoneuvo</string>
+    <string name="settings_current_adapter">OBD-II-yhteys</string>
+    <string name="adapter_section_title">Bluetooth OBD-II -sovitin ja CAN-anturi</string>
+    <string name="paired_bluetooth_devices">Pariliitetyt Bluetooth-laitteet</string>
+    <string name="usb_devices_detected">Havaitut USB-laitteet</string>
+    <string name="usb_none_detected">USB-sarjasovitinta ei löytynyt.</string>
+    <string name="wifi_connection_title">Wi-Fi ELM327 -yhteys</string>
+    <string name="adapter_ip_address">Sovittimen IP-osoite</string>
+    <string name="adapter_tcp_port">TCP-portti (yleensä 35000 tai 23)</string>
+    <string name="adapter_connect_wifi">Yhdistä Wi-Fi-yhteydellä</string>
 </resources>
