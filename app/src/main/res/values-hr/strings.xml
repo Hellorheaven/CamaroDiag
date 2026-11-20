@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Stvarni zakretni moment motora</string>
     <string name="can_trace_pid_63">Referentni zakretni moment motora</string>
     <string name="live_pid_ethanol">Udio etanola</string>
+    <string name="can_trace_flow_status_cts">Nastavi slanje</string>
+    <string name="can_trace_flow_status_wait">Čekaj</string>
+    <string name="can_trace_flow_status_overflow">Preljev</string>
+    <string name="can_trace_flow_status_reserved">Rezervirani status</string>
+    <string name="can_trace_exchange_heading">Razmjena UDS zahtjeva i odgovora</string>
+    <string name="can_trace_exchange_completed">Dovršeno</string>
+    <string name="can_trace_exchange_pending">Čeka se odgovor (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Odgovor nije uočen</string>
+    <string name="can_console_raw_tx_confirm_title">Potvrdi slanje sirovog CAN okvira</string>
+    <string name="can_console_raw_tx_confirm_message">Ovim se okvir šalje izravno na CAN sabirnicu vozila. Pogrešan okvir može utjecati na module vozila. Šaljite samo ako poznajete ciljnu sabirnicu i identifikator.</string>
+    <string name="can_console_tx_unverified">Slanje sirovih CAN okvira je onemogućeno: nije uočen stvarni odgovor ECU-a na provjeru slanja samo za čitanje.</string>
+    <string name="can_trace_clear_filters">Očisti filtre</string>
+    <string name="can_trace_filter_invalid">Neispravan CAN ID ili prefiks podataka.</string>
+    <string name="can_trace_flow_control_heading">Upravljanje protokom ISO-TP</string>
+    <string name="cal_expert_block_recovery">Postupak oporavka za ovu točnu ciljnu jedinicu nije provjeren.</string>
+    <string name="cal_expert_block_driver">Nije spojen provjereni upravljački program za hardversko programiranje.</string>
+    <string name="cal_expert_identity_notice">Unesene oznake i sažeci datoteka opažanja su, a ne dokaz kompatibilnosti hardvera.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULACIJA: ovi identifikatori ECU-a nisu pročitani iz stvarnog vozila i ne mogu potvrditi njegov firmware.</string>
+    <string name="cal_expert_block_memory_map">Memorijska mapa cilja i zaštićene regije nisu provjerene.</string>
+    <string name="flexfuel_preflight_backup">Izvorna sigurnosna kopija ECU-a nije provjerena.</string>
 </resources>
