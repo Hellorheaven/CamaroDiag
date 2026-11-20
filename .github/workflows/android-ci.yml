@@ -1,16 +1,10 @@
 name: Android CI
 # Force one complete validation after the transport compile fix; normal draft builds remain checkpointed.
 
+# Intentionally no push or pull_request trigger.
+# Validation is started manually at the 50-commit checkpoint, not per commit.
 on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
-      - converted_to_draft
-    branches:
-      - main
+  workflow_dispatch:
 
 concurrency:
   group: android-debug-pr-${{ github.event.pull_request.number }}
