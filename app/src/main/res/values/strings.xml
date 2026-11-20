@@ -781,4 +781,5 @@
     <string name="flexfuel_preflight_recovery">Recovery procedure has not been verified</string>
     <string name="flexfuel_preflight_write">ECU calibration writing is not validated and remains disabled</string>
     <string name="status_not_implemented">NOT IMPLEMENTED</string>
+    <string name="app_account_action">My account</string>
 </resources>
