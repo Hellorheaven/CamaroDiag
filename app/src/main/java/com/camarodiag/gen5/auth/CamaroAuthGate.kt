@@ -29,6 +29,7 @@ import java.util.Locale
 @Composable
 fun CamaroAuthGate(
     onAccountChanged: (String?) -> Unit,
+    onAccountDeleted: (String) -> Unit,
     content: @Composable () -> Unit
 ) {
     val auth = remember { FirebaseAuth.getInstance() }
@@ -63,6 +64,9 @@ fun CamaroAuthGate(
         }
     } else {
         var accountOpen by remember(user.uid) { mutableStateOf(false) }
+        var deleteConfirm by remember(user.uid) { mutableStateOf(false) }
+        var deleting by remember(user.uid) { mutableStateOf(false) }
+        var deleteError by remember(user.uid) { mutableStateOf(false) }
         val french = remember { Locale.getDefault().language == "fr" }
         Box {
             content()
@@ -89,6 +93,15 @@ fun CamaroAuthGate(
                             if (french) "Connexion : $provider" else "Signed in with: $provider",
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        Spacer(Modifier.height(12.dp))
+                        TextButton(enabled = !deleting, onClick = { deleteConfirm = true }) {
+                            Text(if (french) "Supprimer mon compte" else "Delete my account")
+                        }
+                        if (deleteError) Text(
+                            if (french) "Suppression impossible. Reconnectez-vous récemment, puis réessayez."
+                            else "Account deletion failed. Sign in again recently, then retry.",
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 },
                 confirmButton = {
@@ -100,6 +113,43 @@ fun CamaroAuthGate(
                 dismissButton = {
                     TextButton(onClick = { accountOpen = false }) {
                         Text(if (french) "Fermer" else "Close")
+                    }
+                }
+            )
+        }
+        if (deleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { if (!deleting) deleteConfirm = false },
+                title = { Text(if (french) "Supprimer définitivement le compte ?" else "Permanently delete account?") },
+                text = {
+                    Text(
+                        if (french)
+                            "Le compte Firebase et les véhicules et diagnostics locaux associés seront supprimés. Exportez vos données avant de continuer."
+                        else
+                            "Your Firebase account and its local saved vehicles and diagnostic history will be deleted. Export important data before continuing."
+                    )
+                },
+                confirmButton = {
+                    TextButton(enabled = !deleting, onClick = {
+                        deleting = true
+                        val accountToDelete = user.uid
+                        user.delete().addOnCompleteListener { result ->
+                            deleting = false
+                            if (result.isSuccessful) {
+                                onAccountDeleted(accountToDelete)
+                                deleteConfirm = false
+                                accountOpen = false
+                                signOut()
+                            } else {
+                                deleteConfirm = false
+                                deleteError = true
+                            }
+                        }
+                    }) { Text(if (french) "Supprimer" else "Delete") }
+                },
+                dismissButton = {
+                    TextButton(enabled = !deleting, onClick = { deleteConfirm = false }) {
+                        Text(if (french) "Annuler" else "Cancel")
                     }
                 }
             )
