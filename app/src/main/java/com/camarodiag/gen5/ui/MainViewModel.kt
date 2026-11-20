@@ -973,6 +973,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     can29Bit = can29Bit,
                     protocolNumber = protocolNumber
                 ).getOrThrow()
+                if (attempt != connectionAttemptGeneration) {
+                    obdManager.disconnect()
+                    return@launch
+                }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534BridgeConnecting = false,
                     isJ2534BridgeConnected = true,
