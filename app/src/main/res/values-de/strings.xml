@@ -208,10 +208,14 @@
     <string name="update_download_failed">Download fehlgeschlagen.</string>
     <string name="update_download_invalid_signature">Download oder Signatur ungültig. Installation blockiert; möglicherweise ist eine manuelle Neuinstallation erforderlich.</string>
     <string name="update_download_complete">Download abgeschlossen.</string>
+    <string name="update_ready_to_install">CamaroDiag – bereit zur Installation</string>
     <string name="update_downloading">Wird heruntergeladen</string>
+    <string name="update_available">Update verfügbar</string>
+    <string name="update_channel_only">Es wird nur der Kanal %1$s angeboten. Debug bleibt Debug und Release bleibt Release.</string>
     <string name="update_allow_unknown_sources">Erlaube Installationen aus dieser Quelle, kehre zurück und tippe auf Installieren.</string>
     <string name="update_install">Installieren</string>
     <string name="update_download">Herunterladen</string>
+    <string name="update_later">Später</string>
     <string name="vehicle_generation_label">Generation %1$d</string>
     <string name="engine_llt">3,6-L-V6-SIDI (2010–2011)</string>
     <string name="engine_lfx">3,6-L-V6-SIDI-FlexFuel (2012–2015)</string>
@@ -618,6 +622,7 @@
     <string name="cal_vin_matches_profile">ECU-VIN stimmt mit dem ausgewählten Fahrzeugprofil überein.</string>
     <string name="cal_vin_mismatch_detected">VIN-ABWEICHUNG — Profil: %1$s • ECU: %2$s</string>
     <string name="cal_vin_profile_not_set">Das ausgewählte Fahrzeugprofil enthält keine gültige VIN.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">ECU-VIN für aktuelles Profil übernehmen</string>
     <string name="cal_vin_mismatch_title">VIN-Abweichung erkannt</string>
     <string name="cal_vin_mismatch_confirmation">Die VIN des ausgewählten Profils lautet %1$s, die ECU hat jedoch %2$s zurückgegeben. Es könnten unterschiedliche Fahrzeuge sein. Erstellen Sie ein separates Profil, um das ausgewählte Fahrzeug zu behalten, oder synchronisieren Sie die VIN erst nach Prüfung des tatsächlichen Fahrzeugs.</string>
     <string name="cal_vin_create_vehicle">Fahrzeugprofil erstellen</string>
