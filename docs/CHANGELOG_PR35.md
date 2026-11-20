@@ -13,5 +13,6 @@
 - Amélioration de l'affichage des réponses de l'adaptateur et des trames reçues.
 - Amélioration de l'export de l'historique, y compris lorsque l'analyse ne détecte pas encore de trames.
 - Amélioration de la stabilité des connexions et des échanges avec les adaptateurs BLE.
+- Après une écriture BLE interrompue ou expirée, la connexion concernée est abandonnée avant toute nouvelle tentative ; une ancienne réponse tardive ne peut plus valider une commande suivante.
 - Amélioration de la gestion des captures interrompues et des reconnexions.
 
