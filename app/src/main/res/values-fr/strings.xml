@@ -826,4 +826,5 @@
     <string name="cal_expert_block_memory_map">La carte mémoire et les zones protégées ne sont pas vérifiées.</string>
     <string name="cal_expert_block_driver">Aucun pilote matériel de programmation validé.</string>
     <string name="cal_expert_identity_notice">Les libellés et hash saisis sont des observations, pas des preuves de compatibilité matérielle.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULATION : ces identifiants ECU ne proviennent pas d’un véhicule réel et ne valident pas son firmware.</string>
 </resources>
