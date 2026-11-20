@@ -41,6 +41,15 @@ internal class ObdTransportSessionEpoch {
 
     fun isCurrent(captured: Long): Boolean = value.get() == captured
 
+    /** Queued work from an old adapter must not report the new adapter as lost. */
+    fun requireQueuedCurrent(captured: Long) {
+        if (!isCurrent(captured)) {
+            throw ObdSupersededSessionException(
+                ObdTransportDisconnectedException("OBD session replaced while waiting")
+            )
+        }
+    }
+
     fun requireCurrent(captured: Long) {
         if (value.get() != captured) {
             throw ObdTransportDisconnectedException("OBD connection changed during command")
