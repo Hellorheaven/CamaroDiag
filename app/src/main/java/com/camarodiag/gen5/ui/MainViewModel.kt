@@ -787,6 +787,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _liveCanMonitorState = MutableStateFlow(LiveCanMonitorState())
     val liveCanMonitorState: StateFlow<LiveCanMonitorState> = _liveCanMonitorState.asStateFlow()
     private var canMonitorJob: Job? = null
+    /** Complete raw recording on private storage; rawText is only a bounded UI preview. */
+    private var activeCanCaptureFile: File? = null
     private var canRequestJob: Job? = null
 
     private fun loadNativeCamaroSignalCatalog() {
@@ -1416,8 +1418,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         monitorJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             val pendingChunks = StringBuilder()
             try {
-                val captured = obdManager.captureCanMonitor(durationMs) { chunk ->
+                val archive = File.createTempFile("camarodiag-can-", ".log", getApplication<Application>().cacheDir)
+                val previousArchive = activeCanCaptureFile
+                activeCanCaptureFile = archive
+                previousArchive?.delete()
+                val captured = archive.bufferedWriter(Charsets.US_ASCII).use { writer ->
+                    obdManager.captureCanMonitor(durationMs) { chunk ->
                     if (canMonitorJob === monitorJob) {
+                        writer.write(chunk)
                         // Keep the raw stream unchanged, but decode only complete lines:
                         // Bluetooth/USB reads may split a CAN record at any character.
                         pendingChunks.append(chunk)
@@ -1435,6 +1443,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val receiveEvents = parseCanConsoleReceiveEvents(completeBatch)
                         val history = (current.consoleHistory + receiveEvents).takeLast(300)
                         _liveCanMonitorState.value = current.copy(rawText = raw, consoleHistory = history)
+                    }
                     }
                 }
                 if (canMonitorJob === monitorJob) {
@@ -1556,7 +1565,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val current = _liveCanMonitorState.value
         // Keep an in-flight TX paired with its eventual RX/SYSTEM result.
         // The UI disables Clear while sending; this guard protects other callers too.
-        if (current.isSendingRequest) return
+        if (current.isSendingRequest || current.isCapturing) return
+        activeCanCaptureFile?.delete()
+        activeCanCaptureFile = null
         _liveCanMonitorState.value = current.copy(
             rawText = "",
             report = null,
@@ -1568,6 +1579,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun stopCanMonitor() {
         val activeJob = canMonitorJob ?: return
         activeJob.cancel()
+        _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isCapturing = false)
         // Do not detach here: the capture cleanup must send ESC before a
         // new request is allowed to take over the adapter command channel.
     }
