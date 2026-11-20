@@ -208,14 +208,10 @@
     <string name="update_download_failed">Η λήψη απέτυχε.</string>
     <string name="update_download_invalid_signature">Μη έγκυρη λήψη ή υπογραφή. Η εγκατάσταση αποκλείστηκε· ενδέχεται να απαιτείται μη αυτόματη επανεγκατάσταση.</string>
     <string name="update_download_complete">Η λήψη ολοκληρώθηκε.</string>
-    <string name="update_ready_to_install">CamaroDiag – έτοιμο για εγκατάσταση</string>
     <string name="update_downloading">Γίνεται λήψη</string>
-    <string name="update_available">Διαθέσιμη ενημέρωση</string>
-    <string name="update_channel_only">Προσφέρεται μόνο το κανάλι %1$s. Το Debug παραμένει Debug και το Release παραμένει Release.</string>
     <string name="update_allow_unknown_sources">Επιτρέψτε εγκαταστάσεις από αυτή την πηγή, επιστρέψτε και πατήστε Εγκατάσταση.</string>
     <string name="update_install">Εγκατάσταση</string>
     <string name="update_download">Λήψη</string>
-    <string name="update_later">Αργότερα</string>
     <string name="vehicle_generation_label">Γενιά %1$d</string>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel (2012–2015)</string>
@@ -623,7 +619,6 @@
     <string name="cal_vin_matches_profile">Το VIN της ECU συμφωνεί με το επιλεγμένο προφίλ οχήματος.</string>
     <string name="cal_vin_mismatch_detected">ΔΙΑΦΟΡΕΤΙΚΟ VIN — προφίλ: %1$s • ECU: %2$s</string>
     <string name="cal_vin_profile_not_set">Το επιλεγμένο προφίλ οχήματος δεν έχει έγκυρο VIN.</string>
-    <string name="cal_use_ecu_vin_for_current_profile">Χρήση VIN ECU για το τρέχον προφίλ</string>
     <string name="cal_vin_mismatch_title">Εντοπίστηκε ασυμφωνία VIN</string>
     <string name="cal_vin_mismatch_confirmation">Το VIN του επιλεγμένου προφίλ είναι %1$s, αλλά η ECU επέστρεψε %2$s. Ενδέχεται να πρόκειται για διαφορετικά οχήματα. Δημιουργήστε ξεχωριστό προφίλ για να διατηρήσετε το επιλεγμένο όχημα ή συγχρονίστε το VIN μόνο αφού επαληθεύσετε το πραγματικό όχημα.</string>
     <string name="cal_vin_create_vehicle">Δημιουργία προφίλ οχήματος</string>
