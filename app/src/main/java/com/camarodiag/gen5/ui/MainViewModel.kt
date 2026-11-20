@@ -1055,6 +1055,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    /**
+     * Converts adapter monitor output into truthful console events. Only validated
+     * arbitration-ID/DLC/data records are RX; prompts, status text and malformed
+     * records remain SYSTEM entries instead of being presented as ECU traffic.
+     */
+    private fun parseCanConsoleReceiveEvents(output: String): List<CanConsoleHistoryEntry> =
+        output.lineSequence().mapNotNull { rawLine ->
+            val line = rawLine.trim().removeSuffix(">").trim()
+            if (line.isEmpty()) return@mapNotNull null
+            val frame = RawCanFrameParser.parseReceivedFrames(line).singleOrNull()
+            if (frame == null) {
+                CanConsoleHistoryEntry(
+                    id = System.nanoTime(),
+                    direction = "SYSTEM",
+                    timestampMillis = System.currentTimeMillis(),
+                    content = line.take(4_096),
+                    succeeded = !Regex("(?i)\\b(ERROR|CAN ERROR|BUS ERROR|UNABLE|BUFFER FULL)\\b")
+                        .containsMatchIn(line)
+                )
+            } else {
+                val identifier = frame.canId.toString(16).uppercase().padStart(
+                    if (frame.isExtended) 8 else 3, '0'
+                )
+                val payload = frame.data.joinToString(" ") {
+                    "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+                }
+                CanConsoleHistoryEntry(
+                    id = System.nanoTime(),
+                    direction = "RX",
+                    timestampMillis = System.currentTimeMillis(),
+                    content = "CAN ID=$identifier DLC=${frame.data.size} DATA=$payload"
+                )
+            }
+        }.toList()
+
     /** Starts a bounded, passive monitor session on a real header-capable ELM/STN adapter. */
     fun startCanMonitor(durationMs: Long = 10_000L) {
         if (canMonitorJob?.isActive == true) return
@@ -1098,25 +1133,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 pendingChunks.delete(0, lineEnd + 1)
                             }
                         } else ""
-                        val decodedFrames = RawCanFrameParser.parseReceivedFrames(completeBatch)
-                        val displayText = if (decodedFrames.isNotEmpty()) {
-                            decodedFrames.joinToString("\n") { frame ->
-                                val id = frame.canId.toString(16).uppercase().padStart(if (frame.isExtended) 8 else 3, '0')
-                                val bytes = frame.data.joinToString(" ") {
-                                    (it.toInt() and 0xFF).toString(16).uppercase().padStart(2, '0')
-                                }
-                                "CAN ID=$id DLC=${frame.data.size} DATA=$bytes"
-                            }
-                        } else completeBatch.take(4_096)
-                        val history = if (completeBatch.isNotBlank()) {
-                            val event = CanConsoleHistoryEntry(
-                                id = System.nanoTime(),
-                                direction = "RX",
-                                timestampMillis = System.currentTimeMillis(),
-                                content = displayText
-                            )
-                            (current.consoleHistory + event).takeLast(300)
-                        } else current.consoleHistory
+                        val receiveEvents = parseCanConsoleReceiveEvents(completeBatch)
+                        val history = (current.consoleHistory + receiveEvents).takeLast(300)
                         _liveCanMonitorState.value = current.copy(rawText = raw, consoleHistory = history)
                     }
                 }
@@ -1124,24 +1142,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val raw = captured.takeLast(131_072)
                     val trailing = pendingChunks.toString()
                     val currentBeforeReport = _liveCanMonitorState.value
-                    val trailingFrames = RawCanFrameParser.parseReceivedFrames(trailing)
-                    val trailingText = if (trailingFrames.isNotEmpty()) {
-                        trailingFrames.joinToString("\n") { frame ->
-                            val id = frame.canId.toString(16).uppercase().padStart(if (frame.isExtended) 8 else 3, '0')
-                            val bytes = frame.data.joinToString(" ") {
-                                (it.toInt() and 0xFF).toString(16).uppercase().padStart(2, '0')
-                            }
-                            "CAN ID=$id DLC=${frame.data.size} DATA=$bytes"
-                        }
-                    } else trailing.take(4_096)
-                    val historyWithTrailing = if (trailing.isNotBlank()) {
-                        currentBeforeReport.consoleHistory + CanConsoleHistoryEntry(
-                            id = System.nanoTime(),
-                            direction = "RX",
-                            timestampMillis = System.currentTimeMillis(),
-                            content = trailingText
-                        )
-                    } else currentBeforeReport.consoleHistory
+                    val trailingEvents = parseCanConsoleReceiveEvents(trailing)
+                    val historyWithTrailing =
+                        (currentBeforeReport.consoleHistory + trailingEvents).takeLast(300)
                     pendingChunks.clear()
                     val report = CanTraceAnalyzer.analyze(
                         raw.replace("\r\n", "\n").replace('\r', '\n'),
