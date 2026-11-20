@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULAZZJONI: dawn l-identifikaturi ECU ma nqrawx minn vettura reali u ma jistgħux jivvalidaw il-firmware tagħha.</string>
     <string name="cal_expert_block_memory_map">Il-mappa tal-memorja tal-mira u ż-żoni protetti mhumiex ivverifikati.</string>
     <string name="flexfuel_preflight_backup">Il-backup oriġinali tal-ECU mhuwiex ivverifikat.</string>
+    <string name="cal_expert_title">Modalità esperta — ECU fuq bank / ċippa</string>
+    <string name="cal_expert_expand">Ikkonfigura l-modalità esperta</string>
+    <string name="cal_expert_collapse">Aħbi s-settings esperti</string>
+    <string name="cal_expert_family">Familja tal-kontrollur (E39 jew E39A)</string>
+    <string name="cal_expert_chip">Marka osservata fuq iċ-ċippa</string>
+    <string name="cal_expert_programmer">Programmatur tal-bank / interface</string>
+    <string name="cal_expert_access_title">Metodu ta\' aċċess</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Memorja esterna, ċippa mneħħija</string>
+    <string name="cal_expert_region_title">Reġjun tal-memorja</string>
+    <string name="cal_expert_region_pflash">Flash interna tal-programm MCU</string>
+    <string name="cal_expert_region_dflash">Flash tad-dejta MCU</string>
+    <string name="cal_expert_region_eeprom">EEPROM esterna</string>
+    <string name="cal_expert_blockers">Verifiki esperti pendenti</string>
+    <string name="cal_expert_block_controller">Ivverifika l-familja eżatta tal-kontrollur (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identifika l-marka fiżika fuq l-MCU jew iċ-ċippa tal-memorja.</string>
+    <string name="cal_expert_block_programmer">Identifika programmatur tal-bank kompatibbli.</string>
+    <string name="cal_expert_block_image_missing">Importa immaġni firmware mhux vojta.</string>
+    <string name="cal_expert_block_image_format">Dan il-proċess ta\' preparazzjoni jeħtieġ fajl binarju mhux ipproċessat.</string>
 </resources>
