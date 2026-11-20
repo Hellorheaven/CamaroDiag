@@ -1,0 +1,65 @@
+package com.camarodiag.gen5.data.obd
+
+/**
+ * Offline consistency check for a backup manifest and the bytes it describes.
+ *
+ * A passing result proves consistency of the supplied in-memory data only.
+ * It does NOT prove that a hardware ECU was read, that the expected memory
+ * map is exhaustive, or that this image can be flashed/restored.
+ */
+object EcuBackupIntegrity {
+    enum class Problem {
+        ENTRY_COUNT_MISMATCH,
+        METADATA_MISMATCH,
+        DIGEST_MISMATCH,
+        INDEPENDENT_READ_MISMATCH,
+        COVERAGE_MISMATCH,
+        UNVERIFIABLE_HARDWARE_PROVENANCE
+    }
+
+    data class Result(val problems: Set<Problem>) {
+        val consistent: Boolean get() = problems.isEmpty()
+    }
+
+    fun verify(
+        manifest: EcuBackupManifest.Manifest,
+        captures: List<EcuBackupManifest.Capture>,
+        requiredRegions: Set<EcuBackupCoverage.Region>
+    ): Result {
+        val problems = mutableSetOf<Problem>()
+        if (manifest.hardwareProvenanceVerified) {
+            // No hardware reader currently issues an independently authenticated attestation.
+            problems += Problem.UNVERIFIABLE_HARDWARE_PROVENANCE
+        }
+        if (manifest.entries.size != captures.size) {
+            problems += Problem.ENTRY_COUNT_MISMATCH
+        }
+        manifest.entries.zip(captures).forEach { (entry, capture) ->
+            if (entry.region != capture.region ||
+                entry.startAddress != capture.startAddress ||
+                entry.expectedBytes != capture.expectedBytes ||
+                entry.bytesCaptured != capture.firstRead.size.toLong() ||
+                entry.origin != capture.origin
+            ) problems += Problem.METADATA_MISMATCH
+
+            if (!entry.sha256.equals(EcuBenchExpertPlan.sha256Hex(capture.firstRead), ignoreCase = true)) {
+                problems += Problem.DIGEST_MISMATCH
+            }
+            val identical = capture.independentRead != null &&
+                EcuBenchExpertPlan.verifiedReadback(capture.firstRead, capture.independentRead)
+            if (entry.readsIdentical != identical) {
+                problems += Problem.INDEPENDENT_READ_MISMATCH
+            }
+        }
+        val expected = EcuBackupManifest.inspect(
+            controllerLabel = manifest.controllerLabel,
+            createdAtUtcMillis = manifest.createdAtUtcMillis,
+            captures = captures,
+            expectedRegions = requiredRegions
+        )
+        if (manifest.coverage != expected.coverage ||
+            manifest.entries.size != expected.entries.size
+        ) problems += Problem.COVERAGE_MISMATCH
+        return Result(problems)
+    }
+}
