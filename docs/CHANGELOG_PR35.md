@@ -43,3 +43,4 @@
 - Les trames CAN reçues sans octet de données (DLC 0) sont désormais conservées et identifiées comme RX dans l'historique, sans assouplir les règles d'envoi.
 - Configuration Firebase actualisée pour les versions normale et Debug après ajout des certificats Google ; l'authentification doit encore être validée sur un APK.
 - La vérification préalable à l'envoi CAN brut rejette aussi les réponses incohérentes sur la longueur des données, afin de ne pas activer l'émission à partir d'une réponse mal formée.
+- Dans l'historique TX, une commande est confirmée comme réussie seulement après la fin effective de l'échange avec l'adaptateur ; une commande annulée ou en échec ne reste plus présentée comme réussie.
