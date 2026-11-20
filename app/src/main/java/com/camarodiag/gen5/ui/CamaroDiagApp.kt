@@ -1318,6 +1318,8 @@ fun CanSnifferScreen(
                             enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
                             modifier = Modifier.weight(1f)
                         ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
                             Text(stringResource(R.string.can_sniffer_start))
                         }
                         OutlinedButton(
@@ -1325,6 +1327,8 @@ fun CanSnifferScreen(
                             enabled = state.isCapturing,
                             modifier = Modifier.weight(1f)
                         ) {
+                            Icon(Icons.Filled.Stop, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
                             Text(stringResource(R.string.can_sniffer_stop))
                         }
                     }
