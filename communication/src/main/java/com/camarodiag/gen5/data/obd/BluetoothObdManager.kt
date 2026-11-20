@@ -62,7 +62,7 @@ class BluetoothObdManager(context: Context) {
             isSimulationActive = isSimulationActive,
             activeTransport = activeTransport,
             classicSocketConnected = socket?.isConnected == true,
-            classicSocketClosed = socket?.isClosed != false,
+            classicSocketClosed = socket?.isConnected != true,
             bleConnected = bleTransport.isConnected
         )
 
