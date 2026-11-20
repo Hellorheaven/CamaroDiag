@@ -74,3 +74,10 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - `73bd143` : contrôle de couverture de ces nouveaux libellés sur l'ensemble des 30 locales.
 - `f275efd` : alignement des versions GitHub Actions/SDK du nouveau workflow de tests sur celles déjà utilisées par la CI du projet.
 - **Pas de succès CI revendiqué** tant qu'une exécution complète n'est pas effectivement retournée pour le SHA visé.
+
+## Nouvelle séquence — contrôle archive, configuration véhicule, langues
+- `e6f3c32`, `7b6f71c`, `f0f1df5` : refuse à l'import les captures primaires vides et les lectures secondaires manquantes ; ajoute deux tests de ZIP altérés ; élimine une condition Kotlin désormais redondante.
+- 150 nouvelles traductions (`vehicle_setup_header`, génération, millésime, moteur, transmission, région, VIN, scan, readiness et mode 06) réparties sur les 15 langues encore peu couvertes.
+- Ces 15 langues disposent désormais de **49 clés** chacune sur 821 clés anglaises ; la traduction exhaustive reste très incomplète.
+- `d66f3cf` : test de ressources obligatoire pour ces 10 clés dans les 30 langues.
+- Tests Android/Windows/lint à faire réellement sur HEAD. CI non confirmée et PR non fusionnable à ce stade.
