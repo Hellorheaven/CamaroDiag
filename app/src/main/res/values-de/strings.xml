@@ -666,4 +666,27 @@
     <string name="cal_ecu_response_addresses_label">Beobachtete funktionale OBD-Antwortadressen (keinem Steuergerät zugeordnet)</string>
     <string name="cal_ecu_identity_limits">RPO, Getriebe, Hardware-Teilenummer des Steuergeräts und GM-Betriebssystem werden durch diese standardisierten OBD-Antworten nicht bestätigt. Antwortadressen sind keine Steuergeräte-Identitäten. GM-spezifische Kennungen erfordern verifizierte fahrzeugspezifische Dokumentation.</string>
     <string name="dtc_vehicle_identity_required">Fahrzeugspezifische Details werden ausgeblendet, da die VIN des verbundenen Steuergeräts nicht gelesen wurde oder nicht zum ausgewählten Fahrzeug passt. Lesen und prüfen Sie die ECU-VIN, bevor Sie diese Interpretationen verwenden.</string>
+    <string name="live_pid_oil">Öldruck (nur Simulation)</string>
+    <string name="live_pid_stft_b2">Kurzzeit-Kraftstoffkorrektur Bank 2</string>
+    <string name="live_pid_ltft_b2">Langzeit-Kraftstoffkorrektur Bank 2</string>
+    <string name="live_pid_rel_tps">Relative Drosselklappenstellung</string>
+    <string name="live_pid_cmd_tps">Angeforderte Drosselklappenstellung</string>
+    <string name="live_pid_abs_tps_b">Absolute Drosselklappenstellung B</string>
+    <string name="live_pid_abs_tps_c">Absolute Drosselklappenstellung C</string>
+    <string name="live_pid_app_d">Gaspedalstellung D</string>
+    <string name="live_pid_app_e">Gaspedalstellung E</string>
+    <string name="live_pid_app_f">Gaspedalstellung F</string>
+    <string name="live_pid_abs_load">Absolute Motorlast</string>
+    <string name="live_pid_ambient">Außentemperatur</string>
+    <string name="live_pid_fuel_press">Kraftstoffdruck</string>
+    <string name="live_pid_timing">Zündzeitpunktverstellung</string>
+    <string name="live_pid_eq_ratio">Angefordertes Äquivalenzverhältnis</string>
+    <string name="live_pid_o2_b1s1">Lambdasonde B1S1 Spannung</string>
+    <string name="live_pid_o2_b1s2">Lambdasonde B1S2 Spannung</string>
+    <string name="live_pid_o2_b1s3">Lambdasonde B1S3 Spannung</string>
+    <string name="live_pid_o2_b1s4">Lambdasonde B1S4 Spannung</string>
+    <string name="live_pid_wbo2_b1s1">Breitband-Lambdasonde B1S1</string>
+    <string name="live_pid_wbo2_b1s2">Breitband-Lambdasonde B1S2</string>
+    <string name="live_pid_wbo2_b2s1">Breitband-Lambdasonde B2S1</string>
+    <string name="live_pid_wbo2_b2s2">Breitband-Lambdasonde B2S2</string>
 </resources>
