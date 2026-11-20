@@ -2126,6 +2126,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonMissingBytes = null,
                     comparisonRanges = emptyList(),
                     comparisonIdentical = null,
+                    partialWriteSummary = null,
+                    partialWriteChangedBytes = null,
+                    partialWriteSectorAddresses = emptyList(),
                     message = getApplication<Application>().getString(R.string.msg_cal_file_imported)
                 )
             } catch (cancelled: CancellationException) {
@@ -2209,6 +2212,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonMissingBytes = comparison.missingBytes,
                     comparisonRanges = ranges,
                     comparisonIdentical = comparison.identical,
+                    partialWriteSummary = null,
+                    partialWriteChangedBytes = null,
+                    partialWriteSectorAddresses = emptyList(),
                     message = getApplication<Application>().getString(R.string.msg_cal_comparison_complete)
                 )
                 current.comparisonFilePath?.let { previousPath ->
@@ -2526,6 +2532,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             comparisonMissingBytes = null,
             comparisonRanges = emptyList(),
             comparisonIdentical = null,
+            partialWriteSummary = null,
+            partialWriteChangedBytes = null,
+            partialWriteSectorAddresses = emptyList(),
             message = ""
         )
     }
