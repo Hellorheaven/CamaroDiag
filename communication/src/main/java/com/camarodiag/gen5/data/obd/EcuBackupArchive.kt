@@ -120,6 +120,9 @@ object EcuBackupArchive {
             require(EcuBenchExpertPlan.sha256Hex(first).equals(field("sha256"), ignoreCase = true)) {
                 "Primary read checksum mismatch"
             }
+            require(second == null || first.contentEquals(second)) {
+                "Independent read differs from primary read for segment $index"
+            }
             EcuBackupManifest.Capture(
                 EcuBackupCoverage.Region.valueOf(field("region")),
                 field("start").toLong(), field("expected").toLong(),
