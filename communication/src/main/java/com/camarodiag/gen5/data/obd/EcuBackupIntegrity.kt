@@ -14,6 +14,7 @@ object EcuBackupIntegrity {
         DIGEST_MISMATCH,
         INDEPENDENT_READ_MISMATCH,
         COVERAGE_MISMATCH,
+        INVALID_COVERAGE,
         UNVERIFIABLE_HARDWARE_PROVENANCE
     }
 
@@ -57,6 +58,9 @@ object EcuBackupIntegrity {
             captures = captures,
             expectedRegions = requiredRegions
         )
+        if (expected.coverage.status == EcuBackupCoverage.Status.INCONSISTENT) {
+            problems += Problem.INVALID_COVERAGE
+        }
         if (manifest.coverage != expected.coverage ||
             manifest.entries.size != expected.entries.size
         ) problems += Problem.COVERAGE_MISMATCH
