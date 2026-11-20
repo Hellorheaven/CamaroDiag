@@ -770,4 +770,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULAZIONE: questi identificativi ECU non sono stati letti da un veicolo reale e non possono validarne il firmware.</string>
     <string name="cal_expert_block_memory_map">Mappa di memoria e regioni protette non verificate.</string>
     <string name="flexfuel_preflight_backup">Il backup ECU originale non è stato verificato.</string>
+    <string name="cal_expert_title">Modalità esperto — ECU al banco / chip</string>
+    <string name="cal_expert_expand">Configura modalità esperto</string>
+    <string name="cal_expert_collapse">Nascondi configurazione esperto</string>
+    <string name="cal_expert_family">Famiglia centralina (E39 o E39A)</string>
+    <string name="cal_expert_chip">Marcatura del chip osservata</string>
+    <string name="cal_expert_programmer">Programmatore da banco / interfaccia</string>
+    <string name="cal_expert_access_title">Metodo di accesso</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Memoria esterna, chip dissaldato</string>
+    <string name="cal_expert_region_title">Regione di memoria</string>
+    <string name="cal_expert_region_pflash">Flash programma interna MCU</string>
+    <string name="cal_expert_region_dflash">Flash dati MCU</string>
+    <string name="cal_expert_region_eeprom">EEPROM esterna</string>
+    <string name="cal_expert_blockers">Verifiche preliminari esperte mancanti</string>
+    <string name="cal_expert_block_controller">Verifica la famiglia esatta della centralina (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identifica la marcatura fisica del microcontrollore o del chip di memoria.</string>
+    <string name="cal_expert_block_programmer">Identifica un programmatore da banco compatibile.</string>
+    <string name="cal_expert_block_image_missing">Importa un\'immagine firmware non vuota.</string>
+    <string name="cal_expert_block_image_format">Per questa preparazione è richiesto un file binario grezzo.</string>
 </resources>
