@@ -378,4 +378,24 @@
     <string name="live_pid_map">Налягане във всмукателния колектор</string>
     <string name="live_pid_iat">Температура на входящия въздух</string>
     <string name="live_pid_maf">Масов дебит на въздуха</string>
+    <string name="cal_expert_title">Експертен режим — ECU на стенд / чип</string>
+    <string name="cal_expert_expand">Настройка на експертен режим</string>
+    <string name="cal_expert_collapse">Скриване на експертните настройки</string>
+    <string name="cal_expert_family">Семейство контролер (E39 или E39A)</string>
+    <string name="cal_expert_chip">Наблюдавана маркировка на чипа</string>
+    <string name="cal_expert_programmer">Програматор за стенд / интерфейс</string>
+    <string name="cal_expert_access_title">Метод за достъп</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Външна памет, демонтиран чип</string>
+    <string name="cal_expert_region_title">Област на паметта</string>
+    <string name="cal_expert_region_pflash">Вътрешна програмна flash памет на MCU</string>
+    <string name="cal_expert_region_dflash">Flash памет за данни на MCU</string>
+    <string name="cal_expert_region_eeprom">Външна EEPROM</string>
+    <string name="cal_expert_blockers">Незавършени експертни проверки</string>
+    <string name="cal_expert_block_controller">Проверете точното семейство на контролера (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Установете физическата маркировка на MCU или чипа памет.</string>
+    <string name="cal_expert_block_programmer">Установете съвместим програматор за стенд.</string>
+    <string name="cal_expert_block_image_missing">Импортирайте непразен фърмуерен образ.</string>
+    <string name="cal_expert_block_image_format">За тази подготовка е необходим необработен двоичен файл.</string>
 </resources>
