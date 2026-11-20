@@ -701,4 +701,5 @@
     <string name="about_check_failed">Δεν ήταν δυνατός ο έλεγχος ενημερώσεων. Ελέγξτε τη σύνδεση στο διαδίκτυο.</string>
     <string name="update_install_update">Εγκατάσταση ενημέρωσης</string>
     <string name="update_version_available">Διαθέσιμη έκδοση: %1$s</string>
+    <string name="system_language_follow_phone">Χρήση γλώσσας τηλεφώνου</string>
 </resources>
