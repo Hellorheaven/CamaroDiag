@@ -18,5 +18,6 @@
 - Lorsqu’une session BLE est fermée ou interrompue, une lecture en attente est réveillée immédiatement au lieu d’attendre l’expiration de son délai.
 - Le contrôle de session BLE est également effectué après l'enregistrement du lecteur en attente, afin qu'une fermeture survenue juste avant cet enregistrement ne laisse pas la lecture attendre inutilement.
 - Les reconnexions USB et Wi-Fi libèrent mieux les anciennes connexions et ignorent les erreurs tardives provenant d'une session remplacée.
+- Les échecs d'ouverture ou de configuration d'un adaptateur USB libèrent également son accès au périphérique.
 - Un échec de connexion Bluetooth classique libère désormais la connexion créée pour la tentative.
 - Le statut du pont PC J2534 reflète la connexion réseau réelle après une interruption.
