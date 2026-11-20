@@ -154,7 +154,12 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 @Composable
 fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
     val lang by viewModel.language.collectAsState()
+    val followSystemLanguage by viewModel.followSystemLanguage.collectAsState()
     val systemConfiguration = LocalConfiguration.current
+    val systemLocale = systemConfiguration.locales[0]
+    LaunchedEffect(followSystemLanguage, systemLocale.toLanguageTag()) {
+        viewModel.refreshSystemLanguage(systemLocale)
+    }
     val localizedConfiguration = remember(systemConfiguration, lang) {
         Configuration(systemConfiguration).apply {
             setLocales(LocaleList.forLanguageTags(if (lang == AppLanguage.ZH) "zh-CN" else lang.code))
@@ -629,6 +634,8 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     lastConnectionProfile = lastConnectionProfile,
                     sessions = savedSessions,
                     onLang = { viewModel.setLanguage(it) },
+                    followSystemLanguage = followSystemLanguage,
+                    onFollowSystemLanguage = { viewModel.setFollowSystemLanguage(systemLocale) },
                     onUnits = { viewModel.setUnitSystem(it) },
                     onDeleteSession = { viewModel.deleteSavedSession(it) },
                     onOpenVehicle = { currentTab = DiagTab.SETUP },
@@ -2325,6 +2332,8 @@ fun SettingsScreen(
     lastConnectionProfile: SavedObdConnectionProfile?,
     sessions: List<com.camarodiag.gen5.data.db.SavedSessionEntity>,
     onLang: (AppLanguage) -> Unit,
+    followSystemLanguage: Boolean,
+    onFollowSystemLanguage: () -> Unit,
     onUnits: (UnitSystem) -> Unit,
     onDeleteSession: (com.camarodiag.gen5.data.db.SavedSessionEntity) -> Unit,
     onOpenVehicle: () -> Unit,
@@ -2355,6 +2364,11 @@ fun SettingsScreen(
         AppLanguage.SL to "🇸🇮",
         AppLanguage.SV to "🇸🇪"
     )
+    val selectedLanguageLabel = if (followSystemLanguage) {
+        "📱 ${stringResource(R.string.system_language_follow_phone)}"
+    } else {
+        "${languageFlags[lang].orEmpty()} ${lang.label}"
+    }
     val currentVehicle = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.transmission.code} • ${vehicle.market.code} • ${vehicle.vin.ifBlank { "VIN —" }}"
     val currentAdapter = if (adapter.tier == AdapterTier.DISCONNECTED) {
         stringResource(R.string.settings_adapter_not_connected)
@@ -2397,15 +2411,22 @@ fun SettingsScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.system_language_current, "${languageFlags[lang].orEmpty()} ${lang.label}"), color = CamaroAmber)
+                    Text(stringResource(R.string.system_language_current, selectedLanguageLabel), color = CamaroAmber)
                     Box {
                         OutlinedButton(onClick = { languageExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text("${languageFlags[lang].orEmpty()} ${lang.label}")
+                            Text(selectedLanguageLabel)
                         }
                         DropdownMenu(
                             expanded = languageExpanded,
                             onDismissRequest = { languageExpanded = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("📱 ${stringResource(R.string.system_language_follow_phone)}") },
+                                onClick = {
+                                    onFollowSystemLanguage()
+                                    languageExpanded = false
+                                }
+                            )
                             AppLanguage.entries.forEach { option ->
                                 DropdownMenuItem(
                                     text = { Text("${languageFlags[option].orEmpty()} ${option.label}") },
