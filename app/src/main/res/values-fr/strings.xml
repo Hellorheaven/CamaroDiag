@@ -216,9 +216,9 @@
     <string name="vm_no_obd_data_read">Mode démo ou interface OBD non connectée : aucune donnée ECU réelle n\'a été lue.</string>
     <string name="update_download_failed">Échec du téléchargement.</string>
     <string name="update_download_invalid_signature">Téléchargement/signature invalide. Installation bloquée ; réinstallation manuelle éventuellement nécessaire.</string>
-    <string name="update_download_complete">Téléchargement terminé.</string>
+    <string name="update_download_complete">Mise à jour téléchargée. Ouverture de l’installateur…</string>
     <string name="update_downloading">Téléchargement</string>
-    <string name="update_allow_unknown_sources">Autorisez les installations depuis cette source, revenez puis appuyez sur Installer.</string>
+    <string name="update_allow_unknown_sources">Autorisez les installations depuis CamaroDiag. L’installateur s’ouvrira automatiquement à votre retour.</string>
     <string name="update_install">Installer</string>
     <string name="update_download">Télécharger</string>
     <string name="vehicle_generation_label">Génération %1$d</string>
@@ -471,7 +471,7 @@
     <string name="cal_mode09_calid_label">CAL ID • 09 04</string>
     <string name="cal_mode09_cvn_label">CVN • 09 06</string>
     <string name="cal_file_hash_label">SHA-256</string>
-    <string name="update_version_channel">Version %1$s • %2$s</string>
+    <string name="update_version_available">Version disponible : %1$s</string>
     <string name="update_notification_title">CamaroDiag %1$s</string>
     <plurals name="vm_native_catalog_loaded">
         <item quantity="one">Profil Camaro natif : %1$d pour l’année modèle %2$d. La lecture en direct exige des preuves propres au véhicule.</item>
