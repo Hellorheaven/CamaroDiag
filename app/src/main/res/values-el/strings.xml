@@ -690,4 +690,15 @@
     <string name="live_pid_wbo2_b1s2">Ευρυζωνικός αισθητήρας λάμδα B1S2</string>
     <string name="live_pid_wbo2_b2s1">Ευρυζωνικός αισθητήρας λάμδα B2S1</string>
     <string name="live_pid_wbo2_b2s2">Ευρυζωνικός αισθητήρας λάμδα B2S2</string>
+    <string name="about_title">Σχετικά με το CamaroDiag</string>
+    <string name="about_version">Εγκατεστημένη έκδοση: %1$s</string>
+    <string name="about_build">Αριθμός έκδοσης: %1$d</string>
+    <string name="about_check_updates">Έλεγχος ενημερώσεων</string>
+    <string name="about_checking">Έλεγχος…</string>
+    <string name="about_up_to_date">Το CamaroDiag είναι ενημερωμένο.</string>
+    <string name="about_update_found">Υπάρχει διαθέσιμη νέα έκδοση.</string>
+    <string name="about_channel_update_unavailable">Υπάρχει νεότερη έκδοση, αλλά δεν έχει δημοσιευτεί πακέτο ενημέρωσης για αυτό το κανάλι εγκατάστασης.</string>
+    <string name="about_check_failed">Δεν ήταν δυνατός ο έλεγχος ενημερώσεων. Ελέγξτε τη σύνδεση στο διαδίκτυο.</string>
+    <string name="update_install_update">Εγκατάσταση ενημέρωσης</string>
+    <string name="update_version_available">Διαθέσιμη έκδοση: %1$s</string>
 </resources>
