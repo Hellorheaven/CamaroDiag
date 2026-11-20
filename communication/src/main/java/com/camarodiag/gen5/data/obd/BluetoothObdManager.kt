@@ -413,6 +413,11 @@ class BluetoothObdManager(context: Context) {
                 check(!headerResponse.contains("?")) {
                     "The adapter rejected CAN header $header."
                 }
+                val headersResponse = sendAtCommandInternal("ATH1", 1_000L)
+                val spacesResponse = sendAtCommandInternal("ATS1", 1_000L)
+                check(!headersResponse.contains("?") && !spacesResponse.contains("?")) {
+                    "The adapter cannot expose received CAN identifiers and byte boundaries."
+                }
                 val payload = frame.data.joinToString(" ") {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
