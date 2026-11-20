@@ -60,6 +60,7 @@ fun ObdScanScreen(
     message: String?,
     isConnected: Boolean,
     vehicle: VehicleProfile,
+    accountUid: String?,
     savedVehicleId: String?,
     onRunScan: () -> Unit
 ) {
@@ -72,8 +73,9 @@ fun ObdScanScreen(
     val vehicleKey = report?.vin?.trim()?.uppercase()?.takeIf { it.length == 17 }
     // An unknown VIN must never share a persistent selection with another vehicle.
     // A saved garage profile provides a stable identity before the ECU VIN is read.
-    val preferenceKey = savedVehicleId?.takeIf(String::isNotBlank)?.let { "profile_$it" }
-        ?: vehicleKey?.let { "vehicle_$it" }
+    val vehicleIdentity = savedVehicleId?.takeIf(String::isNotBlank)?.let { "garage_$it" }
+        ?: vehicleKey?.let { "vin_$it" }
+    val preferenceKey = SensorSelectionScope.key(accountUid, vehicleIdentity)
     val storedPids = remember(preferenceKey, preferences) {
         preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
     }
