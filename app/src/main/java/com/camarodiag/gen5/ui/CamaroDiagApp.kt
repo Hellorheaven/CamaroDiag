@@ -1047,11 +1047,13 @@ fun VehicleControlsScreen(vehicle: VehicleProfile) {
                         }
                     }
                     val availabilityLabel = when (capability.availability) {
+                        ControlAvailability.NOT_IMPLEMENTED -> stringResource(R.string.status_not_implemented)
                         ControlAvailability.NOT_VERIFIED -> stringResource(R.string.status_not_verified)
                         ControlAvailability.AVAILABLE -> stringResource(R.string.status_available)
                         ControlAvailability.NOT_EQUIPPED -> stringResource(R.string.status_not_equipped)
                     }
                     val availabilityColor = when (capability.availability) {
+                        ControlAvailability.NOT_IMPLEMENTED -> TextMuted
                         ControlAvailability.NOT_VERIFIED -> WarnRed
                         ControlAvailability.AVAILABLE -> OkGreen
                         ControlAvailability.NOT_EQUIPPED -> TextMuted
