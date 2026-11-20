@@ -1789,7 +1789,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val snapshot = _liveCanMonitorState.value
                 val history = snapshot.consoleHistory
-                require(history.isNotEmpty() || snapshot.rawText.isNotBlank()) {
+                val archive = activeCanCaptureFile?.takeIf { it.isFile }
+                require(history.isNotEmpty() || snapshot.rawText.isNotBlank() ||
+                    (archive?.length() ?: 0L) > 0L) {
                     "No CAN console history is available to export."
                 }
                 val outputText = buildString {
@@ -1807,15 +1809,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         append("] ")
                         appendLine(entry.content)
                     }
-                    if (snapshot.rawText.isNotBlank()) {
+                    if (archive != null || snapshot.rawText.isNotBlank()) {
                         appendLine()
                         appendLine("# RX RAW — received adapter stream (unmodified)")
-                        append(snapshot.rawText)
                     }
                 }
                 val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
                     ?: error("Could not create the CAN console history file.")
-                output.use { it.write(outputText.toByteArray(Charsets.UTF_8)) }
+                output.use { sink ->
+                    sink.write(outputText.toByteArray(Charsets.UTF_8))
+                    if (archive != null) {
+                        archive.inputStream().use { source -> source.copyTo(sink) }
+                    } else if (snapshot.rawText.isNotBlank()) {
+                        sink.write(snapshot.rawText.toByteArray(Charsets.UTF_8))
+                    }
+                }
                 _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
                     message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
                 )
