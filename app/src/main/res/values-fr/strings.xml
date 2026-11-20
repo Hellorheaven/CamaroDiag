@@ -763,4 +763,8 @@
     <string name="update_version_channel">Version %1$s • %2$s</string>
     <string name="obd_dtc_help_unavailable">Aucune aide au dépannage vérifiée n’est encore disponible pour ce code défaut et ce véhicule. Consultez les informations de réparation du constructeur.</string>
     <string name="obd_dtc_help_close">Fermer</string>
+    <string name="obd_choose_sensors">Choisir les capteurs</string>
+    <string name="obd_filter_sensors">Filtrer par PID</string>
+    <string name="obd_sensor_ok">OK</string>
+    <string name="obd_sensor_cancel">Annuler</string>
 </resources>
