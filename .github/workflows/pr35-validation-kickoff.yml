@@ -1,5 +1,5 @@
 name: PR35 manual validation kickoff
-# Checkpoint 3: FR/EN resource policy, Google credential handling and full Android lint.
+# Checkpoint 4: compile Room upgrade instrumentation tests after clean unit tests and lint.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
