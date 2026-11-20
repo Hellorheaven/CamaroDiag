@@ -271,8 +271,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     loadVehicleProfile(settingsPreferences)
                 } else null
                 val missingCurrent = oldCurrent?.takeUnless { vehicle ->
-                    (existing + imported).any { it.vehicle.vin.isNotBlank() &&
-                        it.vehicle.vin.equals(vehicle.vin, ignoreCase = true) }
+                    val stableId = UUID.nameUUIDFromBytes(
+                        "legacy-current:$uid:${vehicle.modelYear}:${vehicle.engine}:${vehicle.transmission}:${vehicle.market}:${vehicle.vin}".toByteArray(Charsets.UTF_8)
+                    ).toString()
+                    (existing + imported).any { it.id == stableId ||
+                        (vehicle.vin.isNotBlank() && it.vehicle.vin.equals(vehicle.vin, ignoreCase = true)) }
                 }
                 val currentProfile = missingCurrent?.let { vehicle ->
                     SavedVehicleProfile(
