@@ -693,6 +693,9 @@
     <string name="can_sniffer_stn_filter_notice">On STN adapters, temporary filters are cleared for raw capture and automatic OBD filtering is re-enabled afterward. Custom filters set by other software are not restored.</string>
     <string name="connection_lost_bluetooth" tools:ignore="MissingTranslation">Bluetooth connection lost. Reconnect the adapter and restart the operation.</string>
     <string name="connection_lost_vehicle" tools:ignore="MissingTranslation">Vehicle connection lost. Reconnect to the vehicle and restart the operation.</string>
+    <string name="connection_lost_usb" tools:ignore="MissingTranslation">USB adapter disconnected. Reconnect the adapter and restart the operation.</string>
+    <string name="connection_lost_wifi" tools:ignore="MissingTranslation">Wi-Fi OBD connection lost. Reconnect the adapter and restart the operation.</string>
+    <string name="connection_lost_pc_bridge" tools:ignore="MissingTranslation">PC diagnostic bridge connection lost. Reconnect the PC bridge and restart the operation.</string>
     <string name="can_sniffer_direction_all">All</string>
     <string name="can_sniffer_direction_rx">RX</string>
     <string name="can_sniffer_direction_tx">TX</string>
