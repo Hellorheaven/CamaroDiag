@@ -118,6 +118,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (authenticatedAccountUid == accountUid) return
         authenticatedAccountUid = accountUid
         accountSessionGeneration++
+        // A connection started under another Firebase account must never
+        // complete after the garage and session ownership have changed.
+        connectionAttemptGeneration++
+        connectionAttemptJob?.cancel()
+        connectionAttemptJob = null
         _savedSessions.value = emptyList()
         _activeAccountUid.value = accountUid
         discardCanMonitor()
@@ -2361,6 +2366,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectSimulatedAdapter(preset: String) {
+        connectionAttemptGeneration++
+        connectionAttemptJob?.cancel()
+        connectionAttemptJob = null
         viewModelScope.launch {
             beginBusyOperation()
             val activeMonitor = canMonitorJob
