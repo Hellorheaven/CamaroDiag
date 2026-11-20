@@ -1234,9 +1234,7 @@ fun LiveDataScreen(
                 TextButton(onClick = {
                     selectedPidIds = pendingIds.toSet()
                     storageKey?.let { key ->
-                        preferences.edit()
-                            .putString(key, pendingIds.sorted().joinToString(","))
-                            .apply()
+                        preferences.edit { putString(key, pendingIds.sorted().joinToString(",")) }
                     }
                     choosingSensors = false
                 }) { Text(stringResource(R.string.obd_sensor_ok)) }
@@ -1324,7 +1322,7 @@ fun LiveDataScreen(
                     }
                     TextButton(onClick = {
                         selectedPidIds = null
-                        storageKey?.let { preferences.edit().remove(it).apply() }
+                        storageKey?.let { preferences.edit { remove(it) } }
                     }) {
                         Text(stringResource(R.string.live_sensor_show_all), color = CamaroBlue)
                     }
