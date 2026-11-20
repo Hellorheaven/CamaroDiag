@@ -49,4 +49,5 @@
     <string name="obd_scan_title">PEŁNE SKANOWANIE OBD-II</string>
     <string name="obd_readiness">Gotowość OBD</string>
     <string name="obd_mode06_results">Wyniki trybu 06</string>
+    <string name="system_language_follow_phone">Użyj języka telefonu</string>
 </resources>
