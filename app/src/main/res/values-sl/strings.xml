@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULACIJA: ti identifikatorji ECU niso prebrani iz pravega vozila in ne potrjujejo njegove vdelane programske opreme.</string>
     <string name="cal_expert_block_memory_map">Pomnilniški zemljevid cilja in zaščitena območja niso preverjeni.</string>
     <string name="flexfuel_preflight_backup">Izvirna varnostna kopija ECU ni preverjena.</string>
+    <string name="cal_expert_title">Strokovni način — ECU na mizi / čip</string>
+    <string name="cal_expert_expand">Nastavi strokovni način</string>
+    <string name="cal_expert_collapse">Skrij strokovne nastavitve</string>
+    <string name="cal_expert_family">Družina krmilnika (E39 ali E39A)</string>
+    <string name="cal_expert_chip">Opažena oznaka čipa</string>
+    <string name="cal_expert_programmer">Namizni programator / vmesnik</string>
+    <string name="cal_expert_access_title">Način dostopa</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Zunanji pomnilnik, odstranjeni čip</string>
+    <string name="cal_expert_region_title">Pomnilniško območje</string>
+    <string name="cal_expert_region_pflash">Notranji programski flash MCU</string>
+    <string name="cal_expert_region_dflash">Podatkovni flash MCU</string>
+    <string name="cal_expert_region_eeprom">Zunanji EEPROM</string>
+    <string name="cal_expert_blockers">Nezaključena strokovna preverjanja</string>
+    <string name="cal_expert_block_controller">Preveri točno družino krmilnika (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Prepoznaj fizično oznako MCU ali pomnilniškega čipa.</string>
+    <string name="cal_expert_block_programmer">Prepoznaj združljiv namizni programator.</string>
+    <string name="cal_expert_block_image_missing">Uvozi neprazno sliko vdelane programske opreme.</string>
+    <string name="cal_expert_block_image_format">Za to pripravo je potrebna surova binarna datoteka.</string>
 </resources>
