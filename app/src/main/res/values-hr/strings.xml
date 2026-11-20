@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Dijagnostički kodovi grešaka</string>
     <string name="obd_adapter_voltage">Napon adaptera</string>
     <string name="obd_supported_pids">Podržani PID-ovi</string>
+    <string name="obd_ecu_name">Naziv ECU-a</string>
+    <string name="obd_none_identified">Nijedan nije identificiran</string>
+    <string name="obd_data_unavailable">Podaci nisu dostupni</string>
+    <string name="obd_returned_live_data">Primljeni podaci uživo</string>
+    <string name="obd_pending">Na čekanju</string>
+    <string name="obd_permanent">Trajno</string>
+    <string name="obd_confirmed">Potvrđeno</string>
+    <string name="obd_freeze_frame">Zamrznuti podaci</string>
+    <string name="obd_raw_scan_log">Zapis sirovog skeniranja</string>
+    <string name="obd_powertrain_ecm">Pogonski sklop / ECM</string>
 </resources>
