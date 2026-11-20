@@ -58,9 +58,23 @@ object CamaroUdsProtocol {
             supportsCanHeaders = headersResp.contains("OK", ignoreCase = true) &&
                 protocolResp.contains("OK", ignoreCase = true),
             rawProbeLog = logs,
-            supportsCanTransmit = Regex("4100", RegexOption.IGNORE_CASE)
-                .containsMatchIn(transmitProbeResp.replace(Regex("[^0-9A-Fa-f]"), ""))
+            supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp)
         )
+    }
+
+    /**
+     * Accept only a complete positive Mode 01 PID 00 ECU response. A substring
+     * match is unsafe here: adapter banners, command echoes or diagnostic chatter
+     * must never enable raw CAN transmission.
+     */
+    private fun hasPositiveMode01Pid00Response(response: String): Boolean {
+        val responseLine = Regex(
+            "^(?:(?:[0-9A-F]{3}|[0-9A-F]{8}))?(?:0[1-8])?4100[0-9A-F]{8}$"
+        )
+        return response.lineSequence().any { line ->
+            val compact = line.uppercase(Locale.ROOT).replace(Regex("[^0-9A-F]"), "")
+            responseLine.matches(compact)
+        }
     }
 
     fun buildTopology(vehicle: VehicleProfile, adapter: AdapterCapabilities): List<EcuModule> {
