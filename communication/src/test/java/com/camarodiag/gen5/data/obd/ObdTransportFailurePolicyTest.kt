@@ -42,6 +42,17 @@ class ObdTransportFailurePolicyTest {
     }
 
     @Test
+    fun staleSessionIoFailureDoesNotDisconnectNewAdapter() {
+        val oldFailure = ObdSupersededSessionException(
+            EOFException("Old adapter closed after reconnect")
+        )
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(oldFailure))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(
+            IOException("wrapped stale operation", oldFailure)
+        ))
+    }
+
+    @Test
     fun nonIoFailureDoesNotImplyPhysicalDisconnect() {
         assertFalse(ObdTransportFailurePolicy.isConnectionLoss(IllegalStateException("bad command")))
     }
