@@ -50,4 +50,14 @@
     <string name="obd_readiness">Gotowość OBD</string>
     <string name="obd_mode06_results">Wyniki trybu 06</string>
     <string name="system_language_follow_phone">Użyj języka telefonu</string>
+    <string name="settings_current_vehicle">Bieżący pojazd</string>
+    <string name="settings_current_adapter">Połączenie OBD-II</string>
+    <string name="adapter_section_title">Adapter Bluetooth OBD-II i sonda CAN</string>
+    <string name="paired_bluetooth_devices">Sparowane urządzenia Bluetooth</string>
+    <string name="usb_devices_detected">Wykryte urządzenia USB</string>
+    <string name="usb_none_detected">Nie wykryto adaptera szeregowego USB.</string>
+    <string name="wifi_connection_title">Połączenie Wi-Fi ELM327</string>
+    <string name="adapter_ip_address">Adres IP adaptera</string>
+    <string name="adapter_tcp_port">Port TCP (zwykle 35000 lub 23)</string>
+    <string name="adapter_connect_wifi">Połącz przez Wi-Fi</string>
 </resources>
