@@ -1091,6 +1091,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         _liveCanMonitorState.value = previousState.copy(
             isCapturing = true,
+            rawText = "",
+            report = null,
             message = null,
             consoleHistory = (previousState.consoleHistory + startEvent).takeLast(300)
         )
@@ -1152,7 +1154,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
-                    val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                    // Every chunk is already appended to rawText in the receive callback.
+                    // pendingChunks is only a line-framing buffer; appending it again duplicates
+                    // the final unterminated record when capture is stopped or fails.
+                    val raw = current.rawText.takeLast(131_072)
                     val stoppedEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
@@ -1170,7 +1175,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 reportConnectionLoss(error)
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
-                    val raw = (current.rawText + pendingChunks).takeLast(131_072)
+                    // Every chunk is already appended to rawText in the receive callback.
+                    // pendingChunks is only a line-framing buffer; appending it again duplicates
+                    // the final unterminated record when capture is stopped or fails.
+                    val raw = current.rawText.takeLast(131_072)
                     val failureMessage = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
                     val failureEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
