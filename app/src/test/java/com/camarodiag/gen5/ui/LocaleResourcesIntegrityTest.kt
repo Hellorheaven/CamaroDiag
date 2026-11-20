@@ -181,4 +181,25 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun connectionSettingsLabelsExistInEveryDeclaredLocale() {
+        val keys = setOf(
+            "settings_current_vehicle", "settings_current_adapter",
+            "adapter_section_title", "paired_bluetooth_devices",
+            "usb_devices_detected", "usb_none_detected",
+            "wifi_connection_title", "adapter_ip_address",
+            "adapter_tcp_port", "adapter_connect_wifi"
+        )
+        for (locale in locales) {
+            val translated = strings(locale)
+            assertTrue(
+                "Missing OBD connection labels in $locale: ${keys - translated.keys}",
+                translated.keys.containsAll(keys)
+            )
+            assertTrue(
+                "Blank OBD connection label in $locale",
+                keys.all { translated.getValue(it).isNotBlank() }
+            )
+        }
+    }
+
 }
