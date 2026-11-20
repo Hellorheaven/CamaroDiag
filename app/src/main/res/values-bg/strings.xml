@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Език на приложението</string>
     <string name="system_language_hint">Изберете езика за CamaroDiag.</string>
     <string name="about_title">За CamaroDiag</string>
@@ -154,7 +154,8 @@
     <string name="cal_pc_pairing_token">Токен за сдвояване с компютъра</string>
     <string name="cal_connect_j2534">Свързване с мост J2534</string>
     <string name="cal_disconnect_pc_bridge">Прекъсване на връзката с компютърния мост</string>
-    <string name="cal_bridge_capabilities">Мост: HS-CAN ISO15765 250/500 kbit/s и J2534-2 SW-ISO15765 при поддръжка от драйвера. CAN FD остава изключен.</string>
+    <!-- SAE/J2534 bus names contain literal hyphens; do not alter protocol identifiers. -->
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Мост: HS-CAN ISO15765 250/500 kbit/s и J2534-2 SW-ISO15765 при поддръжка от драйвера. CAN FD остава изключен.</string>
     <string name="cal_read_uds_did">Прочитане на UDS DID</string>
     <string name="cal_read_uds_dtcs">Прочитане на UDS DTC</string>
     <string name="cal_uds_trouble_codes">UDS кодове за грешки (0x19)</string>
