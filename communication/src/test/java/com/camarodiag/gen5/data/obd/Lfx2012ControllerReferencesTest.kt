@@ -107,14 +107,16 @@ class Lfx2012ControllerReferencesTest {
 
     @Test fun ecuResponderProvenanceRequiresReadableCanAddresses() {
         val classify = Lfx2012ControllerReferences::classifyResponderAttribution
-        val kind = Lfx2012ControllerReferences.ResponderAttribution
-        assertEquals(kind.NO_VALID_CAN_ADDRESS, classify(emptyList()))
-        assertEquals(kind.NO_VALID_CAN_ADDRESS, classify(listOf("unknown", "7E8")))
-        assertEquals(kind.NO_VALID_CAN_ADDRESS, classify(listOf("7E8", "NO DATA")))
-        assertEquals(kind.SINGLE_ADDRESS_OBSERVED, classify(listOf("7e8", "0x7E8", "7E8")))
-        assertEquals(kind.SINGLE_ADDRESS_OBSERVED, classify(listOf("18daf110")))
-        assertEquals(kind.MULTIPLE_ADDRESSES_OBSERVED, classify(listOf("7E8", "7E9")))
-        assertEquals(kind.MULTIPLE_ADDRESSES_OBSERVED, classify(listOf("18DAF110", "18DAF118")))
+        val none = Lfx2012ControllerReferences.ResponderAttribution.NO_VALID_CAN_ADDRESS
+        val one = Lfx2012ControllerReferences.ResponderAttribution.SINGLE_ADDRESS_OBSERVED
+        val multiple = Lfx2012ControllerReferences.ResponderAttribution.MULTIPLE_ADDRESSES_OBSERVED
+        assertEquals(none, classify(emptyList()))
+        assertEquals(none, classify(listOf("unknown", "7E8")))
+        assertEquals(none, classify(listOf("7E8", "NO DATA")))
+        assertEquals(one, classify(listOf("7e8", "0x7E8", "7E8")))
+        assertEquals(one, classify(listOf("18daf110")))
+        assertEquals(multiple, classify(listOf("7E8", "7E9")))
+        assertEquals(multiple, classify(listOf("18DAF110", "18DAF118")))
     }
 
     @Test fun aCompleteReadOnlyFingerprintNeverAuthorizesAWrite() {
