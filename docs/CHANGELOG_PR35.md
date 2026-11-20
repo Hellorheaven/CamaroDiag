@@ -51,3 +51,7 @@
 - L'écran « Mon compte » permet de voir l'adresse e-mail et le fournisseur de connexion avant de se déconnecter.
 - En cas de déconnexion du compte, les captures et mesures en cours sont arrêtées et les résultats temporaires masqués avant de rouvrir le diagnostic sur un autre compte.
 - La déconnexion Google demande aussi à Android de réinitialiser sa sélection de compte pour éviter une reconnexion involontaire.
+- Les véhicules et sessions de diagnostic enregistrés localement sont séparés par compte ; l'importation des anciens véhicules et historiques nécessite une demande explicite.
+- « Mon compte » permet de lier Google et e-mail pour une même adresse, ou de demander la suppression du compte après confirmation.
+- La session est vérifiée auprès de Firebase ; en cas de coupure réseau, l'utilisation hors ligne est limitée à sept jours depuis la dernière validation en ligne.
+- La suppression confirmée par Firebase efface le garage et l'historique local associés au compte concerné, sans toucher aux comptes des autres utilisateurs.
