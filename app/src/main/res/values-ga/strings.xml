@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Casmhóimint iarbhír an innill</string>
     <string name="can_trace_pid_63">Casmhóimint tagartha an innill</string>
     <string name="live_pid_ethanol">Cion eatánóil</string>
+    <string name="can_trace_flow_status_cts">Lean ar aghaidh ag seoladh</string>
+    <string name="can_trace_flow_status_wait">Fan</string>
+    <string name="can_trace_flow_status_overflow">Róshreabhadh</string>
+    <string name="can_trace_flow_status_reserved">Stádas forchoimeádta</string>
+    <string name="can_trace_exchange_heading">Malartuithe iarratais agus freagartha UDS</string>
+    <string name="can_trace_exchange_completed">Críochnaithe</string>
+    <string name="can_trace_exchange_pending">Freagra ar feitheamh (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Níor breathnaíodh freagra</string>
+    <string name="can_console_raw_tx_confirm_title">Deimhnigh tarchur amh CAN</string>
+    <string name="can_console_raw_tx_confirm_message">Seolann sé seo fráma go díreach chuig bus CAN na feithicle. Féadfaidh fráma mícheart difear a dhéanamh do mhodúil na feithicle. Ná seol ach má tá an bus agus an t-aitheantóir cinn scríbe ar eolas agat.</string>
+    <string name="can_console_tx_unverified">Tá seoladh amh CAN díchumasaithe: níor breathnaíodh fíorfhreagra ECU ar an seiceáil tarchuir inléite amháin.</string>
+    <string name="can_trace_clear_filters">Glan scagairí</string>
+    <string name="can_trace_filter_invalid">Aitheantas CAN nó réimír sonraí neamhbhailí.</string>
+    <string name="can_trace_flow_control_heading">Rialú sreafa ISO-TP</string>
+    <string name="cal_expert_block_recovery">Níor fíoraíodh nós imeachta aisghabhála don sprioc shonrach seo.</string>
+    <string name="cal_expert_block_driver">Níl aon tiománaí crua-earraí cláraithe bailíochtaithe ceangailte.</string>
+    <string name="cal_expert_identity_notice">Is breathnuithe iad na lipéid agus na haisíní comhaid a iontráladh, ní cruthúnas comhoiriúnachta crua-earraí.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">INSAMHLADH: níor léadh na haitheantóirí ECU seo ó fheithicil fhíor agus ní féidir leo a firmware a bhailíochtú.</string>
+    <string name="cal_expert_block_memory_map">Níor fíoraíodh léarscáil chuimhne na sprice ná na réigiúin chosanta.</string>
+    <string name="flexfuel_preflight_backup">Níor fíoraíodh an cúltaca ECU bunaidh.</string>
 </resources>
