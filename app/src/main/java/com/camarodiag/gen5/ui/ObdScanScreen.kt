@@ -246,11 +246,12 @@ fun ObdScanScreen(
             if (allCodes.isEmpty()) {
                 item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
             } else {
-                val reportVin = report.vin?.trim()?.uppercase()
-                val matchesVehicle = !isSimulated &&
-                    reportVin != null && reportVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) &&
-                    reportVin == vehicle.vin.trim().uppercase() &&
-                    report.respondingEcuAddresses.size == 1
+                val matchesVehicle = ObdDtcGuidancePolicy.hasMatchedEcm(
+                    selectedVin = vehicle.vin,
+                    reportedVin = report.vin,
+                    responderAddresses = report.respondingEcuAddresses,
+                    simulation = isSimulated
+                )
                 items(allCodes.distinctBy { it.code to it.status }, key = { "${it.code}-${it.status}" }) { dtc ->
                     DtcResultCard(dtc, vehicle, matchesVehicle)
                 }
