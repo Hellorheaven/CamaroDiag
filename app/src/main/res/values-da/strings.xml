@@ -50,4 +50,14 @@
     <string name="obd_readiness">OBD-parathed</string>
     <string name="obd_mode06_results">Resultater for tilstand 06</string>
     <string name="system_language_follow_phone">Følg telefonens sprog</string>
+    <string name="settings_current_vehicle">Aktuelt køretøj</string>
+    <string name="settings_current_adapter">OBD-II-forbindelse</string>
+    <string name="adapter_section_title">Bluetooth OBD-II-adapter og CAN-sonde</string>
+    <string name="paired_bluetooth_devices">Parrede Bluetooth-enheder</string>
+    <string name="usb_devices_detected">Fundne USB-enheder</string>
+    <string name="usb_none_detected">Ingen seriel USB-adapter fundet.</string>
+    <string name="wifi_connection_title">Wi-Fi ELM327-forbindelse</string>
+    <string name="adapter_ip_address">Adapterens IP-adresse</string>
+    <string name="adapter_tcp_port">TCP-port (ofte 35000 eller 23)</string>
+    <string name="adapter_connect_wifi">Forbind via Wi-Fi</string>
 </resources>
