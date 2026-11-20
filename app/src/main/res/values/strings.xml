@@ -824,4 +824,6 @@
     <string name="cal_expert_block_driver">No validated hardware programming driver is connected.</string>
     <string name="cal_expert_identity_notice">Entered labels and file hashes are observations, not proof of hardware compatibility.</string>
     <string name="flexfuel_lfx2012_simulation_warning">SIMULATION: these ECU identifiers were not read from a real vehicle and cannot validate its firmware.</string>
+    <string name="cal_expert_access_obd">OBD diagnostics / in-vehicle access (not a bench programmer)</string>
+    <string name="cal_expert_access_bench">BENCH / removed ECU power and signal connection</string>
 </resources>
