@@ -7,6 +7,8 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Contrôles : nombre d'entrées, identité région/adresse/taille/origine, SHA-256 des octets, concordance de la lecture indépendante, bilan de couverture recalculé.
 - Refus explicite de la provenance matérielle non attestée.
 - Tests unitaires pour les données modifiées, la couverture altérée, les métadonnées et l'attestation invalide.
+- Refus des segments mémoire superposés ou des plages invalides (couverture incohérente).
+- Tests supplémentaires : mutation du tableau d'octets après manifeste, région requise absente et chevauchement.
 
 ## Commits
 - `4efbad77d0ca86db063153f2c363d45faa593ac8` : vérificateur.
