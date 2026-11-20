@@ -753,4 +753,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">시뮬레이션: 이 ECU 식별자는 실제 차량에서 읽은 값이 아니므로 펌웨어를 검증할 수 없습니다.</string>
     <string name="cal_expert_block_memory_map">대상 메모리 맵과 보호 영역이 검증되지 않았습니다.</string>
     <string name="flexfuel_preflight_backup">원래 ECU 백업이 검증되지 않았습니다.</string>
+    <string name="cal_expert_title">전문가 모드 — ECU 벤치 / 칩</string>
+    <string name="cal_expert_expand">전문가 모드 설정</string>
+    <string name="cal_expert_collapse">전문가 설정 숨기기</string>
+    <string name="cal_expert_family">컨트롤러 계열(E39 또는 E39A)</string>
+    <string name="cal_expert_chip">확인된 칩 표기</string>
+    <string name="cal_expert_programmer">벤치 프로그래머 / 인터페이스</string>
+    <string name="cal_expert_access_title">접근 방법</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">외부 메모리, 분리한 칩</string>
+    <string name="cal_expert_region_title">메모리 영역</string>
+    <string name="cal_expert_region_pflash">MCU 내부 프로그램 플래시</string>
+    <string name="cal_expert_region_dflash">MCU 데이터 플래시</string>
+    <string name="cal_expert_region_eeprom">외부 EEPROM</string>
+    <string name="cal_expert_blockers">전문가 사전 점검 미완료 항목</string>
+    <string name="cal_expert_block_controller">정확한 컨트롤러 계열(E39/E39A)을 확인하세요.</string>
+    <string name="cal_expert_block_chip">MCU 또는 메모리 칩의 실제 표기를 식별하세요.</string>
+    <string name="cal_expert_block_programmer">호환되는 벤치 프로그래머를 식별하세요.</string>
+    <string name="cal_expert_block_image_missing">내용이 있는 펌웨어 이미지를 가져오세요.</string>
+    <string name="cal_expert_block_image_format">이 준비 과정에는 원시 바이너리 파일이 필요합니다.</string>
 </resources>
