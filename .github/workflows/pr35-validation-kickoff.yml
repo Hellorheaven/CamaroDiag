@@ -1,5 +1,5 @@
 name: PR35 manual validation kickoff
-# Checkpoint 8: validate detached CAN capture/TX cleanup and connection lifecycle after checkpoint 7.
+# Final validation checkpoint: Android lint, unit tests, instrumentation, build and Windows bridge.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
