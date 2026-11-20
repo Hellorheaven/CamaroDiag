@@ -66,6 +66,9 @@ fun ObdScanScreen(
         }
     }
     val sensorNames = report?.liveData?.associate { it.pid to localizedObdPidName(it) }.orEmpty()
+    val knownPids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42, 0x52)
+    val catalogPids = (knownPids + report?.supportedPids.orEmpty() + report?.liveData.orEmpty().map { it.pid }).distinct().sorted()
+    val measuredPids = report?.liveData.orEmpty().map { it.pid }.toSet()
     var choosingSensors by rememberSaveable(vehicleKey) { mutableStateOf(false) }
     var sensorQuery by rememberSaveable(vehicleKey) { mutableStateOf("") }
     var chosenPids by rememberSaveable(vehicleKey) { mutableStateOf(storedPids.orEmpty()) }
@@ -86,25 +89,31 @@ fun ObdScanScreen(
                         singleLine = true
                     )
                     LazyColumn {
-                        items(report.liveData.filter {
-                            it.pid.toString(16).contains(sensorQuery, ignoreCase = true) ||
-                                sensorNames[it.pid].orEmpty().contains(sensorQuery, ignoreCase = true)
-                        }, key = { it.pid }) { sensor ->
+                        items(catalogPids.filter { pid ->
+                            pid.toString(16).contains(sensorQuery, ignoreCase = true) ||
+                                sensorNames[pid].orEmpty().contains(sensorQuery, ignoreCase = true)
+                        }, key = { it }) { pid ->
                             Row(
-                                modifier = Modifier.fillMaxWidth().clickable {
-                                    pendingPids = if (sensor.pid in pendingPids)
-                                        pendingPids - sensor.pid else pendingPids + sensor.pid
+                                modifier = Modifier.fillMaxWidth().clickable(enabled = pid in measuredPids) {
+                                    pendingPids = if (pid in pendingPids)
+                                        pendingPids - pid else pendingPids + pid
                                 },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Checkbox(
-                                    checked = sensor.pid in pendingPids,
+                                    checked = pid in measuredPids && pid in pendingPids,
+                                    enabled = pid in measuredPids,
                                     onCheckedChange = { checked ->
-                                        pendingPids = if (checked) pendingPids + sensor.pid
-                                            else pendingPids - sensor.pid
+                                        pendingPids = if (checked) pendingPids + pid
+                                            else pendingPids - pid
                                     }
                                 )
-                                Text(sensorNames[sensor.pid].orEmpty())
+                                Column {
+                                    Text(sensorNames[pid] ?: stringResource(R.string.obd_pid_generic, pid))
+                                    if (pid !in measuredPids) {
+                                        Text(stringResource(R.string.obd_sensor_not_measured), color = TextMuted, fontSize = 11.sp)
+                                    }
+                                }
                             }
                         }
                     }
