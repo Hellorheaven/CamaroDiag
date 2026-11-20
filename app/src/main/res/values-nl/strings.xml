@@ -656,4 +656,27 @@
     <string name="cal_ecu_response_addresses_label">Waargenomen functionele OBD-responsadressen (niet aan modules gekoppeld)</string>
     <string name="cal_ecu_identity_limits">Deze standaard OBD-responsen bevestigen geen RPO, transmissie, hardwareonderdeelnummer van de regeleenheid of GM-besturingssysteem. Responsadressen identificeren geen modules. GM-specifieke identificatie vereist geverifieerde voertuigspecifieke documentatie.</string>
     <string name="dtc_vehicle_identity_required">Voertuigspecifieke details zijn verborgen omdat het VIN van de aangesloten ECU niet is gelezen of niet overeenkomt met het geselecteerde voertuig. Lees en controleer het ECU-VIN voordat u deze interpretaties gebruikt.</string>
+    <string name="live_pid_oil">Oliedruk (alleen simulatie)</string>
+    <string name="live_pid_stft_b2">Kortetermijnbrandstofcorrectie bank 2</string>
+    <string name="live_pid_ltft_b2">Langetermijnbrandstofcorrectie bank 2</string>
+    <string name="live_pid_rel_tps">Relatieve gasklepstand</string>
+    <string name="live_pid_cmd_tps">Aangestuurde gasklepstand</string>
+    <string name="live_pid_abs_tps_b">Absolute gasklepstand B</string>
+    <string name="live_pid_abs_tps_c">Absolute gasklepstand C</string>
+    <string name="live_pid_app_d">Gaspedaalstand D</string>
+    <string name="live_pid_app_e">Gaspedaalstand E</string>
+    <string name="live_pid_app_f">Gaspedaalstand F</string>
+    <string name="live_pid_abs_load">Absolute motorbelasting</string>
+    <string name="live_pid_ambient">Omgevingstemperatuur</string>
+    <string name="live_pid_fuel_press">Brandstofdruk</string>
+    <string name="live_pid_timing">Ontstekingsvervroeging</string>
+    <string name="live_pid_eq_ratio">Gevraagde equivalentieverhouding</string>
+    <string name="live_pid_o2_b1s1">Zuurstofsensor B1S1 spanning</string>
+    <string name="live_pid_o2_b1s2">Zuurstofsensor B1S2 spanning</string>
+    <string name="live_pid_o2_b1s3">Zuurstofsensor B1S3 spanning</string>
+    <string name="live_pid_o2_b1s4">Zuurstofsensor B1S4 spanning</string>
+    <string name="live_pid_wbo2_b1s1">Breedband-lambdasonde B1S1</string>
+    <string name="live_pid_wbo2_b1s2">Breedband-lambdasonde B1S2</string>
+    <string name="live_pid_wbo2_b2s1">Breedband-lambdasonde B2S1</string>
+    <string name="live_pid_wbo2_b2s2">Breedband-lambdasonde B2S2</string>
 </resources>
