@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Fráma reoite</string>
     <string name="obd_raw_scan_log">Loga scanadh amh</string>
     <string name="obd_powertrain_ecm">Córas tiomána / ECM</string>
+    <string name="vehicle_setup_header">Cumraíocht feithicle</string>
+    <string name="vehicle_generation">Glúin</string>
+    <string name="vehicle_model_year">Bliain mhúnla</string>
+    <string name="vehicle_engine">Inneall</string>
+    <string name="vehicle_transmission">Tarchur</string>
+    <string name="vehicle_market_region">Réigiún margaidh</string>
+    <string name="vehicle_vin">VIN na feithicle</string>
+    <string name="obd_scan_title">SCANADH OBD-II IOMLÁN</string>
+    <string name="obd_readiness">Ullmhacht OBD</string>
+    <string name="obd_mode06_results">Torthaí mhód 06</string>
 </resources>
