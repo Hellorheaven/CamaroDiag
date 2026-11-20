@@ -646,7 +646,7 @@
     <string name="can_sniffer_title">Live CAN Monitor</string>
     <string name="can_sniffer_description">Capture CAN frames on a real compatible ELM or STN adapter. Each capture stops automatically after a short session.</string>
     <string name="can_sniffer_safety">Only read-only OBD-II requests are accepted. Arbitrary CAN frames and UDS write services are blocked.</string>
-    <string name="can_sniffer_start">Start 10-second capture</string>
+    <string name="can_sniffer_start">Start capture</string>
     <string name="can_sniffer_stop">Stop capture</string>
     <string name="can_sniffer_request_label">Read-only OBD-II request (hex)</string>
     <string name="can_sniffer_request_examples">Examples: 01 0C (RPM), 09 02 (VIN), 03 / 07 / 0A (read DTCs). Clear codes is not allowed.</string>
