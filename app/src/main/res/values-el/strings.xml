@@ -768,4 +768,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">ΠΡΟΣΟΜΟΙΩΣΗ: αυτά τα αναγνωριστικά ECU δεν διαβάστηκαν από πραγματικό όχημα και δεν μπορούν να επικυρώσουν το υλικολογισμικό του.</string>
     <string name="cal_expert_block_memory_map">Δεν έχει επαληθευτεί ο χάρτης μνήμης στόχου και οι προστατευμένες περιοχές.</string>
     <string name="flexfuel_preflight_backup">Το αρχικό αντίγραφο ασφαλείας ECU δεν έχει επαληθευτεί.</string>
+    <string name="cal_expert_title">Λειτουργία ειδικού — ECU σε πάγκο / μικροκύκλωμα</string>
+    <string name="cal_expert_expand">Ρύθμιση λειτουργίας ειδικού</string>
+    <string name="cal_expert_collapse">Απόκρυψη ρυθμίσεων ειδικού</string>
+    <string name="cal_expert_family">Οικογένεια ελεγκτή (E39 ή E39A)</string>
+    <string name="cal_expert_chip">Σήμανση μικροκυκλώματος που παρατηρήθηκε</string>
+    <string name="cal_expert_programmer">Προγραμματιστής πάγκου / διασύνδεση</string>
+    <string name="cal_expert_access_title">Μέθοδος πρόσβασης</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Εξωτερική μνήμη, αφαιρεμένο μικροκύκλωμα</string>
+    <string name="cal_expert_region_title">Περιοχή μνήμης</string>
+    <string name="cal_expert_region_pflash">Εσωτερική μνήμη flash προγράμματος MCU</string>
+    <string name="cal_expert_region_dflash">Μνήμη flash δεδομένων MCU</string>
+    <string name="cal_expert_region_eeprom">Εξωτερική EEPROM</string>
+    <string name="cal_expert_blockers">Εκκρεμείς έλεγχοι ειδικού</string>
+    <string name="cal_expert_block_controller">Επαληθεύστε την ακριβή οικογένεια ελεγκτή (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Προσδιορίστε τη φυσική σήμανση του MCU ή του τσιπ μνήμης.</string>
+    <string name="cal_expert_block_programmer">Προσδιορίστε συμβατό προγραμματιστή πάγκου.</string>
+    <string name="cal_expert_block_image_missing">Εισαγάγετε μη κενή εικόνα υλικολογισμικού.</string>
+    <string name="cal_expert_block_image_format">Για αυτή την προετοιμασία απαιτείται ακατέργαστο δυαδικό αρχείο.</string>
 </resources>
