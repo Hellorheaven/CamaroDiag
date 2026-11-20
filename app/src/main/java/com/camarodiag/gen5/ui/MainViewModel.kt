@@ -1461,7 +1461,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Cancels monitor capture; the transport sends ESC in a non-cancellable cleanup block. */
     fun stopCanMonitor() {
-        canMonitorJob?.cancel()
+        val activeJob = canMonitorJob ?: return
+        activeJob.cancel()
+        // Do not detach here: the capture cleanup must send ESC before a
+        // new request is allowed to take over the adapter command channel.
     }
 
     /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
