@@ -50,4 +50,14 @@
     <string name="obd_readiness">OBD valmisolek</string>
     <string name="obd_mode06_results">Režiimi 06 tulemused</string>
     <string name="system_language_follow_phone">Kasuta telefoni keelt</string>
+    <string name="settings_current_vehicle">Praegune sõiduk</string>
+    <string name="settings_current_adapter">OBD-II ühendus</string>
+    <string name="adapter_section_title">Bluetooth OBD-II adapter ja CAN-sond</string>
+    <string name="paired_bluetooth_devices">Seotud Bluetooth-seadmed</string>
+    <string name="usb_devices_detected">Leitud USB-seadmed</string>
+    <string name="usb_none_detected">USB-jadaadapterit ei leitud.</string>
+    <string name="wifi_connection_title">Wi-Fi ELM327 ühendus</string>
+    <string name="adapter_ip_address">Adapteri IP-aadress</string>
+    <string name="adapter_tcp_port">TCP-port (tavaliselt 35000 või 23)</string>
+    <string name="adapter_connect_wifi">Ühenda Wi-Fi kaudu</string>
 </resources>
