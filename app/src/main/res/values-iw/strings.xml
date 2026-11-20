@@ -681,4 +681,15 @@
     <string name="live_pid_wbo2_b1s2">חיישן למבדה רחב סרט B1S2</string>
     <string name="live_pid_wbo2_b2s1">חיישן למבדה רחב סרט B2S1</string>
     <string name="live_pid_wbo2_b2s2">חיישן למבדה רחב סרט B2S2</string>
+    <string name="about_title">אודות CamaroDiag</string>
+    <string name="about_version">גרסה מותקנת: %1$s</string>
+    <string name="about_build">מספר בנייה: %1$d</string>
+    <string name="about_check_updates">בדיקת עדכונים</string>
+    <string name="about_checking">בודק…</string>
+    <string name="about_up_to_date">CamaroDiag מעודכן.</string>
+    <string name="about_update_found">גרסה חדשה זמינה.</string>
+    <string name="about_channel_update_unavailable">קיימת גרסה חדשה יותר, אך לא פורסמה חבילת עדכון לערוץ התקנה זה.</string>
+    <string name="about_check_failed">לא ניתן לבדוק עדכונים. יש לבדוק את החיבור לאינטרנט.</string>
+    <string name="update_install_update">התקנת עדכון</string>
+    <string name="update_version_available">גרסה זמינה: %1$s</string>
 </resources>
