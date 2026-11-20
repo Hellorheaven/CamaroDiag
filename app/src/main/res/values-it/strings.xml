@@ -669,4 +669,27 @@
     <string name="cal_ecu_response_addresses_label">Indirizzi di risposta OBD funzionali rilevati (non associati a centraline)</string>
     <string name="cal_ecu_identity_limits">Queste risposte OBD standard non confermano RPO, trasmissione, codice hardware della centralina o sistema operativo GM. Gli indirizzi di risposta non identificano le centraline. Gli identificativi GM richiedono documentazione verificata specifica del veicolo.</string>
     <string name="dtc_vehicle_identity_required">I dettagli specifici del veicolo sono nascosti perché il VIN della centralina collegata non è stato letto o non corrisponde al veicolo selezionato. Leggi e verifica il VIN della ECU prima di utilizzare queste interpretazioni.</string>
+    <string name="live_pid_oil">Pressione olio (solo simulazione)</string>
+    <string name="live_pid_stft_b2">Correzione carburante breve termine banco 2</string>
+    <string name="live_pid_ltft_b2">Correzione carburante lungo termine banco 2</string>
+    <string name="live_pid_rel_tps">Posizione relativa farfalla</string>
+    <string name="live_pid_cmd_tps">Posizione farfalla comandata</string>
+    <string name="live_pid_abs_tps_b">Posizione assoluta farfalla B</string>
+    <string name="live_pid_abs_tps_c">Posizione assoluta farfalla C</string>
+    <string name="live_pid_app_d">Posizione pedale acceleratore D</string>
+    <string name="live_pid_app_e">Posizione pedale acceleratore E</string>
+    <string name="live_pid_app_f">Posizione pedale acceleratore F</string>
+    <string name="live_pid_abs_load">Carico motore assoluto</string>
+    <string name="live_pid_ambient">Temperatura ambiente</string>
+    <string name="live_pid_fuel_press">Pressione carburante</string>
+    <string name="live_pid_timing">Anticipo accensione</string>
+    <string name="live_pid_eq_ratio">Rapporto di equivalenza richiesto</string>
+    <string name="live_pid_o2_b1s1">Tensione sonda ossigeno B1S1</string>
+    <string name="live_pid_o2_b1s2">Tensione sonda ossigeno B1S2</string>
+    <string name="live_pid_o2_b1s3">Tensione sonda ossigeno B1S3</string>
+    <string name="live_pid_o2_b1s4">Tensione sonda ossigeno B1S4</string>
+    <string name="live_pid_wbo2_b1s1">Sonda lambda a banda larga B1S1</string>
+    <string name="live_pid_wbo2_b1s2">Sonda lambda a banda larga B1S2</string>
+    <string name="live_pid_wbo2_b2s1">Sonda lambda a banda larga B2S1</string>
+    <string name="live_pid_wbo2_b2s2">Sonda lambda a banda larga B2S2</string>
 </resources>
