@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Cóid locht diagnóiseacha</string>
     <string name="obd_adapter_voltage">Voltas an oiriúnaitheora</string>
     <string name="obd_supported_pids">PIDanna tacaithe</string>
+    <string name="obd_ecu_name">Ainm ECU</string>
+    <string name="obd_none_identified">Níor aithníodh aon cheann</string>
+    <string name="obd_data_unavailable">Níl sonraí ar fáil</string>
+    <string name="obd_returned_live_data">Sonraí beo faighte</string>
+    <string name="obd_pending">Ar feitheamh</string>
+    <string name="obd_permanent">Buan</string>
+    <string name="obd_confirmed">Deimhnithe</string>
+    <string name="obd_freeze_frame">Fráma reoite</string>
+    <string name="obd_raw_scan_log">Loga scanadh amh</string>
+    <string name="obd_powertrain_ecm">Córas tiomána / ECM</string>
 </resources>
