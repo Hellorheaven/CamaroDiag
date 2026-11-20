@@ -687,4 +687,26 @@
     <string name="update_install_update">更新をインストール</string>
     <string name="update_version_available">利用可能なバージョン: %1$s</string>
     <string name="system_language_follow_phone">端末の言語を使用</string>
+    <string name="can_sniffer_raw_heading">CANアダプターの生出力</string>
+    <string name="can_sniffer_export_raw">生ログをエクスポート</string>
+    <string name="can_sniffer_dtc_heading">検出されたOBD-II故障コード</string>
+    <string name="connection_lost_bluetooth">Bluetooth接続が切断されました。アダプターを再接続して操作をやり直してください。</string>
+    <string name="connection_lost_vehicle">車両との接続が切断されました。再接続して操作をやり直してください。</string>
+    <string name="connection_lost_usb">USBアダプターが切断されました。再接続して操作をやり直してください。</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi接続が切断されました。アダプターを再接続して操作をやり直してください。</string>
+    <string name="connection_lost_pc_bridge">PC診断ブリッジとの接続が切断されました。再接続して操作をやり直してください。</string>
+    <string name="live_sensor_search">センサーを検索</string>
+    <string name="live_sensor_show_all">すべてのセンサーを表示</string>
+    <string name="can_console_history">統合CANコンソール履歴</string>
+    <string name="can_console_clear">履歴を消去</string>
+    <string name="can_console_empty">通信履歴はまだありません。受信・送信データはここに表示されます。</string>
+    <string name="can_console_tx">TX • 送信済み</string>
+    <string name="can_console_rx">RX • 受信済み</string>
+    <string name="can_console_system">システム</string>
+    <string name="can_console_input_label">CANフレームまたはOBDコマンド</string>
+    <string name="can_console_sending">送信中…</string>
+    <string name="obd_dtc_help_unavailable">この故障コードと車両について検証済みの診断手順はまだありません。修理前にメーカーの整備資料を確認してください。</string>
+    <string name="cal_expert_no_write">対応するベンチドライバーの実装と検証が完了するまで書き込みは利用できません。</string>
+    <string name="flexfuel_preflight_write">ECUキャリブレーションの書き込みは未検証のため無効です。</string>
+    <string name="status_not_implemented">未実装</string>
 </resources>
