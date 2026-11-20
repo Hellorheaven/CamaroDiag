@@ -42,3 +42,9 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Tests ECU supplémentaires : chevauchement d'adresses refusé à l'export, corruption des octets primaires dans le ZIP refusée à l'import (`464ec1e`).
 - Audit partiel : 821 ressources EN et FR ; certaines locales historiques comptent 664 ressources, plusieurs locales nouvelles n'en avaient que 7 avant cette passe. **La couverture complète de 821 traductions dans toutes les locales n'est pas achevée.**
 - Validation CI/Android/Windows du dernier HEAD **non confirmée**. Conserver la PR Draft. Ne pas fusionner avant validation complète de #63/#71 et des builds.
+
+## Validation préliminaire supplémentaire — archive hors ligne
+- `808c45c` : refuse les archives vides et les propriétés de manifeste inconnues, afin d'éviter les fausses sauvegardes et les métadonnées silencieusement ignorées.
+- `7149284` : tests unitaires correspondants.
+- Vérification des statuts GitHub et workflows sur `7149284` : aucun statut ni workflow PR retourné. **Aucun build exécuté ou réussi n'est confirmé**.
+- La PR reste ouverte et non fusionnée ; internationalisation exhaustive et validation Android/Windows encore incomplètes.
