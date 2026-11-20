@@ -119,6 +119,14 @@
     <string name="guide_vlinker_description">High-throughput reliability on powertrain/ABS HS-CAN (500 kbps). The vLinker MC+ also supports GMLAN SW-CAN.</string>
     <string name="guide_clone_limitations">3. Limitations of Generic ELM327 v2.1 Clones</string>
     <string name="guide_clone_description">Low-cost blue/mini ELM327 clones lack physical transceivers on Pin 1 (SW-CAN), suffer from truncated RX buffers, and often fail extended CAN header addressing. Module access always depends on vehicle equipment, adapter hardware, and supported protocols.</string>
+    <string name="about_title">About CamaroDiag</string>
+    <string name="about_version">Installed version: %1$s</string>
+    <string name="about_build">Build number: %1$d</string>
+    <string name="about_check_updates">Check for updates</string>
+    <string name="about_checking">Checking…</string>
+    <string name="about_up_to_date">CamaroDiag is up to date.</string>
+    <string name="about_update_found">A new version is available.</string>
+    <string name="about_check_failed">Could not check for updates. Check your Internet connection.</string>
     <string name="settings_title">Settings &amp; Saved Reports</string>
     <string name="settings_unit_system">Measurement Units</string>
     <string name="settings_saved_sessions">Saved Diagnostic Sessions (Local Room DB)</string>
