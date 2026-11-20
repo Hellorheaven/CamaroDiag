@@ -265,7 +265,7 @@ class BluetoothObdManager(context: Context) {
             }
             val engine = Obd2FeatureEngine(
                 ObdCommandChannel { command, timeoutMs ->
-                    sendAtCommandInternal(command, timeoutMs)
+                    sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
                 }
             )
             return block(engine)
@@ -477,7 +477,7 @@ class BluetoothObdManager(context: Context) {
                 // Adapter probing calls this before capability detection has cleared
                 // demo mode. The epoch check is valid here; a channel-available
                 // check would incorrectly reject every initial ATZ/0100 probe.
-                sendAtCommandInternal(command, timeoutMs)
+                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
             }
         }
     }
@@ -485,10 +485,13 @@ class BluetoothObdManager(context: Context) {
     private suspend fun sendAtCommandInternal(
         command: String,
         timeoutMs: Long,
+        expectedEpoch: Long? = null,
         onChunk: ((String) -> Unit)? = null
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
-            val sessionEpoch = transportSessionEpoch.capture()
+            // The operation may have waited on the command mutex across a reconnect.
+            if (expectedEpoch != null) transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
+            val sessionEpoch = expectedEpoch ?: transportSessionEpoch.capture()
             val sessionTransport = activeTransport
             fun ensureSameSession() {
                 transportSessionEpoch.requireCurrent(sessionEpoch)
