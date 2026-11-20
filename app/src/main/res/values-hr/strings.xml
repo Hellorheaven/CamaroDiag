@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Unesite stvarni VIN; ogledni VIN ne stvara se.</string>
     <string name="status_not_verified">NIJE PROVJERENO</string>
     <string name="adapter_discovery_only">SAMO OTKRIVANJE</string>
+    <string name="can_sniffer_raw_heading">Neobrađeni izlaz CAN adaptera</string>
+    <string name="can_sniffer_export_raw">Izvezi sirovi zapis</string>
+    <string name="can_sniffer_dtc_heading">Uočeni OBD-II kodovi grešaka</string>
+    <string name="connection_lost_bluetooth">Bluetooth veza je izgubljena. Ponovno spojite adapter i pokrenite postupak.</string>
+    <string name="connection_lost_vehicle">Veza s vozilom je izgubljena. Ponovno se spojite i pokrenite postupak.</string>
+    <string name="connection_lost_usb">USB adapter je odspojen. Ponovno ga spojite i pokrenite postupak.</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi veza je izgubljena. Ponovno spojite adapter i pokrenite postupak.</string>
+    <string name="connection_lost_pc_bridge">Veza s dijagnostičkim PC mostom je izgubljena. Ponovno spojite most i pokrenite postupak.</string>
+    <string name="live_sensor_search">Traži senzore</string>
+    <string name="live_sensor_show_all">Prikaži sve senzore</string>
+    <string name="can_console_history">Objedinjena povijest CAN konzole</string>
+    <string name="can_console_clear">Izbriši povijest</string>
+    <string name="can_console_empty">Još nema prometa. Primljeni i poslani podaci pojavit će se ovdje.</string>
+    <string name="can_console_tx">TX • POSLANO</string>
+    <string name="can_console_rx">RX • PRIMLJENO</string>
+    <string name="can_console_system">SUSTAV</string>
+    <string name="can_console_input_label">CAN okvir ili OBD naredba</string>
+    <string name="can_console_sending">Slanje…</string>
+    <string name="obd_dtc_help_unavailable">Za ovaj kod greške i vozilo još nema provjerenih uputa za otklanjanje kvara. Prije popravka pogledajte servisne podatke proizvođača.</string>
+    <string name="cal_expert_no_write">Programiranje nije dostupno dok se ne implementira i provjeri podržani upravljački program za rad na stolu.</string>
+    <string name="flexfuel_preflight_write">Upis kalibracije ECU-a nije potvrđen i ostaje onemogućen.</string>
+    <string name="status_not_implemented">NIJE IMPLEMENTIRANO</string>
 </resources>
