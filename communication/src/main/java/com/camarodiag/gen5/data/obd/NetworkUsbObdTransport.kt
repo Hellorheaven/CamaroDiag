@@ -82,10 +82,12 @@ class ElmUsbTransport(private val context: Context) {
             // the USB device handle, including missing-port and serial-open errors.
             connection = conn
 
-            val serial = driver.ports.firstOrNull()
-                ?: return@withContext Result.failure(
+            val serial = driver.ports.firstOrNull() ?: run {
+                close()
+                return@withContext Result.failure<Unit>(
                     IllegalStateException("No USB serial port")
-                ).also { close() }
+                )
+            }
 
             port = serial
             serial.open(conn)
