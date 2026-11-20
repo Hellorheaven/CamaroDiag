@@ -55,3 +55,7 @@
 - « Mon compte » permet de lier Google et e-mail pour une même adresse, ou de demander la suppression du compte après confirmation.
 - La session est vérifiée auprès de Firebase ; en cas de coupure réseau, l'utilisation hors ligne est limitée à sept jours depuis la dernière validation en ligne.
 - La suppression confirmée par Firebase efface le garage et l'historique local associés au compte concerné, sans toucher aux comptes des autres utilisateurs.
+- Les importations interrompues d'anciens véhicules peuvent être relancées sans créer de doublons.
+- Les diagnostics enregistrés, les lectures DTC, l'identification ECU et l'audit kilométrique restent liés au compte utilisateur qui a lancé l'opération.
+- Une validation Firebase renouvelée pendant l'utilisation n'interrompt plus inutilement les diagnostics tant que la session reste autorisée.
+- Une réponse de validation de session arrivée trop tard ne peut plus remplacer une vérification plus récente.
