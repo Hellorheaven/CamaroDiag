@@ -332,7 +332,8 @@ jobs:
 
   windows-debug-validation:
     needs: [evaluate-build-checkpoint, build-windows-debug]
-    if: always() && github.event_name == 'workflow_dispatch'
+    # Report an explicit result on PRs as well as manual executions.
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Report Windows Debug validation applicability
