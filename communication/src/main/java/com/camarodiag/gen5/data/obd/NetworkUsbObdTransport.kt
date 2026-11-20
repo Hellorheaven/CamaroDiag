@@ -38,6 +38,7 @@ class ElmUsbTransport(private val context: Context) {
         deviceId: Int,
         baudRate: Int = 38400
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        close()
         try {
             val driver = UsbSerialProber.getDefaultProber()
                 .findAllDrivers(usbManager)
@@ -112,7 +113,7 @@ class ElmUsbTransport(private val context: Context) {
         try {
             activePort.write(data, 1500)
         } catch (error: java.io.IOException) {
-            connectionLost = true
+            if (port === activePort) connectionLost = true
             throw error
         }
     }
@@ -124,10 +125,10 @@ class ElmUsbTransport(private val context: Context) {
         }
         return try {
             activePort.read(buffer, timeoutMs).also { count ->
-                if (count < 0) connectionLost = true
+                if (count < 0 && port === activePort) connectionLost = true
             }
         } catch (error: java.io.IOException) {
-            connectionLost = true
+            if (port === activePort) connectionLost = true
             throw error
         }
     }
@@ -167,10 +168,10 @@ class ElmWifiTransport {
             close()
 
             val s = Socket()
+            // Publish the socket before connect so a failed attempt can close it.
+            socket = s
             s.connect(InetSocketAddress(host, port), timeoutMs)
             s.soTimeout = 1200
-
-            socket = s
             connectionLost = false
 
             Result.success(Unit)
@@ -186,7 +187,7 @@ class ElmWifiTransport {
         try {
             activeSocket.getOutputStream().write(data)
         } catch (error: java.io.IOException) {
-            connectionLost = true
+            if (socket === activeSocket) connectionLost = true
             throw error
         }
     }
@@ -198,13 +199,13 @@ class ElmWifiTransport {
         }
         return try {
             activeSocket.getInputStream().read(buffer).also { count ->
-                if (count < 0) connectionLost = true
+                if (count < 0 && socket === activeSocket) connectionLost = true
             }
         } catch (timeout: java.net.SocketTimeoutException) {
             // A read timeout is normal while waiting for the ELM prompt.
             throw timeout
         } catch (error: java.io.IOException) {
-            connectionLost = true
+            if (socket === activeSocket) connectionLost = true
             throw error
         }
     }
