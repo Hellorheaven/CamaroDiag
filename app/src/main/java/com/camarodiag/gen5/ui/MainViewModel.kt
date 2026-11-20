@@ -1210,16 +1210,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendRawCanFrame(frame)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val rxEvent = CanConsoleHistoryEntry(
+                    val adapterAck = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
-                        direction = "RX",
+                        direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = response.ifBlank { "No response text returned by adapter." }
+                        content = getApplication<Application>().getString(
+                            R.string.can_console_adapter_ack,
+                            response.ifBlank { "No adapter text returned" }
+                        )
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         requestResponse = response,
-                        consoleHistory = (current.consoleHistory + rxEvent).takeLast(300),
+                        consoleHistory = (current.consoleHistory + adapterAck).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
                 }
