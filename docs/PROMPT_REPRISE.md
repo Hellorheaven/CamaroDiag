@@ -203,6 +203,12 @@ Respecter les dépendances précisées dans ce document et ouvrir une PR distinc
 - Les instructions README Android/Windows renvoient à présent vers les APK et installateurs des Releases, plutôt que vers les artefacts Debug et les archives de développement.
 - Les travaux sont présents sur PR #35 mais **ne doivent pas être annoncés comme validés** : aucun build, test unitaire, lint ou essai véhicule n'a été exécuté sur le SHA courant depuis ces corrections.
 
+**Authentification et isolation des sessions — 20 novembre 2026**
+- Vérification GitHub : l'issue #53 concerne bien la connexion Google et e-mail/mot de passe ; `CamaroAuthGate.kt`, `MainActivity.kt`, les dépendances Firebase, les configurations Debug/Release et les clients OAuth sont présents sur la branche PR #35. Les parcours Mon compte, association des véhicules, validation des deux signatures et tests réels restent à confirmer ; l'issue demeure ouverte.
+- Le développement de la console CAN a repris en évitant les fichiers d'authentification simultanément modifiés dans l'autre conversation.
+- Les commandes OBD en attente, les opérations multicommandes, le monitor CAN, l'envoi CAN brut et leur nettoyage sont liés à l'identité de la session initiale ; une reconnexion ne doit pas déclencher de commande tardive sur l'adaptateur suivant.
+- Tests de classification d'anciennes sessions ajoutés, **mais non exécutés**. Aucun build/lint de validation confirmé sur le head actuel. PR #35 toujours Draft, non fusionnée.
+
 **Documentation utilisateur**
 - Guides réécrits : analyse de traces CAN/UDS, utilisation ELM327, disponibilité des signaux Camaro et matrice de compatibilité Camaro/adaptateurs.
 - README complété avec des liens vers les guides.
