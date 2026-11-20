@@ -49,9 +49,13 @@ object Lfx2012ProgrammingAudit {
         }
         val vinChanged = !before.vin.isNullOrBlank() && !after.vin.isNullOrBlank() &&
             !before.vin.equals(after.vin, ignoreCase = true)
-        val hasUnavailable = original.any { it.status == CheckStatus.UNAVAILABLE } ||
-            current.any { it.status == CheckStatus.UNAVAILABLE }
+        val hasUnavailable = original.any {
+            it.status == CheckStatus.UNAVAILABLE || it.status == CheckStatus.NOT_PERFORMED
+        } || current.any {
+            it.status == CheckStatus.UNAVAILABLE || it.status == CheckStatus.NOT_PERFORMED
+        }
         val requiresReview = vinChanged ||
+            after.capturedAtUtcMillis <= before.capturedAtUtcMillis ||
             original.any { it.status == CheckStatus.REQUIRES_REVIEW } ||
             current.any { it.status == CheckStatus.REQUIRES_REVIEW }
         return Report(
