@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import androidx.credentials.exceptions.NoCredentialException
 import android.content.Context
-import android.os.Build
 import androidx.core.content.edit
 import com.google.firebase.FirebaseNetworkException
 import androidx.credentials.ClearCredentialStateRequest
