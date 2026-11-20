@@ -7,6 +7,7 @@ plugins {
     id("org.jetbrains.kotlin.android") 
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
 }
 
 val appVersionProperties = Properties().apply {
@@ -96,6 +97,23 @@ android {
         jvmTarget = "17"
     }
 
+    lint {
+        // FR and EN are the maintained locales for this development phase.
+        // Older bundled languages intentionally fall back to English for new keys.
+        // CI separately verifies complete French/default resource key parity.
+        disable += setOf("MissingTranslation", "ExtraTranslation")
+    }
+
+    packaging {
+        jniLibs {
+            // These third-party binaries are distributed without strippable debug symbols.
+            keepDebugSymbols += setOf(
+                "**/libandroidx.graphics.path.so",
+                "**/libmlkit_google_ocr_pipeline.so"
+            )
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -122,7 +140,13 @@ dependencies {
     implementation(project(":control"))
     implementation(project(":mileageaudit"))
     implementation("androidx.core:core-ktx:1.16.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("com.google.mlkit:text-recognition:16.0.1")
@@ -140,6 +164,7 @@ dependencies {
 
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.05.01"))

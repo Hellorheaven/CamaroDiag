@@ -14,6 +14,10 @@ internal static class Program
             return 2;
         }
 
+        // Offline, no-driver validation for Windows CI. Never starts a bridge listener.
+        if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
+            return BridgeSelfTests.Run();
+
         if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
         var adapters = J2534Registry.Discover();

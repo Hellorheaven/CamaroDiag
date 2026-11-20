@@ -23,10 +23,18 @@ class J2534BridgeTransport(
     private val pairingToken: String
 ) : UdsPayloadTransport {
     private val mutex = Mutex()
-    private var socket: Socket? = null
+    @Volatile private var socket: Socket? = null
     private var reader: BufferedReader? = null
     private var writer: BufferedWriter? = null
-    private var opened = false
+    @Volatile private var opened = false
+    /** Close requested by the app, not a spontaneous I/O failure of the bridge. */
+    @Volatile private var externallyClosed = false
+
+    /** Reflects a live TCP session rather than just an allocated transport object. */
+    val isConnected: Boolean
+        get() = opened && socket?.let {
+            it.isConnected && !it.isClosed && !it.isInputShutdown && !it.isOutputShutdown
+        } == true
 
     suspend fun connect(
         requestCanId: Int,
@@ -36,6 +44,7 @@ class J2534BridgeTransport(
     ): String = withContext(Dispatchers.IO) {
         mutex.withLock {
             closeInternal()
+            externallyClosed = false
             require(host.isNotBlank()) { "Adresse IP du PC manquante." }
             require(port in 1024..65535) { "Port du pont PC invalide." }
             require(pairingToken.isNotBlank()) { "Jeton d'appairage du pont PC manquant." }
@@ -49,10 +58,12 @@ class J2534BridgeTransport(
             }
             try {
                 val connected = Socket()
+                // Track the descriptor before connect: the failure path must
+                // close it even when TCP establishment never completes.
+                socket = connected
                 connected.tcpNoDelay = true
                 connected.connect(InetSocketAddress(host, port), 5000)
                 connected.soTimeout = 12_000
-                socket = connected
                 reader = BufferedReader(InputStreamReader(connected.getInputStream(), Charsets.UTF_8))
                 writer = BufferedWriter(OutputStreamWriter(connected.getOutputStream(), Charsets.UTF_8))
                 val response = request(
@@ -78,8 +89,8 @@ class J2534BridgeTransport(
     override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            require(payload.isNotEmpty())
-            val boundedTimeout = timeoutMs.coerceIn(100L, 10_000L).toInt()
+            require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
+            val boundedTimeout = J2534BridgeProtocol.boundedTimeoutMs(timeoutMs)
             socket?.soTimeout = boundedTimeout + 3000
             val response = request(
                 JSONObject()
@@ -90,24 +101,28 @@ class J2534BridgeTransport(
                 boundedTimeout + 3000
             )
             val hex = response.optString("payloadHex")
-            require(hex.isNotBlank() && hex.length % 2 == 0) { "Réponse UDS vide ou mal formée du pont J2534." }
-            try { hex.hexToBytes() } catch (error: IllegalArgumentException) {
-                throw IllegalStateException("Le pont J2534 a retourné une réponse hexadécimale invalide.", error)
+            if (hex.isBlank() || hex.length % 2 != 0 || hex.length > 8190 ||
+                !hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }
+            ) {
+                closeInternal()
+                throw IllegalStateException("Réponse UDS vide, trop longue ou mal formée du pont J2534.")
             }
+            hex.hexToBytes()
         }
     }
 
     override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            require(payload.isNotEmpty())
-            socket?.soTimeout = 3000
+            require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
+            val boundedTimeout = timeoutMs.coerceIn(100L, 10_000L).toInt()
             request(
                 JSONObject()
                     .put("op", "sendOnly")
                     .put("token", pairingToken)
-                    .put("payloadHex", payload.toHex()),
-                2000
+                    .put("payloadHex", payload.toHex())
+                    .put("timeoutMs", boundedTimeout),
+                boundedTimeout + 3000
             )
             Unit
         }
@@ -118,11 +133,26 @@ class J2534BridgeTransport(
         activeSocket.soTimeout = timeoutMs.coerceIn(1000, 15_000)
         val output = writer ?: error("Canal d'écriture du pont PC indisponible.")
         val input = reader ?: error("Canal de lecture du pont PC indisponible.")
-        output.write(json.toString())
-        output.newLine()
-        output.flush()
-        val line = input.readLine() ?: error("Le pont PC a fermé la connexion.")
-        val response = JSONObject(line)
+        val line = try {
+            output.write(json.toString())
+            output.newLine()
+            output.flush()
+            J2534BridgeProtocol.readBoundedLine(input)
+                ?: throw java.io.EOFException("Le pont PC a fermé la connexion.")
+        } catch (error: Exception) {
+            val wasClosedByApp = externallyClosed
+            closeInternal()
+            // Closing the old PC bridge intentionally during a reconnect can
+            // break a blocked read. Do not report that error against the new bridge.
+            if (wasClosedByApp) throw ObdSupersededSessionException(error)
+            throw error
+        }
+        val response = try {
+            JSONObject(line)
+        } catch (error: Exception) {
+            closeInternal()
+            throw IllegalStateException("Le pont J2534 a retourné une réponse JSON invalide.", error)
+        }
         if (!response.optBoolean("ok", false)) {
             throw IllegalStateException(response.optString("error", "Erreur inconnue du pont J2534."))
         }
@@ -130,12 +160,13 @@ class J2534BridgeTransport(
     }
 
     private fun ensureOpen() {
-        check(opened && socket?.isConnected == true && socket?.isClosed == false) {
+        check(isConnected) {
             "Connecte d'abord le pont PC J2534."
         }
     }
 
     fun close() {
+        externallyClosed = true
         closeInternal()
     }
 
@@ -156,4 +187,30 @@ class J2534BridgeTransport(
 
     private fun String.hexToBytes(): ByteArray =
         chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+}
+
+/** Bounded framing helpers for the untrusted JSON-lines PC bridge stream. */
+internal object J2534BridgeProtocol {
+    private const val MAX_RESPONSE_LINE_CHARS = 32 * 1024
+
+    fun boundedTimeoutMs(timeoutMs: Long): Int = timeoutMs.coerceIn(100L, 10_000L).toInt()
+
+    fun readBoundedLine(input: BufferedReader): String? {
+        val line = StringBuilder()
+        while (true) {
+            val next = input.read()
+            if (next == -1) {
+                if (line.isEmpty()) return null
+                break
+            }
+            if (next == '\n'.code) break
+            if (next != '\r'.code) {
+                check(line.length < MAX_RESPONSE_LINE_CHARS) {
+                    "The J2534 bridge response exceeds the maximum allowed line size."
+                }
+                line.append(next.toChar())
+            }
+        }
+        return line.toString()
+    }
 }

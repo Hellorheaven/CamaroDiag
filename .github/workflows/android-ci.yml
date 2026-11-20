@@ -1,53 +1,271 @@
-name: Android validation (manual)
+name: Android CI
+# Manual full validation is available on demand; draft validation remains checkpointed.
 
+# Intentionally no push or pull_request trigger.
+# Validation is started manually at the 50-commit checkpoint, not per commit.
 on:
   workflow_dispatch:
-
-permissions:
-  contents: read
+    inputs:
+      target_ref:
+        description: "Branch or commit to validate"
+        required: true
+        default: "feat/live-can-monitor"
+        type: string
+      pr_number:
+        description: "Pull request number (optional)"
+        required: false
+        type: string
 
 concurrency:
-  group: android-manual-${{ github.ref }}
-  cancel-in-progress: false
+  group: android-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || inputs.target_ref || 'manual' }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
 
 jobs:
-  test-and-build:
+  evaluate-build-checkpoint:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
+    outputs:
+      validated_sha: ${{ steps.resolve_revision.outputs.sha }}
+      android_changed: ${{ steps.android_changes.outputs.android_changed }}
+      current_android_changed: ${{ steps.android_changes.outputs.current_android_changed }}
+      build_required: ${{ steps.checkpoint.outputs.build_required }}
+      android_validation_applies: ${{ steps.checkpoint.outputs.validation_applies }}
+      commits_since_build: ${{ steps.checkpoint.outputs.commits_since_build }}
+      interval: ${{ steps.checkpoint.outputs.interval }}
     steps:
-      - name: Checkout selected branch
+      - name: Checkout pull request history
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Capture exact checked-out revision
+        id: resolve_revision
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Detect Android-relevant changes
+        id: android_changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          BASE_SHA="${BASE_SHA:-$(git merge-base origin/main HEAD)}"
+          HEAD_SHA="${HEAD_SHA:-$(git rev-parse HEAD)}"
+          paths=(
+            'app/**' 'core/**' 'diagnostic/**' 'communication/**'
+            'control/**' 'mileageaudit/**' 'storage/**' 'third_party/**'
+            'build.gradle' 'build.gradle.kts' 'settings.gradle' 'settings.gradle.kts'
+            '*.gradle' '*.gradle.kts' 'gradle.properties' 'gradle/**'
+            'gradlew' 'gradlew.bat' 'version.properties'
+            '.github/workflows/android-ci.yml'
+          )
+          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"; then
+            echo "android_changed=false" >> "$GITHUB_OUTPUT"
+            echo "NOT APPLICABLE: no Android source, resource, module, or Gradle build changes."
+          else
+            echo "android_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Android-relevant changes detected:"
+            git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
+          fi
+          if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- "${paths[@]}"; then
+            echo "current_android_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "current_android_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Current commit contains Android-relevant changes."
+          fi
+
+      - name: Find last completed Android Debug validation attempt
+        id: previous_build
+        if: steps.android_changes.outputs.android_changed == 'true' && github.event.pull_request.draft
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: 'android-ci.yml', branch: pr.head.ref,
+              event: 'pull_request', status: 'completed', per_page: 100
+            });
+            const candidates = runs
+              .filter(run => run.head_sha !== pr.head.sha &&
+                (run.pull_requests || []).some(item => item.number === pr.number))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            let previous = null;
+            for (const candidate of candidates) {
+              const jobs = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner, repo: context.repo.repo,
+                run_id: candidate.id, per_page: 100
+              });
+              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.status === 'completed')) {
+                previous = candidate;
+                break;
+              }
+            }
+            core.setOutput('sha', previous ? previous.head_sha : '');
+            core.info(previous
+              ? 'Last completed Android Debug validation attempt: ' + previous.head_sha
+              : 'No previous completed Android Debug validation attempt; counting relevant commits from the PR base.');
+
+      - name: Evaluate Android-only periodic build checkpoint
+        id: checkpoint
+        shell: bash
+        env:
+          BUILD_INTERVAL: ${{ vars.CAMARODIAG_DRAFT_BUILD_INTERVAL }}
+          ANDROID_CHANGED: ${{ steps.android_changes.outputs.android_changed }}
+          CURRENT_ANDROID_CHANGED: ${{ steps.android_changes.outputs.current_android_changed }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_NAME: ${{ github.event_name }}
+          PREVIOUS_BUILD_SHA: ${{ steps.previous_build.outputs.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          BASE_SHA="${BASE_SHA:-$(git merge-base origin/main HEAD)}"
+          HEAD_SHA="${HEAD_SHA:-$(git rev-parse HEAD)}"
+          configured="${BUILD_INTERVAL:-}"
+          if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
+          echo "interval=$interval" >> "$GITHUB_OUTPUT"
+          if [[ "$ANDROID_CHANGED" != "true" ]]; then
+            echo "validation_applies=false" >> "$GITHUB_OUTPUT"
+            echo "build_required=false" >> "$GITHUB_OUTPUT"
+            echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
+            echo "NOT APPLICABLE: this PR contains no Android-relevant changes."
+            exit 0
+          fi
+
+          count_base="$BASE_SHA"
+          if [[ -n "$PREVIOUS_BUILD_SHA" ]]; then count_base="$PREVIOUS_BUILD_SHA"; fi
+          paths=(
+            'app/**' 'core/**' 'diagnostic/**' 'communication/**'
+            'control/**' 'mileageaudit/**' 'storage/**' 'third_party/**'
+            'build.gradle' 'build.gradle.kts' 'settings.gradle' 'settings.gradle.kts'
+            '*.gradle' '*.gradle.kts' 'gradle.properties' 'gradle/**'
+            'gradlew' 'gradlew.bat' 'version.properties'
+            '.github/workflows/android-ci.yml'
+          )
+          commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
+          echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
+
+          # Manual dispatch is an explicit request for a complete validation, independent of the 50-commit draft checkpoint.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "Manual Android Debug validation explicitly requested."
+          # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
+          elif [[ "$IS_DRAFT" == "true" ]]; then
+            if [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
+              echo "validation_applies=false" >> "$GITHUB_OUTPUT"
+              echo "build_required=false" >> "$GITHUB_OUTPUT"
+              echo "NOT APPLICABLE to this commit: no Android-relevant files changed."
+            else
+              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+              if (( commits_since_build >= interval )); then
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
+              else
+                echo "build_required=false" >> "$GITHUB_OUTPUT"
+                echo "Android Debug build deferred: $commits_since_build/$interval Android-relevant commits since the last completed attempt."
+              fi
+            fi
+          else
+            case "$EVENT_ACTION" in
+              ready_for_review|opened|reopened)
+                echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "Initial Ready-for-review validation: Android changes exist in the PR."
+                ;;
+              *)
+                if [[ "$CURRENT_ANDROID_CHANGED" == "true" ]]; then
+                  echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+                  echo "build_required=true" >> "$GITHUB_OUTPUT"
+                  echo "Ready PR commit changes Android files: immediate Android Debug validation required."
+                else
+                  echo "validation_applies=false" >> "$GITHUB_OUTPUT"
+                  echo "build_required=false" >> "$GITHUB_OUTPUT"
+                  echo "NOT APPLICABLE to this Ready PR commit: no Android-relevant files changed."
+                fi
+                ;;
+            esac
+          fi
+  test-and-build:
+    needs: evaluate-build-checkpoint
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.evaluate-build-checkpoint.outputs.build_required == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout requested validation commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
+
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
           java-version: '17'
           distribution: temurin
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.11.1'
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: 14742923
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
+
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.11.1
+
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
+
       - name: Upload Android unit-test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-unit-tests-run-${{ github.run_number }}
+          name: CamaroDiag-unit-tests-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha }}
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
           if-no-files-found: ignore
           retention-days: 14
-      - name: Run Android lint
-        run: ./gradlew app:lintDebug --stacktrace --warning-mode=fail
+
+      - name: Require complete French and English resource coverage
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          def keys(path):
+              content = pathlib.Path(path).read_text(encoding="utf-8")
+              return set(re.findall(r'<string\\s+name="([^"]+)"', content))
+
+          english = keys("app/src/main/res/values/strings.xml")
+          french = keys("app/src/main/res/values-fr/strings.xml")
+          missing = sorted(english - french)
+          extra = sorted(french - english)
+          if missing or extra:
+              print("Missing French strings:", ", ".join(missing), file=sys.stderr)
+              print("Orphan French strings:", ", ".join(extra), file=sys.stderr)
+              sys.exit(1)
+          print(f"FR/EN parity verified for {len(english)} strings.")
+          PY
+
+      - name: Run Android lint across every Android module
+        run: ./gradlew lintDebug --stacktrace --warning-mode=fail
+
       - name: Reject Android lint warnings
         shell: bash
         run: |
@@ -55,25 +273,160 @@ jobs:
           import pathlib
           import sys
           import xml.etree.ElementTree as ET
-          report = pathlib.Path("app/build/reports/lint-results-debug.xml")
-          if not report.is_file():
-              print(f"Android lint report missing: {report}", file=sys.stderr)
-              sys.exit(1)
-          root = ET.parse(report).getroot()
-          findings = [issue for issue in root.findall("issue")
-                      if issue.get("severity", "").lower() in {"warning", "error"}]
-          if findings:
-              for issue in findings:
-                  print(f"{issue.get('severity')}: {issue.get('id')}: {issue.get('message')}")
-              sys.exit(1)
-          print("Android lint clean: zero warnings and zero errors.")
+
+          modules = ("app", "core", "diagnostic", "communication", "storage", "control", "mileageaudit")
+          findings = []
+          missing = []
+          for module in modules:
+              report = pathlib.Path(module) / "build/reports/lint-results-debug.xml"
+              if not report.is_file():
+                  missing.append(str(report))
+                  continue
+              root = ET.parse(report).getroot()
+              for issue in root.findall("issue"):
+                  if issue.get("severity", "").lower() in {"warning", "error", "fatal"}:
+                      findings.append((module, issue))
+          for module, issue in findings:
+              print(f"{module}: {issue.get('severity')}: {issue.get('id')}: {issue.get('message')}")
+          for report in missing:
+              print(f"Missing Android lint report: {report}", file=sys.stderr)
+          if findings or missing:
+              sys.exit(f"Android lint rejected: {len(findings)} finding(s), {len(missing)} missing report(s).")
+          print("All seven Android modules: zero lint warnings/errors.")
           PY
-      - name: Build debug APK
-        run: ./gradlew app:assembleDebug --stacktrace --warning-mode=fail
-      - name: Upload debug APK
+
+      - name: Upload Android lint report
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-debug-run-${{ github.run_number }}
+          name: CamaroDiag-lint-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
+          path: |
+            **/build/reports/lint-results-debug.html
+            **/build/reports/lint-results-debug.xml
+            **/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Compile Android instrumentation test APK
+        run: ./gradlew :app:assembleDebugAndroidTest --stacktrace --warning-mode=fail
+
+      - name: Build debug APK
+        run: ./gradlew app:assembleDebug --stacktrace --warning-mode=fail
+
+      - name: Verify generated Android APK and test reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s app/build/outputs/apk/debug/CamaroDiag-debug.apk
+          test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          python3 - <<'PY'
+          import pathlib
+          import sys
+          reports = list(pathlib.Path(".").glob("*/build/test-results/testDebugUnitTest/TEST-*.xml"))
+          if not reports:
+              sys.exit("No Android unit test result reports found.")
+          print(f"Verified {len(reports)} Android unit-test result files.")
+          PY
+
+      - name: Upload debug APK for this PR commit
+        uses: actions/upload-artifact@v7
+        with:
+          name: CamaroDiag-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
           path: app/build/outputs/apk/debug/CamaroDiag-debug.apk
           if-no-files-found: error
           retention-days: 30
+  android-instrumented-tests:
+    needs: [evaluate-build-checkpoint, test-and-build]
+    if: needs.test-and-build.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 33, 36]
+    steps:
+      - name: Checkout the same validation revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          java-version: '17'
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: 14742923
+          packages: "platform-tools platforms;android-35 platforms;android-36 build-tools;36.0.0"
+
+      - name: Enable emulator virtualization
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y acl
+          sudo setfacl -m u:$USER:rwx /dev/kvm
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.11.1
+
+      - name: Run Android instrumentation tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: ./gradlew connectedDebugAndroidTest --stacktrace --warning-mode=fail
+
+      - name: Upload Android instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: CamaroDiag-instrumented-api${{ matrix.api-level }}-${{ inputs.pr_number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
+          path: |
+            app/build/reports/androidTests/connected/**
+            app/build/outputs/androidTest-results/connected/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+  android-debug-validation:
+    needs: [evaluate-build-checkpoint, test-and-build, android-instrumented-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Android Debug validation applicability
+        env:
+          EVALUATION_RESULT: ${{ needs.evaluate-build-checkpoint.result }}
+          ANDROID_CHANGED: ${{ needs.evaluate-build-checkpoint.outputs.android_changed }}
+          BUILD_REQUIRED: ${{ needs.evaluate-build-checkpoint.outputs.build_required }}
+          BUILD_RESULT: ${{ needs.test-and-build.result }}
+          INSTRUMENTATION_RESULT: ${{ needs.android-instrumented-tests.result }}
+          COMMITS_SINCE_BUILD: ${{ needs.evaluate-build-checkpoint.outputs.commits_since_build }}
+          BUILD_INTERVAL: ${{ needs.evaluate-build-checkpoint.outputs.interval }}
+          VALIDATION_APPLIES: ${{ needs.evaluate-build-checkpoint.outputs.android_validation_applies }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVALUATION_RESULT" != "success" ]]; then
+            echo "::error::Android applicability/checkpoint evaluation did not succeed."
+            exit 1
+          fi
+          if [[ "$VALIDATION_APPLIES" != "true" ]]; then
+            echo "NOT APPLICABLE: this PR event/commit does not change Android-relevant files."
+            exit 0
+          fi
+          if [[ "$BUILD_REQUIRED" != "true" ]]; then
+            echo "BUILD DEFERRED: $COMMITS_SINCE_BUILD/$BUILD_INTERVAL Android-relevant commits."
+            echo "This control is not a compilation and does not reset the checkpoint."
+            exit 0
+          fi
+          if [[ "$BUILD_RESULT" != "success" || "$INSTRUMENTATION_RESULT" != "success" ]]; then
+            echo "::error::Android validation failed: build=$BUILD_RESULT instrumentation=$INSTRUMENTATION_RESULT."
+            exit 1
+          fi
+          echo "VALIDATED: Android unit tests, all-module lint, emulator tests and Debug APK build completed successfully."

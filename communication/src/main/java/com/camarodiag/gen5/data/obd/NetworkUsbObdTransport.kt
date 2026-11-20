@@ -20,8 +20,12 @@ class ElmUsbTransport(private val context: Context) {
     private val usbManager =
         context.getSystemService(Context.USB_SERVICE) as UsbManager
 
-    private var port: UsbSerialPort? = null
-    private var connection: android.hardware.usb.UsbDeviceConnection? = null
+    @Volatile private var port: UsbSerialPort? = null
+    @Volatile private var connection: android.hardware.usb.UsbDeviceConnection? = null
+    @Volatile private var connectionLost = false
+
+    val isConnected: Boolean
+        get() = port != null && connection != null && !connectionLost
 
     fun availableDevices(): List<String> =
         UsbSerialProber.getDefaultProber()
@@ -34,6 +38,7 @@ class ElmUsbTransport(private val context: Context) {
         deviceId: Int,
         baudRate: Int = 38400
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        close()
         try {
             val driver = UsbSerialProber.getDefaultProber()
                 .findAllDrivers(usbManager)
@@ -73,26 +78,26 @@ class ElmUsbTransport(private val context: Context) {
                 ?: return@withContext Result.failure(
                     IllegalStateException("Unable to open USB OBD device")
                 )
+            // Track ownership before subsequent setup so every failure releases
+            // the USB device handle, including missing-port and serial-open errors.
+            connection = conn
 
-            val serial = driver.ports.firstOrNull()
-                ?: run {
-                    conn.close()
-                    return@withContext Result.failure(
-                        IllegalStateException("No USB serial port")
-                    )
-                }
+            val serial = driver.ports.firstOrNull() ?: run {
+                close()
+                return@withContext Result.failure<Unit>(
+                    IllegalStateException("No USB serial port")
+                )
+            }
 
+            port = serial
             serial.open(conn)
-
             serial.setParameters(
                 baudRate,
                 8,
                 UsbSerialPort.STOPBITS_1,
                 UsbSerialPort.PARITY_NONE
             )
-
-            connection = conn
-            port = serial
+            connectionLost = false
 
             Result.success(Unit)
 
@@ -103,12 +108,31 @@ class ElmUsbTransport(private val context: Context) {
     }
 
     fun write(data: ByteArray) {
-        port?.write(data, 1500)
-            ?: error("USB transport not connected")
+        if (connectionLost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
+        val activePort = port ?: throw ObdTransportDisconnectedException("USB OBD adapter is not connected")
+        try {
+            activePort.write(data, 1500)
+        } catch (error: java.io.IOException) {
+            if (port === activePort) connectionLost = true
+            throw error
+        }
     }
 
-    fun read(buffer: ByteArray, timeoutMs: Int): Int =
-        port?.read(buffer, timeoutMs) ?: -1
+    fun read(buffer: ByteArray, timeoutMs: Int): Int {
+        if (connectionLost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
+        val activePort = port ?: run {
+            connectionLost = true
+            return -1
+        }
+        return try {
+            activePort.read(buffer, timeoutMs).also { count ->
+                if (count < 0 && port === activePort) connectionLost = true
+            }
+        } catch (error: java.io.IOException) {
+            if (port === activePort) connectionLost = true
+            throw error
+        }
+    }
 
     fun close() {
         try {
@@ -123,13 +147,18 @@ class ElmUsbTransport(private val context: Context) {
 
         port = null
         connection = null
+        connectionLost = false
     }
 }
 
 /** TCP transport for Wi-Fi ELM327 adapters; common defaults are configurable by the caller. */
 class ElmWifiTransport {
 
-    private var socket: Socket? = null
+    @Volatile private var socket: Socket? = null
+    @Volatile private var connectionLost = false
+
+    val isConnected: Boolean
+        get() = socket?.let { it.isConnected && !it.isClosed && !it.isInputShutdown && !it.isOutputShutdown && !connectionLost } == true
 
     suspend fun connect(
         host: String,
@@ -140,10 +169,11 @@ class ElmWifiTransport {
             close()
 
             val s = Socket()
+            // Publish the socket before connect so a failed attempt can close it.
+            socket = s
             s.connect(InetSocketAddress(host, port), timeoutMs)
             s.soTimeout = 1200
-
-            socket = s
+            connectionLost = false
 
             Result.success(Unit)
 
@@ -154,12 +184,34 @@ class ElmWifiTransport {
     }
 
     fun write(data: ByteArray) {
-        socket?.getOutputStream()?.write(data)
-            ?: error("Wi-Fi transport not connected")
+        if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
+        val activeSocket = socket ?: throw ObdTransportDisconnectedException("Wi-Fi OBD adapter is not connected")
+        try {
+            activeSocket.getOutputStream().write(data)
+        } catch (error: java.io.IOException) {
+            if (socket === activeSocket) connectionLost = true
+            throw error
+        }
     }
 
-    fun read(buffer: ByteArray): Int =
-        socket?.getInputStream()?.read(buffer) ?: -1
+    fun read(buffer: ByteArray): Int {
+        if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
+        val activeSocket = socket ?: run {
+            connectionLost = true
+            return -1
+        }
+        return try {
+            activeSocket.getInputStream().read(buffer).also { count ->
+                if (count < 0 && socket === activeSocket) connectionLost = true
+            }
+        } catch (timeout: java.net.SocketTimeoutException) {
+            // A read timeout is normal while waiting for the ELM prompt.
+            throw timeout
+        } catch (error: java.io.IOException) {
+            if (socket === activeSocket) connectionLost = true
+            throw error
+        }
+    }
 
     fun close() {
         try {
@@ -168,6 +220,7 @@ class ElmWifiTransport {
         }
 
         socket = null
+        connectionLost = false
     }
 }
 

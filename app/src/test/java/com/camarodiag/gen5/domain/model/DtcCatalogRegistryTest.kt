@@ -712,4 +712,19 @@ class DtcCatalogRegistryTest {
         assertFalse(communityEvidence.isUsableForOemInterpretation(vehicle, "ECM"))
     }
 
+    @Test
+    fun vehicleSpecificDefinitionsRequireAnExplicitMatchingEcuVin() {
+        val vin = "1G1FB1E30C9123456"
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX, vin = vin)
+        val matching = VehicleVinMatcher.compare(vin, vin)
+        val mismatch = VehicleVinMatcher.compare(vin, "1G1FB1E30C9123457")
+
+        assertTrue(DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, "ECM", matching))
+        assertFalse(DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, "ECM", mismatch))
+        assertFalse(DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, "ECM", null))
+        assertFalse(DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(
+            vehicle, "EBCM", matching
+        ))
+    }
+
 }

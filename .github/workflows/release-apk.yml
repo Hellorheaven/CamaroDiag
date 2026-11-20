@@ -14,8 +14,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  windows-preflight:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v7
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "8.0.x"
+      - name: Verify J2534 bridge release compilation and offline self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Release -warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Bridge Release compilation failed' }
+          dotnet run --project .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Release --no-build -- --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'J2534 Release self-tests failed' }
+
   release:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: windows-preflight
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -36,13 +58,14 @@ jobs:
           distribution: temurin
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.11.1'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
+          cmdline-tools-version: 14742923
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
 
       - name: Determine next release version
@@ -105,8 +128,32 @@ jobs:
           set -euo pipefail
           gradle wrapper --gradle-version 8.11.1
           chmod +x gradlew
-          ./gradlew testDebugUnitTest -PreleasePatch="$RELEASE_PATCH" --stacktrace
-          ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace
+          ./gradlew testDebugUnitTest -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
+          ./gradlew lintDebug lintRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
+          ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
+          ./gradlew app:assembleDebug -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
+
+      - name: Reject Android lint errors and warnings in every release variant
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+          modules = ("app", "core", "diagnostic", "communication", "storage", "control", "mileageaudit")
+          failures = []
+          for module in modules:
+              for variant in ("debug", "release"):
+                  report = Path(module) / f"build/reports/lint-results-{variant}.xml"
+                  if not report.is_file():
+                      failures.append(f"Missing {report}")
+                      continue
+                  for issue in ElementTree.parse(report).getroot().findall("issue"):
+                      if issue.get("severity", "").lower() in {"warning", "error", "fatal"}:
+                          failures.append(f"{report}: {issue.get('id')}: {issue.get('message')}")
+          if failures:
+              raise SystemExit("\\n".join(failures))
+          print("Android Release/Debug lint: zero warnings or errors in all modules.")
+          PY
 
       - name: Create Git tag
         env:
@@ -132,56 +179,15 @@ jobs:
             - GitHub may also show automatic source-code archives (zip/tar.gz); these are not Windows installers. Download the .exe Setup or Android .apk assets only.
           files: |
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/debug/CamaroDiag-debug.apk
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  detect-windows-release-changes:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      windows_changed: ${{ steps.detect.outputs.windows_changed }}
-    steps:
-      - name: Checkout pushed revision and history
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-      - name: Detect Windows bridge and shared .NET changes
-        id: detect
-        shell: bash
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          paths=(
-            'pc-bridge/**' 'global.json' '.editorconfig' '.github/actions/**' 'NuGet.Config' 'nuget.config'
-            '**/Directory.Build.props' '**/Directory.Build.targets'
-            '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
-            '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
-            '**/NuGet.Config' '**/nuget.config' '.config/dotnet-tools.json'
-            '.github/workflows/pc-bridge-ci.yml' '.github/workflows/release-apk.yml'
-          )
-          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
-            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
-            echo "No valid push base SHA; running Windows Release defensively."
-          elif git diff --quiet "$BEFORE_SHA" "$HEAD_SHA" -- "${paths[@]}"; then
-            echo "windows_changed=false" >> "$GITHUB_OUTPUT"
-            echo "No Windows bridge or shared .NET build changes in this push."
-          else
-            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
-            echo "Windows-relevant changes detected:"
-            git diff --name-only "$BEFORE_SHA" "$HEAD_SHA" -- "${paths[@]}"
-          fi
   bridge-installers:
-    needs:
-      - release
-      - detect-windows-release-changes
-    if: needs.release.result == 'success' && needs.detect-windows-release-changes.result == 'success' && needs.detect-windows-release-changes.outputs.windows_changed == 'true'
+    needs: release
+    if: needs.release.result == 'success'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -236,6 +242,9 @@ jobs:
 
             dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --runtime $variant.Runtime --self-contained true --output $output -warnaserror "-p:Version=$env:VERSION_NAME" "-p:AssemblyVersion=$($env:VERSION_NAME).0" "-p:FileVersion=$($env:VERSION_NAME).0"
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
+            $publishedExe = Join-Path $output 'CamaroDiag.J2534Bridge.exe'
+            & $publishedExe --self-test
+            if ($LASTEXITCODE -ne 0) { throw "Published $($variant.Arch) bridge self-tests failed" }
 
             $installerLog = Join-Path $PWD "dist\$($variant.Name)-installer.log"
             $installerOutput = & $iscc "/DAppVersion=$env:VERSION_NAME" "/DBuildDir=$output" "/DChannel=release" "/DArch=$($variant.Arch)" "/DOutputName=CamaroDiag-J2534-Bridge-Setup-$($variant.Name)" ".\pc-bridge\installer\CamaroDiag.J2534Bridge.iss" 2>&1
@@ -258,8 +267,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cleanup-old-releases:
-    needs: [release, bridge-installers, detect-windows-release-changes]
-    if: always() && needs.release.result == 'success' && needs.detect-windows-release-changes.result == 'success' && (needs.bridge-installers.result == 'success' || needs.bridge-installers.result == 'skipped')
+    needs: [release, bridge-installers]
+    if: always() && needs.release.result == 'success' && needs.bridge-installers.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

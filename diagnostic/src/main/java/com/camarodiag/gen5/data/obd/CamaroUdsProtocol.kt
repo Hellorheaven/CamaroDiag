@@ -15,7 +15,8 @@ object CamaroUdsProtocol {
         stp61Resp: String,
         headersResp: String = "OK",
         protocolResp: String = "OK",
-        swCanWiringVerified: Boolean = false
+        swCanWiringVerified: Boolean = false,
+        transmitProbeResp: String = ""
     ): AdapterCapabilities {
         val logs = listOf(
             "> ATZ  -> $atzResp",
@@ -23,13 +24,15 @@ object CamaroUdsProtocol {
             "> ATAL -> $atalResp",
             "> STP 61 -> $stp61Resp",
             "> ATH1 -> $headersResp",
-            "> ATSP 6 -> $protocolResp"
+            "> ATSP 6 -> $protocolResp",
+            "> 0100 (physical TX verification) -> $transmitProbeResp"
         )
 
+        // Select STN-only monitor commands only when the adapter's firmware response
+        // identifies an STN chipset. A Bluetooth name or the OBDLink product banner is
+        // not sufficient: some adapters expose ELM-compatible firmware instead.
         val isStn = stiResp.contains("STN", ignoreCase = true) ||
-            atzResp.contains("OBDLink", ignoreCase = true) ||
-            deviceName.contains("OBDLink", ignoreCase = true) ||
-            deviceName.contains("vLinker", ignoreCase = true)
+            atzResp.contains("STN", ignoreCase = true)
 
         // STP 61 alone is not proof of DLC pin-1 wiring. MX/MX+ are explicitly listed by the adapter maker as SW-CAN capable.
         val normalizedDeviceName = deviceName.uppercase(Locale.ROOT)
@@ -54,8 +57,24 @@ object CamaroUdsProtocol {
             supportsSwCan = supportsSwCan,
             supportsCanHeaders = headersResp.contains("OK", ignoreCase = true) &&
                 protocolResp.contains("OK", ignoreCase = true),
-            rawProbeLog = logs
+            rawProbeLog = logs,
+            supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp)
         )
+    }
+
+    /**
+     * Accept only a complete positive Mode 01 PID 00 ECU response. A substring
+     * match is unsafe here: adapter banners, command echoes or diagnostic chatter
+     * must never enable raw CAN transmission.
+     */
+    private fun hasPositiveMode01Pid00Response(response: String): Boolean {
+        val responseLine = Regex(
+            "^(?:(?:[0-9A-F]{3}|[0-9A-F]{8}))?(?:06)?4100[0-9A-F]{8}$"
+        )
+        return response.lineSequence().any { line ->
+            val compact = line.uppercase(Locale.ROOT).replace(Regex("[^0-9A-F]"), "")
+            responseLine.matches(compact)
+        }
     }
 
     fun buildTopology(vehicle: VehicleProfile, adapter: AdapterCapabilities): List<EcuModule> {

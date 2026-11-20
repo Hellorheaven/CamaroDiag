@@ -21,6 +21,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    lint {
+        // Room stays pinned through the v1-to-v2 migration validation; upgrade
+        // separately after the migration tests pass on Android 10/13/16.
+        disable += "GradleDependency"
+    }
 }
 
 dependencies {

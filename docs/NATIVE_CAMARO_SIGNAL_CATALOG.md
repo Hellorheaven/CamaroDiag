@@ -1,48 +1,41 @@
-# Native Camaro signal catalogue
+# Guide utilisateur — Signaux spécifiques Chevrolet Camaro
 
-## Status
+## Deux niveaux d’informations
 
-The first-party catalogue is introduced separately from the imported OBDb dataset:
+CamaroDiag distingue les informations OBD-II standard des signaux spécifiques aux Camaro.
 
-- Canonical runtime model: `CamaroSignalCatalog.kt`
-- Asset: `camaro-native-signalset-v1.json`
-- Canonical model tests: `CamaroSignalCatalogTest.kt`
-- The earlier `NativeCamaroSignalCatalog.kt` model and its tests are retained for compatibility with the initial catalogue foundation; new definitions must use the canonical JSON schema and model.
+### Données OBD-II standard
 
-The canonical native asset intentionally starts empty. This is deliberate: no Camaro-specific DID, ECU CAN address, scaling rule or model-year applicability is promoted to a first-party definition without evidence. An empty verified catalogue is safer than plausible-looking but unverified diagnostic data.
+Elles sont fournies par le calculateur moteur selon les services normalisés. Leur disponibilité dépend du véhicule, de son moteur, de sa calibration et de l’adaptateur connecté.
 
-## Existing OBDb catalogue is preserved
+### Signaux communautaires Camaro
 
-The existing community catalogue remains available through `ObdbCamaroSignalCatalog.kt` and `camaro-obdb-signalset-v3.json`. Its existing UI, decoding, attribution and CC BY-SA 4.0 licensing are not removed or silently relicensed by this work.
+CamaroDiag intègre un catalogue communautaire issu du projet **OBDb Chevrolet Camaro**. La version intégrée comprend des commandes et définitions de signaux qui peuvent aider à consulter des informations supplémentaires lorsque le calculateur et l’interface répondent.
 
-Do not copy, translate, rename, reformat or derive records from the OBDb JSON into the native asset and call them independent. If OBDb-derived material is ever distributed in adapted form, retain the required attribution and ShareAlike obligations. The OBDb data and its licence remain separate from first-party code and data.
+Ce catalogue communautaire n’est ni publié ni certifié par General Motors. Une définition présente dans le catalogue ne garantit pas qu’elle fonctionne sur chaque Camaro.
 
-## Promotion requirements
+Source : [OBDb Chevrolet Camaro](https://github.com/OBDb/Chevrolet-Camaro), fichier `signalsets/v3/default.json`, révision source `6771593698dff29cc0c6e8d6219ff360b2891883`. Les données correspondantes sont distribuées sous licence [Creative Commons CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 
-A native definition may become executable only when all of the following are recorded:
+## Informations spécifiques vérifiées
 
-1. Exact Camaro model year and engine/RPO applicability.
-2. UDS service and DID, with a complete and documented response layout.
-3. Physical request and response CAN IDs in valid 11-bit format, independently confirmed for that configuration.
-4. Bit offset, bit length, byte/bit order, signedness, scale, offset, unit and any sentinel values supported by a repeatable decoding test vector.
-5. At least one traceable evidence reference and a named vehicle configuration on which the signal was verified.
-6. A test covering the raw response bytes and expected decoded value.
+Les données propriétaires GM ne sont pas déclarées compatibles simplement parce qu’un identifiant ou une commande a été trouvé sur Internet ou dans une capture. La compatibilité doit être confirmée pour l’année, le moteur, le calculateur et la configuration concernés.
 
-The canonical runtime model deliberately enables only UDS ReadDataByIdentifier (0x22) definitions with valid physical addressing. Other services, 29-bit addressing, extended addressing, session/security requirements and write operations remain out of scope until separately implemented and validated.
+À ce jour, CamaroDiag ne présente pas de catalogue propriétaire GM complet et validé couvrant toutes les années et toutes les motorisations. Les informations qui ne sont pas suffisamment confirmées restent indisponibles plutôt que d’afficher une valeur supposée.
 
-## Evidence hierarchy
+## Pourquoi un signal peut-il manquer ?
 
-Prefer, in order:
+Un signal peut ne pas apparaître ou ne pas répondre pour plusieurs raisons :
 
-- GM service information or OEM documentation that is legitimately available for the exact vehicle/controller.
-- SAE/ISO standards for standardized protocol semantics (these do not, by themselves, prove a Camaro-specific DID or CAN address).
-- Captured request/response traces from a clearly identified Camaro configuration, with repeatable decoding.
-- Independent corroboration from another matching vehicle/configuration.
+- Le moteur ou la version du véhicule ne possède pas cette fonction.
+- Le calculateur utilise une calibration différente.
+- L’adaptateur ne permet pas l’accès au réseau ou au service requis.
+- Le calculateur ne répond pas à cette demande.
+- La définition ne s’applique pas à cette année, finition ou transmission.
 
-A community database can be useful as a research lead, but is not sufficient by itself to mark a first-party Camaro signal as vehicle-verified.
+Une absence de réponse ne signifie donc pas automatiquement qu’un capteur ou un calculateur est défectueux.
 
-## Safety boundary
+## Compatibilité et sécurité
 
-A missing definition or missing ECU response must remain unavailable. Never infer an ECU address from a familiar GM module name, extrapolate a DID across model years, or turn a nominal calibration family into proof of a controller identity. No BCM, TCM, EBCM/ABS, IPC, SDM or other enhanced module address is asserted by this catalogue.
+Les fonctions étendues dépendent de l’interface réellement utilisée. Un ELM327 standard ne donne pas automatiquement accès aux données propriétaires GM. Certains accès nécessitent un OBDLink MX+ compatible ou un pont PC utilisant une interface J2534 adaptée.
 
-Calibration binary reads, table edits, security access, writes and flashing are not enabled by this signal catalogue.
+Le catalogue de signaux sert à la consultation et au diagnostic. Il n’autorise pas l’écriture de paramètres, le codage, le déverrouillage de calculateurs ou le flashage.

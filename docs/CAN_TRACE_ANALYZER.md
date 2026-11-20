@@ -1,30 +1,42 @@
-# Offline CAN / UDS trace analyzer
+# Guide utilisateur — Analyse des traces CAN et UDS
 
-CamaroDiag can inspect text captures without a connected vehicle or diagnostic adapter.
+## À quoi sert cette fonction ?
 
-## Supported input
+L’analyseur permet d’examiner un fichier de capture CAN déjà enregistré, même lorsque la Camaro et l’adaptateur ne sont plus connectés. Il aide à comprendre les échanges entre un outil de diagnostic et les calculateurs du véhicule.
 
-### Vector ASC
-The parser accepts standard classic-CAN records with timestamp, channel, arbitration ID, direction, DLC and data bytes, for example:
+L’analyse est locale et en lecture seule : l’ouverture d’un fichier ne transmet aucune commande au véhicule.
+
+## Fichiers acceptés
+
+### Capture Vector ASC
+
+Les captures texte au format ASC contenant des trames CAN classiques sont acceptées. Elles peuvent inclure l’horodatage, le canal, l’identifiant CAN, le sens de transmission et les octets de données.
+
+Exemple :
 
 ```text
 0.000000 1 7E0 Tx d 8 03 22 F1 90 00 00 00 00
 0.001000 1 7E8 Rx d 8 07 62 F1 90 31 47 30 31
 ```
 
-### ELM327 monitor text
+### Texte de surveillance ELM327
 
-The analyzer accepts header-enabled ELM327 monitor output saved as a text file. Each line must contain a CAN ID, a hexadecimal DLC and the data bytes, for example:
+L’analyseur accepte les captures texte produites par le mode de surveillance CAN d’un ELM327 lorsque les en-têtes sont activés. Chaque ligne doit contenir l’identifiant CAN, la longueur des données et exactement le nombre d’octets annoncé.
+
+Exemple :
 
 ```text
 7E0 04 03 22 F1 90
 7E8 08 07 62 F1 90 31 47 30 31
 ```
 
-ELM monitor output usually has no timestamp or TX/RX marker; the analyzer therefore labels its direction as unknown rather than guessing. Enable CAN headers on the adapter before capturing. Not every ELM327 clone supports monitor mode or complete CAN-frame output.
+Certains adaptateurs ELM327 ne proposent pas ce mode ou n’affichent pas des trames complètes. Une capture sans indication TX/RX ou sans horodatage reste analysable, mais le sens et le temps ne peuvent alors pas être déterminés avec certitude.
 
-### CSV
-CSV files must include a CAN ID column and a data/payload column. Optional columns are timestamp and direction:
+### Fichier CSV
+
+Le CSV doit contenir une colonne pour l’identifiant CAN et une colonne pour les données. L’horodatage et le sens TX/RX sont facultatifs.
+
+Exemple :
 
 ```csv
 timestamp,can_id,direction,data
@@ -32,23 +44,30 @@ timestamp,can_id,direction,data
 0.010,0x7E8,Rx,"07 62 F1 90 31 47 30 31"
 ```
 
-The parser also accepts semicolon-delimited CSV and separate `data0`…`data15` byte columns.
+Les fichiers séparés par des points-virgules sont également acceptés.
 
-## Analysis
+## Préparer et analyser un fichier
 
-- Parses 11-bit and 29-bit arbitration IDs.
-- Reassembles ISO-TP Single Frames, First Frames and Consecutive Frames.
-- Checks consecutive-frame sequence numbers and reports incomplete messages.
-- Identifies UDS services, positive responses and negative response codes.
-- Lists observed ReadDataByIdentifier (0x22 / 0x62) and WriteDataByIdentifier (0x2E / 0x6E) DIDs with CAN ID and TX/RX direction.
-- Ignores ISO-TP Flow Control frames as transport metadata.
+1. Enregistrer une capture avec un outil compatible.
+2. Exporter la capture au format ASC, CSV ou texte ELM327 accepté ci-dessus.
+3. Ouvrir la fonction d’analyse de traces dans CamaroDiag.
+4. Sélectionner le fichier à examiner.
+5. Consulter les trames, les échanges reconstitués et les informations UDS reconnues.
 
-## Limits
+L’analyseur peut notamment présenter les identifiants CAN, les messages ISO-TP reconstitués, les services UDS reconnus, les réponses positives ou négatives et les identifiants de données observés.
 
-- Binary Vector BLF is not supported yet. Export it to ASC or CSV first.
-- CAN FD escape-length Single Frames and ISO-TP extended-length First Frames are not decoded yet.
-- The analyzer does not infer an ECU identity from a CAN ID, pair requests and responses into a verified ECU profile, or decode proprietary signal scaling.
-- A DID observed in a trace is only a candidate. It is not automatically added to the native signal catalogue and never becomes executable from trace observation alone.
-- Captures may contain VINs, calibration IDs, serial numbers or other sensitive vehicle data. Review and redact traces before sharing them publicly.
+Un identifiant de donnée repéré dans une capture n’est pas automatiquement considéré comme compatible avec une Camaro. Il ne devient pas une commande de diagnostic utilisable sans validation indépendante.
 
-No CAN or UDS command is transmitted by this feature. Analysis is entirely local and read-only.
+## Limites à connaître
+
+- Les fichiers Vector BLF binaires ne sont pas directement pris en charge. Les exporter d’abord en ASC ou CSV.
+- Les captures CAN FD et certains formats ISO-TP étendus ne sont pas entièrement interprétés.
+- L’analyseur ne déduit pas à lui seul l’identité d’un calculateur à partir d’un identifiant CAN.
+- Il ne décode pas automatiquement les valeurs spécifiques à chaque moteur, année ou calibration.
+- Une trame observée ne prouve pas qu’une fonction est disponible sur toutes les Camaro.
+
+## Confidentialité
+
+Une capture peut contenir un VIN, des identifiants de calculateur ou des informations propres au véhicule. Vérifier et masquer ces données avant de transmettre un fichier à une autre personne ou de le publier.
+
+L’analyseur ne modifie pas le fichier d’origine et n’envoie aucune trame CAN ou commande UDS.

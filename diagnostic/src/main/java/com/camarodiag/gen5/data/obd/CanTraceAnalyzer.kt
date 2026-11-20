@@ -27,15 +27,43 @@ data class UdsTraceMessage(
         }
     val did: Int?
         get() = if (responseService != 0x7F &&
-            (service == 0x22 || service == 0x2E) && payload.size >= 3
+            (service == 0x22 || service == 0x2E || service == 0x2F) && payload.size >= 3
         ) {
             (payload[1] shl 8) or payload[2]
+        } else null
+    /** Mode-specific PID/test identifier for OBD services that carry one. */
+    val parameterId: Int?
+        get() = when (service) {
+            0x01, 0x02, 0x05, 0x06, 0x08, 0x09 ->
+                if (responseService != 0x7F) payload.getOrNull(1) else null
+            else -> null
+        }
+    /** Echoed UDS sub-function for services whose positive responses repeat it. */
+    val subFunction: Int?
+        get() = when (service) {
+            0x10, 0x11, 0x19, 0x27, 0x28, 0x31, 0x3E ->
+                if (responseService != 0x7F) payload.getOrNull(1)?.and(0x7F) else null
+            else -> null
+        }
+    /** RoutineControl identifier (RID), echoed by positive 0x71 responses. */
+    val routineIdentifier: Int?
+        get() = if (service == 0x31 && responseService != 0x7F && payload.size >= 4) {
+            (payload[2] shl 8) or payload[3]
         } else null
     val negativeResponseCode: Int?
         get() = if (payload.firstOrNull() == 0x7F) payload.getOrNull(2) else null
     val serviceName: String
         get() = when (service) {
             0x01 -> "ShowCurrentData (OBD-II)"
+            0x02 -> "ShowFreezeFrameData (OBD-II)"
+            0x03 -> "ReadStoredDiagnosticTroubleCodes (OBD-II)"
+            0x04 -> "ClearDiagnosticTroubleCodes (OBD-II)"
+            0x05 -> "ReadOxygenSensorMonitoring (OBD-II)"
+            0x06 -> "ReadOnBoardMonitoringTestResults (OBD-II)"
+            0x07 -> "ReadPendingDiagnosticTroubleCodes (OBD-II)"
+            0x08 -> "ControlOnBoardSystems (OBD-II)"
+            0x09 -> "RequestVehicleInformation (OBD-II)"
+            0x0A -> "ReadPermanentDiagnosticTroubleCodes (OBD-II)"
             0x10 -> "DiagnosticSessionControl"
             0x11 -> "ECUReset"
             0x14 -> "ClearDiagnosticInformation"
@@ -64,6 +92,16 @@ data class CanTraceDidObservation(
     val positiveResponse: Boolean
 )
 
+data class CanTraceDtcObservation(
+    val timestampSeconds: Double?,
+    val canId: Int,
+    val direction: CanTraceDirection,
+    /** Original OBD-II request mode: 03 stored, 07 pending, 0A permanent. */
+    val service: Int,
+    val code: String,
+    val rawBytes: List<Int>
+)
+
 data class CanTracePidObservation(
     val timestampSeconds: Double?,
     val canId: Int,
@@ -75,6 +113,35 @@ data class CanTracePidObservation(
     val rawBytes: List<Int>
 )
 
+enum class IsoTpFlowStatus { CONTINUE_TO_SEND, WAIT, OVERFLOW, RESERVED }
+
+data class CanTraceFlowControl(
+    val timestampSeconds: Double?,
+    val canId: Int,
+    val direction: CanTraceDirection,
+    val status: IsoTpFlowStatus,
+    val blockSize: Int,
+    val separationTimeRaw: Int
+) {
+    /** ISO-TP STmin in microseconds; null means the raw value is reserved. */
+    val separationTimeMicros: Int?
+        get() = when (separationTimeRaw) {
+            in 0x00..0x7F -> separationTimeRaw * 1_000
+            in 0xF1..0xF9 -> (separationTimeRaw - 0xF0) * 100
+            else -> null
+        }
+}
+
+enum class UdsExchangeStatus { COMPLETED, RESPONSE_PENDING, UNANSWERED }
+
+data class UdsTraceExchange(
+    val request: UdsTraceMessage,
+    val responses: List<UdsTraceMessage>,
+    val status: UdsExchangeStatus,
+    /** Elapsed time to the final response, in milliseconds; null when timestamps are unavailable. */
+    val elapsedMilliseconds: Double?
+)
+
 data class CanTraceAnalysisReport(
     val sourceName: String,
     val frames: List<CanTraceFrame>,
@@ -82,7 +149,11 @@ data class CanTraceAnalysisReport(
     val didObservations: List<CanTraceDidObservation>,
     val pidObservations: List<CanTracePidObservation>,
     val errors: List<String>,
-    val incompleteIsoTpMessages: Int
+    /** Multi-frame messages not completed, including sessions discarded before end of capture. */
+    val incompleteIsoTpMessages: Int,
+    val flowControlObservations: List<CanTraceFlowControl> = emptyList(),
+    val exchanges: List<UdsTraceExchange> = emptyList(),
+    val dtcObservations: List<CanTraceDtcObservation> = emptyList()
 ) {
     val observedCanIds: List<Int> = frames.map { it.canId }.distinct().sorted()
     val udsServices: List<Int> = messages.mapNotNull { it.service }.distinct().sorted()
@@ -98,8 +169,15 @@ data class CanTraceAnalysisReport(
  * scaling rule, ECU identity or vehicle configuration to a verified catalogue entry.
  */
 object CanTraceAnalyzer {
+    // Bound hostile or accidental 32-bit ISO-TP lengths before buffering a trace payload.
+    private const val MAX_SUPPORTED_ISOTP_PAYLOAD_BYTES = 1_048_576
+
+    // Offline traces use a conservative one-second gap to flag stale partial ISO-TP sessions.
+    // The timeout is applied only when both frame timestamps are available and monotonic.
+    private const val MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS = 1.0
+
     private val ascFrameRegex = Regex(
-        """^\s*(\d+(?:\.\d+)?)\s+\d+\s+([0-9A-Fa-f]{3,8})\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
+        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
         RegexOption.IGNORE_CASE
     )
 
@@ -135,6 +213,7 @@ object CanTraceAnalyzer {
             )
         }
         val pidObservations = messages.mapNotNull(::decodeStandardPid)
+        val dtcObservations = messages.flatMap(::decodeStandardDtc)
         return CanTraceAnalysisReport(
             sourceName = sourceName,
             frames = parsed.frames,
@@ -142,32 +221,215 @@ object CanTraceAnalyzer {
             didObservations = observations,
             pidObservations = pidObservations,
             errors = allErrors,
-            incompleteIsoTpMessages = incomplete
+            incompleteIsoTpMessages = incomplete,
+            flowControlObservations = parsed.frames.mapNotNull(::decodeFlowControl),
+            exchanges = correlateExchanges(messages),
+            dtcObservations = dtcObservations
+        )
+    }
+
+    private data class PendingUdsRequest(
+        val request: UdsTraceMessage,
+        val responses: MutableList<UdsTraceMessage> = mutableListOf()
+    ) {
+        fun toExchange(status: UdsExchangeStatus): UdsTraceExchange {
+            val lastTimestamp = responses.lastOrNull()?.timestampSeconds
+            val startTimestamp = request.timestampSeconds
+            val elapsed = if (lastTimestamp != null && startTimestamp != null &&
+                lastTimestamp >= startTimestamp
+            ) {
+                (lastTimestamp - startTimestamp) * 1_000.0
+            } else null
+            return UdsTraceExchange(request, responses.toList(), status, elapsed)
+        }
+    }
+
+    /**
+     * Correlates only explicit TX/RX traffic. Unknown-direction ELM captures remain unpaired
+     * rather than guessing which ECU sent a request or response. NRC 0x78 keeps the request open.
+     */
+    private fun correlateExchanges(messages: List<UdsTraceMessage>): List<UdsTraceExchange> {
+        val pending = mutableListOf<PendingUdsRequest>()
+        val exchanges = mutableListOf<UdsTraceExchange>()
+        messages.forEach { message ->
+            if (message.direction == CanTraceDirection.UNKNOWN) return@forEach
+            val rawService = message.responseService ?: return@forEach
+            val service = message.service ?: return@forEach
+            val isPositiveResponse = rawService == service + 0x40
+            val isNegativeResponse = rawService == 0x7F
+            // A negative UDS response must contain both the original service and an NRC.
+            // Ignore a truncated 0x7F record instead of misclassifying it as a request.
+            if (isNegativeResponse && message.negativeResponseCode == null) return@forEach
+            if (isPositiveResponse || isNegativeResponse) {
+                // A negative response has no DID. When multiple same-service requests are
+                // outstanding, choosing the first one would fabricate a request/response pair.
+                // Keep the response unpaired unless exactly one candidate is compatible.
+                val matchingIndexes = pending.indices.filter { index ->
+                    val request = pending[index].request
+                    request.direction != message.direction &&
+                        isCompatibleObdCanResponseId(request.canId, message.canId) &&
+                        // A physical ECU may send several NRC 0x78 responses before its final reply.
+                        // For functional requests, also allow that same ECU to complete a pending
+                        // exchange, but do not count duplicate terminal replies from one responder.
+                        pending[index].responses.none {
+                            it.canId == message.canId && it.negativeResponseCode != 0x78
+                        } &&
+                        request.service == service &&
+                        // If both timestamps exist, never pair a response that predates
+                        // its request. Missing timestamps retain capture-order behavior.
+                        (request.timestampSeconds == null || message.timestampSeconds == null ||
+                            message.timestampSeconds >= request.timestampSeconds) &&
+                        when {
+                            // Read, write and I/O-control DID responses must echo the DID.
+                            // A negative response has no DID, so it is safe only when the
+                            // surrounding candidate set contains exactly one request.
+                            service == 0x22 || service == 0x2E || service == 0x2F ->
+                                request.did != null && (isNegativeResponse || message.did == request.did)
+                            // OBD modes with a PID/test identifier must be paired by that
+                            // identifier when several requests of the same mode are in flight.
+                            request.parameterId != null ->
+                                isNegativeResponse || message.parameterId == request.parameterId
+                            request.routineIdentifier != null ->
+                                isNegativeResponse ||
+                                    (message.subFunction == request.subFunction &&
+                                        message.routineIdentifier == request.routineIdentifier)
+                            request.subFunction != null ->
+                                isNegativeResponse || message.subFunction == request.subFunction
+                            else -> request.did == null || message.did == null ||
+                                request.did == message.did
+                        }
+                }
+                val matchIndex = matchingIndexes.singleOrNull()
+                if (matchIndex != null) {
+                    val candidate = pending[matchIndex]
+                    candidate.responses += message
+                    // A functional 7DF request can receive one response from
+                    // several ECUs. Keep it pending for distinct responder IDs and
+                    // aggregate those replies into one exchange until capture end.
+                    val functionalRequest = candidate.request.canId == 0x7DF
+                    if (!functionalRequest && message.negativeResponseCode != 0x78) {
+                        pending.removeAt(matchIndex)
+                        exchanges += candidate.toExchange(UdsExchangeStatus.COMPLETED)
+                    }
+                    return@forEach
+                }
+            } else if (service in 0x01..0x0A || service in 0x10..0x3E) {
+                // Include standard OBD-II modes as well as UDS services in the exchange history.
+                pending += PendingUdsRequest(message)
+            }
+        }
+        pending.forEach { candidate ->
+            val status = when {
+                candidate.responses.lastOrNull()?.negativeResponseCode == 0x78 ->
+                    UdsExchangeStatus.RESPONSE_PENDING
+                candidate.responses.isNotEmpty() ->
+                    UdsExchangeStatus.COMPLETED
+                else -> UdsExchangeStatus.UNANSWERED
+            }
+            exchanges += candidate.toExchange(status)
+        }
+        return exchanges.sortedBy { it.request.timestampSeconds ?: Double.POSITIVE_INFINITY }
+    }
+
+
+    /**
+     * Correlate only the conventional 11-bit OBD-II response ranges.
+     * For physical requests 7E0..7E7 the matching response is +8;
+     * functional request 7DF may be answered by 7E8..7EF.
+     * Unknown/29-bit addressing is deliberately left unpaired.
+     */
+    private fun isCompatibleObdCanResponseId(requestId: Int, responseId: Int): Boolean {
+        if (requestId == 0x7DF) return responseId in 0x7E8..0x7EF
+        if (requestId in 0x7E0..0x7E7) return responseId == requestId + 0x08
+        return false
+    }
+
+    /** Decode ISO-TP Flow Control (PCI type 3) without treating it as a UDS payload. */
+    private fun decodeFlowControl(frame: CanTraceFrame): CanTraceFlowControl? {
+        if (frame.data.firstOrNull()?.and(0xF0) != 0x30 || frame.data.size < 3) return null
+        val rawStatus = frame.data[0] and 0x0F
+        val status = when (rawStatus) {
+            0x00 -> IsoTpFlowStatus.CONTINUE_TO_SEND
+            0x01 -> IsoTpFlowStatus.WAIT
+            0x02 -> IsoTpFlowStatus.OVERFLOW
+            else -> IsoTpFlowStatus.RESERVED
+        }
+        return CanTraceFlowControl(
+            timestampSeconds = frame.timestampSeconds,
+            canId = frame.canId,
+            direction = frame.direction,
+            status = status,
+            blockSize = frame.data[1],
+            separationTimeRaw = frame.data[2]
         )
     }
 
     /**
-     * Decodes only standardized SAE J1979 Mode 01 response PIDs.
-     * Unknown PIDs and incomplete payloads remain raw observations and are not guessed.
+     * Decodes standardized SAE J1979 Mode 01 response PIDs.
+     * Unsupported PIDs and truncated payloads remain available in the raw trace.
      */
     private fun decodeStandardPid(message: UdsTraceMessage): CanTracePidObservation? {
         if (message.responseService != 0x41 || message.payload.size < 3) return null
         val pid = message.payload[1]
-        val a = message.payload.getOrNull(2) ?: return null
-        val b = message.payload.getOrNull(3) ?: 0
+        val bytes = message.payload.drop(2)
+        val a = bytes.getOrNull(0) ?: return null
+        val b = bytes.getOrNull(1) ?: 0
         val decoded = when (pid) {
             0x04 -> Triple("Calculated engine load", a * 100.0 / 255.0, "%")
             0x05 -> Triple("Engine coolant temperature", (a - 40).toDouble(), "°C")
+            0x06 -> Triple("Short-term fuel trim Bank 1", a * 100.0 / 128.0 - 100.0, "%")
+            0x07 -> Triple("Long-term fuel trim Bank 1", a * 100.0 / 128.0 - 100.0, "%")
+            0x08 -> Triple("Short-term fuel trim Bank 2", a * 100.0 / 128.0 - 100.0, "%")
+            0x09 -> Triple("Long-term fuel trim Bank 2", a * 100.0 / 128.0 - 100.0, "%")
+            0x0A -> Triple("Fuel pressure", a * 3.0, "kPa")
             0x0B -> Triple("Intake manifold absolute pressure", a.toDouble(), "kPa")
             0x0C -> Triple("Engine speed", ((a * 256) + b) / 4.0, "rpm")
             0x0D -> Triple("Vehicle speed", a.toDouble(), "km/h")
+            0x0E -> Triple("Timing advance", a / 2.0 - 64.0, "°")
             0x0F -> Triple("Intake air temperature", (a - 40).toDouble(), "°C")
             0x10 -> Triple("Mass air flow", ((a * 256) + b) / 100.0, "g/s")
             0x11 -> Triple("Throttle position", a * 100.0 / 255.0, "%")
+            0x1F -> Triple("Run time since engine start", (a * 256 + b).toDouble(), "s")
+            0x21 -> Triple("Distance traveled with MIL on", (a * 256 + b).toDouble(), "km")
+            0x2F -> Triple("Fuel tank level", a * 100.0 / 255.0, "%")
+            0x31 -> Triple("Distance since diagnostic codes cleared", (a * 256 + b).toDouble(), "km")
+            0x33 -> Triple("Barometric pressure", a.toDouble(), "kPa")
+            in 0x14..0x1B -> Triple("Oxygen sensor " + (pid - 0x13) + " voltage", a / 200.0, "V")
+            in 0x24..0x2B -> Triple("Wide-range oxygen sensor " + (pid - 0x23) + " equivalence ratio", ((a * 256 + b) * 2.0) / 65536.0, "ratio")
+            in 0x34..0x3B -> Triple("Wide-range oxygen sensor " + (pid - 0x33) + " equivalence ratio", ((a * 256 + b) * 2.0) / 65536.0, "ratio")
+            0x3C -> Triple("Catalyst temperature Bank 1 Sensor 1", ((a * 256 + b) / 10.0) - 40.0, "°C")
+            0x3D -> Triple("Catalyst temperature Bank 2 Sensor 1", ((a * 256 + b) / 10.0) - 40.0, "°C")
+            0x3E -> Triple("Catalyst temperature Bank 1 Sensor 2", ((a * 256 + b) / 10.0) - 40.0, "°C")
+            0x3F -> Triple("Catalyst temperature Bank 2 Sensor 2", ((a * 256 + b) / 10.0) - 40.0, "°C")
+            0x42 -> Triple("Control module voltage", (a * 256 + b) / 1000.0, "V")
+            0x43 -> Triple("Absolute engine load", ((a * 256 + b) * 100.0) / 65535.0, "%")
+            0x44 -> Triple("Commanded equivalence ratio", ((a * 256 + b) * 2.0) / 65535.0, "ratio")
+            0x45 -> Triple("Relative throttle position", a * 100.0 / 255.0, "%")
+            0x46 -> Triple("Ambient air temperature", (a - 40).toDouble(), "°C")
+            0x47 -> Triple("Absolute throttle position B", a * 100.0 / 255.0, "%")
+            0x48 -> Triple("Absolute throttle position C", a * 100.0 / 255.0, "%")
+            0x49 -> Triple("Accelerator pedal position D", a * 100.0 / 255.0, "%")
+            0x4A -> Triple("Accelerator pedal position E", a * 100.0 / 255.0, "%")
+            0x4B -> Triple("Accelerator pedal position F", a * 100.0 / 255.0, "%")
+            0x4C -> Triple("Commanded throttle actuator", a * 100.0 / 255.0, "%")
+            0x4D -> Triple("Time run with MIL on", (a * 256 + b).toDouble(), "min")
+            0x4E -> Triple("Time since diagnostic codes cleared", (a * 256 + b).toDouble(), "min")
+            0x5C -> Triple("Engine oil temperature", (a - 40).toDouble(), "°C")
+            0x5D -> Triple("Fuel injection timing", (((a * 256 + b) - 26_880) / 128.0), "°")
+            0x5A -> Triple("Relative accelerator pedal position", a * 100.0 / 255.0, "%")
+            0x5E -> Triple("Engine fuel rate", ((a * 256 + b) / 20.0), "L/h")
+            0x61 -> Triple("Driver demand engine torque", (a - 125).toDouble(), "%")
+            0x62 -> Triple("Actual engine torque", (a - 125).toDouble(), "%")
+            0x63 -> Triple("Engine reference torque", (a * 256 + b).toDouble(), "Nm")
             else -> return null
         }
-        val requiredBytes = if (pid == 0x0C || pid == 0x10) 4 else 3
-        if (message.payload.size < requiredBytes) return null
+        val requiredDataBytes = when (pid) {
+            0x0C, 0x10, 0x1F, 0x21, 0x31, in 0x14..0x1B,
+            in 0x3C..0x3F, 0x42, 0x43, 0x44, 0x4D, 0x4E, 0x5D, 0x5E, 0x63 -> 2
+            in 0x24..0x2B, in 0x34..0x3B -> 4
+            else -> 1
+        }
+        if (bytes.size < requiredDataBytes) return null
         return CanTracePidObservation(
             timestampSeconds = message.timestampSeconds,
             canId = message.canId,
@@ -176,8 +438,48 @@ object CanTraceAnalyzer {
             name = decoded.first,
             value = decoded.second,
             unit = decoded.third,
-            rawBytes = message.payload.drop(2).take(requiredBytes - 2)
+            rawBytes = bytes.take(requiredDataBytes)
         )
+    }
+    /**
+     * Decodes the standardized five-character DTC encoding in OBD-II Mode 03/07/0A
+     * positive responses. Zero pairs are padding, not reported trouble codes.
+     */
+    private fun decodeStandardDtc(message: UdsTraceMessage): List<CanTraceDtcObservation> {
+        val mode = when (message.responseService) {
+            0x43 -> 0x03
+            0x47 -> 0x07
+            0x4A -> 0x0A
+            else -> return emptyList()
+        }
+        if (message.payload.size < 3) return emptyList()
+
+        return message.payload.drop(1).chunked(2).mapNotNull { pair ->
+            if (pair.size != 2 || (pair[0] == 0 && pair[1] == 0)) return@mapNotNull null
+            val first = pair[0]
+            val second = pair[1]
+            val system = when (first ushr 6) {
+                0 -> 'P'
+                1 -> 'C'
+                2 -> 'B'
+                else -> 'U'
+            }
+            val code = buildString(5) {
+                append(system)
+                append((first ushr 4) and 0x03)
+                append((first and 0x0F).toString(16).uppercase(Locale.ROOT))
+                append((second ushr 4).toString(16).uppercase(Locale.ROOT))
+                append((second and 0x0F).toString(16).uppercase(Locale.ROOT))
+            }
+            CanTraceDtcObservation(
+                timestampSeconds = message.timestampSeconds,
+                canId = message.canId,
+                direction = message.direction,
+                service = mode,
+                code = code,
+                rawBytes = pair
+            )
+        }
     }
 
     private data class ParsedFrames(val frames: List<CanTraceFrame>, val errors: List<String>)
@@ -193,11 +495,11 @@ object CanTraceAnalyzer {
             val direction = parseDirection(match.groupValues[3])
             val dlc = match.groupValues[4].toIntOrNull()
             val bytes = parseHexBytes(match.groupValues[5])
-            if (timestamp == null || canId == null || dlc == null || bytes == null) {
+            if (timestamp == null || !timestamp.isFinite() || canId == null || dlc == null || bytes == null) {
                 errors += "Line ${index + 1}: invalid ASC frame header or hexadecimal data."
                 return@forEachIndexed
             }
-            if (dlc !in 0..64 || bytes.size < dlc) {
+            if (dlc !in 0..64 || bytes.size != dlc) {
                 errors += "Line ${index + 1}: DLC does not match the available data bytes."
                 return@forEachIndexed
             }
@@ -218,7 +520,7 @@ object CanTraceAnalyzer {
             val canId = parseCanId(match.groupValues[1])
             val dlc = match.groupValues[2].toIntOrNull(16)
             val bytes = parseHexBytes(match.groupValues[3])
-            if (canId == null || dlc == null || bytes == null || dlc !in 0..8 || bytes.size < dlc) {
+            if (canId == null || dlc == null || bytes == null || dlc !in 0..8 || bytes.size != dlc) {
                 errors += "Line ${index + 1}: invalid ELM327 header/DLC/data record."
                 return@forEachIndexed
             }
@@ -243,9 +545,9 @@ object CanTraceAnalyzer {
         val directionIndex = headers.indexOfFirst { it in setOf("direction", "dir", "tx_rx") }
         val dataIndex = headers.indexOfFirst { it in setOf("data", "payload", "bytes", "frame_data") }
         val dlcIndex = headers.indexOfFirst { it == "dlc" }
-        val dataByteIndexes = headers.indices.filter { headers[it].matches(Regex("(data|byte)_?([0-9]|1[0-5])")) }
+        val dataByteIndexes = headers.indices.filter { headers[it].matches(Regex("(data|byte)_?([0-9]|[1-5][0-9]|6[0-3])")) }
         if (canIdIndex < 0 || (dataIndex < 0 && dataByteIndexes.isEmpty())) {
-            return ParsedFrames(emptyList(), listOf("CSV needs a CAN ID column and a data/payload column (or data0…data15 columns)."))
+            return ParsedFrames(emptyList(), listOf("CSV needs a CAN ID column and a data/payload column (or data0…data63 columns)."))
         }
 
         for (lineIndex in headerLineIndex + 1 until lines.size) {
@@ -254,16 +556,42 @@ object CanTraceAnalyzer {
             val fields = splitCsvLine(line, delimiter)
             fun field(index: Int): String = fields.getOrNull(index).orEmpty().trim().trim('"')
             val canId = parseCanId(field(canIdIndex))
+            val dlcText = if (dlcIndex >= 0) field(dlcIndex) else ""
+            val declaredDlc = if (dlcIndex >= 0) dlcText.toIntOrNull() else null
+            if (dlcIndex >= 0 && (declaredDlc == null || declaredDlc !in 0..64)) {
+                errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
+                continue
+            }
+            val timestampText = if (timestampIndex >= 0) field(timestampIndex) else ""
+            val timestamp = when {
+                timestampIndex < 0 || timestampText.isBlank() -> null
+                else -> timestampText.toDoubleOrNull()?.takeIf { it.isFinite() }
+            }
+            if (timestampIndex >= 0 && timestampText.isNotBlank() && timestamp == null) {
+                errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
+                continue
+            }
             val bytes = if (dataIndex >= 0) parseHexBytes(field(dataIndex)) else {
-                dataByteIndexes.mapNotNull { idx ->
-                    field(idx).takeIf(String::isNotBlank)?.removePrefix("0x")?.removePrefix("0X")
-                        ?.toIntOrNull(16)?.takeIf { it in 0..0xFF }
+                val rawValues: List<String> = dataByteIndexes.map { index -> field(index) }
+                // Empty columns after the declared DLC are normal in fixed-width CSV exports.
+                // Without a DLC column, trim only trailing empties; a gap inside the frame is invalid.
+                val byteCount: Int = declaredDlc
+                    ?: (rawValues.indexOfLast { value -> value.isNotBlank() } + 1)
+                val hasBytesBeyondDeclaredDlc = declaredDlc != null &&
+                    rawValues.drop(declaredDlc).any { value -> value.isNotBlank() }
+                if (byteCount !in 0..rawValues.size || hasBytesBeyondDeclaredDlc) {
+                    null
+                } else {
+                    val values: List<Int?> = rawValues.take(byteCount).map { value: String ->
+                        if (value.isBlank()) null else value.removePrefix("0x").removePrefix("0X")
+                            .toIntOrNull(16)?.takeIf { byte -> byte in 0..0xFF }
+                    }
+                    if (values.any { byte -> byte == null }) null else values.filterNotNull()
                 }
             }
-            val timestamp = if (timestampIndex >= 0) field(timestampIndex).toDoubleOrNull() else null
             val direction = if (directionIndex >= 0) parseDirection(field(directionIndex)) else CanTraceDirection.UNKNOWN
-            val dlc = if (dlcIndex >= 0) field(dlcIndex).toIntOrNull() else bytes?.size
-            if (canId == null || bytes == null || dlc == null || dlc !in 0..64 || bytes.size < dlc) {
+            val dlc = declaredDlc ?: bytes?.size
+            if (canId == null || bytes == null || dlc == null || dlc !in 0..64 || bytes.size != dlc) {
                 errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
                 continue
             }
@@ -330,7 +658,28 @@ object CanTraceAnalyzer {
         val expectedLength: Int,
         val payload: MutableList<Int>,
         var nextSequence: Int
-    )
+    ) {
+        var lastFrameTimestampSeconds: Double? = timestampSeconds
+    }
+
+    private fun hasIsoTpConsecutiveFrameTimedOut(
+        previousTimestampSeconds: Double?,
+        currentTimestampSeconds: Double?
+    ): Boolean {
+        if (previousTimestampSeconds == null || currentTimestampSeconds == null) return false
+        if (currentTimestampSeconds < previousTimestampSeconds) return false
+        return currentTimestampSeconds - previousTimestampSeconds >
+            MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS
+    }
+
+    private fun hasIsoTpTimestampMovedBackwards(
+        previousTimestampSeconds: Double?,
+        currentTimestampSeconds: Double?
+    ): Boolean = previousTimestampSeconds != null && currentTimestampSeconds != null &&
+        currentTimestampSeconds < previousTimestampSeconds
+
+    private fun isValidIsoTpSeparationTime(value: Int): Boolean =
+        value in 0x00..0x7F || value in 0xF1..0xF9
 
     private data class ReassemblyResult(
         val messages: List<UdsTraceMessage>,
@@ -342,45 +691,79 @@ object CanTraceAnalyzer {
         val messages = mutableListOf<UdsTraceMessage>()
         val errors = mutableListOf<String>()
         val pending = mutableMapOf<Pair<Int, CanTraceDirection>, PendingIsoTp>()
+        var discardedIncompleteMessages = 0
 
         frames.forEach { frame ->
             if (frame.data.isEmpty()) return@forEach
             val pci = frame.data[0]
             when (pci and 0xF0) {
                 0x00 -> {
-                    val length = pci and 0x0F
-                    if (length == 0 || length > frame.data.size - 1) {
+                    val key = frame.canId to frame.direction
+                    if (pending.remove(key) != null) {
+                        errors += "Line ${frame.lineNumber}: single frame interrupted an unfinished ISO-TP message."
+                        discardedIncompleteMessages++
+                    }
+                    // CAN FD permits the escaped Single Frame length form: SF_DL=0,
+                    // followed by one byte containing the actual payload length.
+                    val shortLength = pci and 0x0F
+                    val headerLength = if (shortLength == 0) 2 else 1
+                    val length = if (shortLength == 0) frame.data.getOrNull(1) ?: 0 else shortLength
+                    if (length == 0 || length > 62 ||
+                        length > frame.data.size - headerLength
+                    ) {
                         errors += "Line ${frame.lineNumber}: invalid ISO-TP single-frame length."
                     } else {
                         messages += UdsTraceMessage(
                             frame.timestampSeconds, frame.canId, frame.direction,
-                            frame.data.drop(1).take(length)
+                            frame.data.drop(headerLength).take(length)
                         )
                     }
                 }
                 0x10 -> {
+                    val key = frame.canId to frame.direction
+                    if (pending.remove(key) != null) {
+                        errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
+                        discardedIncompleteMessages++
+                    }
                     if (frame.data.size < 2) {
                         errors += "Line ${frame.lineNumber}: truncated ISO-TP first frame."
                     } else {
-                        val length = ((pci and 0x0F) shl 8) or frame.data[1]
-                        if (length <= 0 || length > 4095) {
-                            errors += "Line ${frame.lineNumber}: unsupported ISO-TP first-frame length."
+                        val shortLength = ((pci and 0x0F) shl 8) or frame.data[1]
+                        val usesExtendedLength = shortLength == 0
+                        val headerLength = if (usesExtendedLength) 6 else 2
+                        if (usesExtendedLength && frame.data.size < headerLength) {
+                            errors += "Line ${frame.lineNumber}: truncated ISO-TP extended first-frame length."
                         } else {
-                            val key = frame.canId to frame.direction
-                            if (pending.containsKey(key)) {
-                                errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
-                            }
-                            val bytes = frame.data.drop(2).take(length).toMutableList()
-                            if (bytes.size >= length) {
-                                messages += UdsTraceMessage(
-                                    frame.timestampSeconds, frame.canId, frame.direction, bytes.take(length)
-                                )
-                                pending.remove(key)
+                            val lengthLong = if (usesExtendedLength) {
+                                (frame.data[2].toLong() shl 24) or
+                                    (frame.data[3].toLong() shl 16) or
+                                    (frame.data[4].toLong() shl 8) or
+                                    frame.data[5].toLong()
+                            } else shortLength.toLong()
+                            // A First Frame is only valid when the payload cannot fit in
+                            // a Single Frame of the same CAN data length. Otherwise malformed
+                            // PCI data could be promoted to a complete UDS message.
+                            val maxSingleFramePayload = minOf(62, frame.data.size - 1)
+                            if (lengthLong <= 0 ||
+                                lengthLong > MAX_SUPPORTED_ISOTP_PAYLOAD_BYTES.toLong() ||
+                                (usesExtendedLength && lengthLong <= 4095) ||
+                                (!usesExtendedLength && lengthLong <= maxSingleFramePayload)
+                            ) {
+                                errors += "Line ${frame.lineNumber}: unsupported ISO-TP first-frame length."
                             } else {
-                                pending[key] = PendingIsoTp(
-                                    frame.timestampSeconds, frame.canId, frame.direction,
-                                    length, bytes, nextSequence = 1
-                                )
+                                val length = lengthLong.toInt()
+                                val bytes = frame.data.drop(headerLength).take(length).toMutableList()
+                                if (bytes.size >= length) {
+                                    messages += UdsTraceMessage(
+                                        frame.timestampSeconds, frame.canId, frame.direction, bytes.take(length)
+                                    )
+                                    pending.remove(key)
+                                } else {
+                                    pending[key] = PendingIsoTp(
+                                        frame.timestampSeconds, frame.canId, frame.direction,
+                                        length, bytes, nextSequence = 1
+                                    )
+                                }
                             }
                         }
                     }
@@ -390,13 +773,38 @@ object CanTraceAnalyzer {
                     val state = pending[key]
                     if (state == null) {
                         errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame has no matching first frame."
+                    } else if (hasIsoTpTimestampMovedBackwards(
+                            state.lastFrameTimestampSeconds,
+                            frame.timestampSeconds
+                        )
+                    ) {
+                        errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame timestamp moved backwards."
+                        pending.remove(key)
+                        discardedIncompleteMessages++
+                    } else if (hasIsoTpConsecutiveFrameTimedOut(
+                            state.lastFrameTimestampSeconds,
+                            frame.timestampSeconds
+                        )
+                    ) {
+                        val elapsed = frame.timestampSeconds!! - state.lastFrameTimestampSeconds!!
+                        errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame timed out after ${elapsed}s."
+                        pending.remove(key)
+                        discardedIncompleteMessages++
+                    } else if (frame.data.size < 2) {
+                        errors += "Line ${frame.lineNumber}: truncated ISO-TP consecutive frame."
+                        pending.remove(key)
+                        discardedIncompleteMessages++
                     } else {
                         val sequence = pci and 0x0F
                         if (sequence != state.nextSequence) {
                             errors += "Line ${frame.lineNumber}: ISO-TP sequence mismatch (expected ${state.nextSequence}, got $sequence)."
                             pending.remove(key)
+                            discardedIncompleteMessages++
                         } else {
                             state.payload += frame.data.drop(1).take(state.expectedLength - state.payload.size)
+                            if (frame.timestampSeconds != null) {
+                                state.lastFrameTimestampSeconds = frame.timestampSeconds
+                            }
                             state.nextSequence = (state.nextSequence + 1) and 0x0F
                             if (state.payload.size >= state.expectedLength) {
                                 messages += UdsTraceMessage(
@@ -408,10 +816,21 @@ object CanTraceAnalyzer {
                         }
                     }
                 }
-                0x30 -> Unit // Flow-control frame; it is transport metadata, not a UDS payload.
+                0x30 -> {
+                    // ISO-TP Flow Control carries FlowStatus, BlockSize and STmin.
+                    // Validate metadata even though it is not exposed as a UDS payload.
+                    val flowStatus = pci and 0x0F
+                    val separationTime = frame.data.getOrNull(2)
+                    if (frame.data.size < 3 || flowStatus !in 0..2 ||
+                        separationTime == null || !isValidIsoTpSeparationTime(separationTime)
+                    ) {
+                        errors += "Line ${frame.lineNumber}: invalid ISO-TP flow-control frame."
+                    }
+                }
                 else -> errors += "Line ${frame.lineNumber}: unsupported ISO-TP PCI type 0x${pci.toString(16).uppercase(Locale.ROOT)}."
             }
         }
-        return ReassemblyResult(messages, errors, pending.size)
+        // Include partial messages discarded mid-stream as well as sessions still open at EOF.
+        return ReassemblyResult(messages, errors, discardedIncompleteMessages + pending.size)
     }
 }

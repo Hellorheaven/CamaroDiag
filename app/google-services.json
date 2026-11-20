@@ -1,0 +1,64 @@
+{
+  "project_info": {
+    "project_number": "1094045154128",
+    "project_id": "camarodiag-e1ed1",
+    "storage_bucket": "camarodiag-e1ed1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1094045154128:android:26a037ca15878c44beca55",
+        "android_client_info": {
+          "package_name": "com.camarodiag.gen5"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1094045154128-nbveng03polao90ojrutfb6cjsfpv8kn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.camarodiag.gen5",
+            "certificate_hash": "2d5f90380bca821c1b1d4f2c05fe8656a9e48e8f"
+          }
+        },
+        {
+          "client_id": "1094045154128-408o6tmbvi9drsjipcah8a86o48hnrs6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCphXqaUezcjOJ9GGN4i-9YGO2ObvkNCVo"
+        }
+      ]
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1094045154128:android:05c67c58bcf48a54beca55",
+        "android_client_info": {
+          "package_name": "com.camarodiag.gen5.debug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1094045154128-38e729iam9rbh16a2cdflivuh67o6l7r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.camarodiag.gen5.debug",
+            "certificate_hash": "2d5f90380bca821c1b1d4f2c05fe8656a9e48e8f"
+          }
+        },
+        {
+          "client_id": "1094045154128-408o6tmbvi9drsjipcah8a86o48hnrs6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCphXqaUezcjOJ9GGN4i-9YGO2ObvkNCVo"
+        }
+      ]
+    }
+  ],
+  "configuration_version": "1"
+}

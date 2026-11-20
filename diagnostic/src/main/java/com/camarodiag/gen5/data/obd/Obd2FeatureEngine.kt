@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 
 /** A single-command OBD transport. Implement with Bluetooth/USB/Wi-Fi ELM or a documented provider. */
 fun interface ObdCommandChannel {
@@ -16,6 +17,14 @@ data class ObdValue(
 )
 
 data class ObdDtc(val code: String, val status: String)
+
+data class ObdEcuIdentification(
+    val vin: String?,
+    val calibrationIds: List<String>,
+    val calibrationVerificationNumbers: List<String>,
+    val ecuNames: List<String>,
+    val respondingEcuAddresses: List<String>
+)
 
 data class ObdScanReport(
     val supportedPids: Set<Int>,
@@ -79,7 +88,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
                 .mapNotNull { match ->
                     val id = match.groupValues[1].uppercase(Locale.ROOT)
                     val numeric = id.toIntOrNull(16) ?: return@mapNotNull null
-                    id.takeIf { numeric in 0x700..0x7FF && numeric != 0x7DF }
+                    id.takeIf { numeric in 0x7E8..0x7EF }
                 }
                 .distinct()
                 .sorted()
@@ -221,6 +230,24 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
 
     suspend fun readEcuName(): List<String> =
         decodeAsciiRecords(ask("090A"), 0x49, 0x0A, 20)
+    /** Reads standardized OBD identity fields independently; unsupported optional records do not abort the read. */
+    suspend fun readEcuIdentification(): ObdEcuIdentification {
+        val responders = readOrDefault(emptyList()) { discoverFunctionalObdResponders() }
+        val vin = readOrDefault<String?>(null) { readVin() }
+        val calibrationIds = readOrDefault(emptyList()) { readCalibrationIds() }
+        val cvns = readOrDefault(emptyList()) { readCalibrationVerificationNumbers() }
+        val ecuNames = readOrDefault(emptyList()) { readEcuName() }
+        return ObdEcuIdentification(vin, calibrationIds, cvns, ecuNames, responders)
+    }
+
+    private suspend fun <T> readOrDefault(default: T, read: suspend () -> T): T =
+        try {
+            read()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            default
+        }
 
     suspend fun readReadiness(): String? {
         val data = payload(ask("0101"), 0x41, 0x01) ?: return null
@@ -464,7 +491,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             0x5C -> "Engine oil temperature" to ((a - 40).toDouble() to "°C")
             0x5D -> "Fuel injection timing" to (((word() ?: return emptyList()) / 128.0) - 210.0 to "°")
             0x5E -> "Engine fuel rate" to ((word() ?: return emptyList()) / 20.0 to "L/h")
-            0x5F -> "Hybrid / alternate fuel system status" to (percent(a) to "%")
+            0x5F -> return raw("Emission requirements to which vehicle is designed")
             0x61 -> "Driver demand engine torque" to ((a - 125).toDouble() to "%")
             0x62 -> "Actual engine torque" to ((a - 125).toDouble() to "%")
             0x63 -> "Engine reference torque" to ((word() ?: return emptyList()).toDouble() to "Nm")

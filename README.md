@@ -16,6 +16,18 @@ CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5
 - Pont Windows J2534 facultatif pour certains adaptateurs Pass-Thru, notamment VXDIAG VCX SE et VCX Nano avec pilote compatible.
 - Les commandes carrosserie non validées et les fonctions de programmation restent verrouillées.
 
+## Compte utilisateur et connexion
+
+À l'ouverture de CamaroDiag, un compte est demandé avant d'accéder au diagnostic. Deux méthodes de connexion sont proposées : **Google** ou **adresse e-mail et mot de passe**.
+
+- Pour un nouveau compte e-mail, confirmer l'adresse avec le message reçu. L'écran de vérification permet de contrôler la confirmation et de demander un nouvel envoi.
+- En cas d'oubli, demander la réinitialisation du mot de passe depuis l'écran de connexion.
+- Une fois connecté, ouvrir **Mon compte** pour voir l'adresse, le fournisseur, ajouter l'autre mode de connexion lorsqu'il utilise la même adresse, se déconnecter ou demander la suppression du compte.
+- La première connexion nécessite Internet. Une session déjà vérifiée en ligne sur cet appareil peut poursuivre le diagnostic sans réseau pendant **7 jours maximum** après la dernière validation réussie. Passé ce délai, l'application demande une connexion Internet. La révocation par Firebase ne peut être vérifiée tant que l'appareil est hors ligne.
+- Les véhicules et historiques enregistrés sont séparés localement par compte Firebase. Les anciennes données enregistrées avant l'ajout des comptes ne sont pas affectées automatiquement à un utilisateur : leur importation se demande explicitement dans les paramètres du véhicule.
+
+**Limites actuelles :** aucune synchronisation automatique des véhicules ou historiques entre appareils. Les fichiers exportés hors de CamaroDiag et les copies conservées par l'utilisateur ne sont pas supprimés lors de la suppression du compte. Firebase peut demander une connexion récente pour autoriser la suppression. Les opérations de diagnostic sensibles restent soumises à leurs contrôles propres, indépendamment du compte.
+
 ## Matrice des fonctions par interface
 
 | Interface | Liaison | OBD-II standard | UDS / signaux Camaro | SW-CAN / GMLAN | État et conditions |
@@ -64,43 +76,33 @@ Les familles ECM sont indicatives et doivent être confirmées sur le véhicule 
 
 Le catalogue OBDb est communautaire, non certifié par GM. Un signal répertorié n'est pas nécessairement présent sur chaque finition, marché, transmission ou calibration. Une absence de réponse n'est jamais remplacée par une valeur fictive.
 
-## Télécharger la version Debug
+## Installer CamaroDiag sur Android
 
-Les APK Debug sont publiés comme artefacts des exécutions GitHub Actions (ils ne sont pas ajoutés aux Releases) :
+CamaroDiag nécessite Android 10 ou supérieur. Selon l'adaptateur choisi, le téléphone ou la tablette doit disposer de Bluetooth, de Wi-Fi ou d'un port USB Host/OTG.
 
-1. Ouvrir https://github.com/Hellorheaven/CamaroDiag/actions.
-2. Ouvrir la dernière exécution réussie de **Android CI** sur `main`.
-3. Dans **Artifacts**, télécharger `CamaroDiag-debug-<commit>`.
-4. Décompresser l'archive et installer `CamaroDiag-debug.apk`.
+1. Télécharger l'APK CamaroDiag depuis les [versions publiées](https://github.com/Hellorheaven/CamaroDiag/releases/latest).
+2. Installer l'APK et accepter les autorisations demandées par Android pour l'adaptateur choisi.
+3. Brancher l'adaptateur à la prise diagnostic du véhicule, puis mettre le contact selon la procédure adaptée.
+4. Ouvrir CamaroDiag, sélectionner le véhicule et le type d'interface.
+5. Vérifier la connexion et commencer par la lecture de l'identification ou un diagnostic OBD-II standard.
 
-Chaque artefact est conservé 30 jours. Les Releases restent réservées aux APK Release et aux installateurs du pont Windows.
+Les compatibilités indiquées dans les tableaux ci-dessus sont conditionnelles : un adaptateur reconnu ne garantit pas l'accès à chaque calculateur.
 
-## Installation Android
+## Installer le pont PC Windows (facultatif)
 
-Prérequis : Android 10 ou supérieur (API 29 à 36 déclarées), Bluetooth ou Wi-Fi selon l'adaptateur, et USB Host/OTG pour les interfaces USB.
+Le pont PC permet d'utiliser un fournisseur J2534 sous Windows 10 ou 11, notamment certaines interfaces VXDIAG VCX SE ou VCX Nano lorsque leur modèle et leur pilote sont compatibles.
 
-1. Télécharger l'APK depuis https://github.com/Hellorheaven/CamaroDiag/releases.
-2. Installer l'application ; autoriser si besoin l'installation depuis la source choisie.
-3. Accorder les autorisations Bluetooth à proximité, USB ou réseau demandées par Android.
-4. Brancher l'interface sur la prise diagnostic, mettre le contact selon les instructions du fabricant et sélectionner l'adaptateur.
-5. Commencer par l'identification du véhicule et le scan OBD-II standard.
+1. Installer d'abord le pilote constructeur J2534 correspondant à l'interface (et VX Manager pour les modèles VXDIAG qui le nécessitent).
+2. Télécharger depuis les [versions CamaroDiag](https://github.com/Hellorheaven/CamaroDiag/releases/latest) le programme d'installation Windows x86 ou x64 correspondant au pilote J2534.
+3. Exécuter l'installateur, puis lancer **CamaroDiag J2534 Bridge** depuis le menu Démarrer.
+4. Choisir l'interface et relever l'adresse IP, le port et le jeton d'appairage indiqués.
+5. Relier Android et le PC au même réseau privé, puis renseigner ces informations et les identifiants CAN documentés du calculateur dans CamaroDiag.
 
-## Installation du pont Windows J2534
+La connexion J2534 autorise les lectures UDS et le maintien de session lorsqu'ils sont pris en charge. Elle ne rend pas disponibles le flashage, les commandes constructeur non vérifiées ni tous les réseaux GM.
 
-Le pont PC est facultatif et nécessaire uniquement pour utiliser un fournisseur J2534 installé sur Windows.
+**Sécurité :** utiliser exclusivement un réseau local privé et de confiance. Le pont n'utilise pas de chiffrement TLS : ne jamais exposer son port à Internet ni l'utiliser sur un réseau Wi-Fi public.
 
-1. Installer Windows 10/11 et le pilote constructeur correspondant exactement au VCX SE/Nano ou à l'interface J2534.
-2. Pour VXDIAG, installer VX Manager et vérifier que le fournisseur J2534 est enregistré.
-3. Télécharger l'archive Windows depuis les releases ou artefacts CamaroDiag : https://github.com/Hellorheaven/CamaroDiag/actions.
-4. Choisir x64 ou x86 selon l'architecture du DLL J2534.
-5. Décompresser et lancer CamaroDiag.J2534Bridge.exe.
-6. Sélectionner le fournisseur J2534 si plusieurs sont présents. Relever IP, port et jeton d'appairage.
-7. Connecter le PC et Android au même réseau privé de confiance.
-8. Dans l'espace ECU de CamaroDiag, saisir IP, port, jeton et CAN ID physiques documentés du calculateur.
-
-Le pont est une passerelle J2534 générique : il ne fournit pas de pilote VXDIAG et ne remplace pas VX Manager. Il autorise uniquement la lecture UDS 0x22, 0x19 et TesterPresent 0x3E. Le SW-ISO15765 dépend du support J2534-2 réel du pilote.
-
-Sécurité : le pont utilise TCP local sans TLS. Ne jamais exposer le port à Internet, configurer de redirection de port ou l'utiliser sur un Wi-Fi public. Limiter le pare-feu aux réseaux privés de confiance.
+Pour les étapes détaillées, consulter le [guide d'installation du pont PC](pc-bridge/README.md).
 
 ## Atelier ECU et fichiers de calibration
 
@@ -124,3 +126,12 @@ Le catalogue de signaux communautaire est issu du projet **OBDb Chevrolet Camaro
 Références utiles : OBDLink (https://support.obdsol.com/support/solutions/articles/43000713351-which-obdlink-adapter-is-right-for-me-), fiche MX+ (https://www.obdlink.com/products/obdlink-mxp/), guide GM MDI 2 (https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf), guide GM TIS2Web (https://gsi.ext.gm.com/userguides/GM_TIS2Web_User_Guide.pdf). Ces documents généraux ne remplacent pas les informations de service GM correspondant au VIN.
 
 CamaroDiag est un outil indépendant d'aide au diagnostic, sans certification GM. Ne pas effectuer de diagnostic ou d'opération lorsque le véhicule est en mouvement.
+
+
+## Guides utilisateur
+
+- [Compatibilité Camaro et adaptateurs](docs_GM_SUPPORT.md)
+- [Utiliser un adaptateur ELM327](docs/ELM327_OFFLINE_TESTING.md)
+- [Analyser une capture CAN ou UDS](docs/CAN_TRACE_ANALYZER.md)
+- [Comprendre les signaux spécifiques Camaro](docs/NATIVE_CAMARO_SIGNAL_CATALOG.md)
+- [Nouveautés de la branche de développement](docs/CHANGELOG_PR35.md)

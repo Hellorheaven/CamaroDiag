@@ -76,6 +76,91 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun doesNotConfuseCanHeaderSupportWithPhysicalTransmitCapability() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "ELM327 Bluetooth",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "ELM327 v1.5",
+            stiResp = "?",
+            atalResp = "OK",
+            stp61Resp = "?",
+            headersResp = "OK",
+            protocolResp = "OK"
+        )
+
+        assertTrue(capabilities.supportsCanHeaders)
+        assertFalse(capabilities.supportsCanTransmit)
+    }
+
+    @Test
+    fun enablesCanTransmitOnlyAfterARealStandardObdResponse() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "ELM327 Bluetooth",
+            macAddress = "00:00:00:00:00:00",
+            atzResp = "ELM327 v1.5",
+            stiResp = "?",
+            atalResp = "OK",
+            stp61Resp = "?",
+            headersResp = "OK",
+            protocolResp = "OK",
+            transmitProbeResp = "SEARCHING...\r\n7E8 06 41 00 BE 3E B8 13"
+        )
+
+        assertTrue(capabilities.supportsCanHeaders)
+        assertTrue(capabilities.supportsCanTransmit)
+    }
+
+    @Test
+    fun rejectsAdapterChatterAndIncompletePid00FragmentsAsTransmitProof() {
+        listOf(
+            "0100",
+            "SEARCHING...\r\nNO DATA",
+            "ELM327 v4.100",
+            "7E8 03 41 00 BE",
+            "7E8 05 41 00 BE 3E B8 13",
+            "7E8 08 41 00 BE 3E B8 13",
+            "18DAF110 07 41 00 BE 3E B8 13",
+            "NOPE4100BE3EB813"
+        ).forEach { response ->
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "ELM327 Bluetooth",
+                macAddress = "00:00:00:00:00:00",
+                atzResp = "ELM327 v1.5",
+                stiResp = "?",
+                atalResp = "OK",
+                stp61Resp = "?",
+                headersResp = "OK",
+                protocolResp = "OK",
+                transmitProbeResp = response
+            )
+            assertFalse("Must not trust response: $response", capabilities.supportsCanTransmit)
+        }
+    }
+
+    @Test
+    fun acceptsCompletePid00ResponseWithOrWithoutCanHeader() {
+        listOf(
+            "41 00 BE 3E B8 13",
+            "06 41 00 BE 3E B8 13",
+            "7E8 06 41 00 BE 3E B8 13",
+            "18DAF110 06 41 00 BE 3E B8 13"
+        ).forEach { response ->
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "ELM327 Bluetooth",
+                macAddress = "00:00:00:00:00:00",
+                atzResp = "ELM327 v1.5",
+                stiResp = "?",
+                atalResp = "OK",
+                stp61Resp = "?",
+                headersResp = "OK",
+                protocolResp = "OK",
+                transmitProbeResp = response
+            )
+            assertTrue("Expected a complete ECU response: $response", capabilities.supportsCanTransmit)
+        }
+    }
+
+    @Test
     fun genericElmCloneCanUseStandardCanWithoutClaimingUdsCapabilities() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "ELM327 Bluetooth",
@@ -92,6 +177,25 @@ class CamaroUdsProtocolTest {
         assertTrue(capabilities.supportsCanHeaders)
         assertFalse(capabilities.supportsLongFrames)
         assertFalse(capabilities.supportsSwCan)
+    }
+
+    @Test
+    fun doesNotSelectStnModeFromObdLinkOrVlinkerNameWithoutFirmwareEvidence() {
+        listOf("OBDLink MX+", "OBDLink CX", "vLinker MC+").forEach { name ->
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = name,
+                macAddress = "00:00:00:00:00:00",
+                atzResp = "OBDLink",
+                stiResp = "?",
+                atalResp = "?",
+                stp61Resp = "OK",
+                headersResp = "OK",
+                protocolResp = "OK"
+            )
+
+            assertEquals(name, AdapterTier.CLONE_ELM, capabilities.tier)
+            assertFalse(name, capabilities.supportsSwCan)
+        }
     }
 
     @Test
@@ -137,6 +241,7 @@ class CamaroUdsProtocolTest {
         val adapter = AdapterCapabilities()
         assertEquals(AdapterTier.DISCONNECTED, adapter.tier)
         assertFalse(adapter.supportsCanHeaders)
+        assertFalse(adapter.supportsCanTransmit)
         assertFalse(adapter.supportsLongFrames)
         assertFalse(adapter.supportsSwCan)
     }
