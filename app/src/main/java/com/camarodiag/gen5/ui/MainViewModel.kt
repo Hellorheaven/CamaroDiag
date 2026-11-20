@@ -1483,17 +1483,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Detaching first prevents the cancelled job from publishing buffered frames into the
      * newly selected vehicle's empty CAN monitor state.
      */
+    // Detached jobs no longer own the console UI, but their transport cleanup
+    // must finish before a new adapter or CAN command can use the channel.
+    private var detachedCanMonitorJob: Job? = null
+    private var detachedCanRequestJob: Job? = null
+
     private fun discardCanMonitor() {
-        val activeJob = canMonitorJob
+        val activeJob = canMonitorJob ?: return
         canMonitorJob = null
-        activeJob?.cancel()
+        detachedCanMonitorJob = activeJob
+        activeJob.cancel()
     }
 
     /** Detaches and cancels a manual console request so its result cannot leak into a new vehicle context. */
     private fun detachCanRequest(): Job? {
-        val activeJob = canRequestJob
+        val activeJob = canRequestJob ?: return null
         canRequestJob = null
-        activeJob?.cancel()
+        detachedCanRequestJob = activeJob
+        activeJob.cancel()
         return activeJob
     }
 
