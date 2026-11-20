@@ -119,6 +119,14 @@
     <string name="guide_vlinker_description">Excellente fiabilité sur le bus moteur/boîte/ABS (HS-CAN 500 kbps). Le vLinker MC+ gère également le SW-CAN GMLAN.</string>
     <string name="guide_clone_limitations">3. Limites des Clones ELM327 v2.1 Génériques</string>
     <string name="guide_clone_description">Les boîtiers bleus ou mini ELM327 à bas coût n\'ont aucun circuit physique sur la broche 1 (SW-CAN), possèdent des mémoires tampon tronquées et rejettent souvent les commandes d\'adressage CAN étendu. L\'accès aux modules dépend toujours de l\'équipement du véhicule, de la puce de l\'interface et du protocole supporté.</string>
+    <string name="about_title">À propos de CamaroDiag</string>
+    <string name="about_version">Version installée : %1$s</string>
+    <string name="about_build">Numéro de build : %1$d</string>
+    <string name="about_check_updates">Vérifier les mises à jour</string>
+    <string name="about_checking">Vérification…</string>
+    <string name="about_up_to_date">CamaroDiag est à jour.</string>
+    <string name="about_update_found">Une nouvelle version est disponible.</string>
+    <string name="about_check_failed">Impossible de vérifier les mises à jour. Vérifiez votre connexion Internet.</string>
     <string name="settings_title">Paramètres &amp; Rapports Enregistrés</string>
     <string name="settings_unit_system">Système d\'unités</string>
     <string name="settings_saved_sessions">Sessions Sauvegardées (Base Locale Room)</string>
