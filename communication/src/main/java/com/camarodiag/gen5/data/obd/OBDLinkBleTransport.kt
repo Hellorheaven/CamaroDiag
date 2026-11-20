@@ -252,6 +252,11 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 
     fun close() {
+        // Wake any coroutine still waiting for an operation on the session being closed.
+        val closed = ObdTransportDisconnectedException("OBDLink BLE session was closed")
+        connectResult?.completeExceptionally(closed)
+        writeResult?.completeExceptionally(closed)
+        mtuResult?.completeExceptionally(closed)
         try { gatt?.disconnect() } catch (_: Exception) {}
         try { gatt?.close() } catch (_: Exception) {}
         gatt = null
