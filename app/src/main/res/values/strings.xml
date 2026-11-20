@@ -740,4 +740,14 @@
     <string name="can_console_input_label">CAN frame or OBD command</string>
     <string name="can_console_input_hint">Raw frame: 7E0 02 01 0C or 18DAF110 03 22 F1 90 • OBD: 01 0C</string>
     <string name="can_console_sending">Sending to the connected adapter…</string>
+
+    <string name="can_console_history">Unified CAN console history</string>
+    <string name="can_console_clear">Clear history</string>
+    <string name="can_console_empty">No traffic yet. Received and transmitted data will appear here.</string>
+    <string name="can_console_tx">TX • SENT</string>
+    <string name="can_console_rx">RX • RECEIVED</string>
+    <string name="can_console_system">SYSTEM</string>
+    <string name="can_console_input_label">Frame or OBD command</string>
+    <string name="can_console_input_hint">CAN frame: 7E0 02 01 0C • OBD request: 01 0C</string>
+    <string name="can_console_sending">Sending…</string>
 </resources>
