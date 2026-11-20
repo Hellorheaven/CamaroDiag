@@ -19,6 +19,17 @@ class CanConsoleRecordParserTest {
     }
 
     @Test
+    fun zeroLengthCanFramesAreReceivedRatherThanSystemMessages() {
+        val records = CanConsoleRecordParser.parse(
+            "7E8 00\r\n18DAF110 0\r\n7E8 00 FF"
+        )
+
+        assertEquals(listOf("RX", "RX", "SYSTEM"), records.map { it.direction })
+        assertEquals("CAN ID=7E8 DLC=0 DATA=(empty)", records[0].content)
+        assertEquals("CAN ID=18DAF110 DLC=0 DATA=(empty)", records[1].content)
+    }
+
+    @Test
     fun adapterErrorsRemainSystemEventsAndAreMarkedFailed() {
         val records = CanConsoleRecordParser.parse(
             "NO DATA\r\nCAN ERROR\r\nBUFFER FULL\r\nSEARCHING..."
