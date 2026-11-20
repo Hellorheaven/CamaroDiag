@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Zmrazená data</string>
     <string name="obd_raw_scan_log">Protokol nezpracovaného skenu</string>
     <string name="obd_powertrain_ecm">Pohonné ústrojí / ECM</string>
+    <string name="vehicle_setup_header">Nastavení vozidla</string>
+    <string name="vehicle_generation">Generace</string>
+    <string name="vehicle_model_year">Modelový rok</string>
+    <string name="vehicle_engine">Motor</string>
+    <string name="vehicle_transmission">Převodovka</string>
+    <string name="vehicle_market_region">Oblast trhu</string>
+    <string name="vehicle_vin">VIN vozidla</string>
+    <string name="obd_scan_title">ÚPLNÁ DIAGNOSTIKA OBD-II</string>
+    <string name="obd_readiness">Připravenost OBD</string>
+    <string name="obd_mode06_results">Výsledky režimu 06</string>
 </resources>
