@@ -230,3 +230,13 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Commit de synchronisation : `67643563116fbf3245f6e2d92d2f0f8a19a4c628`.
 - Vérification GitHub après synchronisation : `behind_by = 0`, `mergeable = true`, `mergeable_state = clean`. La PR reste ouverte et en Draft.
 - Aucun workflow de validation n'a été déclenché sur ce commit ; les validations précédemment affichées « success » avaient les jobs de build/test en `skipped`.
+
+
+### Console CAN — correctifs de tests et export de l'historique — 2026-11-20
+
+- Correction des fixtures de tests du parseur CAN brut : les séparateurs CR/LF sont maintenant de vrais échappements Kotlin, afin que les lignes ELM soient réellement découpées pendant les tests.
+- Correction des fixtures de validation de capacité TX Mode 01 PID 00 pour représenter des réponses multi-lignes réalistes ; les tests couvrent maintenant le format avec recherche initiale et réponse ECU sur une ligne distincte.
+- Le bouton d'export de la console unifiée est maintenant disponible directement dans l'en-tête de l'historique, même lorsqu'aucune analyse de capture n'a encore produit de trames. L'export reste désactivé pendant une capture et lorsqu'il n'existe aucun contenu.
+- Le libellé utilise « Export raw log » / « Exporter le journal brut », cohérent avec le fichier texte exporté.
+- Commits : `5c6ad0f` (fixtures CAN), `c107175` (fixtures probe OBD), `3a8bdae` (export console).
+- Modifications relues sur GitHub. Aucun test Gradle, lint ou build APK n'a été exécuté ; ces correctifs ne sont donc pas déclarés validés.
