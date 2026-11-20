@@ -61,6 +61,43 @@ class ObdTransportConnectionStateTest {
     }
 
     @Test
+    fun sessionInvalidationRejectsPendingWorkAfterReconnect() {
+        val epoch = ObdTransportSessionEpoch()
+        val original = epoch.capture()
+        epoch.requireCurrent(original)
+
+        epoch.invalidate()
+        val replacement = epoch.capture()
+        assertTrue(replacement != original)
+
+        val failure = org.junit.Assert.assertThrows(
+            ObdTransportDisconnectedException::class.java
+        ) { epoch.requireCurrent(original) }
+        assertTrue(failure.message.orEmpty().contains("changed"))
+        epoch.requireCurrent(replacement)
+    }
+
+    @Test
+    fun repeatedDisconnectsAdvanceEpochWithoutReusingOldSession() {
+        val epoch = ObdTransportSessionEpoch()
+        val first = epoch.capture()
+        epoch.invalidate()
+        val second = epoch.capture()
+        epoch.invalidate()
+        val third = epoch.capture()
+
+        assertTrue(first < second)
+        assertTrue(second < third)
+        org.junit.Assert.assertThrows(ObdTransportDisconnectedException::class.java) {
+            epoch.requireCurrent(first)
+        }
+        org.junit.Assert.assertThrows(ObdTransportDisconnectedException::class.java) {
+            epoch.requireCurrent(second)
+        }
+        epoch.requireCurrent(third)
+    }
+
+    @Test
     fun unsupportedTransportIsUnavailable() {
         assertFalse(ObdTransportConnectionState.isCommandChannelAvailable(
             false, false, "J2534_BRIDGE"
