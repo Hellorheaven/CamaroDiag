@@ -767,4 +767,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULATION: Diese ECU-Kennungen wurden nicht aus einem echten Fahrzeug gelesen und können dessen Firmware nicht validieren.</string>
     <string name="cal_expert_block_memory_map">Zielspeicherbelegung und geschützte Bereiche wurden nicht verifiziert.</string>
     <string name="flexfuel_preflight_backup">Die ursprüngliche ECU-Sicherung wurde nicht verifiziert.</string>
+    <string name="cal_expert_title">Expertenmodus — ECU auf dem Prüfstand / Chip</string>
+    <string name="cal_expert_expand">Expertenmodus konfigurieren</string>
+    <string name="cal_expert_collapse">Experteneinstellungen ausblenden</string>
+    <string name="cal_expert_family">Steuergerätefamilie (E39 oder E39A)</string>
+    <string name="cal_expert_chip">Abgelesene Chipkennzeichnung</string>
+    <string name="cal_expert_programmer">Programmiergerät / Schnittstelle für den Prüfstand</string>
+    <string name="cal_expert_access_title">Zugriffsmethode</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Externer Speicher, ausgelöteter Chip</string>
+    <string name="cal_expert_region_title">Speicherbereich</string>
+    <string name="cal_expert_region_pflash">Interner Programmspeicher des MCU (Flash)</string>
+    <string name="cal_expert_region_dflash">Datenspeicher des MCU (Flash)</string>
+    <string name="cal_expert_region_eeprom">Externes EEPROM</string>
+    <string name="cal_expert_blockers">Offene Prüfungen im Expertenmodus</string>
+    <string name="cal_expert_block_controller">Genaue Steuergerätefamilie prüfen (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Physische Kennzeichnung von MCU oder Speicherchip ermitteln.</string>
+    <string name="cal_expert_block_programmer">Kompatibles Programmiergerät für den Prüfstand ermitteln.</string>
+    <string name="cal_expert_block_image_missing">Nicht leeres Firmware-Abbild importieren.</string>
+    <string name="cal_expert_block_image_format">Für diesen Vorbereitungsvorgang ist eine rohe Binärdatei erforderlich.</string>
 </resources>
