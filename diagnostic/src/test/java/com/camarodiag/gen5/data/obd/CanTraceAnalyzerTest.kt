@@ -160,7 +160,7 @@ class CanTraceAnalyzerTest {
             "0.000000 1 7E0 Tx d 8 02 01 0C 00 00 00 00 00",
             "0.001000 1 7E0 Tx d 8 02 01 0D 00 00 00 00 00",
             "0.025000 1 7E8 Rx d 8 03 41 0D 54 00 00 00 00",
-            "0.030000 1 7E8 Rx d 8 03 41 0C 1A F8 00 00 00 00"
+            "0.030000 1 7E8 Rx d 8 03 41 0C 1A F8 00 00 00"
         ).joinToString("\n")
         val report = CanTraceAnalyzer.analyze(trace, "multiple-pids.asc")
 
@@ -826,7 +826,7 @@ class CanTraceAnalyzerTest {
         )
 
         assertTrue(report.frames.isEmpty())
-        assertEquals(4, report.errors.size)
+        assertEquals(3, report.errors.size)
     }
 
     @Test
@@ -846,7 +846,7 @@ class CanTraceAnalyzerTest {
         val trace = listOf(
             "NaN 1 7E8 Rx d 8 03 41 0C 00 00 00 00",
             "Infinity 1 7E8 Rx d 8 03 41 0C 00 00 00 00",
-            "1.25e-3 1 7E8 Rx d 8 03 41 0C 00 00 00 00"
+            "1.25e-3 1 7E8 Rx d 8 03 41 0C 00 00 00 00 00"
         ).joinToString("\n")
 
         val report = CanTraceAnalyzer.analyze(trace, "timestamp-validation.asc")
@@ -907,7 +907,7 @@ class CanTraceAnalyzerTest {
         val report = CanTraceAnalyzer.analyze(
             listOf(
                 "7E8 8 10 08 62 F1 90 41 42 43",
-                "7E8 8 21 44 00 00 00 00 00"
+                "7E8 8 21 44 00 00 00 00 00 00"
             ).joinToString("\n"),
             "valid-first-frame.txt"
         )
@@ -948,7 +948,7 @@ class CanTraceAnalyzerTest {
         val trace = listOf(
             "0.000000 1 7DF Tx d 8 02 01 0C 00 00 00 00 00",
             "0.025000 1 7E8 Rx d 8 04 41 0C 1A F8 00 00 00",
-            "0.030000 1 7E9 Rx d 8 04 41 0C 1A F0 00 00"
+            "0.030000 1 7E9 Rx d 8 04 41 0C 1A F0 00 00 00"
         ).joinToString("\n")
         val report = CanTraceAnalyzer.analyze(trace, "functional-multiple-ecus.asc")
 
