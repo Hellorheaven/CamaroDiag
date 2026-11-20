@@ -67,7 +67,7 @@ class LocaleResourcesIntegrityTest {
     @Test fun translatedKeysExistInEnglishAndFormatArgumentsMatch() {
         val english = strings("en")
         // Android format arguments: numbered placeholders must retain their type.
-        val placeholder = Regex("%([1-9][0-9]*\\\\$)?[-+# 0,(]*[0-9]*(?:\\\\.[0-9]+)?[a-zA-Z]")
+        val placeholder = Regex("""%([1-9][0-9]*[$])?[-+# 0,(]*[0-9]*(?:\.[0-9]+)?[a-zA-Z]""")
         fun arguments(value: String): List<String> =
             placeholder.findAll(value.replace("%%", "")).map { it.value }.sorted().toList()
         for (locale in locales.filterNot { it == "en" }) {
