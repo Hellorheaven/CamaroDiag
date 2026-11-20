@@ -22,6 +22,10 @@ class ElmUsbTransport(private val context: Context) {
 
     private var port: UsbSerialPort? = null
     private var connection: android.hardware.usb.UsbDeviceConnection? = null
+    @Volatile private var connectionLost = false
+
+    val isConnected: Boolean
+        get() = port != null && connection != null && !connectionLost
 
     fun availableDevices(): List<String> =
         UsbSerialProber.getDefaultProber()
@@ -93,6 +97,7 @@ class ElmUsbTransport(private val context: Context) {
 
             connection = conn
             port = serial
+            connectionLost = false
 
             Result.success(Unit)
 
@@ -103,12 +108,24 @@ class ElmUsbTransport(private val context: Context) {
     }
 
     fun write(data: ByteArray) {
-        port?.write(data, 1500)
-            ?: error("USB transport not connected")
+        val activePort = port ?: error("USB transport not connected")
+        try {
+            activePort.write(data, 1500)
+        } catch (error: java.io.IOException) {
+            connectionLost = true
+            throw error
+        }
     }
 
-    fun read(buffer: ByteArray, timeoutMs: Int): Int =
-        port?.read(buffer, timeoutMs) ?: -1
+    fun read(buffer: ByteArray, timeoutMs: Int): Int {
+        val activePort = port ?: return -1
+        return try {
+            activePort.read(buffer, timeoutMs)
+        } catch (error: java.io.IOException) {
+            connectionLost = true
+            throw error
+        }
+    }
 
     fun close() {
         try {
@@ -123,6 +140,7 @@ class ElmUsbTransport(private val context: Context) {
 
         port = null
         connection = null
+        connectionLost = false
     }
 }
 
@@ -130,6 +148,10 @@ class ElmUsbTransport(private val context: Context) {
 class ElmWifiTransport {
 
     private var socket: Socket? = null
+    @Volatile private var connectionLost = false
+
+    val isConnected: Boolean
+        get() = socket?.let { it.isConnected && !it.isClosed && !it.isInputShutdown && !connectionLost } == true
 
     suspend fun connect(
         host: String,
@@ -144,6 +166,7 @@ class ElmWifiTransport {
             s.soTimeout = 1200
 
             socket = s
+            connectionLost = false
 
             Result.success(Unit)
 
@@ -154,12 +177,27 @@ class ElmWifiTransport {
     }
 
     fun write(data: ByteArray) {
-        socket?.getOutputStream()?.write(data)
-            ?: error("Wi-Fi transport not connected")
+        val activeSocket = socket ?: error("Wi-Fi transport not connected")
+        try {
+            activeSocket.getOutputStream().write(data)
+        } catch (error: java.io.IOException) {
+            connectionLost = true
+            throw error
+        }
     }
 
-    fun read(buffer: ByteArray): Int =
-        socket?.getInputStream()?.read(buffer) ?: -1
+    fun read(buffer: ByteArray): Int {
+        val activeSocket = socket ?: return -1
+        return try {
+            activeSocket.getInputStream().read(buffer)
+        } catch (timeout: java.net.SocketTimeoutException) {
+            // A read timeout is normal while waiting for the ELM prompt.
+            throw timeout
+        } catch (error: java.io.IOException) {
+            connectionLost = true
+            throw error
+        }
+    }
 
     fun close() {
         try {
@@ -168,6 +206,7 @@ class ElmWifiTransport {
         }
 
         socket = null
+        connectionLost = false
     }
 }
 
