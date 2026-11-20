@@ -881,7 +881,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val rendered = if (report.records.isEmpty()) {
                     getApplication<Application>().getString(R.string.vm_no_dtcs_returned, responseCanIdHex.uppercase())
                 } else {
-                    report.records.joinToString("\\n") { record ->
+                    report.records.joinToString("\n") { record ->
                         "${record.code}  status=0x${record.statusByte.toString(16).uppercase().padStart(2, '0')}"
                     }
                 }
@@ -1092,7 +1092,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val current = _liveCanMonitorState.value
                         val raw = (current.rawText + chunk).takeLast(131_072)
                         val pendingText = pendingChunks.toString()
-                        val lineEnd = maxOf(pendingText.lastIndexOf('\\n'), pendingText.lastIndexOf('\\r'))
+                        val lineEnd = maxOf(pendingText.lastIndexOf('\n'), pendingText.lastIndexOf('\r'))
                         val completeBatch = if (lineEnd >= 0) {
                             pendingText.substring(0, lineEnd + 1).also {
                                 pendingChunks.delete(0, lineEnd + 1)
@@ -1100,7 +1100,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         } else ""
                         val decodedFrames = RawCanFrameParser.parseReceivedFrames(completeBatch)
                         val displayText = if (decodedFrames.isNotEmpty()) {
-                            decodedFrames.joinToString("\\n") { frame ->
+                            decodedFrames.joinToString("\n") { frame ->
                                 val id = frame.canId.toString(16).uppercase().padStart(if (frame.isExtended) 8 else 3, '0')
                                 val bytes = frame.data.joinToString(" ") {
                                     (it.toInt() and 0xFF).toString(16).uppercase().padStart(2, '0')
@@ -1126,7 +1126,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val currentBeforeReport = _liveCanMonitorState.value
                     val trailingFrames = RawCanFrameParser.parseReceivedFrames(trailing)
                     val trailingText = if (trailingFrames.isNotEmpty()) {
-                        trailingFrames.joinToString("\\n") { frame ->
+                        trailingFrames.joinToString("\n") { frame ->
                             val id = frame.canId.toString(16).uppercase().padStart(if (frame.isExtended) 8 else 3, '0')
                             val bytes = frame.data.joinToString(" ") {
                                 (it.toInt() and 0xFF).toString(16).uppercase().padStart(2, '0')
