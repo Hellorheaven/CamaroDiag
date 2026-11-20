@@ -12,9 +12,7 @@ import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -48,11 +46,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private data class CamaroDiagUpdate(val version: String, val channel: String, val url: String)
+private data class CamaroDiagUpdateCheck(val update: CamaroDiagUpdate?, val hasNewerVersion: Boolean)
 
 private object CamaroDiagUpdateChecker {
     private const val API = "https://api.github.com/repos/Hellorheaven/CamaroDiag/releases/latest"
 
-    suspend fun check(context: Context): CamaroDiagUpdate? = withContext(Dispatchers.IO) {
+    suspend fun check(context: Context): CamaroDiagUpdateCheck = withContext(Dispatchers.IO) {
         val info = if (Build.VERSION.SDK_INT >= 33) {
             context.packageManager.getPackageInfo(
                 context.packageName,
@@ -72,15 +71,15 @@ private object CamaroDiagUpdateChecker {
         connection.setRequestProperty("User-Agent", "CamaroDiag-Updater")
         try {
             val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-            if (json.optBoolean("draft") || json.optBoolean("prerelease")) return@withContext null
+            if (json.optBoolean("draft") || json.optBoolean("prerelease")) return@withContext CamaroDiagUpdateCheck(null, false)
             val versionCode = Regex(
                 "Android versionCode\\s*:\\s*(\\d+)",
                 RegexOption.IGNORE_CASE
             ).find(json.optString("body"))?.groupValues?.getOrNull(1)?.toLongOrNull()
-                ?: return@withContext null
-            if (versionCode <= installedCode) return@withContext null
+                ?: throw IllegalStateException("Latest release does not publish an Android versionCode.")
+            if (versionCode <= installedCode) return@withContext CamaroDiagUpdateCheck(null, false)
 
-            val assets = json.optJSONArray("assets") ?: return@withContext null
+            val assets = json.optJSONArray("assets") ?: return@withContext CamaroDiagUpdateCheck(null, true)
             var downloadUrl: String? = null
             for (index in 0 until assets.length()) {
                 val asset = assets.optJSONObject(index) ?: continue
@@ -90,8 +89,11 @@ private object CamaroDiagUpdateChecker {
                 }
             }
             val safeUrl = downloadUrl?.takeIf { it.startsWith("https://github.com/") }
-                ?: return@withContext null
-            CamaroDiagUpdate(json.optString("tag_name").removePrefix("v"), channel, safeUrl)
+                ?: return@withContext CamaroDiagUpdateCheck(null, true)
+            CamaroDiagUpdateCheck(
+                CamaroDiagUpdate(json.optString("tag_name").removePrefix("v"), channel, safeUrl),
+                true
+            )
         } finally {
             connection.disconnect()
         }
@@ -214,10 +216,7 @@ fun AboutUpdateCard() {
         )
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardDefaults.cardColors().containerColor)
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -239,10 +238,14 @@ fun AboutUpdateCard() {
                             downloadedApk = null
                             status = null
                             try {
-                                update = CamaroDiagUpdateChecker.check(context)
+                                val result = CamaroDiagUpdateChecker.check(context)
+                                update = result.update
                                 status = context.getString(
-                                    if (update == null) R.string.about_up_to_date
-                                    else R.string.about_update_found
+                                    when {
+                                        result.update != null -> R.string.about_update_found
+                                        result.hasNewerVersion -> R.string.about_channel_update_unavailable
+                                        else -> R.string.about_up_to_date
+                                    }
                                 )
                             } catch (_: Exception) {
                                 status = context.getString(R.string.about_check_failed)
