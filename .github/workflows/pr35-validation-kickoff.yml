@@ -1,5 +1,6 @@
-name: PR54 manual checkpoint validation
-# PR54 final-candidate checkpoint: account-scoped sensors, full DTC modal, ECU export and tests.
+name: PR54 full validation checkpoint
+# Explicit full validation checkpoint: Android/Windows Debug + signed Release.
+# Each push to this file (only) dispatches all chains on the same immutable SHA.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
@@ -35,4 +36,6 @@ jobs:
             -f target_ref="$TARGET_SHA" -f pr_number=54
           gh workflow run pc-bridge-ci.yml --repo "$GITHUB_REPOSITORY" --ref feat/flexfuel-lfx-2012 \
             -f target_ref="$TARGET_SHA" -f pr_number=54
-          echo "Both validation workflows dispatched for $TARGET_SHA"
+          gh workflow run pr35-release-preflight.yml --repo "$GITHUB_REPOSITORY" --ref feat/flexfuel-lfx-2012 \
+            -f target_ref="$TARGET_SHA"
+          echo "Android Debug + Windows Debug + signed Android/Windows Release checkpoints dispatched for $TARGET_SHA"
