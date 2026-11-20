@@ -49,4 +49,5 @@
     <string name="obd_scan_title">TELJES OBD-II VIZSGÁLAT</string>
     <string name="obd_readiness">OBD-készenlét</string>
     <string name="obd_mode06_results">06-os mód eredményei</string>
+    <string name="system_language_follow_phone">Telefon nyelvének követése</string>
 </resources>
