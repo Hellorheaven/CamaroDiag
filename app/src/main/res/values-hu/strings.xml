@@ -19,4 +19,14 @@
     <string name="tab_guide">Útmutató</string>
     <string name="tab_controls">Vezérlés</string>
     <string name="tab_settings">Beállítások</string>
+    <string name="common_connect">Csatlakozás</string>
+    <string name="common_refresh">Frissítés</string>
+    <string name="status_offline">Kapcsolat nélkül</string>
+    <string name="obd_not_available">Nem érhető el</string>
+    <string name="obd_run_full_scan">Teljes vizsgálat indítása</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokoll</string>
+    <string name="obd_dtc_title">Diagnosztikai hibakódok</string>
+    <string name="obd_adapter_voltage">Adapter feszültsége</string>
+    <string name="obd_supported_pids">Támogatott PID-ek</string>
 </resources>
