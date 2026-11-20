@@ -192,6 +192,7 @@ fun CalibrationWorkspaceScreen(
     ecmType: String,
     isConnected: Boolean,
     onReadIdentification: () -> Unit,
+    onExportIdentification: () -> Unit,
     onCreateVehicleFromEcuVin: (String) -> Unit,
     onSyncVehicleVinFromEcu: (String) -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
@@ -336,6 +337,16 @@ fun CalibrationWorkspaceScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.cal_read_ecu_ids))
+                        }
+                        OutlinedButton(
+                            onClick = onExportIdentification,
+                            enabled = !state.isReading &&
+                                (state.ecuVinResponse.isNotBlank() ||
+                                    state.calibrationIdResponse.isNotBlank() ||
+                                    state.cvnResponse.isNotBlank()),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.flexfuel_lfx2012_export_fingerprint))
                         }
                     }
                 }
