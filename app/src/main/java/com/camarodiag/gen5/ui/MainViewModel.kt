@@ -1338,6 +1338,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 message = ""
             )
             try {
+                val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
                 val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
                 if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                 val ecuVin = identity.vin
@@ -1347,7 +1348,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
-                    ecuIdentityFromSimulation = obdManager.isSimulationActive || obdManager.isDemoMode,
+                    ecuIdentityFromSimulation = sourceWasSimulated ||
+                        obdManager.isSimulationActive || obdManager.isDemoMode,
                     vinComparison = vinComparison,
                     vinModelYear = VehicleVinMatcher.modelYearFromVin(ecuVin),
                     ecuNameResponse = identity.ecuNames.joinToString("\n"),
@@ -3066,11 +3068,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Keep this request ahead of the initial scans to avoid competing for the ELM channel.
             viewModelScope.launch {
                 try {
+                    val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
                     val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
                     val comparison = VehicleVinMatcher.compare(_vehicle.value.vin, identity.vin)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = identity.vin ?: getApplication<Application>().getString(R.string.obd_not_available),
-                        ecuIdentityFromSimulation = obdManager.isSimulationActive || obdManager.isDemoMode,
+                        ecuIdentityFromSimulation = sourceWasSimulated ||
+                        obdManager.isSimulationActive || obdManager.isDemoMode,
                         vinComparison = comparison,
                         vinModelYear = VehicleVinMatcher.modelYearFromVin(identity.vin),
                         ecuNameResponse = identity.ecuNames.joinToString("\n"),
