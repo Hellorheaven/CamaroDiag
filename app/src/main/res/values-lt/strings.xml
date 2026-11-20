@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Užfiksuotas kadras</string>
     <string name="obd_raw_scan_log">Neapdoroto nuskaitymo žurnalas</string>
     <string name="obd_powertrain_ecm">Jėgos pavara / ECM</string>
+    <string name="vehicle_setup_header">Transporto priemonės nustatymai</string>
+    <string name="vehicle_generation">Karta</string>
+    <string name="vehicle_model_year">Modelio metai</string>
+    <string name="vehicle_engine">Variklis</string>
+    <string name="vehicle_transmission">Pavarų dėžė</string>
+    <string name="vehicle_market_region">Rinkos regionas</string>
+    <string name="vehicle_vin">Transporto priemonės VIN</string>
+    <string name="obd_scan_title">VISAS OBD-II NUSKAITYMAS</string>
+    <string name="obd_readiness">OBD parengtis</string>
+    <string name="obd_mode06_results">06 režimo rezultatai</string>
 </resources>
