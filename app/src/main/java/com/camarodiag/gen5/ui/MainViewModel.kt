@@ -193,6 +193,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ?: AppLanguage.fromLocale(application.resources.configuration.locales[0])
     )
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
+    // No saved manual override means follow the device language.
+    private val _followSystemLanguage = MutableStateFlow(
+        settingsPreferences.getString("language", null) == null
+    )
+    val followSystemLanguage: StateFlow<Boolean> = _followSystemLanguage.asStateFlow()
 
     private val _unitSystem = MutableStateFlow(
         runCatching { UnitSystem.valueOf(settingsPreferences.getString("unit_system", UnitSystem.METRIC.name)!!) }
@@ -660,8 +665,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setLanguage(lang: AppLanguage) {
+        _followSystemLanguage.value = false
         _language.value = lang
         settingsPreferences.edit { putString("language", lang.code) }
+    }
+
+    /** Restore automatic language choice and remove any saved manual override. */
+    fun setFollowSystemLanguage(systemLocale: java.util.Locale) {
+        settingsPreferences.edit { remove("language") }
+        _followSystemLanguage.value = true
+        _language.value = AppLanguage.fromLocale(systemLocale)
+    }
+
+    /** Update automatic language after Android reports a device configuration change. */
+    fun refreshSystemLanguage(systemLocale: java.util.Locale) {
+        if (_followSystemLanguage.value) {
+            _language.value = AppLanguage.fromLocale(systemLocale)
+        }
     }
 
     private fun localizedMileageSummaryForStorage(report: com.camarodiag.gen5.domain.model.MileageAuditReport): String {
