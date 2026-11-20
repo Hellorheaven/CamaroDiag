@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag on ajan tasalla.</string>
     <string name="obd_choose_sensors">Valitse anturit</string>
     <string name="obd_sensor_cancel">Peruuta</string>
+    <string name="tab_vehicle">Ajoneuvo</string>
+    <string name="tab_connect">Yhdistä</string>
+    <string name="tab_live">Reaaliaikaiset tiedot</string>
+    <string name="tab_dtcs">Vikakoodit</string>
+    <string name="tab_more">Lisää</string>
+    <string name="tab_modules">Ohjainlaitteet</string>
+    <string name="tab_mileage">Ajokilometrit</string>
+    <string name="tab_calibration">ECU / Kartat</string>
+    <string name="tab_obd_scan">Täysi OBD-skannaus</string>
+    <string name="tab_guide">Opas</string>
+    <string name="tab_controls">Ohjaus</string>
+    <string name="tab_settings">Asetukset</string>
 </resources>
