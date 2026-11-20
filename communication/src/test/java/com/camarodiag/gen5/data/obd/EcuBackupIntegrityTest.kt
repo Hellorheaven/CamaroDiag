@@ -100,8 +100,8 @@ class EcuBackupIntegrityTest {
         val captures = listOf(first, second)
         val savedManifest = manifest(captures)
         assertTrue(savedManifest.coverage.status == EcuBackupCoverage.Status.INCONSISTENT)
-        // Consistency is distinct from completeness and eligibility for restoration.
-        assertTrue(EcuBackupIntegrity.verify(savedManifest, captures, required).consistent)
+        val problems = EcuBackupIntegrity.verify(savedManifest, captures, required).problems
+        assertTrue(EcuBackupIntegrity.Problem.INVALID_COVERAGE in problems)
     }
 
 }
