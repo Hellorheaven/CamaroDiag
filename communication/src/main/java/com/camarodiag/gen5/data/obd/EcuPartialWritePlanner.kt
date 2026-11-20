@@ -73,6 +73,13 @@ object EcuPartialWritePlanner {
         val sectors = changedBySector.map { (index, count) ->
             val start = index * layout.eraseBlockBytes
             val finish = start + layout.eraseBlockBytes
+            val eraseStart = layout.regionStartAddress + start.toLong()
+            val eraseEnd = layout.regionStartAddress + finish.toLong()
+            // A sector containing protected bytes must never be erased, even
+            // when the changed byte itself is outside the protected interval.
+            require(protected.none {
+                it.start < eraseEnd && it.endExclusive > eraseStart
+            }) { "Erase-sector operation would affect protected ECU memory." }
             val before = original.copyOfRange(start, finish)
             val after = modified.copyOfRange(start, finish)
             Sector(
