@@ -522,9 +522,16 @@ class BluetoothObdManager(context: Context) {
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else {
+                check(activeTransport == "BLUETOOTH") {
+                    "An ELM command cannot be sent through the selected transport."
+                }
                 val out = outputStream; val inp = inputStream
-                if (out == null || inp == null) return@withLock "NO_SOCKET"
-                while (inp.available() > 0) inp.read()
+                if (out == null || inp == null || socket?.isConnected != true || socket?.isClosed == true) {
+                    throw ObdTransportDisconnectedException("Bluetooth OBD adapter is not connected")
+                }
+                while (inp.available() > 0) {
+                    if (inp.read() < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
+                }
                 out.write(payload); out.flush()
                 val buffer = StringBuilder()
                 val callbackBuffer = StringBuilder()
@@ -532,7 +539,9 @@ class BluetoothObdManager(context: Context) {
                 var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
                     if (inp.available() > 0) {
-                        val char = inp.read().toChar()
+                        val received = inp.read()
+                        if (received < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
+                        val char = received.toChar()
                         if (char == '>') {
                             promptReceived = true
                             if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
