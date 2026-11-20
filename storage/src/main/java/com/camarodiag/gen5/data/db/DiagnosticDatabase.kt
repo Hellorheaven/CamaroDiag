@@ -17,7 +17,7 @@ data class SavedSessionEntity(
     val mileageSummary: String,
     val hasMileageDiscrepancy: Boolean,
     val maxDeltaKm: Double,
-    val ownerUid: String = ""
+    @ColumnInfo(defaultValue = "''") val ownerUid: String = ""
 )
 
 @Dao
