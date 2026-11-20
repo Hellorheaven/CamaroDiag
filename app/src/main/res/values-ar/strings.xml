@@ -667,4 +667,27 @@
     <string name="cal_ecu_response_addresses_label">عناوين استجابة OBD الوظيفية المرصودة (غير مرتبطة بوحدات محددة)</string>
     <string name="cal_ecu_identity_limits">لا تؤكد استجابات OBD القياسية هذه رمز RPO أو ناقل الحركة أو رقم عتاد وحدة التحكم أو نظام GM. عناوين الاستجابة لا تحدد هوية الوحدات. تتطلب معرّفات GM وثائق موثوقة خاصة بالمركبة.</string>
     <string name="dtc_vehicle_identity_required">تم إخفاء التفاصيل الخاصة بالمركبة لأن رقم VIN لوحدة التحكم المتصلة لم يُقرأ أو لا يطابق المركبة المحددة. اقرأ رقم VIN لوحدة التحكم وتحقق منه قبل استخدام هذه التفسيرات.</string>
+    <string name="live_pid_oil">ضغط الزيت (محاكاة فقط)</string>
+    <string name="live_pid_stft_b2">تصحيح الوقود قصير المدى للبنك 2</string>
+    <string name="live_pid_ltft_b2">تصحيح الوقود طويل المدى للبنك 2</string>
+    <string name="live_pid_rel_tps">موضع الخانق النسبي</string>
+    <string name="live_pid_cmd_tps">موضع الخانق المطلوب</string>
+    <string name="live_pid_abs_tps_b">موضع الخانق المطلق B</string>
+    <string name="live_pid_abs_tps_c">موضع الخانق المطلق C</string>
+    <string name="live_pid_app_d">موضع دواسة الوقود D</string>
+    <string name="live_pid_app_e">موضع دواسة الوقود E</string>
+    <string name="live_pid_app_f">موضع دواسة الوقود F</string>
+    <string name="live_pid_abs_load">حمل المحرك المطلق</string>
+    <string name="live_pid_ambient">درجة الحرارة المحيطة</string>
+    <string name="live_pid_fuel_press">ضغط الوقود</string>
+    <string name="live_pid_timing">تقديم توقيت الإشعال</string>
+    <string name="live_pid_eq_ratio">نسبة التكافؤ المطلوبة</string>
+    <string name="live_pid_o2_b1s1">جهد حساس الأكسجين B1S1</string>
+    <string name="live_pid_o2_b1s2">جهد حساس الأكسجين B1S2</string>
+    <string name="live_pid_o2_b1s3">جهد حساس الأكسجين B1S3</string>
+    <string name="live_pid_o2_b1s4">جهد حساس الأكسجين B1S4</string>
+    <string name="live_pid_wbo2_b1s1">حساس لامبدا واسع النطاق B1S1</string>
+    <string name="live_pid_wbo2_b1s2">حساس لامبدا واسع النطاق B1S2</string>
+    <string name="live_pid_wbo2_b2s1">حساس لامبدا واسع النطاق B2S1</string>
+    <string name="live_pid_wbo2_b2s2">حساس لامبدا واسع النطاق B2S2</string>
 </resources>
