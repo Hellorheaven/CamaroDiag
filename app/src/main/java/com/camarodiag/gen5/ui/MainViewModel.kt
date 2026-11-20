@@ -170,11 +170,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 putString("legacy_vehicles_claimed_uid", "deleted")
             }
         }
-        viewModelScope.launch {
-            sessionDao.deleteAllForOwner(deletedUid)
-        }
+        // Invalidate the active identity before scheduling the asynchronous
+        // database purge: a deleted account must not keep an OBD session alive.
         if (authenticatedAccountUid == deletedUid) {
             onAccountSessionChanged(null)
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            sessionDao.deleteAllForOwner(deletedUid)
         }
     }
 
