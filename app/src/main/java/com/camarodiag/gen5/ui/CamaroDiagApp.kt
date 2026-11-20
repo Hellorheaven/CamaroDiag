@@ -159,6 +159,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
     val savedVehicles by viewModel.savedVehicles.collectAsState()
+    val legacyVehicleImportAvailable by viewModel.legacyVehicleImportAvailable.collectAsState()
     val selectedSavedVehicleId by viewModel.selectedSavedVehicleId.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
     val lastConnectionProfile by viewModel.lastConnectionProfile.collectAsState()
@@ -479,11 +480,13 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 DiagTab.SETUP -> VehicleSetupScreen(
                     vehicle = vehicle,
                     savedVehicles = savedVehicles,
+                    legacyVehicleImportAvailable = legacyVehicleImportAvailable,
                     selectedSavedVehicleId = selectedSavedVehicleId,
                     onChange = { y, e, tr, m -> viewModel.updateVehicle(y, e, tr, m) },
                     onVinChange = { viewModel.updateVin(it) },
                     onCaptureVinPhoto = { vinPhotoLauncher.launch(null) },
                     onSaveVehicle = { viewModel.saveCurrentVehicle(it) },
+                    onImportLegacyVehicles = { viewModel.importLegacyVehicles() },
                     onLoadSavedVehicle = { viewModel.selectSavedVehicle(it) },
                     onDeleteSavedVehicle = { viewModel.deleteSavedVehicle(it) }
                 )
@@ -600,11 +603,13 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
 fun VehicleSetupScreen(
     vehicle: VehicleProfile,
     savedVehicles: List<SavedVehicleProfile>,
+    legacyVehicleImportAvailable: Boolean,
     selectedSavedVehicleId: String?,
     onChange: (Int, CamaroEngine, TransmissionType, MarketRegion) -> Unit,
     onVinChange: (String) -> Unit,
     onCaptureVinPhoto: () -> Unit,
     onSaveVehicle: (String) -> Unit,
+    onImportLegacyVehicles: () -> Unit,
     onLoadSavedVehicle: (String) -> Unit,
     onDeleteSavedVehicle: (String) -> Unit
 ) {
@@ -724,6 +729,11 @@ fun VehicleSetupScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.saved_vehicle_save_current))
+                    }
+                    if (legacyVehicleImportAvailable) {
+                        OutlinedButton(onClick = onImportLegacyVehicles, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.saved_vehicle_import_legacy))
+                        }
                     }
                     if (savedVehicles.isEmpty()) {
                         Text(stringResource(R.string.saved_vehicle_empty), color = TextMuted, fontSize = 12.sp)
