@@ -185,11 +185,13 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 
     suspend fun write(data: ByteArray) = writeMutex.withLock {
+        var writeSession: BluetoothGatt? = null
         try {
             connectionFailure?.let {
                 throw ObdTransportDisconnectedException("OBDLink BLE connection is unavailable", it)
             }
             val g = gatt ?: error("BLE transport not connected")
+            writeSession = g
             val characteristic = writeCharacteristic ?: error("OBDLink BLE write characteristic unavailable")
             var offset = 0
             while (offset < data.size) {
@@ -220,7 +222,7 @@ internal class OBDLinkBleTransport(private val context: Context) {
             // GATT callbacks carry no operation identifier. After a timeout or
             // cancellation, a late callback could otherwise complete the next write.
             // Retire this GATT instance so callbacks from it can never affect a retry.
-            invalidateSession(error)
+            writeSession?.let { invalidateSession(it, error) }
             throw error
         }
     }
@@ -230,7 +232,10 @@ internal class OBDLinkBleTransport(private val context: Context) {
      * this instance is ignored because callbacks verify identity against [gatt].
      * The failure remains visible until connect() starts a fresh session.
      */
-    private fun invalidateSession(cause: Throwable) {
+    private fun invalidateSession(expectedGatt: BluetoothGatt, cause: Throwable) {
+        // A reconnect may have replaced this session while the old coroutine was
+        // unwinding. Never let an old write tear down the newly connected adapter.
+        if (gatt !== expectedGatt) return
         connectionFailure = cause
         connectResult?.completeExceptionally(cause)
         writeResult?.completeExceptionally(cause)
