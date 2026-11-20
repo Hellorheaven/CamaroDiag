@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULERING: Disse ECU-identifikatorer er ikke læst fra et rigtigt køretøj og kan ikke validere dets firmware.</string>
     <string name="cal_expert_block_memory_map">Målets hukommelseskort og beskyttede områder er ikke verificeret.</string>
     <string name="flexfuel_preflight_backup">Den oprindelige ECU-sikkerhedskopi er ikke verificeret.</string>
+    <string name="cal_expert_title">Eksperttilstand — ECU på testbænk / chip</string>
+    <string name="cal_expert_expand">Konfigurer eksperttilstand</string>
+    <string name="cal_expert_collapse">Skjul ekspertindstillinger</string>
+    <string name="cal_expert_family">Controllerfamilie (E39 eller E39A)</string>
+    <string name="cal_expert_chip">Observeret chipmærkning</string>
+    <string name="cal_expert_programmer">Bænkprogrammør / interface</string>
+    <string name="cal_expert_access_title">Adgangsmetode</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Ekstern hukommelse, afmonteret chip</string>
+    <string name="cal_expert_region_title">Hukommelsesområde</string>
+    <string name="cal_expert_region_pflash">Intern programflash i MCU</string>
+    <string name="cal_expert_region_dflash">Dataflash i MCU</string>
+    <string name="cal_expert_region_eeprom">Ekstern EEPROM</string>
+    <string name="cal_expert_blockers">Udestående ekspertkontroller</string>
+    <string name="cal_expert_block_controller">Kontrollér den præcise controllerfamilie (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identificer den fysiske mærkning på MCU eller hukommelseschip.</string>
+    <string name="cal_expert_block_programmer">Identificer en kompatibel bænkprogrammør.</string>
+    <string name="cal_expert_block_image_missing">Importér et ikke-tomt firmwarebillede.</string>
+    <string name="cal_expert_block_image_format">Denne forberedelse kræver en rå binærfil.</string>
 </resources>
