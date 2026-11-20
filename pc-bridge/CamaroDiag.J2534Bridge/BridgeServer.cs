@@ -138,7 +138,7 @@ internal sealed class BridgeServer
         }
     }
 
-    private static bool IsPrivateNetworkAddress(IPAddress address)
+    internal static bool IsPrivateNetworkAddress(IPAddress address)
     {
         if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
         if (IPAddress.IsLoopback(address)) return true;
@@ -167,7 +167,7 @@ internal sealed class BridgeServer
         return expected.Length == actual.Length && CryptographicOperations.FixedTimeEquals(expected, actual);
     }
 
-    private static int ParseHexId(JsonElement root, string property)
+    internal static int ParseHexId(JsonElement root, string property)
     {
         if (!root.TryGetProperty(property, out var element)) throw new ArgumentException($"Missing {property}.");
         var text = element.GetString()?.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase);
@@ -177,7 +177,7 @@ internal sealed class BridgeServer
         return value;
     }
 
-    private static byte[] ParseHexPayload(JsonElement root)
+    internal static byte[] ParseHexPayload(JsonElement root)
     {
         if (!root.TryGetProperty("payloadHex", out var element)) throw new ArgumentException("Missing payloadHex.");
         var text = element.GetString()?.Replace(" ", "").Replace("-", "").Trim();
