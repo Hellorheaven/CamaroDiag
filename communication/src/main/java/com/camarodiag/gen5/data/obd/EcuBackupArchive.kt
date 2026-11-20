@@ -144,6 +144,8 @@ object EcuBackupArchive {
                 require(field("second") == "false") { "Invalid second read flag" }
                 null
             }
+            require(first.isNotEmpty()) { "Empty primary read for segment $index" }
+            require(second != null) { "Missing independent read for segment $index" }
             require(EcuBenchExpertPlan.sha256Hex(first).equals(field("sha256"), ignoreCase = true)) {
                 "Primary read checksum mismatch"
             }
