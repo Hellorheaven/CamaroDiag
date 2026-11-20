@@ -16,7 +16,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             CamaroDiagTheme {
-                CamaroAuthGate { CamaroDiagApp(viewModel = viewModel) }
+                CamaroAuthGate(
+                    onAccountChanged = viewModel::onAccountSessionChanged
+                ) { CamaroDiagApp(viewModel = viewModel) }
             }
         }
     }
