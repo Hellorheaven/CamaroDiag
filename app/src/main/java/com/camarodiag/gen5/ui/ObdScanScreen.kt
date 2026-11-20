@@ -25,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -53,11 +54,22 @@ fun ObdScanScreen(
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
 
-    val vehicleKey = report?.vin ?: "unidentified"
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("obd_sensor_selection", android.content.Context.MODE_PRIVATE)
+    }
+    val vehicleKey = report?.vin?.trim()?.uppercase()?.takeIf { it.length == 17 }
+    val preferenceKey = vehicleKey?.let { "vehicle_$it" }
+    val storedPids = remember(preferenceKey) {
+        preferenceKey?.let { key ->
+            preferences.getString(key, null)?.split(",")?.mapNotNull(String::toIntOrNull)
+        }
+    }
+    val sensorNames = report?.liveData?.associate { it.pid to localizedObdPidName(it) }.orEmpty()
     var choosingSensors by rememberSaveable(vehicleKey) { mutableStateOf(false) }
     var sensorQuery by rememberSaveable(vehicleKey) { mutableStateOf("") }
-    var chosenPids by rememberSaveable(vehicleKey) { mutableStateOf(listOf<Int>()) }
-    var selectionApplied by rememberSaveable(vehicleKey) { mutableStateOf(false) }
+    var chosenPids by rememberSaveable(vehicleKey) { mutableStateOf(storedPids.orEmpty()) }
+    var selectionApplied by rememberSaveable(vehicleKey) { mutableStateOf(storedPids != null) }
     if (choosingSensors && report != null) {
         var pendingPids by remember(report, choosingSensors) {
             mutableStateOf(if (selectionApplied) chosenPids else report.liveData.map { it.pid })
@@ -75,7 +87,8 @@ fun ObdScanScreen(
                     )
                     LazyColumn {
                         items(report.liveData.filter {
-                            it.pid.toString(16).contains(sensorQuery, ignoreCase = true)
+                            it.pid.toString(16).contains(sensorQuery, ignoreCase = true) ||
+                                sensorNames[it.pid].orEmpty().contains(sensorQuery, ignoreCase = true)
                         }, key = { it.pid }) { sensor ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().clickable {
@@ -91,7 +104,7 @@ fun ObdScanScreen(
                                             else pendingPids - sensor.pid
                                     }
                                 )
-                                Text(stringResource(R.string.obd_pid_generic, sensor.pid))
+                                Text(sensorNames[sensor.pid].orEmpty())
                             }
                         }
                     }
@@ -99,8 +112,11 @@ fun ObdScanScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    chosenPids = pendingPids
+                    chosenPids = pendingPids.distinct()
                     selectionApplied = true
+                    preferenceKey?.let { key ->
+                        preferences.edit().putString(key, chosenPids.joinToString(",")).apply()
+                    }
                     choosingSensors = false
                 }) { Text(stringResource(R.string.obd_sensor_ok)) }
             },
