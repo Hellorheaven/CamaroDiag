@@ -44,12 +44,47 @@ fun CamaroAuthGate(content: @Composable () -> Unit) {
     ) {
         EmailVerificationScreen(auth, onVerified = { verificationRevision++ })
     } else {
+        var accountOpen by remember(user.uid) { mutableStateOf(false) }
+        val french = remember { Locale.getDefault().language == "fr" }
         Box {
             content()
             TextButton(
-                onClick = { auth.signOut() },
+                onClick = { accountOpen = true },
                 modifier = Modifier.align(Alignment.TopEnd)
-            ) { Text("Sign out / Déconnexion") }
+            ) { Text(if (french) "Mon compte" else "My account") }
+        }
+        if (accountOpen) {
+            val provider = when {
+                user.providerData.any { it.providerId == "google.com" } -> "Google"
+                user.providerData.any { it.providerId == "password" } ->
+                    if (french) "E-mail / mot de passe" else "Email / password"
+                else -> if (french) "Autre fournisseur" else "Other provider"
+            }
+            AlertDialog(
+                onDismissRequest = { accountOpen = false },
+                title = { Text(if (french) "Mon compte" else "My account") },
+                text = {
+                    Column {
+                        Text(user.email.orEmpty())
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            if (french) "Connexion : $provider" else "Signed in with: $provider",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        accountOpen = false
+                        auth.signOut()
+                    }) { Text(if (french) "Se déconnecter" else "Sign out") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { accountOpen = false }) {
+                        Text(if (french) "Fermer" else "Close")
+                    }
+                }
+            )
         }
     }
 }
