@@ -44,6 +44,8 @@ class BluetoothObdManager(context: Context) {
     private var j2534BridgeResponseCanId: Int? = null
     private var j2534BridgeProtocolNumber: Int? = null
     @Volatile private var activeTransport: String = "BLUETOOTH"
+    /** Incremented on every teardown so an old command cannot cross into a new session. */
+    @Volatile private var transportEpoch: Long = 0L
     private var activeAdapterCapabilities: AdapterCapabilities? = null
 
     /** Capture the active transport before disconnect() resets its identity. */
@@ -469,12 +471,21 @@ class BluetoothObdManager(context: Context) {
         onChunk: ((String) -> Unit)? = null
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
+            val sessionEpoch = transportEpoch
+            val sessionTransport = activeTransport
+            fun ensureSameSession() {
+                if (transportEpoch != sessionEpoch || activeTransport != sessionTransport) {
+                    throw ObdTransportDisconnectedException("OBD connection changed during command")
+                }
+            }
             val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
-            if (activeTransport == "USB") {
+            ensureSameSession()
+            if (sessionTransport == "USB") {
                 usbTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
                 var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
+                    ensureSameSession()
                     val n = usbTransport.read(bytes, 100)
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
@@ -486,13 +497,16 @@ class BluetoothObdManager(context: Context) {
                         throw java.io.EOFException("USB OBD adapter disconnected while reading")
                     } else delay(10)
                 }
+                ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ensureSameSession()
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
-            } else if (activeTransport == "BLE") {
+            } else if (sessionTransport == "BLE") {
                 bleTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
                 var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
+                    ensureSameSession()
                     val n = bleTransport.read(bytes, 100)
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
@@ -502,13 +516,16 @@ class BluetoothObdManager(context: Context) {
                         if (chunk.contains('>')) { promptReceived = true; break }
                     } else delay(10)
                 }
+                ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ensureSameSession()
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
-            } else if (activeTransport == "WIFI") {
+            } else if (sessionTransport == "WIFI") {
                 wifiTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
                 var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
+                    ensureSameSession()
                     try {
                         val n = wifiTransport.read(bytes)
                         if (n > 0) {
@@ -523,10 +540,12 @@ class BluetoothObdManager(context: Context) {
                     } catch (_: java.net.SocketTimeoutException) { }
                     delay(10)
                 }
+                ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ensureSameSession()
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             } else {
-                check(activeTransport == "BLUETOOTH") {
+                check(sessionTransport == "BLUETOOTH") {
                     "An ELM command cannot be sent through the selected transport."
                 }
                 val out = outputStream; val inp = inputStream
@@ -542,6 +561,7 @@ class BluetoothObdManager(context: Context) {
                 val start = System.currentTimeMillis()
                 var promptReceived = false
                 while (System.currentTimeMillis() - start < timeoutMs) {
+                    ensureSameSession()
                     if (inp.available() > 0) {
                         val received = inp.read()
                         if (received < 0) throw java.io.EOFException("Bluetooth OBD adapter disconnected")
@@ -560,7 +580,9 @@ class BluetoothObdManager(context: Context) {
                     } else delay(15)
                 }
                 if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
+                ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ensureSameSession()
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
             }
         }
@@ -663,6 +685,9 @@ class BluetoothObdManager(context: Context) {
         CamaroLfxObdSimulator.createEngine()
 
     fun disconnect() {
+        // Publish teardown before sockets are closed: in-flight commands must not
+        // attach their remaining read/write steps to the next adapter session.
+        transportEpoch++
         // Close every transport independently: one failing close must not leak the others.
         runCatching { usbTransport.close() }
         runCatching { wifiTransport.close() }
