@@ -59,6 +59,7 @@ import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
+import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
@@ -385,6 +386,37 @@ fun CalibrationWorkspaceScreen(
                             Text("• " + stringResource(labelId),
                                 color = WarnRed, fontSize = 11.sp)
                         }
+                        val audit = Lfx2012ProgrammingAudit.review(
+                            before = Lfx2012ProgrammingAudit.Snapshot(
+                                vin = ecuVin,
+                                ecuName = recognizedEcuName,
+                                calibrationIds = state.calibrationIdResponse.lines()
+                                    .filter(String::isNotBlank),
+                                verificationNumbers = state.cvnResponse.lines()
+                                    .filter(String::isNotBlank),
+                                dtcs = null,
+                                voltage = null,
+                                communicationConfirmed = state.respondingEcuAddresses.isNotEmpty(),
+                                functionalCheckPassed = null,
+                                oemRelearnReviewed = false,
+                                capturedAtUtcMillis = 0L
+                            ),
+                            after = null
+                        )
+                        Text(stringResource(R.string.flexfuel_lfx2012_audit_title),
+                            color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(
+                                R.string.flexfuel_lfx2012_audit_summary,
+                                audit.before.count {
+                                    it.status == Lfx2012ProgrammingAudit.CheckStatus.OBSERVED
+                                },
+                                audit.before.size
+                            ),
+                            color = TextMuted, fontSize = 11.sp
+                        )
+                        Text(stringResource(R.string.flexfuel_lfx2012_audit_post_not_performed),
+                            color = WarnRed, fontSize = 11.sp)
                         OutlinedButton(
                             onClick = onReadIdentification,
                             enabled = isConnected && !state.isReading,
