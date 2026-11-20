@@ -208,14 +208,10 @@
     <string name="update_download_failed">ダウンロードに失敗しました。</string>
     <string name="update_download_invalid_signature">ダウンロードまたは署名が無効です。インストールをブロックしました。手動で再インストールする必要がある場合があります。</string>
     <string name="update_download_complete">ダウンロードが完了しました。</string>
-    <string name="update_ready_to_install">CamaroDiag — インストール準備完了</string>
     <string name="update_downloading">ダウンロード中…</string>
-    <string name="update_available">アップデートがあります</string>
-    <string name="update_channel_only">%1$s チャネルのみ提供されます。Debug は Debug のまま、Release は Release のままです。</string>
     <string name="update_allow_unknown_sources">この提供元からのインストールを許可し、戻って「インストール」を押してください。</string>
     <string name="update_install">インストール</string>
     <string name="update_download">ダウンロード</string>
-    <string name="update_later">後で</string>
     <string name="vehicle_generation_label">第 %1$d 世代</string>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel (2012–2015)</string>
@@ -608,7 +604,6 @@
     <string name="cal_vin_matches_profile">ECUのVINは選択中の車両プロファイルと一致しています。</string>
     <string name="cal_vin_mismatch_detected">VIN不一致 — プロファイル：%1$s • ECU：%2$s</string>
     <string name="cal_vin_profile_not_set">選択中の車両プロファイルに有効なVINがありません。</string>
-    <string name="cal_use_ecu_vin_for_current_profile">ECUのVINを現在のプロファイルに使用</string>
     <string name="cal_vin_mismatch_title">VINの不一致を検出しました</string>
     <string name="cal_vin_mismatch_confirmation">選択中のプロファイルのVINは%1$sですが、ECUは%2$sを返しました。別の車両である可能性があります。現在の車両を保持するため別のプロファイルを作成するか、実車を確認した後にのみVINを同期してください。</string>
     <string name="cal_vin_create_vehicle">車両プロファイルを作成</string>
