@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Zamrznuti podaci</string>
     <string name="obd_raw_scan_log">Zapis sirovog skeniranja</string>
     <string name="obd_powertrain_ecm">Pogonski sklop / ECM</string>
+    <string name="vehicle_setup_header">Postavke vozila</string>
+    <string name="vehicle_generation">Generacija</string>
+    <string name="vehicle_model_year">Godina modela</string>
+    <string name="vehicle_engine">Motor</string>
+    <string name="vehicle_transmission">Mjenjač</string>
+    <string name="vehicle_market_region">Tržišna regija</string>
+    <string name="vehicle_vin">VIN vozila</string>
+    <string name="obd_scan_title">POTPUNI OBD-II PREGLED</string>
+    <string name="obd_readiness">Spremnost OBD sustava</string>
+    <string name="obd_mode06_results">Rezultati načina 06</string>
 </resources>
