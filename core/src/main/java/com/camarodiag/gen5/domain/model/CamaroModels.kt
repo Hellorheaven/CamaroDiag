@@ -96,7 +96,9 @@ data class AdapterCapabilities(
     val supportsLongFrames: Boolean = false,
     val supportsSwCan: Boolean = false,
     val supportsCanHeaders: Boolean = false,
-    val rawProbeLog: List<String> = emptyList()
+    val rawProbeLog: List<String> = emptyList(),
+    /** True only after a real ECU response confirms that the physical command path transmits. */
+    val supportsCanTransmit: Boolean = false
 )
 
 enum class ModuleStatus { ACCESSIBLE, REQUIRES_SWCAN, UNSUPPORTED_BY_ADAPTER, NOT_EQUIPPED, DISCOVERY_REQUIRED }
