@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import com.camarodiag.gen5.auth.CamaroAuthGate
 import com.camarodiag.gen5.ui.CamaroDiagApp
 import com.camarodiag.gen5.ui.MainViewModel
 import com.camarodiag.gen5.ui.theme.CamaroDiagTheme
@@ -15,7 +16,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             CamaroDiagTheme {
-                CamaroDiagApp(viewModel = viewModel)
+                CamaroAuthGate { CamaroDiagApp(viewModel = viewModel) }
             }
         }
     }
