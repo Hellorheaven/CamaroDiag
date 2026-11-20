@@ -696,4 +696,26 @@
     <string name="update_install_update">Установить обновление</string>
     <string name="update_version_available">Доступная версия: %1$s</string>
     <string name="system_language_follow_phone">Использовать язык телефона</string>
+    <string name="can_sniffer_raw_heading">Необработанный вывод CAN-адаптера</string>
+    <string name="can_sniffer_export_raw">Экспорт необработанного журнала</string>
+    <string name="can_sniffer_dtc_heading">Обнаруженные коды неисправностей OBD-II</string>
+    <string name="connection_lost_bluetooth">Соединение Bluetooth потеряно. Подключите адаптер снова и повторите операцию.</string>
+    <string name="connection_lost_vehicle">Соединение с автомобилем потеряно. Подключитесь снова и повторите операцию.</string>
+    <string name="connection_lost_usb">USB-адаптер отключён. Подключите его снова и повторите операцию.</string>
+    <string name="connection_lost_wifi">Соединение OBD по Wi-Fi потеряно. Подключите адаптер снова и повторите операцию.</string>
+    <string name="connection_lost_pc_bridge">Соединение с диагностическим мостом ПК потеряно. Подключите мост снова и повторите операцию.</string>
+    <string name="live_sensor_search">Поиск датчиков</string>
+    <string name="live_sensor_show_all">Показать все датчики</string>
+    <string name="can_console_history">Общая история консоли CAN</string>
+    <string name="can_console_clear">Очистить историю</string>
+    <string name="can_console_empty">Передачи данных пока нет. Полученные и отправленные данные появятся здесь.</string>
+    <string name="can_console_tx">TX • ОТПРАВЛЕНО</string>
+    <string name="can_console_rx">RX • ПОЛУЧЕНО</string>
+    <string name="can_console_system">СИСТЕМА</string>
+    <string name="can_console_input_label">Кадр CAN или команда OBD</string>
+    <string name="can_console_sending">Отправка…</string>
+    <string name="obd_dtc_help_unavailable">Для этого кода неисправности и автомобиля пока нет проверенных рекомендаций по диагностике. Перед ремонтом изучите сервисную документацию производителя.</string>
+    <string name="cal_expert_no_write">Программирование недоступно до реализации и проверки совместимого драйвера для стенда.</string>
+    <string name="flexfuel_preflight_write">Запись калибровки ECU не проверена и остаётся отключённой.</string>
+    <string name="status_not_implemented">НЕ РЕАЛИЗОВАНО</string>
 </resources>
