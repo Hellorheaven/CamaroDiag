@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Iesaldētais kadrs</string>
     <string name="obd_raw_scan_log">Neapstrādāts skenēšanas žurnāls</string>
     <string name="obd_powertrain_ecm">Piedziņa / ECM</string>
+    <string name="vehicle_setup_header">Transportlīdzekļa iestatīšana</string>
+    <string name="vehicle_generation">Paaudze</string>
+    <string name="vehicle_model_year">Modeļa gads</string>
+    <string name="vehicle_engine">Dzinējs</string>
+    <string name="vehicle_transmission">Pārnesumkārba</string>
+    <string name="vehicle_market_region">Tirgus reģions</string>
+    <string name="vehicle_vin">Transportlīdzekļa VIN</string>
+    <string name="obd_scan_title">PILNA OBD-II SKENĒŠANA</string>
+    <string name="obd_readiness">OBD gatavība</string>
+    <string name="obd_mode06_results">06. režīma rezultāti</string>
 </resources>
