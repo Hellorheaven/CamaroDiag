@@ -126,6 +126,7 @@
     <string name="about_checking">Vérification…</string>
     <string name="about_up_to_date">CamaroDiag est à jour.</string>
     <string name="about_update_found">Une nouvelle version est disponible.</string>
+    <string name="about_channel_update_unavailable">Une version plus récente existe, mais aucun paquet de mise à jour n’est publié pour ce canal d’installation.</string>
     <string name="about_check_failed">Impossible de vérifier les mises à jour. Vérifiez votre connexion Internet.</string>
     <string name="settings_title">Paramètres &amp; Rapports Enregistrés</string>
     <string name="settings_unit_system">Système d\'unités</string>
