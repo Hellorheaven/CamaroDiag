@@ -27,6 +27,8 @@ class J2534BridgeTransport(
     private var reader: BufferedReader? = null
     private var writer: BufferedWriter? = null
     @Volatile private var opened = false
+    /** Close requested by the app, not a spontaneous I/O failure of the bridge. */
+    @Volatile private var externallyClosed = false
 
     /** Reflects a live TCP session rather than just an allocated transport object. */
     val isConnected: Boolean
@@ -42,6 +44,7 @@ class J2534BridgeTransport(
     ): String = withContext(Dispatchers.IO) {
         mutex.withLock {
             closeInternal()
+            externallyClosed = false
             require(host.isNotBlank()) { "Adresse IP du PC manquante." }
             require(port in 1024..65535) { "Port du pont PC invalide." }
             require(pairingToken.isNotBlank()) { "Jeton d'appairage du pont PC manquant." }
@@ -137,7 +140,11 @@ class J2534BridgeTransport(
             J2534BridgeProtocol.readBoundedLine(input)
                 ?: throw java.io.EOFException("Le pont PC a fermé la connexion.")
         } catch (error: Exception) {
+            val wasClosedByApp = externallyClosed
             closeInternal()
+            // Closing the old PC bridge intentionally during a reconnect can
+            // break a blocked read. Do not report that error against the new bridge.
+            if (wasClosedByApp) throw ObdSupersededSessionException(error)
             throw error
         }
         val response = try {
@@ -159,6 +166,7 @@ class J2534BridgeTransport(
     }
 
     fun close() {
+        externallyClosed = true
         closeInternal()
     }
 
