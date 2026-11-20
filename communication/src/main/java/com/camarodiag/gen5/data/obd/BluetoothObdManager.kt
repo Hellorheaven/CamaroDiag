@@ -602,7 +602,9 @@ class BluetoothObdManager(context: Context) {
     }
 
     fun isJ2534BridgeConnected(): Boolean =
-        activeTransport == "J2534_BRIDGE" && j2534BridgeTransport != null
+        activeTransport == "J2534_BRIDGE" &&
+            !isDemoMode && !isSimulationActive &&
+            j2534BridgeTransport?.isConnected == true
 
     /**
      * Creates a UDS client through the adapter's documented STPX ISO-TP implementation.
