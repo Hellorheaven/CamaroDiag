@@ -1,5 +1,5 @@
 name: PR35 manual validation kickoff
-# Checkpoint 4: compile Room upgrade instrumentation tests after clean unit tests and lint.
+# Checkpoint 5: validate CAN disconnect and account-switch connection cancellation changes.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
