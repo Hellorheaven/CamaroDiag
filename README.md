@@ -124,3 +124,12 @@ Le catalogue de signaux communautaire est issu du projet **OBDb Chevrolet Camaro
 Références utiles : OBDLink (https://support.obdsol.com/support/solutions/articles/43000713351-which-obdlink-adapter-is-right-for-me-), fiche MX+ (https://www.obdlink.com/products/obdlink-mxp/), guide GM MDI 2 (https://gsi.ext.gm.com/userguides/GM_MDI_2_User_Guide.pdf), guide GM TIS2Web (https://gsi.ext.gm.com/userguides/GM_TIS2Web_User_Guide.pdf). Ces documents généraux ne remplacent pas les informations de service GM correspondant au VIN.
 
 CamaroDiag est un outil indépendant d'aide au diagnostic, sans certification GM. Ne pas effectuer de diagnostic ou d'opération lorsque le véhicule est en mouvement.
+
+
+## Guides utilisateur
+
+- [Compatibilité Camaro et adaptateurs](docs_GM_SUPPORT.md)
+- [Utiliser un adaptateur ELM327](docs/ELM327_OFFLINE_TESTING.md)
+- [Analyser une capture CAN ou UDS](docs/CAN_TRACE_ANALYZER.md)
+- [Comprendre les signaux spécifiques Camaro](docs/NATIVE_CAMARO_SIGNAL_CATALOG.md)
+- [Nouveautés de la branche de développement](docs/CHANGELOG_PR35.md)
