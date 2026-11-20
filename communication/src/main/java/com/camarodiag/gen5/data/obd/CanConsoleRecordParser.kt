@@ -21,7 +21,7 @@ object CanConsoleRecordParser {
                 ParsedCanConsoleRecord(
                     direction = "SYSTEM",
                     content = line.take(4_096),
-                    succeeded = !Regex("(?i)\\b(ERROR|CAN ERROR|BUS ERROR|UNABLE|BUFFER FULL)\\b")
+                    succeeded = !Regex("(?i)\\b(ERROR|CAN ERROR|BUS ERROR|UNABLE|BUFFER FULL|NO DATA)\\b")
                         .containsMatchIn(line)
                 )
             } else {
