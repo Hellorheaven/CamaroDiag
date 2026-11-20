@@ -753,4 +753,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">シミュレーション：これらのECU識別子は実車から読み取っておらず、ファームウェアの検証には使えません。</string>
     <string name="cal_expert_block_memory_map">対象のメモリマップと保護領域は検証されていません。</string>
     <string name="flexfuel_preflight_backup">元のECUバックアップは検証されていません。</string>
+    <string name="cal_expert_title">エキスパートモード — ECUベンチ / チップ</string>
+    <string name="cal_expert_expand">エキスパートモードを設定</string>
+    <string name="cal_expert_collapse">エキスパート設定を隠す</string>
+    <string name="cal_expert_family">コントローラー系統（E39またはE39A）</string>
+    <string name="cal_expert_chip">確認したチップ刻印</string>
+    <string name="cal_expert_programmer">ベンチプログラマー / インターフェース</string>
+    <string name="cal_expert_access_title">アクセス方法</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">外部メモリ、取り外したチップ</string>
+    <string name="cal_expert_region_title">メモリ領域</string>
+    <string name="cal_expert_region_pflash">MCU内部プログラムフラッシュ</string>
+    <string name="cal_expert_region_dflash">MCUデータフラッシュ</string>
+    <string name="cal_expert_region_eeprom">外部EEPROM</string>
+    <string name="cal_expert_blockers">エキスパート事前確認の未完了項目</string>
+    <string name="cal_expert_block_controller">コントローラー系統（E39/E39A）を正確に確認してください。</string>
+    <string name="cal_expert_block_chip">MCUまたはメモリチップの物理的な刻印を確認してください。</string>
+    <string name="cal_expert_block_programmer">互換性のあるベンチプログラマーを確認してください。</string>
+    <string name="cal_expert_block_image_missing">空でないファームウェアイメージをインポートしてください。</string>
+    <string name="cal_expert_block_image_format">この準備には生のバイナリファイルが必要です。</string>
 </resources>
