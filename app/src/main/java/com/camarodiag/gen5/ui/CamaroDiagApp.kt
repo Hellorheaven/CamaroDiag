@@ -1210,7 +1210,30 @@ fun LiveDataScreen(
         "MAP" to R.string.live_pid_map,
         "IAT" to R.string.live_pid_iat,
         "MAF" to R.string.live_pid_maf,
-        "ETHANOL" to R.string.live_pid_ethanol
+        "ETHANOL" to R.string.live_pid_ethanol,
+        "OIL" to R.string.live_pid_oil,
+        "STFT_B2" to R.string.live_pid_stft_b2,
+        "LTFT_B2" to R.string.live_pid_ltft_b2,
+        "REL_TPS" to R.string.live_pid_rel_tps,
+        "CMD_TPS" to R.string.live_pid_cmd_tps,
+        "ABS_TPS_B" to R.string.live_pid_abs_tps_b,
+        "ABS_TPS_C" to R.string.live_pid_abs_tps_c,
+        "APP_D" to R.string.live_pid_app_d,
+        "APP_E" to R.string.live_pid_app_e,
+        "APP_F" to R.string.live_pid_app_f,
+        "ABS_LOAD" to R.string.live_pid_abs_load,
+        "AMBIENT" to R.string.live_pid_ambient,
+        "FUEL_PRESS" to R.string.live_pid_fuel_press,
+        "TIMING" to R.string.live_pid_timing,
+        "EQ_RATIO" to R.string.live_pid_eq_ratio,
+        "O2_B1S1" to R.string.live_pid_o2_b1s1,
+        "O2_B1S2" to R.string.live_pid_o2_b1s2,
+        "O2_B1S3" to R.string.live_pid_o2_b1s3,
+        "O2_B1S4" to R.string.live_pid_o2_b1s4,
+        "WBO2_B1S1" to R.string.live_pid_wbo2_b1s1,
+        "WBO2_B1S2" to R.string.live_pid_wbo2_b1s2,
+        "WBO2_B2S1" to R.string.live_pid_wbo2_b2s1,
+        "WBO2_B2S2" to R.string.live_pid_wbo2_b2s2
     )
     val sensorContext = LocalContext.current
     val sensorLabels = liveCatalog.associate { signal ->
