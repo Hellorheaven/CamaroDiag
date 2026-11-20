@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Sovittimen IP-osoite</string>
     <string name="adapter_tcp_port">TCP-portti (yleensä 35000 tai 23)</string>
     <string name="adapter_connect_wifi">Yhdistä Wi-Fi-yhteydellä</string>
+    <string name="obd_connect_adapter_notice">Yhdistä oikea OBD-sovitin ennen skannausta. Esittelytila ei keksi tuloksia.</string>
+    <string name="obd_offline_simulation_notice">OFFLINE-SIMULOINTI — alla näkyvät VIN, CAL ID, CVN, DTC-koodit ja mittaukset ovat synteettisiä eivätkä peräisin oikeasta Camarosta.</string>
+    <string name="obd_vehicle_ecu_identification">Ajoneuvon / ECU:n tunnistus</string>
+    <string name="obd_no_live_data">Käyttökelpoisia reaaliaikaisia PID-tietoja ei saatu.</string>
+    <string name="obd_no_dtcs">Vakiopalvelut 03/07/0A eivät palauttaneet DTC-koodeja.</string>
+    <string name="obd_no_freeze_frame">Käyttökelpoisia pysäytyskuvan tietoja ei ole.</string>
+    <string name="obd_simulation_scope">Laajuus: vain ennalta määrätyt esittelytiedot. Oikeaa sovitinta, ECU:a tai ajoneuvoa ei kysellä.</string>
+    <string name="vehicle_vin_hint">Anna todellinen VIN; esimerkkitunnusta ei luoda.</string>
+    <string name="status_not_verified">EI VAHVISTETTU</string>
+    <string name="adapter_discovery_only">VAIN ETSINTÄ</string>
 </resources>
