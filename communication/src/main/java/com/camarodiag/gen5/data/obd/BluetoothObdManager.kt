@@ -474,9 +474,9 @@ class BluetoothObdManager(context: Context) {
         return withContext(Dispatchers.IO) {
             commandSessionMutex.withLock {
                 transportSessionEpoch.requireCurrent(requestedEpoch)
-                check(isObdCommandChannelAvailable) {
-                    "OBD command channel unavailable after the previous operation."
-                }
+                // Adapter probing calls this before capability detection has cleared
+                // demo mode. The epoch check is valid here; a channel-available
+                // check would incorrectly reject every initial ATZ/0100 probe.
                 sendAtCommandInternal(command, timeoutMs)
             }
         }
