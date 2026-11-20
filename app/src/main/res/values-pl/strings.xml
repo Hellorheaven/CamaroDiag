@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag jest aktualny.</string>
     <string name="obd_choose_sensors">Wybierz czujniki</string>
     <string name="obd_sensor_cancel">Anuluj</string>
+    <string name="tab_vehicle">Pojazd</string>
+    <string name="tab_connect">Połącz</string>
+    <string name="tab_live">Dane na żywo</string>
+    <string name="tab_dtcs">Kody usterek</string>
+    <string name="tab_more">Więcej</string>
+    <string name="tab_modules">Sterowniki</string>
+    <string name="tab_mileage">Przebieg</string>
+    <string name="tab_calibration">ECU / Mapy</string>
+    <string name="tab_obd_scan">Pełne skanowanie OBD</string>
+    <string name="tab_guide">Przewodnik</string>
+    <string name="tab_controls">Sterowanie</string>
+    <string name="tab_settings">Ustawienia</string>
 </resources>
