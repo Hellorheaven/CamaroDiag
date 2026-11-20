@@ -244,6 +244,8 @@ internal class OBDLinkBleTransport(private val context: Context) {
         gatt = null
         writeCharacteristic = null
         characteristicWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        // A new GATT session starts at the default ATT MTU until negotiation succeeds.
+        mtuPayload = 20
         pending = ByteArray(0)
         while (incoming.tryReceive().isSuccess) { }
         connectResult = null
