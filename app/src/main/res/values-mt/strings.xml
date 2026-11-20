@@ -19,4 +19,14 @@
     <string name="tab_guide">Gwida</string>
     <string name="tab_controls">Kontrolli</string>
     <string name="tab_settings">Settings</string>
+    <string name="common_connect">Qabbad</string>
+    <string name="common_refresh">Aġġorna</string>
+    <string name="status_offline">Mhux konness</string>
+    <string name="obd_not_available">Mhux disponibbli</string>
+    <string name="obd_run_full_scan">Ibda skan sħiħ</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokoll</string>
+    <string name="obd_dtc_title">Kodiċijiet dijanjostiċi tal-ħsara</string>
+    <string name="obd_adapter_voltage">Vultaġġ tal-adapter</string>
+    <string name="obd_supported_pids">PID appoġġjati</string>
 </resources>
