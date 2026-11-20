@@ -13,7 +13,7 @@ data class RawCanFrame(
  */
 object RawCanFrameParser {
     private val receivedFramePattern = Regex(
-        "(?i)(?<![0-9A-F])([0-9A-F]{3}|[0-9A-F]{8})\\\\s+((?:[0-9A-F]{2}\\\\s+){0,7}[0-9A-F]{2})(?![0-9A-F])"
+        "(?i)(?<![0-9A-F])([0-9A-F]{3}|[0-9A-F]{8})\\s+((?:[0-9A-F]{2}\\s+){0,7}[0-9A-F]{2})(?![0-9A-F])"
     )
 
     fun parseReceivedFrames(adapterOutput: String): List<RawCanFrame> =
