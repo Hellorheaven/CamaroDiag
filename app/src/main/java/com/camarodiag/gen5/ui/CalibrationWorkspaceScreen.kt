@@ -118,6 +118,9 @@ data class CalibrationWorkspaceState(
     val comparisonMissingBytes: Long? = null,
     val comparisonRanges: List<String> = emptyList(),
     val comparisonIdentical: Boolean? = null,
+    val partialWriteSummary: String? = null,
+    val partialWriteChangedBytes: Long? = null,
+    val partialWriteSectorAddresses: List<String> = emptyList(),
     val activeFilePath: String? = null,
     val mapDefinitions: List<CalibrationMapDefinition> = emptyList(),
     val selectedMapId: String? = null,
@@ -209,6 +212,7 @@ fun CalibrationWorkspaceScreen(
     onImportFile: () -> Unit,
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
+    onPreviewPartialWrite: (Long, Int, Int) -> Unit,
     onImportDefinitions: () -> Unit,
     onExportDefinitionTemplate: () -> Unit,
     onSelectMap: (String) -> Unit,
@@ -229,6 +233,9 @@ fun CalibrationWorkspaceScreen(
     var expertControllerFamily by remember { mutableStateOf("") }
     var expertChipMarking by remember { mutableStateOf("") }
     var expertProgrammerName by remember { mutableStateOf("") }
+    var patchStartHex by remember { mutableStateOf("") }
+    var patchEraseBytes by remember { mutableStateOf("") }
+    var patchProgramBytes by remember { mutableStateOf("") }
     var expertAccessMethod by remember { mutableStateOf(EcuBenchExpertPlan.AccessMethod.BOOT_BAM) }
     var expertMemoryRegion by remember { mutableStateOf(EcuBenchExpertPlan.MemoryRegion.PFLASH) }
     var expertAccessMenuExpanded by remember { mutableStateOf(false) }
