@@ -863,4 +863,5 @@
     <string name="live_pid_wbo2_b1s2">Lambda large bande B1S2</string>
     <string name="live_pid_wbo2_b2s1">Lambda large bande B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda large bande B2S2</string>
+    <string name="system_language_follow_phone">Suivre la langue du téléphone</string>
 </resources>
