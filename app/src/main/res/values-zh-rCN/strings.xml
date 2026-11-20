@@ -687,4 +687,26 @@
     <string name="update_install_update">安装更新</string>
     <string name="update_version_available">可用版本：%1$s</string>
     <string name="system_language_follow_phone">跟随手机语言</string>
+    <string name="can_sniffer_raw_heading">CAN 适配器原始输出</string>
+    <string name="can_sniffer_export_raw">导出原始日志</string>
+    <string name="can_sniffer_dtc_heading">已观察到的 OBD-II 故障码</string>
+    <string name="connection_lost_bluetooth">蓝牙连接已断开。请重新连接适配器并重新执行操作。</string>
+    <string name="connection_lost_vehicle">车辆连接已断开。请重新连接车辆并重新执行操作。</string>
+    <string name="connection_lost_usb">USB 适配器已断开。请重新连接适配器并重新执行操作。</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi 连接已断开。请重新连接适配器并重新执行操作。</string>
+    <string name="connection_lost_pc_bridge">电脑诊断桥接连接已断开。请重新连接桥接程序并重新执行操作。</string>
+    <string name="live_sensor_search">搜索传感器</string>
+    <string name="live_sensor_show_all">显示所有传感器</string>
+    <string name="can_console_history">统一 CAN 控制台历史记录</string>
+    <string name="can_console_clear">清除历史记录</string>
+    <string name="can_console_empty">尚无通信数据。接收和发送的数据将在此显示。</string>
+    <string name="can_console_tx">TX • 已发送</string>
+    <string name="can_console_rx">RX • 已接收</string>
+    <string name="can_console_system">系统</string>
+    <string name="can_console_input_label">CAN 帧或 OBD 命令</string>
+    <string name="can_console_sending">正在发送…</string>
+    <string name="obd_dtc_help_unavailable">尚无针对该故障码及车辆的已验证排障指导。维修前请查阅制造商的维修资料。</string>
+    <string name="cal_expert_no_write">在实现并验证兼容的台架驱动程序之前，无法进行编程。</string>
+    <string name="flexfuel_preflight_write">ECU 标定写入尚未验证，因此保持禁用。</string>
+    <string name="status_not_implemented">尚未实现</string>
 </resources>
