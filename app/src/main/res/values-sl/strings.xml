@@ -60,4 +60,14 @@
     <string name="adapter_ip_address">Naslov IP vmesnika</string>
     <string name="adapter_tcp_port">Vrata TCP (običajno 35000 ali 23)</string>
     <string name="adapter_connect_wifi">Poveži prek Wi-Fi</string>
+    <string name="obd_connect_adapter_notice">Pred pregledom povežite pravi vmesnik OBD. Predstavitveni način ne ustvarja izmišljenih rezultatov.</string>
+    <string name="obd_offline_simulation_notice">SIMULACIJA BREZ POVEZAVE — spodnji VIN, CAL ID, CVN, DTC in meritve so sintetični in ne izvirajo iz pravega Camara.</string>
+    <string name="obd_vehicle_ecu_identification">Identifikacija vozila / ECU</string>
+    <string name="obd_no_live_data">Ni bilo prejetih uporabnih podatkov PID v živo.</string>
+    <string name="obd_no_dtcs">Standardne storitve 03/07/0A niso vrnile kod DTC.</string>
+    <string name="obd_no_freeze_frame">Ni uporabnih podatkov zamrznjenega okvirja.</string>
+    <string name="obd_simulation_scope">Obseg: samo določeni predstavitveni podatki. Pravi vmesnik, ECU ali vozilo niso vprašani.</string>
+    <string name="vehicle_vin_hint">Vnesite pravi VIN; vzorčni VIN se ne ustvari.</string>
+    <string name="status_not_verified">NI PREVERJENO</string>
+    <string name="adapter_discovery_only">SAMO ODKRIVANJE</string>
 </resources>
