@@ -1,5 +1,5 @@
 name: PR54 manual checkpoint validation
-# PR54 retry: SharedPreferences KTX import restored; validate full current Android/Windows tree.
+# PR54 final-candidate checkpoint: account-scoped sensors, full DTC modal, ECU export and tests.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
