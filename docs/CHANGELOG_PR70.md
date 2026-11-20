@@ -67,3 +67,10 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - `6e85d10` : test de présence des 10 libellés de diagnostic dans toutes les 30 locales.
 - `8a575ec` : workflow `.github/workflows/pr-unit-tests.yml` pour lancer les tests unitaires Android lors des mises à jour de PR, en gardant le workflow de validation complète séparé. Résultat d'exécution non confirmé lors de la création.
 - **Reste bloquant** : traductions complètes (dont locales historiques), tests réels Android 10–16, lint, builds Android/Windows et vérification des résultats. Aucune fusion tant que les critères ne sont pas remplis.
+
+## Poursuite i18n et garantie de non-régression
+- Traduction de 10 libellés supplémentaires de diagnostic/identification ECU dans les 15 locales à couverture minimale (150 chaînes au total) : nom ECU, identification absente, données indisponibles, données temps réel, états DTC, freeze frame, journal brut, chaîne cinématique ECM.
+- Ces 15 fichiers comportent maintenant **39 chaînes localisées** chacun, contre 7 avant la série d'ajouts. Cela ne représente toujours qu'une petite partie des 821 clés de référence.
+- `73bd143` : contrôle de couverture de ces nouveaux libellés sur l'ensemble des 30 locales.
+- `f275efd` : alignement des versions GitHub Actions/SDK du nouveau workflow de tests sur celles déjà utilisées par la CI du projet.
+- **Pas de succès CI revendiqué** tant qu'une exécution complète n'est pas effectivement retournée pour le SHA visé.
