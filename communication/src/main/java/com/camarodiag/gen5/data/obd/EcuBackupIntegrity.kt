@@ -15,7 +15,8 @@ object EcuBackupIntegrity {
         INDEPENDENT_READ_MISMATCH,
         COVERAGE_MISMATCH,
         INVALID_COVERAGE,
-        UNVERIFIABLE_HARDWARE_PROVENANCE
+        UNVERIFIABLE_HARDWARE_PROVENANCE,
+        MISSING_INDEPENDENT_READ
     }
 
     data class Result(val problems: Set<Problem>) {
@@ -34,6 +35,10 @@ object EcuBackupIntegrity {
         }
         if (manifest.entries.size != captures.size) {
             problems += Problem.ENTRY_COUNT_MISMATCH
+        }
+        // Do not let an absent second read pass simply because the manifest also says false.
+        captures.forEach { capture ->
+            if (capture.independentRead == null) problems += Problem.MISSING_INDEPENDENT_READ
         }
         manifest.entries.zip(captures).forEach { (entry, capture) ->
             if (entry.region != capture.region ||
