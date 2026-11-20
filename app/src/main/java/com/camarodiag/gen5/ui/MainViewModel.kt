@@ -126,6 +126,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _savedVehicles.value = loadSavedVehicleProfiles()
         _selectedSavedVehicleId.value = selectedVehiclePreference()
         _legacyVehicleImportAvailable.value = canImportLegacyVehicles()
+        refreshLegacyImportAvailability()
         _vehicle.value = loadVehicleProfile()
         _lastConnectionProfile.value = loadLastConnectionProfile()
         _connectionMessage.value = null
@@ -201,7 +202,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (settingsPreferences.contains("legacy_vehicles_claimed_uid")) return false
         return loadSavedVehicleProfiles(
             settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
-        ).isNotEmpty()
+        ).isNotEmpty() ||
+            settingsPreferences.contains("vehicle_vin") ||
+            settingsPreferences.contains("vehicle_year")
+    }
+
+    private fun refreshLegacyImportAvailability() {
+        val uid = authenticatedAccountUid ?: return
+        viewModelScope.launch {
+            val hasHistory = runCatching { sessionDao.countUnassignedSessions() > 0 }.getOrDefault(false)
+            if (authenticatedAccountUid == uid &&
+                !settingsPreferences.contains("legacy_vehicles_claimed_uid")
+            ) {
+                _legacyVehicleImportAvailable.value = canImportLegacyVehicles() || hasHistory
+            }
+        }
     }
 
     /** The unassigned garage remains untouched until the user claims it. */
@@ -211,8 +226,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val legacy = loadSavedVehicleProfiles(
             settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
         )
-        if (legacy.isEmpty()) return
         viewModelScope.launch {
+            val historyCount = sessionDao.countUnassignedSessions()
+            if (legacy.isEmpty() && historyCount == 0 &&
+                !settingsPreferences.contains("vehicle_vin") &&
+                !settingsPreferences.contains("vehicle_year")
+            ) return@launch
             try {
                 // Commit the historical session ownership before marking the
                 // migration complete; retry stays possible if Room fails.
@@ -339,6 +358,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val savedSessions: StateFlow<List<SavedSessionEntity>> = _savedSessions.asStateFlow()
 
     init {
+        refreshLegacyImportAvailability()
         viewModelScope.launch {
             _activeAccountUid.collectLatest { uid ->
                 _savedSessions.value = emptyList()
