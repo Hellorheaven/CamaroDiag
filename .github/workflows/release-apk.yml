@@ -14,7 +14,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  windows-preflight:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v7
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "8.0.x"
+      - name: Verify J2534 bridge release compilation and offline self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Release -warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Bridge Release compilation failed' }
+          dotnet run --project .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Release --no-build -- --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'J2534 Release self-tests failed' }
+
   release:
+    needs: windows-preflight
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
@@ -106,6 +128,7 @@ jobs:
           gradle wrapper --gradle-version 8.11.1
           chmod +x gradlew
           ./gradlew testDebugUnitTest -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
+          ./gradlew lintDebug lintRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
           ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
           ./gradlew app:assembleDebug -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
 
@@ -139,51 +162,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  detect-windows-release-changes:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      windows_changed: ${{ steps.detect.outputs.windows_changed }}
-    steps:
-      - name: Checkout pushed revision and history
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-      - name: Detect Windows bridge and shared .NET changes
-        id: detect
-        shell: bash
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          paths=(
-            'pc-bridge/**' 'global.json' '.editorconfig' '.github/actions/**' 'NuGet.Config' 'nuget.config'
-            '**/Directory.Build.props' '**/Directory.Build.targets'
-            '**/Directory.Packages.props' '**/Directory.Build.rsp' '**/MSBuild.rsp'
-            '**/*.sln' '**/*.slnx' '**/*.props' '**/*.targets'
-            '**/NuGet.Config' '**/nuget.config' '.config/dotnet-tools.json'
-            '.github/workflows/pc-bridge-ci.yml' '.github/workflows/release-apk.yml'
-          )
-          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
-            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
-            echo "No valid push base SHA; running Windows Release defensively."
-          elif git diff --quiet "$BEFORE_SHA" "$HEAD_SHA" -- "${paths[@]}"; then
-            echo "windows_changed=false" >> "$GITHUB_OUTPUT"
-            echo "No Windows bridge or shared .NET build changes in this push."
-          else
-            echo "windows_changed=true" >> "$GITHUB_OUTPUT"
-            echo "Windows-relevant changes detected:"
-            git diff --name-only "$BEFORE_SHA" "$HEAD_SHA" -- "${paths[@]}"
-          fi
   bridge-installers:
-    needs:
-      - release
-      - detect-windows-release-changes
-    if: needs.release.result == 'success' && needs.detect-windows-release-changes.result == 'success' && needs.detect-windows-release-changes.outputs.windows_changed == 'true'
+    needs: release
+    if: needs.release.result == 'success'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -260,8 +241,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cleanup-old-releases:
-    needs: [release, bridge-installers, detect-windows-release-changes]
-    if: always() && needs.release.result == 'success' && needs.detect-windows-release-changes.result == 'success' && (needs.bridge-installers.result == 'success' || needs.bridge-installers.result == 'skipped')
+    needs: [release, bridge-installers]
+    if: always() && needs.release.result == 'success' && needs.bridge-installers.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
