@@ -16,3 +16,4 @@
 - Après une écriture BLE interrompue ou expirée, la connexion concernée est abandonnée avant toute nouvelle tentative ; une ancienne réponse tardive ne peut plus valider une commande suivante.
 - Amélioration de la gestion des captures interrompues et des reconnexions.
 - Lorsqu’une session BLE est fermée ou interrompue, une lecture en attente est réveillée immédiatement au lieu d’attendre l’expiration de son délai.
+- Le contrôle de session BLE est également effectué après l'enregistrement du lecteur en attente, afin qu'une fermeture survenue juste avant cet enregistrement ne laisse pas la lecture attendre inutilement.
