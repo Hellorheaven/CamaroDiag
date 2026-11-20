@@ -158,7 +158,7 @@ class Obd2FeatureEngineTest {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             commands += command
             when (command) {
-                "0100" -> "7E8 06 41 00 FF FF FF FF 7E9 06 41 00 80 00 00 00"
+                "0100" -> "7E0 06 41 00 FF FF FF FF 7DF 06 41 00 FF FF FF FF 7E8 06 41 00 FF FF FF FF 7E9 06 41 00 80 00 00 00"
                 else -> "OK"
             }
         })

@@ -88,7 +88,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
                 .mapNotNull { match ->
                     val id = match.groupValues[1].uppercase(Locale.ROOT)
                     val numeric = id.toIntOrNull(16) ?: return@mapNotNull null
-                    id.takeIf { numeric in 0x700..0x7FF && numeric != 0x7DF }
+                    id.takeIf { numeric in 0x7E8..0x7EF }
                 }
                 .distinct()
                 .sorted()
