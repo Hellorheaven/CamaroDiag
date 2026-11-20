@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
+import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import com.camarodiag.gen5.R
@@ -31,6 +32,7 @@ fun CamaroAuthGate(
     content: @Composable () -> Unit
 ) {
     val auth = remember { FirebaseAuth.getInstance() }
+    val signOut = rememberFirebaseSignOut(auth)
     var currentUser by remember { mutableStateOf(auth.currentUser) }
     // Recompose after an explicit Firebase email verification reload.
     var verificationRevision by remember { mutableIntStateOf(0) }
@@ -92,7 +94,7 @@ fun CamaroAuthGate(
                 confirmButton = {
                     TextButton(onClick = {
                         accountOpen = false
-                        auth.signOut()
+                        signOut()
                     }) { Text(if (french) "Se déconnecter" else "Sign out") }
                 },
                 dismissButton = {
@@ -245,6 +247,7 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
 
 @Composable
 private fun EmailVerificationScreen(auth: FirebaseAuth, onVerified: () -> Unit) {
+    val signOut = rememberFirebaseSignOut(auth)
     val french = remember { Locale.getDefault().language == "fr" }
     var message by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -282,9 +285,27 @@ private fun EmailVerificationScreen(auth: FirebaseAuth, onVerified: () -> Unit) 
                 }
             }
         }) { Text(if (french) "Renvoyer l'e-mail" else "Resend email") }
-        TextButton(onClick = { auth.signOut() }) {
+        TextButton(onClick = { signOut() }) {
             Text(if (french) "Se déconnecter" else "Sign out")
         }
         if (message.isNotBlank()) Text(message)
+    }
+}
+
+/** Clears the Google Credential Manager selection after ending a Firebase session. */
+@Composable
+private fun rememberFirebaseSignOut(auth: FirebaseAuth): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    return remember(auth, context, scope) {
+        {
+            auth.signOut()
+            scope.launch {
+                runCatching {
+                    CredentialManager.create(context)
+                        .clearCredentialState(ClearCredentialStateRequest())
+                }
+            }
+        }
     }
 }
