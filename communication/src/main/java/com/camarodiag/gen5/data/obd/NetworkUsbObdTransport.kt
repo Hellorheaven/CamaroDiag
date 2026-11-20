@@ -106,7 +106,8 @@ class ElmUsbTransport(private val context: Context) {
     }
 
     fun write(data: ByteArray) {
-        val activePort = port ?: error("USB transport not connected")
+        if (connectionLost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
+        val activePort = port ?: throw ObdTransportDisconnectedException("USB OBD adapter is not connected")
         try {
             activePort.write(data, 1500)
         } catch (error: java.io.IOException) {
@@ -116,6 +117,7 @@ class ElmUsbTransport(private val context: Context) {
     }
 
     fun read(buffer: ByteArray, timeoutMs: Int): Int {
+        if (connectionLost) throw ObdTransportDisconnectedException("USB OBD adapter disconnected")
         val activePort = port ?: run {
             connectionLost = true
             return -1
@@ -180,7 +182,8 @@ class ElmWifiTransport {
     }
 
     fun write(data: ByteArray) {
-        val activeSocket = socket ?: error("Wi-Fi transport not connected")
+        if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
+        val activeSocket = socket ?: throw ObdTransportDisconnectedException("Wi-Fi OBD adapter is not connected")
         try {
             activeSocket.getOutputStream().write(data)
         } catch (error: java.io.IOException) {
@@ -190,6 +193,7 @@ class ElmWifiTransport {
     }
 
     fun read(buffer: ByteArray): Int {
+        if (connectionLost) throw ObdTransportDisconnectedException("Wi-Fi OBD adapter disconnected")
         val activeSocket = socket ?: run {
             connectionLost = true
             return -1
