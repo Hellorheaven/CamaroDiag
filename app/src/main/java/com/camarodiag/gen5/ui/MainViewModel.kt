@@ -2324,6 +2324,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _connectionMessage.value = fallbackMessage
                 }
             } finally {
+                if (attempt == connectionAttemptGeneration) {
+                    connectionAttemptJob = null
+                }
                 endBusyOperation()
             }
         }
