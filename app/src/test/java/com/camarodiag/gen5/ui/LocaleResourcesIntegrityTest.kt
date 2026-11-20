@@ -96,4 +96,21 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    /**
+     * Release gate for #71/#72: each declared locale must provide every English
+     * string key. The current incomplete locales intentionally fail this test
+     * until real translations are committed; copying English text is not completion.
+     */
+    @Test fun allAdvertisedLocalesCoverEveryStringKey() {
+        val source = strings("en").keys
+        for (locale in locales.filterNot { it == "en" }) {
+            val missing = source - strings(locale).keys
+            assertTrue(
+                "Incomplete translations for $locale: ${missing.size} missing keys, " +
+                    missing.sorted().take(20).joinToString(", "),
+                missing.isEmpty()
+            )
+        }
+    }
+
 }
