@@ -223,4 +223,6 @@
     <string name="update_install_update">Инсталиране на актуализация</string>
     <string name="update_download">Изтегляне</string>
     <string name="system_language_follow_phone">Следване на езика на телефона</string>
+    <string name="settings_current_vehicle">Текущ автомобил</string>
+    <string name="settings_current_adapter">OBD-II връзка</string>
 </resources>
