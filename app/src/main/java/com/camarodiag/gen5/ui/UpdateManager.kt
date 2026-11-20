@@ -26,6 +26,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -133,6 +136,7 @@ private object CamaroDiagUpdateChecker {
 @Composable
 fun AboutUpdateCard() {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var update by remember { mutableStateOf<CamaroDiagUpdate?>(null) }
     var checking by remember { mutableStateOf(false) }
@@ -140,11 +144,49 @@ fun AboutUpdateCard() {
     var downloadId by remember { mutableLongStateOf(-1L) }
     var downloadedApk by remember { mutableStateOf<File?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
+    var installRequested by remember { mutableStateOf(false) }
 
     val latestDownloadId = rememberUpdatedState(downloadId)
     val setDownloadedApk = rememberUpdatedState<(File?) -> Unit>({ downloadedApk = it })
     val setDownloading = rememberUpdatedState<(Boolean) -> Unit>({ downloading = it })
     val setStatus = rememberUpdatedState<(String?) -> Unit>({ status = it })
+    val latestInstallRequested = rememberUpdatedState(installRequested)
+    val latestDownloadedApk = rememberUpdatedState(downloadedApk)
+
+    fun launchInstaller(file: File) {
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            installRequested = true
+            context.startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${context.packageName}".toUri())
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            status = context.getString(R.string.update_allow_unknown_sources)
+            return
+        }
+        installRequested = false
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        // Android requires an explicit user confirmation for installing an APK.
+        // The app opens the system installer automatically after signature validation.
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME &&
+                latestInstallRequested.value &&
+                latestDownloadedApk.value?.isFile == true &&
+                context.packageManager.canRequestPackageInstalls()
+            ) {
+                latestDownloadedApk.value?.let { launchInstaller(it) }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     DisposableEffect(context) {
         val receiver = object : BroadcastReceiver() {
@@ -179,6 +221,7 @@ fun AboutUpdateCard() {
                     setDownloadedApk.value(file)
                     setDownloading.value(false)
                     setStatus.value(context.getString(R.string.update_download_complete))
+                    launchInstaller(file)
                 }
             }
         }
@@ -191,29 +234,6 @@ fun AboutUpdateCard() {
         onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
 
-    fun installDownloadedApk() {
-        val file = downloadedApk ?: return
-        if (!context.packageManager.canRequestPackageInstalls()) {
-            context.startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    "package:${context.packageName}".toUri()
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-            status = context.getString(R.string.update_allow_unknown_sources)
-            return
-        }
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-    }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -225,7 +245,7 @@ fun AboutUpdateCard() {
             Text(stringResource(R.string.about_build, BuildConfig.VERSION_CODE))
             status?.let { Text(it) }
             update?.let {
-                Text(stringResource(R.string.update_version_channel, it.version, it.channel.uppercase()))
+                Text(stringResource(R.string.update_version_available, it.version))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
@@ -281,7 +301,7 @@ fun AboutUpdateCard() {
                         Text(
                             stringResource(
                                 if (downloading) R.string.update_downloading
-                                else R.string.update_download
+                                else R.string.update_install_update
                             )
                         )
                     }
