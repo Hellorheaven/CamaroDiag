@@ -63,7 +63,9 @@ class BluetoothObdManager(context: Context) {
             activeTransport = activeTransport,
             classicSocketConnected = socket?.isConnected == true,
             classicSocketClosed = socket?.isConnected != true,
-            bleConnected = bleTransport.isConnected
+            bleConnected = bleTransport.isConnected,
+            usbConnected = usbTransport.isConnected,
+            wifiConnected = wifiTransport.isConnected
         )
 
     @SuppressLint("MissingPermission")
