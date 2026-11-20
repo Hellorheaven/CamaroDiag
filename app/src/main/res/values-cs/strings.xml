@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULACE: tyto identifikátory ECU nebyly načteny ze skutečného vozidla a nemohou ověřit jeho firmware.</string>
     <string name="cal_expert_block_memory_map">Paměťová mapa cíle a chráněné oblasti nejsou ověřeny.</string>
     <string name="flexfuel_preflight_backup">Původní záloha ECU nebyla ověřena.</string>
+    <string name="cal_expert_title">Expertní režim — ECU na stole / čip</string>
+    <string name="cal_expert_expand">Nastavit expertní režim</string>
+    <string name="cal_expert_collapse">Skrýt expertní nastavení</string>
+    <string name="cal_expert_family">Rodina řídicí jednotky (E39 nebo E39A)</string>
+    <string name="cal_expert_chip">Zjištěné označení čipu</string>
+    <string name="cal_expert_programmer">Stolní programátor / rozhraní</string>
+    <string name="cal_expert_access_title">Metoda přístupu</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Externí paměť, vyjmutý čip</string>
+    <string name="cal_expert_region_title">Oblast paměti</string>
+    <string name="cal_expert_region_pflash">Interní programová flash paměť MCU</string>
+    <string name="cal_expert_region_dflash">Datová flash paměť MCU</string>
+    <string name="cal_expert_region_eeprom">Externí EEPROM</string>
+    <string name="cal_expert_blockers">Nesplněné expertní kontroly</string>
+    <string name="cal_expert_block_controller">Ověřte přesnou rodinu řídicí jednotky (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Zjistěte fyzické označení MCU nebo paměťového čipu.</string>
+    <string name="cal_expert_block_programmer">Zjistěte kompatibilní stolní programátor.</string>
+    <string name="cal_expert_block_image_missing">Importujte neprázdný obraz firmwaru.</string>
+    <string name="cal_expert_block_image_format">Pro tuto přípravu je nutný surový binární soubor.</string>
 </resources>
