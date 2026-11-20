@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
+import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
 import com.camarodiag.gen5.auth.AccountStorageKeys
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
@@ -1251,6 +1252,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("calibrationIds", lines(observation.calibrationIdResponse))
                     put("calibrationVerificationNumbers", lines(observation.cvnResponse))
                     put("respondingCanAddresses", JSONArray(observation.respondingEcuAddresses))
+                    put(
+                        "observedFingerprintComplete",
+                        Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+                            Lfx2012ControllerReferences.ObservedIdentity(
+                                ecuName = reported(observation.ecuNameResponse),
+                                calibrationIds = observation.calibrationIdResponse.lines(),
+                                calibrationVerificationNumbers = observation.cvnResponse.lines()
+                            )
+                        )
+                    )
                     put("ecuMemoryBackedUp", false)
                     put("firmwareCompatibilityValidated", false)
                     put("calibrationWritingPermitted", false)
