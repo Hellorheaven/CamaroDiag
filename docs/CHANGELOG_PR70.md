@@ -35,3 +35,10 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Validation préalable à l'export d'archive, avant d'écrire le moindre octet : absence de seconde lecture et divergences provoquent un rejet (`71cc462`, `29a7685`).
 - Tests d'export adaptés pour confirmer le rejet et la sortie vide.
 - Builds/tests CI du dernier HEAD toujours à confirmer avant toute fusion.
+
+## Renforcement du 20 novembre — couverture navigation et archives
+- Ajout de 12 traductions de navigation pour chacune des 15 locales initialement limitées à 7 clés : croate, tchèque, danois, estonien, finnois, hongrois, irlandais, letton, lituanien, maltais, polonais, roumain, slovaque, slovène et suédois.
+- Test de présence/non-vacuité des 12 libellés principaux dans toutes les 30 locales (`e60cb12`).
+- Tests ECU supplémentaires : chevauchement d'adresses refusé à l'export, corruption des octets primaires dans le ZIP refusée à l'import (`464ec1e`).
+- Audit partiel : 821 ressources EN et FR ; certaines locales historiques comptent 664 ressources, plusieurs locales nouvelles n'en avaient que 7 avant cette passe. **La couverture complète de 821 traductions dans toutes les locales n'est pas achevée.**
+- Validation CI/Android/Windows du dernier HEAD **non confirmée**. Conserver la PR Draft. Ne pas fusionner avant validation complète de #63/#71 et des builds.
