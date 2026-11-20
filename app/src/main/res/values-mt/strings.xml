@@ -50,4 +50,14 @@
     <string name="obd_readiness">Prontezza OBD</string>
     <string name="obd_mode06_results">Riżultati tal-modalità 06</string>
     <string name="system_language_follow_phone">Segwi l-lingwa tat-telefon</string>
+    <string name="settings_current_vehicle">Vettura attwali</string>
+    <string name="settings_current_adapter">Konnessjoni OBD-II</string>
+    <string name="adapter_section_title">Adapter Bluetooth OBD-II u sonda CAN</string>
+    <string name="paired_bluetooth_devices">Apparati Bluetooth imqabbda</string>
+    <string name="usb_devices_detected">Apparati USB misjuba</string>
+    <string name="usb_none_detected">L-ebda adapter USB serjali ma nstab.</string>
+    <string name="wifi_connection_title">Konnessjoni Wi-Fi ELM327</string>
+    <string name="adapter_ip_address">Indirizz IP tal-adapter</string>
+    <string name="adapter_tcp_port">Port TCP (normalment 35000 jew 23)</string>
+    <string name="adapter_connect_wifi">Qabbad permezz tal-Wi-Fi</string>
 </resources>
