@@ -39,9 +39,15 @@ internal class ObdTransportSessionEpoch {
 
     fun invalidate(): Long = value.incrementAndGet()
 
+    fun isCurrent(captured: Long): Boolean = value.get() == captured
+
     fun requireCurrent(captured: Long) {
         if (value.get() != captured) {
             throw ObdTransportDisconnectedException("OBD connection changed during command")
         }
     }
 }
+
+/** A response from a replaced connection must never disconnect its successor. */
+internal class ObdSupersededSessionException(cause: Throwable) :
+    java.io.IOException("An earlier OBD connection was replaced", cause)
