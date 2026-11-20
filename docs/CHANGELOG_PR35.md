@@ -240,3 +240,10 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Le libellé utilise « Export raw log » / « Exporter le journal brut », cohérent avec le fichier texte exporté.
 - Commits : `5c6ad0f` (fixtures CAN), `c107175` (fixtures probe OBD), `3a8bdae` (export console).
 - Modifications relues sur GitHub. Aucun test Gradle, lint ou build APK n'a été exécuté ; ces correctifs ne sont donc pas déclarés validés.
+
+
+### Reconnexion OBDLink BLE — réinitialisation MTU — 2026-11-20
+- Le transport BLE réinitialise maintenant la charge utile MTU à 20 octets lors de chaque fermeture de session GATT. Une reconnexion repart donc de la valeur ATT par défaut jusqu'à confirmation de la négociation MTU de la nouvelle session.
+- Cela évite de réutiliser la taille négociée sur un adaptateur précédent si la connexion suivante ne répond pas à la demande de MTU.
+- Commit : `f077a2756a990e6622e7596c4e57de2596108c89`.
+- Relecture statique effectuée ; tests Gradle, build Android et essai avec OBDLink CX non exécutés.
