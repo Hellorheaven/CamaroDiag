@@ -1196,8 +1196,8 @@ fun LiveDataScreen(
         )
     }
     val localeFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
-    // Existing Android translations take precedence over legacy bilingual catalog labels.
-    // Unknown/discovered technical signals retain their stable ID and legacy fallback.
+    // Android resources are authoritative for known signals. Legacy bilingual labels
+    // remain a fallback only for signals discovered outside the known catalog.
     val sensorLabelResources = mapOf(
         "RPM" to R.string.live_pid_rpm,
         "ECT" to R.string.live_pid_ect,
@@ -1264,8 +1264,6 @@ fun LiveDataScreen(
                         items(
                             liveCatalog.filter { signal ->
                                 sensorQuery.isBlank() || signal.id.contains(sensorQuery, true) ||
-                                    signal.labelEn.contains(sensorQuery, true) ||
-                                    signal.labelFr.contains(sensorQuery, true) ||
                                     sensorLabels[signal.id].orEmpty().contains(sensorQuery, true)
                             },
                             key = { it.id }
