@@ -19,4 +19,14 @@
     <string name="tab_guide">Ghid</string>
     <string name="tab_controls">Comenzi</string>
     <string name="tab_settings">Setări</string>
+    <string name="common_connect">Conectare</string>
+    <string name="common_refresh">Actualizează</string>
+    <string name="status_offline">Deconectat</string>
+    <string name="obd_not_available">Indisponibil</string>
+    <string name="obd_run_full_scan">Pornește scanarea completă</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protocol</string>
+    <string name="obd_dtc_title">Coduri de eroare de diagnostic</string>
+    <string name="obd_adapter_voltage">Tensiunea adaptorului</string>
+    <string name="obd_supported_pids">PID-uri acceptate</string>
 </resources>
