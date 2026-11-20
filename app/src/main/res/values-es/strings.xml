@@ -208,10 +208,14 @@
     <string name="update_download_failed">Descarga fallida.</string>
     <string name="update_download_invalid_signature">Descarga o firma no válidas. Instalación bloqueada; puede ser necesaria una reinstalación manual.</string>
     <string name="update_download_complete">Descarga completada.</string>
+    <string name="update_ready_to_install">CamaroDiag – listo para instalar</string>
     <string name="update_downloading">Descargando</string>
+    <string name="update_available">Actualización disponible</string>
+    <string name="update_channel_only">Solo se ofrece el canal %1$s. Debug sigue siendo Debug y Release sigue siendo Release.</string>
     <string name="update_allow_unknown_sources">Permite las instalaciones desde este origen, vuelve y pulsa Instalar.</string>
     <string name="update_install">Instalar</string>
     <string name="update_download">Descargar</string>
+    <string name="update_later">Más tarde</string>
     <string name="vehicle_generation_label">Generación %1$d</string>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
     <string name="engine_lfx">3.6L V6 SIDI FlexFuel (2012–2015)</string>
@@ -621,6 +625,7 @@
     <string name="cal_vin_matches_profile">El VIN de la ECU coincide con el perfil del vehículo seleccionado.</string>
     <string name="cal_vin_mismatch_detected">VIN DIFERENTE — perfil: %1$s • ECU: %2$s</string>
     <string name="cal_vin_profile_not_set">El perfil de vehículo seleccionado no contiene un VIN válido.</string>
+    <string name="cal_use_ecu_vin_for_current_profile">Usar el VIN de la ECU en el perfil actual</string>
     <string name="cal_vin_mismatch_title">Se detectó una discrepancia de VIN</string>
     <string name="cal_vin_mismatch_confirmation">El VIN del perfil seleccionado es %1$s, pero la ECU devolvió %2$s. Podrían ser vehículos distintos. Crea un perfil separado para conservar el vehículo seleccionado o sincroniza el VIN solo después de verificar el vehículo físico.</string>
     <string name="cal_vin_create_vehicle">Crear perfil de vehículo</string>
