@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_language_title">Sovelluksen kieli</string>
+    <string name="system_language_hint">Valitse CamaroDiagin kieli.</string>
+    <string name="about_title">Tietoja CamaroDiagista</string>
+    <string name="about_check_updates">Tarkista päivitykset</string>
+    <string name="about_up_to_date">CamaroDiag on ajan tasalla.</string>
+    <string name="obd_choose_sensors">Valitse anturit</string>
+    <string name="obd_sensor_cancel">Peruuta</string>
+</resources>
