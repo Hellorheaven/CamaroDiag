@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Mootori tegelik pöördemoment</string>
     <string name="can_trace_pid_63">Mootori etalonpöördemoment</string>
     <string name="live_pid_ethanol">Etanoolisisaldus</string>
+    <string name="can_trace_flow_status_cts">Jätka saatmist</string>
+    <string name="can_trace_flow_status_wait">Oota</string>
+    <string name="can_trace_flow_status_overflow">Ületäitumine</string>
+    <string name="can_trace_flow_status_reserved">Reserveeritud olek</string>
+    <string name="can_trace_exchange_heading">UDS-päringute ja vastuste vahetus</string>
+    <string name="can_trace_exchange_completed">Lõpetatud</string>
+    <string name="can_trace_exchange_pending">Vastuse ootel (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Vastust ei täheldatud</string>
+    <string name="can_console_raw_tx_confirm_title">Kinnita CAN-toorkaadri saatmine</string>
+    <string name="can_console_raw_tx_confirm_message">See saadab kaadri otse sõiduki CAN-siinile. Vale kaader võib mõjutada sõiduki juhtplokke. Saada ainult siis, kui tead sihtsiini ja identifikaatorit.</string>
+    <string name="can_console_tx_unverified">CAN-toorkaadrite saatmine on keelatud: ainult lugemiseks mõeldud saatmiskontrollile ei täheldatud tegelikku ECU vastust.</string>
+    <string name="can_trace_clear_filters">Kustuta filtrid</string>
+    <string name="can_trace_filter_invalid">Vigane CAN ID või andmete prefiks.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP voo juhtimine</string>
+    <string name="cal_expert_block_recovery">Selle konkreetse sihtmärgi taastamisprotseduur pole kinnitatud.</string>
+    <string name="cal_expert_block_driver">Kinnitatud riistvaraprogrammeerimise draiver pole ühendatud.</string>
+    <string name="cal_expert_identity_notice">Sisestatud nimed ja failiräsid on vaatlused, mitte riistvara ühilduvuse tõend.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULATSIOON: neid ECU identifikaatoreid ei loetud päris sõidukilt ega saa nende abil püsivara kinnitada.</string>
+    <string name="cal_expert_block_memory_map">Sihtmälu kaart ja kaitstud piirkonnad pole kinnitatud.</string>
+    <string name="flexfuel_preflight_backup">Algset ECU varukoopiat pole kinnitatud.</string>
 </resources>
