@@ -2705,7 +2705,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _obdScanMessage.value = getApplication<Application>().getString(R.string.msg_full_scan_failed)
                 }
             } finally {
-                _isObdScanning.value = false
+                // An old scan finishing after account switch must not reset
+                // the busy state of a new scan already started for that user.
+                if (isCurrentAccountGeneration(startedGeneration)) {
+                    _isObdScanning.value = false
+                }
             }
         }
     }
