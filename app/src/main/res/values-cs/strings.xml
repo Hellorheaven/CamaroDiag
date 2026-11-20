@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_language_title">Jazyk aplikace</string>
+    <string name="system_language_hint">Vyberte jazyk aplikace CamaroDiag.</string>
+    <string name="about_title">O aplikaci CamaroDiag</string>
+    <string name="about_check_updates">Zkontrolovat aktualizace</string>
+    <string name="about_up_to_date">CamaroDiag je aktuální.</string>
+    <string name="obd_choose_sensors">Vybrat senzory</string>
+    <string name="obd_sensor_cancel">Zrušit</string>
+</resources>
