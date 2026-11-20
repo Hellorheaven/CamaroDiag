@@ -1373,8 +1373,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         append("] ")
                         appendLine(entry.content)
                     }
-                    if (history.isEmpty() && snapshot.rawText.isNotBlank()) {
-                        appendLine("# Raw adapter capture (direction not decoded by the adapter)")
+                    if (snapshot.rawText.isNotBlank()) {
+                        appendLine()
+                        appendLine("# RX RAW — received adapter stream (unmodified)")
                         append(snapshot.rawText)
                     }
                 }
