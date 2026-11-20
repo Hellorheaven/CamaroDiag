@@ -265,14 +265,16 @@ fun AboutUpdateCard() {
                     Button(
                         enabled = !downloading,
                         onClick = {
-                            val available = update ?: return@Button
-                            try {
-                                downloadId = CamaroDiagUpdateChecker.enqueue(context, available)
-                                downloading = true
-                                status = context.getString(R.string.update_downloading)
-                            } catch (_: Exception) {
-                                downloading = false
-                                status = context.getString(R.string.update_download_failed)
+                            val available = update
+                            if (available != null) {
+                                try {
+                                    downloadId = CamaroDiagUpdateChecker.enqueue(context, available)
+                                    downloading = true
+                                    status = context.getString(R.string.update_downloading)
+                                } catch (_: Exception) {
+                                    downloading = false
+                                    status = context.getString(R.string.update_download_failed)
+                                }
                             }
                         }
                     ) {
