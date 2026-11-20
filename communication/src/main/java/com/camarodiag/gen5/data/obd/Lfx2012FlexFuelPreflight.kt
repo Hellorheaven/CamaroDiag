@@ -70,17 +70,19 @@ object Lfx2012FlexFuelPreflight {
 
     private fun isPlaceholderIdentity(value: String?): Boolean {
         val normalized = value?.trim()?.lowercase().orEmpty()
-        return normalized.isEmpty() ||
-            normalized.startsWith("unknown") ||
-            normalized.startsWith("demo") ||
-            normalized.startsWith("sample") ||
-            normalized.startsWith("simulated") ||
-            normalized == "n/a" || normalized == "none" || normalized == "null" ||
-            normalized == "not available" || normalized == "not supported" ||
-            normalized == "pending" || normalized == "tbd" || normalized == "test" ||
-            normalized == "0x" || normalized == "-" ||
-            normalized.all { it == '0' || it == 'x' } ||
-            normalized.all { it == 'f' || it == 'x' }
+        if (normalized.isEmpty() || normalized == "n/a" ||
+            normalized == "none" || normalized == "null" || normalized == "-"
+        ) return true
+        val placeholders = Regex(
+            "(?:^|[^a-z0-9])(?:unknown|demo|sample|simulated|invalid|" +
+                "not available|not supported|unavailable|no data|no response|" +
+                "pending|tbd|test|error|stopped)(?:$|[^a-z0-9])"
+        )
+        if (placeholders.containsMatchIn(normalized)) return true
+        // Some ELM responses include a 0x prefix, spaces or separators.
+        // Remove them before checking for missing data filled with 00 or FF.
+        val bytes = normalized.removePrefix("0x").replace(Regex("[\\s:_-]"), "")
+        return bytes.isEmpty() || bytes.all { it == '0' } || bytes.all { it == 'f' }
     }
 
     private fun isVin(value: String?): Boolean =
