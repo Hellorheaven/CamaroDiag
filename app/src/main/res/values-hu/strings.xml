@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Kimerevített adatok</string>
     <string name="obd_raw_scan_log">Nyers vizsgálati napló</string>
     <string name="obd_powertrain_ecm">Hajtáslánc / ECM</string>
+    <string name="vehicle_setup_header">Jármű beállítása</string>
+    <string name="vehicle_generation">Generáció</string>
+    <string name="vehicle_model_year">Modellév</string>
+    <string name="vehicle_engine">Motor</string>
+    <string name="vehicle_transmission">Sebességváltó</string>
+    <string name="vehicle_market_region">Piaci régió</string>
+    <string name="vehicle_vin">Jármű VIN</string>
+    <string name="obd_scan_title">TELJES OBD-II VIZSGÁLAT</string>
+    <string name="obd_readiness">OBD-készenlét</string>
+    <string name="obd_mode06_results">06-os mód eredményei</string>
 </resources>
