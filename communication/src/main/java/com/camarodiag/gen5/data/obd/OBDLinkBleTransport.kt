@@ -302,6 +302,12 @@ internal class OBDLinkBleTransport(private val context: Context) {
                         incoming.onReceive { it }
                     }
                 } ?: run {
+                    if (gatt !== readSession) {
+                        throw ObdTransportDisconnectedException(
+                            "OBDLink BLE session changed while reading",
+                            connectionFailure
+                        )
+                    }
                     connectionFailure?.let {
                         throw ObdTransportDisconnectedException("OBDLink BLE disconnected while reading", it)
                     }
