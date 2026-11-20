@@ -28,6 +28,20 @@ class ObdTransportFailurePolicyTest {
     }
 
     @Test
+    fun wrappedSocketTimeoutDoesNotImplyPhysicalDisconnect() {
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(
+            IOException("command read failed", SocketTimeoutException("prompt timeout"))
+        ))
+    }
+
+    @Test
+    fun wrappedIoFailureStillReportsPhysicalDisconnect() {
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(
+            IllegalStateException("transport operation failed", EOFException("peer closed"))
+        ))
+    }
+
+    @Test
     fun nonIoFailureDoesNotImplyPhysicalDisconnect() {
         assertFalse(ObdTransportFailurePolicy.isConnectionLoss(IllegalStateException("bad command")))
     }
