@@ -313,9 +313,13 @@ jobs:
           if-no-files-found: error
           retention-days: 30
   android-instrumented-tests:
-    needs: test-and-build
+    needs: [evaluate-build-checkpoint, test-and-build]
     if: needs.test-and-build.result == 'success'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 33, 36]
     steps:
       - name: Checkout the same validation revision
         uses: actions/checkout@v7
@@ -351,7 +355,7 @@ jobs:
       - name: Run Android instrumentation tests on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: ${{ matrix.api-level }}
           arch: x86_64
           target: default
           disable-animations: true
@@ -361,7 +365,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-instrumented-${{ inputs.pr_number || 'manual' }}-${{ github.sha }}
+          name: CamaroDiag-instrumented-api${{ matrix.api-level }}-${{ inputs.pr_number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
           path: |
             app/build/reports/androidTests/connected/**
             app/build/outputs/androidTest-results/connected/**
