@@ -1418,6 +1418,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         monitorJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             val pendingChunks = StringBuilder()
             try {
+                // A quickly cancelled or superseded session must not create or claim a new archive.
+                if (canMonitorJob !== monitorJob || !currentCoroutineContext().isActive) return@launch
                 val archive = File.createTempFile("camarodiag-can-", ".log", getApplication<Application>().cacheDir)
                 val previousArchive = activeCanCaptureFile
                 activeCanCaptureFile = archive
@@ -1545,6 +1547,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var detachedCanRequestJob: Job? = null
 
     private fun discardCanMonitor() {
+        // A changed vehicle must never inherit the previous vehicle's raw archive.
+        activeCanCaptureFile?.delete()
+        activeCanCaptureFile = null
         val activeJob = canMonitorJob ?: return
         canMonitorJob = null
         detachedCanMonitorJob = activeJob
