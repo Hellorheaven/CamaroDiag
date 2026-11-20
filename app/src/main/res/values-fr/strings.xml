@@ -755,4 +755,10 @@
     <string name="live_pid_ethanol">Teneur en éthanol</string>
     <string name="saved_vehicle_import_legacy">Importer les anciens véhicules et diagnostics</string>
     <string name="saved_vehicle_legacy_default_name">Camaro enregistrée auparavant</string>
+    <string name="cal_use_ecu_vin_for_current_profile">Utiliser le VIN du calculateur pour le profil actuel</string>
+    <string name="update_available">Mise à jour disponible</string>
+    <string name="update_channel_only">Seul le canal %1$s est proposé. Debug reste Debug et Release reste Release.</string>
+    <string name="update_later">Plus tard</string>
+    <string name="update_ready_to_install">CamaroDiag – prêt à installer</string>
+    <string name="update_version_channel">Version %1$s • %2$s</string>
 </resources>
