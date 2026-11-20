@@ -123,6 +123,7 @@ dependencies {
     implementation(project(":mileageaudit"))
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("com.google.mlkit:text-recognition:16.0.1")
