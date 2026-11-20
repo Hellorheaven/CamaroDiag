@@ -519,6 +519,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 DiagTab.CAN_SNIFFER -> CanSnifferScreen(
                     state = liveCanMonitorState,
                     isAvailable = viewModel.canMonitorAvailable(),
+                    canTransmitAvailable = adapter.supportsCanTransmit,
                     onStart = { viewModel.startCanMonitor() },
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
@@ -1245,6 +1246,7 @@ fun LiveDataScreen(
 fun CanSnifferScreen(
     state: LiveCanMonitorState,
     isAvailable: Boolean,
+    canTransmitAvailable: Boolean,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
@@ -1259,6 +1261,7 @@ fun CanSnifferScreen(
     var directionFilter by remember { mutableStateOf("ALL") }
     var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
     val report = state.report
+    val rawCanFrameInput = remember(requestInput) { RawCanFrameParser.parse(requestInput) != null }
     val parsedCanId = remember(canIdFilter) {
         if (canIdFilter.isBlank()) null else CanTraceFilter.parseCanId(canIdFilter)
     }
@@ -1378,6 +1381,9 @@ fun CanSnifferScreen(
                         placeholder = { Text("7E0 02 01 0C  •  01 0C") }
                     )
                     Text(stringResource(R.string.can_console_input_hint), color = TextMuted, fontSize = 10.sp)
+                    if (rawCanFrameInput && !canTransmitAvailable) {
+                        Text(stringResource(R.string.can_console_tx_unverified), color = WarnRed, fontSize = 11.sp)
+                    }
                     Button(
                         onClick = {
                             if (RawCanFrameParser.parse(requestInput) != null) {
@@ -1387,7 +1393,7 @@ fun CanSnifferScreen(
                             }
                         },
                         enabled = isAvailable && !state.isCapturing && !state.isSendingRequest &&
-                            requestInput.isNotBlank(),
+                            requestInput.isNotBlank() && (!rawCanFrameInput || canTransmitAvailable),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.can_sniffer_send))
