@@ -759,4 +759,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">סימולציה: מזהי ECU אלה לא נקראו מרכב אמיתי ואינם יכולים לאמת את הקושחה שלו.</string>
     <string name="cal_expert_block_memory_map">מפת הזיכרון ואזורי ההגנה של היעד לא אומתו.</string>
     <string name="flexfuel_preflight_backup">גיבוי ECU המקורי לא אומת.</string>
+    <string name="cal_expert_title">מצב מומחה — ECU על שולחן עבודה / שבב</string>
+    <string name="cal_expert_expand">הגדרת מצב מומחה</string>
+    <string name="cal_expert_collapse">הסתר הגדרות מומחה</string>
+    <string name="cal_expert_family">משפחת בקר (E39 או E39A)</string>
+    <string name="cal_expert_chip">סימון שנצפה על השבב</string>
+    <string name="cal_expert_programmer">מתכנת שולחני / ממשק</string>
+    <string name="cal_expert_access_title">שיטת גישה</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">זיכרון חיצוני, שבב שהוסר</string>
+    <string name="cal_expert_region_title">אזור זיכרון</string>
+    <string name="cal_expert_region_pflash">זיכרון פלאש פנימי לתוכנית MCU</string>
+    <string name="cal_expert_region_dflash">זיכרון פלאש לנתוני MCU</string>
+    <string name="cal_expert_region_eeprom">EEPROM חיצוני</string>
+    <string name="cal_expert_blockers">בדיקות מומחה שטרם הושלמו</string>
+    <string name="cal_expert_block_controller">אמת את משפחת הבקר המדויקת (E39/E39A).</string>
+    <string name="cal_expert_block_chip">זהה את הסימון הפיזי על MCU או שבב הזיכרון.</string>
+    <string name="cal_expert_block_programmer">זהה מתכנת שולחני תואם.</string>
+    <string name="cal_expert_block_image_missing">ייבא תמונת קושחה שאינה ריקה.</string>
+    <string name="cal_expert_block_image_format">לשלב הכנה זה נדרש קובץ בינארי גולמי.</string>
 </resources>
