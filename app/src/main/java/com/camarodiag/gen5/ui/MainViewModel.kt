@@ -1269,24 +1269,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendRawCanFrame(frame)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val receivedFrames = RawCanFrameParser.parseReceivedFrames(response)
-                    val receivedEvents = if (receivedFrames.isNotEmpty()) {
-                        receivedFrames.map { receivedFrame ->
-                            val identifier = receivedFrame.canId.toString(16).uppercase().padStart(
-                                if (receivedFrame.isExtended) 8 else 3,
-                                '0'
-                            )
-                            val payload = receivedFrame.data.joinToString(" ") {
-                                "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
-                            }
-                            CanConsoleHistoryEntry(
-                                id = System.nanoTime(),
-                                direction = "RX",
-                                timestampMillis = System.currentTimeMillis(),
-                                content = "$identifier $payload"
-                            )
-                        }
-                    } else {
+                    val receivedEvents = parseCanConsoleReceiveEvents(response).ifEmpty {
                         listOf(
                             CanConsoleHistoryEntry(
                                 id = System.nanoTime(),
