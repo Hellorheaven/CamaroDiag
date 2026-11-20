@@ -1199,18 +1199,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendRawCanFrame(frame)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val adapterAck = CanConsoleHistoryEntry(
-                        id = System.nanoTime(),
-                        direction = "SYSTEM",
-                        timestampMillis = System.currentTimeMillis(),
-                        content = getApplication<Application>().getString(
-                            R.string.can_console_adapter_ack,
-                            response.ifBlank { "No adapter text returned" }
+                    val receivedFrames = RawCanFrameParser.parseReceivedFrames(response)
+                    val receivedEvents = if (receivedFrames.isNotEmpty()) {
+                        receivedFrames.map { receivedFrame ->
+                            val identifier = receivedFrame.canId.toString(16).uppercase().padStart(
+                                if (receivedFrame.isExtended) 8 else 3,
+                                '0'
+                            )
+                            val payload = receivedFrame.data.joinToString(" ") {
+                                "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+                            }
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = "RX",
+                                timestampMillis = System.currentTimeMillis(),
+                                content = "$identifier $payload"
+                            )
+                        }
+                    } else {
+                        listOf(
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = "SYSTEM",
+                                timestampMillis = System.currentTimeMillis(),
+                                content = getApplication<Application>().getString(
+                                    R.string.can_console_adapter_ack,
+                                    response.ifBlank { "No adapter text returned" }
+                                )
+                            )
                         )
-                    )
+                    }
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        consoleHistory = (current.consoleHistory + adapterAck).takeLast(300),
+                        consoleHistory = (current.consoleHistory + receivedEvents).takeLast(300),
                         message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
                     )
                 }
