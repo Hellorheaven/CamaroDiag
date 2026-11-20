@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_language_title">Appsprog</string>
+    <string name="system_language_hint">Vælg sprog til CamaroDiag.</string>
+    <string name="about_title">Om CamaroDiag</string>
+    <string name="about_check_updates">Søg efter opdateringer</string>
+    <string name="about_up_to_date">CamaroDiag er opdateret.</string>
+    <string name="obd_choose_sensors">Vælg sensorer</string>
+    <string name="obd_sensor_cancel">Annuller</string>
+</resources>
