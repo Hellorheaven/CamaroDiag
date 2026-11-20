@@ -702,4 +702,26 @@
     <string name="update_install_update">تثبيت التحديث</string>
     <string name="update_version_available">الإصدار المتاح: %1$s</string>
     <string name="system_language_follow_phone">استخدام لغة الهاتف</string>
+    <string name="can_sniffer_raw_heading">الخرج الخام لمحول CAN</string>
+    <string name="can_sniffer_export_raw">تصدير السجل الخام</string>
+    <string name="can_sniffer_dtc_heading">رموز أعطال OBD-II المرصودة</string>
+    <string name="connection_lost_bluetooth">انقطع اتصال Bluetooth. أعد توصيل المحول وابدأ العملية من جديد.</string>
+    <string name="connection_lost_vehicle">انقطع الاتصال بالمركبة. أعد الاتصال بالمركبة وابدأ العملية من جديد.</string>
+    <string name="connection_lost_usb">تم فصل محول USB. أعد توصيله وابدأ العملية من جديد.</string>
+    <string name="connection_lost_wifi">انقطع اتصال OBD عبر Wi-Fi. أعد توصيل المحول وابدأ العملية من جديد.</string>
+    <string name="connection_lost_pc_bridge">انقطع اتصال جسر التشخيص بالحاسوب. أعد توصيله وابدأ العملية من جديد.</string>
+    <string name="live_sensor_search">البحث عن الحساسات</string>
+    <string name="live_sensor_show_all">عرض كل الحساسات</string>
+    <string name="can_console_history">سجل موحد لوحدة تحكم CAN</string>
+    <string name="can_console_clear">مسح السجل</string>
+    <string name="can_console_empty">لا توجد حركة بيانات بعد. ستظهر هنا البيانات المرسلة والمستلمة.</string>
+    <string name="can_console_tx">TX • تم الإرسال</string>
+    <string name="can_console_rx">RX • تم الاستلام</string>
+    <string name="can_console_system">النظام</string>
+    <string name="can_console_input_label">إطار CAN أو أمر OBD</string>
+    <string name="can_console_sending">جارٍ الإرسال…</string>
+    <string name="obd_dtc_help_unavailable">لا تتوفر بعد إرشادات تشخيص موثّقة لهذا الرمز وهذه المركبة. راجع معلومات الصيانة الصادرة عن الشركة المصنعة قبل الإصلاح.</string>
+    <string name="cal_expert_no_write">البرمجة غير متاحة حتى يتم تنفيذ برنامج تشغيل متوافق لمنضدة الاختبار والتحقق منه.</string>
+    <string name="flexfuel_preflight_write">لم يتم التحقق من كتابة معايرة ECU ولذلك تظل معطّلة.</string>
+    <string name="status_not_implemented">غير منفّذ</string>
 </resources>
