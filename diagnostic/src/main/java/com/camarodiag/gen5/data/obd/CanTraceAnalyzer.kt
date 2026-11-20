@@ -268,7 +268,12 @@ object CanTraceAnalyzer {
                     val request = pending[index].request
                     request.direction != message.direction &&
                         isCompatibleObdCanResponseId(request.canId, message.canId) &&
-                        pending[index].responses.none { it.canId == message.canId } &&
+                        // A physical ECU may send several NRC 0x78 responses before its final reply.
+                        // For functional requests, also allow that same ECU to complete a pending
+                        // exchange, but do not count duplicate terminal replies from one responder.
+                        pending[index].responses.none {
+                            it.canId == message.canId && it.negativeResponseCode != 0x78
+                        } &&
                         request.service == service &&
                         // If both timestamps exist, never pair a response that predates
                         // its request. Missing timestamps retain capture-order behavior.
