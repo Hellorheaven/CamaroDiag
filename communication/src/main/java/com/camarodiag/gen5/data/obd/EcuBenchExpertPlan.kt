@@ -79,6 +79,18 @@ object EcuBenchExpertPlan {
     fun isProgrammingEnabled(target: Target, image: CandidateImage?, evidence: Evidence = Evidence()): Boolean =
         blockers(target, image, evidence).isEmpty()
 
+    /**
+     * Offline file integrity check using actual bytes, not just user-supplied
+     * metadata. A matching checksum does not prove that these bytes were
+     * read from this specific ECU or authorize flashing them.
+     */
+    fun verifyCandidateImage(image: CandidateImage?, rawBytes: ByteArray?): Boolean {
+        if (image == null || rawBytes.isNullOrEmpty()) return false
+        if (image.fileName.isNullOrBlank() || image.format != "RAW_BINARY") return false
+        if (image.sizeBytes != rawBytes.size.toLong() || !isSha256(image.sha256)) return false
+        return sha256Hex(rawBytes).equals(image.sha256, ignoreCase = true)
+    }
+
     /** Compare two actual byte arrays, not merely two filenames or reported hashes. */
     fun verifiedReadback(sourceBytes: ByteArray, readbackBytes: ByteArray): Boolean =
         sourceBytes.isNotEmpty() && sourceBytes.contentEquals(readbackBytes)
