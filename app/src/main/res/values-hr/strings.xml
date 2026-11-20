@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULACIJA: ovi identifikatori ECU-a nisu pročitani iz stvarnog vozila i ne mogu potvrditi njegov firmware.</string>
     <string name="cal_expert_block_memory_map">Memorijska mapa cilja i zaštićene regije nisu provjerene.</string>
     <string name="flexfuel_preflight_backup">Izvorna sigurnosna kopija ECU-a nije provjerena.</string>
+    <string name="cal_expert_title">Stručni način — ECU na stolu / čip</string>
+    <string name="cal_expert_expand">Postavi stručni način</string>
+    <string name="cal_expert_collapse">Sakrij stručne postavke</string>
+    <string name="cal_expert_family">Obitelj kontrolera (E39 ili E39A)</string>
+    <string name="cal_expert_chip">Uočena oznaka čipa</string>
+    <string name="cal_expert_programmer">Programator za stolni rad / sučelje</string>
+    <string name="cal_expert_access_title">Način pristupa</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Vanjska memorija, uklonjeni čip</string>
+    <string name="cal_expert_region_title">Memorijska regija</string>
+    <string name="cal_expert_region_pflash">Interna programska flash memorija MCU-a</string>
+    <string name="cal_expert_region_dflash">Podatkovna flash memorija MCU-a</string>
+    <string name="cal_expert_region_eeprom">Vanjski EEPROM</string>
+    <string name="cal_expert_blockers">Neispunjene stručne provjere</string>
+    <string name="cal_expert_block_controller">Provjerite točnu obitelj kontrolera (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Utvrdite fizičku oznaku MCU-a ili memorijskog čipa.</string>
+    <string name="cal_expert_block_programmer">Utvrdite kompatibilan stolni programator.</string>
+    <string name="cal_expert_block_image_missing">Uvezite nepraznu sliku firmwarea.</string>
+    <string name="cal_expert_block_image_format">Za ovu pripremu potrebna je sirova binarna datoteka.</string>
 </resources>
