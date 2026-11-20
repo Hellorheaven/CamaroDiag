@@ -67,11 +67,23 @@ class RawCanFrameParserTest {
         assertTrue(frames.isEmpty())
     }
 
+    @Test fun receivesZeroLengthFramesWithoutAllowingMalformedPayloads() {
+        val frames = RawCanFrameParser.parseReceivedFrames(
+            "7E8 00\r\n18DAF110 0\r\n7E8 00 FF\r\n7E8 09\r\n800 00"
+        )
+        assertEquals(2, frames.size)
+        assertFalse(frames[0].isExtended)
+        assertTrue(frames[1].isExtended)
+        assertTrue(frames.all { it.data.isEmpty() })
+    }
+
     @Test fun keepsOnlyFramesWhoseDlcMatchesPayloadLength() {
         val frames = RawCanFrameParser.parseReceivedFrames(
             "7E8 03 41 0C 1A\r\n7E8 02 41 0C 1A\r\n7E8 00"
         )
-        assertEquals(1, frames.size)
-        assertArrayEquals(byteArrayOf(0x41, 0x0C, 0x1A), frames.single().data)
+        assertEquals(2, frames.size)
+        assertArrayEquals(byteArrayOf(0x41, 0x0C, 0x1A), frames[0].data)
+        assertEquals(0x7E8L, frames[1].canId)
+        assertTrue(frames[1].data.isEmpty())
     }
 }
