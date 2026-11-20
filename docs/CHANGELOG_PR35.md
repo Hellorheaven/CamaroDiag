@@ -45,3 +45,4 @@
 - La vérification préalable à l'envoi CAN brut rejette aussi les réponses incohérentes sur la longueur des données, afin de ne pas activer l'émission à partir d'une réponse mal formée.
 - Dans l'historique TX, une commande est confirmée comme réussie seulement après la fin effective de l'échange avec l'adaptateur ; une commande annulée ou en échec ne reste plus présentée comme réussie.
 - Les requêtes OBD et les opérations de capture/envoi CAN encore en attente lors d'un changement d'adaptateur sont désormais abandonnées sans agir sur la nouvelle connexion.
+- Une capture CAN, un envoi manuel ou une opération OBD composée déjà en attente lors d'une reconnexion ne peut plus envoyer de commandes sur la nouvelle liaison, y compris pendant le retour de l'adaptateur en mode normal.
