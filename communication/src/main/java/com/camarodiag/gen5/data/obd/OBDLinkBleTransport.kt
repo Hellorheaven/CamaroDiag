@@ -185,34 +185,71 @@ internal class OBDLinkBleTransport(private val context: Context) {
     }
 
     suspend fun write(data: ByteArray) = writeMutex.withLock {
-        connectionFailure?.let { throw ObdTransportDisconnectedException("OBDLink BLE connection is unavailable", it) }
-        val g = gatt ?: error("BLE transport not connected")
-        val characteristic = writeCharacteristic ?: error("OBDLink BLE write characteristic unavailable")
-        var offset = 0
-        while (offset < data.size) {
-            // A disconnect may arrive between BLE chunks.
+        try {
             connectionFailure?.let {
-                throw ObdTransportDisconnectedException("OBDLink BLE disconnected during write", it)
+                throw ObdTransportDisconnectedException("OBDLink BLE connection is unavailable", it)
             }
-            check(gatt === g) { "BLE transport session was replaced during write" }
-            val count = minOf(mtuPayload, data.size - offset)
-            val chunk = data.copyOfRange(offset, offset + count)
-            val result = CompletableDeferred<Unit>()
-            writeResult = result
-            val started = if (Build.VERSION.SDK_INT >= 33) {
-                g.writeCharacteristic(characteristic, chunk, characteristicWriteType) == BluetoothStatusCodes.SUCCESS
-            } else {
-                writeLegacyCharacteristic(g, characteristic, chunk)
+            val g = gatt ?: error("BLE transport not connected")
+            val characteristic = writeCharacteristic ?: error("OBDLink BLE write characteristic unavailable")
+            var offset = 0
+            while (offset < data.size) {
+                // A disconnect may arrive between BLE chunks.
+                connectionFailure?.let {
+                    throw ObdTransportDisconnectedException("OBDLink BLE disconnected during write", it)
+                }
+                check(gatt === g) { "BLE transport session was replaced during write" }
+                val count = minOf(mtuPayload, data.size - offset)
+                val chunk = data.copyOfRange(offset, offset + count)
+                val result = CompletableDeferred<Unit>()
+                writeResult = result
+                val started = if (Build.VERSION.SDK_INT >= 33) {
+                    g.writeCharacteristic(characteristic, chunk, characteristicWriteType) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    writeLegacyCharacteristic(g, characteristic, chunk)
+                }
+                check(started) { "Unable to start OBDLink BLE write" }
+                // Also wait for WRITE_TYPE_NO_RESPONSE: it skips the peer's ATT
+                // acknowledgement, but Android still reports local GATT completion.
+                // Sending the next chunk before this callback can make Android reject
+                // it as GATT_BUSY and silently truncate an ELM command.
+                withTimeout(4_000) { result.await() }
+                check(gatt === g) { "BLE transport session was replaced during write" }
+                offset += count
             }
-            check(started) { "Unable to start OBDLink BLE write" }
-            // Also wait for WRITE_TYPE_NO_RESPONSE: it skips the peer's ATT
-            // acknowledgement, but Android still reports local GATT completion.
-            // Sending the next chunk before this callback can make Android reject
-            // it as GATT_BUSY and silently truncate an ELM command.
-            withTimeout(4_000) { result.await() }
-            check(gatt === g) { "BLE transport session was replaced during write" }
-            offset += count
+        } catch (error: Throwable) {
+            // GATT callbacks carry no operation identifier. After a timeout or
+            // cancellation, a late callback could otherwise complete the next write.
+            // Retire this GATT instance so callbacks from it can never affect a retry.
+            invalidateSession(error)
+            throw error
         }
+    }
+
+    /**
+     * Retires a GATT session after an ambiguous write outcome. A late callback from
+     * this instance is ignored because callbacks verify identity against [gatt].
+     * The failure remains visible until connect() starts a fresh session.
+     */
+    private fun invalidateSession(cause: Throwable) {
+        connectionFailure = cause
+        connectResult?.completeExceptionally(cause)
+        writeResult?.completeExceptionally(cause)
+        mtuResult?.completeExceptionally(cause)
+
+        val failedGatt = gatt
+        gatt = null
+        writeCharacteristic = null
+        characteristicWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        mtuPayload = 20
+        pending = ByteArray(0)
+        incoming.trySend(ByteArray(0))
+
+        connectResult = null
+        writeResult = null
+        mtuResult = null
+
+        try { failedGatt?.disconnect() } catch (_: Exception) {}
+        try { failedGatt?.close() } catch (_: Exception) {}
     }
 
     /**
