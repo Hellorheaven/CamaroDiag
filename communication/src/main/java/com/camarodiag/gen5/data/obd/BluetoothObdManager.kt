@@ -481,6 +481,7 @@ class BluetoothObdManager(context: Context) {
             }
             val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
             ensureSameSession()
+            try {
             if (sessionTransport == "USB") {
                 usbTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
@@ -591,6 +592,16 @@ class BluetoothObdManager(context: Context) {
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
                 buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+            }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // A failing read from a replaced socket must not cause the ViewModel
+                // to disconnect the successor session after a fast reconnect.
+                if (!transportSessionEpoch.isCurrent(sessionEpoch)) {
+                    throw ObdSupersededSessionException(error)
+                }
+                throw error
             }
         }
     }
