@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Adja meg a valódi VIN-t; mintaszám nem keletkezik.</string>
     <string name="status_not_verified">NINCS ELLENŐRIZVE</string>
     <string name="adapter_discovery_only">CSAK FELDERÍTÉS</string>
+    <string name="can_sniffer_raw_heading">A CAN-adapter nyers kimenete</string>
+    <string name="can_sniffer_export_raw">Nyers napló exportálása</string>
+    <string name="can_sniffer_dtc_heading">Észlelt OBD-II hibakódok</string>
+    <string name="connection_lost_bluetooth">A Bluetooth-kapcsolat megszakadt. Csatlakoztassa újra az adaptert, majd indítsa újra a műveletet.</string>
+    <string name="connection_lost_vehicle">A járműkapcsolat megszakadt. Csatlakozzon újra a járműhöz, majd indítsa újra a műveletet.</string>
+    <string name="connection_lost_usb">Az USB-adapter levált. Csatlakoztassa újra, majd indítsa újra a műveletet.</string>
+    <string name="connection_lost_wifi">Az OBD Wi-Fi-kapcsolat megszakadt. Csatlakoztassa újra az adaptert, majd indítsa újra a műveletet.</string>
+    <string name="connection_lost_pc_bridge">A PC diagnosztikai hídjával megszakadt a kapcsolat. Csatlakoztassa újra, majd indítsa újra a műveletet.</string>
+    <string name="live_sensor_search">Érzékelők keresése</string>
+    <string name="live_sensor_show_all">Összes érzékelő megjelenítése</string>
+    <string name="can_console_history">Egységes CAN-konzolelőzmények</string>
+    <string name="can_console_clear">Előzmények törlése</string>
+    <string name="can_console_empty">Még nincs forgalom. A fogadott és elküldött adatok itt jelennek meg.</string>
+    <string name="can_console_tx">TX • ELKÜLDVE</string>
+    <string name="can_console_rx">RX • FOGADVA</string>
+    <string name="can_console_system">RENDSZER</string>
+    <string name="can_console_input_label">CAN-keret vagy OBD-parancs</string>
+    <string name="can_console_sending">Küldés…</string>
+    <string name="obd_dtc_help_unavailable">Ehhez a hibakódhoz és járműhöz még nincs ellenőrzött hibaelhárítási útmutató. Javítás előtt nézze át a gyártó szervizdokumentációját.</string>
+    <string name="cal_expert_no_write">A programozás nem érhető el, amíg a kompatibilis asztali meghajtó nincs megvalósítva és ellenőrizve.</string>
+    <string name="flexfuel_preflight_write">Az ECU-kalibráció írása nincs validálva, ezért letiltva marad.</string>
+    <string name="status_not_implemented">NINCS MEGVALÓSÍTVA</string>
 </resources>
