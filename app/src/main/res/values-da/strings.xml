@@ -19,4 +19,14 @@
     <string name="tab_guide">Vejledning</string>
     <string name="tab_controls">Styring</string>
     <string name="tab_settings">Indstillinger</string>
+    <string name="common_connect">Forbind</string>
+    <string name="common_refresh">Opdater</string>
+    <string name="status_offline">Offline</string>
+    <string name="obd_not_available">Ikke tilgængelig</string>
+    <string name="obd_run_full_scan">Start fuld scanning</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokol</string>
+    <string name="obd_dtc_title">Diagnostiske fejlkoder</string>
+    <string name="obd_adapter_voltage">Adapterspænding</string>
+    <string name="obd_supported_pids">Understøttede PID\'er</string>
 </resources>
