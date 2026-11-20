@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Indtast den faktiske VIN; der genereres ingen eksempel-VIN.</string>
     <string name="status_not_verified">IKKE VERIFICERET</string>
     <string name="adapter_discovery_only">KUN SØGNING</string>
+    <string name="can_sniffer_raw_heading">Rå output fra CAN-adapter</string>
+    <string name="can_sniffer_export_raw">Eksportér rå log</string>
+    <string name="can_sniffer_dtc_heading">Registrerede OBD-II-fejlkoder</string>
+    <string name="connection_lost_bluetooth">Bluetooth-forbindelsen er afbrudt. Tilslut adapteren igen, og genstart handlingen.</string>
+    <string name="connection_lost_vehicle">Forbindelsen til bilen er afbrudt. Tilslut bilen igen, og genstart handlingen.</string>
+    <string name="connection_lost_usb">USB-adapteren er frakoblet. Tilslut den igen, og genstart handlingen.</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi-forbindelsen er afbrudt. Tilslut adapteren igen, og genstart handlingen.</string>
+    <string name="connection_lost_pc_bridge">Forbindelsen til pc-diagnosebroen er afbrudt. Tilslut broen igen, og genstart handlingen.</string>
+    <string name="live_sensor_search">Søg efter sensorer</string>
+    <string name="live_sensor_show_all">Vis alle sensorer</string>
+    <string name="can_console_history">Samlet historik for CAN-konsollen</string>
+    <string name="can_console_clear">Ryd historik</string>
+    <string name="can_console_empty">Endnu ingen trafik. Modtagne og sendte data vises her.</string>
+    <string name="can_console_tx">TX • SENDT</string>
+    <string name="can_console_rx">RX • MODTAGET</string>
+    <string name="can_console_system">SYSTEM</string>
+    <string name="can_console_input_label">CAN-ramme eller OBD-kommando</string>
+    <string name="can_console_sending">Sender…</string>
+    <string name="obd_dtc_help_unavailable">Der findes endnu ingen verificeret fejlfindingsvejledning til denne fejlkode og bil. Se producentens serviceoplysninger før reparation.</string>
+    <string name="cal_expert_no_write">Programmering er ikke tilgængelig, før en understøttet bænkdriver er implementeret og valideret.</string>
+    <string name="flexfuel_preflight_write">Skrivning af ECU-kalibrering er ikke valideret og forbliver deaktiveret.</string>
+    <string name="status_not_implemented">IKKE IMPLEMENTERET</string>
 </resources>
