@@ -50,6 +50,7 @@ fun ObdScanScreen(
     isScanning: Boolean,
     message: String?,
     isConnected: Boolean,
+    savedVehicleId: String?,
     onRunScan: () -> Unit
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
@@ -59,9 +60,12 @@ fun ObdScanScreen(
         context.getSharedPreferences("obd_sensor_selection", android.content.Context.MODE_PRIVATE)
     }
     val vehicleKey = report?.vin?.trim()?.uppercase()?.takeIf { it.length == 17 }
-    val preferenceKey = vehicleKey?.let { "vehicle_$it" } ?: "vehicle_unidentified"
+    // An unknown VIN must never share a persistent selection with another vehicle.
+    // A saved garage profile provides a stable identity before the ECU VIN is read.
+    val preferenceKey = savedVehicleId?.takeIf(String::isNotBlank)?.let { "profile_$it" }
+        ?: vehicleKey?.let { "vehicle_$it" }
     val storedPids = remember(preferenceKey, preferences) {
-        preferences.getString(preferenceKey, null)?.split(",")?.mapNotNull(String::toIntOrNull)
+        preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
     }
     val sensorNames = report?.liveData?.associate { it.pid to localizedObdPidName(it) }.orEmpty()
     val knownPids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42, 0x52)
@@ -121,7 +125,9 @@ fun ObdScanScreen(
                 TextButton(onClick = {
                     chosenPids = pendingPids.distinct()
                     selectionApplied = true
-                    preferences.edit().putString(preferenceKey, chosenPids.joinToString(",")).apply()
+                    preferenceKey?.let { key ->
+                        preferences.edit().putString(key, chosenPids.joinToString(",")).apply()
+                    }
                     choosingSensors = false
                 }) { Text(stringResource(R.string.obd_sensor_ok)) }
             },
