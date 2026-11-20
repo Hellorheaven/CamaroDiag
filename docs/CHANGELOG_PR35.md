@@ -36,3 +36,4 @@
 - Les commandes interrompues par une reconnexion rapide ne peuvent plus traiter une réponse de l'ancienne session comme celle du nouvel adaptateur, ni signaler à tort que cette nouvelle connexion est perdue.
 - Préparation de l'affichage des empreintes SHA-1/SHA-256 du certificat de signature lors d'une future publication, sans exposer les secrets de signature. Empreintes encore non récupérées.
 - Une tentative de connexion au pont PC qui échoue libère désormais la connexion TCP créée, afin de permettre une nouvelle tentative propre.
+- Les instructions d'installation Android et du pont Windows ont été simplifiées autour des installateurs publiés, sans manipulation d'archives de développement.
