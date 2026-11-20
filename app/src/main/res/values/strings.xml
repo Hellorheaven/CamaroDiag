@@ -746,4 +746,5 @@
     <string name="can_console_tx_unverified">Raw CAN send is disabled: no real ECU response to the read-only transmit check was observed.</string>
     <string name="can_console_raw_tx_confirm_title">Confirm raw CAN transmission</string>
     <string name="can_console_raw_tx_confirm_message">This sends a frame directly onto the vehicle CAN bus. An incorrect frame can affect vehicle modules. Send only when you know the target bus and identifier.</string>
+    <string name="live_pid_ethanol">Ethanol content</string>
 </resources>
