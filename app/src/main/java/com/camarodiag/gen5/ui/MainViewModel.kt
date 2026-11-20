@@ -1066,10 +1066,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         if (_liveCanMonitorState.value.isSendingRequest) return
-        val requestHistory = _liveCanMonitorState.value.requestHistory
-        _liveCanMonitorState.value = LiveCanMonitorState(
+        val previousState = _liveCanMonitorState.value
+        _liveCanMonitorState.value = previousState.copy(
             isCapturing = true,
-            requestHistory = requestHistory
+            message = null
         )
         // Install the job reference before it can execute. A lazy start also lets the
         // finally block compare its identity, so an older cancelled capture cannot clear
