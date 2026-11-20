@@ -181,6 +181,9 @@ class BluetoothObdManager(context: Context) {
             val atal = sendAtCommand("ATAL")
             val stp61 = sendAtCommand("STP 61")
             val protocolResp = sendAtCommand("ATSP 6")
+            // A real 0100 response proves that the connected physical command path
+            // transmitted a request and received an ECU reply; AT header support alone does not.
+            val transmitProbeResp = sendAtCommand("0100", 2_500L)
 
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = deviceName,
@@ -190,7 +193,8 @@ class BluetoothObdManager(context: Context) {
                 atalResp = atal,
                 stp61Resp = stp61,
                 headersResp = headersResp,
-                protocolResp = protocolResp
+                protocolResp = protocolResp,
+                transmitProbeResp = transmitProbeResp
             )
             isDemoMode = false
             activeAdapterCapabilities = capabilities
@@ -384,6 +388,9 @@ class BluetoothObdManager(context: Context) {
             ?: error("The connected adapter has not been identified.")
         check(capabilities.supportsCanHeaders) {
             "The connected adapter has not confirmed CAN header support."
+        }
+        check(capabilities.supportsCanTransmit) {
+            "CAN transmission is disabled: no real ECU response to the read-only 0100 capability probe was observed."
         }
         check(activeTransport in setOf("BLUETOOTH", "BLE", "USB", "WIFI")) {
             "Raw CAN transmission is not available on this transport."
