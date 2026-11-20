@@ -1095,6 +1095,7 @@ private fun localizedLivePidLabel(pid: LivePidValue): String {
         "MAP" -> stringResource(R.string.live_pid_map)
         "IAT" -> stringResource(R.string.live_pid_iat)
         "MAF" -> stringResource(R.string.live_pid_maf)
+        "ETHANOL" -> stringResource(R.string.live_pid_ethanol)
         else -> stringResource(R.string.live_pid_generic, pid.id)
     }
 }
