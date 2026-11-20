@@ -1330,7 +1330,8 @@ fun CanSnifferScreen(
                         Text(stringResource(R.string.can_console_history), color = CamaroAmber, fontWeight = FontWeight.Bold)
                         TextButton(
                             onClick = onClearHistory,
-                            enabled = state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank()
+                            enabled = !state.isSendingRequest &&
+                                (state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank())
                         ) {
                             Text(stringResource(R.string.can_console_clear), color = CamaroBlue)
                         }
