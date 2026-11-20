@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SYMULACJA: te identyfikatory ECU nie zostały odczytane z prawdziwego pojazdu i nie potwierdzają jego oprogramowania.</string>
     <string name="cal_expert_block_memory_map">Mapa pamięci celu i obszary chronione nie są zweryfikowane.</string>
     <string name="flexfuel_preflight_backup">Oryginalna kopia zapasowa ECU nie została zweryfikowana.</string>
+    <string name="cal_expert_title">Tryb ekspercki — ECU na stanowisku / układ</string>
+    <string name="cal_expert_expand">Konfiguruj tryb ekspercki</string>
+    <string name="cal_expert_collapse">Ukryj ustawienia eksperckie</string>
+    <string name="cal_expert_family">Rodzina sterownika (E39 lub E39A)</string>
+    <string name="cal_expert_chip">Odczytane oznaczenie układu</string>
+    <string name="cal_expert_programmer">Programator stanowiskowy / interfejs</string>
+    <string name="cal_expert_access_title">Metoda dostępu</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Pamięć zewnętrzna, wylutowany układ</string>
+    <string name="cal_expert_region_title">Obszar pamięci</string>
+    <string name="cal_expert_region_pflash">Wewnętrzna pamięć programu flash MCU</string>
+    <string name="cal_expert_region_dflash">Pamięć danych flash MCU</string>
+    <string name="cal_expert_region_eeprom">Zewnętrzna EEPROM</string>
+    <string name="cal_expert_blockers">Niezakończone kontrole eksperckie</string>
+    <string name="cal_expert_block_controller">Zweryfikuj dokładną rodzinę sterownika (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Zidentyfikuj fizyczne oznaczenie MCU lub układu pamięci.</string>
+    <string name="cal_expert_block_programmer">Zidentyfikuj zgodny programator stanowiskowy.</string>
+    <string name="cal_expert_block_image_missing">Zaimportuj niepusty obraz firmware.</string>
+    <string name="cal_expert_block_image_format">Do tego etapu przygotowania wymagany jest surowy plik binarny.</string>
 </resources>
