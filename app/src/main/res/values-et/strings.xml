@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULATSIOON: neid ECU identifikaatoreid ei loetud päris sõidukilt ega saa nende abil püsivara kinnitada.</string>
     <string name="cal_expert_block_memory_map">Sihtmälu kaart ja kaitstud piirkonnad pole kinnitatud.</string>
     <string name="flexfuel_preflight_backup">Algset ECU varukoopiat pole kinnitatud.</string>
+    <string name="cal_expert_title">Eksperdirežiim — ECU töölaual / kiip</string>
+    <string name="cal_expert_expand">Seadista eksperdirežiim</string>
+    <string name="cal_expert_collapse">Peida eksperdiseaded</string>
+    <string name="cal_expert_family">Juhtploki perekond (E39 või E39A)</string>
+    <string name="cal_expert_chip">Täheldatud kiibimärgistus</string>
+    <string name="cal_expert_programmer">Töölauaprogrammeerija / liides</string>
+    <string name="cal_expert_access_title">Juurdepääsumeetod</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Väline mälu, eemaldatud kiip</string>
+    <string name="cal_expert_region_title">Mälupiirkond</string>
+    <string name="cal_expert_region_pflash">MCU sisemine programmi välkmälu</string>
+    <string name="cal_expert_region_dflash">MCU andmete välkmälu</string>
+    <string name="cal_expert_region_eeprom">Väline EEPROM</string>
+    <string name="cal_expert_blockers">Eksperdirežiimi pooleliolevad kontrollid</string>
+    <string name="cal_expert_block_controller">Kontrolli täpset juhtploki perekonda (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Tuvasta MCU või mälukiibi füüsiline märgistus.</string>
+    <string name="cal_expert_block_programmer">Tuvasta ühilduv töölauaprogrammeerija.</string>
+    <string name="cal_expert_block_image_missing">Impordi mittetühi püsivara tõmmis.</string>
+    <string name="cal_expert_block_image_format">Selle ettevalmistuse jaoks on vaja töötlemata binaarfaili.</string>
 </resources>
