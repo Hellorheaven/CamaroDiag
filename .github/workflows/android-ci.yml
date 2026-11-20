@@ -245,6 +245,10 @@ jobs:
         run: gradle wrapper --gradle-version 8.11.1
 
       - name: Run unit tests
+        id: unit_tests
+        # Continue diagnostics after a failed unit test so lint/build errors are
+        # not hidden. The job still fails at the final verification step.
+        continue-on-error: true
         run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
 
       - name: Upload Android unit-test reports
@@ -353,6 +357,15 @@ jobs:
           path: app/build/outputs/apk/debug/CamaroDiag-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Enforce successful Android unit tests
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.unit_tests.outcome }}" != "success" ]]; then
+            echo "::error::Android unit tests failed; downstream lint and build were diagnostic only."
+            exit 1
+          fi
   android-instrumented-tests:
     needs: [evaluate-build-checkpoint, test-and-build]
     if: needs.test-and-build.result == 'success'
