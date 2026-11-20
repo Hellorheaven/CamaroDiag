@@ -49,4 +49,5 @@
     <string name="obd_scan_title">TÄIELIK OBD-II SKANNIMINE</string>
     <string name="obd_readiness">OBD valmisolek</string>
     <string name="obd_mode06_results">Režiimi 06 tulemused</string>
+    <string name="system_language_follow_phone">Kasuta telefoni keelt</string>
 </resources>
