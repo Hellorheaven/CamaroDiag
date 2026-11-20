@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Diagnostiske fejlkoder</string>
     <string name="obd_adapter_voltage">Adapterspænding</string>
     <string name="obd_supported_pids">Understøttede PID\'er</string>
+    <string name="obd_ecu_name">ECU-navn</string>
+    <string name="obd_none_identified">Ingen identificeret</string>
+    <string name="obd_data_unavailable">Data ikke tilgængelige</string>
+    <string name="obd_returned_live_data">Modtagne livedata</string>
+    <string name="obd_pending">Afventende</string>
+    <string name="obd_permanent">Permanente</string>
+    <string name="obd_confirmed">Bekræftede</string>
+    <string name="obd_freeze_frame">Frys-ramme</string>
+    <string name="obd_raw_scan_log">Rå scanningslog</string>
+    <string name="obd_powertrain_ecm">Drivlinje / ECM</string>
 </resources>
