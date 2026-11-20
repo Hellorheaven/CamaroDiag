@@ -54,6 +54,27 @@ class EcuBenchExpertPlanTest {
         assertTrue(EcuBenchExpertPlan.Blocker.ORIGINAL_READBACK_NOT_VERIFIED in missing)
     }
 
+    @Test fun offlineImageVerificationRequiresActualContentNotMetadataAlone() {
+        val bytes = byteArrayOf(0x12, 0x34, 0x56, 0x78)
+        val valid = image.copy(
+            sizeBytes = bytes.size.toLong(),
+            sha256 = EcuBenchExpertPlan.sha256Hex(bytes)
+        )
+        assertTrue(EcuBenchExpertPlan.verifyCandidateImage(valid, bytes))
+        assertTrue(EcuBenchExpertPlan.verifyCandidateImage(
+            valid.copy(sha256 = valid.sha256?.uppercase()), bytes
+        ))
+        assertFalse(EcuBenchExpertPlan.verifyCandidateImage(valid, null))
+        assertFalse(EcuBenchExpertPlan.verifyCandidateImage(valid, byteArrayOf()))
+        assertFalse(EcuBenchExpertPlan.verifyCandidateImage(valid, byteArrayOf(0x12, 0x34, 0x56, 0x79)))
+        assertFalse(EcuBenchExpertPlan.verifyCandidateImage(valid.copy(sizeBytes = 4096L), bytes))
+        assertFalse(EcuBenchExpertPlan.verifyCandidateImage(valid.copy(format = "ZIP"), bytes))
+        assertFalse(EcuBenchExpertPlan.verifyCandidateImage(valid.copy(fileName = ""), bytes))
+        assertFalse(EcuBenchExpertPlan.verifyCandidateImage(valid.copy(sha256 = "ab".repeat(32)), bytes))
+        // A matching file hash must never enable a hardware write without a driver.
+        assertFalse(EcuBenchExpertPlan.isProgrammingEnabled(target, valid))
+    }
+
     @Test fun exactReadbackComparisonIsRequired() {
         val original = byteArrayOf(0, 1, -1, 4)
         assertTrue(EcuBenchExpertPlan.verifiedReadback(original, original.clone()))
