@@ -153,4 +153,23 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun vehicleSetupAndReadinessLabelsExistInEveryLocale() {
+        val keys = setOf(
+            "vehicle_setup_header", "vehicle_generation", "vehicle_model_year",
+            "vehicle_engine", "vehicle_transmission", "vehicle_market_region",
+            "vehicle_vin", "obd_scan_title", "obd_readiness", "obd_mode06_results"
+        )
+        for (locale in locales) {
+            val translations = strings(locale)
+            assertTrue(
+                "Missing vehicle/OBD labels in $locale: ${keys - translations.keys}",
+                translations.keys.containsAll(keys)
+            )
+            assertTrue(
+                "Blank vehicle/OBD label in $locale",
+                keys.all { translations.getValue(it).isNotBlank() }
+            )
+        }
+    }
+
 }
