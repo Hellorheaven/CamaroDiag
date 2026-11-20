@@ -65,6 +65,32 @@ object Lfx2012ControllerReferences {
                 Regex("(?i)(?:^|[^A-Z0-9])E39A?(?:$|[^A-Z0-9])").containsMatchIn(name)
         } ?: false
 
+    /**
+     * Distinguishes an unknown, single or mixed responder set observed during Mode 09.
+     * Even one response address does not prove which physical ECU supplied a CAL ID,
+     * that the ECU is an ECM, or that its firmware is compatible with writing.
+     */
+    enum class ResponderAttribution {
+        NO_VALID_CAN_ADDRESS,
+        SINGLE_ADDRESS_OBSERVED,
+        MULTIPLE_ADDRESSES_OBSERVED
+    }
+
+    fun classifyResponderAttribution(respondingAddresses: Collection<String>): ResponderAttribution {
+        val rawAddresses = respondingAddresses.map(String::trim).filter(String::isNotEmpty)
+        if (rawAddresses.isEmpty()) return ResponderAttribution.NO_VALID_CAN_ADDRESS
+        val validAddress = Regex("(?:[0-9A-F]{3}|[0-9A-F]{8})")
+        val normalized = rawAddresses.map { it.uppercase().removePrefix("0X") }
+        if (normalized.any { !validAddress.matches(it) }) {
+            return ResponderAttribution.NO_VALID_CAN_ADDRESS
+        }
+        return if (normalized.distinct().size == 1) {
+            ResponderAttribution.SINGLE_ADDRESS_OBSERVED
+        } else {
+            ResponderAttribution.MULTIPLE_ADDRESSES_OBSERVED
+        }
+    }
+
     fun describedServiceParts(): List<String> =
         listOf(currentServicePart, supersededServicePart)
 }
