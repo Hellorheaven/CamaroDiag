@@ -40,16 +40,25 @@ fun CamaroAuthGate(
         onDispose { auth.removeAuthStateListener(listener) }
     }
     val user = currentUser
+    var readyAccountUid by remember { mutableStateOf<String?>(null) }
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
-    // An expired/revoked login or explicit sign-out must stop any running
-    // diagnostic operation before the next account can use the application.
-    LaunchedEffect(user?.uid) { latestOnAccountChanged(user?.uid) }
+    // Delay diagnostic UI until the old user's active connection and transient
+    // diagnostic results have been cleared by the ViewModel.
+    LaunchedEffect(user?.uid) {
+        readyAccountUid = null
+        latestOnAccountChanged(user?.uid)
+        readyAccountUid = user?.uid
+    }
     if (user == null) {
         CamaroLoginScreen(auth)
     } else if (user.providerData.any { it.providerId == "password" } &&
         !remember(user, verificationRevision) { user.isEmailVerified }
     ) {
         EmailVerificationScreen(auth, onVerified = { verificationRevision++ })
+    } else if (readyAccountUid != user.uid) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
     } else {
         var accountOpen by remember(user.uid) { mutableStateOf(false) }
         val french = remember { Locale.getDefault().language == "fr" }
