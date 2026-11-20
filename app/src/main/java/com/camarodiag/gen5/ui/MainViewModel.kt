@@ -2286,10 +2286,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         endpoint: String
     ) {
         val attempt = ++connectionAttemptGeneration
-        connectionAttemptJob?.cancel()
+        val previousAttempt = connectionAttemptJob
+        previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
             beginBusyOperation()
             try {
+                // A cancelled transport handshake may still be closing its
+                // socket. Wait for that cleanup before opening the replacement.
+                previousAttempt?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
                 _connectionMessage.value = null
                 val activeMonitor = canMonitorJob
