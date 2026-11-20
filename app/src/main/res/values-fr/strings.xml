@@ -734,16 +734,6 @@
     <string name="cal_ecu_response_addresses_label">Adresses de réponse OBD fonctionnelles observées (non associées à un calculateur)</string>
     <string name="cal_ecu_identity_limits">Le RPO, la transmission, la référence matérielle du calculateur et l’OS GM ne sont pas confirmés par ces réponses OBD standard. Une adresse de réponse ne permet pas d’identifier un calculateur. Les identifiants GM nécessitent une documentation vérifiée propre au véhicule.</string>
     <string name="dtc_vehicle_identity_required">Les détails propres au véhicule sont masqués car le VIN du calculateur connecté n’a pas été lu ou ne correspond pas au véhicule sélectionné. Lisez et vérifiez le VIN ECU avant d’utiliser ces interprétations.</string>
-    <string name="can_console_history">Historique de la console CAN</string>
-    <string name="can_console_clear">Effacer l’historique</string>
-    <string name="can_console_empty">Aucun trafic pour le moment. Lance une capture ou envoie une trame / requête OBD.</string>
-    <string name="can_console_tx">TX • Envoyé</string>
-    <string name="can_console_rx">RX • Reçu</string>
-    <string name="can_console_system">SYSTÈME</string>
-    <string name="can_console_input_label">Trame CAN ou commande OBD</string>
-    <string name="can_console_input_hint">Trame brute : 7E0 02 01 0C ou 18DAF110 03 22 F1 90 • OBD : 01 0C</string>
-    <string name="can_console_sending">Envoi vers l’interface connectée…</string>
-
     <string name="can_console_history">Historique unique de la console CAN</string>
     <string name="can_console_clear">Effacer l’historique</string>
     <string name="can_console_empty">Aucun trafic pour le moment. Les données reçues et envoyées apparaîtront ici.</string>
@@ -753,4 +743,5 @@
     <string name="can_console_input_label">Trame ou commande OBD</string>
     <string name="can_console_input_hint">Trame CAN : 7E0 02 01 0C • Requête OBD : 01 0C</string>
     <string name="can_console_sending">Envoi en cours…</string>
+
 </resources>
