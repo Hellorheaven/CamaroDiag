@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Dejta ffriżata</string>
     <string name="obd_raw_scan_log">Reġistru tal-iskan mhux ipproċessat</string>
     <string name="obd_powertrain_ecm">Sistema tal-propulsjoni / ECM</string>
+    <string name="vehicle_setup_header">Konfigurazzjoni tal-vettura</string>
+    <string name="vehicle_generation">Ġenerazzjoni</string>
+    <string name="vehicle_model_year">Sena tal-mudell</string>
+    <string name="vehicle_engine">Magna</string>
+    <string name="vehicle_transmission">Trażmissjoni</string>
+    <string name="vehicle_market_region">Reġjun tas-suq</string>
+    <string name="vehicle_vin">VIN tal-vettura</string>
+    <string name="obd_scan_title">SKAN OBD-II SĦIĦ</string>
+    <string name="obd_readiness">Prontezza OBD</string>
+    <string name="obd_mode06_results">Riżultati tal-modalità 06</string>
 </resources>
