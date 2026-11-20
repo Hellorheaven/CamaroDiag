@@ -246,4 +246,14 @@ class EcuBackupArchiveTest {
         }.isFailure)
     }
 
+    @Test fun archiveSizeIncludesManifestAndCannotCrossImportLimit() {
+        val limit = 256L * 1024 * 1024
+        assertTrue(EcuBackupArchive.fitsUncompressedLimit(limit - 64L, 64L))
+        assertTrue(!EcuBackupArchive.fitsUncompressedLimit(limit - 64L, 65L))
+        assertTrue(!EcuBackupArchive.fitsUncompressedLimit(limit, 1L))
+        assertTrue(!EcuBackupArchive.fitsUncompressedLimit(-1L, 0L))
+        assertTrue(!EcuBackupArchive.fitsUncompressedLimit(0L, -1L))
+        assertTrue(!EcuBackupArchive.fitsUncompressedLimit(Long.MAX_VALUE, 1L))
+    }
+
 }
