@@ -121,4 +121,12 @@ class EcuBackupIntegrityTest {
         assertTrue(EcuBackupIntegrity.Problem.DIVERGENT_INDEPENDENT_READ in problems)
     }
 
+    @Test fun emptyOfflineManifestDoesNotCountAsValidBackup() {
+        val captures = emptyList<EcuBackupManifest.Capture>()
+        val emptyManifest = manifest(captures)
+        val result = EcuBackupIntegrity.verify(emptyManifest, captures, required)
+        assertFalse(result.consistent)
+        assertTrue(EcuBackupIntegrity.Problem.EMPTY_BACKUP in result.problems)
+    }
+
 }
