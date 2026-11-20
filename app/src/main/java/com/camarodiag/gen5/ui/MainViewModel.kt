@@ -930,7 +930,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 previousAttempt?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
                 val activeMonitor = canMonitorJob
-                val activeRequest = canRequestJob
+                val activeRequest = detachCanRequest()
                 markAdapterDisconnected()
                 activeMonitor?.join()
                 activeRequest?.join()
@@ -2336,7 +2336,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (attempt != connectionAttemptGeneration) return@launch
                 _connectionMessage.value = null
                 val activeMonitor = canMonitorJob
-                val activeRequest = canRequestJob
+                val activeRequest = detachCanRequest()
                 markAdapterDisconnected()
                 activeMonitor?.join()
                 activeRequest?.join()
@@ -2426,7 +2426,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 previousAttempt?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
                 val activeMonitor = canMonitorJob
-                val activeRequest = canRequestJob
+                val activeRequest = detachCanRequest()
                 markAdapterDisconnected()
                 activeMonitor?.join()
                 activeRequest?.join()
