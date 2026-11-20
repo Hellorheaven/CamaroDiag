@@ -36,6 +36,7 @@ object EcuBackupArchive {
         require(captures.size <= MAX_ENTRIES) { "Too many memory segments" }
         require(captures.all { it.firstRead.size <= MAX_REGION_BYTES &&
             (it.independentRead?.size ?: 0) <= MAX_REGION_BYTES }) { "Segment too large" }
+        require(captures.sumOf { it.firstRead.size.toLong() + (it.independentRead?.size?.toLong() ?: 0L) } <= MAX_ARCHIVE_BYTES) { "Archive data exceeds size limit" }
         val manifest = EcuBackupManifest.inspect(controllerLabel, createdAtUtcMillis, captures, requiredRegions)
         val properties = Properties()
         properties.setProperty("format", FORMAT)
