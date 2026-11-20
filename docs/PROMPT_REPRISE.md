@@ -39,6 +39,9 @@ Cette règle est prioritaire et s'applique en continu :
 - Travailler par PR fonctionnelle cohérente. La PR #35 est réservée au Sniffer / Console CAN. Les autres demandes vont au backlog puis dans des PR distinctes, par lots.
 - Ne jamais fusionner une PR sans autorisation explicite de l'utilisateur.
 - Ne pas fermer/supprimer des branches ou modifier des noms/structures sans raison et vérification.
+- Le fichier `docs/PROMPT_REPRISE.md` est essentiel à la continuité du projet : **ne jamais le supprimer, le déplacer ou le renommer sans demande explicite de l'utilisateur**. Le maintenir à jour sur `main` conformément à la synchronisation documentaire.
+- Conserver exactement deux branches (`main` et `feat/live-can-monitor`) et une seule PR ouverte (#35), sauf autorisation explicite contraire. Ne jamais créer une nouvelle branche ou PR de sa propre initiative.
+- Tous les documents destinés aux utilisateurs doivent expliquer les fonctions, les véhicules, le matériel compatible, l'utilisation et les limites, sans exposer les détails internes de développement. Seuls le backlog et les documents d'évolutions futures sont exemptés et peuvent rester techniques.
 - Respecter le périmètre validé. Pas de dérive fonctionnelle dans une PR en cours.
 - L'utilisateur travaille souvent depuis Android et GitHub Actions ; privilégier les opérations directes dans le dépôt plutôt que de lui demander de téléverser des fichiers quand le dépôt suffit.
 - Fournir des fichiers complets lorsqu'il demande un fichier, pas des extraits incomplets.
@@ -156,25 +159,43 @@ Respecter les dépendances précisées dans ce document et ouvrir une PR distinc
 - Un job skipped ne compte jamais comme un succès.
 - Passage Ready for review : validations complètes réelles ; les commits ultérieurs doivent relancer les validations appropriées.
 
-## État GitHub connu — à rafraîchir impérativement
+## État GitHub connu — photographie du 20 novembre 2026, à rafraîchir à chaque reprise
 
-Dernière photographie fiable rapportée dans les notes de continuité, autour du 19 novembre 2026 :
-- PR #35 : `feat(can): add safe live CAN monitor and read-only request console`
-- URL : https://github.com/Hellorheaven/CamaroDiag/pull/35
-- Branche : `feat/live-can-monitor`
-- État alors observé : Open, Draft, non fusionnée ; mergeable propre à cet instant.
-- Head SHA alors observé : `ffc95eebced0413c9b25c7f143c82247a3b81afa` (peut avoir changé depuis).
-- Périmètre de départ de la PR était formulé read-only ; une clarification a été ajoutée pour inclure l'émission lorsque matériellement supportée.
-- Commentaire de clarification PR #35 : ID 6999604027.
-- CI observée sur cet ancien SHA : workflow Android et workflow Windows terminés en succès, mais les jobs de compilation/package étaient `skipped`. Donc **aucun build réel ne pouvait être déduit de ces runs**.
-- Un audit précédent indiquait environ 73 commits et 25 fichiers changés, chiffres à rafraîchir.
-- Ne pas considérer ces données comme actuelles : vérifier le head SHA, commits, files changed, checks, jobs, logs et statut de draft.
+- Dépôt : https://github.com/Hellorheaven/CamaroDiag
+- PR unique en cours : [#35 — Sniffer / Console CAN](https://github.com/Hellorheaven/CamaroDiag/pull/35).
+- État observé : **Open, Draft, non fusionnée**. Ne pas fusionner sans autorisation explicite de l'utilisateur.
+- Branche de travail : `feat/live-can-monitor`.
+- Branches existantes vérifiées : uniquement `main` et `feat/live-can-monitor`. Conserver strictement ces deux branches et une seule PR ; ne créer ni branche ni PR supplémentaire sans accord explicite.
+- Dernier état GitHub vérifié avant cette mise à jour documentaire : head `c0c306f0c4f5298af9fd83baa2b801a032e7dc03`, 554 commits d'avance sur `main`, 0 en retard, 63 fichiers modifiés. Ces chiffres sont une photographie et doivent être rafraîchis au démarrage de tout nouveau chat.
+- PR : https://github.com/Hellorheaven/CamaroDiag/pull/35
+- Le périmètre reste le module unifié Sniffer / Console CAN. L'envoi de commandes/trames est autorisé dans l'interface uniquement lorsque les capacités réelles du matériel et du réseau le permettent.
+- Aucun merge n'a été effectué.
 
-Backlog mis à jour directement sur `main` :
-- Fichier : https://github.com/Hellorheaven/CamaroDiag/blob/main/docs/FUTURE_FEATURES_CAN_VEHICLE_GARAGE.md
-- Commit historique de la mise à jour des lots : `1b6769068a596a60ec60bcc79259e2acdca0eeaf`
-- Ajout langues/tablettes : `ffdc24ce869fc8027d45cd947344ed741410ec38`
-- Ajout profils de recette tablette 8/10/12 pouces : `e26c0d91971abdab764657e66ba49ddd569ff559`
+### Avancement concret récent dans la PR #35
+
+**Transport BLE**
+- Écritures GATT sérialisées et invalidation de la session lorsqu'une écriture échoue, expire ou est annulée avec un résultat ambigu.
+- Protection contre les callbacks tardifs et contre la fermeture d'une nouvelle session par une ancienne coroutine.
+- Les lectures BLE en attente disposent désormais d'un signal de fermeture dédié ; les lectures sont sérialisées et associées à l'instance GATT qui les a commencées.
+- Test unitaire ajouté : `communication/src/test/java/com/camarodiag/gen5/data/obd/ObdReadWakeupTest.kt`.
+- Ces changements sont **codés mais pas encore validés par exécution**. Le test ciblé, la suite des tests, lint et builds Android/Windows doivent encore être exécutés sur un SHA précis. Aucun essai physique BLE n'a été possible.
+
+**Documentation utilisateur**
+- Guides réécrits : analyse de traces CAN/UDS, utilisation ELM327, disponibilité des signaux Camaro et matrice de compatibilité Camaro/adaptateurs.
+- README complété avec des liens vers les guides.
+- Changelog général rendu orienté utilisateur.
+- Les documents de backlog et d'évolutions restent des documents de planification et peuvent conserver leurs détails techniques.
+- Le guide `pc-bridge/README.md` et le README principal doivent encore être revus pour vérifier qu'ils respectent entièrement la règle documentaire utilisateur.
+
+**Suivi des issues**
+- Issue #41 — matrice des capacités matérielles : toujours ouverte. Les capacités exactes de chaque interface, leurs limites et leurs preuves restent à établir.
+- Issue #43 — robustesse des sessions/déconnexions : toujours ouverte. Un commentaire d'avancement a été ajouté le 20 novembre (commentaire ID `7034719506`) pour le progrès BLE. Les transports USB, Wi-Fi, pont PC et l'application globale à tous les écrans restent à traiter.
+- Ne fermer aucune issue avant intégration à `main`, tests/builds réels, documentation et accord utilisateur.
+
+**Validation**
+- Sur le head `c0c306f0c4f5298af9fd83baa2b801a032e7dc03`, aucun workflow PR n'a été retourné par la vérification GitHub effectuée le 20 novembre.
+- Pas de preuve d'exécution du nouveau test unitaire, de la suite complète, de lint, d'un APK Debug/Release ou des packages Windows sur ce head.
+- Aucun test sur une Camaro ou un adaptateur physique n'a été réalisé. Le véhicule et l'adaptateur ne doivent pas être déclarés validés sur cette base.
 
 ## Points techniques antérieurement signalés — vérifier s'ils sont encore présents
 
