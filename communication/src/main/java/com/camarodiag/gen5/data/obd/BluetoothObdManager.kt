@@ -428,7 +428,11 @@ class BluetoothObdManager(context: Context) {
                 val payload = frame.data.joinToString(" ") {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
-                sendAtCommandInternal(payload, 4_000L)
+                val frameResponse = sendAtCommandInternal(payload, 4_000L)
+                check(!frameResponse.contains("?")) {
+                    "The adapter rejected the raw CAN frame."
+                }
+                frameResponse
             } finally {
                 // Return to the app's configured 11-bit HS-CAN / automatic-format state.
                 withContext(NonCancellable) {
