@@ -26,7 +26,10 @@ import java.util.Locale
  * The authenticated user's session is persisted by the Firebase SDK.
  */
 @Composable
-fun CamaroAuthGate(content: @Composable () -> Unit) {
+fun CamaroAuthGate(
+    onAccountChanged: (String?) -> Unit,
+    content: @Composable () -> Unit
+) {
     val auth = remember { FirebaseAuth.getInstance() }
     var currentUser by remember { mutableStateOf(auth.currentUser) }
     // Recompose after an explicit Firebase email verification reload.
@@ -37,6 +40,10 @@ fun CamaroAuthGate(content: @Composable () -> Unit) {
         onDispose { auth.removeAuthStateListener(listener) }
     }
     val user = currentUser
+    val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
+    // An expired/revoked login or explicit sign-out must stop any running
+    // diagnostic operation before the next account can use the application.
+    LaunchedEffect(user?.uid) { latestOnAccountChanged(user?.uid) }
     if (user == null) {
         CamaroLoginScreen(auth)
     } else if (user.providerData.any { it.providerId == "password" } &&
