@@ -172,4 +172,13 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun phoneLanguageOptionIsTranslatedInAllThirtyLocales() {
+        for (locale in locales) {
+            val localized = strings(locale)
+            val key = "system_language_follow_phone"
+            assertTrue("Missing phone-language label in $locale", key in localized)
+            assertTrue("Blank phone-language label in $locale", localized.getValue(key).isNotBlank())
+        }
+    }
+
 }
