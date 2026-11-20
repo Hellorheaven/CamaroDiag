@@ -29,12 +29,20 @@ object RawCanFrameParser {
             .trim()
             .split(Regex("\\s+"))
             .filter { it.isNotBlank() }
-        if (tokens.size < 3) return null
-        val frame = parse(tokens.first() + " " + tokens.drop(2).joinToString(" ")) ?: return null
+        if (tokens.size < 2) return null
         val dlcToken = tokens[1]
         if (dlcToken.length !in 1..2 || !dlcToken.all { it.digitToIntOrNull(16) != null }) return null
         val declaredLength = dlcToken.toInt(16)
-        if (declaredLength !in 1..8 || frame.data.size != declaredLength) return null
+        if (declaredLength !in 0..8) return null
+        // CAN data frames may carry zero bytes. Validate the ID using the same
+        // parser as nonempty frames, but never invent a payload byte for DLC 0.
+        if (declaredLength == 0) {
+            if (tokens.size != 2) return null
+            return parse(tokens.first() + " 00")?.copy(data = byteArrayOf())
+        }
+        if (tokens.size < 3) return null
+        val frame = parse(tokens.first() + " " + tokens.drop(2).joinToString(" ")) ?: return null
+        if (frame.data.size != declaredLength) return null
         return frame
     }
 
