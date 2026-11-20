@@ -519,6 +519,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         ?: vehicle.vin.trim().uppercase(Locale.ROOT)
                             .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
                             ?.let { "vin_$it" },
+                    catalogSignals = calibrationWorkspace.nativeSignals
+                        .filterNot { it.hidden }
+                        .map { LiveSensorDefinition("ECU:" + it.id, it.name, it.name) } +
+                        calibrationWorkspace.obdbSignals
+                            .filterNot { it.hidden }
+                            .map { LiveSensorDefinition("OBDB:" + it.id, it.name, it.name) },
                     onToggleStream = { viewModel.toggleLiveStream() },
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
@@ -1139,6 +1145,7 @@ fun LiveDataScreen(
     recording: LiveRecordingState,
     telemetryMessage: String?,
     vehicleIdentity: String?,
+    catalogSignals: List<LiveSensorDefinition>,
     onToggleStream: () -> Unit,
     onToggleUnits: () -> Unit,
     onToggleRecording: () -> Unit,
@@ -1159,9 +1166,9 @@ fun LiveDataScreen(
     }
     var choosingSensors by remember(storageKey) { mutableStateOf(false) }
     val allPidIds = pids.map { it.id }.toSet()
-    val liveCatalog = remember(pids) {
+    val liveCatalog = remember(pids, catalogSignals) {
         LiveSensorCatalog.entriesWithObserved(
-            pids.map { LiveSensorDefinition(it.id, it.labelEn, it.labelFr) }
+            catalogSignals + pids.map { LiveSensorDefinition(it.id, it.labelEn, it.labelFr) }
         )
     }
     val localeFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
