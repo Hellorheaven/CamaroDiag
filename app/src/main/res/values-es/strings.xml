@@ -770,4 +770,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULACIÓN: estos identificadores ECU no se leyeron de un vehículo real y no permiten validar su firmware.</string>
     <string name="cal_expert_block_memory_map">No se han verificado el mapa de memoria de destino ni las regiones protegidas.</string>
     <string name="flexfuel_preflight_backup">No se ha verificado la copia de seguridad original de la ECU.</string>
+    <string name="cal_expert_title">Modo experto — ECU en banco / chip</string>
+    <string name="cal_expert_expand">Configurar modo experto</string>
+    <string name="cal_expert_collapse">Ocultar configuración experta</string>
+    <string name="cal_expert_family">Familia de controlador (E39 o E39A)</string>
+    <string name="cal_expert_chip">Marcado del chip observado</string>
+    <string name="cal_expert_programmer">Programador de banco / interfaz</string>
+    <string name="cal_expert_access_title">Método de acceso</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Memoria externa, chip desoldado</string>
+    <string name="cal_expert_region_title">Región de memoria</string>
+    <string name="cal_expert_region_pflash">Flash interna de programa del MCU</string>
+    <string name="cal_expert_region_dflash">Flash de datos del MCU</string>
+    <string name="cal_expert_region_eeprom">EEPROM externa</string>
+    <string name="cal_expert_blockers">Comprobaciones expertas pendientes</string>
+    <string name="cal_expert_block_controller">Verifica la familia exacta del controlador (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identifica el marcado físico del MCU o chip de memoria.</string>
+    <string name="cal_expert_block_programmer">Identifica un programador de banco compatible.</string>
+    <string name="cal_expert_block_image_missing">Importa una imagen de firmware no vacía.</string>
+    <string name="cal_expert_block_image_format">Se requiere un binario sin procesar para este procedimiento.</string>
 </resources>
