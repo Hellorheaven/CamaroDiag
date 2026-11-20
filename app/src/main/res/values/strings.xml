@@ -750,4 +750,5 @@
     <string name="can_console_raw_tx_confirm_title">Confirm raw CAN transmission</string>
     <string name="can_console_raw_tx_confirm_message">This sends a frame directly onto the vehicle CAN bus. An incorrect frame can affect vehicle modules. Send only when you know the target bus and identifier.</string>
     <string name="live_pid_ethanol">Ethanol content</string>
+    <string name="saved_vehicle_import_legacy">Import vehicles saved before account sign-in</string>
 </resources>
