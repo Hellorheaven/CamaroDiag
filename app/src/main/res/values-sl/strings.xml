@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Vnesite pravi VIN; vzorčni VIN se ne ustvari.</string>
     <string name="status_not_verified">NI PREVERJENO</string>
     <string name="adapter_discovery_only">SAMO ODKRIVANJE</string>
+    <string name="can_sniffer_raw_heading">Neobdelan izhod vmesnika CAN</string>
+    <string name="can_sniffer_export_raw">Izvozi surovi dnevnik</string>
+    <string name="can_sniffer_dtc_heading">Zaznane kode napak OBD-II</string>
+    <string name="connection_lost_bluetooth">Povezava Bluetooth je prekinjena. Znova povežite vmesnik in začnite postopek.</string>
+    <string name="connection_lost_vehicle">Povezava z vozilom je prekinjena. Znova vzpostavite povezavo in začnite postopek.</string>
+    <string name="connection_lost_usb">Vmesnik USB je odklopljen. Znova ga priklopite in začnite postopek.</string>
+    <string name="connection_lost_wifi">Povezava OBD prek Wi-Fi je prekinjena. Znova povežite vmesnik in začnite postopek.</string>
+    <string name="connection_lost_pc_bridge">Povezava z diagnostičnim mostom računalnika je prekinjena. Znova povežite most in začnite postopek.</string>
+    <string name="live_sensor_search">Poišči senzorje</string>
+    <string name="live_sensor_show_all">Prikaži vse senzorje</string>
+    <string name="can_console_history">Združena zgodovina konzole CAN</string>
+    <string name="can_console_clear">Počisti zgodovino</string>
+    <string name="can_console_empty">Prometa še ni. Prejeti in poslani podatki bodo prikazani tukaj.</string>
+    <string name="can_console_tx">TX • POSLANO</string>
+    <string name="can_console_rx">RX • PREJETO</string>
+    <string name="can_console_system">SISTEM</string>
+    <string name="can_console_input_label">Okvir CAN ali ukaz OBD</string>
+    <string name="can_console_sending">Pošiljanje…</string>
+    <string name="obd_dtc_help_unavailable">Za to kodo napake in vozilo še ni preverjenih navodil za odpravljanje težav. Pred popravilom preglejte servisno dokumentacijo proizvajalca.</string>
+    <string name="cal_expert_no_write">Programiranje ni na voljo, dokler ni izdelan in preverjen združljiv gonilnik za delo na mizi.</string>
+    <string name="flexfuel_preflight_write">Zapis umeritve ECU ni preverjen in ostaja onemogočen.</string>
+    <string name="status_not_implemented">NI IZVEDENO</string>
 </resources>
