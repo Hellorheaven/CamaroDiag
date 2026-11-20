@@ -11,6 +11,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
+import android.content.Context
+import androidx.core.content.edit
+import com.google.firebase.FirebaseNetworkException
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -34,6 +37,10 @@ fun CamaroAuthGate(
     content: @Composable () -> Unit
 ) {
     val auth = remember { FirebaseAuth.getInstance() }
+    val context = LocalContext.current
+    val validationPrefs = remember(context) {
+        context.getSharedPreferences("camarodiag_session_validation", Context.MODE_PRIVATE)
+    }
     val signOut = rememberFirebaseSignOut(auth)
     var currentUser by remember { mutableStateOf(auth.currentUser) }
     // Recompose after an explicit Firebase email verification reload.
@@ -45,13 +52,48 @@ fun CamaroAuthGate(
     }
     val user = currentUser
     var readyAccountUid by remember { mutableStateOf<String?>(null) }
+    var validatedAccountUid by remember { mutableStateOf<String?>(null) }
+    var validationError by remember { mutableStateOf<String?>(null) }
+    var retryValidation by remember { mutableIntStateOf(0) }
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
     // Delay diagnostic UI until the old user's active connection and transient
     // diagnostic results have been cleared by the ViewModel.
-    LaunchedEffect(user?.uid) {
+    LaunchedEffect(user?.uid, retryValidation) {
         readyAccountUid = null
+        validatedAccountUid = null
+        validationError = null
         latestOnAccountChanged(user?.uid)
         readyAccountUid = user?.uid
+        if (user != null) {
+            val targetUid = user.uid
+            val targetAttempt = retryValidation
+            user.getIdToken(true).addOnCompleteListener { task ->
+                if (auth.currentUser?.uid != targetUid || retryValidation != targetAttempt) {
+                    return@addOnCompleteListener
+                }
+                if (task.isSuccessful) {
+                    validationPrefs.edit {
+                        putLong("verified_$targetUid", System.currentTimeMillis())
+                    }
+                    validatedAccountUid = targetUid
+                } else {
+                    val lastValidated = validationPrefs.getLong("verified_$targetUid", 0L)
+                    val offlineGrace = task.exception is FirebaseNetworkException &&
+                        OfflineSessionPolicy.allowsOfflineAccess(
+                            lastValidated, System.currentTimeMillis()
+                        )
+                    if (offlineGrace) {
+                        validatedAccountUid = targetUid
+                    } else {
+                        validationError = if (task.exception is FirebaseNetworkException) {
+                            "offline"
+                        } else {
+                            "invalid"
+                        }
+                    }
+                }
+            }
+        }
     }
     if (user == null) {
         CamaroLoginScreen(auth)
@@ -59,9 +101,33 @@ fun CamaroAuthGate(
         !remember(user, verificationRevision) { user.isEmailVerified }
     ) {
         EmailVerificationScreen(auth, onVerified = { verificationRevision++ })
-    } else if (readyAccountUid != user.uid) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+    } else if (readyAccountUid != user.uid || validatedAccountUid != user.uid) {
+        val french = remember { Locale.getDefault().language == "fr" }
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            if (validationError == null) {
+                CircularProgressIndicator()
+            } else {
+                Text(
+                    if (validationError == "offline") {
+                        if (french) "Connexion requise : la validation hors ligne a expiré."
+                        else "Connect to the internet: offline validation has expired."
+                    } else {
+                        if (french) "Impossible de confirmer la session. Reconnectez-vous."
+                        else "Session could not be verified. Sign in again."
+                    }
+                )
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = { retryValidation++ }) {
+                    Text(if (french) "Réessayer" else "Retry")
+                }
+                TextButton(onClick = { signOut() }) {
+                    Text(if (french) "Se déconnecter" else "Sign out")
+                }
+            }
         }
     } else {
         var accountOpen by remember(user.uid) { mutableStateOf(false) }
