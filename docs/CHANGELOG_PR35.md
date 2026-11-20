@@ -26,3 +26,4 @@
 - Le statut du pont PC est également remis à zéro lors d'un changement d'adaptateur pour éviter un affichage de connexion périmée.
 - Les commandes USB et Wi-Fi sont désormais immédiatement refusées après une coupure détectée, sans tenter de continuer sur une liaison perdue.
 - L'historique chronologique RX/TX et le texte déjà capturé restent consultables après une déconnexion ou un changement d'adaptateur ; seul l'effacement demandé par l'utilisateur les supprime.
+- Les échanges Bluetooth classiques signalent explicitement une connexion fermée ou une fin de flux, au lieu de traiter ces situations comme une réponse valide.
