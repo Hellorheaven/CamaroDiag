@@ -1,5 +1,5 @@
 name: PR54 full validation checkpoint
-# Explicit full validation checkpoint: Android/Windows Debug + signed Release.
+# Final software checkpoint: Android/Windows Debug, instrumented devices and signed Release.
 # Each push to this file (only) dispatches all chains on the same immutable SHA.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
