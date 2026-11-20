@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag ir atjaunināts.</string>
     <string name="obd_choose_sensors">Izvēlēties sensorus</string>
     <string name="obd_sensor_cancel">Atcelt</string>
+    <string name="tab_vehicle">Transportlīdzeklis</string>
+    <string name="tab_connect">Savienot</string>
+    <string name="tab_live">Reāllaika dati</string>
+    <string name="tab_dtcs">Kļūdu kodi</string>
+    <string name="tab_more">Vairāk</string>
+    <string name="tab_modules">Vadības bloki</string>
+    <string name="tab_mileage">Nobraukums</string>
+    <string name="tab_calibration">ECU / Kartes</string>
+    <string name="tab_obd_scan">Pilna OBD skenēšana</string>
+    <string name="tab_guide">Rokasgrāmata</string>
+    <string name="tab_controls">Vadība</string>
+    <string name="tab_settings">Iestatījumi</string>
 </resources>
