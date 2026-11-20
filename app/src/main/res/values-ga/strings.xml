@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_language_title">Teanga an aip</string>
+    <string name="system_language_hint">Roghnaigh teanga CamaroDiag.</string>
+    <string name="about_title">Maidir le CamaroDiag</string>
+    <string name="about_check_updates">Seiceáil le haghaidh nuashonruithe</string>
+    <string name="about_up_to_date">Tá CamaroDiag cothrom le dáta.</string>
+    <string name="obd_choose_sensors">Roghnaigh braiteoirí</string>
+    <string name="obd_sensor_cancel">Cealaigh</string>
+</resources>
