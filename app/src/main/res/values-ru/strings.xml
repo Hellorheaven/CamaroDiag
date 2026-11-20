@@ -742,4 +742,24 @@
     <string name="can_trace_pid_62">Фактический крутящий момент двигателя</string>
     <string name="can_trace_pid_63">Номинальный крутящий момент двигателя</string>
     <string name="live_pid_ethanol">Содержание этанола</string>
+    <string name="can_trace_flow_status_cts">Продолжить передачу</string>
+    <string name="can_trace_flow_status_wait">Ожидание</string>
+    <string name="can_trace_flow_status_overflow">Переполнение</string>
+    <string name="can_trace_flow_status_reserved">Зарезервированное состояние</string>
+    <string name="can_trace_exchange_heading">Обмен запросами и ответами UDS</string>
+    <string name="can_trace_exchange_completed">Завершено</string>
+    <string name="can_trace_exchange_pending">Ожидание ответа (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Ответ не обнаружен</string>
+    <string name="can_console_raw_tx_confirm_title">Подтвердить отправку сырого CAN-кадра</string>
+    <string name="can_console_raw_tx_confirm_message">Кадр отправляется непосредственно в CAN-шину автомобиля. Неверный кадр может повлиять на блоки управления. Отправляйте только при знании целевой шины и идентификатора.</string>
+    <string name="can_console_tx_unverified">Отправка сырых CAN-кадров отключена: реальный ответ ECU на проверочный запрос только для чтения не получен.</string>
+    <string name="can_trace_clear_filters">Очистить фильтры</string>
+    <string name="can_trace_filter_invalid">Недопустимый CAN ID или префикс данных.</string>
+    <string name="can_trace_flow_control_heading">Управление потоком ISO-TP</string>
+    <string name="cal_expert_block_recovery">Для этой конкретной цели не проверена процедура восстановления.</string>
+    <string name="cal_expert_block_driver">Не подключён проверенный драйвер аппаратного программирования.</string>
+    <string name="cal_expert_identity_notice">Введённые названия и хеши файлов — лишь наблюдения, а не доказательство аппаратной совместимости.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">СИМУЛЯЦИЯ: эти идентификаторы ECU не были считаны с реального автомобиля и не могут подтвердить его прошивку.</string>
+    <string name="cal_expert_block_memory_map">Карта памяти целевого устройства и защищённые области не проверены.</string>
+    <string name="flexfuel_preflight_backup">Исходная резервная копия ECU не проверена.</string>
 </resources>
