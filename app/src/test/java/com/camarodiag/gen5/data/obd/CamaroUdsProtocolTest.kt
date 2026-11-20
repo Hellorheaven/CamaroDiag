@@ -117,7 +117,7 @@ class CamaroUdsProtocolTest {
             "SEARCHING...\\r\\nNO DATA",
             "ELM327 v4.100",
             "7E8 03 41 00 BE",
-            "ABC4100BE3EB813"
+            "NOPE4100BE3EB813"
         ).forEach { response ->
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "ELM327 Bluetooth",
