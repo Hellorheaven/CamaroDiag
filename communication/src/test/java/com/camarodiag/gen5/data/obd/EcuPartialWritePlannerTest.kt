@@ -66,6 +66,18 @@ class EcuPartialWritePlannerTest {
         assertEquals(4.toByte(), original[4])
     }
 
+    @Test fun touchingAnUnprotectedByteMustNotEraseProtectedNeighborInSameSector() {
+        val modified = original.clone()
+        modified[1] = 100
+        val guarded = layout.copy(protectedRanges = listOf(
+            EcuPartialWritePlanner.Range(0x1004L, 0x1006L)
+        ))
+        assertThrows(IllegalArgumentException::class.java) {
+            EcuPartialWritePlanner.preview(guarded, original, modified)
+        }
+        assertEquals(1.toByte(), original[1])
+    }
+
     @Test fun rejectsIncompleteOrMismatchedSectorGeometryAndImageSizes() {
         val modified = original.clone()
         assertThrows(IllegalArgumentException::class.java) {
