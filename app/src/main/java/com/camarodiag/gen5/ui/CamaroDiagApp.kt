@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -519,7 +520,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isAvailable = viewModel.canMonitorAvailable(),
                     onStart = { viewModel.startCanMonitor() },
                     onStop = { viewModel.stopCanMonitor() },
-                    onSendRequest = { viewModel.sendSafeObdRequest(it) },
+                    onSendRequest = { viewModel.sendCanConsoleInput(it) },
+                    onClearHistory = { viewModel.clearCanConsoleHistory() },
                     onExport = { canTraceExporter.launch("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") }
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
@@ -1244,6 +1246,7 @@ fun CanSnifferScreen(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
+    onClearHistory: () -> Unit,
     onExport: () -> Unit
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
@@ -1310,77 +1313,81 @@ fun CanSnifferScreen(
                 }
             }
         }
-        if (state.rawText.isNotBlank()) {
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(stringResource(R.string.can_sniffer_raw_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text(
-                            state.rawText.takeLast(4096),
-                            color = TextPrimary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            maxLines = 24
-                        )
-                    }
-                }
-            }
-        }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.can_sniffer_request_label), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(stringResource(R.string.can_console_history), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        TextButton(
+                            onClick = onClearHistory,
+                            enabled = state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank()
+                        ) {
+                            Text(stringResource(R.string.can_console_clear), color = CamaroBlue)
+                        }
+                    }
+                    Column(
+                        Modifier.fillMaxWidth().height(220.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (state.consoleHistory.isEmpty()) {
+                            Text(stringResource(R.string.can_console_empty), color = TextMuted, fontSize = 11.sp)
+                        } else {
+                            state.consoleHistory.forEach { entry ->
+                                val time = java.text.DateFormat.getTimeInstance(
+                                    java.text.DateFormat.MEDIUM,
+                                    LocalConfiguration.current.locales[0]
+                                ).format(java.util.Date(entry.timestampMillis))
+                                val direction = when (entry.direction) {
+                                    "TX" -> stringResource(R.string.can_console_tx)
+                                    "RX" -> stringResource(R.string.can_console_rx)
+                                    else -> stringResource(R.string.can_console_system)
+                                }
+                                Text(
+                                    "$time  $direction",
+                                    color = when (entry.direction) {
+                                        "TX" -> CamaroBlue
+                                        "RX" -> CamaroAmber
+                                        else -> WarnRed
+                                    },
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    entry.content.ifBlank { "—" },
+                                    color = if (entry.succeeded) TextPrimary else WarnRed,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = Color.DarkGray)
                     OutlinedTextField(
                         value = requestInput,
-                        onValueChange = { requestInput = it.take(16) },
+                        onValueChange = { requestInput = it.take(48) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text(stringResource(R.string.can_sniffer_request_label)) },
-                        placeholder = { Text("01 0C / 09 02 / 03 / 07 / 0A") }
+                        label = { Text(stringResource(R.string.can_console_input_label)) },
+                        placeholder = { Text("7E0 02 01 0C  •  01 0C") }
                     )
-                    Text(stringResource(R.string.can_sniffer_request_examples), color = TextMuted, fontSize = 10.sp)
+                    Text(stringResource(R.string.can_console_input_hint), color = TextMuted, fontSize = 10.sp)
                     Button(
                         onClick = { onSendRequest(requestInput) },
-                        enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
+                        enabled = isAvailable && !state.isCapturing && !state.isSendingRequest &&
+                            requestInput.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.can_sniffer_send))
                     }
-                    state.requestResponse?.let { response ->
-                        Text(stringResource(R.string.can_sniffer_response_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text(response.ifBlank { "—" }, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    if (state.isSendingRequest) {
+                        Text(stringResource(R.string.can_console_sending), color = CamaroAmber, fontSize = 11.sp)
                     }
-                }
-            }
-        }
-        if (state.requestHistory.isNotEmpty()) {
-            item {
-                Text(stringResource(R.string.can_sniffer_request_history), color = CamaroAmber, fontWeight = FontWeight.Bold)
-            }
-            items(state.requestHistory.take(20)) { entry ->
-                val requestTime = java.text.DateFormat.getTimeInstance(
-                    java.text.DateFormat.SHORT,
-                    LocalConfiguration.current.locales[0]
-                ).format(java.util.Date(entry.completedAtMillis))
-                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            stringResource(R.string.can_sniffer_request_history_item, requestTime, entry.command),
-                            color = TextPrimary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        )
-                        if (entry.succeeded) {
-                            Text(
-                                stringResource(R.string.can_sniffer_request_history_response, entry.response.orEmpty().ifBlank { "—" }),
-                                color = TextMuted,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                maxLines = 4
-                            )
-                        } else {
-                            Text(stringResource(R.string.can_sniffer_request_failed), color = WarnRed, fontSize = 10.sp)
-                        }
+                    state.message?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = TextMuted, fontSize = 11.sp)
                     }
                 }
             }
