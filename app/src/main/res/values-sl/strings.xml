@@ -19,4 +19,14 @@
     <string name="tab_guide">Vodnik</string>
     <string name="tab_controls">Upravljanje</string>
     <string name="tab_settings">Nastavitve</string>
+    <string name="common_connect">Poveži</string>
+    <string name="common_refresh">Osveži</string>
+    <string name="status_offline">Brez povezave</string>
+    <string name="obd_not_available">Ni na voljo</string>
+    <string name="obd_run_full_scan">Zaženi celoten pregled</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokol</string>
+    <string name="obd_dtc_title">Diagnostične kode napak</string>
+    <string name="obd_adapter_voltage">Napetost vmesnika</string>
+    <string name="obd_supported_pids">Podprti PID-i</string>
 </resources>
