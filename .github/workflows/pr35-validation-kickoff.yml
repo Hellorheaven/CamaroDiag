@@ -15,7 +15,6 @@ on:
 permissions:
   contents: read
   actions: write
-  issues: write
 
 concurrency:
   group: pr54-validation-kickoff
@@ -65,4 +64,4 @@ jobs:
           REPORT="$REPORT
           
           Runs were dispatched, not yet confirmed successful. Inspect all jobs, lint warnings and test results before merging."
-          gh pr comment 54 --repo "$GITHUB_REPOSITORY" --body "$REPORT"
+          printf '%s\n' "$REPORT" >> "$GITHUB_STEP_SUMMARY"
