@@ -12,6 +12,15 @@ data class RawCanFrame(
  * "18DAF110 03 22 F1 90". Whitespace and optional 0x prefixes are accepted.
  */
 object RawCanFrameParser {
+    private val receivedFramePattern = Regex(
+        "(?i)(?<![0-9A-F])([0-9A-F]{3}|[0-9A-F]{8})\\\\s+((?:[0-9A-F]{2}\\\\s+){0,7}[0-9A-F]{2})(?![0-9A-F])"
+    )
+
+    fun parseReceivedFrames(adapterOutput: String): List<RawCanFrame> =
+        receivedFramePattern.findAll(adapterOutput)
+            .mapNotNull { match -> parse(match.value.trim()) }
+            .toList()
+
     fun parse(input: String): RawCanFrame? {
         val tokens = input.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         if (tokens.size < 2) return null
