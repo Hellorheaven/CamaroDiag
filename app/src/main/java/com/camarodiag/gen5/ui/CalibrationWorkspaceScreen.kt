@@ -71,6 +71,8 @@ import com.camarodiag.gen5.domain.model.VehicleVinComparison
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
     val ecuVinResponse: String = "",
+    /** Origin of the captured identity; never infer origin from the CURRENT adapter state. */
+    val ecuIdentityFromSimulation: Boolean = false,
     val vinComparison: VehicleVinComparison? = null,
     val vinModelYear: Int? = null,
     val ecuNameResponse: String = "",
@@ -281,6 +283,7 @@ fun CalibrationWorkspaceScreen(
                 val reportedCalibrationId = state.calibrationIdResponse.trim()
                     .takeIf { it.isNotBlank() && it != unavailable }
                 val completeReadOnlyFingerprint =
+                    !state.ecuIdentityFromSimulation &&
                     Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
                         Lfx2012ControllerReferences.ObservedIdentity(
                             ecuName = recognizedEcuName,
@@ -324,6 +327,14 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(R.string.flexfuel_lfx2012_calid_label,
                             reportedCalibrationId ?: unavailable),
                             color = TextMuted, fontSize = 11.sp)
+                        if (state.ecuIdentityFromSimulation) {
+                            Text(
+                                stringResource(R.string.flexfuel_lfx2012_simulation_warning),
+                                color = WarnRed,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         if (!completeReadOnlyFingerprint) {
                             Text(stringResource(R.string.flexfuel_lfx2012_fingerprint_incomplete),
                                 color = WarnRed, fontSize = 11.sp)
