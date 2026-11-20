@@ -744,4 +744,5 @@
     <string name="can_console_input_hint">Trame CAN : 7E0 02 01 0C • Requête OBD : 01 0C</string>
     <string name="can_console_sending">Envoi en cours…</string>
 
+    <string name="can_console_adapter_ack">Accusé de réception de l’interface (pas une trame RX ECU) : %1$s</string>
 </resources>
