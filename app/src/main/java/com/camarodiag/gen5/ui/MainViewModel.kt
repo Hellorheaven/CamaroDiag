@@ -1219,9 +1219,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!obdManager.isObdCommandChannelAvailable ||
             currentState.isCapturing || canMonitorJob?.isActive == true
         ) {
-            _liveCanMonitorState.value = currentState.copy(
-                message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
-            )
+            val message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            appendCanConsoleSystemEvent(message, succeeded = false)
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
         }
         val txEvent = CanConsoleHistoryEntry(
@@ -1311,9 +1311,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun sendSafeObdRequest(input: String) {
         val request = SafeObdRequestPolicy.parse(input)
         if (request == null) {
-            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
-                message = getApplication<Application>().getString(R.string.can_sniffer_invalid_request)
-            )
+            val message = getApplication<Application>().getString(R.string.can_sniffer_invalid_request)
+            // Invalid input is still part of the operator's console session: retain it
+            // as a failed SYSTEM event rather than silently dropping it from the history.
+            appendCanConsoleSystemEvent("$message — ${input.trim().take(120)}", succeeded = false)
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
         }
         val currentState = _liveCanMonitorState.value
