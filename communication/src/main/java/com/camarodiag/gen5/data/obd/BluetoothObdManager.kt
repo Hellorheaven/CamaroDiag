@@ -43,8 +43,12 @@ class BluetoothObdManager(context: Context) {
     private var j2534BridgeRequestCanId: Int? = null
     private var j2534BridgeResponseCanId: Int? = null
     private var j2534BridgeProtocolNumber: Int? = null
-    private var activeTransport: String = "BLUETOOTH"
+    @Volatile private var activeTransport: String = "BLUETOOTH"
     private var activeAdapterCapabilities: AdapterCapabilities? = null
+
+    /** Capture the active transport before disconnect() resets its identity. */
+    val currentTransportKind: String
+        get() = activeTransport
 
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
