@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_language_title">Lietotnes valoda</string>
+    <string name="system_language_hint">Izvēlieties CamaroDiag valodu.</string>
+    <string name="about_title">Par CamaroDiag</string>
+    <string name="about_check_updates">Pārbaudīt atjauninājumus</string>
+    <string name="about_up_to_date">CamaroDiag ir atjaunināts.</string>
+    <string name="obd_choose_sensors">Izvēlēties sensorus</string>
+    <string name="obd_sensor_cancel">Atcelt</string>
+</resources>
