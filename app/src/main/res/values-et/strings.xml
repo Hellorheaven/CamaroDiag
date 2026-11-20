@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Külmutatud kaader</string>
     <string name="obd_raw_scan_log">Skannimise toorlogi</string>
     <string name="obd_powertrain_ecm">Jõuülekanne / ECM</string>
+    <string name="vehicle_setup_header">Sõiduki seadistus</string>
+    <string name="vehicle_generation">Põlvkond</string>
+    <string name="vehicle_model_year">Mudeliaasta</string>
+    <string name="vehicle_engine">Mootor</string>
+    <string name="vehicle_transmission">Käigukast</string>
+    <string name="vehicle_market_region">Turupiirkond</string>
+    <string name="vehicle_vin">Sõiduki VIN</string>
+    <string name="obd_scan_title">TÄIELIK OBD-II SKANNIMINE</string>
+    <string name="obd_readiness">OBD valmisolek</string>
+    <string name="obd_mode06_results">Režiimi 06 tulemused</string>
 </resources>
