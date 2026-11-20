@@ -19,4 +19,14 @@
     <string name="tab_guide">Vodič</string>
     <string name="tab_controls">Kontrole</string>
     <string name="tab_settings">Postavke</string>
+    <string name="common_connect">Poveži</string>
+    <string name="common_refresh">Osvježi</string>
+    <string name="status_offline">Izvan mreže</string>
+    <string name="obd_not_available">Nije dostupno</string>
+    <string name="obd_run_full_scan">Pokreni potpuno skeniranje</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokol</string>
+    <string name="obd_dtc_title">Dijagnostički kodovi grešaka</string>
+    <string name="obd_adapter_voltage">Napon adaptera</string>
+    <string name="obd_supported_pids">Podržani PID-ovi</string>
 </resources>
