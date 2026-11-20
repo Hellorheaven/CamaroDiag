@@ -932,8 +932,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val activeMonitor = canMonitorJob
                 val activeRequest = detachCanRequest()
                 markAdapterDisconnected()
+                val detachedMonitor = detachedCanMonitorJob
+                val detachedRequest = detachedCanRequestJob
                 activeMonitor?.join()
                 activeRequest?.join()
+                detachedMonitor?.join()
+                detachedRequest?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -1014,9 +1018,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val activeMonitor = canMonitorJob
             val activeRequest = detachCanRequest()
             stopCanMonitor()
+            val detachedMonitor = detachedCanMonitorJob
+            val detachedRequest = detachedCanRequestJob
             pendingConnection?.join()
             activeMonitor?.join()
             activeRequest?.join()
+            detachedMonitor?.join()
+            detachedRequest?.join()
             // A replacement adapter may have been requested while we waited.
             if (attempt != connectionAttemptGeneration) return@launch
             obdManager.disconnect()
@@ -2345,8 +2353,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val activeMonitor = canMonitorJob
                 val activeRequest = detachCanRequest()
                 markAdapterDisconnected()
+                val detachedMonitor = detachedCanMonitorJob
+                val detachedRequest = detachedCanRequestJob
                 activeMonitor?.join()
                 activeRequest?.join()
+                detachedMonitor?.join()
+                detachedRequest?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
                 connect()
                     .onSuccess { capabilities ->
@@ -2435,8 +2447,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val activeMonitor = canMonitorJob
                 val activeRequest = detachCanRequest()
                 markAdapterDisconnected()
+                val detachedMonitor = detachedCanMonitorJob
+                val detachedRequest = detachedCanRequestJob
                 activeMonitor?.join()
                 activeRequest?.join()
+                detachedMonitor?.join()
+                detachedRequest?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     ecuVinResponse = "",
