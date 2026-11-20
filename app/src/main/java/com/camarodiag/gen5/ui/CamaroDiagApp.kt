@@ -275,6 +275,12 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
         uri?.let { viewModel.exportCalibrationFile(it) }
     }
 
+    val ecuIdentityExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { viewModel.exportEcuIdentification(it) }
+    }
+
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
@@ -572,6 +578,11 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                         adapter.tier != AdapterTier.DISCONNECTED,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onExportIdentification = {
+                        ecuIdentityExporter.launch(
+                            "CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json"
+                        )
+                    },
                     onCreateVehicleFromEcuVin = { viewModel.createVehicleFromEcuVin(it) },
                     onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
