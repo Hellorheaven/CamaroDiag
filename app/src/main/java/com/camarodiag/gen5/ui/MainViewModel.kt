@@ -2637,6 +2637,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = b * 100.0 / 128.0 - 100.0
                                     values += LivePidValue("LTFT_B2", "Long Term Fuel Trim B2", "Correction carburant long terme B2", v, "%", v, "%", -100.0, 99.2, push("LTFT_B2", v))
                                 }
+                                // SAE J1979 Mode 01 PID 0x52: ethanol fuel percentage (A * 100 / 255).
+                                // This is reported only when the ECU advertises/supports the PID; trims are not an ethanol sensor.
+                                read("52")?.firstOrNull()?.let { a ->
+                                    val ethanolPercent = a * 100.0 / 255.0
+                                    values += LivePidValue(
+                                        "ETHANOL",
+                                        "Ethanol content (SAE PID 0x52)",
+                                        "Teneur en éthanol (PID SAE 0x52)",
+                                        ethanolPercent,
+                                        "%",
+                                        ethanolPercent,
+                                        "%",
+                                        0.0,
+                                        100.0,
+                                        push("ETHANOL", ethanolPercent)
+                                    )
+                                }
                                 read("0A")?.firstOrNull()?.let { b ->
                                     val v = b * 3.0
                                     values += LivePidValue("FUEL_PRESS", "Fuel Pressure", "Pression carburant", v, "kPa", v * 0.145038, "PSI", 0.0, 765.0, push("FUEL_PRESS", v))
