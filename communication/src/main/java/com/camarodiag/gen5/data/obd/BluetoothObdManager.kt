@@ -125,9 +125,11 @@ class BluetoothObdManager(context: Context) {
                 activeTransport = "BLE"
             } else {
                 val btSocket = device.createRfcommSocketToServiceRecord(sppUuid)
+                // Retain the socket before connecting so disconnect() also closes a
+                // failed RFCOMM handshake instead of leaking its descriptor.
+                socket = btSocket
                 btSocket.connect()
                 activeTransport = "BLUETOOTH"
-                socket = btSocket
                 inputStream = btSocket.inputStream
                 outputStream = btSocket.outputStream
             }
