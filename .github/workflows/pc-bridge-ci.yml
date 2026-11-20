@@ -222,6 +222,13 @@ jobs:
           if (-not (Test-Path $exe)) { throw "Windows debug executable missing: $exe" }
           if ((Get-Item $exe).Length -lt 1024) { throw 'Windows bridge executable unexpectedly small' }
 
+      - name: Run hardware-free bridge security and protocol self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & '.\pc-bridge\CamaroDiag.J2534Bridge\bin\Debug\net8.0-windows\CamaroDiag.J2534Bridge.exe' --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'J2534 bridge self-tests failed' }
+
       - name: Ensure Inno Setup is available
         shell: pwsh
         run: |
@@ -271,6 +278,18 @@ jobs:
             if (($installerOutput | Out-String) -match '(?i)\bwarning\b') {
               throw "Inno Setup emitted a warning for $($variant.Name); warning-free Debug builds are mandatory. See $installerLog"
             }
+          }
+
+      - name: Verify both Windows installers exist
+        shell: pwsh
+        env:
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($arch in @('x64', 'x86')) {
+            $installer = ".\\dist\\CamaroDiag-J2534-Bridge-Setup-debug-pr$env:PR_NUMBER-$arch.exe"
+            if (-not (Test-Path $installer)) { throw "Missing $arch Windows installer: $installer" }
+            if ((Get-Item $installer).Length -lt 4096) { throw "Invalid $arch Windows installer size" }
           }
 
       - name: Upload Windows Debug installers for this PR commit
