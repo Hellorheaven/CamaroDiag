@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag je aktuální.</string>
     <string name="obd_choose_sensors">Vybrat senzory</string>
     <string name="obd_sensor_cancel">Zrušit</string>
+    <string name="tab_vehicle">Vozidlo</string>
+    <string name="tab_connect">Připojit</string>
+    <string name="tab_live">Živá data</string>
+    <string name="tab_dtcs">Chybové kódy</string>
+    <string name="tab_more">Více</string>
+    <string name="tab_modules">Řídicí jednotky</string>
+    <string name="tab_mileage">Stav kilometrů</string>
+    <string name="tab_calibration">ECU / Mapy</string>
+    <string name="tab_obd_scan">Úplná diagnostika OBD</string>
+    <string name="tab_guide">Průvodce</string>
+    <string name="tab_controls">Ovládání</string>
+    <string name="tab_settings">Nastavení</string>
 </resources>
