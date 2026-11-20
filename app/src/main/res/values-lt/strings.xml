@@ -50,4 +50,14 @@
     <string name="obd_readiness">OBD parengtis</string>
     <string name="obd_mode06_results">06 režimo rezultatai</string>
     <string name="system_language_follow_phone">Naudoti telefono kalbą</string>
+    <string name="settings_current_vehicle">Dabartinė transporto priemonė</string>
+    <string name="settings_current_adapter">OBD-II ryšys</string>
+    <string name="adapter_section_title">Bluetooth OBD-II adapteris ir CAN zondas</string>
+    <string name="paired_bluetooth_devices">Susieti Bluetooth įrenginiai</string>
+    <string name="usb_devices_detected">Aptikti USB įrenginiai</string>
+    <string name="usb_none_detected">USB nuoseklusis adapteris nerastas.</string>
+    <string name="wifi_connection_title">Wi-Fi ELM327 ryšys</string>
+    <string name="adapter_ip_address">Adapterio IP adresas</string>
+    <string name="adapter_tcp_port">TCP prievadas (dažniausiai 35000 arba 23)</string>
+    <string name="adapter_connect_wifi">Prisijungti per Wi-Fi</string>
 </resources>
