@@ -684,4 +684,15 @@
     <string name="live_pid_wbo2_b1s2">Широкополосный лямбда-зонд B1S2</string>
     <string name="live_pid_wbo2_b2s1">Широкополосный лямбда-зонд B2S1</string>
     <string name="live_pid_wbo2_b2s2">Широкополосный лямбда-зонд B2S2</string>
+    <string name="about_title">О CamaroDiag</string>
+    <string name="about_version">Установленная версия: %1$s</string>
+    <string name="about_build">Номер сборки: %1$d</string>
+    <string name="about_check_updates">Проверить обновления</string>
+    <string name="about_checking">Проверка…</string>
+    <string name="about_up_to_date">CamaroDiag обновлён.</string>
+    <string name="about_update_found">Доступна новая версия.</string>
+    <string name="about_channel_update_unavailable">Существует более новая версия, но пакет обновления для этого канала установки не опубликован.</string>
+    <string name="about_check_failed">Не удалось проверить обновления. Проверьте подключение к Интернету.</string>
+    <string name="update_install_update">Установить обновление</string>
+    <string name="update_version_available">Доступная версия: %1$s</string>
 </resources>
