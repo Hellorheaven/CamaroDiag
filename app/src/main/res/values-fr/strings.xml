@@ -790,4 +790,7 @@
     <string name="flexfuel_lfx2012_export_failed">Impossible d’exporter la fiche d’identification ECU.</string>
     <string name="flexfuel_preflight_ecu_unverified">L’identité du calculateur est absente, simulée ou non vérifiée indépendamment</string>
     <string name="flexfuel_lfx2012_fingerprint_incomplete">Identification du calculateur incomplète : nom du calculateur, identifiant de calibration et numéro de vérification réels requis. Cela ne valide pas le firmware.</string>
+    <string name="flexfuel_lfx2012_responder_unknown">Aucune adresse de réponse ECU exploitable n’a été relevée. Impossible d’attribuer les CAL ID et CVN à un seul calculateur.</string>
+    <string name="flexfuel_lfx2012_responder_single">Une adresse de réponse ECU a été observée. L’origine de chaque CAL ID et CVN reste à vérifier.</string>
+    <string name="flexfuel_lfx2012_responder_multiple">Plusieurs adresses ECU ont répondu. Les CAL ID et CVN peuvent provenir de calculateurs différents ; la compatibilité du firmware n’est pas établie.</string>
 </resources>
