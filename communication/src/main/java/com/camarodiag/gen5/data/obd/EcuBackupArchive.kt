@@ -109,7 +109,14 @@ object EcuBackupArchive {
         }
         val metadata = files.remove("manifest.properties")
             ?: throw IllegalArgumentException("Missing archive manifest")
-        val properties = Properties().apply { load(ByteArrayInputStream(metadata)) }
+        // Properties.load normally accepts duplicate keys and silently keeps the last
+        // value. Reject ambiguous manifests instead of allowing metadata shadowing.
+        val properties = object : Properties() {
+            override fun put(key: Any, value: Any): Any? {
+                require(!containsKey(key)) { "Duplicate archive manifest property" }
+                return super.put(key, value)
+            }
+        }.apply { load(ByteArrayInputStream(metadata)) }
         require(properties.getProperty("format") == FORMAT) { "Unsupported archive format" }
         val count = properties.getProperty("count")?.toIntOrNull()
         require(count != null && count in 1..MAX_ENTRIES) { "Invalid segment count" }
