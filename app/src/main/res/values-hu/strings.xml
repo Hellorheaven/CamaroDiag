@@ -50,4 +50,14 @@
     <string name="obd_readiness">OBD-készenlét</string>
     <string name="obd_mode06_results">06-os mód eredményei</string>
     <string name="system_language_follow_phone">Telefon nyelvének követése</string>
+    <string name="settings_current_vehicle">Aktuális jármű</string>
+    <string name="settings_current_adapter">OBD-II kapcsolat</string>
+    <string name="adapter_section_title">Bluetooth OBD-II adapter és CAN-szonda</string>
+    <string name="paired_bluetooth_devices">Párosított Bluetooth-eszközök</string>
+    <string name="usb_devices_detected">Észlelt USB-eszközök</string>
+    <string name="usb_none_detected">Nem található USB-soros adapter.</string>
+    <string name="wifi_connection_title">Wi-Fi ELM327 kapcsolat</string>
+    <string name="adapter_ip_address">Adapter IP-címe</string>
+    <string name="adapter_tcp_port">TCP-port (általában 35000 vagy 23)</string>
+    <string name="adapter_connect_wifi">Csatlakozás Wi-Fi-n</string>
 </resources>
