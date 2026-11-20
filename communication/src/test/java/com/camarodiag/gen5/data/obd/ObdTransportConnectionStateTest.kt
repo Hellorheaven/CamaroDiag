@@ -78,6 +78,20 @@ class ObdTransportConnectionStateTest {
     }
 
     @Test
+    fun queuedWorkFromReplacedSessionIsNotReportedAsCurrentConnectionLoss() {
+        val epoch = ObdTransportSessionEpoch()
+        val pendingRequest = epoch.capture()
+        epoch.invalidate()
+        val currentRequest = epoch.capture()
+
+        val stale = org.junit.Assert.assertThrows(
+            ObdSupersededSessionException::class.java
+        ) { epoch.requireQueuedCurrent(pendingRequest) }
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(stale))
+        epoch.requireQueuedCurrent(currentRequest)
+    }
+
+    @Test
     fun repeatedDisconnectsAdvanceEpochWithoutReusingOldSession() {
         val epoch = ObdTransportSessionEpoch()
         val first = epoch.capture()
