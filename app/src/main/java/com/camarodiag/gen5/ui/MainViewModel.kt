@@ -2582,7 +2582,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun runMileageAudit() {
+        val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
+            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
             beginBusyOperation()
             _mileageReport.value = null
             val readings = mutableListOf<MileageSourceReading>()
@@ -2639,14 +2641,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Donnée IPC non interrogée : aucun profil VIN avec adresse/DID vérifié n'est installé."
                     )
                 }
+                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                 _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
                 _connectionMessage.value = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                reportConnectionLoss(error)
-                _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
-                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_mileage_audit_failed)
+                if (isCurrentAccountGeneration(startedGeneration)) {
+                    reportConnectionLoss(error)
+                    _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
+                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_mileage_audit_failed)
+                }
             } finally {
                 endBusyOperation()
             }
