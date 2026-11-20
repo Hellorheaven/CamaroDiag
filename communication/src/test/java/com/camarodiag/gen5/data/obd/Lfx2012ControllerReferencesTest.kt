@@ -52,6 +52,26 @@ class Lfx2012ControllerReferencesTest {
         assertTrue(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(identity))
     }
 
+    @Test fun multilinePlaceholderResponsesDoNotFormACompleteFingerprint() {
+        val valid = Lfx2012ControllerReferences.ObservedIdentity(
+            ecuName = "ECM E39",
+            calibrationIds = listOf("12612345"),
+            calibrationVerificationNumbers = listOf("12A4")
+        )
+        assertFalse(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+            valid.copy(ecuName = "UNKNOWN\\nSIMULATED")
+        ))
+        assertFalse(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+            valid.copy(calibrationIds = listOf("N/A\\n00000000"))
+        ))
+        assertFalse(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+            valid.copy(calibrationVerificationNumbers = listOf("FFFFFFFF\\nTBD"))
+        ))
+        assertTrue(Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+            valid.copy(calibrationIds = listOf("N/A\\n12612345"))
+        ))
+    }
+
     @Test fun aCompleteReadOnlyFingerprintNeverAuthorizesAWrite() {
         val vehicle = Lfx2012FlexFuelPreflight.Vehicle(
             2012, "LFX", 5, "2G1FF3D36C9104199", "2G1FF3D36C9104199"
