@@ -112,4 +112,13 @@ class EcuBackupIntegrityTest {
         assertTrue(EcuBackupIntegrity.Problem.MISSING_INDEPENDENT_READ in problems)
     }
 
+    @Test fun twoDifferentReadsAreRejectedEvenWhenManifestAgrees() {
+        val capture = capture().copy(independentRead = byteArrayOf(1, 2, 9))
+        val captures = listOf(capture)
+        val savedManifest = manifest(captures)
+        assertFalse(savedManifest.entries.single().readsIdentical)
+        val problems = EcuBackupIntegrity.verify(savedManifest, captures, required).problems
+        assertTrue(EcuBackupIntegrity.Problem.DIVERGENT_INDEPENDENT_READ in problems)
+    }
+
 }
