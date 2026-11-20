@@ -768,4 +768,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">محاكاة: لم تُقرأ معرّفات ECU هذه من مركبة حقيقية ولا يمكنها التحقق من برنامجها الثابت.</string>
     <string name="cal_expert_block_memory_map">لم يتم التحقق من خريطة ذاكرة الهدف والمناطق المحمية.</string>
     <string name="flexfuel_preflight_backup">لم يتم التحقق من النسخة الاحتياطية الأصلية لوحدة ECU.</string>
+    <string name="cal_expert_title">وضع الخبير — ECU على المنضدة / الشريحة</string>
+    <string name="cal_expert_expand">إعداد وضع الخبير</string>
+    <string name="cal_expert_collapse">إخفاء إعدادات الخبير</string>
+    <string name="cal_expert_family">عائلة وحدة التحكم (E39 أو E39A)</string>
+    <string name="cal_expert_chip">العلامة المرصودة على الشريحة</string>
+    <string name="cal_expert_programmer">مبرمج المنضدة / الواجهة</string>
+    <string name="cal_expert_access_title">طريقة الوصول</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">ذاكرة خارجية، شريحة منزوعة</string>
+    <string name="cal_expert_region_title">منطقة الذاكرة</string>
+    <string name="cal_expert_region_pflash">ذاكرة فلاش البرامج الداخلية لـ MCU</string>
+    <string name="cal_expert_region_dflash">ذاكرة فلاش البيانات لـ MCU</string>
+    <string name="cal_expert_region_eeprom">ذاكرة EEPROM خارجية</string>
+    <string name="cal_expert_blockers">فحوصات وضع الخبير غير المكتملة</string>
+    <string name="cal_expert_block_controller">تحقق من عائلة وحدة التحكم الدقيقة (E39/E39A).</string>
+    <string name="cal_expert_block_chip">حدد العلامة الفعلية على MCU أو شريحة الذاكرة.</string>
+    <string name="cal_expert_block_programmer">حدد مبرمج منضدة متوافقًا.</string>
+    <string name="cal_expert_block_image_missing">استورد صورة برنامج ثابت غير فارغة.</string>
+    <string name="cal_expert_block_image_format">يلزم ملف ثنائي خام لمرحلة التحضير هذه.</string>
 </resources>
