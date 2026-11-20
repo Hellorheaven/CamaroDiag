@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Faktinis variklio sukimo momentas</string>
     <string name="can_trace_pid_63">Etaloninis variklio sukimo momentas</string>
     <string name="live_pid_ethanol">Etanolio kiekis</string>
+    <string name="can_trace_flow_status_cts">Tęsti siuntimą</string>
+    <string name="can_trace_flow_status_wait">Laukti</string>
+    <string name="can_trace_flow_status_overflow">Perpildymas</string>
+    <string name="can_trace_flow_status_reserved">Rezervuota būsena</string>
+    <string name="can_trace_exchange_heading">UDS užklausų ir atsakymų mainai</string>
+    <string name="can_trace_exchange_completed">Baigta</string>
+    <string name="can_trace_exchange_pending">Laukiama atsakymo (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Atsakymas nepastebėtas</string>
+    <string name="can_console_raw_tx_confirm_title">Patvirtinti neapdoroto CAN kadro siuntimą</string>
+    <string name="can_console_raw_tx_confirm_message">Šis veiksmas siunčia kadrą tiesiai į transporto priemonės CAN magistralę. Neteisingas kadras gali paveikti valdymo blokus. Siųskite tik žinodami tikslinę magistralę ir identifikatorių.</string>
+    <string name="can_console_tx_unverified">Neapdorotų CAN kadrų siuntimas išjungtas: tik skaitymo siuntimo patikrai nebuvo pastebėta tikro ECU atsakymo.</string>
+    <string name="can_trace_clear_filters">Išvalyti filtrus</string>
+    <string name="can_trace_filter_invalid">Netinkamas CAN ID arba duomenų priešdėlis.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP srauto valdymas</string>
+    <string name="cal_expert_block_recovery">Šiam konkrečiam tikslui atkūrimo procedūra nepatikrinta.</string>
+    <string name="cal_expert_block_driver">Neprijungta patvirtinta aparatinio programavimo tvarkyklė.</string>
+    <string name="cal_expert_identity_notice">Įvesti pavadinimai ir failų maišos tėra stebėjimai, ne aparatinės įrangos suderinamumo įrodymas.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULIACIJA: šie ECU identifikatoriai nenuskaityti iš tikros transporto priemonės ir negali patvirtinti jos programinės įrangos.</string>
+    <string name="cal_expert_block_memory_map">Tikslinė atminties schema ir apsaugotos sritys nepatikrintos.</string>
+    <string name="flexfuel_preflight_backup">Originali ECU atsarginė kopija nepatikrinta.</string>
 </resources>
