@@ -1358,7 +1358,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Starts a bounded, passive monitor session on a real header-capable ELM/STN adapter. */
     fun startCanMonitor(durationMs: Long = 10_000L) {
-        if (canMonitorJob?.isActive == true) return
+        if (canMonitorJob?.isActive == true || detachedCanMonitorJob?.isActive == true ||
+            canRequestJob?.isActive == true || detachedCanRequestJob?.isActive == true
+        ) return
         if (!obdManager.isObdCommandChannelAvailable || !_adapter.value.supportsCanHeaders) {
             val unavailable = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(unavailable, succeeded = false)
@@ -1545,9 +1547,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun sendRawCanConsoleFrame(input: String, frame: com.camarodiag.gen5.data.obd.RawCanFrame) {
         val currentState = _liveCanMonitorState.value
-        if (currentState.isSendingRequest || canRequestJob?.isActive == true) return
+        if (currentState.isSendingRequest || canRequestJob?.isActive == true ||
+            detachedCanRequestJob?.isActive == true
+        ) return
         if (!obdManager.isObdCommandChannelAvailable ||
-            currentState.isCapturing || canMonitorJob?.isActive == true
+            currentState.isCapturing || canMonitorJob?.isActive == true ||
+            detachedCanMonitorJob?.isActive == true
         ) {
             val message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(message, succeeded = false)
@@ -1636,10 +1641,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val currentState = _liveCanMonitorState.value
-        if (currentState.isSendingRequest || canRequestJob?.isActive == true) return
+        if (currentState.isSendingRequest || canRequestJob?.isActive == true ||
+            detachedCanRequestJob?.isActive == true
+        ) return
         if (!obdManager.isObdCommandChannelAvailable ||
             currentState.isCapturing ||
-            canMonitorJob?.isActive == true
+            canMonitorJob?.isActive == true ||
+            detachedCanMonitorJob?.isActive == true
         ) {
             val message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(message, succeeded = false)
@@ -3186,10 +3194,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         connectionAttemptGeneration++
-        val activeJobs = listOfNotNull(canMonitorJob, canRequestJob, connectionAttemptJob)
+        val activeJobs = listOfNotNull(
+            canMonitorJob, canRequestJob, detachedCanMonitorJob,
+            detachedCanRequestJob, connectionAttemptJob
+        )
             .distinct()
         canMonitorJob = null
         canRequestJob = null
+        detachedCanMonitorJob = null
+        detachedCanRequestJob = null
         connectionAttemptJob = null
         activeJobs.forEach(Job::cancel)
         if (activeJobs.isEmpty()) {
