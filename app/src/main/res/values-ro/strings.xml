@@ -7,4 +7,16 @@
     <string name="about_up_to_date">CamaroDiag este actualizat.</string>
     <string name="obd_choose_sensors">Selectați senzorii</string>
     <string name="obd_sensor_cancel">Anulează</string>
+    <string name="tab_vehicle">Vehicul</string>
+    <string name="tab_connect">Conectare</string>
+    <string name="tab_live">Date în timp real</string>
+    <string name="tab_dtcs">Coduri de eroare</string>
+    <string name="tab_more">Mai multe</string>
+    <string name="tab_modules">Module</string>
+    <string name="tab_mileage">Kilometraj</string>
+    <string name="tab_calibration">ECU / Hărți</string>
+    <string name="tab_obd_scan">Scanare OBD completă</string>
+    <string name="tab_guide">Ghid</string>
+    <string name="tab_controls">Comenzi</string>
+    <string name="tab_settings">Setări</string>
 </resources>
