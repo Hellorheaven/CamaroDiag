@@ -298,7 +298,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     accountSessionGeneration != importGeneration
                 ) return@launch
                 sessionDao.claimUnassignedSessions(uid)
-                if (!settingsPreferences.edit().putString("legacy_vehicles_claimed_uid", uid).commit()) {
+                if (!settingsPreferences.edit(commit = true) { putString("legacy_vehicles_claimed_uid", uid) }) {
                     throw IllegalStateException("Unable to finalize legacy import")
                 }
                 if (authenticatedAccountUid == uid) {
@@ -535,10 +535,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
         }
-        val editor = accountVehiclePreferences(ownerUid).edit()
-            .putString("saved_vehicle_profiles", array.toString())
-        if (durable) return editor.commit()
-        editor.apply()
+        if (durable) {
+            accountVehiclePreferences(ownerUid).edit(commit = true) {
+                putString("saved_vehicle_profiles", array.toString())
+            }
+        } else {
+            accountVehiclePreferences(ownerUid).edit {
+                putString("saved_vehicle_profiles", array.toString())
+            }
+        }
         return true
     }
 
