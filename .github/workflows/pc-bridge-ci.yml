@@ -4,6 +4,16 @@ name: PC J2534 Bridge CI
 # Validation is started manually at the 50-commit checkpoint, not per commit.
 on:
   workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Branch or commit to validate"
+        required: true
+        default: "feat/live-can-monitor"
+        type: string
+      pr_number:
+        description: "Pull request number (optional)"
+        required: false
+        type: string
 
 permissions:
   actions: read
@@ -29,7 +39,7 @@ jobs:
       - name: Checkout pull request history
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Detect Windows-relevant changes
@@ -176,7 +186,7 @@ jobs:
           fi
   build-windows-debug:
     needs: evaluate-build-checkpoint
-    if: needs.evaluate-build-checkpoint.outputs.build_required == 'true'
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.evaluate-build-checkpoint.outputs.build_required == 'true')
     runs-on: windows-latest
     steps:
       - name: Checkout pull request commit
@@ -213,7 +223,7 @@ jobs:
 
       - name: Publish and package Windows Debug installers
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -246,7 +256,7 @@ jobs:
       - name: Upload Windows Debug installers for this PR commit
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-J2534-Bridge-debug-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: CamaroDiag-J2534-Bridge-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha }}
           path: |
             dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x64.exe
             dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x86.exe
@@ -255,7 +265,7 @@ jobs:
 
   windows-debug-validation:
     needs: [evaluate-build-checkpoint, build-windows-debug]
-    if: always()
+    if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Report Windows Debug validation applicability
