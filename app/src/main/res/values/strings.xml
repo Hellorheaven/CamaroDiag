@@ -645,6 +645,8 @@
     <string name="vin_photo_not_found">No valid 17-character VIN detected. Enter it manually or take another photo.</string>
     <string name="vin_photo_error">Could not read the VIN photo. Try again with better lighting and focus.</string>
     <string name="tab_can_sniffer">CAN Sniffer</string>
+    <string name="can_sniffer_raw_heading">Raw CAN adapter output</string>
+    <string name="can_sniffer_export_raw">Export raw log</string>
     <string name="can_sniffer_title">Live CAN Monitor</string>
     <string name="can_sniffer_description">Capture CAN frames on a real compatible ELM or STN adapter. Each capture stops automatically after a short session.</string>
     <string name="can_sniffer_safety">Only read-only OBD-II requests are accepted. Arbitrary CAN frames and UDS write services are blocked.</string>

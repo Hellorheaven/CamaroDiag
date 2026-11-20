@@ -648,6 +648,8 @@
     <string name="vin_photo_not_found">Aucun VIN valide de 17 caractères détecté. Saisissez-le manuellement ou reprenez la photo.</string>
     <string name="vin_photo_error">Impossible de lire la photo du VIN. Réessayez avec plus de lumière et une meilleure mise au point.</string>
     <string name="tab_can_sniffer">Analyseur CAN</string>
+    <string name="can_sniffer_raw_heading">Flux brut reçu de l’interface CAN</string>
+    <string name="can_sniffer_export_raw">Exporter le journal brut</string>
     <string name="can_sniffer_title">Moniteur CAN en direct</string>
     <string name="can_sniffer_description">Capture des trames CAN avec un adaptateur ELM ou STN réel et compatible. Chaque capture s’arrête automatiquement après une courte session.</string>
     <string name="can_sniffer_safety">Seules les requêtes OBD-II en lecture seule sont acceptées. Les trames CAN arbitraires et les écritures UDS sont bloquées.</string>

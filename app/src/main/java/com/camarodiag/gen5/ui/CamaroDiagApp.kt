@@ -1151,7 +1151,7 @@ fun LiveDataScreen(
                                 enabled = recording.sampleCount > 0 && !recording.isRecording,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text(stringResource(R.string.live_export_csv))
+                                Text(stringResource(R.string.can_sniffer_export_raw))
                             }
                         }
                         Text(
@@ -1306,6 +1306,22 @@ fun CanSnifferScreen(
                     }
                     state.message?.takeIf { it.isNotBlank() }?.let {
                         Text(it, color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+        if (state.rawText.isNotBlank()) {
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(stringResource(R.string.can_sniffer_raw_heading), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        Text(
+                            state.rawText.takeLast(4096),
+                            color = TextPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            maxLines = 24
+                        )
                     }
                 }
             }
