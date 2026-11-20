@@ -410,3 +410,5 @@ Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L
 ---
 
 **Consigne de maintenance :** à chaque nouvelle demande d'évolution durable, ajouter une entrée dans la bonne section, indiquer sa priorité et son statut, puis conserver ce fichier à jour au fil des PR. Avant de commencer un nouveau chantier, relire ce backlog et vérifier ce qui est déjà réalisé afin d'éviter les doublons.
+
+- 2026-11-20 : PR #54 P0 #57 — sélecteur de capteurs de scan OBD avec cases à cocher, filtre par PID/nom, persistance locale par VIN, catalogue PID connus + annoncés par ECU et indication non mesuré ; **partiel/non validé** : reste à intégrer à la télémétrie temps réel complète et à tester. P0 #58 — modale d'aide au clic sur un DTC dans la liste principale, basée sur le catalogue véhicule existant et son contrôle d'identité ; **partiel/non validé**. P0 #56 — premier correctif de zones système, validation Android 10–16 encore requise. Aucun de ces points ne doit être marqué terminé avant recette.
