@@ -3084,6 +3084,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var consecutiveFailures = 0
             var activeTelemetryBatch = 0
             val histories = mutableMapOf<String, ArrayDeque<Double>>()
+            val sensorRecency = LiveSignalRecency()
 
             fun push(id: String, value: Double): List<Double> {
                 val queue = histories.getOrPut(id) { ArrayDeque() }
@@ -3289,8 +3290,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
                                 }
                                 val mergedValues = _livePids.value.associateBy { it.id }.toMutableMap()
-                                values.forEach { mergedValues[it.id] = it }
-                                _livePids.value = mergedValues.values.toList()
+                                val now = System.currentTimeMillis()
+                                values.forEach {
+                                    mergedValues[it.id] = it
+                                    sensorRecency.record(it.id, now)
+                                }
+                                _livePids.value = mergedValues.values.filter {
+                                    sensorRecency.isRecent(it.id, now)
+                                }
                                 valuesForRecording = values
                                 _liveTelemetryMessage.value = if (_livePids.value.isEmpty()) {
                                     getApplication<Application>().getString(R.string.msg_live_no_pid_response)
