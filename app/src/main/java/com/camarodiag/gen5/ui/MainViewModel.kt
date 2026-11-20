@@ -2030,7 +2030,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun markAdapterDisconnected() {
         stopCanMonitor()
-        _liveCanMonitorState.value = LiveCanMonitorState()
+        // Keep RX/TX history and already captured text across a disconnect or
+        // adapter switch. Only explicit "clear history" may erase the console.
+        _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
+            isCapturing = false,
+            isSendingRequest = false
+        )
         _adapter.value = AdapterCapabilities()
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
