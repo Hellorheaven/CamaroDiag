@@ -54,3 +54,8 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - `0031586` : test de régression sur un manifeste modifié contenant une deuxième propriété `count`.
 - Vérification locale isolée avec le compilateur Kotlin : la surcharge de `Properties.put` compile et rejette effectivement une clé dupliquée. Cela **n'est pas** un build Android/Windows ni une exécution de la suite Gradle.
 - Périmètre non terminé : parité et traduction de l'ensemble des chaînes UI dans les 30 langues, builds complets et recette matérielle.
+
+## Contrôle bloquant de couverture linguistique
+- `74959a5` : test de parité des clés de `strings.xml` sur les 30 locales déclarées. Toute clé anglaise manquante provoque un échec explicite avec les 20 premières clés absentes.
+- Le test est volontairement **non satisfait actuellement** : plusieurs locales sont incomplètes. Ne pas maquiller cette situation en recopiant le texte anglais comme traduction.
+- Priorité : traduire réellement les valeurs manquantes et valider la cohérence des placeholders et le rendu RTL avant fusion.
