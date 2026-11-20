@@ -16,15 +16,25 @@ object EcuBackupCoverage {
         val sha256: String?,
         val verifiedIndependentReadback: Boolean
     )
-    data class Report(val status: Status, val capturedBytes: Long, val missingBytes: Long)
+    data class Report(
+        val status: Status,
+        val capturedBytes: Long,
+        val missingBytes: Long,
+        val missingRegions: Set<Region> = emptySet()
+    )
 
     /**
      * Checks a single non-overlapping memory segment against the expected coverage.
      * The caller must not substitute a checksum reported by an untrusted device for
      * hashing the actual captured bytes.
      */
-    fun inspect(segments: List<Segment>): Report {
-        if (segments.isEmpty()) return Report(Status.PARTIAL, 0, 0)
+    fun inspect(
+        segments: List<Segment>,
+        requiredRegions: Set<Region> = emptySet()
+    ): Report {
+        val observedRegions = segments.map(Segment::region).toSet()
+        val missingRegions = requiredRegions - observedRegions
+        if (segments.isEmpty()) return Report(Status.PARTIAL, 0, 0, missingRegions)
         var captured = 0L
         var missing = 0L
         var inconsistent = false
@@ -58,9 +68,9 @@ object EcuBackupCoverage {
         }
         val status = when {
             inconsistent -> Status.INCONSISTENT
-            missing == 0L && allVerified -> Status.COMPLETE
+            missing == 0L && allVerified && missingRegions.isEmpty() -> Status.COMPLETE
             else -> Status.PARTIAL
         }
-        return Report(status, captured, missing)
+        return Report(status, captured, missing, missingRegions)
     }
 }
