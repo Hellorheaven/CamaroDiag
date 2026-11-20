@@ -55,6 +55,11 @@ class SafeObdRequestPolicyTest {
     }
 
     @Test
+    fun rejectsOversizedInputBeforeParsing() {
+        assertNull(SafeObdRequestPolicy.parse("01" + " ".repeat(31) + "0C"))
+    }
+
+    @Test
     fun rejectsMalformedAndEmptyInput() {
         assertNull(SafeObdRequestPolicy.parse(""))
         assertNull(SafeObdRequestPolicy.parse("hello"))
