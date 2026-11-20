@@ -50,4 +50,14 @@
     <string name="obd_readiness">Pripravenosť OBD</string>
     <string name="obd_mode06_results">Výsledky režimu 06</string>
     <string name="system_language_follow_phone">Použiť jazyk telefónu</string>
+    <string name="settings_current_vehicle">Aktuálne vozidlo</string>
+    <string name="settings_current_adapter">Pripojenie OBD-II</string>
+    <string name="adapter_section_title">Adaptér Bluetooth OBD-II a sonda CAN</string>
+    <string name="paired_bluetooth_devices">Spárované zariadenia Bluetooth</string>
+    <string name="usb_devices_detected">Zistené zariadenia USB</string>
+    <string name="usb_none_detected">Nenašiel sa sériový adaptér USB.</string>
+    <string name="wifi_connection_title">Pripojenie Wi-Fi ELM327</string>
+    <string name="adapter_ip_address">IP adresa adaptéra</string>
+    <string name="adapter_tcp_port">Port TCP (zvyčajne 35000 alebo 23)</string>
+    <string name="adapter_connect_wifi">Pripojiť cez Wi-Fi</string>
 </resources>
