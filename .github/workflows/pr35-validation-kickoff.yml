@@ -1,5 +1,5 @@
 name: PR35 manual validation kickoff
-# Checkpoint 5: validate CAN disconnect and account-switch connection cancellation changes.
+# Checkpoint 6: validate account deletion, module greying, J2534 cancellation and connection lifecycle.
 
 # One-time checkpoint: changing THIS file is the only push that requests builds.
 # Ordinary source commits never trigger this workflow.
