@@ -962,6 +962,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isReading = false,
                     ecuVinResponse = "",
                     vinComparison = null,
+                    vinModelYear = null,
+                    ecuNameResponse = "",
+                    respondingEcuAddresses = emptyList(),
+                    calibrationIdResponse = "",
+                    cvnResponse = "",
                     message = getApplication<Application>().getString(R.string.msg_cal_identifiers_failed)
                 )
             }
@@ -2290,7 +2295,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (_: Exception) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = getApplication<Application>().getString(R.string.obd_not_available),
-                        vinComparison = null
+                        vinComparison = null,
+                        vinModelYear = null,
+                        ecuNameResponse = "",
+                        respondingEcuAddresses = emptyList(),
+                        calibrationIdResponse = "",
+                        cvnResponse = ""
                     )
                     scanDtcs()
                     runMileageAudit()
