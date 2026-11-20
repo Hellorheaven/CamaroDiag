@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Iontráil an VIN fíor; ní chruthaítear VIN samplach.</string>
     <string name="status_not_verified">NEAMHFHÍORAITHE</string>
     <string name="adapter_discovery_only">FIONNACHTAIN AMHÁIN</string>
+    <string name="can_sniffer_raw_heading">Aschur amh an oiriúnaitheora CAN</string>
+    <string name="can_sniffer_export_raw">Easpórtáil loga amh</string>
+    <string name="can_sniffer_dtc_heading">Cóid locht OBD-II a breathnaíodh</string>
+    <string name="connection_lost_bluetooth">Cailleadh an ceangal Bluetooth. Ceangail an t-oiriúnaitheoir arís agus atosaigh an oibríocht.</string>
+    <string name="connection_lost_vehicle">Cailleadh ceangal na feithicle. Ceangail leis an bhfeithicil arís agus atosaigh an oibríocht.</string>
+    <string name="connection_lost_usb">Dícheanglaíodh an t-oiriúnaitheoir USB. Ceangail arís é agus atosaigh an oibríocht.</string>
+    <string name="connection_lost_wifi">Cailleadh an ceangal OBD Wi-Fi. Ceangail an t-oiriúnaitheoir arís agus atosaigh an oibríocht.</string>
+    <string name="connection_lost_pc_bridge">Cailleadh ceangal an droichid dhiagnóisigh PC. Ceangail an droichead arís agus atosaigh an oibríocht.</string>
+    <string name="live_sensor_search">Cuardaigh braiteoirí</string>
+    <string name="live_sensor_show_all">Taispeáin gach braiteoir</string>
+    <string name="can_console_history">Stair aontaithe chonsól CAN</string>
+    <string name="can_console_clear">Glan an stair</string>
+    <string name="can_console_empty">Níl trácht ar bith fós. Beidh na sonraí faighte agus seolta le feiceáil anseo.</string>
+    <string name="can_console_tx">TX • SEOLTA</string>
+    <string name="can_console_rx">RX • FAIGHTE</string>
+    <string name="can_console_system">CÓRAS</string>
+    <string name="can_console_input_label">Fráma CAN nó ordú OBD</string>
+    <string name="can_console_sending">Á sheoladh…</string>
+    <string name="obd_dtc_help_unavailable">Níl treoir fabhtcheartaithe fhíoraithe ar fáil fós don chód locht seo agus don fheithicil seo. Seiceáil faisnéis seirbhíse an mhonaróra roimh dheisiú.</string>
+    <string name="cal_expert_no_write">Níl ríomhchlárú ar fáil go dtí go gcuirtear tiománaí binse comhoiriúnach i bhfeidhm agus go bhfíoraítear é.</string>
+    <string name="flexfuel_preflight_write">Níor bailíochtaíodh scríobh calabrúcháin ECU agus fanann sé díchumasaithe.</string>
+    <string name="status_not_implemented">NÍL CURTHA I BHFEIDHM</string>
 </resources>
