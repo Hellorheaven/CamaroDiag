@@ -789,4 +789,5 @@
     <string name="flexfuel_lfx2012_export_success">Fiche d’identification exportée. Aucune mémoire ECU n’a été sauvegardée.</string>
     <string name="flexfuel_lfx2012_export_failed">Impossible d’exporter la fiche d’identification ECU.</string>
     <string name="flexfuel_preflight_ecu_unverified">L’identité du calculateur est absente, simulée ou non vérifiée indépendamment</string>
+    <string name="flexfuel_lfx2012_fingerprint_incomplete">Identification du calculateur incomplète : nom du calculateur, identifiant de calibration et numéro de vérification réels requis. Cela ne valide pas le firmware.</string>
 </resources>
