@@ -49,5 +49,5 @@ internal class ObdTransportSessionEpoch {
 }
 
 /** A response from a replaced connection must never disconnect its successor. */
-internal class ObdSupersededSessionException(cause: Throwable) :
+class ObdSupersededSessionException(cause: Throwable) :
     java.io.IOException("An earlier OBD connection was replaced", cause)
