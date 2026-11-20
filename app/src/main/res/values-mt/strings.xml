@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Torque attwali tal-magna</string>
     <string name="can_trace_pid_63">Torque ta\' referenza tal-magna</string>
     <string name="live_pid_ethanol">Kontenut ta\' etanol</string>
+    <string name="can_trace_flow_status_cts">Kompli ibgħat</string>
+    <string name="can_trace_flow_status_wait">Stenna</string>
+    <string name="can_trace_flow_status_overflow">Overflow</string>
+    <string name="can_trace_flow_status_reserved">Status riżervat</string>
+    <string name="can_trace_exchange_heading">Skambji ta\' talbiet u tweġibiet UDS</string>
+    <string name="can_trace_exchange_completed">Lest</string>
+    <string name="can_trace_exchange_pending">Tweġiba pendenti (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Ebda tweġiba osservata</string>
+    <string name="can_console_raw_tx_confirm_title">Ikkonferma trasmissjoni CAN mhux ipproċessata</string>
+    <string name="can_console_raw_tx_confirm_message">Dan jibgħat qafas direttament fuq il-bus CAN tal-vettura. Qafas ħażin jista\' jaffettwa l-moduli tal-vettura. Ibgħat biss meta tkun taf il-bus u l-identifikatur fil-mira.</string>
+    <string name="can_console_tx_unverified">It-trażmissjoni CAN mhux ipproċessata hija diżattivata: ma ġiet osservata ebda tweġiba ECU reali għat-test tat-trażmissjoni għall-qari biss.</string>
+    <string name="can_trace_clear_filters">Neħħi l-filtri</string>
+    <string name="can_trace_filter_invalid">ID CAN jew prefiss tad-dejta invalidu.</string>
+    <string name="can_trace_flow_control_heading">Kontroll tal-fluss ISO-TP</string>
+    <string name="cal_expert_block_recovery">Ma ġietx ivverifikata proċedura ta\' rkupru għal din il-mira preċiża.</string>
+    <string name="cal_expert_block_driver">L-ebda driver ivvalidat għall-ipprogrammar tal-hardware ma huwa konness.</string>
+    <string name="cal_expert_identity_notice">L-ismijiet u l-hashes tal-fajls imdaħħla huma osservazzjonijiet, mhux prova ta\' kompatibbiltà tal-hardware.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULAZZJONI: dawn l-identifikaturi ECU ma nqrawx minn vettura reali u ma jistgħux jivvalidaw il-firmware tagħha.</string>
+    <string name="cal_expert_block_memory_map">Il-mappa tal-memorja tal-mira u ż-żoni protetti mhumiex ivverifikati.</string>
+    <string name="flexfuel_preflight_backup">Il-backup oriġinali tal-ECU mhuwiex ivverifikat.</string>
 </resources>
