@@ -250,3 +250,9 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 
 - Complément BLE : chaque fragment d'une écriture multi-paquets revérifie l'état de la connexion et l'identité de la session GATT. Une déconnexion ou un remplacement de session entre deux fragments interrompt donc l'envoi au lieu de tenter les fragments restants sur une session périmée.
 - Commit complémentaire : `e108377db9c1633dbf67e741e235aed63dc8f512`.
+
+### Écritures OBDLink BLE — sérialisation GATT — 2026-11-20
+- Les écritures sur le transport BLE sont maintenant protégées par un mutex : deux commandes concurrentes ne peuvent plus remplacer mutuellement leur attente de callback.
+- Chaque fragment attend désormais le callback Android de fin d'opération GATT, y compris en mode `WRITE_TYPE_NO_RESPONSE`. Ce mode supprime l'accusé de réception ATT du périphérique, mais ne justifie pas d'empiler les appels Android avant la fin locale de l'opération.
+- Commit : `e35b426ee33f8af8225a56a3a2419aad9ac26e43`.
+- Relecture statique effectuée ; tests Gradle, build Android et essai avec OBDLink CX non exécutés.
