@@ -70,4 +70,26 @@
     <string name="vehicle_vin_hint">Sisestage tegelik VIN; näidis-VIN-i ei looda.</string>
     <string name="status_not_verified">KONTROLLIMATA</string>
     <string name="adapter_discovery_only">AINULT OTSING</string>
+    <string name="can_sniffer_raw_heading">CAN-adapteri töötlemata väljund</string>
+    <string name="can_sniffer_export_raw">Ekspordi toorlogi</string>
+    <string name="can_sniffer_dtc_heading">Täheldatud OBD-II veakoodid</string>
+    <string name="connection_lost_bluetooth">Bluetooth-ühendus katkes. Ühenda adapter uuesti ja alusta toimingut uuesti.</string>
+    <string name="connection_lost_vehicle">Sõidukiühendus katkes. Ühenda sõiduk uuesti ja alusta toimingut uuesti.</string>
+    <string name="connection_lost_usb">USB-adapter ühendati lahti. Ühenda see uuesti ja alusta toimingut uuesti.</string>
+    <string name="connection_lost_wifi">OBD Wi-Fi-ühendus katkes. Ühenda adapter uuesti ja alusta toimingut uuesti.</string>
+    <string name="connection_lost_pc_bridge">Arvuti diagnostikasilla ühendus katkes. Ühenda sild uuesti ja alusta toimingut uuesti.</string>
+    <string name="live_sensor_search">Otsi andureid</string>
+    <string name="live_sensor_show_all">Kuva kõik andurid</string>
+    <string name="can_console_history">Ühine CAN-konsooli ajalugu</string>
+    <string name="can_console_clear">Kustuta ajalugu</string>
+    <string name="can_console_empty">Andmevahetust pole veel toimunud. Vastuvõetud ja saadetud andmed ilmuvad siia.</string>
+    <string name="can_console_tx">TX • SAADETUD</string>
+    <string name="can_console_rx">RX • VASTU VÕETUD</string>
+    <string name="can_console_system">SÜSTEEM</string>
+    <string name="can_console_input_label">CAN-kaader või OBD-käsk</string>
+    <string name="can_console_sending">Saatmine…</string>
+    <string name="obd_dtc_help_unavailable">Selle veakoodi ja sõiduki kohta pole veel kinnitatud tõrkeotsingujuhiseid. Enne parandamist vaata tootja hooldusteavet.</string>
+    <string name="cal_expert_no_write">Programmeerimine pole saadaval enne ühilduva töölauadraiveri rakendamist ja kontrollimist.</string>
+    <string name="flexfuel_preflight_write">ECU kalibreeringu kirjutamine pole valideeritud ja jääb keelatuks.</string>
+    <string name="status_not_implemented">POLE TEOSTATUD</string>
 </resources>
