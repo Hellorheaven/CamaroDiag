@@ -29,4 +29,14 @@
     <string name="obd_dtc_title">Diagnostilised veakoodid</string>
     <string name="obd_adapter_voltage">Adapteri pinge</string>
     <string name="obd_supported_pids">Toetatud PID-id</string>
+    <string name="obd_ecu_name">ECU nimi</string>
+    <string name="obd_none_identified">Ühtegi ei tuvastatud</string>
+    <string name="obd_data_unavailable">Andmed pole saadaval</string>
+    <string name="obd_returned_live_data">Saadud reaalaja andmed</string>
+    <string name="obd_pending">Ootel</string>
+    <string name="obd_permanent">Püsiv</string>
+    <string name="obd_confirmed">Kinnitatud</string>
+    <string name="obd_freeze_frame">Külmutatud kaader</string>
+    <string name="obd_raw_scan_log">Skannimise toorlogi</string>
+    <string name="obd_powertrain_ecm">Jõuülekanne / ECM</string>
 </resources>
