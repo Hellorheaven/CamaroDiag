@@ -288,6 +288,15 @@ internal class OBDLinkBleTransport(private val context: Context) {
         if (pending.isEmpty()) {
             val wakeup = readWakeup.beginWait()
             try {
+                // close() can run after readSession is captured but before beginWait().
+                // In that ordering its one-shot wakeup has no waiter to signal, so
+                // verify the GATT identity again before entering the suspending select.
+                if (gatt !== readSession) {
+                    throw ObdTransportDisconnectedException(
+                        "OBDLink BLE session changed before reading",
+                        connectionFailure
+                    )
+                }
                 // Recheck after registering to close the race with a disconnect callback.
                 connectionFailure?.let(wakeup::complete)
                 val packet = withTimeoutOrNull(timeoutMs.toLong()) {
