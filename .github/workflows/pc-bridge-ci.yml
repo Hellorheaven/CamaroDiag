@@ -21,12 +21,12 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: pc-bridge-debug-pr-${{ github.event.pull_request.number }}
+  group: pc-bridge-debug-${{ inputs.target_ref || github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   evaluate-build-checkpoint:
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       windows_changed: ${{ steps.windows_changes.outputs.windows_changed }}
@@ -50,6 +50,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          BASE_SHA="${BASE_SHA:-$(git merge-base origin/main HEAD)}"
+          HEAD_SHA="${HEAD_SHA:-$(git rev-parse HEAD)}"
           paths=(
             'pc-bridge/**' 'global.json' '.editorconfig' '.github/actions/**' 'NuGet.Config' 'nuget.config'
             '**/Directory.Build.props' '**/Directory.Build.targets'
@@ -119,9 +121,18 @@ jobs:
           IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
+          BASE_SHA="${BASE_SHA:-$(git merge-base origin/main HEAD)}"
+          HEAD_SHA="${HEAD_SHA:-$(git rev-parse HEAD)}"
           configured="${BUILD_INTERVAL:-}"
           if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
           echo "interval=$interval" >> "$GITHUB_OUTPUT"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
+            echo "Explicit manual Windows validation runs regardless of diff thresholds."
+            exit 0
+          fi
           if [[ "$WINDOWS_CHANGED" != "true" ]]; then
             echo "validation_applies=false" >> "$GITHUB_OUTPUT"
             echo "build_required=false" >> "$GITHUB_OUTPUT"
@@ -203,6 +214,14 @@ jobs:
         run: dotnet build .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
         continue-on-error: false
 
+      - name: Verify compiled .NET bridge executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = '.\pc-bridge\CamaroDiag.J2534Bridge\bin\Debug\net8.0-windows\CamaroDiag.J2534Bridge.exe'
+          if (-not (Test-Path $exe)) { throw "Windows debug executable missing: $exe" }
+          if ((Get-Item $exe).Length -lt 1024) { throw 'Windows bridge executable unexpectedly small' }
+
       - name: Ensure Inno Setup is available
         shell: pwsh
         run: |
@@ -242,6 +261,7 @@ jobs:
 
             dotnet publish .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Debug --runtime $variant.Runtime --self-contained true --output $output -warnaserror "-p:Version=0.0.0" "-p:AssemblyVersion=0.0.0.0" "-p:FileVersion=0.0.0.0"
             if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $($variant.Name)" }
+            if (-not (Test-Path (Join-Path $output 'CamaroDiag.J2534Bridge.exe'))) { throw "Bridge missing from $output" }
 
             $outputName = "CamaroDiag-J2534-Bridge-Setup-debug-pr$env:PR_NUMBER-$($variant.Arch)"
             $installerLog = Join-Path $PWD "dist\$($variant.Name)-installer.log"
@@ -258,14 +278,14 @@ jobs:
         with:
           name: CamaroDiag-J2534-Bridge-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha }}
           path: |
-            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x64.exe
-            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr${{ github.event.pull_request.number }}-x86.exe
+            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr*-x64.exe
+            dist/CamaroDiag-J2534-Bridge-Setup-debug-pr*-x86.exe
           if-no-files-found: error
           retention-days: 30
 
   windows-debug-validation:
     needs: [evaluate-build-checkpoint, build-windows-debug]
-    if: always() && github.event_name == 'pull_request'
+    if: always() && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Report Windows Debug validation applicability
