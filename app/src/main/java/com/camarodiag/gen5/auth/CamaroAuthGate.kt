@@ -59,7 +59,7 @@ fun CamaroAuthGate(
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
     // Delay diagnostic UI until the old user's active connection and transient
     // diagnostic results have been cleared by the ViewModel.
-    LaunchedEffect(user?.uid, retryValidation) {
+    LaunchedEffect(user, retryValidation) {
         readyAccountUid = null
         validatedAccountUid = null
         validatedUser = null
