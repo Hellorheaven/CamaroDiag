@@ -93,9 +93,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Each authenticated Firebase UID receives a distinct local garage. Old data
      * can only be imported through an explicit user action.
      */
-    private fun accountVehiclePreferences(): android.content.SharedPreferences =
+    private fun accountVehiclePreferences(
+        ownerUid: String? = authenticatedAccountUid
+    ): android.content.SharedPreferences =
         getApplication<Application>().getSharedPreferences(
-            "camarodiag_garage_" + (authenticatedAccountUid ?: "no_account"),
+            "camarodiag_garage_" + (ownerUid ?: "no_account"),
             Context.MODE_PRIVATE
         )
 
@@ -186,18 +188,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Commit the historical session ownership before marking the
                 // migration complete; retry stays possible if Room fails.
                 sessionDao.claimUnassignedSessions(uid)
-                if (authenticatedAccountUid != uid) return@launch
-                val existing = _savedVehicles.value
+                val existing = loadSavedVehicleProfiles(
+                    accountVehiclePreferences(uid).getString("saved_vehicle_profiles", "[]").orEmpty()
+                )
                 val ids = existing.mapTo(mutableSetOf()) { it.id }
                 val imported = legacy.map { profile ->
                     if (ids.add(profile.id)) profile
                     else profile.copy(id = UUID.randomUUID().toString())
                 }
                 val merged = existing + imported
-                persistSavedVehicleProfiles(merged)
-                _savedVehicles.value = merged
+                persistSavedVehicleProfiles(merged, ownerUid = uid)
                 settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
-                _legacyVehicleImportAvailable.value = false
+                if (authenticatedAccountUid == uid) {
+                    _savedVehicles.value = merged
+                    _legacyVehicleImportAvailable.value = false
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -391,7 +396,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.getOrDefault(emptyList())
 
-    private fun persistSavedVehicleProfiles(profiles: List<SavedVehicleProfile>) {
+    private fun persistSavedVehicleProfiles(
+        profiles: List<SavedVehicleProfile>,
+        ownerUid: String? = authenticatedAccountUid
+    ) {
         val array = JSONArray()
         profiles.forEach { saved ->
             array.put(
@@ -407,7 +415,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
         }
-        accountVehiclePreferences().edit { putString("saved_vehicle_profiles", array.toString()) }
+        accountVehiclePreferences(ownerUid).edit { putString("saved_vehicle_profiles", array.toString()) }
     }
 
     fun saveCurrentVehicle(name: String) {
