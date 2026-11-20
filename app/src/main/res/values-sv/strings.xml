@@ -39,4 +39,14 @@
     <string name="obd_freeze_frame">Frysram</string>
     <string name="obd_raw_scan_log">Rå skanningslogg</string>
     <string name="obd_powertrain_ecm">Drivlina / ECM</string>
+    <string name="vehicle_setup_header">Fordonsinställningar</string>
+    <string name="vehicle_generation">Generation</string>
+    <string name="vehicle_model_year">Modellår</string>
+    <string name="vehicle_engine">Motor</string>
+    <string name="vehicle_transmission">Växellåda</string>
+    <string name="vehicle_market_region">Marknadsregion</string>
+    <string name="vehicle_vin">Fordonets VIN</string>
+    <string name="obd_scan_title">FULLSTÄNDIG OBD-II-SKANNING</string>
+    <string name="obd_readiness">OBD-beredskap</string>
+    <string name="obd_mode06_results">Resultat för läge 06</string>
 </resources>
