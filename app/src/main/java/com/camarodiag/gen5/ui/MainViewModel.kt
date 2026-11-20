@@ -276,14 +276,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val currentProfile = missingCurrent?.let { vehicle ->
                     SavedVehicleProfile(
-                        id = UUID.randomUUID().toString(),
+                        id = UUID.nameUUIDFromBytes(
+                            "legacy-current:$uid:${vehicle.modelYear}:${vehicle.engine}:${vehicle.transmission}:${vehicle.market}:${vehicle.vin}".toByteArray(Charsets.UTF_8)
+                        ).toString(),
                         name = getApplication<Application>().getString(R.string.saved_vehicle_legacy_default_name),
                         vehicle = vehicle,
                         requiresReview = true
                     )
                 }
                 val merged = existing + imported + listOfNotNull(currentProfile)
-                persistSavedVehicleProfiles(merged, ownerUid = uid)
+                if (!persistSavedVehicleProfiles(merged, ownerUid = uid, durable = true)) {
+                    throw IllegalStateException("Unable to persist imported garage")
+                }
                 // Claim the historical Room rows only after the destination garage
                 // is persisted; a failure remains retryable without duplicates.
                 // Do not claim history if the account changed during preparation.
@@ -291,7 +295,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     accountSessionGeneration != importGeneration
                 ) return@launch
                 sessionDao.claimUnassignedSessions(uid)
-                settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
+                if (!settingsPreferences.edit().putString("legacy_vehicles_claimed_uid", uid).commit()) {
+                    throw IllegalStateException("Unable to finalize legacy import")
+                }
                 if (authenticatedAccountUid == uid) {
                     _savedVehicles.value = merged
                     _legacyVehicleImportAvailable.value = false
@@ -508,8 +514,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun persistSavedVehicleProfiles(
         profiles: List<SavedVehicleProfile>,
-        ownerUid: String? = authenticatedAccountUid
-    ) {
+        ownerUid: String? = authenticatedAccountUid,
+        durable: Boolean = false
+    ): Boolean {
         val array = JSONArray()
         profiles.forEach { saved ->
             array.put(
@@ -525,7 +532,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
         }
-        accountVehiclePreferences(ownerUid).edit { putString("saved_vehicle_profiles", array.toString()) }
+        val editor = accountVehiclePreferences(ownerUid).edit()
+            .putString("saved_vehicle_profiles", array.toString())
+        if (durable) return editor.commit()
+        editor.apply()
+        return true
     }
 
     fun saveCurrentVehicle(name: String) {
