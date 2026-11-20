@@ -1,5 +1,5 @@
 name: Android CI
-# Force one complete validation after the transport compile fix; normal draft builds remain checkpointed.
+# Manual full validation is available on demand; draft validation remains checkpointed.
 
 # Intentionally no push or pull_request trigger.
 # Validation is started manually at the 50-commit checkpoint, not per commit.
@@ -195,7 +195,7 @@ jobs:
     if: always() && (github.event_name == 'workflow_dispatch' || needs.evaluate-build-checkpoint.outputs.build_required == 'true')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout pull request commit
+      - name: Checkout requested validation commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.target_ref || github.event.pull_request.head.sha }}
