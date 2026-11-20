@@ -28,7 +28,7 @@ object CanConsoleRecordParser {
                 val identifier = frame.canId.toString(16).uppercase().padStart(
                     if (frame.isExtended) 8 else 3, '0'
                 )
-                val payload = frame.data.joinToString(" ") {
+                val payload = if (frame.data.isEmpty()) "(empty)" else frame.data.joinToString(" ") {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
                 ParsedCanConsoleRecord(
