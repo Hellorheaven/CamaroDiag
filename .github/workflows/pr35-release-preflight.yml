@@ -1,10 +1,5 @@
 name: PR54 Release size and compatibility checkpoint
 on:
-  push:
-    branches:
-      - feat/flexfuel-lfx-2012
-    paths:
-      - .github/workflows/pr35-release-preflight.yml
   workflow_dispatch:
 permissions:
   contents: read
