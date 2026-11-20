@@ -100,9 +100,23 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
                         .addOnCompleteListener { task ->
                             busy = false
                             if (task.isSuccessful) {
-                                auth.currentUser?.sendEmailVerification()
-                                message = if (french) "Compte créé. Vérifiez votre boîte e-mail."
-                                else "Account created. Check your email for verification."
+                                val registeredUser = auth.currentUser
+                                if (registeredUser == null) {
+                                    finishError()
+                                } else {
+                                    // Do not claim the verification email was sent before
+                                    // Firebase confirms the request actually succeeded.
+                                    registeredUser.sendEmailVerification().addOnCompleteListener { sent ->
+                                        if (auth.currentUser?.uid != registeredUser.uid) return@addOnCompleteListener
+                                        message = if (sent.isSuccessful) {
+                                            if (french) "Compte créé. Vérifiez votre boîte e-mail."
+                                            else "Account created. Check your email for verification."
+                                        } else {
+                                            if (french) "Compte créé, mais l'envoi de l'e-mail a échoué. Réessayez depuis l'écran de vérification."
+                                            else "Account created, but the verification email could not be sent. Retry from the verification screen."
+                                        }
+                                    }
+                                }
                             } else finishError()
                         }
                 } else {
