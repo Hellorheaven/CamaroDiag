@@ -27,3 +27,4 @@
 - Les commandes USB et Wi-Fi sont désormais immédiatement refusées après une coupure détectée, sans tenter de continuer sur une liaison perdue.
 - L'historique chronologique RX/TX et le texte déjà capturé restent consultables après une déconnexion ou un changement d'adaptateur ; seul l'effacement demandé par l'utilisateur les supprime.
 - Les échanges Bluetooth classiques signalent explicitement une connexion fermée ou une fin de flux, au lieu de traiter ces situations comme une réponse valide.
+- Le message de connexion perdue précise désormais si la liaison concernée est Bluetooth, USB, Wi-Fi ou pont PC.
