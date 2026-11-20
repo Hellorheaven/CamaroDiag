@@ -19,4 +19,14 @@
     <string name="tab_guide">Opas</string>
     <string name="tab_controls">Ohjaus</string>
     <string name="tab_settings">Asetukset</string>
+    <string name="common_connect">Yhdistä</string>
+    <string name="common_refresh">Päivitä</string>
+    <string name="status_offline">Ei yhteyttä</string>
+    <string name="obd_not_available">Ei saatavilla</string>
+    <string name="obd_run_full_scan">Suorita täysi skannaus</string>
+    <string name="obd_vin">VIN</string>
+    <string name="obd_protocol">Protokolla</string>
+    <string name="obd_dtc_title">Vikakoodit</string>
+    <string name="obd_adapter_voltage">Sovittimen jännite</string>
+    <string name="obd_supported_pids">Tuetut PID-tunnukset</string>
 </resources>
