@@ -2337,7 +2337,23 @@ fun SettingsScreen(
         AppLanguage.IT to "🇮🇹", AppLanguage.ES to "🇪🇸", AppLanguage.HE to "🇮🇱",
         AppLanguage.RU to "🇷🇺", AppLanguage.ZH to "🇨🇳", AppLanguage.JA to "🇯🇵",
         AppLanguage.KO to "🇰🇷", AppLanguage.AR to "🇸🇦", AppLanguage.PT to "🇵🇹",
-        AppLanguage.NL to "🇳🇱", AppLanguage.EL to "🇬🇷"
+        AppLanguage.NL to "🇳🇱", AppLanguage.EL to "🇬🇷",
+        AppLanguage.BG to "🇧🇬",
+        AppLanguage.HR to "🇭🇷",
+        AppLanguage.CS to "🇨🇿",
+        AppLanguage.DA to "🇩🇰",
+        AppLanguage.ET to "🇪🇪",
+        AppLanguage.FI to "🇫🇮",
+        AppLanguage.HU to "🇭🇺",
+        AppLanguage.GA to "🇮🇪",
+        AppLanguage.LV to "🇱🇻",
+        AppLanguage.LT to "🇱🇹",
+        AppLanguage.MT to "🇲🇹",
+        AppLanguage.PL to "🇵🇱",
+        AppLanguage.RO to "🇷🇴",
+        AppLanguage.SK to "🇸🇰",
+        AppLanguage.SL to "🇸🇮",
+        AppLanguage.SV to "🇸🇪"
     )
     val currentVehicle = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.transmission.code} • ${vehicle.market.code} • ${vehicle.vin.ifBlank { "VIN —" }}"
     val currentAdapter = if (adapter.tier == AdapterTier.DISCONNECTED) {
