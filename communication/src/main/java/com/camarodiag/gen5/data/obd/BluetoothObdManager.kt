@@ -15,6 +15,8 @@ import com.camarodiag.gen5.data.obd.ObdCommandChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -330,7 +332,7 @@ class BluetoothObdManager(context: Context) {
      * PID polling or another diagnostic request cannot corrupt the monitor stream.
      */
     suspend fun captureCanMonitor(
-        durationMs: Long = 10_000L,
+        durationMs: Long = Long.MAX_VALUE,
         onChunk: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
@@ -342,8 +344,8 @@ class BluetoothObdManager(context: Context) {
         check(capabilities.supportsCanHeaders) {
             "The connected adapter does not report CAN header support."
         }
-        require(durationMs in 1_000L..30_000L) {
-            "CAN monitor duration must be between 1 and 30 seconds."
+        require(durationMs >= 1_000L) {
+            "CAN monitor duration must be at least one second."
         }
 
         commandSessionMutex.withLock {
@@ -353,10 +355,10 @@ class BluetoothObdManager(context: Context) {
                 sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk)
             val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
             // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
-            // STM uses the current filter table, so clear it for this bounded session and restore
+            // STM uses the current filter table, so clear it for this session and restore
             // automatic OBD filtering after the capture.
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
-            val captured = StringBuilder()
+            val captured = CanCaptureTextBuffer()
             try {
                 boundCommand("ATE0", 1_000L)
                 boundCommand("ATL0", 1_000L)
@@ -379,9 +381,6 @@ class BluetoothObdManager(context: Context) {
                     }
                 }
                 val monitorResponse = boundCommand(monitorCommand, durationMs) { chunk ->
-                    check(captured.length + chunk.length <= 131_072) {
-                        "CAN monitor capture exceeded the 128 KiB safety limit."
-                    }
                     captured.append(chunk)
                     onChunk(chunk)
                 }
@@ -406,7 +405,7 @@ class BluetoothObdManager(context: Context) {
                     runCatching { boundCommand("ATCAF1", 1_000L) }
                 }
             }
-            captured.toString()
+            captured.snapshot()
         }
     }
 
@@ -512,7 +511,9 @@ class BluetoothObdManager(context: Context) {
             if (expectedEpoch != null) transportSessionEpoch.requireQueuedCurrent(expectedEpoch)
             val sessionEpoch = expectedEpoch ?: transportSessionEpoch.capture()
             val sessionTransport = activeTransport
+            val commandContext = currentCoroutineContext()
             fun ensureSameSession() {
+                commandContext.ensureActive()
                 transportSessionEpoch.requireCurrent(sessionEpoch)
                 if (activeTransport != sessionTransport) {
                     throw ObdTransportDisconnectedException("OBD connection changed during command")
@@ -532,7 +533,9 @@ class BluetoothObdManager(context: Context) {
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                         val payloadChunk = chunk.substringBefore('>')
-                        buffer.append(payloadChunk)
+                        if (buffer.length < 1024 || onChunk == null) {
+                            buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
+                        }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
                         if (chunk.contains('>')) { promptReceived = true; break }
                     } else if (n < 0) {
@@ -554,7 +557,9 @@ class BluetoothObdManager(context: Context) {
                     if (n > 0) {
                         val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                         val payloadChunk = chunk.substringBefore('>')
-                        buffer.append(payloadChunk)
+                        if (buffer.length < 1024 || onChunk == null) {
+                            buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
+                        }
                         if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
                         if (chunk.contains('>')) { promptReceived = true; break }
                     } else delay(10)
@@ -575,7 +580,9 @@ class BluetoothObdManager(context: Context) {
                         if (n > 0) {
                             val chunk = String(bytes, 0, n, Charsets.US_ASCII)
                             val payloadChunk = chunk.substringBefore('>')
-                            buffer.append(payloadChunk)
+                            if (buffer.length < 1024 || onChunk == null) {
+                            buffer.append(if (onChunk == null) payloadChunk else payloadChunk.take(1024 - buffer.length))
+                        }
                             if (payloadChunk.isNotEmpty()) onChunk?.invoke(payloadChunk)
                             if (chunk.contains('>')) { promptReceived = true; break }
                         } else if (n < 0) {
@@ -618,7 +625,7 @@ class BluetoothObdManager(context: Context) {
                             if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                             break
                         }
-                        buffer.append(char)
+                        if (buffer.length < 1024 || onChunk == null) buffer.append(char)
                         callbackBuffer.append(char)
                         if (char == '\r' || char == '\n' || callbackBuffer.length >= 128) {
                             onChunk?.invoke(callbackBuffer.toString())

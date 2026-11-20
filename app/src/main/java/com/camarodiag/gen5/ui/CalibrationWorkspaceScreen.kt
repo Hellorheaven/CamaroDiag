@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
@@ -56,6 +57,10 @@ import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
+import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
+import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
+import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
+import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
@@ -67,6 +72,8 @@ import com.camarodiag.gen5.domain.model.VehicleVinComparison
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
     val ecuVinResponse: String = "",
+    /** Origin of the captured identity; never infer origin from the CURRENT adapter state. */
+    val ecuIdentityFromSimulation: Boolean = false,
     val vinComparison: VehicleVinComparison? = null,
     val vinModelYear: Int? = null,
     val ecuNameResponse: String = "",
@@ -111,6 +118,9 @@ data class CalibrationWorkspaceState(
     val comparisonMissingBytes: Long? = null,
     val comparisonRanges: List<String> = emptyList(),
     val comparisonIdentical: Boolean? = null,
+    val partialWriteSummary: String? = null,
+    val partialWriteChangedBytes: Long? = null,
+    val partialWriteSectorAddresses: List<String> = emptyList(),
     val activeFilePath: String? = null,
     val mapDefinitions: List<CalibrationMapDefinition> = emptyList(),
     val selectedMapId: String? = null,
@@ -190,6 +200,7 @@ fun CalibrationWorkspaceScreen(
     ecmType: String,
     isConnected: Boolean,
     onReadIdentification: () -> Unit,
+    onExportIdentification: () -> Unit,
     onCreateVehicleFromEcuVin: (String) -> Unit,
     onSyncVehicleVinFromEcu: (String) -> Unit,
     onReadUdsDid: (String, String, String, String) -> Unit,
@@ -201,6 +212,7 @@ fun CalibrationWorkspaceScreen(
     onImportFile: () -> Unit,
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
+    onPreviewPartialWrite: (Long, Int, Int) -> Unit,
     onImportDefinitions: () -> Unit,
     onExportDefinitionTemplate: () -> Unit,
     onSelectMap: (String) -> Unit,
@@ -217,6 +229,17 @@ fun CalibrationWorkspaceScreen(
     var j2534Host by remember { mutableStateOf("192.168.1.100") }
     var j2534Port by remember { mutableStateOf("35001") }
     var j2534Token by remember { mutableStateOf("") }
+    var expertExpanded by remember { mutableStateOf(false) }
+    var expertControllerFamily by remember { mutableStateOf("") }
+    var expertChipMarking by remember { mutableStateOf("") }
+    var expertProgrammerName by remember { mutableStateOf("") }
+    var patchStartHex by remember { mutableStateOf("") }
+    var patchEraseBytes by remember { mutableStateOf("") }
+    var patchProgramBytes by remember { mutableStateOf("") }
+    var expertAccessMethod by remember { mutableStateOf(EcuBenchExpertPlan.AccessMethod.BOOT_BAM) }
+    var expertMemoryRegion by remember { mutableStateOf(EcuBenchExpertPlan.MemoryRegion.PFLASH) }
+    var expertAccessMenuExpanded by remember { mutableStateOf(false) }
+    var expertRegionMenuExpanded by remember { mutableStateOf(false) }
     var obdbSignalSearch by remember { mutableStateOf("") }
     var obdbSignalMenuExpanded by remember { mutableStateOf(false) }
     var showVinMismatchDialog by remember { mutableStateOf(false) }
@@ -258,6 +281,168 @@ fun CalibrationWorkspaceScreen(
                     } ?: stringResource(R.string.cal_engine_profile_missing),
                     color = CamaroAmber, fontSize = 12.sp
                 )
+            }
+        }
+        if (vehicle.modelYear == 2012 && vehicle.engine.rpo == "LFX") {
+            item {
+                val unavailable = stringResource(R.string.obd_not_available)
+                val recognizedEcuName = state.ecuNameResponse.trim()
+                    .takeIf { it != unavailable && Lfx2012ControllerReferences.hasCandidateE39FamilyLabel(it) }
+                val reportedCalibrationId = state.calibrationIdResponse.trim()
+                    .takeIf { it.isNotBlank() && it != unavailable }
+                val completeReadOnlyFingerprint =
+                    Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+                        Lfx2012ControllerReferences.ObservedIdentity(
+                            ecuName = recognizedEcuName,
+                            calibrationIds = listOf(state.calibrationIdResponse),
+                            calibrationVerificationNumbers = listOf(state.cvnResponse),
+                            simulated = state.ecuIdentityFromSimulation
+                        )
+                    )
+                val responderAttribution =
+                    Lfx2012ControllerReferences.classifyResponderAttribution(state.respondingEcuAddresses)
+                val ecuVin = state.ecuVinResponse.trim().uppercase()
+                    .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                val evidence = Lfx2012FlexFuelPreflight.Evidence(
+                    controllerId = recognizedEcuName,
+                    firmwareId = reportedCalibrationId,
+                    verifiedFirmware = false,
+                    originalBackupVerified = false,
+                    recoveryVerified = false
+                )
+                val missing = Lfx2012FlexFuelPreflight.missingPreconditions(
+                    vehicle = Lfx2012FlexFuelPreflight.Vehicle(
+                        modelYear = vehicle.modelYear,
+                        engineCode = vehicle.engine.rpo,
+                        generation = 5,
+                        selectedVin = vehicle.vin,
+                        ecuVin = ecuVin
+                    ),
+                    evidence = evidence
+                )
+                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.flexfuel_lfx2012_title),
+                            color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.flexfuel_lfx2012_parts,
+                            Lfx2012ControllerReferences.controllerFamily,
+                            Lfx2012ControllerReferences.currentServicePart,
+                            Lfx2012ControllerReferences.supersededServicePart),
+                            color = TextPrimary, fontSize = 12.sp)
+                        Text(stringResource(R.string.flexfuel_lfx2012_parts_warning),
+                            color = TextMuted, fontSize = 11.sp)
+                        Text(stringResource(R.string.flexfuel_lfx2012_calid_label,
+                            reportedCalibrationId ?: unavailable),
+                            color = TextMuted, fontSize = 11.sp)
+                        if (state.ecuIdentityFromSimulation) {
+                            Text(
+                                stringResource(R.string.flexfuel_lfx2012_simulation_warning),
+                                color = WarnRed,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (!completeReadOnlyFingerprint) {
+                            Text(stringResource(R.string.flexfuel_lfx2012_fingerprint_incomplete),
+                                color = WarnRed, fontSize = 11.sp)
+                        }
+                        if (state.respondingEcuAddresses.isNotEmpty() || completeReadOnlyFingerprint) {
+                            val responderNotice = when (responderAttribution) {
+                                Lfx2012ControllerReferences.ResponderAttribution.NO_VALID_CAN_ADDRESS ->
+                                    R.string.flexfuel_lfx2012_responder_unknown
+                                Lfx2012ControllerReferences.ResponderAttribution.SINGLE_ADDRESS_OBSERVED ->
+                                    R.string.flexfuel_lfx2012_responder_single
+                                Lfx2012ControllerReferences.ResponderAttribution.MULTIPLE_ADDRESSES_OBSERVED ->
+                                    R.string.flexfuel_lfx2012_responder_multiple
+                            }
+                            Text(
+                                stringResource(responderNotice),
+                                color = if (responderAttribution ==
+                                    Lfx2012ControllerReferences.ResponderAttribution.SINGLE_ADDRESS_OBSERVED)
+                                    TextMuted else WarnRed,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Text(stringResource(R.string.flexfuel_lfx2012_boot,
+                            Lfx2012ControllerReferences.associatedMainBootFile),
+                            color = TextMuted, fontSize = 11.sp)
+                        Text(stringResource(R.string.flexfuel_lfx2012_checks),
+                            color = CamaroAmber, fontWeight = FontWeight.SemiBold)
+                        missing.forEach { missingRequirement ->
+                            val labelId = when (missingRequirement) {
+                                Lfx2012FlexFuelPreflight.Status.VEHICLE_NOT_SELECTED ->
+                                    R.string.flexfuel_preflight_vehicle_missing
+                                Lfx2012FlexFuelPreflight.Status.WRONG_VEHICLE ->
+                                    R.string.flexfuel_preflight_wrong_vehicle
+                                Lfx2012FlexFuelPreflight.Status.VIN_MISMATCH ->
+                                    R.string.flexfuel_preflight_vin
+                                Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_MISSING ->
+                                    R.string.flexfuel_preflight_ecu
+                                Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_UNVERIFIED ->
+                                    R.string.flexfuel_preflight_ecu_unverified
+                                Lfx2012FlexFuelPreflight.Status.FIRMWARE_NOT_VERIFIED ->
+                                    R.string.flexfuel_preflight_firmware
+                                Lfx2012FlexFuelPreflight.Status.ORIGINAL_BACKUP_MISSING ->
+                                    R.string.flexfuel_preflight_backup
+                                Lfx2012FlexFuelPreflight.Status.RECOVERY_NOT_VERIFIED ->
+                                    R.string.flexfuel_preflight_recovery
+                                Lfx2012FlexFuelPreflight.Status.WRITE_NOT_VALIDATED ->
+                                    R.string.flexfuel_preflight_write
+                            }
+                            Text("• " + stringResource(labelId),
+                                color = WarnRed, fontSize = 11.sp)
+                        }
+                        val audit = Lfx2012ProgrammingAudit.review(
+                            before = Lfx2012ProgrammingAudit.Snapshot(
+                                vin = ecuVin,
+                                ecuName = recognizedEcuName,
+                                calibrationIds = state.calibrationIdResponse.lines()
+                                    .filter(String::isNotBlank),
+                                verificationNumbers = state.cvnResponse.lines()
+                                    .filter(String::isNotBlank),
+                                dtcs = null,
+                                voltage = null,
+                                communicationConfirmed = state.respondingEcuAddresses.isNotEmpty(),
+                                functionalCheckPassed = null,
+                                oemRelearnReviewed = false,
+                                capturedAtUtcMillis = 0L
+                            ),
+                            after = null
+                        )
+                        Text(stringResource(R.string.flexfuel_lfx2012_audit_title),
+                            color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(
+                                R.string.flexfuel_lfx2012_audit_summary,
+                                audit.before.count {
+                                    it.status == Lfx2012ProgrammingAudit.CheckStatus.OBSERVED
+                                },
+                                audit.before.size
+                            ),
+                            color = TextMuted, fontSize = 11.sp
+                        )
+                        Text(stringResource(R.string.flexfuel_lfx2012_audit_post_not_performed),
+                            color = WarnRed, fontSize = 11.sp)
+                        OutlinedButton(
+                            onClick = onReadIdentification,
+                            enabled = isConnected && !state.isReading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.cal_read_ecu_ids))
+                        }
+                        OutlinedButton(
+                            onClick = onExportIdentification,
+                            enabled = !state.isReading &&
+                                (state.ecuVinResponse.isNotBlank() ||
+                                    state.calibrationIdResponse.isNotBlank() ||
+                                    state.cvnResponse.isNotBlank()),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.flexfuel_lfx2012_export_fingerprint))
+                        }
+                    }
+                }
             }
         }
         item {
@@ -877,19 +1062,19 @@ fun CalibrationWorkspaceScreen(
                                     color = TextMuted,
                                     fontSize = 10.sp
                                 )
-                                Row(
-                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                LazyRow(
+                                    modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Text("X", modifier = Modifier.width(48.dp), color = CamaroAmber, fontSize = 10.sp)
-                                    state.mapXAxisValues.forEach { axisValue ->
-                                        Text(
-                                            axisValue,
-                                            modifier = Modifier.width(88.dp),
+                                    item {
+                                        Text("X", modifier = Modifier.width(48.dp),
+                                            color = CamaroAmber, fontSize = 10.sp)
+                                    }
+                                    itemsIndexed(state.mapXAxisValues) { _, axisValue ->
+                                        Text(axisValue, modifier = Modifier.width(88.dp),
                                             color = CamaroAmber,
                                             fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp
-                                        )
+                                            fontSize = 10.sp)
                                     }
                                 }
                             }
@@ -898,19 +1083,22 @@ fun CalibrationWorkspaceScreen(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 itemsIndexed(state.mapValues) { rowIndex, rowValues ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    LazyRow(
+                                        modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            state.mapYAxisValues.getOrNull(rowIndex) ?: "%02d".format(rowIndex),
-                                            modifier = Modifier.width(48.dp),
-                                            color = CamaroAmber,
-                                            fontSize = 10.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        rowValues.forEachIndexed { columnIndex, value ->
+                                        item {
+                                            Text(
+                                                state.mapYAxisValues.getOrNull(rowIndex)
+                                                    ?: "%02d".format(rowIndex),
+                                                modifier = Modifier.width(48.dp),
+                                                color = CamaroAmber,
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                        itemsIndexed(rowValues, key = { columnIndex, _ -> columnIndex }) { columnIndex, value ->
                                             OutlinedTextField(
                                                 value = value,
                                                 onValueChange = { onCellChange(rowIndex, columnIndex, it) },
@@ -967,6 +1155,186 @@ fun CalibrationWorkspaceScreen(
                         stringResource(R.string.cal_no_calibration_write),
                         color = CamaroAmber, fontSize = 12.sp
                     )
+                }
+            }
+        }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Column(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.Icon(Icons.Default.Memory, contentDescription = null, tint = CamaroAmber)
+                        Text(stringResource(R.string.cal_expert_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    }
+                    Text(stringResource(R.string.cal_expert_intro), color = TextMuted, fontSize = 12.sp)
+                    OutlinedButton(onClick = { expertExpanded = !expertExpanded }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (expertExpanded) R.string.cal_expert_collapse else R.string.cal_expert_expand))
+                    }
+                    if (expertExpanded) {
+                        OutlinedTextField(
+                            value = expertControllerFamily,
+                            onValueChange = { expertControllerFamily = it.uppercase().take(24) },
+                            label = { Text(stringResource(R.string.cal_expert_family)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = expertChipMarking,
+                            onValueChange = { expertChipMarking = it.take(64) },
+                            label = { Text(stringResource(R.string.cal_expert_chip)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = expertProgrammerName,
+                            onValueChange = { expertProgrammerName = it.take(64) },
+                            label = { Text(stringResource(R.string.cal_expert_programmer)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(stringResource(R.string.cal_expert_access_title), color = TextPrimary)
+                        Box {
+                            OutlinedButton(onClick = { expertAccessMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(when (expertAccessMethod) {
+                                    EcuBenchExpertPlan.AccessMethod.OBD -> R.string.cal_expert_access_obd
+                                    EcuBenchExpertPlan.AccessMethod.BENCH -> R.string.cal_expert_access_bench
+                                    EcuBenchExpertPlan.AccessMethod.BOOT_BAM -> R.string.cal_expert_access_boot
+                                    EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG -> R.string.cal_expert_access_nexus
+                                    EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF -> R.string.cal_expert_access_chipoff
+                                }))
+                            }
+                            DropdownMenu(
+                                expanded = expertAccessMenuExpanded,
+                                onDismissRequest = { expertAccessMenuExpanded = false }
+                            ) {
+                                listOf(
+                                    EcuBenchExpertPlan.AccessMethod.OBD to R.string.cal_expert_access_obd,
+                                    EcuBenchExpertPlan.AccessMethod.BENCH to R.string.cal_expert_access_bench,
+                                    EcuBenchExpertPlan.AccessMethod.BOOT_BAM to R.string.cal_expert_access_boot,
+                                    EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG to R.string.cal_expert_access_nexus,
+                                    EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF to R.string.cal_expert_access_chipoff
+                                ).forEach { (method, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(label)) },
+                                        onClick = { expertAccessMethod = method; expertAccessMenuExpanded = false }
+                                    )
+                                }
+                            }
+                        }
+                        Text(stringResource(R.string.cal_expert_region_title), color = TextPrimary)
+                        Box {
+                            OutlinedButton(onClick = { expertRegionMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(when (expertMemoryRegion) {
+                                    EcuBenchExpertPlan.MemoryRegion.PFLASH -> R.string.cal_expert_region_pflash
+                                    EcuBenchExpertPlan.MemoryRegion.DFLASH -> R.string.cal_expert_region_dflash
+                                    EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM -> R.string.cal_expert_region_eeprom
+                                }))
+                            }
+                            DropdownMenu(
+                                expanded = expertRegionMenuExpanded,
+                                onDismissRequest = { expertRegionMenuExpanded = false }
+                            ) {
+                                listOf(
+                                    EcuBenchExpertPlan.MemoryRegion.PFLASH to R.string.cal_expert_region_pflash,
+                                    EcuBenchExpertPlan.MemoryRegion.DFLASH to R.string.cal_expert_region_dflash,
+                                    EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM to R.string.cal_expert_region_eeprom
+                                ).forEach { (region, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(label)) },
+                                        onClick = { expertMemoryRegion = region; expertRegionMenuExpanded = false }
+                                    )
+                                }
+                            }
+                        }
+                        val expertTarget = EcuBenchExpertPlan.Target(
+                            controllerFamily = expertControllerFamily.trim(),
+                            chipMarking = expertChipMarking.trim(),
+                            programmerName = expertProgrammerName.trim(),
+                            accessMethod = expertAccessMethod,
+                            region = expertMemoryRegion
+                        )
+                        val candidateImage = state.importedFileName?.let {
+                            EcuBenchExpertPlan.CandidateImage(
+                                fileName = it,
+                                format = state.inspectionFormat,
+                                sizeBytes = state.importedFileSize,
+                                sha256 = state.importedFileSha256
+                            )
+                        }
+                        Text(
+                            candidateImage?.let { stringResource(R.string.cal_expert_image_selected, it.fileName.orEmpty()) }
+                                ?: stringResource(R.string.cal_expert_image_none),
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                        Text(stringResource(R.string.cal_expert_patch_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.cal_expert_patch_warning), color = TextMuted, fontSize = 11.sp)
+                        OutlinedTextField(
+                            value = patchStartHex,
+                            onValueChange = { patchStartHex = it.take(16) },
+                            label = { Text(stringResource(R.string.cal_expert_patch_address)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = patchEraseBytes,
+                            onValueChange = { patchEraseBytes = it.take(10) },
+                            label = { Text(stringResource(R.string.cal_expert_patch_erase_bytes)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                        OutlinedTextField(
+                            value = patchProgramBytes,
+                            onValueChange = { patchProgramBytes = it.take(10) },
+                            label = { Text(stringResource(R.string.cal_expert_patch_program_bytes)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                onPreviewPartialWrite(
+                                    patchStartHex.trim().removePrefix("0x").removePrefix("0X")
+                                        .toLongOrNull(16) ?: -1L,
+                                    patchEraseBytes.toIntOrNull() ?: 0,
+                                    patchProgramBytes.toIntOrNull() ?: 0
+                                )
+                            },
+                            enabled = state.importedFilePath != null &&
+                                state.comparisonFilePath != null,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.cal_expert_patch_preview_button))
+                        }
+                        state.partialWriteSummary?.let { summary ->
+                            Text(summary, color = CamaroAmber, fontSize = 11.sp)
+                            state.partialWriteSectorAddresses.forEach { address ->
+                                Text(address, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                            }
+                        }
+                        Text(stringResource(R.string.cal_expert_identity_notice), color = CamaroAmber, fontSize = 11.sp)
+                        Text(stringResource(R.string.cal_expert_blockers), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                        EcuBenchExpertPlan.blockers(expertTarget, candidateImage).forEach { blocker ->
+                            val label = when (blocker) {
+                                EcuBenchExpertPlan.Blocker.CONTROLLER_NOT_IDENTIFIED -> R.string.cal_expert_block_controller
+                                EcuBenchExpertPlan.Blocker.CHIP_NOT_IDENTIFIED -> R.string.cal_expert_block_chip
+                                EcuBenchExpertPlan.Blocker.ACCESS_REGION_INCOMPATIBLE -> R.string.cal_expert_block_access_region
+                                EcuBenchExpertPlan.Blocker.PROGRAMMER_NOT_IDENTIFIED -> R.string.cal_expert_block_programmer
+                                EcuBenchExpertPlan.Blocker.IMAGE_MISSING -> R.string.cal_expert_block_image_missing
+                                EcuBenchExpertPlan.Blocker.IMAGE_NOT_RAW_BINARY -> R.string.cal_expert_block_image_format
+                                EcuBenchExpertPlan.Blocker.IMAGE_INTEGRITY_MISSING -> R.string.cal_expert_block_image_integrity
+                                EcuBenchExpertPlan.Blocker.ORIGINAL_READBACK_NOT_VERIFIED -> R.string.cal_expert_block_readback
+                                EcuBenchExpertPlan.Blocker.RECOVERY_PATH_NOT_VERIFIED -> R.string.cal_expert_block_recovery
+                                EcuBenchExpertPlan.Blocker.MEMORY_MAP_NOT_VERIFIED -> R.string.cal_expert_block_memory_map
+                                EcuBenchExpertPlan.Blocker.HARDWARE_PROGRAMMING_DRIVER_UNAVAILABLE -> R.string.cal_expert_block_driver
+                            }
+                            Text("• " + stringResource(label), color = WarnRed, fontSize = 11.sp)
+                        }
+                    }
+                    Text(stringResource(R.string.cal_expert_no_write), color = CamaroAmber, fontSize = 11.sp)
                 }
             }
         }

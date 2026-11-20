@@ -36,7 +36,7 @@ import java.util.Locale
 fun CamaroAuthGate(
     onAccountChanged: (String?) -> Unit,
     onAccountDeleted: (String) -> Unit,
-    content: @Composable () -> Unit
+    content: @Composable (onOpenAccount: () -> Unit) -> Unit
 ) {
     val auth = remember { FirebaseAuth.getInstance() }
     val context = LocalContext.current
@@ -174,13 +174,9 @@ fun CamaroAuthGate(
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         val french = remember { Locale.getDefault().language == "fr" }
-        Box {
-            content()
-            TextButton(
-                onClick = { accountOpen = true },
-                modifier = Modifier.align(Alignment.TopEnd)
-            ) { Text(if (french) "Mon compte" else "My account") }
-        }
+        // Account action belongs to the app's TopAppBar; an overlay here would
+        // overlap system bars and the title on narrow Android 15/16 devices.
+        content { accountOpen = true }
         if (accountOpen) {
             val googleLinked = remember(user, accountRevision) {
                 user.providerData.any { it.providerId == "google.com" }

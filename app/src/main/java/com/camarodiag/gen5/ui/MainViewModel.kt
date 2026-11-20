@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.camarodiag.gen5.data.db.DiagnosticDatabase
 import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
+import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
 import com.camarodiag.gen5.auth.AccountStorageKeys
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
@@ -18,6 +19,7 @@ import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
+import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
@@ -92,6 +94,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         started == accountSessionGeneration && authenticatedAccountUid != null
 
     private val _activeAccountUid = MutableStateFlow(authenticatedAccountUid)
+    val activeAccountUid: StateFlow<String?> = _activeAccountUid.asStateFlow()
 
     /**
      * Keep existing pre-authentication vehicles untouched in the legacy settings.
@@ -769,6 +772,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveTelemetryMessage.value = null
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             ecuVinResponse = "",
+            ecuIdentityFromSimulation = false,
             vinComparison = null,
             vinModelYear = null,
             ecuNameResponse = "",
@@ -787,6 +791,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _liveCanMonitorState = MutableStateFlow(LiveCanMonitorState())
     val liveCanMonitorState: StateFlow<LiveCanMonitorState> = _liveCanMonitorState.asStateFlow()
     private var canMonitorJob: Job? = null
+    /** Complete raw recording on private storage; rawText is only a bounded UI preview. */
+    @Volatile private var activeCanCaptureFile: File? = null
     private var canRequestJob: Job? = null
 
     private fun loadNativeCamaroSignalCatalog() {
@@ -1211,6 +1217,91 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Reads only standardized OBD Mode 09 calibration identifiers; this is not a binary map read. */
+    /**
+     * Export SAE Mode 09 identification only; this is explicitly NOT an ECU-memory
+     * backup and never grants any permission to write calibrations.
+     */
+    fun exportEcuIdentification(destinationUri: Uri) {
+        val accountUid = authenticatedAccountUid ?: return
+        val profile = _vehicle.value
+        val observation = _calibrationWorkspace.value
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (authenticatedAccountUid != accountUid) return@launch
+                require(
+                    observation.ecuVinResponse.isNotBlank() ||
+                        observation.calibrationIdResponse.isNotBlank() ||
+                        observation.cvnResponse.isNotBlank()
+                ) { "No observed ECU identity can be exported." }
+                val missing = getApplication<Application>().getString(R.string.obd_not_available)
+                fun reported(value: String): String? = value.trim().takeIf {
+                    it.isNotBlank() && !it.equals(missing, ignoreCase = true)
+                }
+                fun lines(value: String): JSONArray = JSONArray().apply {
+                    value.lines().map(String::trim).filter(String::isNotBlank)
+                        .filterNot { it.equals(missing, ignoreCase = true) }
+                        .forEach { put(it) }
+                }
+                val report = JSONObject().apply {
+                    put("format", "CamaroDiag-ecu-identity-v1")
+                    put("source", "SAE-J1979-Mode09-read-only")
+                    put("exportedAtUtcMillis", System.currentTimeMillis())
+                    put("vehicleYear", profile.modelYear)
+                    put("vehicleEngine", profile.engine.rpo)
+                    put("selectedVehicleVin", profile.vin)
+                    put("observedEcuVin", reported(observation.ecuVinResponse) ?: JSONObject.NULL)
+                    put("ecuNames", lines(observation.ecuNameResponse))
+                    put("calibrationIds", lines(observation.calibrationIdResponse))
+                    put("calibrationVerificationNumbers", lines(observation.cvnResponse))
+                    put("respondingCanAddresses", JSONArray(observation.respondingEcuAddresses))
+                    put("observationFromSimulation", observation.ecuIdentityFromSimulation)
+                    put(
+                        "responderAttribution",
+                        Lfx2012ControllerReferences
+                            .classifyResponderAttribution(observation.respondingEcuAddresses).name
+                    )
+                    // Mode 09 aggregated fields do not prove that each identifier
+                    // was returned by the same ECU, even with one responder address.
+                    put("calibrationIdCvnAttributionVerified", false)
+                    put(
+                        "observedFingerprintComplete",
+                        Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
+                            Lfx2012ControllerReferences.ObservedIdentity(
+                                ecuName = reported(observation.ecuNameResponse),
+                                calibrationIds = observation.calibrationIdResponse.lines(),
+                                calibrationVerificationNumbers = observation.cvnResponse.lines(),
+                                simulated = observation.ecuIdentityFromSimulation
+                            )
+                        )
+                    )
+                    put("ecuMemoryBackedUp", false)
+                    put("firmwareCompatibilityValidated", false)
+                    put("calibrationWritingPermitted", false)
+                }
+                if (authenticatedAccountUid != accountUid) return@launch
+                val output = getApplication<Application>().contentResolver
+                    .openOutputStream(destinationUri, "w")
+                    ?: error("Cannot create ECU identity report.")
+                output.use { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
+                if (authenticatedAccountUid == accountUid) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        message = getApplication<Application>()
+                            .getString(R.string.flexfuel_lfx2012_export_success)
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (authenticatedAccountUid == accountUid) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        message = getApplication<Application>()
+                            .getString(R.string.flexfuel_lfx2012_export_failed)
+                    )
+                }
+            }
+        }
+    }
+
     fun readCalibrationIdentification() {
         val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
@@ -1220,6 +1311,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
+                    ecuIdentityFromSimulation = false,
                     vinComparison = null,
                     vinModelYear = null,
                     ecuNameResponse = "",
@@ -1237,6 +1329,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isReading = true,
                 ecuVinResponse = "",
+                ecuIdentityFromSimulation = false,
                 vinComparison = null,
                 vinModelYear = null,
                 ecuNameResponse = "",
@@ -1246,6 +1339,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 message = ""
             )
             try {
+                val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
                 val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
                 if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                 val ecuVin = identity.vin
@@ -1255,6 +1349,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                    ecuIdentityFromSimulation = sourceWasSimulated ||
+                        obdManager.isSimulationActive || obdManager.isDemoMode,
                     vinComparison = vinComparison,
                     vinModelYear = VehicleVinMatcher.modelYearFromVin(ecuVin),
                     ecuNameResponse = identity.ecuNames.joinToString("\n"),
@@ -1274,6 +1370,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
+                    ecuIdentityFromSimulation = false,
                     vinComparison = null,
                     vinModelYear = null,
                     ecuNameResponse = "",
@@ -1383,10 +1480,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-    /** Starts a bounded, passive monitor session on a real header-capable ELM/STN adapter. */
-    fun startCanMonitor(durationMs: Long = 10_000L) {
-        if (canMonitorJob?.isActive == true || detachedCanMonitorJob?.isActive == true ||
-            canRequestJob?.isActive == true || detachedCanRequestJob?.isActive == true
+    /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
+    fun startCanMonitor(durationMs: Long = Long.MAX_VALUE) {
+        if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
+            canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
         ) return
         if (!obdManager.isObdCommandChannelAvailable || !_adapter.value.supportsCanHeaders) {
             val unavailable = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
@@ -1395,6 +1492,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         if (_liveCanMonitorState.value.isSendingRequest) return
+        // A cancelled-before-start session must not leave an earlier session's
+        // archive exportable as if it belonged to this recording.
+        activeCanCaptureFile?.delete()
+        activeCanCaptureFile = null
         val previousState = _liveCanMonitorState.value
         val startEvent = CanConsoleHistoryEntry(
             id = System.nanoTime(),
@@ -1416,11 +1517,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         monitorJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             val pendingChunks = StringBuilder()
             try {
-                val captured = obdManager.captureCanMonitor(durationMs) { chunk ->
+                // A quickly cancelled or superseded session must not create or claim a new archive.
+                if (canMonitorJob !== monitorJob || !currentCoroutineContext().isActive) return@launch
+                val archive = File.createTempFile("camarodiag-can-", ".log", getApplication<Application>().cacheDir)
+                val previousArchive = activeCanCaptureFile
+                activeCanCaptureFile = archive
+                previousArchive?.delete()
+                val captured = archive.bufferedWriter(Charsets.US_ASCII).use { writer ->
+                    obdManager.captureCanMonitor(durationMs) { chunk ->
                     if (canMonitorJob === monitorJob) {
+                        writer.write(chunk)
                         // Keep the raw stream unchanged, but decode only complete lines:
                         // Bluetooth/USB reads may split a CAN record at any character.
                         pendingChunks.append(chunk)
+                        // Protect long-running sessions from a malformed stream without line breaks.
+                        if (pendingChunks.length > 4096) pendingChunks.delete(0, pendingChunks.length - 4096)
                         val current = _liveCanMonitorState.value
                         val raw = (current.rawText + chunk).takeLast(131_072)
                         val pendingText = pendingChunks.toString()
@@ -1433,6 +1544,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val receiveEvents = parseCanConsoleReceiveEvents(completeBatch)
                         val history = (current.consoleHistory + receiveEvents).takeLast(300)
                         _liveCanMonitorState.value = current.copy(rawText = raw, consoleHistory = history)
+                    }
                     }
                 }
                 if (canMonitorJob === monitorJob) {
@@ -1477,9 +1589,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         timestampMillis = System.currentTimeMillis(),
                         content = getApplication<Application>().getString(R.string.can_sniffer_stop)
                     )
+                    val report = runCatching {
+                        CanTraceAnalyzer.analyze(
+                            raw.replace("\r\n", "\n").replace('\r', '\n'),
+                            "live-can-monitor.txt"
+                        )
+                    }.getOrNull()
                     _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
                         rawText = raw,
+                        report = report,
+                        message = stoppedEvent.content,
                         consoleHistory = (current.consoleHistory + stoppedEvent).takeLast(300)
                     )
                 }
@@ -1526,6 +1646,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var detachedCanRequestJob: Job? = null
 
     private fun discardCanMonitor() {
+        // A changed vehicle must never inherit the previous vehicle's raw archive.
+        activeCanCaptureFile?.delete()
+        activeCanCaptureFile = null
         val activeJob = canMonitorJob ?: return
         canMonitorJob = null
         detachedCanMonitorJob = activeJob
@@ -1546,7 +1669,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val current = _liveCanMonitorState.value
         // Keep an in-flight TX paired with its eventual RX/SYSTEM result.
         // The UI disables Clear while sending; this guard protects other callers too.
-        if (current.isSendingRequest) return
+        if (current.isSendingRequest || current.isCapturing) return
+        activeCanCaptureFile?.delete()
+        activeCanCaptureFile = null
         _liveCanMonitorState.value = current.copy(
             rawText = "",
             report = null,
@@ -1558,8 +1683,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun stopCanMonitor() {
         val activeJob = canMonitorJob ?: return
         activeJob.cancel()
-        // Do not detach here: the capture cleanup must send ESC before a
-        // new request is allowed to take over the adapter command channel.
+        // Leave capture marked active until ESC cleanup and the file writer have closed.
+        // If the lazy job was cancelled before entering its body, no finally block runs:
+        // the join fallback clears that case without enabling export too early.
+        viewModelScope.launch {
+            activeJob.join()
+            if (canMonitorJob === activeJob) {
+                canMonitorJob = null
+                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isCapturing = false)
+            }
+        }
+        // Do not detach: a later request must not overtake the adapter cleanup.
     }
 
     /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
@@ -1767,7 +1901,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val snapshot = _liveCanMonitorState.value
                 val history = snapshot.consoleHistory
-                require(history.isNotEmpty() || snapshot.rawText.isNotBlank()) {
+                val archive = activeCanCaptureFile?.takeIf { it.isFile }
+                require(history.isNotEmpty() || snapshot.rawText.isNotBlank() ||
+                    (archive?.length() ?: 0L) > 0L) {
                     "No CAN console history is available to export."
                 }
                 val outputText = buildString {
@@ -1785,15 +1921,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         append("] ")
                         appendLine(entry.content)
                     }
-                    if (snapshot.rawText.isNotBlank()) {
+                    if (archive != null || snapshot.rawText.isNotBlank()) {
                         appendLine()
                         appendLine("# RX RAW — received adapter stream (unmodified)")
-                        append(snapshot.rawText)
                     }
                 }
                 val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
                     ?: error("Could not create the CAN console history file.")
-                output.use { it.write(outputText.toByteArray(Charsets.UTF_8)) }
+                output.use { sink ->
+                    sink.write(outputText.toByteArray(Charsets.UTF_8))
+                    if (archive != null) {
+                        archive.inputStream().use { source -> source.copyTo(sink) }
+                    } else if (snapshot.rawText.isNotBlank()) {
+                        sink.write(snapshot.rawText.toByteArray(Charsets.UTF_8))
+                    }
+                }
                 _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
                     message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
                 )
@@ -1984,6 +2126,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonMissingBytes = null,
                     comparisonRanges = emptyList(),
                     comparisonIdentical = null,
+                    partialWriteSummary = null,
+                    partialWriteChangedBytes = null,
+                    partialWriteSectorAddresses = emptyList(),
                     message = getApplication<Application>().getString(R.string.msg_cal_file_imported)
                 )
             } catch (cancelled: CancellationException) {
@@ -2067,6 +2212,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     comparisonMissingBytes = comparison.missingBytes,
                     comparisonRanges = ranges,
                     comparisonIdentical = comparison.identical,
+                    partialWriteSummary = null,
+                    partialWriteChangedBytes = null,
+                    partialWriteSectorAddresses = emptyList(),
                     message = getApplication<Application>().getString(R.string.msg_cal_comparison_complete)
                 )
                 current.comparisonFilePath?.let { previousPath ->
@@ -2078,6 +2226,72 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 storedFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = getApplication<Application>().getString(R.string.msg_cal_comparison_failed)
+                )
+            }
+        }
+    }
+
+    /**
+     * Calculates a read-only preview of physical erase-sector impact.
+     * Geometry is user supplied and remains UNVERIFIED, even when the calculation succeeds.
+     */
+    fun previewPartialCalibrationWrite(
+        regionStartAddress: Long,
+        eraseBlockBytes: Int,
+        programBlockBytes: Int
+    ) {
+        val ownerGeneration = accountSessionGeneration
+        viewModelScope.launch(Dispatchers.IO) {
+            val snapshot = _calibrationWorkspace.value
+            try {
+                require(snapshot.inspectionFormat == "RAW_BINARY" &&
+                    snapshot.comparisonFilePath != null) { "Two raw BIN files are required." }
+                val original = File(
+                    snapshot.activeFilePath ?: snapshot.importedFilePath
+                    ?: error("No original image is available.")
+                )
+                val modified = File(snapshot.comparisonFilePath)
+                require(original.isFile && modified.isFile &&
+                    original.length() in 1..(32L * 1024 * 1024) &&
+                    modified.length() in 1..(32L * 1024 * 1024)
+                ) { "Unsupported or missing ECU image." }
+                val originalBytes = original.readBytes()
+                val modifiedBytes = modified.readBytes()
+                val plan = EcuPartialWritePlanner.preview(
+                    EcuPartialWritePlanner.Layout(
+                        regionStartAddress = regionStartAddress,
+                        regionSize = originalBytes.size.toLong(),
+                        eraseBlockBytes = eraseBlockBytes,
+                        programBlockBytes = programBlockBytes,
+                        mapVerifiedForTargetEcu = false
+                    ),
+                    originalBytes,
+                    modifiedBytes
+                )
+                if (!isCurrentAccountGeneration(ownerGeneration)) return@launch
+                if (_calibrationWorkspace.value.comparisonFilePath != snapshot.comparisonFilePath ||
+                    _calibrationWorkspace.value.importedFilePath != snapshot.importedFilePath
+                ) return@launch
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    partialWriteSummary = getApplication<Application>().getString(
+                        R.string.cal_expert_patch_summary,
+                        plan.changedBytes,
+                        plan.affectedSectors.size
+                    ),
+                    partialWriteChangedBytes = plan.changedBytes,
+                    partialWriteSectorAddresses = plan.affectedSectors.take(16).map {
+                        "0x" + it.absoluteAddress.toString(16).uppercase()
+                    }
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (!isCurrentAccountGeneration(ownerGeneration)) return@launch
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    partialWriteSummary = getApplication<Application>()
+                        .getString(R.string.cal_expert_patch_invalid),
+                    partialWriteChangedBytes = null,
+                    partialWriteSectorAddresses = emptyList()
                 )
             }
         }
@@ -2318,6 +2532,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             comparisonMissingBytes = null,
             comparisonRanges = emptyList(),
             comparisonIdentical = null,
+            partialWriteSummary = null,
+            partialWriteChangedBytes = null,
+            partialWriteSectorAddresses = emptyList(),
             message = ""
         )
     }
@@ -2493,6 +2710,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (attempt != connectionAttemptGeneration) return@launch
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     ecuVinResponse = "",
+                    ecuIdentityFromSimulation = false,
                     calibrationIdResponse = "",
                     cvnResponse = ""
                 )
@@ -2926,10 +3144,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Keep this request ahead of the initial scans to avoid competing for the ELM channel.
             viewModelScope.launch {
                 try {
+                    val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
                     val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
                     val comparison = VehicleVinMatcher.compare(_vehicle.value.vin, identity.vin)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = identity.vin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                        ecuIdentityFromSimulation = sourceWasSimulated ||
+                        obdManager.isSimulationActive || obdManager.isDemoMode,
                         vinComparison = comparison,
                         vinModelYear = VehicleVinMatcher.modelYearFromVin(identity.vin),
                         ecuNameResponse = identity.ecuNames.joinToString("\n"),
@@ -2950,6 +3171,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (connectionLost) reportConnectionLoss(error)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         ecuVinResponse = getApplication<Application>().getString(R.string.obd_not_available),
+                        ecuIdentityFromSimulation = false,
                         vinComparison = null,
                         vinModelYear = null,
                         ecuNameResponse = "",
@@ -2972,6 +3194,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var consecutiveFailures = 0
             var activeTelemetryBatch = 0
             val histories = mutableMapOf<String, ArrayDeque<Double>>()
+            val sensorRecency = LiveSignalRecency()
 
             fun push(id: String, value: Double): List<Double> {
                 val queue = histories.getOrPut(id) { ArrayDeque() }
@@ -3177,8 +3400,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     values += LivePidValue("BAT", "Control Module Voltage", "Tension calculateur", v, "V", v, "V", 9.0, 16.0, push("BAT", v))
                                 }
                                 val mergedValues = _livePids.value.associateBy { it.id }.toMutableMap()
-                                values.forEach { mergedValues[it.id] = it }
-                                _livePids.value = mergedValues.values.toList()
+                                val now = System.currentTimeMillis()
+                                values.forEach {
+                                    mergedValues[it.id] = it
+                                    sensorRecency.record(it.id, now)
+                                }
+                                _livePids.value = mergedValues.values.filter {
+                                    sensorRecency.isRecent(it.id, now)
+                                }
                                 valuesForRecording = values
                                 _liveTelemetryMessage.value = if (_livePids.value.isEmpty()) {
                                     getApplication<Application>().getString(R.string.msg_live_no_pid_response)

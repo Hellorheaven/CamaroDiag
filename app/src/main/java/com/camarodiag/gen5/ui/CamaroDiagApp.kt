@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.LocaleList
 import android.widget.Toast
+import androidx.core.content.edit
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -98,6 +100,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
     GUIDE("Guide", "Guide", R.string.tab_guide),
     CONTROL("Controls", "Pilotage", R.string.tab_controls),
+    ABOUT("About", "À propos", R.string.about_title),
     SETTINGS("Settings", "Réglages", R.string.tab_settings)
 }
 
@@ -149,7 +152,7 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CamaroDiagApp(viewModel: MainViewModel) {
+fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
     val lang by viewModel.language.collectAsState()
     val systemConfiguration = LocalConfiguration.current
     val localizedConfiguration = remember(systemConfiguration, lang) {
@@ -160,6 +163,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
     val savedVehicles by viewModel.savedVehicles.collectAsState()
+    val accountUid by viewModel.activeAccountUid.collectAsState()
     val legacyVehicleImportAvailable by viewModel.legacyVehicleImportAvailable.collectAsState()
     val selectedSavedVehicleId by viewModel.selectedSavedVehicleId.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
@@ -273,6 +277,12 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
         uri?.let { viewModel.exportCalibrationFile(it) }
     }
 
+    val ecuIdentityExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { viewModel.exportEcuIdentification(it) }
+    }
+
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
@@ -306,6 +316,10 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenAccount) {
+                        Icon(Icons.Default.AccountCircle,
+                            contentDescription = stringResource(R.string.app_account_action))
+                    }
                     when {
                         adapter.deviceName.contains("Demo", ignoreCase = true) ||
                             adapter.deviceName.contains("Simulated", ignoreCase = true) -> {
@@ -372,6 +386,7 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
+                        DiagTab.ABOUT,
                         DiagTab.SETUP,
                         DiagTab.ADAPTER
                     ),
@@ -396,7 +411,8 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.GUIDE,
-                        DiagTab.CONTROL
+                        DiagTab.CONTROL,
+                        DiagTab.ABOUT
                     ).forEach { tab ->
                         DropdownMenuItem(
                             text = {
@@ -511,6 +527,17 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     isStreaming = isStreaming,
                     recording = liveRecording,
                     telemetryMessage = liveTelemetryMessage,
+                    accountUid = accountUid,
+                    vehicleIdentity = selectedSavedVehicleId?.let { "garage_$it" }
+                        ?: vehicle.vin.trim().uppercase(Locale.ROOT)
+                            .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                            ?.let { "vin_$it" },
+                    catalogSignals = calibrationWorkspace.nativeSignals
+                        .filterNot { it.hidden }
+                        .map { LiveSensorDefinition("ECU:" + it.id, it.name, it.name) } +
+                        calibrationWorkspace.obdbSignals
+                            .filterNot { it.hidden }
+                            .map { LiveSensorDefinition("OBDB:" + it.id, it.name, it.name) },
                     onToggleStream = { viewModel.toggleLiveStream() },
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
@@ -532,12 +559,18 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.ABOUT -> LazyColumn {
+                    item { AboutUpdateCard() }
+                }
                 DiagTab.OBD_SCAN -> ObdScanScreen(
                     report = obdScanReport,
                     isScanning = isObdScanning,
                     message = obdScanMessage,
                     isConnected = adapter.tier != AdapterTier.DISCONNECTED &&
                         !adapter.deviceName.contains("Demo", ignoreCase = true),
+                    vehicle = vehicle,
+                    accountUid = accountUid,
+                    savedVehicleId = selectedSavedVehicleId,
                     onRunScan = { viewModel.runFullObdScan() }
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
@@ -549,6 +582,11 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                         adapter.tier != AdapterTier.DISCONNECTED,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onExportIdentification = {
+                        ecuIdentityExporter.launch(
+                            "CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json"
+                        )
+                    },
                     onCreateVehicleFromEcuVin = { viewModel.createVehicleFromEcuVin(it) },
                     onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
                     onReadUdsDid = { requestId, responseId, did, protocol -> viewModel.readUdsDid(requestId, responseId, did, protocol) },
@@ -561,6 +599,9 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportTrace = { canTracePicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel", "*/*")) },
                     onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
+                    onPreviewPartialWrite = { start, eraseBytes, programBytes ->
+                        viewModel.previewPartialCalibrationWrite(start, eraseBytes, programBytes)
+                    },
                     onImportDefinitions = {
                         calibrationDefinitionsPicker.launch(arrayOf("text/*", "text/csv", "text/tab-separated-values", "*/*"))
                     },
@@ -1035,11 +1076,13 @@ fun VehicleControlsScreen(vehicle: VehicleProfile) {
                         }
                     }
                     val availabilityLabel = when (capability.availability) {
+                        ControlAvailability.NOT_IMPLEMENTED -> stringResource(R.string.status_not_implemented)
                         ControlAvailability.NOT_VERIFIED -> stringResource(R.string.status_not_verified)
                         ControlAvailability.AVAILABLE -> stringResource(R.string.status_available)
                         ControlAvailability.NOT_EQUIPPED -> stringResource(R.string.status_not_equipped)
                     }
                     val availabilityColor = when (capability.availability) {
+                        ControlAvailability.NOT_IMPLEMENTED -> TextMuted
                         ControlAvailability.NOT_VERIFIED -> WarnRed
                         ControlAvailability.AVAILABLE -> OkGreen
                         ControlAvailability.NOT_EQUIPPED -> TextMuted
@@ -1124,19 +1167,108 @@ fun LiveDataScreen(
     isStreaming: Boolean,
     recording: LiveRecordingState,
     telemetryMessage: String?,
+    vehicleIdentity: String?,
+    accountUid: String?,
+    catalogSignals: List<LiveSensorDefinition>,
     onToggleStream: () -> Unit,
     onToggleUnits: () -> Unit,
     onToggleRecording: () -> Unit,
     onExportRecording: () -> Unit
 ) {
-    var pidSearch by remember { mutableStateOf("") }
-    var selectedPidIds by remember { mutableStateOf<Set<String>?>(null) }
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("live_sensor_selection", android.content.Context.MODE_PRIVATE)
+    }
+    val storageKey = SensorSelectionScope.key(accountUid, vehicleIdentity)
+    val storedSelection = remember(storageKey, preferences) {
+        storageKey?.let { key ->
+            preferences.getString(key, null)?.split(",")?.filter(String::isNotBlank)?.toSet()
+        }
+    }
+    var selectedPidIds by remember(storageKey) {
+        mutableStateOf<Set<String>?>(storedSelection)
+    }
+    var choosingSensors by remember(storageKey) { mutableStateOf(false) }
     val allPidIds = pids.map { it.id }.toSet()
+    val liveCatalog = remember(pids, catalogSignals) {
+        LiveSensorCatalog.entriesWithObserved(
+            catalogSignals + pids.map { LiveSensorDefinition(it.id, it.labelEn, it.labelFr) }
+        )
+    }
+    val localeFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     val activePidIds = selectedPidIds ?: allPidIds
-    val visiblePids = pids.filter { pid ->
-        pid.id in activePidIds &&
-            (pidSearch.isBlank() || pid.labelEn.contains(pidSearch, true) ||
-                pid.labelFr.contains(pidSearch, true) || pid.id.contains(pidSearch, true))
+    val visiblePids = pids.filter { it.id in activePidIds }
+
+    if (choosingSensors) {
+        var sensorQuery by remember(storageKey, choosingSensors) { mutableStateOf("") }
+        var pendingIds by remember(storageKey, choosingSensors) {
+            mutableStateOf(activePidIds)
+        }
+        AlertDialog(
+            onDismissRequest = { choosingSensors = false },
+            title = { Text(stringResource(R.string.obd_choose_sensors)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = sensorQuery,
+                        onValueChange = { sensorQuery = it.take(48) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.live_sensor_search)) },
+                        singleLine = true
+                    )
+                    LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
+                        items(
+                            liveCatalog.filter { signal ->
+                                sensorQuery.isBlank() || signal.id.contains(sensorQuery, true) ||
+                                    signal.labelEn.contains(sensorQuery, true) ||
+                                    signal.labelFr.contains(sensorQuery, true)
+                            },
+                            key = { it.id }
+                        ) { signal ->
+                            val measured = LiveSensorCatalog.isMeasured(signal.id, allPidIds)
+                            Row(
+                                Modifier.fillMaxWidth().clickable(enabled = measured) {
+                                    pendingIds = if (signal.id in pendingIds) pendingIds - signal.id
+                                        else pendingIds + signal.id
+                                },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = signal.id in pendingIds,
+                                    enabled = measured,
+                                    onCheckedChange = { checked ->
+                                        pendingIds = if (checked) pendingIds + signal.id
+                                            else pendingIds - signal.id
+                                    }
+                                )
+                                Column {
+                                    Text(if (localeFrench) signal.labelFr else signal.labelEn)
+                                    Text(signal.id, color = TextMuted, fontSize = 11.sp)
+                                    if (!measured) {
+                                        Text(stringResource(R.string.obd_sensor_not_measured),
+                                            color = TextMuted, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedPidIds = pendingIds.toSet()
+                    storageKey?.let { key ->
+                        preferences.edit { putString(key, pendingIds.sorted().joinToString(",")) }
+                    }
+                    choosingSensors = false
+                }) { Text(stringResource(R.string.obd_sensor_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { choosingSensors = false }) {
+                    Text(stringResource(R.string.obd_sensor_cancel))
+                }
+            }
+        )
     }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -1204,32 +1336,18 @@ fun LiveDataScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Capteurs affichés (${visiblePids.size}/${pids.size})", color = CamaroAmber, fontWeight = FontWeight.Bold)
-                    OutlinedTextField(
-                        value = pidSearch,
-                        onValueChange = { pidSearch = it.take(48) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text(stringResource(R.string.live_sensor_search)) },
-                        placeholder = { Text("Lambda, pression, température…") }
+                    Text(
+                        stringResource(R.string.live_selected_sensors, visiblePids.size, pids.size),
+                        color = CamaroAmber,
+                        fontWeight = FontWeight.Bold
                     )
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        pids.distinctBy { it.id }.forEach { pid ->
-                            FilterChip(
-                                selected = pid.id in activePidIds,
-                                onClick = {
-                                    val updated = activePidIds.toMutableSet()
-                                    if (!updated.add(pid.id)) updated.remove(pid.id)
-                                    selectedPidIds = if (updated.containsAll(allPidIds)) null else updated
-                                },
-                                label = { Text(pid.id) }
-                            )
-                        }
+                    Button(onClick = { choosingSensors = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.obd_choose_sensors))
                     }
-                    TextButton(onClick = { selectedPidIds = null; pidSearch = "" }) {
+                    TextButton(onClick = {
+                        selectedPidIds = null
+                        storageKey?.let { preferences.edit { remove(it) } }
+                    }) {
                         Text(stringResource(R.string.live_sensor_show_all), color = CamaroBlue)
                     }
                 }
@@ -1318,6 +1436,8 @@ fun CanSnifferScreen(
                             enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
                             modifier = Modifier.weight(1f)
                         ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
                             Text(stringResource(R.string.can_sniffer_start))
                         }
                         OutlinedButton(
@@ -1325,6 +1445,8 @@ fun CanSnifferScreen(
                             enabled = state.isCapturing,
                             modifier = Modifier.weight(1f)
                         ) {
+                            Icon(Icons.Filled.Stop, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
                             Text(stringResource(R.string.can_sniffer_stop))
                         }
                     }
@@ -1355,7 +1477,7 @@ fun CanSnifferScreen(
                         }
                         TextButton(
                             onClick = onClearHistory,
-                            enabled = !state.isSendingRequest &&
+                            enabled = !state.isCapturing && !state.isSendingRequest &&
                                 (state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank())
                         ) {
                             Text(stringResource(R.string.can_console_clear), color = CamaroBlue)
@@ -1829,6 +1951,70 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, onScan: () -> Unit, onClear: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+    var selectedDtc by remember { mutableStateOf<DiagnosticDtc?>(null) }
+    selectedDtc?.let { selected ->
+        val mayApply = DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(
+            vehicle, selected.module, ecuVinComparison
+        )
+        val explanation = if (mayApply) {
+            CamaroDtcCatalog.find(selected.code.substringBefore('-'), vehicle)
+        } else null
+        // GM monitor details are shown only for an identified, matching vehicle/ECU.
+        val gmMonitor = if (mayApply) {
+            GmEngineMonitorCatalog.find(selected.code.substringBefore('-'), vehicle)
+        } else null
+        val gmSourceLabel = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
+        AlertDialog(
+            onDismissRequest = { selectedDtc = null },
+            title = { Text(selected.code) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(localizedDtcDescription(selected))
+                    if (explanation == null) {
+                        if (gmMonitor == null) Text(stringResource(R.string.obd_dtc_help_unavailable))
+                        if (!mayApply) Text(stringResource(R.string.dtc_vehicle_identity_required))
+                    } else {
+                        Text(if (isFrench) explanation.meaningFr else explanation.meaningEn)
+                        Text(stringResource(R.string.dtc_severity), fontWeight = FontWeight.Bold)
+                        Text(if (isFrench) explanation.severityFr else explanation.severityEn)
+                        Text(stringResource(R.string.dtc_possible_causes), fontWeight = FontWeight.Bold)
+                        (if (isFrench) explanation.causesFr else explanation.causesEn).forEach {
+                            Text("• $it")
+                        }
+                        Text(stringResource(R.string.dtc_recommended_checks), fontWeight = FontWeight.Bold)
+                        (if (isFrench) explanation.checksFr else explanation.checksEn).forEachIndexed { index, check ->
+                            Text("${index + 1}. $check")
+                        }
+                        val applicability = if (isFrench) explanation.applicabilityFr else explanation.applicabilityEn
+                        if (!applicability.isNullOrBlank()) Text(applicability, color = WarnRed)
+                    }
+                    if (gmMonitor != null) {
+                        HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
+                        Text(stringResource(R.string.dtc_gm_monitor_title, gmSourceLabel),
+                            fontWeight = FontWeight.Bold, color = CamaroAmber)
+                        Text(if (isFrench) gmMonitor.componentFr else gmMonitor.componentEn,
+                            fontWeight = FontWeight.SemiBold)
+                        Text(if (isFrench) gmMonitor.strategyFr else gmMonitor.strategyEn)
+                        Text(stringResource(R.string.dtc_gm_monitor_criteria,
+                            if (isFrench) gmMonitor.malfunctionCriteriaFr else gmMonitor.malfunctionCriteriaEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_enable,
+                            if (isFrench) gmMonitor.enableConditionsFr else gmMonitor.enableConditionsEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_failure,
+                            if (isFrench) gmMonitor.failureCriteriaFr else gmMonitor.failureCriteriaEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_mil, gmMonitor.milClassification))
+                        Text(stringResource(R.string.dtc_gm_monitor_source, gmSourceLabel, gmMonitor.sourcePage),
+                            color = TextMuted, fontSize = 10.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedDtc = null }) {
+                    Text(stringResource(R.string.obd_dtc_help_close))
+                }
+            }
+        )
+    }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -1868,100 +2054,20 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
             }
         } else {
             items(dtcs) { dtc ->
-                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Card(modifier = Modifier.clickable { selectedDtc = dtc }, colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("${dtc.code} (${dtc.module})", fontWeight = FontWeight.Bold, color = if (dtc.isPending) CamaroAmber else WarnRed, fontSize = 16.sp)
                             Text(localizedDtcStatus(dtc), fontSize = 12.sp, color = TextMuted)
                         }
                         Text(localizedDtcDescription(dtc))
-                        val moduleCatalogue = DtcCatalogRegistry.catalogueFor(dtc.module, vehicle)
-                        val mayApplyVehicleSpecific = DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(vehicle, dtc.module, ecuVinComparison)
-                        val applicabilityNotice = if (mayApplyVehicleSpecific) {
-                            CamaroDtcCatalog.applicabilityNotice(dtc.code.substringBefore('-'), vehicle)
-                        } else {
-                            null
-                        }
-                        if (applicabilityNotice != null) {
-                            Text(
-                                if (isFrench) applicabilityNotice.first else applicabilityNotice.second,
-                                color = WarnRed,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp
+                        val mayApplyVehicleSpecific =
+                            DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(
+                                vehicle, dtc.module, ecuVinComparison
                             )
-                        }
-                        else if (!mayApplyVehicleSpecific) {
-                            Text(
-                                stringResource(R.string.dtc_vehicle_identity_required),
-                                color = WarnRed,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        if (!moduleCatalogue.hasVehicleSpecificDefinitions) {
-                            Text(
-                                if (isFrench) moduleCatalogue.noteFr else moduleCatalogue.noteEn,
-                                color = TextMuted,
-                                fontSize = 11.sp
-                            )
-                        }
-                        val vehicleExplanation = if (mayApplyVehicleSpecific) {
-                            CamaroDtcCatalog.find(dtc.code.substringBefore('-'), vehicle)
-                        } else {
-                            null
-                        }
-                        if (vehicleExplanation != null) {
-                            HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
-                            Text(stringResource(R.string.dtc_vehicle_interpretation), fontWeight = FontWeight.Bold, color = CamaroAmber)
-                            Text(if (isFrench) vehicleExplanation.meaningFr else vehicleExplanation.meaningEn)
-                            Text(
-                                stringResource(R.string.dtc_severity) + ": " +
-                                    if (isFrench) vehicleExplanation.severityFr else vehicleExplanation.severityEn,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(stringResource(R.string.dtc_possible_causes), fontWeight = FontWeight.Bold)
-                            (if (isFrench) vehicleExplanation.causesFr else vehicleExplanation.causesEn).forEach { cause ->
-                                Text("• $cause")
-                            }
-                            Text(stringResource(R.string.dtc_recommended_checks), fontWeight = FontWeight.Bold)
-                            (if (isFrench) vehicleExplanation.checksFr else vehicleExplanation.checksEn).forEachIndexed { index, check ->
-                                Text("${index + 1}. $check")
-                            }
-                            val applicability = if (isFrench) vehicleExplanation.applicabilityFr else vehicleExplanation.applicabilityEn
-                            if (!applicability.isNullOrBlank()) {
-                                Text(applicability, color = WarnRed)
-                            }
-                        }
-                        val gmMonitor = if (mayApplyVehicleSpecific) {
-                            GmEngineMonitorCatalog.find(dtc.code.substringBefore('-'), vehicle)
-                        } else {
-                            null
-                        }
-                        val gmSourceLabel = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
-                        if (gmMonitor != null) {
-                            HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
-                            Text(
-                                stringResource(R.string.dtc_gm_monitor_title, gmSourceLabel),
-                                fontWeight = FontWeight.Bold,
-                                color = CamaroAmber
-                            )
-                            Text(if (isFrench) gmMonitor.componentFr else gmMonitor.componentEn, fontWeight = FontWeight.SemiBold)
-                            Text(if (isFrench) gmMonitor.strategyFr else gmMonitor.strategyEn)
-                            Text(stringResource(R.string.dtc_gm_monitor_criteria, if (isFrench) gmMonitor.malfunctionCriteriaFr else gmMonitor.malfunctionCriteriaEn))
-                            Text(stringResource(R.string.dtc_gm_monitor_enable, if (isFrench) gmMonitor.enableConditionsFr else gmMonitor.enableConditionsEn))
-                            Text(stringResource(R.string.dtc_gm_monitor_failure, if (isFrench) gmMonitor.failureCriteriaFr else gmMonitor.failureCriteriaEn))
-                            Text(stringResource(R.string.dtc_gm_monitor_mil, gmMonitor.milClassification))
-                            Text(
-                                stringResource(R.string.dtc_gm_monitor_source, gmSourceLabel, gmMonitor.sourcePage),
-                                color = TextMuted,
-                                fontSize = 10.sp
-                            )
-                        } else if (vehicleExplanation == null && moduleCatalogue.hasVehicleSpecificDefinitions) {
-                            Text(
-                                stringResource(R.string.dtc_vehicle_specific_not_documented),
-                                color = TextMuted,
-                                fontSize = 12.sp
-                            )
+                        if (!mayApplyVehicleSpecific) {
+                            Text(stringResource(R.string.dtc_vehicle_identity_required),
+                                color = TextMuted, fontSize = 11.sp)
                         }
                     }
                 }
@@ -2283,9 +2389,6 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
-        item {
-            AboutUpdateCard()
         }
     }
 }

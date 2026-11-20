@@ -1,13 +1,25 @@
 package com.camarodiag.gen5.ui
 
+import androidx.core.content.edit
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -15,6 +27,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -26,6 +39,13 @@ import androidx.compose.ui.unit.sp
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.ObdValue
+import com.camarodiag.gen5.domain.model.CamaroDtcCatalog
+import com.camarodiag.gen5.domain.model.DtcCatalogRegistry
+import com.camarodiag.gen5.domain.model.GmEngineMonitorCatalog
+import com.camarodiag.gen5.domain.model.VehicleProfile
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.camarodiag.gen5.ui.theme.CamaroAmber
 import com.camarodiag.gen5.ui.theme.OkGreen
 import com.camarodiag.gen5.ui.theme.SurfaceDark
@@ -39,9 +59,98 @@ fun ObdScanScreen(
     isScanning: Boolean,
     message: String?,
     isConnected: Boolean,
+    vehicle: VehicleProfile,
+    accountUid: String?,
+    savedVehicleId: String?,
     onRunScan: () -> Unit
 ) {
     val unavailable = stringResource(R.string.obd_not_available)
+
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("obd_sensor_selection", android.content.Context.MODE_PRIVATE)
+    }
+    val vehicleKey = report?.vin?.trim()?.uppercase()?.takeIf { it.length == 17 }
+    // An unknown VIN must never share a persistent selection with another vehicle.
+    // A saved garage profile provides a stable identity before the ECU VIN is read.
+    val vehicleIdentity = savedVehicleId?.takeIf(String::isNotBlank)?.let { "garage_$it" }
+        ?: vehicleKey?.let { "vin_$it" }
+    val preferenceKey = SensorSelectionScope.key(accountUid, vehicleIdentity)
+    val storedPids = remember(preferenceKey, preferences) {
+        preferenceKey?.let { preferences.getString(it, null)?.split(",")?.mapNotNull(String::toIntOrNull) }
+    }
+    val knownPids = listOf(0x03, 0x04, 0x05, 0x06, 0x07, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x42, 0x52)
+    val catalogPids = (knownPids + report?.supportedPids.orEmpty() + report?.liveData.orEmpty().map { it.pid }).distinct().sorted()
+    val sensorNames = catalogPids.associateWith { localizedObdPidName(it) }
+    val measuredPids = report?.liveData.orEmpty().map { it.pid }.toSet()
+    var choosingSensors by rememberSaveable(preferenceKey) { mutableStateOf(false) }
+    var sensorQuery by rememberSaveable(preferenceKey) { mutableStateOf("") }
+    var chosenPids by rememberSaveable(preferenceKey) { mutableStateOf(storedPids.orEmpty()) }
+    var selectionApplied by rememberSaveable(preferenceKey) { mutableStateOf(storedPids != null) }
+    if (choosingSensors && report != null) {
+        var pendingPids by remember(preferenceKey, choosingSensors) {
+            mutableStateOf(if (selectionApplied) chosenPids else report.liveData.map { it.pid })
+        }
+        AlertDialog(
+            onDismissRequest = { choosingSensors = false },
+            title = { Text(stringResource(R.string.obd_choose_sensors)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = sensorQuery,
+                        onValueChange = { sensorQuery = it },
+                        label = { Text(stringResource(R.string.obd_filter_sensors)) },
+                        singleLine = true
+                    )
+                    LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
+                        items(catalogPids.filter { pid ->
+                            pid.toString(16).contains(sensorQuery, ignoreCase = true) ||
+                                sensorNames[pid].orEmpty().contains(sensorQuery, ignoreCase = true)
+                        }, key = { it }) { pid ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable(enabled = pid in measuredPids) {
+                                    pendingPids = if (pid in pendingPids)
+                                        pendingPids - pid else pendingPids + pid
+                                },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = pid in measuredPids && pid in pendingPids,
+                                    enabled = pid in measuredPids,
+                                    onCheckedChange = { checked ->
+                                        pendingPids = if (checked) pendingPids + pid
+                                            else pendingPids - pid
+                                    }
+                                )
+                                Column {
+                                    Text(sensorNames[pid] ?: stringResource(R.string.obd_pid_generic, pid))
+                                    if (pid !in measuredPids) {
+                                        Text(stringResource(R.string.obd_sensor_not_measured), color = TextMuted, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    chosenPids = pendingPids.distinct()
+                    selectionApplied = true
+                    preferenceKey?.let { key ->
+                        preferences.edit { putString(key, chosenPids.joinToString(",")) }
+                    }
+                    choosingSensors = false
+                }) { Text(stringResource(R.string.obd_sensor_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { choosingSensors = false }) {
+                    Text(stringResource(R.string.obd_sensor_cancel))
+                }
+            }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -119,10 +228,15 @@ fun ObdScanScreen(
             item {
                 SectionTitle(stringResource(R.string.obd_returned_live_data))
             }
+            item {
+                Button(onClick = { choosingSensors = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.obd_choose_sensors))
+                }
+            }
             if (report.liveData.isEmpty()) {
                 item { Text(stringResource(R.string.obd_no_live_data), color = TextMuted) }
             } else {
-                items(report.liveData, key = { it.pid }) { value ->
+                items(report.liveData.filter { !selectionApplied || it.pid in chosenPids }, key = { it.pid }) { value ->
                     ObdValueCard(value)
                 }
             }
@@ -134,8 +248,14 @@ fun ObdScanScreen(
             if (allCodes.isEmpty()) {
                 item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
             } else {
+                val matchesVehicle = ObdDtcGuidancePolicy.hasMatchedEcm(
+                    selectedVin = vehicle.vin,
+                    reportedVin = report.vin,
+                    responderAddresses = report.respondingEcuAddresses,
+                    simulation = isSimulated
+                )
                 items(allCodes.distinctBy { it.code to it.status }, key = { "${it.code}-${it.status}" }) { dtc ->
-                    DtcResultCard(dtc)
+                    DtcResultCard(dtc, vehicle, matchesVehicle)
                 }
             }
 
@@ -204,19 +324,24 @@ private fun InfoLine(label: String, value: String) {
 }
 
 @Composable
-private fun localizedObdPidName(value: ObdValue): String = when (value.pid) {
+private fun localizedObdPidName(value: ObdValue): String = localizedObdPidName(value.pid)
+
+@Composable
+private fun localizedObdPidName(pid: Int): String = when (pid) {
     0x03 -> stringResource(R.string.live_pid_fuel_system_status)
     0x04 -> stringResource(R.string.live_pid_load)
     0x05 -> stringResource(R.string.live_pid_ect)
     0x06 -> stringResource(R.string.live_pid_stft)
     0x07 -> stringResource(R.string.live_pid_ltft)
+    0x0B -> stringResource(R.string.live_pid_map)
     0x0C -> stringResource(R.string.live_pid_rpm)
     0x0D -> stringResource(R.string.live_pid_speed)
     0x0F -> stringResource(R.string.live_pid_iat)
     0x10 -> stringResource(R.string.live_pid_maf)
     0x11 -> stringResource(R.string.live_pid_throttle)
     0x42 -> stringResource(R.string.live_pid_bat)
-    else -> stringResource(R.string.obd_pid_generic, value.pid)
+    0x52 -> stringResource(R.string.live_pid_ethanol)
+    else -> stringResource(R.string.obd_pid_generic, pid)
 }
 
 @Composable
@@ -233,18 +358,89 @@ private fun ObdValueCard(value: ObdValue) {
 }
 
 @Composable
-private fun DtcResultCard(dtc: ObdDtc) {
+private fun DtcResultCard(
+    dtc: ObdDtc,
+    vehicle: VehicleProfile,
+    vehicleEcuIdentityConfirmed: Boolean
+) {
+    val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+    val normalizedCode = dtc.code.substringBefore('-')
+    val generic = DtcCatalogRegistry.genericDescription(normalizedCode)
+    val specific = if (vehicleEcuIdentityConfirmed) {
+        CamaroDtcCatalog.find(normalizedCode, vehicle)
+    } else null
+    val monitor = if (vehicleEcuIdentityConfirmed) {
+        GmEngineMonitorCatalog.find(normalizedCode, vehicle)
+    } else null
+    val gmSource = GmEngineMonitorCatalog.sourceLabel(vehicle) ?: "GM"
+    var showHelp by remember(dtc.code, dtc.status) { mutableStateOf(false) }
+    if (showHelp) {
+        AlertDialog(
+            onDismissRequest = { showHelp = false },
+            title = { Text(dtc.code) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (generic != null) Text(if (isFrench) generic.second else generic.first)
+                    if (specific == null && monitor == null && generic == null) {
+                        Text(stringResource(R.string.obd_dtc_help_unavailable))
+                    }
+                    if (!vehicleEcuIdentityConfirmed) {
+                        Text(stringResource(R.string.dtc_vehicle_identity_required),
+                            color = WarnRed, fontSize = 12.sp)
+                    }
+                    if (specific != null) {
+                        Text(if (isFrench) specific.meaningFr else specific.meaningEn)
+                        Text(stringResource(R.string.dtc_severity), fontWeight = FontWeight.Bold)
+                        Text(if (isFrench) specific.severityFr else specific.severityEn)
+                        Text(stringResource(R.string.dtc_possible_causes), fontWeight = FontWeight.Bold)
+                        (if (isFrench) specific.causesFr else specific.causesEn).forEach {
+                            Text("• $it")
+                        }
+                        Text(stringResource(R.string.dtc_recommended_checks), fontWeight = FontWeight.Bold)
+                        (if (isFrench) specific.checksFr else specific.checksEn).forEachIndexed { index, check ->
+                            Text("${index + 1}. $check")
+                        }
+                    }
+                    if (monitor != null) {
+                        HorizontalDivider(color = TextMuted.copy(alpha = 0.25f))
+                        Text(stringResource(R.string.dtc_gm_monitor_title, gmSource),
+                            fontWeight = FontWeight.Bold, color = CamaroAmber)
+                        Text(if (isFrench) monitor.componentFr else monitor.componentEn)
+                        Text(if (isFrench) monitor.strategyFr else monitor.strategyEn)
+                        Text(stringResource(R.string.dtc_gm_monitor_criteria,
+                            if (isFrench) monitor.malfunctionCriteriaFr else monitor.malfunctionCriteriaEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_enable,
+                            if (isFrench) monitor.enableConditionsFr else monitor.enableConditionsEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_failure,
+                            if (isFrench) monitor.failureCriteriaFr else monitor.failureCriteriaEn))
+                        Text(stringResource(R.string.dtc_gm_monitor_source, gmSource, monitor.sourcePage),
+                            color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHelp = false }) {
+                    Text(stringResource(R.string.obd_dtc_help_close))
+                }
+            }
+        )
+    }
     val status = when (dtc.status) {
         "pending" -> stringResource(R.string.obd_pending)
         "permanent" -> stringResource(R.string.obd_permanent)
         else -> stringResource(R.string.obd_confirmed)
     }
     val statusColor = if (dtc.status == "confirmed") WarnRed else CamaroAmber
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Card(modifier = Modifier.clickable { showHelp = true },
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+        Row(Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(dtc.code, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(stringResource(R.string.obd_powertrain_ecm), color = TextMuted, fontSize = 10.sp)
+                Text(stringResource(R.string.obd_powertrain_ecm),
+                    color = TextMuted, fontSize = 10.sp)
             }
             Text(status, color = statusColor, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
         }
