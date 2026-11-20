@@ -27,8 +27,13 @@ object Lfx2012ControllerReferences {
      */
     fun hasCompleteReadOnlyFingerprint(observed: ObservedIdentity): Boolean =
         isMeaningfulIdentifier(observed.ecuName) &&
-            observed.calibrationIds.any(::isMeaningfulIdentifier) &&
-            observed.calibrationVerificationNumbers.any(::isMeaningfulIdentifier)
+            observed.calibrationIds.any(::hasMeaningfulComponent) &&
+            observed.calibrationVerificationNumbers.any(::hasMeaningfulComponent)
+
+    // Identification responses may contain several CAL IDs/CVNs joined into one
+    // display string. Validate each item, not the concatenation of placeholders.
+    private fun hasMeaningfulComponent(response: String): Boolean =
+        response.split('\r', '\n', '|', ';').any(::isMeaningfulIdentifier)
 
     /**
      * Reject demo/placeholder diagnostic fields before presenting an ECU
