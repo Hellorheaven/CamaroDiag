@@ -758,4 +758,6 @@
     <string name="update_later">Later</string>
     <string name="update_ready_to_install">CamaroDiag – ready to install</string>
     <string name="update_version_channel">Version %1$s • %2$s</string>
+    <string name="obd_dtc_help_unavailable">No verified troubleshooting guidance is available for this fault code and vehicle yet. Check the manufacturer service information before repairs.</string>
+    <string name="obd_dtc_help_close">Close</string>
 </resources>
