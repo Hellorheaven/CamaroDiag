@@ -36,6 +36,20 @@ class Lfx2012FlexFuelPreflightTest {
         assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(mismatched, unknown))
     }
 
+    @Test fun placeholderControllerAndFirmwareNeverCountAsIdentity() {
+        val problems = Lfx2012FlexFuelPreflight.missingPreconditions(vehicle, evidence)
+        assertTrue(problems.contains(Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_UNVERIFIED))
+        assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(vehicle, evidence))
+    }
+
+    @Test fun concreteNonPlaceholderIdsDoNotTriggerPlaceholderWarning() {
+        val identified = evidence.copy(controllerId = "12600001", firmwareId = "CAL-12345")
+        val problems = Lfx2012FlexFuelPreflight.missingPreconditions(vehicle, identified)
+        assertFalse(problems.contains(Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_UNVERIFIED))
+        assertTrue(problems.contains(Lfx2012FlexFuelPreflight.Status.WRITE_NOT_VALIDATED))
+        assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(vehicle, identified))
+    }
+
     @Test fun refusesOtherEnginesAndYears() {
         assertTrue(
             Lfx2012FlexFuelPreflight.missingPreconditions(
