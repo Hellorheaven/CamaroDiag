@@ -25,4 +25,23 @@ class AppLanguageFallbackTest {
         assertEquals(AppLanguage.EN, AppLanguage.fromLocale(Locale.forLanguageTag("zh-TW")))
         assertEquals(AppLanguage.EN, AppLanguage.fromLocale(Locale.forLanguageTag("zh-HK")))
     }
+    @Test fun everyDeclaredLanguageHasASystemLocaleMapping() {
+        for (language in AppLanguage.entries) {
+            val tag = when (language) {
+                AppLanguage.ZH -> "zh-CN"
+                AppLanguage.KO -> "ko-KR"
+                else -> language.code
+            }
+            assertEquals(
+                "Unexpected system locale mapping for ${language.code}",
+                language,
+                AppLanguage.fromLocale(Locale.forLanguageTag(tag))
+            )
+        }
+    }
+
+    @Test fun legacyHebrewLanguageTagIsAccepted() {
+        assertEquals(AppLanguage.HE, AppLanguage.fromLocale(Locale.forLanguageTag("iw-IL")))
+    }
+
 }
