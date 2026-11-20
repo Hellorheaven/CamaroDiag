@@ -21,6 +21,8 @@ class RawCanFrameParserTest {
     @Test fun rejectsInvalidIdentifiersAndPayloads() {
         assertNull(RawCanFrameParser.parse("800 01"))
         assertNull(RawCanFrameParser.parse("20000000 01"))
+        assertNull(RawCanFrameParser.parse("7E00 01"))
+        assertNull(RawCanFrameParser.parse("18DAF11 01"))
         assertNull(RawCanFrameParser.parse("7E0"))
         assertNull(RawCanFrameParser.parse("7E0 GG"))
         assertNull(RawCanFrameParser.parse("7E0 01 02 03 04 05 06 07 08 09"))
