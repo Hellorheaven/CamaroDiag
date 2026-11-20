@@ -103,7 +103,7 @@ class CamaroUdsProtocolTest {
             stp61Resp = "?",
             headersResp = "OK",
             protocolResp = "OK",
-            transmitProbeResp = "SEARCHING...\\r\\n7E8 06 41 00 BE 3E B8 13"
+            transmitProbeResp = "SEARCHING...\r\n7E8 06 41 00 BE 3E B8 13"
         )
 
         assertTrue(capabilities.supportsCanHeaders)
@@ -114,7 +114,7 @@ class CamaroUdsProtocolTest {
     fun rejectsAdapterChatterAndIncompletePid00FragmentsAsTransmitProof() {
         listOf(
             "0100",
-            "SEARCHING...\\r\\nNO DATA",
+            "SEARCHING...\r\nNO DATA",
             "ELM327 v4.100",
             "7E8 03 41 00 BE",
             "NOPE4100BE3EB813"
