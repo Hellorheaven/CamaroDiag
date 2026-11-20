@@ -136,4 +136,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULĀCIJA: šie ECU identifikatori nav nolasīti no īsta transportlīdzekļa un nevar apliecināt tā programmaparatūru.</string>
     <string name="cal_expert_block_memory_map">Mērķa atmiņas karte un aizsargātie reģioni nav pārbaudīti.</string>
     <string name="flexfuel_preflight_backup">Sākotnējā ECU dublējumkopija nav pārbaudīta.</string>
+    <string name="cal_expert_title">Eksperta režīms — ECU uz stenda / mikroshēma</string>
+    <string name="cal_expert_expand">Konfigurēt eksperta režīmu</string>
+    <string name="cal_expert_collapse">Paslēpt eksperta iestatījumus</string>
+    <string name="cal_expert_family">Vadības bloka saime (E39 vai E39A)</string>
+    <string name="cal_expert_chip">Novērotais mikroshēmas marķējums</string>
+    <string name="cal_expert_programmer">Stenda programmētājs / saskarne</string>
+    <string name="cal_expert_access_title">Piekļuves metode</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Ārējā atmiņa, noņemta mikroshēma</string>
+    <string name="cal_expert_region_title">Atmiņas reģions</string>
+    <string name="cal_expert_region_pflash">MCU iekšējā programmas zibatmiņa</string>
+    <string name="cal_expert_region_dflash">MCU datu zibatmiņa</string>
+    <string name="cal_expert_region_eeprom">Ārēja EEPROM</string>
+    <string name="cal_expert_blockers">Nepabeigtās eksperta pārbaudes</string>
+    <string name="cal_expert_block_controller">Pārbaudiet precīzu vadības bloka saimi (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Nosakiet MCU vai atmiņas mikroshēmas fizisko marķējumu.</string>
+    <string name="cal_expert_block_programmer">Nosakiet saderīgu stenda programmētāju.</string>
+    <string name="cal_expert_block_image_missing">Importējiet netukšu programmaparatūras attēlu.</string>
+    <string name="cal_expert_block_image_format">Šai sagatavošanai vajadzīgs neapstrādāts binārais fails.</string>
 </resources>
