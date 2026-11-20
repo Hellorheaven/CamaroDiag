@@ -418,3 +418,5 @@ Objectif : ne plus limiter l'écran Live à une poignée de PID codés en dur. L
 - #52 **en cours** : le précontrôle distingue maintenant les références ECU/firmware inconnues ou fictives d'identifiants renseignés. Cela ne démontre ni la compatibilité ni la possibilité d'écrire une calibration. Verrou d'écriture maintenu, même si les autres conditions sont déclarées satisfaites.
 - Tests unitaires ajoutés, non encore exécutés sur le HEAD. Restent : références et versions vérifiées sur ECU réel, sauvegarde intégrale contrôlée, procédure de récupération démontrée, validation Android/Windows et recette véhicule.
 - #55 demeure un lot ultérieur après fusion validée de la PR #54. Les P0 #56/#57/#58 restent ouverts jusqu'à recette.
+
+- 2026-11-20 — #52 / PR #54 : filtrage supplémentaire des identifiants ECU/firmware factices (zéros, F, TBD, pending, test) avec tests unitaires ajoutés. **Non validé sur le dernier HEAD**, identification réelle ECU/firmware, sauvegarde mémoire et procédure de récupération toujours manquantes. Aucune écriture autorisée. #55 reste postérieure à #54.
