@@ -151,7 +151,7 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CamaroDiagApp(viewModel: MainViewModel) {
+fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
     val lang by viewModel.language.collectAsState()
     val systemConfiguration = LocalConfiguration.current
     val localizedConfiguration = remember(systemConfiguration, lang) {
@@ -308,6 +308,10 @@ fun CamaroDiagApp(viewModel: MainViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenAccount) {
+                        Icon(Icons.Default.AccountCircle,
+                            contentDescription = stringResource(R.string.app_account_action))
+                    }
                     when {
                         adapter.deviceName.contains("Demo", ignoreCase = true) ||
                             adapter.deviceName.contains("Simulated", ignoreCase = true) -> {
