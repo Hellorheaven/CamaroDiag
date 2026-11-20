@@ -378,7 +378,7 @@ private fun DtcResultCard(
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (generic != null) Text(if (isFrench) generic.first else generic.second)
+                    if (generic != null) Text(if (isFrench) generic.second else generic.first)
                     if (specific == null && monitor == null && generic == null) {
                         Text(stringResource(R.string.obd_dtc_help_unavailable))
                     }
