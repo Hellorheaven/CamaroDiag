@@ -2687,26 +2687,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveCurrentSession() {
+        // Capture the identity and evidence at the user's action, never after
+        // a queued coroutine may have crossed a Firebase account switch.
+        val ownerUid = authenticatedAccountUid ?: return
+        val v = _vehicle.value
+        val report = _mileageReport.value
+        val adapterName = _adapter.value.deviceName
+        val diagnosticCodes = _dtcs.value.map { it.code }
         viewModelScope.launch {
             try {
-                val v = _vehicle.value
-                val report = _mileageReport.value
-                val ownerUid = authenticatedAccountUid ?: return@launch
+                if (authenticatedAccountUid != ownerUid) return@launch
                 val entity = SavedSessionEntity(
                     ownerUid = ownerUid,
                     timestamp = System.currentTimeMillis(),
                     vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} (${v.market.code})",
                     vin = v.vin,
-                    adapterName = _adapter.value.deviceName,
-                    dtcSummary = if (_dtcs.value.isEmpty()) "0 DTC" else _dtcs.value.joinToString(", ") { it.code },
+                    adapterName = adapterName,
+                    dtcSummary = if (diagnosticCodes.isEmpty()) "0 DTC" else diagnosticCodes.joinToString(", "),
                     mileageSummary = report?.let {
                         localizedMileageSummaryForStorage(it)
                     } ?: getApplication<Application>().getString(R.string.mileage_audit_not_run),
                     hasMileageDiscrepancy = report?.hasDiscrepancy ?: false,
                     maxDeltaKm = report?.maxDeltaKm ?: 0.0
                 )
+                if (authenticatedAccountUid != ownerUid) return@launch
                 sessionDao.insertSession(entity)
-                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_session_saved)
+                if (authenticatedAccountUid == ownerUid) {
+                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_session_saved)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -2716,9 +2724,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteSavedSession(session: SavedSessionEntity) {
+        val ownerUid = authenticatedAccountUid ?: return
+        if (session.ownerUid != ownerUid) return
         viewModelScope.launch {
             try {
-                val ownerUid = authenticatedAccountUid ?: return@launch
+                if (authenticatedAccountUid != ownerUid) return@launch
                 sessionDao.deleteSessionForOwner(session.id, ownerUid)
             } catch (cancelled: CancellationException) {
                 throw cancelled
