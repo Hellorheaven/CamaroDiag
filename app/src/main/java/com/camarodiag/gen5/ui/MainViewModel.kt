@@ -2033,6 +2033,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveCanMonitorState.value = LiveCanMonitorState()
         _adapter.value = AdapterCapabilities()
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isJ2534BridgeConnecting = false,
+            isJ2534BridgeConnected = false
+        )
         clearVehicleEvidence()
         _isObdScanning.value = false
     }
