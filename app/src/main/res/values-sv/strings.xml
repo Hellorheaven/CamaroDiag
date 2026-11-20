@@ -116,4 +116,24 @@
     <string name="can_trace_pid_62">Faktiskt motormoment</string>
     <string name="can_trace_pid_63">Motorns referensmoment</string>
     <string name="live_pid_ethanol">Etanolhalt</string>
+    <string name="can_trace_flow_status_cts">Fortsätt skicka</string>
+    <string name="can_trace_flow_status_wait">Vänta</string>
+    <string name="can_trace_flow_status_overflow">Överflöd</string>
+    <string name="can_trace_flow_status_reserved">Reserverad status</string>
+    <string name="can_trace_exchange_heading">UDS-utbyten av begäran och svar</string>
+    <string name="can_trace_exchange_completed">Slutfört</string>
+    <string name="can_trace_exchange_pending">Svar inväntas (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Inget svar observerat</string>
+    <string name="can_console_raw_tx_confirm_title">Bekräfta rå CAN-sändning</string>
+    <string name="can_console_raw_tx_confirm_message">Detta skickar en ram direkt på fordonets CAN-buss. En felaktig ram kan påverka styrenheter. Skicka bara om du känner till målbussen och identifieraren.</string>
+    <string name="can_console_tx_unverified">Rå CAN-sändning är avaktiverad: inget verkligt ECU-svar upptäcktes vid den skrivskyddade sändkontrollen.</string>
+    <string name="can_trace_clear_filters">Rensa filter</string>
+    <string name="can_trace_filter_invalid">Ogiltigt CAN-ID eller dataprefix.</string>
+    <string name="can_trace_flow_control_heading">ISO-TP-flödeskontroll</string>
+    <string name="cal_expert_block_recovery">En återställningsprocedur för detta exakta mål har inte verifierats.</string>
+    <string name="cal_expert_block_driver">Ingen validerad drivrutin för hårdvaruprogrammering är ansluten.</string>
+    <string name="cal_expert_identity_notice">Angivna namn och filhashvärden är observationer, inte bevis för maskinvarukompatibilitet.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">SIMULERING: dessa ECU-identifierare har inte lästs från ett verkligt fordon och kan inte verifiera dess firmware.</string>
+    <string name="cal_expert_block_memory_map">Målets minneskarta och skyddade områden är inte verifierade.</string>
+    <string name="flexfuel_preflight_backup">Den ursprungliga ECU-säkerhetskopian har inte verifierats.</string>
 </resources>
