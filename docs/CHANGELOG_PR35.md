@@ -200,3 +200,11 @@ Ce journal appartient à la branche de la PR #35. Il sera intégré à `main` av
 - Pont J2534 : limitation des lignes JSON reçues à 32 Kio et des charges UDS à 4095 octets ; validation stricte de l'hexadécimal et de la taille des réponses. Le lecteur de lignes est isolé et couvert par des tests (plusieurs réponses, EOF sans saut de ligne, dépassement de taille).
 - BLE OBDLink : validation des propriétés GATT des caractéristiques UART avant abonnement/émission. Le transport sélectionne maintenant notification ou indication selon les propriétés annoncées et prend en charge les caractéristiques d'écriture avec réponse ou sans réponse, sans attendre un callback d'écriture qui n'est pas garanti dans le second cas.
 - Les callbacks BLE de découverte, abonnement, MTU, écriture et notifications ignorent désormais les événements provenant d'une ancienne session GATT après reconnexion. Cela évite qu'un callback tardif d'un ancien adaptateur valide une nouvelle connexion ou injecte des données périmées.
+
+## 2026-11-20 — Console receive classification and updater cleanup
+
+- Removed the obsolete manual APK installation button reference. A successful, signature-verified download now proceeds directly to Android's system installer flow; Android still requires the user's final installation confirmation.
+- Added `CanConsoleRecordParser` to classify each ELM/STN monitor line independently.
+- Only records with a valid CAN arbitration ID, DLC, and matching payload length are shown as ECU RX frames.
+- Adapter acknowledgements and status text remain SYSTEM events; explicit adapter error states are marked failed.
+- Added focused unit tests for standard/extended CAN records, malformed or empty lines, monitor prompts, and adapter error messages.
