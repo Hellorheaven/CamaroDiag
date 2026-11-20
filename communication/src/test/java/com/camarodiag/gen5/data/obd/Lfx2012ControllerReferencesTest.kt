@@ -105,6 +105,18 @@ class Lfx2012ControllerReferencesTest {
         assertFalse(Lfx2012ControllerReferences.hasCandidateE39FamilyLabel(null))
     }
 
+    @Test fun ecuResponderProvenanceRequiresReadableCanAddresses() {
+        val classify = Lfx2012ControllerReferences::classifyResponderAttribution
+        val kind = Lfx2012ControllerReferences.ResponderAttribution
+        assertEquals(kind.NO_VALID_CAN_ADDRESS, classify(emptyList()))
+        assertEquals(kind.NO_VALID_CAN_ADDRESS, classify(listOf("unknown", "7E8")))
+        assertEquals(kind.NO_VALID_CAN_ADDRESS, classify(listOf("7E8", "NO DATA")))
+        assertEquals(kind.SINGLE_ADDRESS_OBSERVED, classify(listOf("7e8", "0x7E8", "7E8")))
+        assertEquals(kind.SINGLE_ADDRESS_OBSERVED, classify(listOf("18daf110")))
+        assertEquals(kind.MULTIPLE_ADDRESSES_OBSERVED, classify(listOf("7E8", "7E9")))
+        assertEquals(kind.MULTIPLE_ADDRESSES_OBSERVED, classify(listOf("18DAF110", "18DAF118")))
+    }
+
     @Test fun aCompleteReadOnlyFingerprintNeverAuthorizesAWrite() {
         val vehicle = Lfx2012FlexFuelPreflight.Vehicle(
             2012, "LFX", 5, "2G1FF3D36C9104199", "2G1FF3D36C9104199"
