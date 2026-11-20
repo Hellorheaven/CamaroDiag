@@ -118,6 +118,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         obdManager.disconnect()
         clearVehicleEvidence()
         _calibrationWorkspace.value = CalibrationWorkspaceState()
+        _savedVehicles.value = loadSavedVehicleProfiles()
+        _selectedSavedVehicleId.value = selectedVehiclePreference()
+        _vehicle.value = loadVehicleProfile()
+        _lastConnectionProfile.value = null
         _connectionMessage.value = null
         _connectionLossMessage.value = null
         _isObdScanning.value = false
