@@ -731,16 +731,6 @@
     <string name="cal_ecu_response_addresses_label">Observed functional OBD response IDs (not mapped to modules)</string>
     <string name="cal_ecu_identity_limits">RPO, transmission, controller hardware number and GM OS are not confirmed by these standard OBD responses. Response IDs are not module identities. GM-specific identifiers require verified, vehicle-specific documentation.</string>
     <string name="dtc_vehicle_identity_required">Vehicle-specific details are withheld because the connected ECU VIN has not been read or does not match the selected vehicle. Read and verify the ECU VIN before using these interpretations.</string>
-    <string name="can_console_history">CAN console history</string>
-    <string name="can_console_clear">Clear history</string>
-    <string name="can_console_empty">No traffic yet. Start capture or send a frame / OBD request.</string>
-    <string name="can_console_tx">TX • Sent</string>
-    <string name="can_console_rx">RX • Received</string>
-    <string name="can_console_system">SYSTEM</string>
-    <string name="can_console_input_label">CAN frame or OBD command</string>
-    <string name="can_console_input_hint">Raw frame: 7E0 02 01 0C or 18DAF110 03 22 F1 90 • OBD: 01 0C</string>
-    <string name="can_console_sending">Sending to the connected adapter…</string>
-
     <string name="can_console_history">Unified CAN console history</string>
     <string name="can_console_clear">Clear history</string>
     <string name="can_console_empty">No traffic yet. Received and transmitted data will appear here.</string>
@@ -750,4 +740,5 @@
     <string name="can_console_input_label">Frame or OBD command</string>
     <string name="can_console_input_hint">CAN frame: 7E0 02 01 0C • OBD request: 01 0C</string>
     <string name="can_console_sending">Sending…</string>
+
 </resources>
