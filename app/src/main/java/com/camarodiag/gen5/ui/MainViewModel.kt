@@ -120,6 +120,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = CalibrationWorkspaceState()
         _savedVehicles.value = loadSavedVehicleProfiles()
         _selectedSavedVehicleId.value = selectedVehiclePreference()
+        _legacyVehicleImportAvailable.value = canImportLegacyVehicles()
         _vehicle.value = loadVehicleProfile()
         _lastConnectionProfile.value = null
         _connectionMessage.value = null
@@ -157,6 +158,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _selectedSavedVehicleId = MutableStateFlow(selectedVehiclePreference())
     val selectedSavedVehicleId: StateFlow<String?> = _selectedSavedVehicleId.asStateFlow()
+
+    private val _legacyVehicleImportAvailable = MutableStateFlow(canImportLegacyVehicles())
+    val legacyVehicleImportAvailable: StateFlow<Boolean> = _legacyVehicleImportAvailable.asStateFlow()
+
+    private fun canImportLegacyVehicles(): Boolean {
+        if (authenticatedAccountUid == null) return false
+        if (settingsPreferences.contains("legacy_vehicles_claimed_uid")) return false
+        return loadSavedVehicleProfiles(
+            settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
+        ).isNotEmpty()
+    }
+
+    /** The user must explicitly claim the unassigned, pre-login garage. */
+    fun importLegacyVehicles() {
+        val uid = authenticatedAccountUid ?: return
+        if (!canImportLegacyVehicles()) return
+        val legacy = loadSavedVehicleProfiles(
+            settingsPreferences.getString("saved_vehicle_profiles", "[]").orEmpty()
+        )
+        if (legacy.isEmpty()) return
+        val existing = _savedVehicles.value
+        val existingIds = existing.mapTo(mutableSetOf()) { it.id }
+        val imported = legacy.map { profile ->
+            if (existingIds.add(profile.id)) profile
+            else profile.copy(id = UUID.randomUUID().toString())
+        }
+        val combined = existing + imported
+        persistSavedVehicleProfiles(combined)
+        _savedVehicles.value = combined
+        settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
+        _legacyVehicleImportAvailable.value = false
+    }
 
     private val _pairedDevices = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val pairedDevices: StateFlow<List<Pair<String, String>>> = _pairedDevices.asStateFlow()
@@ -297,8 +330,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return SavedObdConnectionProfile(transport, adapterName, endpoint)
     }
 
-    private fun loadSavedVehicleProfiles(): List<SavedVehicleProfile> = runCatching {
-        val source = accountVehiclePreferences().getString("saved_vehicle_profiles", "[]").orEmpty()
+    private fun loadSavedVehicleProfiles(
+        source: String = accountVehiclePreferences().getString("saved_vehicle_profiles", "[]").orEmpty()
+    ): List<SavedVehicleProfile> = runCatching {
         val array = JSONArray(source)
         buildList {
             for (index in 0 until array.length()) {
