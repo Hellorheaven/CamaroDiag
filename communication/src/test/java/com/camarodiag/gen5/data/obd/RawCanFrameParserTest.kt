@@ -33,7 +33,7 @@ class RawCanFrameParserTest {
 
     @Test fun decodesReceivedStandardAndExtendedFramesFromAdapterOutput() {
         val frames = RawCanFrameParser.parseReceivedFrames(
-            "SEARCHING...\\r\\n7E8 03 41 0C 1A F8\\r\\n18DAF110 03 7F 22 31"
+            "SEARCHING...\r\n7E8 03 41 0C 1A F8\r\n18DAF110 03 7F 22 31"
         )
         assertEquals(2, frames.size)
         assertEquals(0x7E8L, frames[0].canId)
@@ -45,7 +45,7 @@ class RawCanFrameParserTest {
 
     @Test fun ignoresAdapterStatusAndMalformedReceivedLines() {
         val frames = RawCanFrameParser.parseReceivedFrames(
-            "OK\\r\\nNO DATA\\r\\n7E8 03 41 0C\\r\\nNOT A FRAME"
+            "OK\r\nNO DATA\r\n7E8 03 41 0C\r\nNOT A FRAME"
         )
         assertEquals(1, frames.size)
         assertEquals(0x7E8L, frames.single().canId)
