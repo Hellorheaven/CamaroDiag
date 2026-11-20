@@ -18,9 +18,10 @@ object RawCanFrameParser {
             .toList()
 
     /**
-     * ELM raw-CAN output includes a DLC after the arbitration ID. Validate it and
-     * remove it: DLC is framing metadata, not the first byte of the ECU payload.
-     * Lines such as SEARCHING, OK, NO DATA and the ELM prompt are intentionally ignored.
+     * ELM raw-CAN output includes a DLC after the arbitration ID. ELM/STN
+     * adapters may print that hexadecimal nibble as either "8" or "08".
+     * Validate it and remove it: DLC is framing metadata, not ECU payload.
+     * Lines such as SEARCHING, OK, NO DATA and the ELM prompt are ignored.
      */
     private fun parseAdapterFrameLine(line: String): RawCanFrame? {
         val tokens = line.trim()
@@ -31,7 +32,7 @@ object RawCanFrameParser {
         if (tokens.size < 3) return null
         val frame = parse(tokens.first() + " " + tokens.drop(2).joinToString(" ")) ?: return null
         val dlcToken = tokens[1]
-        if (dlcToken.length != 2 || !dlcToken.all { it.digitToIntOrNull(16) != null }) return null
+        if (dlcToken.length !in 1..2 || !dlcToken.all { it.digitToIntOrNull(16) != null }) return null
         val declaredLength = dlcToken.toInt(16)
         if (declaredLength !in 1..8 || frame.data.size != declaredLength) return null
         return frame
