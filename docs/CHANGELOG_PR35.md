@@ -64,3 +64,5 @@
 - Lors d'un changement de compte ou d'une perte de connexion, une nouvelle liaison attend maintenant la fermeture de la précédente.
 - La déconnexion du pont PC interrompt aussi une tentative de connexion encore en cours.
 - Lors d'un changement d'adaptateur, de simulateur ou de pont PC, une requête en cours dans la console CAN est arrêtée avant d'utiliser la nouvelle liaison.
+
+- La console attend désormais la fin complète de l'arrêt d'une ancienne capture ou d'un ancien envoi avant d'en démarrer un nouveau, même après un changement de véhicule ou de compte.
