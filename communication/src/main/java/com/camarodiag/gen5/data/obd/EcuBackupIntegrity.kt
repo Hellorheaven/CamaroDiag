@@ -9,6 +9,7 @@ package com.camarodiag.gen5.data.obd
  */
 object EcuBackupIntegrity {
     enum class Problem {
+        EMPTY_BACKUP,
         ENTRY_COUNT_MISMATCH,
         METADATA_MISMATCH,
         DIGEST_MISMATCH,
@@ -30,6 +31,7 @@ object EcuBackupIntegrity {
         requiredRegions: Set<EcuBackupCoverage.Region>
     ): Result {
         val problems = mutableSetOf<Problem>()
+        if (captures.isEmpty()) problems += Problem.EMPTY_BACKUP
         if (manifest.hardwareProvenanceVerified) {
             // No hardware reader currently issues an independently authenticated attestation.
             problems += Problem.UNVERIFIABLE_HARDWARE_PROVENANCE
