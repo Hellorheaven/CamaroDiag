@@ -1829,6 +1829,48 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, onScan: () -> Unit, onClear: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+    var selectedDtc by remember { mutableStateOf<DiagnosticDtc?>(null) }
+    selectedDtc?.let { selected ->
+        val mayApply = DtcCatalogRegistry.mayApplyVehicleSpecificDefinitions(
+            vehicle, selected.module, ecuVinComparison
+        )
+        val explanation = if (mayApply) {
+            CamaroDtcCatalog.find(selected.code.substringBefore('-'), vehicle)
+        } else null
+        AlertDialog(
+            onDismissRequest = { selectedDtc = null },
+            title = { Text(selected.code) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(localizedDtcDescription(selected))
+                    if (explanation == null) {
+                        Text(stringResource(R.string.obd_dtc_help_unavailable))
+                        if (!mayApply) Text(stringResource(R.string.dtc_vehicle_identity_required))
+                    } else {
+                        Text(if (isFrench) explanation.meaningFr else explanation.meaningEn)
+                        Text(stringResource(R.string.dtc_severity), fontWeight = FontWeight.Bold)
+                        Text(if (isFrench) explanation.severityFr else explanation.severityEn)
+                        Text(stringResource(R.string.dtc_possible_causes), fontWeight = FontWeight.Bold)
+                        (if (isFrench) explanation.causesFr else explanation.causesEn).forEach {
+                            Text("• $it")
+                        }
+                        Text(stringResource(R.string.dtc_recommended_checks), fontWeight = FontWeight.Bold)
+                        (if (isFrench) explanation.checksFr else explanation.checksEn).forEachIndexed { index, check ->
+                            Text("${index + 1}. $check")
+                        }
+                        val applicability = if (isFrench) explanation.applicabilityFr else explanation.applicabilityEn
+                        if (!applicability.isNullOrBlank()) Text(applicability, color = WarnRed)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedDtc = null }) {
+                    Text(stringResource(R.string.obd_dtc_help_close))
+                }
+            }
+        )
+    }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -1868,7 +1910,7 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
             }
         } else {
             items(dtcs) { dtc ->
-                Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
+                Card(modifier = Modifier.clickable { selectedDtc = dtc }, colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("${dtc.code} (${dtc.module})", fontWeight = FontWeight.Bold, color = if (dtc.isPending) CamaroAmber else WarnRed, fontSize = 16.sp)
