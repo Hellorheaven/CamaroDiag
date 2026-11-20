@@ -272,4 +272,24 @@
     <string name="can_trace_pid_62">Действителен въртящ момент на двигателя</string>
     <string name="can_trace_pid_63">Еталонен въртящ момент на двигателя</string>
     <string name="live_pid_ethanol">Съдържание на етанол</string>
+    <string name="can_trace_flow_status_cts">Продължи изпращането</string>
+    <string name="can_trace_flow_status_wait">Изчакай</string>
+    <string name="can_trace_flow_status_overflow">Препълване</string>
+    <string name="can_trace_flow_status_reserved">Резервиран статус</string>
+    <string name="can_trace_exchange_heading">Обмен на UDS заявки и отговори</string>
+    <string name="can_trace_exchange_completed">Завършено</string>
+    <string name="can_trace_exchange_pending">Очаква се отговор (NRC 0x78)</string>
+    <string name="can_trace_exchange_unanswered">Няма наблюдаван отговор</string>
+    <string name="can_console_raw_tx_confirm_title">Потвърждение за изпращане на необработена CAN рамка</string>
+    <string name="can_console_raw_tx_confirm_message">Това изпраща рамка директно в CAN шината на автомобила. Неправилна рамка може да повлияе на модулите. Изпращайте само ако знаете целевата шина и идентификатор.</string>
+    <string name="can_console_tx_unverified">Изпращането на необработени CAN рамки е изключено: няма реален отговор от ECU при проверката за предаване само за четене.</string>
+    <string name="can_trace_clear_filters">Изчисти филтрите</string>
+    <string name="can_trace_filter_invalid">Невалиден CAN ID или префикс на данните.</string>
+    <string name="can_trace_flow_control_heading">Управление на потока ISO-TP</string>
+    <string name="cal_expert_block_recovery">Няма проверена процедура за възстановяване за тази точна цел.</string>
+    <string name="cal_expert_block_driver">Няма свързан проверен драйвер за хардуерно програмиране.</string>
+    <string name="cal_expert_identity_notice">Въведените означения и хешове са наблюдения, а не доказателство за хардуерна съвместимост.</string>
+    <string name="flexfuel_lfx2012_simulation_warning">СИМУЛАЦИЯ: тези идентификатори ECU не са прочетени от реален автомобил и не потвърждават неговия фърмуер.</string>
+    <string name="cal_expert_block_memory_map">Картата на паметта и защитените области не са проверени.</string>
+    <string name="flexfuel_preflight_backup">Оригиналното резервно копие на ECU не е проверено.</string>
 </resources>
