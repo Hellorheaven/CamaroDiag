@@ -237,17 +237,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val hasLegacyCurrentVehicle = settingsPreferences.contains("vehicle_vin") ||
                     settingsPreferences.contains("vehicle_year")
                 if (legacy.isEmpty() && historyCount == 0 && !hasLegacyCurrentVehicle) return@launch
-                // Commit the historical session ownership before marking the
-                // migration complete; retry stays possible if Room fails.
-                sessionDao.claimUnassignedSessions(uid)
+                // Keep retries idempotent: a partial import must never create
+                // duplicate vehicles when Room or settings persistence fails.
                 val existing = loadSavedVehicleProfiles(
                     accountVehiclePreferences(uid).getString("saved_vehicle_profiles", "[]").orEmpty()
                 )
                 val ids = existing.mapTo(mutableSetOf()) { it.id }
-                val imported = legacy.map { profile ->
-                    if (ids.add(profile.id)) profile
-                    else profile.copy(id = UUID.randomUUID().toString())
-                }
+                val imported = legacy.filter { profile -> ids.add(profile.id) }
                 val oldCurrent = if (hasLegacyCurrentVehicle) {
                     loadVehicleProfile(settingsPreferences)
                 } else null
@@ -265,6 +261,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val merged = existing + imported + listOfNotNull(currentProfile)
                 persistSavedVehicleProfiles(merged, ownerUid = uid)
+                // Claim the historical Room rows only after the destination garage
+                // is persisted; a failure remains retryable without duplicates.
+                sessionDao.claimUnassignedSessions(uid)
                 settingsPreferences.edit { putString("legacy_vehicles_claimed_uid", uid) }
                 if (authenticatedAccountUid == uid) {
                     _savedVehicles.value = merged
