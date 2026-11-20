@@ -32,6 +32,25 @@ class ObdTransportConnectionStateTest {
     }
 
     @Test
+    fun usbAndWifiRequireTheirOwnLiveConnectionState() {
+        assertFalse(ObdTransportConnectionState.isCommandChannelAvailable(
+            false, false, "USB"
+        ))
+        assertFalse(ObdTransportConnectionState.isCommandChannelAvailable(
+            false, false, "WIFI"
+        ))
+        assertTrue(ObdTransportConnectionState.isCommandChannelAvailable(
+            false, false, "USB", usbConnected = true
+        ))
+        assertTrue(ObdTransportConnectionState.isCommandChannelAvailable(
+            false, false, "WIFI", wifiConnected = true
+        ))
+        assertFalse(ObdTransportConnectionState.isCommandChannelAvailable(
+            false, false, "USB", usbConnected = true, isSimulationActive = true
+        ))
+    }
+
+    @Test
     fun demoAndSimulationNeverExposePhysicalCommandChannel() {
         assertFalse(ObdTransportConnectionState.isCommandChannelAvailable(
             true, false, "USB"
