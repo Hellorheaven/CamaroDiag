@@ -1196,6 +1196,27 @@ fun LiveDataScreen(
         )
     }
     val localeFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+    // Existing Android translations take precedence over legacy bilingual catalog labels.
+    // Unknown/discovered technical signals retain their stable ID and legacy fallback.
+    val sensorLabelResources = mapOf(
+        "RPM" to R.string.live_pid_rpm,
+        "ECT" to R.string.live_pid_ect,
+        "STFT" to R.string.live_pid_stft,
+        "LTFT" to R.string.live_pid_ltft,
+        "BAT" to R.string.live_pid_bat,
+        "SPD" to R.string.live_pid_speed,
+        "TPS" to R.string.live_pid_throttle,
+        "LOAD" to R.string.live_pid_load,
+        "MAP" to R.string.live_pid_map,
+        "IAT" to R.string.live_pid_iat,
+        "MAF" to R.string.live_pid_maf,
+        "ETHANOL" to R.string.live_pid_ethanol
+    )
+    val sensorContext = LocalContext.current
+    val sensorLabels = liveCatalog.associate { signal ->
+        signal.id to (sensorLabelResources[signal.id]?.let(sensorContext::getString)
+            ?: if (localeFrench) signal.labelFr else signal.labelEn)
+    }
     val activePidIds = selectedPidIds ?: allPidIds
     val visiblePids = pids.filter { it.id in activePidIds }
 
@@ -1221,7 +1242,8 @@ fun LiveDataScreen(
                             liveCatalog.filter { signal ->
                                 sensorQuery.isBlank() || signal.id.contains(sensorQuery, true) ||
                                     signal.labelEn.contains(sensorQuery, true) ||
-                                    signal.labelFr.contains(sensorQuery, true)
+                                    signal.labelFr.contains(sensorQuery, true) ||
+                                    sensorLabels[signal.id].orEmpty().contains(sensorQuery, true)
                             },
                             key = { it.id }
                         ) { signal ->
@@ -1242,7 +1264,7 @@ fun LiveDataScreen(
                                     }
                                 )
                                 Column {
-                                    Text(if (localeFrench) signal.labelFr else signal.labelEn)
+                                    Text(sensorLabels[signal.id] ?: signal.id)
                                     Text(signal.id, color = TextMuted, fontSize = 11.sp)
                                     if (!measured) {
                                         Text(stringResource(R.string.obd_sensor_not_measured),
