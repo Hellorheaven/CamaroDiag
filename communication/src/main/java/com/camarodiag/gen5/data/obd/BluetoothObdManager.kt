@@ -259,7 +259,7 @@ class BluetoothObdManager(context: Context) {
         }
         commandSessionMutex.lock()
         try {
-            transportSessionEpoch.requireCurrent(requestedEpoch)
+            transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(isObdCommandChannelAvailable) {
                 "OBD command channel disconnected while waiting for the previous operation."
             }
@@ -332,7 +332,7 @@ class BluetoothObdManager(context: Context) {
         }
 
         commandSessionMutex.withLock {
-            transportSessionEpoch.requireCurrent(requestedEpoch)
+            transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(isObdCommandChannelAvailable) { "CAN monitor connection changed while waiting." }
             val isStnAdapter = capabilities.tier == AdapterTier.PRO_STN
             // STMA emits ISO-15765 OBD messages on STN devices; STM is required for raw CAN frames.
@@ -420,7 +420,7 @@ class BluetoothObdManager(context: Context) {
         }
 
         commandSessionMutex.withLock {
-            transportSessionEpoch.requireCurrent(requestedEpoch)
+            transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(isObdCommandChannelAvailable) { "CAN transmission connection changed while waiting." }
             val protocol = if (frame.isExtended) "7" else "6"
             val header = if (frame.isExtended) {
@@ -473,7 +473,7 @@ class BluetoothObdManager(context: Context) {
         val requestedEpoch = transportSessionEpoch.capture()
         return withContext(Dispatchers.IO) {
             commandSessionMutex.withLock {
-                transportSessionEpoch.requireCurrent(requestedEpoch)
+                transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
                 // Adapter probing calls this before capability detection has cleared
                 // demo mode. The epoch check is valid here; a channel-available
                 // check would incorrectly reject every initial ATZ/0100 probe.
