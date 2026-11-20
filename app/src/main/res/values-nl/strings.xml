@@ -757,4 +757,24 @@
     <string name="flexfuel_lfx2012_simulation_warning">SIMULATIE: deze ECU-identificaties zijn niet uit een echt voertuig gelezen en kunnen de firmware niet valideren.</string>
     <string name="cal_expert_block_memory_map">Doelgeheugenindeling en beveiligde gebieden zijn niet geverifieerd.</string>
     <string name="flexfuel_preflight_backup">De oorspronkelijke ECU-back-up is niet geverifieerd.</string>
+    <string name="cal_expert_title">Expertmodus — ECU op testbank / chip</string>
+    <string name="cal_expert_expand">Expertmodus configureren</string>
+    <string name="cal_expert_collapse">Expertinstellingen verbergen</string>
+    <string name="cal_expert_family">Controllerfamilie (E39 of E39A)</string>
+    <string name="cal_expert_chip">Waargenomen chipmarkering</string>
+    <string name="cal_expert_programmer">Werkbankprogrammeerapparaat / interface</string>
+    <string name="cal_expert_access_title">Toegangsmethode</string>
+    <string name="cal_expert_access_boot">BOOT / BAM</string>
+    <string name="cal_expert_access_nexus">Nexus / JTAG</string>
+    <string name="cal_expert_access_chipoff">Extern geheugen, uitgenomen chip</string>
+    <string name="cal_expert_region_title">Geheugengebied</string>
+    <string name="cal_expert_region_pflash">Intern MCU-programmaflashgeheugen</string>
+    <string name="cal_expert_region_dflash">MCU-dataflashgeheugen</string>
+    <string name="cal_expert_region_eeprom">Externe EEPROM</string>
+    <string name="cal_expert_blockers">Openstaande expertcontroles</string>
+    <string name="cal_expert_block_controller">Controleer de exacte controllerfamilie (E39/E39A).</string>
+    <string name="cal_expert_block_chip">Identificeer de fysieke markering van de MCU of geheugenchip.</string>
+    <string name="cal_expert_block_programmer">Identificeer een compatibel werkbankprogrammeerapparaat.</string>
+    <string name="cal_expert_block_image_missing">Importeer een niet-leeg firmwarebestand.</string>
+    <string name="cal_expert_block_image_format">Voor deze voorbereiding is een onbewerkt binair bestand vereist.</string>
 </resources>
