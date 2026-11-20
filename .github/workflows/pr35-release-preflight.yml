@@ -1,8 +1,8 @@
-name: PR35 pre-merge Release validation
+name: PR54 Release size and compatibility checkpoint
 on:
   push:
     branches:
-      - feat/live-can-monitor
+      - feat/flexfuel-lfx-2012
     paths:
       - .github/workflows/pr35-release-preflight.yml
   workflow_dispatch:
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pr35-release-preflight-results
+          name: pr54-release-optimization-results
           path: |
             app/build/outputs/apk/release/*.apk
             **/build/reports/lint-results-*.xml
