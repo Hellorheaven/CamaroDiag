@@ -554,4 +554,9 @@
     <string name="update_later">Senare</string>
     <string name="update_ready_to_install">CamaroDiag – klar för installation</string>
     <string name="update_version_channel">Version %1$s • %2$s</string>
+    <string name="vin_photo_cancelled">Fotograferingen av VIN avbröts.</string>
+    <string name="vin_photo_success">VIN hittades och kopierades till fordonsprofilen. Kontrollera varje tecken.</string>
+    <string name="vin_photo_not_found">Inget giltigt VIN med 17 tecken hittades. Ange det manuellt eller ta ett nytt foto.</string>
+    <string name="vin_photo_error">VIN kunde inte läsas från fotot. Försök igen med bättre ljus och skärpa.</string>
+    <string name="vehicle_vin_placeholder">17 tecken</string>
 </resources>
