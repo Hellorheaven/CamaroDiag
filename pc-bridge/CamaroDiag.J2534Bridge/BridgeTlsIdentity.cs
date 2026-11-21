@@ -4,10 +4,12 @@ using System.Security.Cryptography.X509Certificates;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// Fresh ephemeral identity for each bridge process. The authenticated Android
-/// client receives the SHA-256 certificate fingerprint out of band in the
-/// operator-displayed pairing code. Neither certificates nor private keys are
-/// written to disk; TLS is mandatory before the first pairing token is sent.
+/// Fresh TLS identity for each bridge process. Android pins the SHA-256
+/// certificate fingerprint from the local pairing code. On Windows, Schannel
+/// requires a non-ephemeral private key handle, so the generated certificate
+/// is imported with a temporary, user-scoped key (no PersistKeySet). No PFX
+/// file or trusted CA entry is created; disposal releases the temporary key.
+/// TLS must complete before any pairing token is sent.
 /// </summary>
 internal sealed class BridgeTlsIdentity : IDisposable
 {
@@ -33,10 +35,30 @@ internal sealed class BridgeTlsIdentity : IDisposable
             new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, true));
         // Small clock skew tolerated. The certificate changes at each bridge
         // restart, so the operator must pair with a fresh displayed code.
-        var certificate = request.CreateSelfSigned(
+        using var generated = request.CreateSelfSigned(
             DateTimeOffset.UtcNow.AddMinutes(-5),
             DateTimeOffset.UtcNow.AddDays(1));
-        return new BridgeTlsIdentity(certificate);
+        // Windows Schannel cannot reliably use a purely ephemeral private
+        // key from CertificateRequest.CreateSelfSigned. Export only to RAM,
+        // then import into the current user's *temporary* key storage.
+        // Do not use PersistKeySet or MachineKeySet (no admin required).
+        var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var pkcs12 = generated.Export(X509ContentType.Pkcs12, password);
+        try
+        {
+            var usable = new X509Certificate2(
+                pkcs12, password, X509KeyStorageFlags.UserKeySet);
+            if (!usable.HasPrivateKey)
+            {
+                usable.Dispose();
+                throw new CryptographicException("TLS identity is missing its private key.");
+            }
+            return new BridgeTlsIdentity(usable);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(pkcs12);
+        }
     }
 
     public void Dispose() => Certificate.Dispose();
