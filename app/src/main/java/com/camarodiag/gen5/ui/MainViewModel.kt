@@ -25,7 +25,6 @@ import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
-import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.toDiagnosticDtc
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
