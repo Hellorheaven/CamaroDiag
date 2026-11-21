@@ -171,7 +171,7 @@
     <string name="cal_read_uds_did">Read UDS DID</string>
     <string name="cal_read_uds_dtcs">Read UDS DTCs</string>
     <string name="cal_uds_trouble_codes">UDS trouble codes (0x19)</string>
-    <string name="cal_native_catalog_title">CAMARODIAG FIRST-PARTY CATALOG</string>
+    <string name="cal_native_catalog_title">CamaroDiag FIRST-PARTY CATALOG</string>
     <string name="cal_native_catalog_explanation">Definitions maintained by CamaroDiag, independent from community catalogues. Proposed or documented definitions are never sent to an ECU.</string>
     <string name="cal_native_catalog_loading">Loading first-party catalogue…</string>
     <string name="cal_native_catalog_empty">No proprietary Camaro DID is currently declared as usable. Unknown addresses and scaling are not fabricated.</string>
