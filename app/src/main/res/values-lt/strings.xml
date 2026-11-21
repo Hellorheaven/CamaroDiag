@@ -586,4 +586,11 @@
     <string name="msg_live_csv_exported">CSV žurnalas eksportuotas. Mėginių skaičius: %1$d.</string>
     <string name="msg_live_csv_export_failed">Nepavyko eksportuoti CSV žurnalo.</string>
     <string name="msg_live_recording_max_samples">Pasiekta saugos riba (%1$d). Įrašymas automatiškai sustabdytas.</string>
+    <string name="msg_cal_file_import_failed">Nepavyko importuoti kalibravimo failo.</string>
+    <string name="msg_cal_file_export_failed">Nepavyko eksportuoti kalibravimo failo.</string>
+    <string name="msg_cal_comparison_failed">Nepavyko palyginti kalibravimo failų.</string>
+    <string name="msg_cal_template_export_failed">Nepavyko eksportuoti TSV šablono.</string>
+    <string name="msg_cal_definitions_import_failed">Nepavyko importuoti lentelių apibrėžčių.</string>
+    <string name="msg_cal_map_read_failed">Nepavyko nuskaityti pasirinktos lentelės.</string>
+    <string name="msg_cal_table_edit_failed">Nepavyko redaguoti kalibravimo lentelės.</string>
 </resources>
