@@ -587,4 +587,10 @@
     <string name="msg_cal_definitions_import_failed">A tábladefiníciók importálása sikertelen.</string>
     <string name="msg_cal_map_read_failed">A kiválasztott tábla olvasása sikertelen.</string>
     <string name="msg_cal_table_edit_failed">A kalibrációs tábla szerkesztése sikertelen.</string>
+    <string name="cal_expert_image_selected">Importált fájl: %1$s</string>
+    <string name="cal_expert_patch_address">A memóriaterület kezdőcíme (hexadecimális)</string>
+    <string name="cal_expert_patch_erase_bytes">Törlési szektor mérete (bájt)</string>
+    <string name="cal_expert_patch_program_bytes">Programozási egység mérete (bájt)</string>
+    <string name="cal_expert_patch_preview_button">A módosított BIN által érintett szektorok előnézete</string>
+    <string name="cal_expert_patch_summary">Módosult bájtok: %1$d. Érintett törlési szektorok: %2$d. A hardver memóriatérképe nincs ellenőrizve. Írás nem történt.</string>
 </resources>
