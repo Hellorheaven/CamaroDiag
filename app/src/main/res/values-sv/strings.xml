@@ -579,4 +579,10 @@
     <string name="msg_cal_definitions_import_failed">Det gick inte att importera tabelldefinitionerna.</string>
     <string name="msg_cal_map_read_failed">Det gick inte att läsa den valda tabellen.</string>
     <string name="msg_cal_table_edit_failed">Det gick inte att redigera kalibreringstabellen.</string>
+    <string name="cal_expert_image_selected">Importerad fil: %1$s</string>
+    <string name="cal_expert_patch_address">Minnesområdets startadress (hex)</string>
+    <string name="cal_expert_patch_erase_bytes">Raderingssektorns storlek (byte)</string>
+    <string name="cal_expert_patch_program_bytes">Programmeringsenhetens storlek (byte)</string>
+    <string name="cal_expert_patch_preview_button">Förhandsvisa sektorer som påverkas av den ändrade BIN-filen</string>
+    <string name="cal_expert_patch_summary">Ändrade byte: %1$d. Berörda raderingssektorer: %2$d. Hårdvarans minneskarta har inte verifierats. Ingen skrivning har utförts.</string>
 </resources>
