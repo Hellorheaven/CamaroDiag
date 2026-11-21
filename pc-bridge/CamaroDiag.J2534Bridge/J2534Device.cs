@@ -88,6 +88,7 @@ internal sealed class J2534Device : IDisposable
     public string AdapterName => _adapter.Name;
     public string DriverPath => _adapter.FunctionLibrary;
     public bool IsOpen => _opened;
+    public string ResponseCanIdLabel => _responseCanId.ToString(_can29Bit ? "X8" : "X3");
     public bool IsMemoryReadEnabled => _memoryReadScope != null && _memoryReadVinVerified;
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]

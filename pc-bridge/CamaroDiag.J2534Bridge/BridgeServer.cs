@@ -177,6 +177,7 @@ internal sealed class BridgeServer
                         {
                             ok = true,
                             identity,
+                            responseCanId = device.ResponseCanIdLabel,
                             readOnly = true,
                             flashQualified = false
                         }));
