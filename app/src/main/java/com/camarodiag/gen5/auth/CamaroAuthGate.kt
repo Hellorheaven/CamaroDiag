@@ -103,7 +103,12 @@ fun CamaroAuthGate(
                     val providerIds = user.providerData.map { it.providerId }
                     // Owner claim is signed by Firebase Admin. Paying users
                     // require a SECOND proof from Firestore's SERVER, never cache.
-                    accessLevel = LicenseAccessPolicy.resolve(
+                    accessLevel = if (!LicenseRolloutConfig.ENABLED) {
+                        // Licensing is staged but disconnected: normal functions
+                        // remain available without license lookup or payment.
+                        if (OwnerFunctionalTestPolicy.isAllowed(providerIds, verifiedClaims))
+                            LicenseLevel.OWNER else LicenseLevel.PREMIUM
+                    } else LicenseAccessPolicy.resolve(
                         uid = targetUid,
                         email = user.email,
                         emailVerified = user.isEmailVerified,
@@ -111,7 +116,7 @@ fun CamaroAuthGate(
                         signedClaims = verifiedClaims,
                         license = null
                     )
-                    if (accessLevel != LicenseLevel.OWNER &&
+                    if (LicenseRolloutConfig.ENABLED && accessLevel != LicenseLevel.OWNER &&
                         verifiedClaims[LicenseAccessPolicy.PREMIUM_CLAIM] == true
                     ) {
                         FirebaseFirestore.getInstance().collection("licenses")
@@ -158,6 +163,10 @@ fun CamaroAuthGate(
                             lastValidated, System.currentTimeMillis()
                         )
                     if (offlineGrace) {
+                        // Ordinary diagnostics remain available; private tools
+                        // stay locked until a fresh signed Google token is checked.
+                        accessLevel = if (LicenseRolloutConfig.ENABLED)
+                            LicenseLevel.FREE else LicenseLevel.PREMIUM
                         validatedAccountUid = targetUid
                         validatedUser = user
                         latestOnAccountChanged(targetUid)
