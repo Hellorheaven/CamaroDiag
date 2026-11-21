@@ -1620,24 +1620,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )?.use { cursor ->
                         if (cursor.moveToFirst()) cursor.getString(0) else null
                     } ?: uri.lastPathSegment ?: "can-trace.asc"
-                    val bytes = resolver.openInputStream(uri)?.use { input ->
-                        val output = java.io.ByteArrayOutputStream()
-                        val buffer = ByteArray(8192)
-                        var total = 0
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            total += count
-                            require(total <= 32 * 1024 * 1024) {
-                                localizedContext.getString(R.string.msg_trace_too_large)
-                            }
-                            output.write(buffer, 0, count)
-                        }
-                        output.toByteArray()
-                    } ?: error(localizedContext.getString(R.string.msg_trace_open_failed))
-                    require(bytes.isNotEmpty()) { localizedContext.getString(R.string.msg_trace_empty) }
-                    CanTraceAnalyzer.analyze(bytes.toString(Charsets.UTF_8), displayName)
+                    val trace = resolver.openInputStream(uri)?.use { it.readCanTraceText(32 * 1024 * 1024) }
+                        ?: throw CanTraceInputException(R.string.msg_trace_open_failed)
+                    CanTraceAnalyzer.analyze(trace, displayName)
                 }
                 val localizedErrors = report.errors.map(::localizedCanTraceError)
                 val localizedReport = report.copy(errors = localizedErrors)
@@ -1661,10 +1646,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                currentCoroutineContext().ensureActive()
+                val message = when (error) {
+                    is CanTraceInputException -> error.messageRes
+                    is java.io.IOException, is SecurityException -> R.string.msg_trace_open_failed
+                    else -> R.string.msg_trace_analysis_failed
+                }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isTraceAnalyzing = false,
                     canTraceReport = null,
-                    traceMessage = localizedContext.getString(R.string.msg_trace_analysis_failed)
+                    traceMessage = localizedContext.getString(message)
                 )
             }
         }

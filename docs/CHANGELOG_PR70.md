@@ -140,3 +140,8 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Au commit `31e6e7e8`, le contrôle Android compte 192 tests du module application réussis sur 193. Le test de couverture des traductions échoue encore pour 14 langues (4 456 traductions manquantes au total). Le noyau ECU a passé ses tests sur hôte. La qualification E39/E39A sur banc reste ouverte.
 - La méthode de copie de l’identité GMLAN est désormais privée, comme son constructeur. Cette correction traite l’avertissement du compilateur Kotlin relevé au même commit.
 - Sur `31e6e7e8`, le lint des sept modules Android est passé sans avertissement. Les APK Debug et de tests instrumentés ont été compilés et les artefacts vérifiés. Le test de traduction en échec empêche le lancement des tests sur émulateur.
+
+## Traces CAN et traductions
+
+- À l’ouverture d’une seconde trace CAN ou au changement de compte, l’analyse précédente est annulée. L’écran distingue un fichier vide, un fichier inaccessible et un dépassement de la limite locale de 32 Mio.
+- 602 traductions ajoutées dans 14 langues pour la lecture du VIN sur photo, la capture CAN, les enregistrements OBD, la calibration hors ligne, les moniteurs GM et les unités.
