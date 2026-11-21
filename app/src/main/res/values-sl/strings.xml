@@ -604,4 +604,6 @@
     <string name="msg_usb_identifier_unavailable">Identifikator naprave USB ni na voljo</string>
     <string name="msg_simulation_activation_failed">Načina simulacije ni bilo mogoče vklopiti.</string>
     <string name="msg_live_simulation_active">Simulacija je vključena. Prikazane vrednosti niso iz vozila.</string>
+    <string name="msg_mileage_audit_failed">Branje podatkov za preverjanje kilometrine ni uspelo.</string>
+    <string name="msg_session_delete_failed">Shranjene seje ni bilo mogoče izbrisati.</string>
 </resources>
