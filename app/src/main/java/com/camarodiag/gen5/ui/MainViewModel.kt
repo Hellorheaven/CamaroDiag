@@ -1389,11 +1389,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val observation = _calibrationWorkspace.value
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (authenticatedAccountUid != accountUid) return@launch
+                if (authenticatedAccountUid != accountUid || _vehicle.value != profile) return@launch
                 require(
                     observation.ecuVinResponse.isNotBlank() ||
                         observation.calibrationIdResponse.isNotBlank() ||
-                        observation.cvnResponse.isNotBlank()
+                        observation.cvnResponse.isNotBlank() || observation.gmlanIdentity != null
                 ) { "No observed ECU identity can be exported." }
                 val missing = localizedContext.getString(R.string.obd_not_available)
                 fun reported(value: String): String? = value.trim().takeIf {
@@ -1406,7 +1406,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val report = JSONObject().apply {
                     put("format", "CamaroDiag-ecu-identity-v1")
-                    put("source", "SAE-J1979-Mode09-read-only")
+                    val hasMode09 = listOf(observation.ecuVinResponse, observation.calibrationIdResponse,
+                        observation.cvnResponse, observation.ecuNameResponse).any { reported(it) != null }
+                    put("source", if (hasMode09) "SAE-J1979-Mode09-read-only" else "J2534-GMLAN-read-only")
+                    observation.gmlanIdentity?.let { identity ->
+                        put("gmlanIdentity", JSONObject().apply {
+                            put("source", "GMLAN-1A-physical-J2534")
+                            put("vin", identity.vin)
+                            put("operatingSystemId", identity.operatingSystemId)
+                            put("osDid", identity.osDid)
+                            put("responseCanId", identity.responseCanId)
+                            put("physicalRead", true)
+                            put("readOnly", true)
+                            put("flashQualified", false)
+                        })
+                    }
                     put("exportedAtUtcMillis", System.currentTimeMillis())
                     put("vehicleYear", profile.modelYear)
                     put("vehicleEngine", profile.engine.rpo)
@@ -1440,7 +1454,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("firmwareCompatibilityValidated", false)
                     put("calibrationWritingPermitted", false)
                 }
-                if (authenticatedAccountUid != accountUid) return@launch
+                if (authenticatedAccountUid != accountUid || _vehicle.value != profile) return@launch
                 val output = getApplication<Application>().contentResolver
                     .openOutputStream(destinationUri, "w")
                     ?: error("Cannot create ECU identity report.")

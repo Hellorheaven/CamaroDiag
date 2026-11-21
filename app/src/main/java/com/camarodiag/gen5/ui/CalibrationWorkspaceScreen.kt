@@ -486,7 +486,7 @@ fun CalibrationWorkspaceScreen(
                             enabled = !state.isReading &&
                                 (state.ecuVinResponse.isNotBlank() ||
                                     state.calibrationIdResponse.isNotBlank() ||
-                                    state.cvnResponse.isNotBlank()),
+                                    state.cvnResponse.isNotBlank() || state.gmlanIdentity != null),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.flexfuel_lfx2012_export_fingerprint))
@@ -705,6 +705,13 @@ fun CalibrationWorkspaceScreen(
                                         }
                                     } else Text(stringResource(R.string.cal_vin_profile_not_set),
                                         color = CamaroAmber, fontSize = 11.sp)
+                                    OutlinedButton(
+                                        onClick = onExportIdentification,
+                                        enabled = !state.isReading && !state.isGmlanReading,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(stringResource(R.string.flexfuel_lfx2012_export_fingerprint))
+                                    }
                                 }
                                 HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                             }
