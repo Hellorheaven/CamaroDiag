@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.net.Uri
 import com.camarodiag.gen5.R
 import androidx.compose.ui.res.stringResource
@@ -23,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -36,8 +36,8 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun DebugDownloadsScreen() {
-    val french = LocalConfiguration.current.locales[0].language == "fr"
     val errorText = stringResource(R.string.debug_builds_error)
+    val browserError = stringResource(R.string.debug_builds_no_browser)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
@@ -64,9 +64,15 @@ internal fun DebugDownloadsScreen() {
     fun openDownload(artifact: DebugBuildArtifact) {
         // The selected link is constructed from validated numeric GitHub IDs;
         // never accept an arbitrary URL from remote JSON.
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(artifact.downloadPage()))
-        )
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(artifact.downloadPage()))
+            )
+        } catch (_: ActivityNotFoundException) {
+            error = browserError
+        } catch (_: SecurityException) {
+            error = browserError
+        }
     }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -75,14 +81,7 @@ internal fun DebugDownloadsScreen() {
                 Text(stringResource(R.string.debug_builds_title),
                     style = MaterialTheme.typography.titleLarge)
                 Text(
-                    if (french)
-                        "Télécharge les derniers artefacts Debug de la PR #70. " +
-                            "GitHub demande une connexion à un compte GitHub autorisé. " +
-                            "Le fichier téléchargé est une archive ZIP à extraire."
-                    else
-                        "Download the latest PR #70 Debug artifacts. " +
-                            "GitHub requires sign-in with a permitted GitHub account. " +
-                            "The download is a ZIP archive to extract.",
+                    stringResource(R.string.debug_builds_intro),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 OutlinedButton(onClick = { scope.launch { refresh() } }, enabled = !loading) {
@@ -95,10 +94,8 @@ internal fun DebugDownloadsScreen() {
         item {
             DebugArtifactCard(
                 title = "Android Debug",
-                description = if (french) "Archive contenant l’APK Android Debug."
-                else "Archive containing the Android Debug APK.",
+                description = stringResource(R.string.debug_builds_android_archive),
                 artifact = listing.android,
-                french = french,
                 enabled = !loading,
                 onOpen = ::openDownload
             )
@@ -106,25 +103,15 @@ internal fun DebugDownloadsScreen() {
         item {
             DebugArtifactCard(
                 title = "Windows J2534 Debug",
-                description = if (french) "Archive contenant les installateurs Windows x64 et x86."
-                else "Archive containing the Windows x64 and x86 installers.",
+                description = stringResource(R.string.debug_builds_windows_archive),
                 artifact = listing.windows,
-                french = french,
                 enabled = !loading,
                 onOpen = ::openDownload
             )
         }
         item {
             Text(
-                if (french)
-                    "Les artefacts expirent après 30 jours. Ils peuvent provenir " +
-                        "d’une compilation non validée : leur disponibilité ne garantit " +
-                        "ni une CI verte ni des tests sur véhicule. Les APK Debug ne sont " +
-                        "pas forcément compatibles avec la signature de la version publique."
-                else
-                    "Artifacts expire after 30 days. Availability does not certify " +
-                        "a passing CI run or physical vehicle testing. Debug APKs " +
-                        "may have a different package/signature than production builds.",
+                stringResource(R.string.debug_builds_caution),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -136,7 +123,6 @@ private fun DebugArtifactCard(
     title: String,
     description: String,
     artifact: DebugBuildArtifact?,
-    french: Boolean,
     enabled: Boolean,
     onOpen: (DebugBuildArtifact) -> Unit
 ) {
@@ -154,12 +140,12 @@ private fun DebugArtifactCard(
                 )
             } else {
                 Text(
-                    "Commit : " + artifact.headSha.take(12) +
-                        " · " + (if (french) "Créé" else "Created") + " : " + artifact.createdAt,
+                    "Commit: " + artifact.headSha.take(12) +
+                        " · " + stringResource(R.string.debug_builds_created) + ": " + artifact.createdAt,
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    (if (french) "Expiration : " else "Expires: ") + artifact.expiresAt,
+                    stringResource(R.string.debug_builds_expires) + ": " + artifact.expiresAt,
                     style = MaterialTheme.typography.bodySmall
                 )
                 Button(onClick = { onOpen(artifact) }, enabled = enabled) {
