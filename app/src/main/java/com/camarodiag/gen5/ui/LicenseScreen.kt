@@ -96,7 +96,9 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                             .call()
                             .addOnCompleteListener { task ->
                                 busy = false
-                                val data = task.result?.data as? Map<*, *>
+                                val data = if (task.isSuccessful) {
+                                    task.result?.data as? Map<*, *>
+                                } else null
                                 val url = data?.get("url") as? String
                                 // No arbitrary remote redirect URL.
                                 if (task.isSuccessful &&
@@ -107,6 +109,10 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                                             Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                         )
                                     } catch (_: ActivityNotFoundException) {
+                                        error = if (french)
+                                            "Aucun navigateur disponible."
+                                        else "No browser available."
+                                    } catch (_: SecurityException) {
                                         error = if (french)
                                             "Aucun navigateur disponible."
                                         else "No browser available."
