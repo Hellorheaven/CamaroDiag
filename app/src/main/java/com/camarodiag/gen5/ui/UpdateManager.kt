@@ -238,7 +238,7 @@ fun AboutUpdateCard() {
                         downloadId = pending.downloadId
                         downloadedApk = staged
                         downloading = false
-                        status = context.getString(R.string.update_download_complete)
+                        status = context.getString(R.string.update_ready_to_install)
                     } else {
                         withContext(Dispatchers.IO) {
                             CamaroDiagUpdateCleanup.discardInvalidDownload(context, pending.downloadId)
@@ -389,7 +389,8 @@ fun AboutUpdateCard() {
                         scope.launch {
                             checking = true
                             update = null
-                            downloadedApk = null
+                            // Preserve an already verified APK so checking the
+                            // latest release does not force another download.
                             status = null
                             try {
                                 val result = CamaroDiagUpdateChecker.check(context)
