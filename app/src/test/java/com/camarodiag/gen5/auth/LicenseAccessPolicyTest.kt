@@ -30,6 +30,17 @@ class LicenseAccessPolicyTest {
         assertEquals(LicenseLevel.FREE, check(claims = mapOf(LicenseAccessPolicy.PREMIUM_CLAIM to "true")))
     }
 
+    @Test fun normalizationMatchesServerForCompatibilityCharacters() {
+        assertEquals("user@example.com", LicenseAccessPolicy.normalizeEmail(" Ｕｓｅｒ＠Ｅｘａｍｐｌｅ．ｃｏｍ "))
+        assertEquals(LicenseLevel.PREMIUM, check(email = "Ｕｓｅｒ＠Ｅｘａｍｐｌｅ．ｃｏｍ"))
+        assertEquals(LicenseLevel.FREE, check(email = "other@example.com"))
+    }
+
+    @Test fun expiredPerpetualGrantIsRejected() {
+        assertEquals(LicenseLevel.FREE, check(record = valid.copy(expiresAtEpochMillis = now)))
+        assertEquals(LicenseLevel.PREMIUM, check(record = valid.copy(expiresAtEpochMillis = now + 1)))
+    }
+
     @Test fun subscriptionMustHaveFutureExpiry() {
         val subscription = valid.copy(kind = "subscription")
         assertEquals(LicenseLevel.FREE, check(record = subscription))

@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.auth
 
 import java.util.Locale
+import java.text.Normalizer
 
 /**
  * CLIENT UX gating only. The server owns billing, grants and revocation.
@@ -23,7 +24,8 @@ object LicenseAccessPolicy {
     const val PREMIUM_CLAIM = "license_active"
 
     fun normalizeEmail(email: String?): String? =
-        email?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.contains("@") }
+        email?.trim()?.let { Normalizer.normalize(it, Normalizer.Form.NFKC) }
+            ?.lowercase(Locale.ROOT)?.takeIf { it.contains("@") }
 
     fun resolve(
         uid: String?,
