@@ -867,4 +867,17 @@
     <string name="cal_archive_verified">Оба чтения совпадают. Хеши SHA-256 для сохранённых диапазонов верны.</string>
     <string name="cal_archive_partial">Копия охватывает только часть запрошенной памяти.</string>
     <string name="cal_archive_failed">Не удалось проверить ZIP-архив. Предельный размер после распаковки — 32 МиБ.</string>
+    <string name="tab_functional_tests">Функциональные тесты</string>
+    <string name="functional_tests_title">Функциональные тесты — ЭБУ и OBD</string>
+    <string name="functional_tests_readonly">Запуск доступных проверок только на чтение через подключённый физический адаптер. Остальные адаптеры и неподтверждённые ЭБУ отмечаются как НЕ ПРОВЕРЕНО. Без стирания и прошивки.</string>
+    <string name="functional_tests_run">Запустить все</string>
+    <string name="functional_tests_stop">Остановить</string>
+    <string name="functional_tests_export">Экспорт JSON</string>
+    <string name="functional_tests_summary">%1$d успешно · %2$d ошибок · %3$d не проверено</string>
+    <string name="functional_tests_passed">УСПЕШНО (физическая проверка)</string>
+    <string name="functional_tests_failed">ОШИБКА</string>
+    <string name="functional_tests_skipped">НЕ ПРОВЕРЕНО</string>
+    <string name="functional_tests_denied">Доступ запрещён: войдите в разрешённую учётную запись Google.</string>
+    <string name="functional_tests_not_connected">Физический адаптер OBD не подключён. Остальные проверки не выполнялись.</string>
+    <string name="functional_tests_cancelled">Проверки отменены.</string>
 </resources>
