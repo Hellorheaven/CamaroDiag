@@ -567,4 +567,11 @@
     <string name="vin_photo_not_found">Nem található érvényes, 17 karakteres VIN. Adja meg kézzel, vagy készítsen új fényképet.</string>
     <string name="vin_photo_error">A VIN nem olvasható a képen. Próbálja újra jobb megvilágítással és pontosabb fókuszálással.</string>
     <string name="vehicle_vin_placeholder">17 karakter</string>
+    <string name="can_sniffer_start">Rögzítés indítása</string>
+    <string name="can_sniffer_stop">Rögzítés leállítása</string>
+    <string name="can_sniffer_empty">Még nincs rögzített CAN-keret.</string>
+    <string name="can_sniffer_capture_complete">A CAN-rögzítés befejeződött.</string>
+    <string name="can_sniffer_capture_failed">A CAN-rögzítés sikertelen volt, vagy az adapter nem válaszol.</string>
+    <string name="can_sniffer_frame_count">Rögzített keretek: %1$d</string>
+    <string name="can_sniffer_filtered_count">Megjelenített keretek: %1$d / %2$d</string>
 </resources>
