@@ -185,4 +185,25 @@
     <string name="obd_sensor_ok">OK</string>
     <string name="obd_sensor_not_measured">V tomto skenu nebylo měřeno</string>
     <string name="live_selected_sensors">Zobrazené senzory (%1$d/%2$d)</string>
+    <string name="obd_scan_description">Kontrola pouze pro čtení podle SAE J1979: data hnacího ústrojí, chybové kódy, zmrazený snímek a identifikace ECU.</string>
+    <string name="obd_responding_can_ids">Odpovídající identifikátory CAN</string>
+    <string name="obd_can_id_limit_explanation">Identifikátory CAN představují odpovědi zaznamenané na funkční požadavek OBD 0100. Nestačí k identifikaci modulu (BCM, TCM, ABS, IPC, SDM) ani k povolení rozšířených služeb GM.</string>
+    <string name="obd_trigger_dtc">Spouštěcí DTC</string>
+    <string name="obd_real_scan_scope">Rozsah: výsledky pocházejí pouze ze skutečně přijatých odpovědí ECU dostupné přes OBD-II. Toto skenování se nedotazuje modulů BCM, IPC, ABS, SDM ani dalších modulů GM a nespouští ovládací ani programovací příkazy.</string>
+    <string name="connection_busy">Probíhá připojování nebo operace…</string>
+    <string name="swcan_wiring_verified">Ověřené zapojení SW-CAN (pin 1)</string>
+    <string name="long_response_mode">Režim dlouhých odpovědí (ATAL)</string>
+    <string name="adapter_none_detected">Nebyl nalezen adaptér. Spárujte OBDLink MX+, MX, LX nebo jiné adaptéry s klasickým Bluetooth; CX se vyhledává v okolí přes BLE.</string>
+    <string name="usb_connection_title">Připojení USB (OBDLink EX / SX, ELM327 a sériové adaptéry)</string>
+    <string name="adapter_connect_label">Připojit: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: přenosová architektura je připravena, ale bez oficiální sady Android SDK pro daný model nelze tvrdit kompatibilitu rozhraní J2534 s Androidem. Přístup J2534 není simulován.</string>
+    <string name="adapter_vxdiag_profiles">Deklarované profily rozhraní VXDIAG</string>
+    <string name="adapter_vxdiag_profiles_hint">Tyto profily rozlišují varianty hardwaru a spojení. Neznamenají, že je k dispozici ovladač Android nebo komunikace s vozidlem.</string>
+    <string name="adapter_simulation_profiles">Simulované hardwarové profily (test na stole)</string>
+    <string name="control_vehicle_title">Ovládání vozidla</string>
+    <string name="control_vehicle_label">Camaro %1$s • %2$s • %3$s</string>
+    <string name="control_gm_body_notice">Příkazy pro karosářské systémy GM závisejí na VIN, BCM a kalibraci. Zůstávají zakázané, dokud nebudou na tomto vozidle ověřeny DID, bezpečnostní relace a sekvence příkazů.</string>
+    <string name="status_available">DOSTUPNÉ</string>
+    <string name="status_not_equipped">NENÍ VE VÝBAVĚ</string>
+    <string name="control_no_actuation_notice">Ve výchozím nastavení se neposílají příkazy pro okna, odemykání ani akční členy. Tím se předchází chybným nebo nebezpečným příkazům.</string>
 </resources>
