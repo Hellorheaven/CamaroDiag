@@ -110,14 +110,14 @@ L'atelier permet l'analyse de fichiers locaux : import BIN/ORI/MOD, Intel HEX, M
 
 Aucun pack de tables Camaro validé n'est fourni. Les définitions doivent correspondre exactement au VIN, au calculateur, au CAL ID/CVN, à l'OS et à l'image concernée. Les formats XDF/A2L/XML ou conteneurs propriétaires non décodés ne sont pas automatiquement convertis.
 
-La lecture mémoire directe de l'ECM, l'écriture, le flashage, le recovery, les checksums GM et les procédures Seed/Key ne sont pas disponibles.
+La **lecture physique limitée d'une plage mémoire ECU** est disponible via le pont PC J2534, uniquement avec un profil de plage documenté configuré sur Windows, une correspondance VIN vérifiée et deux acquisitions concordantes. Il ne s'agit **ni d'un dump complet garanti ni d'une sauvegarde restaurable**. La lecture complète universelle de l'ECM, l'écriture physique, le flashage, le recovery, les checksums GM et les procédures Seed/Key ne sont pas disponibles.
 
 ## Fonctions non disponibles
 
 - Scan exhaustif garanti de BCM, TCM, EBCM/ABS, IPC, SDM et de tous les calculateurs GM.
 - Commandes carrosserie non validées pour le VIN, BCM et calibration.
 - Démarrage à distance générique, contournement antidémarrage ou dispositifs antivol.
-- Écriture UDS, actionneurs, codage, programmation, lecture mémoire ou flashage GM.
+- Écriture UDS, actionneurs, codage, programmation, lecture mémoire **hors profil autorisé**, dump complet garanti ou flashage GM.
 
 ## Origine des données et licences intégrées
 
