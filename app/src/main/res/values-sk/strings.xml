@@ -388,4 +388,19 @@
     <string name="functional_tests_denied">Prístup odmietnutý: prihláste sa autorizovaným účtom Google a znova sa pripojte.</string>
     <string name="functional_tests_not_connected">Nie je pripojený fyzický OBD adaptér. Ostatné kontroly sa nevykonali.</string>
     <string name="functional_tests_cancelled">Testovanie bolo zrušené.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Ladiace verzie</string>
+    <string name="tab_license">Licencia</string>
+    <string name="debug_builds_title">Súkromné ladiace verzie</string>
+    <string name="debug_builds_refresh">Obnoviť dostupné verzie</string>
+    <string name="debug_builds_download">Stiahnuť z GitHubu</string>
+    <string name="debug_builds_unavailable">Nie je dostupný platný ladiaci archív.</string>
+    <string name="debug_builds_error">Nepodarilo sa načítať ladiace verzie z GitHubu.</string>
+    <string name="license_disabled">Licenčný systém nie je aktivovaný.</string>
+    <string name="license_buy">Kúpiť licenciu</string>
+    <string name="license_refresh">Obnoviť licenciu</string>
+    <string name="license_free">Zadarmo</string>
+    <string name="license_owner">Vlastník: všetky oprávnenia</string>
+    <string name="license_premium">Plná licencia aktívna</string>
+    <string name="license_title">Licencia CamaroDiag</string>
 </resources>
