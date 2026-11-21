@@ -580,4 +580,11 @@
     <string name="msg_live_csv_exported">A CSV-napló exportálva. Minták száma: %1$d.</string>
     <string name="msg_live_csv_export_failed">A CSV-napló exportálása sikertelen.</string>
     <string name="msg_live_recording_max_samples">A biztonsági korlát elérésekor (%1$d) a rögzítés automatikusan leállt.</string>
+    <string name="msg_cal_file_import_failed">A kalibrációs fájl importálása sikertelen.</string>
+    <string name="msg_cal_file_export_failed">A kalibrációs fájl exportálása sikertelen.</string>
+    <string name="msg_cal_comparison_failed">A kalibrációs fájlok összehasonlítása sikertelen.</string>
+    <string name="msg_cal_template_export_failed">A TSV-sablon exportálása sikertelen.</string>
+    <string name="msg_cal_definitions_import_failed">A tábladefiníciók importálása sikertelen.</string>
+    <string name="msg_cal_map_read_failed">A kiválasztott tábla olvasása sikertelen.</string>
+    <string name="msg_cal_table_edit_failed">A kalibrációs tábla szerkesztése sikertelen.</string>
 </resources>
