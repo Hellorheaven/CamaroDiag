@@ -2,6 +2,8 @@ package com.camarodiag.gen5.ui
 
 import android.content.Intent
 import android.net.Uri
+import com.camarodiag.gen5.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +37,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun DebugDownloadsScreen() {
     val french = LocalConfiguration.current.locales[0].language == "fr"
+    val errorText = stringResource(R.string.debug_builds_error)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
@@ -50,8 +53,7 @@ internal fun DebugDownloadsScreen() {
             throw cancelled
         } catch (_: Exception) {
             listing = DebugBuildListing()
-            error = if (french) "Impossible de consulter les artefacts GitHub Actions. Vérifiez Internet et réessayez."
-            else "Unable to load GitHub Actions artifacts. Check connectivity and retry."
+            error = errorText
         } finally {
             loading = false
         }
@@ -70,10 +72,8 @@ internal fun DebugDownloadsScreen() {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    if (french) "Versions Debug privées" else "Private Debug builds",
-                    style = MaterialTheme.typography.titleLarge
-                )
+                Text(stringResource(R.string.debug_builds_title),
+                    style = MaterialTheme.typography.titleLarge)
                 Text(
                     if (french)
                         "Télécharge les derniers artefacts Debug de la PR #70. " +
@@ -86,7 +86,7 @@ internal fun DebugDownloadsScreen() {
                     style = MaterialTheme.typography.bodyMedium
                 )
                 OutlinedButton(onClick = { scope.launch { refresh() } }, enabled = !loading) {
-                    Text(if (french) "Actualiser les versions" else "Refresh available builds")
+                    Text(stringResource(R.string.debug_builds_refresh))
                 }
                 if (loading) CircularProgressIndicator()
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -149,8 +149,7 @@ private fun DebugArtifactCard(
             Text(description, style = MaterialTheme.typography.bodySmall)
             if (artifact == null) {
                 Text(
-                    if (french) "Aucune archive Debug encore disponible pour cette branche."
-                    else "No unexpired Debug artifact is available for this branch.",
+                    stringResource(R.string.debug_builds_unavailable),
                     style = MaterialTheme.typography.bodyMedium
                 )
             } else {
@@ -165,8 +164,7 @@ private fun DebugArtifactCard(
                 )
                 Button(onClick = { onOpen(artifact) }, enabled = enabled) {
                     Text(
-                        if (french) "Télécharger sur GitHub"
-                        else "Download from GitHub"
+                        stringResource(R.string.debug_builds_download)
                     )
                 }
             }
