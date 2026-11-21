@@ -44,8 +44,11 @@ object LicenseAccessPolicy {
             license != null && license.verifiedFromServer &&
             license.uid == uid && license.emailLower == verifiedEmail &&
             license.status == "active" &&
-            license.kind in setOf("perpetual", "subscription") &&
-            (validUntil == null || validUntil > nowEpochMillis)
+            when (license.kind) {
+                "perpetual" -> validUntil == null || validUntil > nowEpochMillis
+                "subscription" -> validUntil != null && validUntil > nowEpochMillis
+                else -> false
+            }
         ) return LicenseLevel.PREMIUM
         return LicenseLevel.FREE
     }
