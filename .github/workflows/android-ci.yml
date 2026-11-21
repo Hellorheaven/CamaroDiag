@@ -175,7 +175,19 @@ jobs:
               echo "NOT APPLICABLE to this commit: no Android-relevant files changed."
             else
               echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-              if (( commits_since_build >= interval )); then
+              # An updater change affects public file storage, APK signing
+              # validation and cleanup after package replacement. Always
+              # compile and lint it immediately, irrespective of the normal
+              # draft checkpoint used for ordinary Android edits.
+              if ! git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- \
+                  'app/src/main/java/com/camarodiag/gen5/ui/UpdateManager.kt' \
+                  'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagUpdateCleanup.kt' \
+                  'app/src/main/AndroidManifest.xml' \
+                  'app/src/main/res/xml/update_file_paths.xml' \
+                  '.github/workflows/android-ci.yml'; then
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "APK updater or CI safety-critical change: full Android Debug validation required."
+              elif (( commits_since_build >= interval )); then
                 echo "build_required=true" >> "$GITHUB_OUTPUT"
                 echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
               else
