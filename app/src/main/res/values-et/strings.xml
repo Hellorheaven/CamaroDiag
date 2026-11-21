@@ -495,4 +495,6 @@
     <string name="mileage_source_generic">Allikas %1$s</string>
     <string name="mileage_details_unavailable">Selle allika tehnilised üksikasjad pole saadaval.</string>
     <string name="mileage_caveat_unavailable">Selle allika kohta pole täiendavat lokaliseeritud teavet.</string>
+    <string name="obd_physical_can_scope">Füüsiline CAN-vastaja: 0x%1$s. Skannimine hõlmab ainult valitud OBD ECU-d, mitte kõigi moodulite funktsionaalset skannimist. GM-i programmeerimis- ega täiturikäske ei saadetud.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Lubage heitgaaside DTC-de kustutamine Windowsi sillal, ühendage uuesti, seisake mootor ja kinnitage lähtestamine. Heitgaasisüsteemide valmisolekuandmed lähtestatakse; püsikoode ei kustutata.</string>
 </resources>
