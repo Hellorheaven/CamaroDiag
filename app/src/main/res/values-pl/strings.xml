@@ -503,4 +503,21 @@
     <string name="mileage_caveat_unavailable">Brak dodatkowych informacji w wybranym języku dla tego źródła.</string>
     <string name="obd_physical_can_scope">Fizyczny węzeł CAN odpowiadający na żądanie: 0x%1$s. Skanowanie obejmuje tylko wybrany sterownik OBD, a nie funkcjonalne skanowanie wszystkich modułów. Nie wysyłano poleceń programowania GM ani elementów wykonawczych.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Włącz kasowanie DTC emisji w moście Windows, połącz ponownie, wyłącz silnik i potwierdź reset. Dane gotowości układu emisji zostaną zresetowane; kody trwałe nie zostaną usunięte.</string>
+    <string name="units_metric">SI / metryczne</string>
+    <string name="units_imperial">Imperialne</string>
+    <string name="live_pause">Wstrzymaj</string>
+    <string name="live_recording_status">Próbki: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Obwód nastawnika położenia wałka rozrządu zaworów dolotowych (bank 1)</string>
+    <string name="dtc_desc_p0011">Zbyt wczesne fazy wałka rozrządu zaworów dolotowych (bank 1)</string>
+    <string name="dtc_desc_p0014">Zbyt wczesne fazy wałka rozrządu zaworów wydechowych (bank 1)</string>
+    <string name="dtc_desc_p0087">Zbyt niskie ciśnienie w listwie lub układzie paliwowym</string>
+    <string name="dtc_desc_p0089">Nieprawidłowe działanie regulatora ciśnienia paliwa</string>
+    <string name="dtc_desc_p0191">Zakres lub działanie obwodu czujnika ciśnienia listwy paliwowej</string>
+    <string name="dtc_desc_p0299">Zbyt niskie ciśnienie doładowania turbosprężarki lub sprężarki</string>
+    <string name="cal_engine_profile">Profil silnika: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Silniki w katalogu dla roku %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Odczyt binarny: %2$s • Zweryfikowane tabele silnika: %3$s • Programowanie ECU: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • żądanie %2$s / odpowiedź %3$s • okres %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • liczba=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Tylko profil sprzętu; nadal wymagane są oficjalne Android SDK/API lub udokumentowany most.</string>
 </resources>
