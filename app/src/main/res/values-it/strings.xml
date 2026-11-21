@@ -912,4 +912,6 @@
     <string name="debug_builds_created">Creato</string>
     <string name="debug_builds_expires">Scade</string>
     <string name="debug_builds_no_browser">Nessun browser disponibile per aprire il download.</string>
+    <string name="obd_physical_can_scope">Risponditore CAN fisico: 0x%1$s. La scansione riguarda solo la centralina OBD selezionata, non una scansione funzionale di tutti i moduli. Non sono stati inviati comandi di programmazione GM o degli attuatori.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Abilitare la cancellazione dei DTC relativi alle emissioni nel bridge Windows, riconnettersi, spegnere il motore e confermare il ripristino. I dati di readiness delle emissioni saranno azzerati; i codici permanenti non vengono cancellati.</string>
 </resources>
