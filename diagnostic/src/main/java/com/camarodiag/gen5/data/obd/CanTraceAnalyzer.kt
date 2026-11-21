@@ -536,8 +536,10 @@ object CanTraceAnalyzer {
         val headerLineIndex = lines.indexOfFirst { it.isNotBlank() && !it.trimStart().startsWith("#") }
         if (headerLineIndex < 0) return ParsedFrames(emptyList(), listOf("CSV trace is empty."))
 
-        val delimiter = if (lines[headerLineIndex].count { it == ';' } >
-            lines[headerLineIndex].count { it == ',' }) ';' else ','
+        val header = lines[headerLineIndex]
+        val delimiter = listOf(',', ';', '\t').maxBy { candidate ->
+            splitCsvLine(header, candidate)?.size ?: 0
+        }
         val headerFields = splitCsvLine(lines[headerLineIndex], delimiter)
             ?: return ParsedFrames(emptyList(), listOf("CSV header contains an unclosed quote."))
         val headers = headerFields.map { it.trim().trim('"').lowercase(Locale.ROOT).replace(" ", "_") }

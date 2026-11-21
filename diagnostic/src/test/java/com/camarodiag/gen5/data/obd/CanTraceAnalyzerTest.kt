@@ -1043,4 +1043,11 @@ class CanTraceAnalyzerTest {
         assertEquals(0x7E9, report.frames.single().canId)
         assertTrue(report.errors.any { it.startsWith("Line 2:") })
     }
+    @Test
+    fun recognizesTabsAndQuotedDelimiterInCsvHeader() {
+        val tsv = CanTraceAnalyzer.analyze("id\tdata\n7E8\t02 41 00", "capture.tsv")
+        assertEquals(0x7E8, tsv.frames.single().canId)
+        val csv = CanTraceAnalyzer.analyze("id,data,\"note;;;;\"\n7E9,02 41 01,x", "capture.csv")
+        assertEquals(0x7E9, csv.frames.single().canId)
+    }
 }
