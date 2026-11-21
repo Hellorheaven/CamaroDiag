@@ -588,4 +588,10 @@
     <string name="cal_expert_patch_program_bytes">Veľkosť programovacej jednotky (bajty)</string>
     <string name="cal_expert_patch_preview_button">Zobraziť sektory ovplyvnené upraveným súborom BIN</string>
     <string name="cal_expert_patch_summary">Zmenené bajty: %1$d. Dotknuté sektory mazania: %2$d. Hardvérová mapa pamäte nebola overená. Zápis neprebehol.</string>
+    <string name="dtc_gm_monitor_title">Monitor motora GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Kritériá uloženia chybového kódu: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Podmienky aktivácie: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Počítadlo zlyhaní / frekvencia overovania: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Klasifikácia kontrolky MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Zdroj: GM %1$s, strana %2$d</string>
 </resources>
