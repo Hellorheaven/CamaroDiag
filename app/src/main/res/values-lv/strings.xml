@@ -570,4 +570,11 @@
     <string name="vin_photo_not_found">Derīgs 17 rakstzīmju VIN nav atrasts. Ievadiet to manuāli vai uzņemiet citu fotoattēlu.</string>
     <string name="vin_photo_error">VIN nevar nolasīt no fotoattēla. Mēģiniet vēlreiz ar labāku apgaismojumu un asāku fokusu.</string>
     <string name="vehicle_vin_placeholder">17 rakstzīmes</string>
+    <string name="can_sniffer_start">Sākt ierakstīšanu</string>
+    <string name="can_sniffer_stop">Apturēt ierakstīšanu</string>
+    <string name="can_sniffer_empty">Vēl nav ierakstīts neviens CAN kadrs.</string>
+    <string name="can_sniffer_capture_complete">CAN kadru ierakstīšana pabeigta.</string>
+    <string name="can_sniffer_capture_failed">CAN kadru ierakstīšana neizdevās vai adapteris pārstāja atbildēt.</string>
+    <string name="can_sniffer_frame_count">Ierakstītie kadri: %1$d</string>
+    <string name="can_sniffer_filtered_count">Redzami %1$d no %2$d kadriem</string>
 </resources>
