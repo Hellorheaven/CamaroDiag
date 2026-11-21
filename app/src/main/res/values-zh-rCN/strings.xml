@@ -858,4 +858,17 @@
     <string name="cal_archive_verified">两次读取的数据一致，归档地址范围的 SHA-256 哈希值校验通过。</string>
     <string name="cal_archive_partial">备份仅包含所请求内存的一部分。</string>
     <string name="cal_archive_failed">无法校验此 ZIP 文件。解压后的大小上限为 32 MiB。</string>
+    <string name="tab_functional_tests">功能测试</string>
+    <string name="functional_tests_title">功能测试 — 控制器与 OBD</string>
+    <string name="functional_tests_readonly">对当前连接的实体适配器运行所有可用的只读检查。其他接口和未验证的控制器标记为未测试。不执行清除或刷写。</string>
+    <string name="functional_tests_run">全部运行</string>
+    <string name="functional_tests_stop">停止</string>
+    <string name="functional_tests_export">导出 JSON</string>
+    <string name="functional_tests_summary">通过 %1$d 项 · 失败 %2$d 项 · 未测试 %3$d 项</string>
+    <string name="functional_tests_passed">通过（实体检查）</string>
+    <string name="functional_tests_failed">失败</string>
+    <string name="functional_tests_skipped">未测试</string>
+    <string name="functional_tests_denied">拒绝访问：请使用已授权的 Google 帐号登录。</string>
+    <string name="functional_tests_not_connected">未连接实体 OBD 适配器，其他检查未执行。</string>
+    <string name="functional_tests_cancelled">测试已取消。</string>
 </resources>
