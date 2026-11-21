@@ -60,6 +60,7 @@ import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
+import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
@@ -645,7 +646,7 @@ fun CalibrationWorkspaceScreen(
                                     },
                                     enabled = !state.isJ2534BridgeConnecting &&
                                         j2534Host.isNotBlank() && j2534Port.isNotBlank() &&
-                                        j2534Token.isNotBlank() && canIdsMatchProfile &&
+                                        J2534BridgePairingCodeFormat.isValid(j2534Token) && canIdsMatchProfile &&
                                         udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
