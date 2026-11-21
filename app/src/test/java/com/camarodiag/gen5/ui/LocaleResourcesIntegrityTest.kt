@@ -73,8 +73,14 @@ class LocaleResourcesIntegrityTest {
                     assertEquals("Brand spelling or case modified in $locale/$key",
                         "CamaroDiag", match.value)
                     val following = value.getOrNull(match.range.last + 1)
-                    assertFalse("Brand must not carry translated suffix in $locale/$key",
-                        following?.isLetter() == true)
+                    // A Korean/Japanese/Chinese particle immediately after the
+                    // unchanged brand is grammar, NOT a changed spelling.
+                    // Reject Latin-letter suffixes attached to the product name.
+                    assertFalse("Brand must not carry a Latin-letter suffix in $locale/$key",
+                        following != null && (
+                            following in 'a'..'z' || following in 'A'..'Z' ||
+                                following in '\u00C0'..'\u024F'
+                        ))
                 }
             }
         }
