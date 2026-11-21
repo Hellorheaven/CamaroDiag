@@ -1032,4 +1032,9 @@ class CanTraceAnalyzerTest {
         val report = CanTraceAnalyzer.analyze("time;id;data\n1,25;7E8;02 41 00", "capture.csv")
         assertEquals(1.25, report.frames.single().timestampSeconds!!, 0.0)
     }
+    @Test
+    fun rejectsMalformedIndexedCsvBytes() {
+        val report = CanTraceAnalyzer.analyze("id,data0\n7E8,+1\n7E8,000\n7E8,0x0F", "bytes.csv")
+        assertEquals(listOf(15), report.frames.single().data)
+    }
 }

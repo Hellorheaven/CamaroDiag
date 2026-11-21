@@ -591,8 +591,9 @@ object CanTraceAnalyzer {
                     null
                 } else {
                     val values: List<Int?> = rawValues.take(byteCount).map { value: String ->
-                        if (value.isBlank()) null else value.removePrefix("0x").removePrefix("0X")
-                            .toIntOrNull(16)?.takeIf { byte -> byte in 0..0xFF }
+                        val hex = value.removePrefix("0x").removePrefix("0X")
+                        hex.takeIf { it.length in 1..2 && it.all { c -> c.digitToIntOrNull(16) != null } }
+                            ?.toIntOrNull(16)
                     }
                     if (values.any { byte -> byte == null }) null else values.filterNotNull()
                 }
