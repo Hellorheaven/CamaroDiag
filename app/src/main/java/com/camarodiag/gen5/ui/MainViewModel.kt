@@ -1387,13 +1387,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val accountUid = authenticatedAccountUid ?: return
         val profile = _vehicle.value
         val observation = _calibrationWorkspace.value
+        val accountGeneration = accountSessionGeneration
+        val connectionGeneration = connectionAttemptGeneration
+        val mode09Generation = calibrationIdentityGeneration
+        val gmGeneration = gmlanIdentityGeneration
+        fun current() = authenticatedAccountUid == accountUid &&
+            isCurrentAccountGeneration(accountGeneration) &&
+            connectionGeneration == connectionAttemptGeneration &&
+            mode09Generation == calibrationIdentityGeneration &&
+            gmGeneration == gmlanIdentityGeneration &&
+            _vehicle.value == profile && hasPremiumLicense()
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (authenticatedAccountUid != accountUid || _vehicle.value != profile) return@launch
+                if (!current()) return@launch
                 require(
-                    observation.ecuVinResponse.isNotBlank() ||
-                        observation.calibrationIdResponse.isNotBlank() ||
-                        observation.cvnResponse.isNotBlank() || observation.gmlanIdentity != null
+                    !observation.isReading && !observation.isGmlanReading &&
+                        (observation.ecuVinResponse.isNotBlank() ||
+                            observation.calibrationIdResponse.isNotBlank() ||
+                            observation.cvnResponse.isNotBlank() ||
+                            observation.ecuNameResponse.isNotBlank() ||
+                            observation.gmlanIdentity != null)
                 ) { "No observed ECU identity can be exported." }
                 val missing = localizedContext.getString(R.string.obd_not_available)
                 fun reported(value: String): String? = value.trim().takeIf {
@@ -1454,12 +1467,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("firmwareCompatibilityValidated", false)
                     put("calibrationWritingPermitted", false)
                 }
-                if (authenticatedAccountUid != accountUid || _vehicle.value != profile) return@launch
+                if (!current()) return@launch
                 val output = getApplication<Application>().contentResolver
                     .openOutputStream(destinationUri, "w")
                     ?: error("Cannot create ECU identity report.")
                 output.use { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
-                if (authenticatedAccountUid == accountUid) {
+                if (current()) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         message = getApplication<Application>()
                             .getString(R.string.flexfuel_lfx2012_export_success)
@@ -1468,7 +1481,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (authenticatedAccountUid == accountUid) {
+                if (current()) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         message = getApplication<Application>()
                             .getString(R.string.flexfuel_lfx2012_export_failed)
