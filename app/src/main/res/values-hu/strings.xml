@@ -574,4 +574,10 @@
     <string name="can_sniffer_capture_failed">A CAN-rögzítés sikertelen volt, vagy az adapter nem válaszol.</string>
     <string name="can_sniffer_frame_count">Rögzített keretek: %1$d</string>
     <string name="can_sniffer_filtered_count">Megjelenített keretek: %1$d / %2$d</string>
+    <string name="msg_live_recording_real_started">Elindult a valós OBD-adatok rögzítése.</string>
+    <string name="msg_live_recording_started">Rögzítés folyamatban. Minták száma: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">A rögzítés leállt. Rögzített minták: %1$d.</string>
+    <string name="msg_live_csv_exported">A CSV-napló exportálva. Minták száma: %1$d.</string>
+    <string name="msg_live_csv_export_failed">A CSV-napló exportálása sikertelen.</string>
+    <string name="msg_live_recording_max_samples">A biztonsági korlát elérésekor (%1$d) a rögzítés automatikusan leállt.</string>
 </resources>
