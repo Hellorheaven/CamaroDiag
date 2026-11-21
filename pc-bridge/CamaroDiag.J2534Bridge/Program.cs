@@ -23,6 +23,10 @@ internal static class Program
         if (args.Contains("--probe-drivers", StringComparer.OrdinalIgnoreCase))
             return J2534DriverProbe.RunAll();
 
+        // Offline image check: native, no ECU, no vendor driver or network.
+        if (args.Contains("--inspect-e39-image", StringComparer.OrdinalIgnoreCase))
+            return InspectE39Image(args);
+
 
         if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
@@ -96,6 +100,50 @@ internal static class Program
         {
             Console.Error.WriteLine($"Could not listen on TCP port {port}: {ex.Message}");
             return 5;
+        }
+    }
+
+    private static int InspectE39Image(string[] args)
+    {
+        if (args.Length != 2 || !args[0].Equals("--inspect-e39-image", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine("Usage: CamaroDiag.J2534Bridge.exe --inspect-e39-image <original-3MiB.bin>");
+            return 10;
+        }
+
+        try
+        {
+            var path = Path.GetFullPath(args[1]);
+            var bytes = new FileInfo(path);
+            if (bytes.Length != NativeE39ImageInspector.ImageBytes)
+            {
+                Console.Error.WriteLine("Expected exact E39/E39A raw image length: 0x300000 bytes.");
+                return 10;
+            }
+            var report = NativeE39ImageInspector.Inspect(File.ReadAllBytes(path));
+            Console.WriteLine($"E39/E39A image status: {report.Status}");
+            if (report.OsIdentifier.HasValue)
+                Console.WriteLine($"OS ID: {report.OsIdentifier.Value}");
+            foreach (var segment in report.Segments)
+                Console.WriteLine($"  {segment.Name,-12} 0x{segment.Start:X6}..0x{segment.EndInclusive:X6}");
+            foreach (var check in report.Checks)
+                Console.WriteLine($"  {check.Name,-12} {check.Kind}: stored=0x{check.Stored:X4}, computed=0x{check.Computed:X4} " +
+                    (check.Matches ? "OK" : "MISMATCH"));
+            if (report.Reason is not null)
+                Console.Error.WriteLine("Invalid image: " + report.Reason);
+            if (report.Status == NativeE39ImageInspector.Verdict.CvnMismatch)
+                Console.Error.WriteLine("CVN mismatch: inspect the file's provenance before any programming.");
+            return report.Status switch
+            {
+                NativeE39ImageInspector.Verdict.Valid => 0,
+                NativeE39ImageInspector.Verdict.CvnMismatch => 9,
+                _ => 10
+            };
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Console.Error.WriteLine("Could not inspect image: " + error.Message);
+            return 10;
         }
     }
 
