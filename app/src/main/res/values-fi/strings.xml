@@ -408,4 +408,13 @@
     <string name="flexfuel_preflight_recovery">Palautusmenettelyä ei ole vahvistettu</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: tarkistus ennen ohjelmointia ja sen jälkeen (vain luku)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Ohjelmoinnin jälkeistä tarkistusta ei ole tehty. ECU:n ohjelmointia tai ajoneuvon testiä kirjoituksen jälkeen ei ole validoitu.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Lataa PR:n #70 uusimmat Debug-artefaktit. Kirjaudu GitHubiin hyväksytyllä tilillä. Lataukset ovat purettavia ZIP-arkistoja.</string>
+    <string name="debug_builds_android_archive">ZIP-arkisto, joka sisältää Android Debug APK:n.</string>
+    <string name="debug_builds_windows_archive">ZIP-arkisto, jossa on Windows x64- ja x86-asennusohjelmat.</string>
+    <string name="debug_builds_caution">Artefaktit vanhenevat 30 päivän kuluttua. Saatavuus ei todista onnistunutta käännöstä tai ajoneuvotestausta. Debug APK:n allekirjoitus voi erota julkisesta versiosta.</string>
+    <string name="debug_builds_created">Luotu</string>
+    <string name="debug_builds_expires">Vanhenee</string>
+    <string name="debug_builds_no_browser">Latauslinkin avaamiseen ei ole selainta.</string>
 </resources>
