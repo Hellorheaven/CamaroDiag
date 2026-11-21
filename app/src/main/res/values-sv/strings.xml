@@ -406,4 +406,34 @@
     <string name="debug_builds_created">Skapad</string>
     <string name="debug_builds_expires">Upphör</string>
     <string name="debug_builds_no_browser">Ingen webbläsare finns för att öppna nedladdningen.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Valt språk: %1$s</string>
+    <string name="settings_adapter_not_connected">Ingen adapter ansluten</string>
+    <string name="settings_last_connection">Senaste anslutningsprofil</string>
+    <string name="settings_no_last_connection">Ingen anslutningsprofil har sparats ännu.</string>
+    <string name="saved_vehicle_profiles_title">Sparade fordonsprofiler</string>
+    <string name="saved_vehicle_name_label">Profilnamn</string>
+    <string name="saved_vehicle_name_placeholder">t.ex. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Spara nuvarande fordon</string>
+    <string name="saved_vehicle_empty">Inga fordonsprofiler har sparats ännu.</string>
+    <string name="saved_vehicle_delete">Ta bort</string>
+    <string name="saved_vehicle_requires_review">Profilen skapades från ECU:ns VIN. Kontrollera modellår, motor och växellåda före diagnostik.</string>
+    <string name="saved_vehicle_ecu_default_name">Fordon från ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Ange ett profilnamn.</string>
+    <string name="msg_vehicle_profile_saved">Fordonsprofilen har sparats.</string>
+    <string name="msg_vehicle_profile_review_required">En profil skapades från ECU:ns VIN. Kontrollera år, motor och växellåda före diagnostik.</string>
+    <string name="msg_vehicle_profile_loaded">Inläst fordonsprofil: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU:n returnerade inget giltigt VIN med 17 tecken. Ingen profil skapades.</string>
+    <string name="cal_vin_matches_profile">ECU:ns VIN stämmer överens med vald fordonsprofil.</string>
+    <string name="cal_vin_mismatch_detected">VIN-AVVIKELSE — profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Den valda fordonsprofilen innehåller inget giltigt VIN.</string>
+    <string name="cal_vin_mismatch_title">VIN-avvikelse upptäckt</string>
+    <string name="cal_vin_mismatch_confirmation">Den valda profilens VIN är %1$s, men ECU:n returnerade %2$s. Det kan vara olika fordon. Skapa en separat profil för att bevara det valda fordonet, eller synkronisera först efter kontroll av det fysiska fordonet.</string>
+    <string name="cal_vin_create_vehicle">Skapa fordonsprofil</string>
+    <string name="cal_vin_sync_existing">Synkronisera vald profils VIN</string>
+    <string name="cal_vin_sync_warning_title">Bekräfta byte av VIN?</string>
+    <string name="cal_vin_sync_warning_message">VIN i den valda profilen (%1$s) ersätts med ECU:ns VIN (%2$s). År, motor, växellåda och marknad ändras inte. Gör detta först när du bekräftat att rätt bil är ansluten.</string>
+    <string name="cal_vin_sync_confirm">Ersätt VIN</string>
+    <string name="vin_photo_capture">Fotografera VIN</string>
 </resources>
