@@ -672,4 +672,6 @@
     <string name="mileage_source_generic">Zdroj %1$s</string>
     <string name="mileage_details_unavailable">Technické podrobnosti pro tento zdroj nejsou dostupné.</string>
     <string name="mileage_caveat_unavailable">Pro tento zdroj nejsou dostupné další lokalizované informace.</string>
+    <string name="obd_physical_can_scope">Fyzický odpovídající uzel CAN: 0x%1$s. Skenování zahrnuje pouze vybranou OBD jednotku, nikoli funkční skenování všech modulů. Nebyly odeslány žádné příkazy programování GM ani akčních členů.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Povolte mazání emisních DTC v mostu Windows, znovu se připojte, vypněte motor a potvrďte reset. Údaje o připravenosti emisních systémů budou resetovány; trvalé kódy se nemažou.</string>
 </resources>
