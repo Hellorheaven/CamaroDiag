@@ -44,7 +44,12 @@ object J2534LiveMemoryBackup {
         val manifest: EcuBackupManifest.Manifest,
         val capture: EcuBackupManifest.Capture,
         val verification: EcuBackupIntegrity.Result
-    )
+    ) {
+        internal fun export(output: OutputStream) = EcuBackupArchive.export(
+            output, listOf(capture), setOf(capture.region), manifest.controllerLabel,
+            manifest.createdAtUtcMillis, manifest.vehicleVin
+        )
+    }
 
     /**
      * Production entry point: no simulator transport can be supplied.
@@ -68,12 +73,7 @@ object J2534LiveMemoryBackup {
         progress: (CaptureProgress) -> Unit = {}
     ): CaptureResult {
         val read = capture(bridge, request, progress)
-        EcuBackupArchive.export(
-            output = output,
-            captures = listOf(read.capture),
-            requiredRegions = setOf(request.region),
-            controllerLabel = request.controllerLabel
-        )
+        read.export(output)
         return read
     }
 
@@ -103,7 +103,7 @@ object J2534LiveMemoryBackup {
 
         suspend fun liveVin(): String {
             val response = transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), TIMEOUT_MS)
-            require(response.size >= 20 &&
+            require(response.size == 20 &&
                 response[0] == 0x62.toByte() &&
                 response[1] == 0xF1.toByte() && response[2] == 0x90.toByte()
             ) { "ECU did not respond to DID F190 with a valid VIN." }
@@ -165,7 +165,7 @@ object J2534LiveMemoryBackup {
             // A second independent hardware acquisition is compulsory.
             val second = pass(2)
             // VIN could change after a session replacement or reconnect.
-            liveVin()
+            val observedVin = liveVin()
             require(first.contentEquals(second)) {
                 "Two physical memory acquisitions disagree; do not export this backup."
             }
@@ -179,7 +179,7 @@ object J2534LiveMemoryBackup {
             )
             val required = setOf(request.region)
             val manifest = EcuBackupManifest.inspect(
-                request.controllerLabel, System.currentTimeMillis(), listOf(capture), required
+                request.controllerLabel, System.currentTimeMillis(), listOf(capture), required, observedVin
             )
             val verification = EcuBackupIntegrity.verify(manifest, listOf(capture), required)
             check(verification.consistent) { "Physical ECU memory backup failed integrity checks." }

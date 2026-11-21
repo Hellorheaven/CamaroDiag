@@ -74,9 +74,11 @@ class J2534LiveMemoryBackupTest {
         assertEquals(EcuBackupManifest.Origin.SIMULATION, result.capture.origin)
         assertEquals(6, fake.reads)
         val output = ByteArrayOutputStream()
-        EcuBackupArchive.export(output, listOf(result.capture),
-            setOf(EcuBackupCoverage.Region.CALIBRATION))
-        assertTrue(EcuBackupArchive.import(ByteArrayInputStream(output.toByteArray())).verification.consistent)
+        result.export(output)
+        val imported = EcuBackupArchive.import(ByteArrayInputStream(output.toByteArray()))
+        assertTrue(imported.verification.consistent)
+        assertEquals(vin, imported.manifest.vehicleVin)
+        assertEquals(result.manifest, imported.manifest)
     }
 
     @Test fun aDifferentLiveVinStopsBeforeAnyMemoryRequest() = runBlocking {
@@ -84,6 +86,18 @@ class J2534LiveMemoryBackupTest {
         val invalid = request("1G1FA1RXXR0123457")
         assertTrue(runCatching { J2534LiveMemoryBackup.captureForTest(fake, invalid) }.isFailure)
         assertEquals(0, fake.reads)
+    }
+
+    @Test fun aDifferentVinAfterBothPassesRejectsTheCapture() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val replacement = ScriptedEcu(baseline, "1G1FA1RXXR0123457")
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload[0] == 0x22.toByte() && ecu.reads > 0) replacement.exchange(payload, timeoutMs)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching { J2534LiveMemoryBackup.captureForTest(transport, request()) }.isFailure)
+        assertEquals(6, ecu.reads)
     }
 
     @Test fun divergentSecondPassRejectsTheEntireCapture() = runBlocking {

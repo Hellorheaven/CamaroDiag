@@ -721,16 +721,26 @@ class BluetoothObdManager(context: Context) {
         output: OutputStream,
         progress: (J2534LiveMemoryBackup.CaptureProgress) -> Unit = {}
     ): J2534LiveMemoryBackup.CaptureResult {
-        check(isJ2534BridgeConnected() && isJ2534MemoryReadAvailable()) {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534MemoryReadAvailable()) {
             "Connect a real Windows J2534 bridge with an approved VIN-bound memory read profile."
         }
         return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
             val bridge = j2534BridgeTransport
                 ?: error("The J2534 bridge was disconnected.")
             check(isJ2534BridgeConnected() && bridge.isScopedMemoryReadEnabled) {
                 "The J2534 bridge has no approved physical ECU memory read scope."
             }
-            J2534LiveMemoryBackup.captureAndExport(bridge, request, output, progress)
+            val result = try {
+                J2534LiveMemoryBackup.capture(bridge, request, progress)
+            } finally {
+                // A reconnect can use the same VIN with a different adapter.
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+            }
+            result.export(output)
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            result
         }
     }
 

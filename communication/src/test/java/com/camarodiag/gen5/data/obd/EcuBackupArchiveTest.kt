@@ -22,9 +22,19 @@ class EcuBackupArchiveTest {
         val result = EcuBackupArchive.import(ByteArrayInputStream(archive.toByteArray()))
         assertTrue(result.verification.consistent)
         assertEquals("LFX offline", result.manifest.controllerLabel)
+        assertEquals(null, result.manifest.vehicleVin)
         assertEquals(EcuBackupCoverage.Status.COMPLETE, result.manifest.coverage.status)
         assertArrayEquals(capture().firstRead, result.captures.single().firstRead)
         assertArrayEquals(capture().independentRead, result.captures.single().independentRead)
+    }
+
+    @Test fun malformedVinIsRejectedBeforeCreatingArchive() {
+        val output = ByteArrayOutputStream()
+        val failure = runCatching {
+            EcuBackupArchive.export(output, listOf(capture()), setOf(capture().region), vehicleVin = "unknown")
+        }
+        assertTrue(failure.isFailure)
+        assertEquals(0, output.size())
     }
 
     @Test fun missingIndependentReadIsRejected() {
