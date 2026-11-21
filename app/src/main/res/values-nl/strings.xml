@@ -890,4 +890,13 @@
     <string name="license_owner">Eigenaar: alle rechten</string>
     <string name="license_premium">Volledige licentie actief</string>
     <string name="license_title">CamaroDiag-licentie</string>
+
+    <!-- Owner-only Debug download details -->
+    <string name="debug_builds_intro">Download de nieuwste Debug-artefacten van PR #70. Meld je aan bij GitHub met een gemachtigd account. De downloads zijn ZIP-archieven die je moet uitpakken.</string>
+    <string name="debug_builds_android_archive">ZIP met de Android Debug-APK.</string>
+    <string name="debug_builds_windows_archive">ZIP met de Windows-installatieprogramma\'s voor x64 en x86.</string>
+    <string name="debug_builds_caution">Artefacten vervallen na 30 dagen. Beschikbaarheid bewijst geen geslaagde build of voertuigtests. Debug-APK\'s kunnen anders zijn ondertekend dan openbare versies.</string>
+    <string name="debug_builds_created">Aangemaakt</string>
+    <string name="debug_builds_expires">Verloopt</string>
+    <string name="debug_builds_no_browser">Geen webbrowser beschikbaar om deze download te openen.</string>
 </resources>
