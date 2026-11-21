@@ -58,7 +58,7 @@ internal sealed class J2534MemoryReadScope
 
     public bool AllowsReadMemory(byte[] payload)
     {
-        if (payload.Length < 8 || payload[0] != 0x23) return false;
+        if (payload.Length < 7 || payload[0] != 0x23) return false;
         var format = payload[1];
         var addressWidth = format & 0x0F;
         var sizeWidth = format >> 4;
