@@ -68,6 +68,51 @@ class PersistentEcuWriteJournalTest {
         }.isFailure)
     }
 
+    @Test fun disorderedEraseAndVerificationAreRejectedBeforeChangingJournal() = runBlocking {
+        val (_, journal) = newJournal()
+        val nextSector = record.copy(address = 0x1008)
+        journal.append(record)
+        journal.append(nextSector)
+        val originalCount = journal.inspect().records
+        for (illegal in listOf(
+            record, // duplicate baseline
+            nextSector.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE), // skip first sector
+            record.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE) // no erase
+        )) {
+            assertTrue("Illegal ECU journal stage must be rejected: $illegal",
+                runCatching { journal.append(illegal) }.isFailure)
+            assertTrue(journal.inspect().valid)
+            assertEquals(originalCount, journal.inspect().records)
+        }
+        journal.append(record.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        for (illegal in listOf(
+            nextSector.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE),
+            record.copy(stage = EcuWriteTransaction.Stage.BASELINE_CHECKED, address = 0x1010),
+            record.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE,
+                updatedSha256 = "c".repeat(64))
+        )) {
+            assertTrue(runCatching { journal.append(illegal) }.isFailure)
+            assertEquals(originalCount + 1, journal.inspect().records)
+        }
+        journal.append(record.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        journal.append(nextSector.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        journal.append(nextSector.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        assertEquals(originalCount + 4, journal.inspect().records)
+        assertTrue(journal.inspect().valid)
+    }
+
+    @Test fun verificationCannotBeAppendedBeforeAnyBaseline() = runBlocking {
+        val (_, journal) = newJournal()
+        for (stage in listOf(
+            EcuWriteTransaction.Stage.BEFORE_ERASE,
+            EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE
+        )) {
+            assertTrue(runCatching { journal.append(record.copy(stage = stage)) }.isFailure)
+        }
+        assertTrue(journal.inspect().valid)
+        assertEquals(0, journal.inspect().records)
+    }
+
     @Test fun invalidSha256OrVinIsRejected() = runBlocking {
         val (_, journal) = newJournal()
         assertTrue(runCatching { journal.append(record.copy(updatedSha256 = "NOT_SHA256")) }.isFailure)
