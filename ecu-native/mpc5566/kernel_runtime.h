@@ -11,6 +11,8 @@ typedef struct {
     uint8_t response[CD_ISOTP_MAX];
     bool destructive_response;
     bool link_failed;
+    bool write_idle_armed;
+    uint32_t write_idle_since;
 } cd_kernel_runtime;
 
 bool cd_kernel_runtime_init(cd_kernel_runtime *runtime,

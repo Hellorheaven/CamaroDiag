@@ -10,6 +10,8 @@ bool cd_kernel_runtime_init(cd_kernel_runtime *r,
         !cd_isotp_tx_init(&r->tx, channel)) return false;
     r->destructive_response = false;
     r->link_failed = false;
+    r->write_idle_armed = false;
+    r->write_idle_since = 0;
     return true;
 }
 
@@ -63,6 +65,18 @@ bool cd_kernel_runtime_step(cd_kernel_runtime *r,
         cd_kernel_runtime_link_failure(r);
         return false;
     }
+    /* Arm on the first poll after synchronous flash processing, so erase
+     * latency is not mistaken for host inactivity. Only an accepted write
+     * fragment/command refreshes the deadline, not unrelated CAN traffic. */
+    if (r->kernel.remaining != 0) {
+        if (!r->write_idle_armed) {
+            r->write_idle_armed = true;
+            r->write_idle_since = now_us;
+        } else if ((uint32_t)(now_us - r->write_idle_since) >= r->rx.channel.timeout_us) {
+            cd_kernel_runtime_link_failure(r);
+            return false;
+        }
+    } else r->write_idle_armed = false;
     if (incoming == NULL) return true;
     rx = cd_isotp_rx_frame(&r->rx, incoming, now_us);
     if (rx == CD_ISOTP_SEND_FAILED ||
@@ -70,6 +84,8 @@ bool cd_kernel_runtime_step(cd_kernel_runtime *r,
         cd_kernel_runtime_link_failure(r);
         return false;
     }
+    if (rx == CD_ISOTP_RECEIVING && r->write_idle_armed)
+        r->write_idle_since = now_us;
     if (rx != CD_ISOTP_COMPLETE) return true;
 
     bool destructive = potential_write(r->request, r->rx.used);
@@ -85,10 +101,12 @@ bool cd_kernel_runtime_step(cd_kernel_runtime *r,
         cd_isotp_tx_release(&r->tx);
     }
 
+    uint32_t remaining_before = r->kernel.remaining;
     r->destructive_response = destructive;
     size_t size = cd_kernel_process(&r->kernel, r->request, r->rx.used,
         r->response, sizeof(r->response));
     cd_isotp_rx_release(&r->rx);
+    if (r->kernel.remaining != remaining_before) r->write_idle_armed = false;
     if (size == 0 || !cd_isotp_tx_start(&r->tx, r->response, size, now_us)) {
         cd_kernel_runtime_link_failure(r);
         return false;

@@ -71,6 +71,14 @@ int main(void)
     assert(cd_kernel_runtime_step(&runtime, &invalid, 1));
     assert(cd_kernel_runtime_step(&runtime, &invalid, 2));
     assert(link.count == 2);
+    init_model(&m);
+    flash = controller_for(&m);
+    link.count = 0;
+    assert(cd_kernel_runtime_init(&runtime, &flash, &channel, 4, 1));
+    assert(cd_kernel_runtime_step(&runtime, &erase, 1));
+    assert(cd_kernel_runtime_step(&runtime, NULL, 4000000));
+    assert(!cd_kernel_runtime_step(&runtime, NULL, 5000000));
+    assert(flash.recovery_required);
     puts("PASS: native runtime CAN-to-flash dispatch and response-loss handling");
     return 0;
 }
