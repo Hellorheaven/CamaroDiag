@@ -500,4 +500,21 @@
     <string name="mileage_caveat_unavailable">Šim avotam nav pieejama papildu lokalizēta informācija.</string>
     <string name="obd_physical_can_scope">Fiziskais CAN atbildētājs: 0x%1$s. Skenēšana aptver tikai atlasīto OBD ECU, nevis visu moduļu funkcionālo skenēšanu. GM programmēšanas vai izpildmehānismu komandas netika sūtītas.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Iespējojiet emisiju DTC dzēšanu Windows tiltā, izveidojiet savienojumu no jauna, apturiet dzinēju un apstipriniet atiestatīšanu. Emisiju gatavības dati tiks atiestatīti; pastāvīgie kodi netiks dzēsti.</string>
+    <string name="units_metric">SI / metriskās</string>
+    <string name="units_imperial">Angļu mērvienības</string>
+    <string name="live_pause">Pauze</string>
+    <string name="live_recording_status">Paraugi: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Ieplūdes sadales vārpstas pozīcijas izpildmehānisma ķēde (1. cilindru rinda)</string>
+    <string name="dtc_desc_p0011">Pārāk agras ieplūdes sadales vārpstas fāzes (1. cilindru rinda)</string>
+    <string name="dtc_desc_p0014">Pārāk agras izplūdes sadales vārpstas fāzes (1. cilindru rinda)</string>
+    <string name="dtc_desc_p0087">Pārāk zems degvielas sliedes vai sistēmas spiediens</string>
+    <string name="dtc_desc_p0089">Degvielas spiediena regulatora darbības traucējumi</string>
+    <string name="dtc_desc_p0191">Degvielas sliedes spiediena sensora ķēdes diapazons vai darbība</string>
+    <string name="dtc_desc_p0299">Pārāk zems turbokompresora vai kompresora pārspiediens</string>
+    <string name="cal_engine_profile">Dzinēja profils: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Katalogā iekļautie dzinēji %1$d. gadam: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Binārā nolasīšana: %2$s • Validētas dzinēja tabulas: %3$s • ECU programmēšana: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • pieprasījums %2$s / atbilde %3$s • intervāls %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • skaits=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Tikai aparatūras profils; joprojām nepieciešams oficiāls Android SDK/API vai dokumentēts tilts.</string>
 </resources>
