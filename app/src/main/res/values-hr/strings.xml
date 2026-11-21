@@ -577,4 +577,21 @@
     <string name="live_pid_wbo2_b1s2">Širokopojasna lambda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Širokopojasna lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Širokopojasna lambda B2S2</string>
+    <string name="mileage_summary_discrepancy">Potvrđeni neovisni izvori razlikuju se za %1$.1f km. Provjerite zamjenu ili reprogramiranje modula te servisnu povijest. Ovo je razlog za dodatnu provjeru, a ne dokaz manipulacije.</string>
+    <string name="mileage_summary_agreement">Potvrđeni neovisni izvori podudaraju se unutar %1$.1f km. To ne jamči vjerodostojnost povijesti kilometraže.</string>
+    <string name="mileage_summary_no_data">Nije očitana pouzdana vrijednost ukupne kilometraže. BCM i IPC nisu provjereni; nijedna vrijednost nije simulirana.</string>
+    <string name="mileage_summary_insufficient">Upotrebljiva očitanja kilometraže: %1$d; neovisni ECU moduli potvrđeni s visokom pouzdanošću: %2$d. Nema dovoljno dokaza za usporedbu.</string>
+    <string name="mileage_source_j2534">Most J2534 (samo UDS)</string>
+    <string name="mileage_details_j2534">Na ovom prijenosnom kanalu nije dostupan OBD-II način rada 01</string>
+    <string name="mileage_details_pid">Način rada 01, PID %1$s • %2$s</string>
+    <string name="mileage_pid_not_advertised">ECU ne navodi podršku</string>
+    <string name="mileage_details_module_not_read">Nije očitano: potreban je potvrđen GM profil adresiranja i DID-ova</string>
+    <string name="mileage_caveat_j2534">Povezani PC most prenosi UDS podatke, ali ne pruža ELM/SAE J1979 naredbeni kanal. Nije zatražen nijedan OBD PID kilometraže.</string>
+    <string name="mileage_caveat_demo">Demonstracijski način rada nikada ne prikazuje stvarnu kilometražu vozila.</string>
+    <string name="mileage_caveat_ecm_a6_valid">Vrijednost kilometraže koju je ECU prijavio putem OBD-a. To je podatak jednog ECU-a, a ne neovisna provjera između modula.</string>
+    <string name="mileage_caveat_ecm_a6_missing">ECU nije naveo podršku za PID A6 ili nije vratio valjan odgovor.</string>
+    <string name="mileage_caveat_ecm_d3_valid">Vrijednost samo iz ECU-a motora; nije neovisna potvrda iz BCM-a ili IPC-a.</string>
+    <string name="mileage_caveat_ecm_d3_missing">ECU nije naveo podršku za PID D3 ili nije vratio valjan odgovor.</string>
+    <string name="mileage_caveat_bcm">Podaci o kilometraži iz BCM-a nisu zatraženi: nije instaliran potvrđen profil adresa i DID-ova za određeni VIN.</string>
+    <string name="mileage_caveat_ipc">Podaci o kilometraži iz IPC-a nisu zatraženi: nije instaliran potvrđen profil adresa i DID-ova za određeni VIN.</string>
 </resources>
