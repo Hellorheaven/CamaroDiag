@@ -676,4 +676,19 @@
     <string name="cal_warning_import_review">Prije uporabe bilo koje tablice pregledajte upozorenja o uvezenoj definiciji.</string>
     <string name="cal_warning_overlapping_regions">Područja tablice ili osi se preklapaju; provjerite je li preklapanje namjerno.</string>
     <string name="cal_warning_invalid_file">Provjera strukture nije uspjela. Nemojte koristiti ovu datoteku za uređivanje kalibracije.</string>
+
+    <!-- Private functional-test laboratory: genuine hr translations -->
+    <string name="tab_functional_tests">Funkcionalni testovi</string>
+    <string name="functional_tests_title">Funkcionalni testovi — ECU i OBD</string>
+    <string name="functional_tests_readonly">Pokrenite sve dostupne provjere samo za čitanje preko trenutačno spojenog fizičkog adaptera. Drugi adapteri i nepotvrđeni ECU moduli označeni su kao NISU TESTIRANI. Bez brisanja, upravljanja ili programiranja.</string>
+    <string name="functional_tests_run">Pokreni sve</string>
+    <string name="functional_tests_stop">Zaustavi</string>
+    <string name="functional_tests_export">Izvezi JSON</string>
+    <string name="functional_tests_summary">%1$d uspješno · %2$d neuspješno · %3$d nije testirano</string>
+    <string name="functional_tests_passed">USPJEŠNO (fizički dokaz)</string>
+    <string name="functional_tests_failed">NEUSPJEŠNO</string>
+    <string name="functional_tests_skipped">NIJE TESTIRANO</string>
+    <string name="functional_tests_denied">Pristup odbijen: prijavite se ovlaštenim Google računom i ponovno se povežite.</string>
+    <string name="functional_tests_not_connected">Nije spojen fizički OBD adapter. Preostale provjere nisu provedene.</string>
+    <string name="functional_tests_cancelled">Testiranje je otkazano.</string>
 </resources>
