@@ -215,6 +215,15 @@ jobs:
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39CalibrationRepairSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanBenchProbe.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanBenchProbeSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeConsoleWindow.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.Console.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.Diagnostics.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.Memory.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgePairingDetails.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgePairingDetailsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeScopedMemoryReader.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeScopedMemoryReaderSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/Program.cs'; then
@@ -262,6 +271,15 @@ jobs:
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39CalibrationRepairSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanBenchProbe.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanBenchProbeSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeConsoleWindow.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.Console.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.Diagnostics.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.Memory.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgePairingDetails.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgePairingDetailsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeScopedMemoryReader.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeScopedMemoryReaderSelfTests.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/J2534MemoryReadScope.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs'; then
