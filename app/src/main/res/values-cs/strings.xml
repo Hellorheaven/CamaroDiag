@@ -530,4 +530,34 @@
     <string name="debug_builds_created">Vytvořeno</string>
     <string name="debug_builds_expires">Platnost do</string>
     <string name="debug_builds_no_browser">Pro otevření staženého souboru není k dispozici prohlížeč.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Vybraný jazyk: %1$s</string>
+    <string name="settings_adapter_not_connected">Není připojen žádný adaptér</string>
+    <string name="settings_last_connection">Poslední profil připojení</string>
+    <string name="settings_no_last_connection">Zatím není uložen žádný profil připojení.</string>
+    <string name="saved_vehicle_profiles_title">Uložené profily vozidel</string>
+    <string name="saved_vehicle_name_label">Název profilu</string>
+    <string name="saved_vehicle_name_placeholder">např. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Uložit aktuální vozidlo</string>
+    <string name="saved_vehicle_empty">Zatím nejsou uloženy žádné profily vozidel.</string>
+    <string name="saved_vehicle_delete">Odstranit</string>
+    <string name="saved_vehicle_requires_review">Profil byl vytvořen z VIN jednotky ECU. Před diagnostikou ověřte modelový rok, motor a převodovku.</string>
+    <string name="saved_vehicle_ecu_default_name">Vozidlo z ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Zadejte název profilu.</string>
+    <string name="msg_vehicle_profile_saved">Profil vozidla byl uložen.</string>
+    <string name="msg_vehicle_profile_review_required">Profil byl vytvořen z VIN jednotky ECU. Před diagnostikou ověřte rok, motor a převodovku.</string>
+    <string name="msg_vehicle_profile_loaded">Načtený profil vozidla: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU nevrátila platný 17znakový VIN. Profil nebyl vytvořen.</string>
+    <string name="cal_vin_matches_profile">VIN z ECU odpovídá vybranému profilu vozidla.</string>
+    <string name="cal_vin_mismatch_detected">NESHODA VIN — profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Vybraný profil vozidla neobsahuje platný VIN.</string>
+    <string name="cal_vin_mismatch_title">Zjištěna neshoda VIN</string>
+    <string name="cal_vin_mismatch_confirmation">VIN vybraného profilu je %1$s, ale ECU vrátila %2$s. Může jít o různá vozidla. Vytvořte samostatný profil, abyste zachovali vybrané vozidlo, nebo synchronizujte až po ověření skutečného vozidla.</string>
+    <string name="cal_vin_create_vehicle">Vytvořit profil vozidla</string>
+    <string name="cal_vin_sync_existing">Synchronizovat VIN vybraného profilu</string>
+    <string name="cal_vin_sync_warning_title">Potvrdit nahrazení VIN?</string>
+    <string name="cal_vin_sync_warning_message">VIN uložený ve vybraném profilu (%1$s) bude nahrazen VIN z ECU (%2$s). Rok, motor, převodovka ani trh se nezmění. Proveďte to pouze po potvrzení, že je připojeno správné vozidlo.</string>
+    <string name="cal_vin_sync_confirm">Nahradit VIN</string>
+    <string name="vin_photo_capture">Vyfotografovat VIN</string>
 </resources>
