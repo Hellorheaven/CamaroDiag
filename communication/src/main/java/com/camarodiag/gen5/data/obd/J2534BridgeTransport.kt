@@ -157,7 +157,7 @@ class J2534BridgeTransport(
     override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
+            require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES) { "La requête UDS doit contenir entre 1 et 4091 octets." }
             val boundedTimeout = J2534BridgeProtocol.boundedTimeoutMs(timeoutMs)
             socket?.soTimeout = boundedTimeout + 3000
             val response = request(
@@ -169,7 +169,7 @@ class J2534BridgeTransport(
                 boundedTimeout + 3000
             )
             val hex = response.optString("payloadHex")
-            if (hex.isBlank() || hex.length % 2 != 0 || hex.length > 8190 ||
+            if (hex.isBlank() || hex.length % 2 != 0 || hex.length > J2534BridgeProtocol.MAX_PAYLOAD_BYTES * 2 ||
                 !hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }
             ) {
                 closeInternal()
@@ -182,7 +182,7 @@ class J2534BridgeTransport(
     override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
+            require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES) { "La requête UDS doit contenir entre 1 et 4091 octets." }
             val boundedTimeout = timeoutMs.coerceIn(100L, 10_000L).toInt()
             request(
                 JSONObject()
@@ -261,6 +261,7 @@ class J2534BridgeTransport(
 
 /** Bounded framing helpers for the untrusted JSON-lines PC bridge stream. */
 internal object J2534BridgeProtocol {
+    const val MAX_PAYLOAD_BYTES = 4091
     private const val MAX_RESPONSE_LINE_CHARS = 32 * 1024
 
     fun boundedTimeoutMs(timeoutMs: Long): Int = timeoutMs.coerceIn(100L, 10_000L).toInt()
@@ -271,15 +272,18 @@ internal object J2534BridgeProtocol {
             val next = input.read()
             if (next == -1) {
                 if (line.isEmpty()) return null
-                break
+                throw java.io.EOFException("Incomplete J2534 response frame.")
             }
             if (next == '\n'.code) break
-            if (next != '\r'.code) {
-                check(line.length < MAX_RESPONSE_LINE_CHARS) {
-                    "The J2534 bridge response exceeds the maximum allowed line size."
-                }
-                line.append(next.toChar())
+            if (next == '\r'.code) {
+                if (input.read() != '\n'.code)
+                    throw java.io.IOException("Invalid J2534 response frame terminator.")
+                break
             }
+            check(line.length < MAX_RESPONSE_LINE_CHARS) {
+                "The J2534 bridge response exceeds the maximum allowed line size."
+            }
+            line.append(next.toChar())
         }
         return line.toString()
     }
