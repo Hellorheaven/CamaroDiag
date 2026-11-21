@@ -605,4 +605,10 @@
     <string name="cal_expert_patch_program_bytes">Daqs tal-unità tal-ipprogrammar (bytes)</string>
     <string name="cal_expert_patch_preview_button">Uri s-setturi affettwati mill-fajl BIN modifikat</string>
     <string name="cal_expert_patch_summary">Bytes mibdula: %1$d. Setturi tat-tħassir affettwati: %2$d. Il-mappa tal-memorja tal-ħardwer mhix ivverifikata. Ma nkitbet ebda data.</string>
+    <string name="dtc_gm_monitor_title">Monitoraġġ tal-magna GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Kriterji għar-reġistrazzjoni tal-kodiċi: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Kundizzjonijiet għall-attivazzjoni: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Għadd ta’ ħsarat / rata ta’ validazzjoni: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Klassifikazzjoni tal-MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Sors: GM %1$s, paġna %2$d</string>
 </resources>
