@@ -400,4 +400,15 @@
     <string name="license_owner">Īpašnieks: visas tiesības</string>
     <string name="license_premium">Pilna licence ir aktīva</string>
     <string name="license_title">CamaroDiag licence</string>
+    <!-- LFX 2012 ECU safety and verification guidance -->
+    <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012: ECU identificēšana (tikai lasīšana)</string>
+    <string name="flexfuel_lfx2012_checks">Nosacījumi, kas joprojām neļauj mainīt kalibrāciju</string>
+    <string name="flexfuel_preflight_vehicle_missing">Nav atlasīts transportlīdzekļa profils</string>
+    <string name="flexfuel_preflight_wrong_vehicle">Transportlīdzeklis nav 2012. gada Camaro LFX</string>
+    <string name="flexfuel_preflight_vin">VIN jānolasa no ECU, un tam jāsakrīt ar saglabātā transportlīdzekļa VIN</string>
+    <string name="flexfuel_preflight_ecu">Jāidentificē faktiskais ECU vadības bloka numurs</string>
+    <string name="flexfuel_preflight_firmware">Precīza ECU programmaparatūra nav pārbaudīta</string>
+    <string name="flexfuel_preflight_recovery">Atkopšanas procedūra nav pārbaudīta</string>
+    <string name="flexfuel_lfx2012_audit_title">LFX 2012: pārbaude pirms un pēc programmēšanas (tikai lasīšana)</string>
+    <string name="flexfuel_lfx2012_audit_post_not_performed">Pēcprogrammēšanas pārbaude nav veikta. Ne ECU programmēšana, ne transportlīdzekļa pārbaude pēc ierakstīšanas nav validēta.</string>
 </resources>
