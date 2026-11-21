@@ -30,7 +30,9 @@ data class FunctionalTestState(
     val checks: List<FunctionalTestCheck> = emptyList(),
     val error: String? = null,
     val context: FunctionalTestContext? = null
-)
+) {
+    val canExport: Boolean get() = !running && finishedAtMillis != null && context != null && checks.isNotEmpty()
+}
 
 /** Enumerates all supported transports and topology candidates without inventing hardware results. */
 object FunctionalTestPlanner {

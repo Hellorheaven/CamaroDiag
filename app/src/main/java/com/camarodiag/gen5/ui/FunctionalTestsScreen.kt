@@ -49,10 +49,17 @@ fun FunctionalTestsScreen(
                         }
                         CircularProgressIndicator(modifier = Modifier.height(22.dp))
                     } else {
-                        OutlinedButton(onClick = onExport, enabled = state.finishedAtMillis != null) {
+                        OutlinedButton(onClick = onExport, enabled = state.canExport) {
                             Text(stringResource(R.string.functional_tests_export))
                         }
                     }
+                }
+                state.context?.let { evidence ->
+                    Text(stringResource(R.string.vehicle_vin) + ": " +
+                        evidence.selectedVin.ifBlank { stringResource(R.string.obd_not_available) },
+                        style = MaterialTheme.typography.bodySmall)
+                    Text(evidence.adapterName + " • " + evidence.transport,
+                        style = MaterialTheme.typography.bodySmall)
                 }
                 if (state.checks.isNotEmpty()) {
                     Text(stringResource(R.string.functional_tests_summary, passed, failed, untested))

@@ -3592,7 +3592,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (!confirmFunctionalTestOwner(accountUid) ||
                 !isCurrentAccountGeneration(sessionGeneration)) return@launch
             val snapshot = _functionalTestState.value
-            if (snapshot.running || snapshot.finishedAtMillis == null) return@launch
+            if (!snapshot.canExport) return@launch
             val evidenceContext = snapshot.context ?: return@launch
             val json = JSONObject()
                 .put("schema", "camarodiag-functional-test-v1")
