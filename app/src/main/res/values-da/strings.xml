@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Appsprog</string>
     <string name="system_language_hint">Vælg sprog til CamaroDiag.</string>
     <string name="about_title">Om CamaroDiag</string>
@@ -380,7 +380,7 @@
     <string name="cal_pc_pairing_token">Pc-parringstoken</string>
     <string name="cal_connect_j2534">Opret forbindelse til J2534-bro</string>
     <string name="cal_disconnect_pc_bridge">Afbryd forbindelsen til pc-broen</string>
-    <string name="cal_bridge_capabilities">Bro: HS-CAN ISO15765 250/500 kbit/s og J2534-2 SW-ISO15765, når driveren understøtter det. CAN FD forbliver deaktiveret.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Bro: HS-CAN ISO15765 250/500 kbit/s og J2534-2 SW-ISO15765, når driveren understøtter det. CAN FD forbliver deaktiveret.</string>
     <string name="cal_read_uds_did">Læs UDS DID</string>
     <string name="cal_read_uds_dtcs">Læs UDS-fejlkoder</string>
     <string name="cal_uds_trouble_codes">UDS-fejlkoder (0x19)</string>
