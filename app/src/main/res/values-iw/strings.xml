@@ -877,4 +877,19 @@
     <string name="functional_tests_denied">הגישה נדחתה: יש להתחבר באמצעות חשבון Google המורשה.</string>
     <string name="functional_tests_not_connected">לא מחובר מתאם OBD פיזי. שאר הבדיקות לא בוצעו.</string>
     <string name="functional_tests_cancelled">הבדיקות בוטלו.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">גרסאות ניפוי שגיאות</string>
+    <string name="tab_license">רישיון</string>
+    <string name="debug_builds_title">גרסאות ניפוי שגיאות פרטיות</string>
+    <string name="debug_builds_refresh">רענון גרסאות זמינות</string>
+    <string name="debug_builds_download">הורדה מ-GitHub</string>
+    <string name="debug_builds_unavailable">אין ארכיון ניפוי שגיאות תקין זמין.</string>
+    <string name="debug_builds_error">לא ניתן לטעון גרסאות ניפוי שגיאות מ-GitHub.</string>
+    <string name="license_disabled">מערכת הרישוי אינה פעילה.</string>
+    <string name="license_buy">רכישת רישיון</string>
+    <string name="license_refresh">רענון רישיון</string>
+    <string name="license_free">חינם</string>
+    <string name="license_owner">בעלים: כל ההרשאות</string>
+    <string name="license_premium">רישיון מלא פעיל</string>
+    <string name="license_title">רישיון CamaroDiag</string>
 </resources>
