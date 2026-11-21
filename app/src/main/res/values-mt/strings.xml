@@ -599,4 +599,10 @@
     <string name="msg_cal_definitions_import_failed">Id-definizzjonijiet tat-tabelli ma setgħux jiġu importati.</string>
     <string name="msg_cal_map_read_failed">It-tabella magħżula ma setgħetx tinqara.</string>
     <string name="msg_cal_table_edit_failed">It-tabella tal-kalibrazzjoni ma setgħetx tiġi editjata.</string>
+    <string name="cal_expert_image_selected">Fajl importat: %1$s</string>
+    <string name="cal_expert_patch_address">Indirizz tal-bidu tar-reġjun tal-memorja (eżadeċimali)</string>
+    <string name="cal_expert_patch_erase_bytes">Daqs tas-settur tat-tħassir (bytes)</string>
+    <string name="cal_expert_patch_program_bytes">Daqs tal-unità tal-ipprogrammar (bytes)</string>
+    <string name="cal_expert_patch_preview_button">Uri s-setturi affettwati mill-fajl BIN modifikat</string>
+    <string name="cal_expert_patch_summary">Bytes mibdula: %1$d. Setturi tat-tħassir affettwati: %2$d. Il-mappa tal-memorja tal-ħardwer mhix ivverifikata. Ma nkitbet ebda data.</string>
 </resources>
