@@ -507,4 +507,6 @@
     <string name="mileage_source_generic">Sors %1$s</string>
     <string name="mileage_details_unavailable">Id-dettalji tekniċi mhumiex disponibbli għal dan is-sors.</string>
     <string name="mileage_caveat_unavailable">Ma hemmx aktar informazzjoni lokalizzata disponibbli għal dan is-sors.</string>
+    <string name="obd_physical_can_scope">Rispondent fiżiku CAN: 0x%1$s. Dan l-iskennjar ikopri biss l-ECU OBD magħżul, mhux skennjar funzjonali tal-moduli kollha. Ma ntbagħtu ebda kmandi ta’ programmar GM jew ta’ attwaturi.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Ippermetti t-tħassir tad-DTC tal-emissjonijiet fil-pont Windows, erġa’ qabbad, itfi l-magna u kkonferma r-reset. Id-data dwar il-prontezza tal-emissjonijiet tiġi rrisettjata; il-kodiċijiet permanenti ma jitħassrux.</string>
 </resources>
