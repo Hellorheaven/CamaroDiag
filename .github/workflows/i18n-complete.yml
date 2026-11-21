@@ -1,0 +1,110 @@
+name: Complete draft translations for 16 Android locales
+on:
+  push:
+    branches: [feat/ecu-backup-integrity]
+    paths:
+      - '.github/workflows/i18n-complete.yml'
+      - 'tools/i18n/complete_mt.py'
+permissions:
+  contents: read
+concurrency:
+  group: camaro-locales-16-existing-pr
+  cancel-in-progress: true
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        locale: [bg, hr, cs, da, et, fi, hu, ga, lv, lt, mt, pl, ro, sk, sl, sv]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install CPU-only offline translator
+        run: |
+          python -m pip install --disable-pip-version-check "ctranslate2>=4.5,<5" "transformers>=4.40,<5" "huggingface_hub>=0.27,<1" "sentencepiece>=0.2,<1" "protobuf>=5,<7"
+      - name: Cache MIT-licensed neural translation model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: m2m100-418m-ct2-mit-v1
+      - name: Translate missing strings without overriding existing translations
+        env:
+          HF_HUB_DISABLE_TELEMETRY: '1'
+          TOKENIZERS_PARALLELISM: 'false'
+        run: |
+          python tools/i18n/complete_mt.py --lang "${{ matrix.locale }}" --output generated-i18n
+      - name: Upload validated locale XML
+        uses: actions/upload-artifact@v7
+        with:
+          name: draft-translation-${{ matrix.locale }}
+          path: generated-i18n/values-${{ matrix.locale }}/strings.xml
+          retention-days: 7
+          if-no-files-found: error
+
+  commit-all:
+    needs: translate
+    if: needs.translate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ecu-backup-integrity
+          persist-credentials: true
+      - name: Download all 16 locale files
+        uses: actions/download-artifact@v7
+        with:
+          pattern: draft-translation-*
+          path: generated-i18n
+          merge-multiple: true
+      - name: Validate exact completeness, XML and resource formats
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, xml.etree.ElementTree as ET
+          en = pathlib.Path('app/src/main/res/values/strings.xml').read_text(encoding='utf-8')
+          string_re = re.compile(r'<string\s+name="([^"]+)"[^>]*>([\s\S]*?)</string>')
+          printf = re.compile(r'%([1-9]\d*\$)?[-+# 0,(]*\d*(?:\.\d+)?[a-zA-Z]')
+          reference = dict(string_re.findall(en))
+          languages = 'bg hr cs da et fi hu ga lv lt mt pl ro sk sl sv'.split()
+          for language in languages:
+              source = pathlib.Path(f'generated-i18n/values-{language}/strings.xml')
+              assert source.is_file(), f'Missing generated locale {language}'
+              xml = source.read_text(encoding='utf-8')
+              ET.fromstring(xml)
+              pairs = string_re.findall(xml)
+              translations = dict(pairs)
+              assert len(pairs) == len(reference), (language, 'key count', len(pairs))
+              assert set(translations) == set(reference), (language, 'missing keys')
+              for key, value in translations.items():
+                  old = sorted(m.group(0) for m in printf.finditer(reference[key].replace('%%', '')))
+                  new = sorted(m.group(0) for m in printf.finditer(value.replace('%%', '')))
+                  assert old == new, (language, key, old, new)
+                  assert value.strip(), (language, key, 'empty translation')
+              print(f'Complete draft language: {language} {len(pairs)} keys')
+          PY
+      - name: Copy validated generated XML into the existing PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          for lang in bg hr cs da et fi hu ga lv lt mt pl ro sk sl sv; do
+            cp "generated-i18n/values-${lang}/strings.xml" \
+               "app/src/main/res/values-${lang}/strings.xml"
+          done
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/res/values-{bg,hr,cs,da,et,fi,hu,ga,lv,lt,mt,pl,ro,sk,sl,sv}/strings.xml
+          if git diff --cached --quiet; then
+            echo 'Already complete: no commit required.'
+            exit 0
+          fi
+          git commit -m "i18n: fill missing keys in 16 locales using offline MIT model (draft translations)"
+          git push origin HEAD:refs/heads/feat/ecu-backup-integrity
