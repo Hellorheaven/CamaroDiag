@@ -562,4 +562,9 @@
     <string name="update_later">Később</string>
     <string name="update_ready_to_install">CamaroDiag – telepítésre kész</string>
     <string name="update_version_channel">%1$s verzió • %2$s</string>
+    <string name="vin_photo_cancelled">A VIN fényképezése megszakítva.</string>
+    <string name="vin_photo_success">A felismert VIN bekerült a járműprofilba. Ellenőrizzen minden karaktert.</string>
+    <string name="vin_photo_not_found">Nem található érvényes, 17 karakteres VIN. Adja meg kézzel, vagy készítsen új fényképet.</string>
+    <string name="vin_photo_error">A VIN nem olvasható a képen. Próbálja újra jobb megvilágítással és pontosabb fókuszálással.</string>
+    <string name="vehicle_vin_placeholder">17 karakter</string>
 </resources>
