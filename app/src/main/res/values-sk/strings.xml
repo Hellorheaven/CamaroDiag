@@ -582,4 +582,10 @@
     <string name="msg_cal_definitions_import_failed">Definície tabuliek sa nepodarilo importovať.</string>
     <string name="msg_cal_map_read_failed">Vybranú tabuľku sa nepodarilo prečítať.</string>
     <string name="msg_cal_table_edit_failed">Kalibračnú tabuľku sa nepodarilo upraviť.</string>
+    <string name="cal_expert_image_selected">Importovaný súbor: %1$s</string>
+    <string name="cal_expert_patch_address">Počiatočná adresa oblasti pamäte (hex)</string>
+    <string name="cal_expert_patch_erase_bytes">Veľkosť sektora mazania (bajty)</string>
+    <string name="cal_expert_patch_program_bytes">Veľkosť programovacej jednotky (bajty)</string>
+    <string name="cal_expert_patch_preview_button">Zobraziť sektory ovplyvnené upraveným súborom BIN</string>
+    <string name="cal_expert_patch_summary">Zmenené bajty: %1$d. Dotknuté sektory mazania: %2$d. Hardvérová mapa pamäte nebola overená. Zápis neprebehol.</string>
 </resources>
