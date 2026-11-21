@@ -232,13 +232,22 @@ internal class EcuWriteExecutionEngine(
                     )
                 )
                 driver.erase(region)
-                if (!powerMonitor.isStable()) {
-                    return EcuWriteTransaction.Outcome(
-                        EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
-                        verifiedSectors = verified, failedAddress = currentAddress
+                val unitBytes = request.layout.programBlockBytes
+                for (offset in sector.patchedBytes.indices step unitBytes) {
+                    val unitAddress = sector.absoluteAddress + offset
+                    currentAddress = unitAddress
+                    if (!powerMonitor.isStable()) {
+                        return EcuWriteTransaction.Outcome(
+                            EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
+                            verifiedSectors = verified, failedAddress = unitAddress
+                        )
+                    }
+                    val unit = EcuProgrammingDriverContract.RegionRequest(
+                        request.region, unitAddress, unitBytes.toLong()
                     )
+                    driver.write(unit, sector.patchedBytes.copyOfRange(offset, offset + unitBytes))
                 }
-                driver.write(region, sector.patchedBytes.copyOf())
+                currentAddress = sector.absoluteAddress
                 if (!driver.independentReadback(region).contentEquals(sector.patchedBytes)) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,

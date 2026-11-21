@@ -40,7 +40,9 @@ class EcuWriteTransactionTest {
     ) : EcuProgrammingDriverContract {
         val memory = initial.copyOf()
         var eraseCalls = 0
-        var writeCalls = 0
+        val writes = mutableListOf<EcuProgrammingDriverContract.RegionRequest>()
+        val writeCalls: Int get() = writes.size
+        var failWriteAt: Long? = null
         var resetCalls = 0
         var corruptAfterWrite = false
         var failOnErase = false
@@ -74,8 +76,9 @@ class EcuWriteTransactionTest {
             bytes: ByteArray
         ) {
             require(bytes.size.toLong() == request.length)
+            writes += request
+            if (request.address == failWriteAt) error("Connection lost during write")
             bytes.copyInto(memory, destinationOffset = start(request))
-            writeCalls++
         }
         override suspend fun independentReadback(
             request: EcuProgrammingDriverContract.RegionRequest
@@ -127,7 +130,8 @@ class EcuWriteTransactionTest {
         assertEquals(2, outcome.verifiedSectors)
         assertArrayEquals(updated, device.memory)
         assertEquals(2, device.eraseCalls)
-        assertEquals(2, device.writeCalls)
+        assertEquals((0x1000L until 0x1010L step 2).toList(), device.writes.map { it.address })
+        assertTrue(device.writes.all { it.length == 2L })
         assertEquals(0, device.resetCalls)
         assertEquals(4, records.count { it.stage == EcuWriteTransaction.Stage.BASELINE_CHECKED ||
             it.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE })
@@ -173,6 +177,22 @@ class EcuWriteTransactionTest {
         assertEquals(0, outcome.verifiedSectors)
     }
 
+    @Test fun stopsAtFailedProgrammingUnitWithoutErasingTheNextSector() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        device.failWriteAt = 0x1002L
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val updated = original.copyOf().also { it[2] = 100; it[10] = 110 }
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+        ).run(request(updated))
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(0x1002L, outcome.failedAddress)
+        assertEquals(listOf(0x1000L, 0x1002L), device.writes.map { it.address })
+        assertEquals(1, device.eraseCalls)
+        assertEquals(0, outcome.verifiedSectors)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE })
+    }
+
     @Test fun readbackMismatchStopsWithoutProgrammingNextSector() = runBlocking {
         val device = FakeDriver(original, expectedIdentity)
         device.corruptAfterWrite = true
@@ -183,7 +203,7 @@ class EcuWriteTransactionTest {
         ).run(request(updated))
         assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
         assertEquals(1, device.eraseCalls)
-        assertEquals(1, device.writeCalls)
+        assertEquals(4, device.writeCalls)
         assertEquals(0, outcome.verifiedSectors)
     }
 
