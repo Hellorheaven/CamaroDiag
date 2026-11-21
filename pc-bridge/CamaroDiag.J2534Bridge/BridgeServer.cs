@@ -10,6 +10,9 @@ namespace CamaroDiag.J2534Bridge;
 
 internal sealed class BridgeServer
 {
+    private const int MaxRequestLineChars = 64 * 1024;
+    private static readonly TimeSpan TlsHandshakeTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan RequestReadTimeout = TimeSpan.FromSeconds(30);
     private readonly J2534Adapter _adapter;
     private readonly string _token;
     private readonly int _port;
@@ -62,6 +65,8 @@ internal sealed class BridgeServer
     {
         using var networkStream = client.GetStream();
         using var stream = new SslStream(networkStream, leaveInnerStreamOpen: false);
+        using var handshakeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        handshakeTimeout.CancelAfter(TlsHandshakeTimeout);
         try
         {
             await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
@@ -70,7 +75,12 @@ internal sealed class BridgeServer
                 EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
                 ClientCertificateRequired = false,
                 AllowRenegotiation = false
-            }, cancellationToken);
+            }, handshakeTimeout.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Console.Error.WriteLine("TLS handshake timed out; closing unauthenticated client.");
+            return;
         }
         catch (AuthenticationException)
         {
@@ -91,14 +101,21 @@ internal sealed class BridgeServer
         while (!cancellationToken.IsCancellationRequested && client.Connected)
         {
             string? line;
-            try { line = await reader.ReadLineAsync(cancellationToken); }
-            catch (IOException) { break; }
-            if (line is null) break;
-            if (line.Length > 65536)
+            using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            readTimeout.CancelAfter(RequestReadTimeout);
+            try { line = await ReadBoundedLineAsync(reader, readTimeout.Token); }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                Console.Error.WriteLine("Timed out waiting for a bridge request; connection closed.");
+                break;
+            }
+            catch (InvalidDataException)
             {
                 await WriteErrorAsync(writer, "Request exceeds the 64 KiB bridge limit.");
                 break;
             }
+            catch (IOException) { break; }
+            if (line is null) break;
 
             try
             {
@@ -174,6 +191,29 @@ internal sealed class BridgeServer
             {
                 await WriteErrorAsync(writer, ex.Message);
             }
+        }
+    }
+
+    // Read one bounded request without StreamReader.ReadLineAsync buffering an
+    // attacker-controlled unbounded line before the length check.
+    internal static async Task<string?> ReadBoundedLineAsync(
+        StreamReader reader, CancellationToken cancellationToken)
+    {
+        var line = new StringBuilder();
+        var character = new char[1];
+        var received = 0;
+        while (true)
+        {
+            var count = await reader.ReadAsync(character.AsMemory(), cancellationToken);
+            if (count == 0)
+            {
+                if (received == 0) return null;
+                throw new IOException("Bridge request ended without a newline.");
+            }
+            if (character[0] == '\n') return line.ToString();
+            if (++received > MaxRequestLineChars)
+                throw new InvalidDataException("Bridge request exceeds the 64 KiB limit.");
+            if (character[0] != '\r') line.Append(character[0]);
         }
     }
 
