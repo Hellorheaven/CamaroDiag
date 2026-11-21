@@ -91,7 +91,12 @@ internal sealed partial class BridgeDesktopForm : Form
         copyAll.Enabled = copyCode.Enabled = copyIp.Enabled = copyPort.Enabled = false;
         pairingCode.UseSystemPasswordChar = true;
         RefreshDetected();
-        FormClosing += (_, _) => bridgeCancellation?.Cancel();
+        FormClosing += (_, _) =>
+        {
+            bridgeCancellation?.Cancel();
+            consoleDevice?.Dispose();
+            consoleDevice = null;
+        };
     }
 
     private static Button Button(string label) =>
@@ -303,6 +308,43 @@ La correction est limitée aux segments de calibration connus. Le système
 d'exploitation, le bootloader et les zones inconnues sont protégés.
 Un fichier de sortie existant ne sera jamais écrasé.
 
+5. CONSOLE CAN / OBD COMPLÈTE
+Fermez d'abord le pont Android. Dans « Console CAN / OBD », choisissez le
+profil et les CAN IDs documentés, puis « Ouvrir canal J2534 ».
+Entrez une requête hexadécimale dans « Trame » et cliquez « Envoyer / recevoir ».
+Les trames transmises (TX) et reçues (RX) apparaissent séparément.
+Les services de lecture autorisés sont disponibles : 22, 19, 1A GM et 09 OBD.
+Les identités Mode 09 et GMLAN peuvent être lues d'un clic ; la tension est
+visible si le pilote la fournit. L'historique peut être exporté.
+Le mode « Envoyer sans réponse » n'accepte que les trames explicitement
+autorisées, pas les commandes de flash, SecurityAccess ou actionneurs.
+Fermez le canal local avant de redémarrer le pont Android.
+
+6. LECTURE MÉMOIRE ECU LIMITÉE
+Choisissez « Lecture mémoire ECU ». Saisissez le VIN exact, l'adresse de début
+connue et vérifiée, la taille, le nombre d'octets par bloc et la session.
+La console CAN fournit les CAN IDs et le profil 33/34/35/36/63/64.
+Enregistrez votre profil JSON avec « Créer le profil », ou chargez un profil
+déjà validé. Aucun offset constructeur n'est inventé.
+Lisez la zone à l'aide du bouton prévu : le VIN réel est comparé au profil
+avant toute lecture. Deux lectures indépendantes doivent être identiques.
+La sauvegarde résultante est écrite dans un NOUVEAU fichier binaire, jamais
+à la place de l'original. Le bouton Annuler interrompt entre deux trames.
+La limite actuelle de lecture Windows est de 16 Mio par capture.
+Ce fichier représente une zone, pas nécessairement toute la flash.
+
+7. PILOTES ET DIAGNOSTICS
+L'onglet « Pilotes et diagnostics » vérifie les exports J2534, la détection
+du boîtier, le firmware et les versions DLL/API, sans écrire sur l'ECU.
+Les autotests logiciels et l'export de diagnostic sont disponibles.
+
+8. MISES À JOUR
+Dans « Mises à jour / À propos », consultez la version installée,
+recherchez la dernière release officielle GitHub et lancez son
+installation automatique. Fermez d'abord le pont et le canal local.
+Le prochain lancement de l'application affiche le journal de résultat.
+Les versions x86/x64 utilisent l'installateur adapté.
+
 IMPORTANT
 Les sommes de contrôle correctes ne prouvent pas qu'un flash est sûr.
 L'écriture ECU E39/E39A n'est pas disponible tant que le kernel natif,
@@ -330,7 +372,7 @@ pas le port du pont sur Internet.",
 
     private void RefreshDetected()
     {
-        if (bridgeTask is { IsCompleted: false }) return;
+        if (bridgeTask is { IsCompleted: false } || consoleDevice is not null || busy) return;
         try
         {
             var previousIndex = adapter.SelectedIndex;
@@ -362,6 +404,11 @@ pas le port du pont sur Internet.",
     private void Start()
     {
         if (bridgeTask is { IsCompleted: false }) return;
+        if (consoleDevice is not null || busy)
+        {
+            ShowError("Fermez la console et terminez la lecture ECU avant de démarrer le pont.");
+            return;
+        }
         BridgeTlsIdentity? identity = null;
         CancellationTokenSource? stop = null;
         try
@@ -459,6 +506,12 @@ pas le port du pont sur Internet.",
 
     private void ChooseFile(TextBox target, bool save, string? filter = null)
     {
+        if (ReferenceEquals(target, memoryProfile) &&
+            bridgeTask is { IsCompleted: false })
+        {
+            ShowError("Arrêtez le pont avant de modifier son profil mémoire.");
+            return;
+        }
         filter ??= "Image ECU (*.bin)|*.bin|Tous les fichiers (*.*)|*.*";
         if (save)
         {
@@ -572,9 +625,9 @@ pas le port du pont sur Internet.",
     private async Task ProbeEcuAsync()
     {
         if (busy) return;
-        if (bridgeTask is { IsCompleted: false })
+        if (bridgeTask is { IsCompleted: false } || consoleDevice is not null)
         {
-            ShowError("Arrêtez d'abord le pont : le test doit utiliser seul le canal J2534.");
+            ShowError("Arrêtez le pont et fermez la console : le test doit utiliser seul le canal J2534.");
             return;
         }
         if (adapter.SelectedItem is not AdapterChoice choice)
