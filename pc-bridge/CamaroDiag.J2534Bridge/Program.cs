@@ -35,6 +35,11 @@ internal static class Program
         if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
             return BridgeSelfTests.Run();
 
+        // Offline recovery inspection must never load a J2534 driver or
+        // trigger the updater. Invalid or incomplete evidence is not success.
+        if (args.Contains("--inspect-write-journal", StringComparer.OrdinalIgnoreCase))
+            return InspectWriteJournal(args);
+
         // Driver verification is explicitly requested by the operator. Do not
         // contact an ECU, start the network bridge or run the updater here.
         if (args.Contains("--probe-drivers", StringComparer.OrdinalIgnoreCase))
@@ -138,6 +143,33 @@ internal static class Program
         {
             Console.Error.WriteLine($"Could not listen on TCP port {port}: {ex.Message}");
             return 5;
+        }
+    }
+
+    private static int InspectWriteJournal(string[] args)
+    {
+        if (args.Length != 2 ||
+            !args[0].Equals("--inspect-write-journal", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(args[1]))
+        {
+            Console.Error.WriteLine("Usage: --inspect-write-journal <journal.jsonl>");
+            return 6;
+        }
+
+        try
+        {
+            var state = NativeE39FileWriteJournal.Inspect(args[1]);
+            Console.WriteLine("ECU journal: " + state);
+            Console.WriteLine("Offline evidence only; this command does not contact, reset or program an ECU.");
+            if (state == NativeE39FileWriteJournal.CompletionState.Completed) return 0;
+            Console.Error.WriteLine("No completed transaction recorded. Preserve the original backup and journal.");
+            return 8;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException
+            or NotSupportedException)
+        {
+            Console.Error.WriteLine("Unable to inspect ECU journal: " + error.Message);
+            return 6;
         }
     }
 
