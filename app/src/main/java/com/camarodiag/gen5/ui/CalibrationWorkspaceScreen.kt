@@ -89,6 +89,7 @@ data class CalibrationWorkspaceState(
     val udsMessage: String = "",
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
+    val isJ2534MemoryReadAvailable: Boolean = false,
     val j2534BridgeMessage: String = "",
     val isJ2534MemoryCapturing: Boolean = false,
     val j2534MemoryCaptureMessage: String = "",
@@ -724,6 +725,7 @@ fun CalibrationWorkspaceScreen(
                                     )
                                 },
                                 enabled = state.isJ2534BridgeConnected &&
+                                    state.isJ2534MemoryReadAvailable &&
                                     !state.isJ2534MemoryCapturing &&
                                     vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}")) &&
                                     memoryAddress != null && memoryBytes != null &&
