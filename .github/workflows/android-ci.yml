@@ -45,7 +45,7 @@ permissions:
 
 jobs:
   evaluate-build-checkpoint:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
+    if: (github.event_name == 'workflow_dispatch' && inputs.target_ref != 'main' && inputs.target_ref != 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
     outputs:
       validated_sha: ${{ steps.resolve_revision.outputs.sha }}
