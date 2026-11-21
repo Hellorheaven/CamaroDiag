@@ -529,4 +529,23 @@
     <string name="adapter_vxdiag_profiles">Deklarált VXDIAG interfészprofilok</string>
     <string name="adapter_vxdiag_profiles_hint">Ezek a profilok a hardver- és kapcsolatváltozatokat különböztetik meg. Nem igazolják Android-illesztőprogram vagy járműkommunikáció elérhetőségét.</string>
     <string name="adapter_simulation_profiles">Szimulált hardverprofilok (próbapadi teszt)</string>
+    <string name="modules_vehicle_title">Járművezérlő modulok</string>
+    <string name="module_accessible">Elérhető</string>
+    <string name="module_requires_swcan">SW-CAN szükséges (1. érintkező)</string>
+    <string name="module_blocked_adapter">Az adapter blokkolja</string>
+    <string name="module_not_equipped">Nincs felszerelve</string>
+    <string name="module_discovery_required">Járműfelderítés szükséges</string>
+    <string name="live_engine_telemetry">Élő motortelemetria</string>
+    <string name="live_resume">Folytatás</string>
+    <string name="live_stop_recording">Rögzítés leállítása</string>
+    <string name="live_record">Élő adatok rögzítése</string>
+    <string name="live_export_csv">CSV exportálása</string>
+    <string name="live_recording_notice">A naplózó a megjelenített OBD-értékeket (metrikus egységekben) időbélyeggel rögzíti. Nem módosítja az ECU kalibrációs tábláit.</string>
+    <string name="dtc_title">Diagnosztikai hibakódok</string>
+    <string name="dtc_clear_warning">A 04 mód törli az emissziós hibakódokat és visszaállít egyes készenléti monitorokat. Folytatás előtt mentse a jelentést. A 04 mód nem törli a többi járműmodul bővített DTC-it.</string>
+    <string name="dtc_none_returned">A legutóbbi vizsgálat nem adott vissza hibakódokat.</string>
+    <string name="dtc_confirm_clear">Megerősíti a hibakódok törlését?</string>
+    <string name="dtc_clear_description">Ez OBD 04 módú parancsot küld az ECU-nak. A készenléti adatok visszaállhatnak. A hiba okát nem javítja meg.</string>
+    <string name="dtc_clear_action">Kódok törlése</string>
+    <string name="common_save">Mentés</string>
 </resources>
