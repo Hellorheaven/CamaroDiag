@@ -391,16 +391,19 @@
     <plurals name="vm_native_catalog_loaded">
         <item quantity="one">Počet oficiálních profilů Camaro pro modelový rok %2$d: %1$d. Pro živé čtení je nutné ověření na vozidle.</item>
         <item quantity="few">Počet oficiálních profilů Camaro pro modelový rok %2$d: %1$d. Pro živé čtení je nutné ověření na vozidle.</item>
+        <item quantity="many">Počet oficiálních profilů Camaro pro modelový rok %2$d: %1$d. Pro živé čtení je nutné ověření na vozidle.</item>
         <item quantity="other">Počet oficiálních profilů Camaro pro modelový rok %2$d: %1$d. Pro živé čtení je nutné ověření na vozidle.</item>
     </plurals>
     <plurals name="vm_community_catalog_loaded">
         <item quantity="one">Počet komunitních definic signálů pro modelový rok %2$d: %1$d.</item>
         <item quantity="few">Počet komunitních definic signálů pro modelový rok %2$d: %1$d.</item>
+        <item quantity="many">Počet komunitních definic signálů pro modelový rok %2$d: %1$d.</item>
         <item quantity="other">Počet komunitních definic signálů pro modelový rok %2$d: %1$d.</item>
     </plurals>
     <plurals name="cal_file_size_bytes">
         <item quantity="one">%1$d B</item>
         <item quantity="few">%1$d B</item>
+        <item quantity="many">%1$d B</item>
         <item quantity="other">%1$d B</item>
     </plurals>
     <string name="engine_llt">3.6L V6 SIDI (2010–2011)</string>
