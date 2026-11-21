@@ -605,4 +605,6 @@
     <string name="units_metric_details">Meetermõõdustik (km, °C, kPa)</string>
     <string name="units_imperial_details">Briti mõõtühikud (mi, °F, psi)</string>
     <string name="cal_tcp_port">TCP-port</string>
+    <string name="msg_refresh_adapters_failed">Adapterite loendi värskendamine nurjus.</string>
+    <string name="msg_usb_identifier_unavailable">USB-seadme tunnus pole saadaval</string>
 </resources>
