@@ -82,7 +82,7 @@ object EcuWriteTransaction {
         if (request.controllerFamily.isBlank() ||
             request.expectedIdentity.controllerId.isBlank() ||
             request.expectedIdentity.firmwareId.isBlank() ||
-            request.expectedIdentity.vin.isNullOrBlank()
+            request.expectedIdentity.vin?.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) != true
         ) blockers += Blocker.UNKNOWN_TARGET
         if (request.transport == EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS) {
             blockers += Blocker.DIAGNOSTIC_ONLY_TRANSPORT
@@ -230,7 +230,11 @@ internal class EcuWriteExecutionEngine(
                 val region = EcuProgrammingDriverContract.RegionRequest(
                     request.region, sector.absoluteAddress, sector.patchedBytes.size.toLong()
                 )
-                if (!powerMonitor.isStable()) {
+                if (!powerMonitor.isStable() ||
+                    driver.identify() != request.expectedIdentity
+                ) {
+                    // An adapter can reconnect to a different controller mid-run.
+                    // Never erase the next sector without confirming the live ECU.
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                         verifiedSectors = verified, failedAddress = currentAddress
