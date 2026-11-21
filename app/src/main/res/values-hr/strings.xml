@@ -367,4 +367,21 @@
     <string name="dtc_desc_p1101">Sustav protoka usisnog zraka: neispravan rad</string>
     <string name="cal_axis_x">Os X</string>
     <string name="cal_axis_y">Os Y</string>
+    <string name="obd_cal_id">Identifikator kalibracije</string>
+    <string name="obd_cvn">Kontrolni broj kalibracije</string>
+    <string name="cal_engine_profiles_hint">Prikazani su svi katalogizirani profili motora. Navedena obitelj ECM-a samo je okvirna: CAL ID, CVN, broj hardvera i operacijski sustav moraju identificirati stvarno ugrađeni ECU.</string>
+    <string name="cal_capability_summary">CAL ID/CVN: standardno očitavanje • Binarni ispis, uređivanje i zapisivanje: postupak za ECU mora biti potvrđen</string>
+    <string name="cal_obd_mode09_explanation">Očitajte identifikatore putem OBD načina 09: VIN (PID 02), CAL ID (PID 04) i CVN (PID 06). Ti identifikatori ne očitavaju binarnu kalibracijsku mapu.</string>
+    <string name="cal_uds_transport_hint">STPX prijenos za OBDLink MX+ ili računalni most J2534 za VXDIAG. Unesite potvrđene fizičke CAN identifikatore; GM adrese ne pretpostavljaju se.</string>
+    <string name="cal_can_profile">CAN profil: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
+    <string name="cal_j2534_bridge_title">RAČUNALNI MOST J2534 • VXDIAG VCX SE / NANO</string>
+    <string name="cal_j2534_launch_instructions">Pokrenite CamaroDiag.J2534Bridge.exe na računalu sa sustavom Windows, zatim unesite njegovu IP adresu i token prikazan u konzoli. Oba uređaja moraju biti na istoj lokalnoj mreži.</string>
+    <string name="cal_pc_ip_address">IP adresa računala</string>
+    <string name="cal_pc_pairing_token">Token za uparivanje računala</string>
+    <string name="cal_connect_j2534">Poveži most J2534</string>
+    <string name="cal_disconnect_pc_bridge">Prekini vezu s računalnim mostom</string>
+    <string name="cal_bridge_capabilities">Most: HS-CAN ISO15765 250/500 kbit/s i J2534-2 SW-ISO15765 ako ih upravljački program podržava. CAN FD ostaje isključen.</string>
+    <string name="cal_read_uds_did">Očitaj UDS DID</string>
+    <string name="cal_read_uds_dtcs">Očitaj UDS kodove grešaka</string>
+    <string name="cal_uds_trouble_codes">UDS kodovi grešaka (0x19)</string>
 </resources>
