@@ -540,4 +540,18 @@
     <string name="dtc_clear_description">Se trimite modul OBD 04 către ECU. Datele de disponibilitate pot fi resetate. Aceasta nu remediază cauza defecțiunii.</string>
     <string name="dtc_clear_action">Șterge codurile</string>
     <string name="common_save">Salvează</string>
+    <string name="update_download_failed">Descărcarea a eșuat.</string>
+    <string name="update_download_invalid_signature">Fișierul descărcat sau semnătura nu este validă. Instalarea a fost blocată. Poate fi necesară reinstalarea manuală.</string>
+    <string name="update_download_complete">Actualizare descărcată. Se deschide programul de instalare…</string>
+    <string name="update_downloading">Se descarcă</string>
+    <string name="update_allow_unknown_sources">Permite instalarea din CamaroDiag. Programul de instalare se va deschide automat la întoarcere.</string>
+    <string name="update_install">Instalează</string>
+    <string name="update_install_update">Instalează actualizarea</string>
+    <string name="update_download">Descarcă</string>
+    <string name="update_version_available">Versiune disponibilă: %1$s</string>
+    <string name="update_available">Actualizare disponibilă</string>
+    <string name="update_channel_only">Este disponibil doar canalul %1$s. Versiunile Debug și Release rămân pe canalele respective.</string>
+    <string name="update_later">Mai târziu</string>
+    <string name="update_ready_to_install">CamaroDiag – gata de instalare</string>
+    <string name="update_version_channel">Versiunea %1$s • %2$s</string>
 </resources>

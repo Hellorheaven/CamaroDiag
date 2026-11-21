@@ -554,4 +554,18 @@
     <string name="dtc_clear_description">Polecenie wysyła do ECU tryb OBD 04. Dane gotowości mogą zostać zresetowane. Nie usuwa to przyczyny usterki.</string>
     <string name="dtc_clear_action">Kasuj kody</string>
     <string name="common_save">Zapisz</string>
+    <string name="update_download_failed">Pobieranie nie powiodło się.</string>
+    <string name="update_download_invalid_signature">Pobrany plik lub podpis jest nieprawidłowy. Instalacja została zablokowana. Może być konieczna ręczna ponowna instalacja.</string>
+    <string name="update_download_complete">Pobrano aktualizację. Otwieranie instalatora…</string>
+    <string name="update_downloading">Pobieranie</string>
+    <string name="update_allow_unknown_sources">Zezwól na instalowanie z aplikacji CamaroDiag. Po powrocie instalator otworzy się automatycznie.</string>
+    <string name="update_install">Zainstaluj</string>
+    <string name="update_install_update">Zainstaluj aktualizację</string>
+    <string name="update_download">Pobierz</string>
+    <string name="update_version_available">Dostępna wersja: %1$s</string>
+    <string name="update_available">Dostępna aktualizacja</string>
+    <string name="update_channel_only">Dostępny jest tylko kanał %1$s. Wersje Debug i Release pozostają w swoich kanałach.</string>
+    <string name="update_later">Później</string>
+    <string name="update_ready_to_install">CamaroDiag – gotowa do instalacji</string>
+    <string name="update_version_channel">Wersja %1$s • %2$s</string>
 </resources>

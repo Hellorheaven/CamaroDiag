@@ -685,4 +685,10 @@
     <string name="cal_signal_metadata">DID 0x%1$s • forespørgsel %2$s / svar %3$s • interval %4$d s</string>
     <string name="cal_axis_values">0x%1$s • antal=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Kun hardwareprofil; et officielt Android SDK/API eller en dokumenteret bro er stadig påkrævet.</string>
+    <string name="update_version_available">Tilgængelig version: %1$s</string>
+    <string name="update_available">Opdatering tilgængelig</string>
+    <string name="update_channel_only">Kun kanalen %1$s tilbydes. Debug og Release forbliver på hver sin kanal.</string>
+    <string name="update_later">Senere</string>
+    <string name="update_ready_to_install">CamaroDiag – klar til installation</string>
+    <string name="update_version_channel">Version %1$s • %2$s</string>
 </resources>

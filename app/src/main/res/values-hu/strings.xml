@@ -548,4 +548,18 @@
     <string name="dtc_clear_description">Ez OBD 04 módú parancsot küld az ECU-nak. A készenléti adatok visszaállhatnak. A hiba okát nem javítja meg.</string>
     <string name="dtc_clear_action">Kódok törlése</string>
     <string name="common_save">Mentés</string>
+    <string name="update_download_failed">A letöltés sikertelen.</string>
+    <string name="update_download_invalid_signature">A letöltött fájl vagy az aláírás érvénytelen. A telepítés le van tiltva. Kézi újratelepítésre lehet szükség.</string>
+    <string name="update_download_complete">A frissítés letöltve. A telepítő megnyitása…</string>
+    <string name="update_downloading">Letöltés folyamatban</string>
+    <string name="update_allow_unknown_sources">Engedélyezd a telepítést a CamaroDiag alkalmazásból. Visszatéréskor a telepítő automatikusan megnyílik.</string>
+    <string name="update_install">Telepítés</string>
+    <string name="update_install_update">Frissítés telepítése</string>
+    <string name="update_download">Letöltés</string>
+    <string name="update_version_available">Elérhető verzió: %1$s</string>
+    <string name="update_available">Frissítés érhető el</string>
+    <string name="update_channel_only">Csak a(z) %1$s csatorna érhető el. A Debug és a Release kiadás a saját csatornáján marad.</string>
+    <string name="update_later">Később</string>
+    <string name="update_ready_to_install">CamaroDiag – telepítésre kész</string>
+    <string name="update_version_channel">%1$s verzió • %2$s</string>
 </resources>

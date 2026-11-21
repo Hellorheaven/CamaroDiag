@@ -543,4 +543,18 @@
     <string name="dtc_clear_description">Odošle sa režim OBD 04 do ECU. Údaje o pripravenosti sa môžu resetovať. Príčina poruchy sa tým neopraví.</string>
     <string name="dtc_clear_action">Vymazať kódy</string>
     <string name="common_save">Uložiť</string>
+    <string name="update_download_failed">Sťahovanie zlyhalo.</string>
+    <string name="update_download_invalid_signature">Stiahnutý súbor alebo podpis je neplatný. Inštalácia bola zablokovaná. Môže byť potrebná ručná preinštalácia.</string>
+    <string name="update_download_complete">Aktualizácia bola stiahnutá. Otvára sa inštalátor…</string>
+    <string name="update_downloading">Sťahuje sa</string>
+    <string name="update_allow_unknown_sources">Povoľte inštaláciu z aplikácie CamaroDiag. Po návrate sa automaticky otvorí inštalátor.</string>
+    <string name="update_install">Inštalovať</string>
+    <string name="update_install_update">Inštalovať aktualizáciu</string>
+    <string name="update_download">Stiahnuť</string>
+    <string name="update_version_available">Dostupná verzia: %1$s</string>
+    <string name="update_available">K dispozícii je aktualizácia</string>
+    <string name="update_channel_only">K dispozícii je iba kanál %1$s. Verzie Debug a Release zostávajú vo svojich kanáloch.</string>
+    <string name="update_later">Neskôr</string>
+    <string name="update_ready_to_install">CamaroDiag – pripravené na inštaláciu</string>
+    <string name="update_version_channel">Verzia %1$s • %2$s</string>
 </resources>

@@ -548,4 +548,18 @@
     <string name="dtc_clear_description">See saadab ECU-le OBD režiimi 04 käsu. Valmisolekuandmed võidakse lähtestada. See ei kõrvalda rikke põhjust.</string>
     <string name="dtc_clear_action">Kustuta koodid</string>
     <string name="common_save">Salvesta</string>
+    <string name="update_download_failed">Allalaadimine nurjus.</string>
+    <string name="update_download_invalid_signature">Allalaaditud fail või allkiri on kehtetu. Installimine on blokeeritud. Võib olla vaja rakendus käsitsi uuesti installida.</string>
+    <string name="update_download_complete">Värskendus on alla laaditud. Installiprogrammi avatakse…</string>
+    <string name="update_downloading">Allalaadimine</string>
+    <string name="update_allow_unknown_sources">Luba installimine rakendusest CamaroDiag. Naasmisel avaneb installiprogramm automaatselt.</string>
+    <string name="update_install">Installi</string>
+    <string name="update_install_update">Installi värskendus</string>
+    <string name="update_download">Laadi alla</string>
+    <string name="update_version_available">Saadaval versioon: %1$s</string>
+    <string name="update_available">Värskendus on saadaval</string>
+    <string name="update_channel_only">Saadaval on ainult kanal %1$s. Debug ja Release jäävad kumbki oma kanalisse.</string>
+    <string name="update_later">Hiljem</string>
+    <string name="update_ready_to_install">CamaroDiag – installimiseks valmis</string>
+    <string name="update_version_channel">Versioon %1$s • %2$s</string>
 </resources>

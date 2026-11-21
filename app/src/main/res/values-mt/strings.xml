@@ -560,4 +560,18 @@
     <string name="dtc_clear_description">Dan jibgħat il-modalità OBD 04 lill-ECU. Id-data tal-prontezza tista’ tiġi rrisettjata. Ma jsewwix il-kawża tal-ħsara.</string>
     <string name="dtc_clear_action">Ħassar il-kodiċijiet</string>
     <string name="common_save">Issejvja</string>
+    <string name="update_download_failed">It-tniżżil ma rnexxiex.</string>
+    <string name="update_download_invalid_signature">Il-fajl imniżżel jew il-firma mhix valida. L-installazzjoni ġiet imblukkata. Jista’ jkun hemm bżonn terġa’ tinstalla l-app manwalment.</string>
+    <string name="update_download_complete">L-aġġornament tniżżel. Qed jinfetaħ l-installatur…</string>
+    <string name="update_downloading">Qed jitniżżel</string>
+    <string name="update_allow_unknown_sources">Ippermetti installazzjonijiet minn CamaroDiag. L-installatur jinfetaħ awtomatikament meta terġa’ lura.</string>
+    <string name="update_install">Installa</string>
+    <string name="update_install_update">Installa l-aġġornament</string>
+    <string name="update_download">Niżżel</string>
+    <string name="update_version_available">Verżjoni disponibbli: %1$s</string>
+    <string name="update_available">Aġġornament disponibbli</string>
+    <string name="update_channel_only">Huwa disponibbli biss il-kanal %1$s. Debug u Release jibqgħu fil-kanali rispettivi tagħhom.</string>
+    <string name="update_later">Aktar tard</string>
+    <string name="update_ready_to_install">CamaroDiag – lesta għall-installazzjoni</string>
+    <string name="update_version_channel">Verżjoni %1$s • %2$s</string>
 </resources>

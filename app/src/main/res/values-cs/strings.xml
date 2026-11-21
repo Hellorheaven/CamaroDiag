@@ -691,4 +691,10 @@
     <string name="cal_signal_metadata">DID 0x%1$s • požadavek %2$s / odpověď %3$s • interval %4$d s</string>
     <string name="cal_axis_values">0x%1$s • počet=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Pouze profil hardwaru; stále je potřeba oficiální Android SDK/API nebo dokumentovaný most.</string>
+    <string name="update_version_available">Dostupná verze: %1$s</string>
+    <string name="update_available">Aktualizace je k dispozici</string>
+    <string name="update_channel_only">K dispozici je pouze kanál %1$s. Verze Debug i Release zůstávají ve svém kanálu.</string>
+    <string name="update_later">Později</string>
+    <string name="update_ready_to_install">CamaroDiag – připraveno k instalaci</string>
+    <string name="update_version_channel">Verze %1$s • %2$s</string>
 </resources>

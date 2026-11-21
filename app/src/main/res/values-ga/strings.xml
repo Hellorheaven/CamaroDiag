@@ -557,4 +557,18 @@
     <string name="dtc_clear_description">Seolann sé seo mód OBD 04 chuig an ECU. D’fhéadfaí sonraí ullmhachta a athshocrú. Ní dheisíonn sé cúis an locht.</string>
     <string name="dtc_clear_action">Glan cóid</string>
     <string name="common_save">Sábháil</string>
+    <string name="update_download_failed">Theip ar an íoslódáil.</string>
+    <string name="update_download_invalid_signature">Tá an comhad íoslódáilte nó an síniú neamhbhailí. Cuireadh bac ar an tsuiteáil. Seans go mbeidh gá le hathshuiteáil de láimh.</string>
+    <string name="update_download_complete">Íoslódáladh an nuashonrú. An suiteálaí á oscailt…</string>
+    <string name="update_downloading">Á íoslódáil</string>
+    <string name="update_allow_unknown_sources">Ceadaigh suiteálacha ó CamaroDiag. Osclófar an suiteálaí go huathoibríoch nuair a fhillfidh tú.</string>
+    <string name="update_install">Suiteáil</string>
+    <string name="update_install_update">Suiteáil an nuashonrú</string>
+    <string name="update_download">Íoslódáil</string>
+    <string name="update_version_available">Leagan ar fáil: %1$s</string>
+    <string name="update_available">Nuashonrú ar fáil</string>
+    <string name="update_channel_only">Níl ach an cainéal %1$s ar fáil. Fanann Debug agus Release ina gcainéil féin.</string>
+    <string name="update_later">Níos déanaí</string>
+    <string name="update_ready_to_install">CamaroDiag – réidh le suiteáil</string>
+    <string name="update_version_channel">Leagan %1$s • %2$s</string>
 </resources>

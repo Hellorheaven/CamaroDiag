@@ -540,4 +540,18 @@
     <string name="dtc_clear_description">Detta skickar OBD-läge 04 till ECU. Beredskapsdata kan återställas. Det åtgärdar inte orsaken till felet.</string>
     <string name="dtc_clear_action">Radera koder</string>
     <string name="common_save">Spara</string>
+    <string name="update_download_failed">Nedladdningen misslyckades.</string>
+    <string name="update_download_invalid_signature">Den hämtade filen eller signaturen är ogiltig. Installationen har blockerats. Manuell ominstallation kan behövas.</string>
+    <string name="update_download_complete">Uppdateringen har hämtats. Öppnar installationsprogrammet…</string>
+    <string name="update_downloading">Hämtar</string>
+    <string name="update_allow_unknown_sources">Tillåt installationer från CamaroDiag. Installationsprogrammet öppnas automatiskt när du återvänder.</string>
+    <string name="update_install">Installera</string>
+    <string name="update_install_update">Installera uppdatering</string>
+    <string name="update_download">Hämta</string>
+    <string name="update_version_available">Tillgänglig version: %1$s</string>
+    <string name="update_available">Uppdatering finns</string>
+    <string name="update_channel_only">Endast kanalen %1$s är tillgänglig. Debug och Release behåller sina respektive kanaler.</string>
+    <string name="update_later">Senare</string>
+    <string name="update_ready_to_install">CamaroDiag – klar för installation</string>
+    <string name="update_version_channel">Version %1$s • %2$s</string>
 </resources>

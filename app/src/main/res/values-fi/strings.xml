@@ -548,4 +548,18 @@
     <string name="dtc_clear_description">Tämä lähettää ECU:lle OBD-tilan 04 komennon. Valmiustiedot voidaan nollata. Se ei korjaa vian syytä.</string>
     <string name="dtc_clear_action">Tyhjennä koodit</string>
     <string name="common_save">Tallenna</string>
+    <string name="update_download_failed">Lataus epäonnistui.</string>
+    <string name="update_download_invalid_signature">Ladattu tiedosto tai allekirjoitus on virheellinen. Asennus estettiin. Sovellus on ehkä asennettava uudelleen käsin.</string>
+    <string name="update_download_complete">Päivitys ladattu. Avataan asennusohjelma…</string>
+    <string name="update_downloading">Ladataan</string>
+    <string name="update_allow_unknown_sources">Salli asennukset sovelluksesta CamaroDiag. Asennusohjelma avautuu automaattisesti, kun palaat.</string>
+    <string name="update_install">Asenna</string>
+    <string name="update_install_update">Asenna päivitys</string>
+    <string name="update_download">Lataa</string>
+    <string name="update_version_available">Saatavilla oleva versio: %1$s</string>
+    <string name="update_available">Päivitys saatavilla</string>
+    <string name="update_channel_only">Vain kanava %1$s on käytettävissä. Debug ja Release pysyvät omilla kanavillaan.</string>
+    <string name="update_later">Myöhemmin</string>
+    <string name="update_ready_to_install">CamaroDiag – valmis asennettavaksi</string>
+    <string name="update_version_channel">Versio %1$s • %2$s</string>
 </resources>

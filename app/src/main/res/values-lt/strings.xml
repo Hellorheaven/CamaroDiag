@@ -554,4 +554,18 @@
     <string name="dtc_clear_description">Ši komanda siunčia OBD 04 režimą į ECU. Parengties duomenys gali būti atstatyti. Gedimo priežastis nepašalinama.</string>
     <string name="dtc_clear_action">Ištrinti kodus</string>
     <string name="common_save">Išsaugoti</string>
+    <string name="update_download_failed">Atsisiųsti nepavyko.</string>
+    <string name="update_download_invalid_signature">Atsisiųstas failas arba parašas negalioja. Diegimas užblokuotas. Gali reikėti programą iš naujo įdiegti rankiniu būdu.</string>
+    <string name="update_download_complete">Naujinys atsisiųstas. Atveriama diegimo programa…</string>
+    <string name="update_downloading">Atsisiunčiama</string>
+    <string name="update_allow_unknown_sources">Leiskite diegti iš CamaroDiag. Kai grįšite, diegimo programa atsidarys automatiškai.</string>
+    <string name="update_install">Įdiegti</string>
+    <string name="update_install_update">Įdiegti naujinį</string>
+    <string name="update_download">Atsisiųsti</string>
+    <string name="update_version_available">Pasiekiama versija: %1$s</string>
+    <string name="update_available">Yra naujinys</string>
+    <string name="update_channel_only">Siūlomas tik kanalas %1$s. Debug ir Release versijos lieka savo kanaluose.</string>
+    <string name="update_later">Vėliau</string>
+    <string name="update_ready_to_install">CamaroDiag – paruošta diegti</string>
+    <string name="update_version_channel">Versija %1$s • %2$s</string>
 </resources>

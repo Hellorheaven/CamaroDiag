@@ -543,4 +543,18 @@
     <string name="dtc_clear_description">To pošlje način OBD 04 v ECU. Podatki pripravljenosti se lahko ponastavijo. S tem se ne odpravi vzrok napake.</string>
     <string name="dtc_clear_action">Izbriši kode</string>
     <string name="common_save">Shrani</string>
+    <string name="update_download_failed">Prenos ni uspel.</string>
+    <string name="update_download_invalid_signature">Prenesena datoteka ali podpis ni veljaven. Namestitev je blokirana. Morda bo potrebna ročna ponovna namestitev.</string>
+    <string name="update_download_complete">Posodobitev je prenesena. Odpiranje namestitvenega programa…</string>
+    <string name="update_downloading">Prenašanje</string>
+    <string name="update_allow_unknown_sources">Dovoli namestitve iz aplikacije CamaroDiag. Ko se vrneš, se bo namestitveni program samodejno odprl.</string>
+    <string name="update_install">Namesti</string>
+    <string name="update_install_update">Namesti posodobitev</string>
+    <string name="update_download">Prenesi</string>
+    <string name="update_version_available">Razpoložljiva različica: %1$s</string>
+    <string name="update_available">Na voljo je posodobitev</string>
+    <string name="update_channel_only">Na voljo je samo kanal %1$s. Različici Debug in Release ostaneta vsaka na svojem kanalu.</string>
+    <string name="update_later">Pozneje</string>
+    <string name="update_ready_to_install">CamaroDiag – pripravljeno za namestitev</string>
+    <string name="update_version_channel">Različica %1$s • %2$s</string>
 </resources>

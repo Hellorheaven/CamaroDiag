@@ -551,4 +551,18 @@
     <string name="dtc_clear_description">Šī komanda nosūta OBD 04 režīmu ECU. Gatavības dati var tikt atiestatīti. Tā nenovērš bojājuma cēloni.</string>
     <string name="dtc_clear_action">Dzēst kodus</string>
     <string name="common_save">Saglabāt</string>
+    <string name="update_download_failed">Lejupielāde neizdevās.</string>
+    <string name="update_download_invalid_signature">Lejupielādētais fails vai paraksts nav derīgs. Instalēšana ir bloķēta. Iespējams, lietotne būs manuāli jāinstalē vēlreiz.</string>
+    <string name="update_download_complete">Atjauninājums lejupielādēts. Tiek atvērts instalētājs…</string>
+    <string name="update_downloading">Notiek lejupielāde</string>
+    <string name="update_allow_unknown_sources">Atļauj instalēšanu no CamaroDiag. Kad atgriezīsies, instalētājs tiks atvērts automātiski.</string>
+    <string name="update_install">Instalēt</string>
+    <string name="update_install_update">Instalēt atjauninājumu</string>
+    <string name="update_download">Lejupielādēt</string>
+    <string name="update_version_available">Pieejamā versija: %1$s</string>
+    <string name="update_available">Pieejams atjauninājums</string>
+    <string name="update_channel_only">Pieejams tikai kanāls %1$s. Debug un Release versijas paliek savos kanālos.</string>
+    <string name="update_later">Vēlāk</string>
+    <string name="update_ready_to_install">CamaroDiag – gatava instalēšanai</string>
+    <string name="update_version_channel">Versija %1$s • %2$s</string>
 </resources>
