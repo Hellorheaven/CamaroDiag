@@ -129,9 +129,12 @@ fun CamaroAuthGate(
                                 if (auth.currentUser?.uid != targetUid ||
                                     validationGeneration != attempt
                                 ) return@addOnCompleteListener
-                                val snapshot = licenseTask.result?.takeIf {
-                                    licenseTask.isSuccessful && it.exists()
-                                }
+                                // Task.result throws if the request failed. A network
+                                // error, permission denial or missing record must
+                                // simply leave the entitlement locked.
+                                val snapshot = if (licenseTask.isSuccessful) {
+                                    licenseTask.result?.takeIf { it.exists() }
+                                } else null
                                 val licenseRecord = snapshot?.let {
                                     ServerLicenseRecord(
                                         uid = it.getString("uid").orEmpty(),
