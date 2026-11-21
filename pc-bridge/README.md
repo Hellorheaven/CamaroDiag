@@ -12,7 +12,7 @@ Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru insta
 - SW-ISO15765 GMLAN à 62,5 kbit/s si le fournisseur J2534-2 l'accepte.
 - Transmission de charges UDS ; le fournisseur J2534 gère ISO-TP et le contrôle de flux.
 - Lecture UDS limitée aux services 0x22, 0x19 et 0x3E.
-- Un client Android à la fois, protégé par un jeton d'appairage.
+- Un client Android à la fois, protégé par TLS 1.2/1.3 et un code d'appairage associant un jeton aléatoire à l'empreinte SHA-256 du certificat du pont.
 
 Ce pont est générique J2534. Il ne fournit aucun pilote VXDIAG et ne remplace ni VX Manager ni le DLL PassThru du fabricant.
 
@@ -41,9 +41,9 @@ Ce pont est générique J2534. Il ne fournit aucun pilote VXDIAG et ne remplace 
    - `CamaroDiag-J2534-Bridge-Setup-release-win-x86.exe` pour un fournisseur J2534 32 bits.
 5. Lancer l'installateur. Il installe le pont dans le profil Windows courant, sans droits administrateur, et crée un raccourci dans le menu Démarrer. Le raccourci Bureau est facultatif.
 6. Lancer **CamaroDiag J2534 Bridge** depuis le menu Démarrer. Si plusieurs fournisseurs sont présents, sélectionner celui à utiliser.
-7. Relever l'adresse IP du PC, le port TCP et le jeton d'appairage affichés.
+7. Relever l'adresse IP du PC, le port et **l'intégralité du code d'appairage sécurisé** affiché (forme `jeton.empreinte_SHA256`, sans espace). Le certificat TLS est renouvelé au redémarrage du pont.
 8. Connecter le PC et Android au même réseau privé.
-9. Saisir IP, port, jeton et CAN ID physiques documentés du calculateur dans CamaroDiag.
+9. Saisir IP, port, **code d'appairage sécurisé complet** dans le champ d'appairage de CamaroDiag, ainsi que les identifiants CAN documentés du calculateur. Installer la version Android et le pont Windows de la même mise à jour : les anciens ponts TCP sont volontairement refusés.
 10. Si Windows Firewall le demande, demander à l'administrateur d'autoriser le programme uniquement sur les réseaux privés.
 
 **Important pour les PC sans droits administrateur :** l'utilisateur peut installer le pont CamaroDiag avec le Setup dans son profil Windows, mais il ne peut pas installer lui-même VX Manager ni le pilote J2534 si la politique informatique réserve ces opérations à l'administrateur. Le pilote et l'interface doivent donc être préparés par le service informatique avant l'utilisation.
@@ -52,7 +52,9 @@ Le contrôle de mise à jour du pont utilise l'installateur Setup Release publi�
 
 ## Sécurité réseau
 
-La liaison utilise TCP et un jeton, sans chiffrement TLS. Le pont refuse les adresses distantes publiques et n'accepte que les réseaux privés/locaux (RFC1918, ULA IPv6, link-local). Ne jamais exposer le port à Internet, ne pas configurer de redirection de port et ne pas utiliser le pont sur un Wi-Fi public. Le jeton reste transmis en clair sur le réseau local : utiliser uniquement un réseau de confiance.
+La liaison Android–pont Windows est obligatoirement **chiffrée en TLS 1.2 ou TLS 1.3**. L'application vérifie l'empreinte SHA-256 exacte du certificat présentée par le pont, à partir du code recopié localement : aucune commande ni aucun jeton d'appairage n'est envoyé avant la négociation TLS et le contrôle de l'empreinte. Les clients TCP en clair et les codes d'appairage anciens (jeton seul) sont rejetés. Le certificat et le jeton sont éphémères : recopier le nouveau code à chaque démarrage du pont.
+
+Le pont continue à refuser les adresses distantes publiques et n'accepte que les réseaux privés/locaux (RFC1918, ULA IPv6, link-local). Ne jamais exposer le port à Internet ni configurer de redirection de port. Une mauvaise empreinte, une négociation TLS impossible ou un ancien client doivent entraîner un refus de connexion, jamais un repli vers TCP en clair.
 
 ## Fonctions et limites
 
@@ -80,7 +82,8 @@ Pour contrôler une sauvegarde, ouvrez la section des fichiers de cartographie e
 
 - Aucun fournisseur détecté : demander à l'administrateur de réinstaller le pilote constructeur et vérifier l'enregistrement J2534.
 - Erreur DLL : vérifier que le pont et le DLL fournisseur sont tous deux x86 ou tous deux x64.
-- Connexion TCP impossible : vérifier IP, port, réseau et pare-feu.
+- Connexion TLS impossible : vérifier IP, port, réseau et pare-feu, ainsi que la version du pont ; un ancien pont TCP n'est plus compatible.
+- Erreur d'empreinte TLS : recopier le **nouveau code d'appairage complet** du pont lancé sur le PC. Ne jamais ignorer une erreur de certificat.
 - Échec d'ouverture du protocole : le pilote peut ne pas prendre en charge le profil sélectionné.
 - Aucune réponse ECU : vérifier contact, broches DLC, débit CAN et paire d'identifiants physiques.
 - SW-CAN indisponible : le matériel ou le pilote peut ne pas exposer le protocole J2534-2 requis.
