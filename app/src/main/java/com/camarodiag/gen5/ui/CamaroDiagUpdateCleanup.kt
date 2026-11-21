@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.ui
 
+import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.SharedPreferences
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -46,6 +48,15 @@ internal object CamaroDiagUpdateCleanup {
     private const val CACHE_FOLDER = "camarodiag-install-apks"
     private val legacyApkName = Regex("^CamaroDiag-(debug|release)-[a-zA-Z0-9._-]+\\.apk$")
 
+    /**
+     * This safety state must be committed synchronously before opening the
+     * package installer. Losing it would leave public Downloads APKs orphaned.
+     * This is deliberately not an asynchronous SharedPreferences.apply().
+     */
+    @SuppressLint("ApplySharedPref", "UseKtx")
+    private fun persistEntries(prefs: SharedPreferences, entries: Set<String>): Boolean =
+        prefs.edit().putStringSet(PENDING_KEY, entries).commit()
+
     fun verifiedInstallFile(context: Context, downloadId: Long): File {
         require(downloadId > 0L)
         return File(File(context.cacheDir, CACHE_FOLDER), "update-$downloadId.apk")
@@ -56,7 +67,7 @@ internal object CamaroDiagUpdateCleanup {
         val prefs = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val entries = prefs.getStringSet(PENDING_KEY, emptySet()).orEmpty().toMutableSet()
         entries.add(pending.encode())
-        return prefs.edit().putStringSet(PENDING_KEY, entries).commit()
+        return persistEntries(prefs, entries)
     }
 
     fun targetVersion(context: Context, downloadId: Long): Long? {
@@ -83,7 +94,7 @@ internal object CamaroDiagUpdateCleanup {
             manager.remove(downloadId)
             verifiedInstallFile(context, downloadId).delete()
             entries.remove(pending.encode())
-            prefs.edit().putStringSet(PENDING_KEY, entries).commit()
+            persistEntries(prefs, entries)
         } catch (_: Exception) {
             // Keep ownership record so the next app launch can retry cleanup.
         }
@@ -132,7 +143,7 @@ internal object CamaroDiagUpdateCleanup {
                 // Keep the record, retry safely on the next launch.
             }
         }
-        if (remaining != original && !prefs.edit().putStringSet(PENDING_KEY, remaining).commit()) {
+        if (remaining != original && !persistEntries(prefs, remaining)) {
             return
         }
         if (successfullyRemoved || packageWasReplaced) {
