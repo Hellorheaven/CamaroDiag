@@ -62,7 +62,13 @@ internal object CamaroDiagUpdateCleanup {
         return File(File(context.cacheDir, CACHE_FOLDER), "update-$downloadId.apk")
     }
 
+    private fun removeCachedApk(context: Context, downloadId: Long): Boolean {
+        val file = verifiedInstallFile(context, downloadId)
+        return file.delete() || !file.exists()
+    }
+
     /** Persist before installation; survive app process death or an APK replacement. */
+    @Synchronized
     fun recordDownload(context: Context, pending: PendingCamaroDiagApk): Boolean {
         val prefs = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val entries = prefs.getStringSet(PENDING_KEY, emptySet()).orEmpty().toMutableSet()
@@ -87,6 +93,7 @@ internal object CamaroDiagUpdateCleanup {
      * A failed/malformed download may be removed immediately. NEVER call this
      * for an installer cancellation: users must retain their download.
      */
+    @Synchronized
     fun discardInvalidDownload(context: Context, downloadId: Long) {
         if (downloadId <= 0) return
         val prefs = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
@@ -96,7 +103,7 @@ internal object CamaroDiagUpdateCleanup {
         val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         try {
             manager.remove(downloadId)
-            verifiedInstallFile(context, downloadId).delete()
+            if (!removeCachedApk(context, downloadId)) return
             entries.remove(pending.encode())
             persistEntries(prefs, entries)
         } catch (_: Exception) {
@@ -109,6 +116,7 @@ internal object CamaroDiagUpdateCleanup {
      * DownloadManager.remove(id) deletes the file even when it is in the
      * public /storage/emulated/0/Download folder (scoped-storage compatible).
      */
+    @Synchronized
     fun cleanupAfterSuccessfulInstall(context: Context, packageWasReplaced: Boolean = false) {
         val prefs = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val original = prefs.getStringSet(PENDING_KEY, emptySet()).orEmpty()
@@ -140,7 +148,7 @@ internal object CamaroDiagUpdateCleanup {
                 // This removes the DownloadManager entry AND the downloaded APK.
                 // Do not try deleting arbitrary public files by filename.
                 manager.remove(pending.downloadId)
-                verifiedInstallFile(context, pending.downloadId).delete()
+                if (!removeCachedApk(context, pending.downloadId)) continue
                 remaining.remove(encoded)
                 successfullyRemoved = true
             } catch (_: Exception) {
