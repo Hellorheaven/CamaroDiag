@@ -61,7 +61,7 @@ class PersistentEcuWriteJournal(
             "Only complete SHA-256 image digests may be recorded."
         }
         synchronized(guard) {
-            val audit = inspectLocked()
+            val audit = inspectLocked(nextRecord = record)
             check(audit.valid) { "The ECU write journal is missing, damaged, or has been modified." }
             val lines = file.readLines(StandardCharsets.UTF_8)
             val lastHash = if (audit.records == 0) sha256(header) else lines.last().substringAfterLast('\t')
@@ -86,7 +86,64 @@ class PersistentEcuWriteJournal(
     /** Detects truncated records and alterations, including changes to earlier entries. */
     fun inspect(): Audit = synchronized(guard) { inspectLocked() }
 
-    private fun inspectLocked(): Audit {
+    /**
+     * Reject impossible state transitions even when record hashes are syntactically
+     * valid. All independent baseline reads precede the first erase, and only the
+     * next verified sector may be erased. A sector must be independently verified
+     * before the next sector can be erased.
+     */
+    private class SequenceGuard {
+        private data class Sector(
+            val region: EcuBackupCoverage.Region,
+            val address: Long,
+            val originalSha256: String,
+            val updatedSha256: String
+        )
+
+        private val baseline = mutableListOf<Sector>()
+        private val completed = mutableSetOf<Sector>()
+        private var inFlight: Sector? = null
+        private var erasePhase = false
+
+        fun accept(record: EcuWriteTransaction.Record): Boolean {
+            val sector = Sector(
+                record.region, record.address,
+                record.originalSha256.lowercase(), record.updatedSha256.lowercase()
+            )
+            return when (record.stage) {
+                EcuWriteTransaction.Stage.BASELINE_CHECKED -> {
+                    if (erasePhase || inFlight != null || baseline.any {
+                        it.region == sector.region && it.address == sector.address
+                    } || baseline.lastOrNull()?.address?.let { sector.address <= it } == true) {
+                        false
+                    } else {
+                        baseline += sector
+                        true
+                    }
+                }
+                EcuWriteTransaction.Stage.BEFORE_ERASE -> {
+                    if (inFlight != null || baseline.getOrNull(completed.size) != sector) {
+                        false
+                    } else {
+                        erasePhase = true
+                        inFlight = sector
+                        true
+                    }
+                }
+                EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE -> {
+                    if (inFlight != sector) {
+                        false
+                    } else {
+                        inFlight = null
+                        completed += sector
+                        true
+                    }
+                }
+            }
+        }
+    }
+
+    private fun inspectLocked(nextRecord: EcuWriteTransaction.Record? = null): Audit {
         if (!file.isFile || file.length() !in 1..MAX_JOURNAL_BYTES) return Audit(false, 0)
         val raw = file.readBytes()
         if (raw.isEmpty() || raw.last() != '\n'.code.toByte()) return Audit(false, 0)
@@ -95,6 +152,7 @@ class PersistentEcuWriteJournal(
         var previousHash = sha256(header)
         var count = 0
         var lastStage: EcuWriteTransaction.Stage? = null
+        val sequence = SequenceGuard()
         for (line in lines.drop(1)) {
             val parts = line.split('\t')
             if (parts.size != 8 || parts[0].toIntOrNull() != count + 1 ||
@@ -104,14 +162,20 @@ class PersistentEcuWriteJournal(
             ) return Audit(false, count, lastStage)
             val stage = runCatching { EcuWriteTransaction.Stage.valueOf(parts[2]) }.getOrNull()
                 ?: return Audit(false, count, lastStage)
-            if (runCatching { EcuBackupCoverage.Region.valueOf(parts[3]) }.isFailure) {
-                return Audit(false, count, lastStage)
-            }
+            val region = runCatching { EcuBackupCoverage.Region.valueOf(parts[3]) }.getOrNull()
+                ?: return Audit(false, count, lastStage)
+            if (!sequence.accept(EcuWriteTransaction.Record(
+                stage = stage, region = region, address = parts[4].toLong(),
+                originalSha256 = parts[5], updatedSha256 = parts[6]
+            ))) return Audit(false, count, lastStage)
             val expected = sha256(previousHash + "\t" + parts.take(7).joinToString("\t"))
             if (parts[7] != expected) return Audit(false, count, lastStage)
             previousHash = expected
             count++
             lastStage = stage
+        }
+        if (nextRecord != null && !sequence.accept(nextRecord)) {
+            return Audit(false, count, lastStage)
         }
         return Audit(true, count, lastStage)
     }
