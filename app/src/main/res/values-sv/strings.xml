@@ -566,4 +566,10 @@
     <string name="can_sniffer_capture_failed">CAN-fångsten misslyckades eller adaptern slutade svara.</string>
     <string name="can_sniffer_frame_count">Fångade ramar: %1$d</string>
     <string name="can_sniffer_filtered_count">Visar %1$d av %2$d ramar</string>
+    <string name="msg_live_recording_real_started">Inspelning av faktiska OBD-data har startat.</string>
+    <string name="msg_live_recording_started">Inspelning pågår. Antal mätvärden: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Inspelningen stoppades. Antal registrerade mätvärden: %1$d.</string>
+    <string name="msg_live_csv_exported">CSV-loggen har exporterats. Antal mätvärden: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Det gick inte att exportera CSV-loggen.</string>
+    <string name="msg_live_recording_max_samples">Säkerhetsgränsen nåddes (%1$d). Inspelningen stoppades automatiskt.</string>
 </resources>
