@@ -593,4 +593,10 @@
     <string name="cal_expert_patch_program_bytes">Programmeerimisüksuse suurus (baitides)</string>
     <string name="cal_expert_patch_preview_button">Kuva muudetud BIN-failist mõjutatud sektorid</string>
     <string name="cal_expert_patch_summary">Muudetud baite: %1$d. Mõjutatud kustutussektoreid: %2$d. Riistvara mälukaart on kontrollimata. Kirjutamist ei toimunud.</string>
+    <string name="dtc_gm_monitor_title">GM-i mootori seire – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Veakoodi salvestamise kriteeriumid: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Aktiveerimistingimused: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Tõrkeloendur / kontrollimise sagedus: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL-märgutule liigitus: %1$s</string>
+    <string name="dtc_gm_monitor_source">Allikas: GM %1$s, lk %2$d</string>
 </resources>
