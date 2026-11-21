@@ -373,4 +373,7 @@
     <string name="about_checking">Ag seiceáil…</string>
     <string name="about_update_found">Tá leagan nua ar fáil.</string>
     <string name="about_version">Leagan suiteáilte: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Tosaigh CamaroDiag.J2534Bridge.exe ar Windows. Cuir isteach IP an ríomhaire agus an cód iomlán (comhartha.méarlorg TLS) ón gconsól. Úsáid líonra áitiúil iontaofa.</string>
+    <string name="cal_j2534_security_notice">Tá TLS 1.2+ agus seiceáil mhéarlorg an teastais riachtanach. Diúltaítear do sheanchomharthaí gan mhéarlorg. Ná nocht an port don Idirlíon.</string>
+    <string name="cal_pc_pairing_token">Cód TLS (comhartha.méarlorg)</string>
 </resources>

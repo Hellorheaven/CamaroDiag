@@ -139,10 +139,10 @@
     <string name="cal_can_profile">ملف CAN: ‏33/34 HS-CAN ‏500k • ‏35/36 HS-CAN ‏250k • ‏63/64 SW-CAN</string>
     <string name="cal_uds_did">UDS DID ‏(F190 = VIN)</string>
     <string name="cal_j2534_bridge_title">جسر J2534 للكمبيوتر • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">شغّل CamaroDiag.J2534Bridge.exe على كمبيوتر Windows، ثم أدخل عنوان IP والرمز الظاهر في وحدة التحكم. يجب أن يكون الجهازان على الشبكة المحلية نفسها.</string>
-    <string name="cal_j2534_security_notice">الأمان: الرمز غير مشفّر باستخدام TLS. استخدم شبكة خاصة موثوقة ولا تعرض هذا المنفذ مطلقًا للإنترنت.</string>
+    <string name="cal_j2534_launch_instructions">شغّل CamaroDiag.J2534Bridge.exe على حاسوب Windows. أدخل عنوان IP للحاسوب ورمز الاقتران الكامل (الرمز.بصمة TLS) المعروض في وحدة التحكم. استخدم شبكة محلية موثوقة.</string>
+    <string name="cal_j2534_security_notice">يلزم TLS 1.2+ والتحقق من بصمة الشهادة. تُرفض الرموز القديمة دون بصمة. لا تعرض المنفذ للإنترنت.</string>
     <string name="cal_pc_ip_address">عنوان IP للكمبيوتر</string>
-    <string name="cal_pc_pairing_token">رمز إقران الكمبيوتر</string>
+    <string name="cal_pc_pairing_token">رمز اقتران TLS (الرمز.البصمة)</string>
     <string name="cal_connect_j2534">الاتصال بجسر J2534</string>
     <string name="cal_disconnect_pc_bridge">قطع اتصال جسر الكمبيوتر</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">الجسر: HS-CAN ISO15765 بسرعة 250/500 كيلوبت/ث، وJ2534-2 SW-ISO15765 عند دعم برنامج التشغيل. يظل CAN FD معطّلًا.</string>

@@ -255,7 +255,7 @@
     <string name="cal_can_request_id">CAN ID požadavku (např. 7E0)</string>
     <string name="cal_can_response_id">CAN ID odpovědi (např. 7E8)</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
-    <string name="cal_j2534_security_notice">Zabezpečení: token není šifrován pomocí TLS. Používejte důvěryhodnou soukromou síť a nikdy tento port nevystavujte internetu.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ a ověření otisku certifikátu jsou povinné. Staré tokeny bez otisku se odmítají. Port nikdy nevystavujte internetu.</string>
     <string name="cal_native_catalog_title">VLASTNÍ KATALOG CAMARODIAG</string>
     <string name="cal_native_catalog_explanation">Definice spravuje CamaroDiag nezávisle na komunitních katalozích. Navržené ani zdokumentované definice se nikdy neodesílají do ECU.</string>
     <string name="cal_native_catalog_loading">Načítání vlastního katalogu…</string>
@@ -375,9 +375,9 @@
     <string name="cal_uds_transport_hint">Přenos STPX pro OBDLink STN nebo počítačový most J2534 pro VXDIAG. Zadejte ověřené fyzické identifikátory CAN; žádná adresa GM se nepředpokládá.</string>
     <string name="cal_can_profile">Profil CAN: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_j2534_bridge_title">POČÍTAČOVÝ MOST J2534 • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">Spusťte CamaroDiag.J2534Bridge.exe na počítači s Windows a zadejte jeho IP adresu a token zobrazený v konzoli. Obě zařízení musí být ve stejné místní síti.</string>
+    <string name="cal_j2534_launch_instructions">Spusťte CamaroDiag.J2534Bridge.exe na Windows. Zadejte IP počítače a úplný párovací kód (token.otisk TLS) z konzole. Použijte důvěryhodnou místní síť.</string>
     <string name="cal_pc_ip_address">IP adresa počítače</string>
-    <string name="cal_pc_pairing_token">Párovací token počítače</string>
+    <string name="cal_pc_pairing_token">Kód TLS (token.otisk)</string>
     <string name="cal_connect_j2534">Připojit most J2534</string>
     <string name="cal_disconnect_pc_bridge">Odpojit počítačový most</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Most: HS-CAN ISO15765 250/500 kbit/s a J2534-2 SW-ISO15765, pokud je podporuje ovladač. CAN FD zůstává vypnutý.</string>

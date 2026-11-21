@@ -364,4 +364,7 @@
     <string name="about_checking">Kontrollimine…</string>
     <string name="about_update_found">Saadaval on uus versioon.</string>
     <string name="about_version">Paigaldatud versioon: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Käivita Windowsis CamaroDiag.J2534Bridge.exe. Sisesta arvuti IP ja konsoolis kuvatud täielik kood (token.TLS-sõrmejälg). Kasuta usaldusväärset kohtvõrku.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ ja sertifikaadi sõrmejälje kontroll on kohustuslikud. Vanu üksikuid tokeneid ei lubata. Ära ava porti internetile.</string>
+    <string name="cal_pc_pairing_token">TLS-kood (token.sõrmejälg)</string>
 </resources>

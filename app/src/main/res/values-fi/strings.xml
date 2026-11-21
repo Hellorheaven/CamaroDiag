@@ -364,4 +364,7 @@
     <string name="about_checking">Tarkistetaan…</string>
     <string name="about_update_found">Uusi versio on saatavilla.</string>
     <string name="about_version">Asennettu versio: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Käynnistä CamaroDiag.J2534Bridge.exe Windowsissa. Anna tietokoneen IP ja konsolissa näkyvä koko koodi (tunnus.TLS-sormenjälki). Käytä luotettua lähiverkkoa.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ ja varmenteen sormenjäljen tarkistus vaaditaan. Vanhat pelkät tunnukset hylätään. Älä avaa porttia internetiin.</string>
+    <string name="cal_pc_pairing_token">TLS-koodi (tunnus.sormenjälki)</string>
 </resources>

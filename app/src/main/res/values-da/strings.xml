@@ -255,7 +255,7 @@
     <string name="cal_can_request_id">CAN-ID for anmodning (f.eks. 7E0)</string>
     <string name="cal_can_response_id">CAN-ID for svar (f.eks. 7E8)</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
-    <string name="cal_j2534_security_notice">Sikkerhed: Tokenet er ikke TLS-krypteret. Brug et betroet privat netværk, og gør aldrig denne port tilgængelig fra internettet.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ og kontrol af certifikatets fingeraftryk er påkrævet. Gamle koder med kun token afvises. Åbn aldrig porten mod internettet.</string>
     <string name="cal_native_catalog_title">CAMARODIAGS EGET KATALOG</string>
     <string name="cal_native_catalog_explanation">Definitionerne vedligeholdes af CamaroDiag uafhængigt af fællesskabets kataloger. Foreslåede eller dokumenterede definitioner sendes aldrig til en ECU.</string>
     <string name="cal_native_catalog_loading">Indlæser eget katalog…</string>
@@ -375,9 +375,9 @@
     <string name="cal_uds_transport_hint">STPX-transport til OBDLink STN eller en J2534-pc-bro til VXDIAG. Angiv bekræftede fysiske CAN-id\'er; der antages ingen GM-adresse.</string>
     <string name="cal_can_profile">CAN-profil: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_j2534_bridge_title">J2534-PC-BRO • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">Start CamaroDiag.J2534Bridge.exe på Windows-pc\'en, og indtast derefter dens IP-adresse og den token, der vises i konsollen. Begge enheder skal være på samme lokale netværk.</string>
+    <string name="cal_j2534_launch_instructions">Start CamaroDiag.J2534Bridge.exe på Windows-pc. Indtast pc-ens IP og den fulde kode (token.TLS-fingeraftryk) fra konsollen. Brug et pålideligt lokalt netværk.</string>
     <string name="cal_pc_ip_address">Pc\'ens IP-adresse</string>
-    <string name="cal_pc_pairing_token">Pc-parringstoken</string>
+    <string name="cal_pc_pairing_token">TLS-kode (token.fingeraftryk)</string>
     <string name="cal_connect_j2534">Opret forbindelse til J2534-bro</string>
     <string name="cal_disconnect_pc_bridge">Afbryd forbindelsen til pc-broen</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Bro: HS-CAN ISO15765 250/500 kbit/s og J2534-2 SW-ISO15765, når driveren understøtter det. CAN FD forbliver deaktiveret.</string>

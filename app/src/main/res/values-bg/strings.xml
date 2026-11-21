@@ -148,10 +148,10 @@
     <string name="cal_can_profile">CAN профил: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
     <string name="cal_j2534_bridge_title">КОМПЮТЪРЕН МОСТ J2534 • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">Стартирайте CamaroDiag.J2534Bridge.exe на компютъра с Windows, след което въведете неговия IP адрес и токена, показан в конзолата. Двете устройства трябва да са в една и съща локална мрежа.</string>
-    <string name="cal_j2534_security_notice">Сигурност: токенът не е шифрован чрез TLS. Използвайте доверена частна мрежа и никога не излагайте този порт в интернет.</string>
+    <string name="cal_j2534_launch_instructions">Стартирайте CamaroDiag.J2534Bridge.exe на Windows. Въведете IP адреса на компютъра и пълния код (токен.TLS отпечатък) от конзолата. Използвайте надеждна локална мрежа.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ и проверката на отпечатъка на сертификата са задължителни. Старите токени без отпечатък се отхвърлят. Не отваряйте порта към интернет.</string>
     <string name="cal_pc_ip_address">IP адрес на компютъра</string>
-    <string name="cal_pc_pairing_token">Токен за сдвояване с компютъра</string>
+    <string name="cal_pc_pairing_token">TLS код (токен.отпечатък)</string>
     <string name="cal_connect_j2534">Свързване с мост J2534</string>
     <string name="cal_disconnect_pc_bridge">Прекъсване на връзката с компютърния мост</string>
     <!-- SAE/J2534 bus names contain literal hyphens; do not alter protocol identifiers. -->
