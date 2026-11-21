@@ -541,4 +541,23 @@
     <string name="adapter_vxdiag_profiles">Profili ddikjarati tal-interfaċċi VXDIAG</string>
     <string name="adapter_vxdiag_profiles_hint">Dawn il-profili jiddistingwu varjanti tal-ħardwer u tal-konnessjoni. Ma jikkonfermawx li hemm driver Android jew komunikazzjoni mal-vettura disponibbli.</string>
     <string name="adapter_simulation_profiles">Profili simulati tal-ħardwer (test fuq bank)</string>
+    <string name="modules_vehicle_title">Moduli ta’ kontroll tal-vettura</string>
+    <string name="module_accessible">Aċċessibbli</string>
+    <string name="module_requires_swcan">Jeħtieġ SW-CAN (pin 1)</string>
+    <string name="module_blocked_adapter">Imblukkat mill-adapter</string>
+    <string name="module_not_equipped">Mhux installat</string>
+    <string name="module_discovery_required">Jeħtieġ identifikazzjoni tal-moduli tal-vettura</string>
+    <string name="live_engine_telemetry">Telemetrija tal-magna f’ħin reali</string>
+    <string name="live_resume">Kompli</string>
+    <string name="live_stop_recording">Waqqaf ir-reġistrazzjoni</string>
+    <string name="live_record">Irreġistra data f’ħin reali</string>
+    <string name="live_export_csv">Esporta CSV</string>
+    <string name="live_recording_notice">Il-logger jirreġistra l-valuri OBD murija (metriċi) bil-ħinijiet tagħhom. Ma jbiddilx it-tabelli tal-kalibrazzjoni tal-ECU.</string>
+    <string name="dtc_title">Kodiċijiet dijanjostiċi ta’ ħsara</string>
+    <string name="dtc_clear_warning">It-tħassir bil-modalità 04 ineħħi kodiċijiet ta’ ħsara relatati mal-emissjonijiet u jirrisettja xi monitors tal-prontezza. Issejvja r-rapport qabel tkompli. Il-modalità 04 ma tħassarx DTC avvanzati maħżuna f’moduli oħra tal-vettura.</string>
+    <string name="dtc_none_returned">L-aħħar skennjar ma rritorna ebda kodiċi ta’ ħsara.</string>
+    <string name="dtc_confirm_clear">Tikkonferma t-tħassir tad-DTC?</string>
+    <string name="dtc_clear_description">Dan jibgħat il-modalità OBD 04 lill-ECU. Id-data tal-prontezza tista’ tiġi rrisettjata. Ma jsewwix il-kawża tal-ħsara.</string>
+    <string name="dtc_clear_action">Ħassar il-kodiċijiet</string>
+    <string name="common_save">Issejvja</string>
 </resources>
