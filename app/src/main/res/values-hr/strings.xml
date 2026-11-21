@@ -717,4 +717,13 @@
     <string name="flexfuel_preflight_recovery">Postupak oporavka nije provjeren</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: provjera prije i nakon programiranja (samo čitanje)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Provjera nakon programiranja nije provedena. Programiranje ECU-a i ispitivanje vozila nakon upisa nisu potvrđeni.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Preuzmite najnovije Debug artefakte iz PR-a #70. Prijavite se na GitHub ovlaštenim računom. Preuzete datoteke su ZIP arhive koje treba raspakirati.</string>
+    <string name="debug_builds_android_archive">ZIP arhiva s Android Debug APK-om.</string>
+    <string name="debug_builds_windows_archive">ZIP arhiva s instalacijskim programima za Windows x64 i x86.</string>
+    <string name="debug_builds_caution">Artefakti istječu nakon 30 dana. Njihova dostupnost ne dokazuje uspješnu kompilaciju ni testiranje na vozilu. Potpisi Debug APK-a mogu se razlikovati od javne verzije.</string>
+    <string name="debug_builds_created">Stvoreno</string>
+    <string name="debug_builds_expires">Istječe</string>
+    <string name="debug_builds_no_browser">Nema dostupnog preglednika za otvaranje preuzimanja.</string>
 </resources>
