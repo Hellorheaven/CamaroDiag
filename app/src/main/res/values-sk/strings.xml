@@ -602,4 +602,6 @@
     <string name="cal_tcp_port">Port TCP</string>
     <string name="msg_refresh_adapters_failed">Zoznam adaptérov sa nepodarilo obnoviť.</string>
     <string name="msg_usb_identifier_unavailable">Identifikátor zariadenia USB nie je dostupný</string>
+    <string name="msg_simulation_activation_failed">Režim simulácie sa nepodarilo aktivovať.</string>
+    <string name="msg_live_simulation_active">Simulácia je aktívna. Zobrazené hodnoty nepochádzajú z vozidla.</string>
 </resources>
