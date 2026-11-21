@@ -613,4 +613,6 @@
     <string name="cal_tcp_port">TCP prievadas</string>
     <string name="msg_refresh_adapters_failed">Nepavyko atnaujinti adapterių sąrašo.</string>
     <string name="msg_usb_identifier_unavailable">USB įrenginio identifikatorius nepasiekiamas</string>
+    <string name="msg_simulation_activation_failed">Nepavyko įjungti modeliavimo režimo.</string>
+    <string name="msg_live_simulation_active">Modeliavimas įjungtas. Rodomos reikšmės gautos ne iš transporto priemonės.</string>
 </resources>
