@@ -37,12 +37,15 @@ static bool write_reg(void *ctx, uint32_t offset, uint32_t value)
         ++m->pulses;
         m->regs[0] &= ~(CD_MCR_DONE | CD_MCR_PEG);
         if (m->busy_timeout) return true;
-        assert(m->interlock >= 0x20000 && m->interlock < 0x40000);
+        assert(m->interlock >= CD_E39_PROTECTED_END && m->interlock < CD_MPC5566_FLASH_SIZE);
         if (value & CD_MCR_ERS) {
-            assert(m->regs[CD_HSR / 4] == 0);
-            assert(m->regs[CD_LMSR / 4] == 0x10 || m->regs[CD_LMSR / 4] == 0x20);
-            unsigned start = (m->interlock - 0x20000) / 4;
-            for (unsigned i = 0; i < 0x10000 / 4; ++i)
+            cd_flash_block block;
+            assert(cd_flash_block_for(m->interlock, &block));
+            assert(m->interlock == block.start);
+            assert(m->regs[CD_LMSR / 4] == block.lm_select);
+            assert(m->regs[CD_HSR / 4] == block.h_select);
+            unsigned start = (m->interlock - CD_E39_PROTECTED_END) / 4u;
+            for (unsigned i = 0; i < block.size / 4u; ++i)
                 m->words[start + i] = UINT32_MAX;
             if (m->erase_corruption) m->words[start] = 0;
         } else {
@@ -62,8 +65,8 @@ static bool write_reg(void *ctx, uint32_t offset, uint32_t value)
 static bool read_word(void *ctx, uint32_t address, uint32_t *out)
 {
     model *m = ctx;
-    if ((m->regs[0] & CD_MCR_EHV) || address < 0x20000 ||
-        address >= 0x40000 || address % 4) return false;
+    if ((m->regs[0] & CD_MCR_EHV) || address < CD_E39_PROTECTED_END ||
+        address >= CD_MPC5566_FLASH_SIZE || address % 4) return false;
     *out = m->words[(address - 0x20000) / 4];
     if (m->ecc_after_pulse && m->pulses) m->regs[0] |= CD_MCR_EER;
     return true;
@@ -72,7 +75,7 @@ static bool read_word(void *ctx, uint32_t address, uint32_t *out)
 static bool write_word(void *ctx, uint32_t address, uint32_t value)
 {
     model *m = ctx;
-    if (address < 0x20000 || address >= 0x40000 || address % 4) return false;
+    if (address < CD_E39_PROTECTED_END || address >= CD_MPC5566_FLASH_SIZE || address % 4) return false;
     ++m->word_writes;
     if (m->regs[0] & CD_MCR_ERS) {
         m->interlock = address;

@@ -2,9 +2,12 @@
 #define CAMARODIAG_FLASH_MODEL_H
 #include "../flash_controller.h"
 
+/* Simulate every writable main-array address, not only the first two low blocks. */
+#define CD_MODEL_FLASH_BYTES (CD_MPC5566_FLASH_SIZE - CD_E39_PROTECTED_END)
+
 typedef struct {
     uint32_t regs[6];
-    uint32_t words[0x20000 / 4];
+    uint32_t words[CD_MODEL_FLASH_BYTES / 4u];
     uint32_t interlock;
     uint32_t pending[2];
     unsigned word_writes, register_writes, pulses, pending_count;

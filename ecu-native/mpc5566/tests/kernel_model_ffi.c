@@ -12,7 +12,8 @@ static bool initialized;
 int cd_sim_init(const uint8_t *input, uint32_t length)
 {
     initialized = false;
-    if (!input || length != sizeof(memory.words)) return 0;
+    if (!input || length < 0x20000u ||
+        length > sizeof(memory.words) || length % 4u != 0) return 0;
     init_model(&memory);
     for (uint32_t i = 0; i < length; i += 4)
         memory.words[i / 4] = ((uint32_t)input[i] << 24) |
