@@ -1010,4 +1010,9 @@ class CanTraceAnalyzerTest {
         assertTrue(report.messages.isEmpty())
     }
 
+    @Test
+    fun opensCsvWithBomBeforeCanId() {
+        val report = CanTraceAnalyzer.analyze("\uFEFFcan_id,data\n7E8,02 41 00", "capture.csv")
+        assertEquals(0x7E8, report.frames.single().canId)
+    }
 }

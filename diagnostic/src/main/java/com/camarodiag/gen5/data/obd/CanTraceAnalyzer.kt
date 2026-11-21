@@ -186,7 +186,7 @@ object CanTraceAnalyzer {
     )
 
     fun analyze(text: String, sourceName: String = "trace.asc"): CanTraceAnalysisReport {
-        val lines = text.lineSequence().toList()
+        val lines = text.removePrefix("\uFEFF").lineSequence().toList()
         val ascLike = sourceName.endsWith(".asc", true) || lines.any { ascFrameRegex.matches(it) }
         val csvLike = sourceName.endsWith(".csv", true)
         val elmLike = lines.any { elmFrameRegex.matches(it) }
