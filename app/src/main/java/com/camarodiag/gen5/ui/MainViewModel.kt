@@ -109,6 +109,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             accountUid != null && level != LicenseLevel.OWNER
         ) LicenseLevel.PREMIUM else level
         if (LicenseRolloutConfig.ENABLED && level == LicenseLevel.FREE) {
+            gmlanIdentityGeneration++
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isGmlanReading = false, gmlanIdentity = null, gmlanIdentityFailed = false
+            )
             if (_liveRecordingState.value.isRecording) stopLiveRecording()
             discardCanMonitor()
             detachCanRequest()
@@ -822,9 +826,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var calibrationIdentityGeneration = 0L
+    private var gmlanIdentityGeneration = 0L
 
     private fun clearVehicleEvidence() {
         calibrationIdentityGeneration++
+        gmlanIdentityGeneration++
         discardCanMonitor()
         detachCanRequest()
         _liveCanMonitorState.value = LiveCanMonitorState()
@@ -845,6 +851,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveTelemetryMessage.value = null
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isReading = false,
+            isGmlanReading = false,
+            gmlanIdentity = null,
+            gmlanIdentityFailed = false,
             ecuVinResponse = "",
             ecuIdentityFromSimulation = false,
             vinComparison = null,
@@ -1450,6 +1459,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         message = getApplication<Application>()
                             .getString(R.string.flexfuel_lfx2012_export_failed)
                     )
+                }
+            }
+        }
+    }
+
+    /** Keep the legacy GM observation separate from generic OBD Mode 09. */
+    fun readGmlanIdentification() {
+        if (!requirePremiumLicense()) return
+        if (_calibrationWorkspace.value.isGmlanReading) return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val vehicle = _vehicle.value
+        val generation = ++gmlanIdentityGeneration
+        fun current(): Boolean =
+            isCurrentAccountGeneration(account) &&
+                generation == gmlanIdentityGeneration &&
+                connection == connectionAttemptGeneration &&
+                _vehicle.value == vehicle &&
+                hasPremiumLicense()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isGmlanReading = true, gmlanIdentity = null, gmlanIdentityFailed = false
+        )
+        viewModelScope.launch {
+            try {
+                if (!current()) return@launch
+                check(obdManager.isJ2534BridgeConnected())
+                val identity = obdManager.readGmlanIdentification()
+                if (current() && obdManager.isJ2534BridgeConnected()) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        isGmlanReading = false, gmlanIdentity = identity
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (current()) {
+                    reportConnectionLoss(error)
+                    if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        isGmlanReading = false, gmlanIdentity = null, gmlanIdentityFailed = true
+                    )
+                }
+            } finally {
+                if (current() && _calibrationWorkspace.value.isGmlanReading) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isGmlanReading = false)
                 }
             }
         }

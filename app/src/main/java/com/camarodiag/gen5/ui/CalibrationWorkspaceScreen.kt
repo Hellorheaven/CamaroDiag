@@ -66,6 +66,7 @@ import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.EcuBackupManifest
+import com.camarodiag.gen5.data.obd.GmlanIdentityEvidence
 import com.camarodiag.gen5.data.obd.EcuBackupCoverage
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
@@ -83,6 +84,9 @@ sealed interface ArchiveVerification {
 
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
+    val isGmlanReading: Boolean = false,
+    val gmlanIdentity: GmlanIdentityEvidence? = null,
+    val gmlanIdentityFailed: Boolean = false,
     val ecuVinResponse: String = "",
     /** Origin of the captured identity; never infer origin from the CURRENT adapter state. */
     val ecuIdentityFromSimulation: Boolean = false,
