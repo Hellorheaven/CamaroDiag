@@ -1,9 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import android.Manifest
-import android.content.res.Configuration
 import android.os.Build
-import android.os.LocaleList
 import android.widget.Toast
 import androidx.core.content.edit
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,9 +29,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import com.camarodiag.gen5.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -153,19 +148,9 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
+fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount: () -> Unit) {
     val lang by viewModel.language.collectAsState()
     val followSystemLanguage by viewModel.followSystemLanguage.collectAsState()
-    val systemConfiguration = LocalConfiguration.current
-    val systemLocale = systemConfiguration.locales[0]
-    LaunchedEffect(followSystemLanguage, systemLocale.toLanguageTag()) {
-        viewModel.refreshSystemLanguage(systemLocale)
-    }
-    val localizedConfiguration = remember(systemConfiguration, lang) {
-        Configuration(systemConfiguration).apply {
-            setLocales(LocaleList.forLanguageTags(if (lang == AppLanguage.ZH) "zh-CN" else lang.code))
-        }
-    }
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
     val savedVehicles by viewModel.savedVehicles.collectAsState()
@@ -312,10 +297,6 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
         }
     }
 
-    CompositionLocalProvider(
-        LocalConfiguration provides localizedConfiguration,
-        LocalLayoutDirection provides if (lang == AppLanguage.AR || lang == AppLanguage.HE) LayoutDirection.Rtl else LayoutDirection.Ltr
-    ) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -683,7 +664,6 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
             }
             }
         }
-    }
     }
 }
 
@@ -1814,7 +1794,8 @@ fun CanSnifferScreen(
             }
             if (report.messages.isNotEmpty()) {
                 item {
-                    Text(stringResource(R.string.cal_trace_uds_services), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    val services = report.udsServices.joinToString { "0x" + it.toString(16).uppercase().padStart(2, '0') }
+                    Text(stringResource(R.string.cal_trace_uds_services, services), color = CamaroAmber, fontWeight = FontWeight.Bold)
                 }
                 items(report.messages.takeLast(30).asReversed()) { message ->
                     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {

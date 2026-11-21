@@ -1176,7 +1176,8 @@ fun CalibrationWorkspaceScreen(
                             Text(stringResource(R.string.cal_comparison_name, comparisonName), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Text(state.comparisonSummary.orEmpty(), color = TextPrimary, fontSize = 12.sp)
                             Text(
-                                stringResource(R.string.cal_comparison_byte_counts),
+                                stringResource(R.string.cal_comparison_byte_counts, state.comparisonChangedBytes ?: 0,
+                                    state.comparisonAppendedBytes ?: 0, state.comparisonMissingBytes ?: 0),
                                 color = TextMuted, fontSize = 11.sp
                             )
                             state.comparisonRanges.forEach { range ->

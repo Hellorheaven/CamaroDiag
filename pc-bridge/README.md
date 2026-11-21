@@ -63,11 +63,18 @@ La liaison utilise TCP et un jeton, sans chiffrement TLS. Le pont refuse les adr
 | TesterPresent (0x3E) | Autorisé |
 | Écriture DID, effacement UDS | Bloqués |
 | RoutineControl, actionneurs | Bloqués |
-| SecurityAccess, lecture/écriture mémoire, flashage | Bloqués |
+| Lecture d’une plage mémoire | Disponible avec un profil de lecture configuré sur le PC et un VIN confirmé par le calculateur |
+| SecurityAccess, écriture mémoire, flashage | Bloqués |
 | CAN FD | Non pris en charge |
 | Découverte automatique de tous les calculateurs GM | Non fournie |
 
 Les CAN ID, débits et services doivent provenir d'une documentation fiable pour le VIN et le calculateur. Le pont ne devine aucune adresse ni procédure de programmation.
+
+### Sauvegarde d’une plage mémoire
+
+Dans **ECU / cartographies**, sélectionnez le véhicule et connectez le pont. Lorsque le profil de lecture du PC autorise la plage demandée, l’application la lit deux fois et propose de sauvegarder le ZIP si les lectures concordent.
+
+Pour contrôler une sauvegarde, ouvrez la section des fichiers de cartographie et choisissez **Vérifier le ZIP de sauvegarde du calculateur**. Ce contrôle fonctionne aussi hors connexion. Il affiche les adresses archivées, les empreintes SHA-256 et le VIN enregistré lorsque le fichier en contient un. Une sauvegarde peut couvrir une seule plage du calculateur.
 
 ## Dépannage
 

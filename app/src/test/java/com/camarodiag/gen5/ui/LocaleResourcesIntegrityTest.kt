@@ -113,6 +113,27 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun everyLocaleContainsAllLiveSensorLabelsAndPluralResources() {
+        val sensors = strings("en").keys.filter { it.startsWith("live_pid_") }.toSet()
+        fun plurals(locale: String): Map<String, Element> {
+            val nodes = document(File("src/main/res/${directory(locale)}/strings.xml")).getElementsByTagName("plurals")
+            return (0 until nodes.length).map { nodes.item(it) as Element }.associateBy { it.getAttribute("name") }
+        }
+        val expectedPlurals = plurals("en").keys
+        for (locale in locales) {
+            val labels = strings(locale)
+            assertTrue("Missing live sensor label in $locale", sensors.all { !labels[it].isNullOrBlank() })
+            val translated = plurals(locale)
+            assertEquals("Plural resources differ for $locale", expectedPlurals, translated.keys)
+            for ((key, plural) in translated) {
+                val items = plural.getElementsByTagName("item")
+                val fallback = (0 until items.length).map { items.item(it) as Element }
+                    .single { it.getAttribute("quantity") == "other" }
+                assertTrue("Empty default plural form for $locale/$key", fallback.textContent.isNotBlank())
+            }
+        }
+    }
+
     @Test fun diagnosticCoreLabelsAreTranslatedInEveryLocale() {
         val required = setOf(
             "common_connect", "common_refresh", "status_offline",
