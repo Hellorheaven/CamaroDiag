@@ -580,4 +580,10 @@
     <string name="can_sniffer_capture_failed">Przechwytywanie CAN nie powiodło się lub adapter przestał odpowiadać.</string>
     <string name="can_sniffer_frame_count">Przechwycone ramki: %1$d</string>
     <string name="can_sniffer_filtered_count">Wyświetlono %1$d z %2$d ramek</string>
+    <string name="msg_live_recording_real_started">Rozpoczęto rejestrowanie rzeczywistych danych OBD.</string>
+    <string name="msg_live_recording_started">Trwa rejestrowanie. Liczba próbek: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Zatrzymano rejestrowanie. Liczba zapisanych próbek: %1$d.</string>
+    <string name="msg_live_csv_exported">Wyeksportowano dziennik CSV. Liczba próbek: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Nie udało się wyeksportować dziennika CSV.</string>
+    <string name="msg_live_recording_max_samples">Osiągnięto limit bezpieczeństwa (%1$d). Rejestrowanie zatrzymano automatycznie.</string>
 </resources>
