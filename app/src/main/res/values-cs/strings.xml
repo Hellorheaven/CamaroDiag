@@ -367,4 +367,21 @@
     <string name="dtc_desc_p1101">Systém průtoku nasávaného vzduchu: nesprávná funkce</string>
     <string name="cal_axis_x">Osa X</string>
     <string name="cal_axis_y">Osa Y</string>
+    <string name="obd_cal_id">Identifikátor kalibrace</string>
+    <string name="obd_cvn">Ověřovací číslo kalibrace</string>
+    <string name="cal_engine_profiles_hint">Jsou uvedeny všechny katalogizované profily motorů. Zobrazená rodina ECM je pouze orientační: CAL ID, CVN, číslo hardwaru a operační systém musí určit skutečně instalovanou ECU.</string>
+    <string name="cal_capability_summary">CAL ID/CVN: standardní čtení • Binární výpis, úpravy a zápis: postup pro ECU musí být ověřen</string>
+    <string name="cal_obd_mode09_explanation">Načtěte identifikátory pomocí režimu OBD 09: VIN (PID 02), CAL ID (PID 04) a CVN (PID 06). Tyto identifikátory nenačítají binární kalibrační mapu.</string>
+    <string name="cal_uds_transport_hint">Přenos STPX pro OBDLink MX+ nebo počítačový most J2534 pro VXDIAG. Zadejte ověřené fyzické identifikátory CAN; žádná adresa GM se nepředpokládá.</string>
+    <string name="cal_can_profile">Profil CAN: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
+    <string name="cal_j2534_bridge_title">POČÍTAČOVÝ MOST J2534 • VXDIAG VCX SE / NANO</string>
+    <string name="cal_j2534_launch_instructions">Spusťte CamaroDiag.J2534Bridge.exe na počítači s Windows a zadejte jeho IP adresu a token zobrazený v konzoli. Obě zařízení musí být ve stejné místní síti.</string>
+    <string name="cal_pc_ip_address">IP adresa počítače</string>
+    <string name="cal_pc_pairing_token">Párovací token počítače</string>
+    <string name="cal_connect_j2534">Připojit most J2534</string>
+    <string name="cal_disconnect_pc_bridge">Odpojit počítačový most</string>
+    <string name="cal_bridge_capabilities">Most: HS-CAN ISO15765 250/500 kbit/s a J2534-2 SW-ISO15765, pokud je podporuje ovladač. CAN FD zůstává vypnutý.</string>
+    <string name="cal_read_uds_did">Načíst UDS DID</string>
+    <string name="cal_read_uds_dtcs">Načíst chybové kódy UDS</string>
+    <string name="cal_uds_trouble_codes">Chybové kódy UDS (0x19)</string>
 </resources>
