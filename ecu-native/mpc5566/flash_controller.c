@@ -17,6 +17,11 @@ bool cd_flash_init(cd_flash_controller *c, const cd_flash_bus *bus)
         bus->write_reg == NULL || bus->read_word == NULL ||
         bus->write_word == NULL || bus->barrier == NULL || bus->service == NULL)
         return false;
+    uint32_t mcr;
+    if (!bus->service(bus->context) ||
+        !bus->read_reg(bus->context, CD_MCR, &mcr) ||
+        (mcr & CD_MCR_GEOMETRY_MASK) != CD_MCR_MPC5566_GEOMETRY)
+        return false;
     c->bus = *bus;
     c->recovery_required = false;
     return true;
@@ -63,7 +68,9 @@ static cd_flash_result require_ready(cd_flash_controller *c, const cd_flash_bloc
     if (!c->bus.service(c->bus.context) || !read_reg(c, CD_MCR, &mcr) ||
         !read_reg(c, CD_LMLR, &lm) || !read_reg(c, CD_SLMLR, &slm) ||
         !read_reg(c, CD_HLR, &hi)) return CD_FLASH_IO_FAILURE;
-    if ((mcr & (ACTIVE_MASK | ERROR_MASK)) != 0 || (mcr & CD_MCR_DONE) == 0)
+    if ((mcr & CD_MCR_GEOMETRY_MASK) != CD_MCR_MPC5566_GEOMETRY ||
+        (mcr & (ACTIVE_MASK | ERROR_MASK | CD_MCR_PEAS)) != 0 ||
+        (mcr & (CD_MCR_DONE | CD_MCR_PEG)) != (CD_MCR_DONE | CD_MCR_PEG))
         return CD_FLASH_NOT_READY;
     /* Primary + secondary locks both apply to low/mid blocks. */
     if (((lm | slm) & block->lm_select) != 0 || (hi & block->h_select) != 0)

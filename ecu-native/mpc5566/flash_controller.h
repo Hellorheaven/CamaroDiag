@@ -8,6 +8,10 @@ enum {
     CD_MCR = 0x00, CD_LMLR = 0x04, CD_HLR = 0x08, CD_SLMLR = 0x0C,
     CD_LMSR = 0x10, CD_HSR = 0x14
 };
+/* NXP MPC5566RM rev. 2, Figure 13-4: read-only SIZE=0xB,
+ * LAS=6 and MAS=0 identify this precise flash geometry. */
+#define CD_MCR_GEOMETRY_MASK UINT32_C(0x0F710000)
+#define CD_MCR_MPC5566_GEOMETRY UINT32_C(0x0B600000)
 #define CD_MCR_EHV UINT32_C(0x00000001)
 #define CD_MCR_ESUS UINT32_C(0x00000002)
 #define CD_MCR_ERS UINT32_C(0x00000004)

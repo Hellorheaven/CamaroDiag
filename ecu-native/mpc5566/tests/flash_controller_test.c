@@ -15,6 +15,19 @@ int main(void)
     assert(cd_flash_erase(&c, 0x20000, 0x1000) == CD_FLASH_INVALID);
     assert(cd_flash_program(&c, 0x1FFF8, data, 8) == CD_FLASH_INVALID);
     assert(m.register_writes == 0 && m.word_writes == 0);
+    /* A different flash silicon geometry or prior failed pulse is never ready. */
+    m.regs[CD_MCR / 4] ^= UINT32_C(0x01000000);
+    assert(cd_flash_probe_program(&c, 0x20000, 8) == CD_FLASH_NOT_READY);
+    assert(!cd_flash_init(&c, &c.bus));
+    m.regs[CD_MCR / 4] ^= UINT32_C(0x01000000);
+    m.regs[CD_MCR / 4] &= ~CD_MCR_PEG;
+    assert(cd_flash_probe_program(&c, 0x20000, 8) == CD_FLASH_NOT_READY);
+    m.regs[CD_MCR / 4] |= CD_MCR_PEG;
+    m.regs[CD_MCR / 4] |= CD_MCR_PEAS;
+    assert(cd_flash_probe_program(&c, 0x20000, 8) == CD_FLASH_NOT_READY);
+    m.regs[CD_MCR / 4] &= ~CD_MCR_PEAS;
+    assert(cd_flash_init(&c, &c.bus));
+    assert(m.register_writes == 0 && m.word_writes == 0);
     m.regs[CD_SLMLR / 4] = 0x10;
     assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_LOCKED);
     assert(m.register_writes == 0);

@@ -7,7 +7,7 @@
 void init_model(model *m)
 {
     memset(m, 0, sizeof(*m));
-    m->regs[CD_MCR / 4] = CD_MCR_DONE | CD_MCR_PEG;
+    m->regs[CD_MCR / 4] = CD_MCR_MPC5566_GEOMETRY | CD_MCR_DONE | CD_MCR_PEG;
 }
 
 static bool read_reg(void *ctx, uint32_t offset, uint32_t *out)
