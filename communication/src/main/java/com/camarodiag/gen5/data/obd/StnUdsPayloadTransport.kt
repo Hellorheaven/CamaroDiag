@@ -59,8 +59,23 @@ class StnUdsPayloadTransport(
         if (configured) return
         val firmware = sendCommand("STI", timeoutMs)
         val hardware = sendCommand("STDI", timeoutMs)
-        require(firmware.contains("STN", true) && hardware.contains("OBDLink MX+", true)) {
-            "This UDS transport requires a documented OBDLink MX+ STN adapter. Detected: $hardware / $firmware"
+        // STPX/ISO-TP is a family feature, not an MX+-only feature.
+        // Detect documented OBDLink models by complete token so e.g. an
+        // "OBDLink MX+ clone" cannot be mistaken for an unrelated model.
+        // These identifiers are sufficient for the diagnostic transport only;
+        // an adapter string can NEVER authorize ECU erasure/programming.
+        val model = Regex("""(?i)\bOBDLink\s+(MX\+|MX|EX|CX|LX|SX)(?=\s|$)""")
+            .find(hardware)?.groupValues?.get(1)?.uppercase(Locale.ROOT)
+        require(firmware.contains("STN", true) && model != null) {
+            "An identified OBDLink STN adapter is required for STPX diagnostics. Detected: $hardware / $firmware"
+        }
+        // Only the MX / MX+ families expose GM single-wire CAN in the
+        // published manufacturer compatibility matrix. EX has Ford MS-CAN,
+        // which is a different bus and must not be confused with GM SW-CAN.
+        if (protocolNumber == 63 || protocolNumber == 64) {
+            require(model == "MX+" || model == "MX") {
+                "GM SW-CAN cannot be selected on OBDLink $model; use supported hardware."
+            }
         }
         requireOk(sendCommand("STP $protocolNumber", timeoutMs), "select CAN protocol")
         requireOk(sendCommand("ATH1", timeoutMs), "enable CAN headers")
