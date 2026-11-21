@@ -872,4 +872,17 @@
     <string name="cal_archive_verified">Beide Lesungen stimmen überein. Die SHA-256-Prüfsummen der archivierten Bereiche sind gültig.</string>
     <string name="cal_archive_partial">Die Sicherung enthält nur einen Teil des angeforderten Speichers.</string>
     <string name="cal_archive_failed">Das ZIP-Archiv konnte nicht geprüft werden. Entpackt sind höchstens 32 MiB zulässig.</string>
+    <string name="tab_functional_tests">Funktionstests</string>
+    <string name="functional_tests_title">Funktionstests — Steuergeräte und OBD</string>
+    <string name="functional_tests_readonly">Alle verfügbaren Nur-Lese-Prüfungen mit dem verbundenen Adapter starten. Andere Adapter und ungeprüfte Steuergeräte bleiben UNGETESTET. Kein Löschen und kein Flashen.</string>
+    <string name="functional_tests_run">Alle starten</string>
+    <string name="functional_tests_stop">Stoppen</string>
+    <string name="functional_tests_export">JSON exportieren</string>
+    <string name="functional_tests_summary">%1$d bestanden · %2$d fehlgeschlagen · %3$d ungetestet</string>
+    <string name="functional_tests_passed">BESTANDEN (physisch geprüft)</string>
+    <string name="functional_tests_failed">FEHLER</string>
+    <string name="functional_tests_skipped">UNGETESTET</string>
+    <string name="functional_tests_denied">Zugriff verweigert: Mit dem autorisierten Google-Konto anmelden.</string>
+    <string name="functional_tests_not_connected">Kein physischer OBD-Adapter verbunden. Weitere Prüfungen wurden nicht ausgeführt.</string>
+    <string name="functional_tests_cancelled">Testlauf abgebrochen.</string>
 </resources>
