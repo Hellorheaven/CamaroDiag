@@ -12,6 +12,35 @@ internal object J2534StandardObd {
         (protocol in setOf(33, 35) && request == 0x7E0 && response == 0x7E8) ||
             (protocol in setOf(34, 36) && request == 0x18DA10F1 && response == 0x18DAF110)
 
+    /** Bind Mode 09 records to the negotiated physical channel. Reject
+     * malformed metadata rather than importing a different ECU fingerprint. */
+    fun validateIdentity(
+        vin: String?, calibrationIds: List<String>,
+        calibrationVerificationNumbers: List<String>, ecuNames: List<String>,
+        responseCanId: String, expectedResponseCanId: String
+    ): ObdEcuIdentification {
+        require(responseCanId == expectedResponseCanId &&
+            responseCanId.matches(Regex("[0-9A-F]{3}|[0-9A-F]{8}")) &&
+            responseCanId.toLong(16) <= if (responseCanId.length == 3) 0x7FFL else 0x1FFFFFFFL
+        ) { "Mode 09 identity responder differs from the selected physical CAN channel." }
+        require(vin == null || vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
+            "Malformed Mode 09 VIN."
+        }
+        fun printable(value: String, width: Int) =
+            value.length in 1..width && value.all { it in ' '..'~' } && value.isNotBlank()
+        require(calibrationIds.all { printable(it,16) } &&
+            ecuNames.all { printable(it,20) } &&
+            calibrationVerificationNumbers.all { it.matches(Regex("[0-9A-F]{8}")) }
+        ) { "Malformed physical Mode 09 record." }
+        require(vin != null || calibrationIds.isNotEmpty() ||
+            calibrationVerificationNumbers.isNotEmpty() || ecuNames.isNotEmpty()) {
+            "No physical identity records."
+        }
+        return ObdEcuIdentification(vin = vin, calibrationIds = calibrationIds.toList(),
+            calibrationVerificationNumbers = calibrationVerificationNumbers.toList(),
+            ecuNames = ecuNames.toList(), respondingEcuAddresses = listOf(responseCanId))
+    }
+
     private fun ByteArray.u(index: Int): Int = this[index].toInt() and 0xFF
 
     fun pidData(pid: Int, reply: ByteArray): ByteArray {

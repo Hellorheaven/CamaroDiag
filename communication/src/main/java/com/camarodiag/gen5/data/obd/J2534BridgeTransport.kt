@@ -128,12 +128,13 @@ class J2534BridgeTransport(
                 val values = data.getJSONArray(name)
                 return List(values.length()) { index -> values.getString(index) }
             }
-            ObdEcuIdentification(
+            J2534StandardObd.validateIdentity(
                 vin = if (data.isNull("vin")) null else data.getString("vin"),
                 calibrationIds = records("calibrationIds"),
                 calibrationVerificationNumbers = records("cvns"),
                 ecuNames = records("ecuNames"),
-                respondingEcuAddresses = listOf(data.getString("responseCanId"))
+                responseCanId = data.getString("responseCanId"),
+                expectedResponseCanId = checkNotNull(connectedResponseCanId)
             )
         }
     }

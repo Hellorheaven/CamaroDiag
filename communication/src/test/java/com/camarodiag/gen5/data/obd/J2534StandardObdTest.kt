@@ -5,6 +5,25 @@ import org.junit.Test
 
 class J2534StandardObdTest {
     private fun bytes(vararg v: Int) = v.map { it.toByte() }.toByteArray()
+    @Test fun identityMustBelongToNegotiatedPhysicalResponder() {
+        val vin = "1G1FA1RXXR0123456"
+        fun identity(response: String = "7E8", expected: String = "7E8",
+            id: String? = vin, cvn: String = "1234ABCD") =
+            J2534StandardObd.validateIdentity(id,listOf("12664221"),listOf(cvn),
+                listOf("ECM E39"),response,expected)
+        assertEquals(vin,identity().vin)
+        assertEquals(listOf("7E8"),identity().respondingEcuAddresses)
+        assertEquals(listOf("18DAF110"),identity("18DAF110","18DAF110").respondingEcuAddresses)
+        assertThrows(IllegalArgumentException::class.java) { identity("7E9") }
+        assertThrows(IllegalArgumentException::class.java) { identity("800","800") }
+        assertThrows(IllegalArgumentException::class.java) { identity("20000000","20000000") }
+        assertThrows(IllegalArgumentException::class.java) { identity(id = "INVALID") }
+        assertThrows(IllegalArgumentException::class.java) { identity(cvn = "1234") }
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.validateIdentity(null,emptyList(),emptyList(),emptyList(),"7E8","7E8")
+        }
+    }
+
     @Test fun canDtcCountIsNotPartOfFirstCode() {
         assertEquals(listOf(ObdDtc("P0300","confirmed"), ObdDtc("U0121","confirmed")),
             J2534StandardObd.dtcs(3,bytes(0x43,2,3,0,0xC1,0x21)))
