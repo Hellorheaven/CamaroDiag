@@ -529,4 +529,23 @@
     <string name="adapter_vxdiag_profiles">Ilmoitetut VXDIAG-liitäntäprofiilit</string>
     <string name="adapter_vxdiag_profiles_hint">Profiilit erottavat laitteisto- ja yhteysvaihtoehdot. Ne eivät takaa Android-ajurin tai ajoneuvoyhteyden saatavuutta.</string>
     <string name="adapter_simulation_profiles">Simuloidut laitteistoprofiilit (penkkitesti)</string>
+    <string name="modules_vehicle_title">Ajoneuvon ohjainlaitteet</string>
+    <string name="module_accessible">Käytettävissä</string>
+    <string name="module_requires_swcan">Vaatii SW-CAN-yhteyden (nasta 1)</string>
+    <string name="module_blocked_adapter">Sovitin estää</string>
+    <string name="module_not_equipped">Ei asennettu</string>
+    <string name="module_discovery_required">Ajoneuvon ohjainlaitteiden tunnistus tarvitaan</string>
+    <string name="live_engine_telemetry">Moottorin reaaliaikainen telemetria</string>
+    <string name="live_resume">Jatka</string>
+    <string name="live_stop_recording">Lopeta tallennus</string>
+    <string name="live_record">Tallenna reaaliaikaiset tiedot</string>
+    <string name="live_export_csv">Vie CSV</string>
+    <string name="live_recording_notice">Tallennin kirjaa näytetyt OBD-arvot (metrijärjestelmä) aikaleimoineen. Se ei muuta ECU:n kalibrointitaulukoita.</string>
+    <string name="dtc_title">Diagnostiset vikakoodit</string>
+    <string name="dtc_clear_warning">Tilan 04 tyhjennys poistaa päästöihin liittyvät vikakoodit ja nollaa osan valmiusmonitoreista. Tallenna raportti ennen jatkamista. Tila 04 ei poista muiden ajoneuvomoduulien laajennettuja vikakoodeja.</string>
+    <string name="dtc_none_returned">Viimeisin skannaus ei palauttanut vikakoodeja.</string>
+    <string name="dtc_confirm_clear">Vahvistetaanko vikakoodien tyhjennys?</string>
+    <string name="dtc_clear_description">Tämä lähettää ECU:lle OBD-tilan 04 komennon. Valmiustiedot voidaan nollata. Se ei korjaa vian syytä.</string>
+    <string name="dtc_clear_action">Tyhjennä koodit</string>
+    <string name="common_save">Tallenna</string>
 </resources>
