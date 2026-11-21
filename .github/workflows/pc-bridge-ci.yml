@@ -187,7 +187,17 @@ jobs:
               echo "NOT APPLICABLE to this commit: no Windows-relevant files changed."
             else
               echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-              if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/pc-bridge-ci.yml'; then
+              # Safety-critical J2534 transport and ECU memory readers require
+              # immediate compile + protocol self-tests, independent of the
+              # normal adjustable draft checkpoint for unrelated Windows work.
+              if ! git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- \
+                  'pc-bridge/CamaroDiag.J2534Bridge/J2534Device.cs' \
+                  'pc-bridge/CamaroDiag.J2534Bridge/J2534MemoryReadScope.cs' \
+                  'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
+                  'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs'; then
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "Safety-critical J2534 code changed: full bridge compilation required."
+              elif git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/pc-bridge-ci.yml'; then
                 if (( commits_since_build >= interval )); then
                   echo "build_required=true" >> "$GITHUB_OUTPUT"
                   echo "Windows Debug build due: $commits_since_build relevant commits (interval $interval)."
