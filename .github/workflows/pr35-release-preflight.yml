@@ -1,4 +1,4 @@
-name: PR54 Release size and compatibility checkpoint
+name: PR70 Release size and compatibility checkpoint
 on:
   workflow_dispatch:
     inputs:
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: pr54-release-optimization-results
+          name: pr70-release-optimization-results
           path: |
             app/build/outputs/apk/release/*.apk
             **/build/reports/lint-results-*.xml
