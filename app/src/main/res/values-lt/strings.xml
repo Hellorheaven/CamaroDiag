@@ -423,4 +423,34 @@
     <string name="debug_builds_created">Sukurta</string>
     <string name="debug_builds_expires">Galioja iki</string>
     <string name="debug_builds_no_browser">Nėra naršyklės atsisiuntimo nuorodai atverti.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Pasirinkta kalba: %1$s</string>
+    <string name="settings_adapter_not_connected">Neprijungtas joks adapteris</string>
+    <string name="settings_last_connection">Paskutinis ryšio profilis</string>
+    <string name="settings_no_last_connection">Dar nėra išsaugoto ryšio profilio.</string>
+    <string name="saved_vehicle_profiles_title">Išsaugoti transporto priemonių profiliai</string>
+    <string name="saved_vehicle_name_label">Profilio pavadinimas</string>
+    <string name="saved_vehicle_name_placeholder">pvz., Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Išsaugoti dabartinę transporto priemonę</string>
+    <string name="saved_vehicle_empty">Dar nėra išsaugotų transporto priemonių profilių.</string>
+    <string name="saved_vehicle_delete">Ištrinti</string>
+    <string name="saved_vehicle_requires_review">Profilis sukurtas pagal ECU VIN. Prieš diagnostiką patikrinkite modelio metus, variklį ir pavarų dėžę.</string>
+    <string name="saved_vehicle_ecu_default_name">Transporto priemonė iš ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Įveskite profilio pavadinimą.</string>
+    <string name="msg_vehicle_profile_saved">Transporto priemonės profilis išsaugotas.</string>
+    <string name="msg_vehicle_profile_review_required">Profilis sukurtas pagal ECU VIN. Prieš diagnostiką patikrinkite metus, variklį ir pavarų dėžę.</string>
+    <string name="msg_vehicle_profile_loaded">Įkeltas transporto priemonės profilis: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU negrąžino galiojančio 17 simbolių VIN. Profilis nesukurtas.</string>
+    <string name="cal_vin_matches_profile">ECU VIN atitinka pasirinktą transporto priemonės profilį.</string>
+    <string name="cal_vin_mismatch_detected">VIN NEATITIKTIS — profilis: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Pasirinktame transporto priemonės profilyje nėra galiojančio VIN.</string>
+    <string name="cal_vin_mismatch_title">Aptikta VIN neatitiktis</string>
+    <string name="cal_vin_mismatch_confirmation">Pasirinkto profilio VIN yra %1$s, tačiau ECU grąžino %2$s. Tai gali būti skirtingos transporto priemonės. Sukurkite atskirą profilį, kad išsaugotumėte pasirinktą transporto priemonę, arba sinchronizuokite tik patikrinę faktinę transporto priemonę.</string>
+    <string name="cal_vin_create_vehicle">Sukurti transporto priemonės profilį</string>
+    <string name="cal_vin_sync_existing">Sinchronizuoti pasirinkto profilio VIN</string>
+    <string name="cal_vin_sync_warning_title">Patvirtinti VIN pakeitimą?</string>
+    <string name="cal_vin_sync_warning_message">Pasirinktame profilyje išsaugotas VIN (%1$s) bus pakeistas ECU VIN (%2$s). Metai, variklis, pavarų dėžė ir rinka nepasikeis. Tai atlikite tik įsitikinę, kad prijungta tinkama transporto priemonė.</string>
+    <string name="cal_vin_sync_confirm">Pakeisti VIN</string>
+    <string name="vin_photo_capture">Nufotografuoti VIN</string>
 </resources>
