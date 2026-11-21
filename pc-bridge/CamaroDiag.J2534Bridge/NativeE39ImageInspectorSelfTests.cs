@@ -97,6 +97,12 @@ internal static class NativeE39ImageInspectorSelfTests
                NativeE39ImageInspector.Verdict.InvalidLayout,
                "Malformed checksum pointers are bounded");
 
+        var shortCvnBlock = (byte[])baseline.Clone();
+        Put32(shortCvnBlock, 0xCB062 + 4, 0x20040);
+        Assert(NativeE39ImageInspector.Inspect(shortCvnBlock).Status ==
+               NativeE39ImageInspector.Verdict.Valid,
+               "Single-byte CVN range is legal; only SUM requires complete words");
+
         var badOs = (byte[])baseline.Clone();
         Put32(badOs, Table + 5, 0);
         Assert(NativeE39ImageInspector.Inspect(badOs).Status ==
