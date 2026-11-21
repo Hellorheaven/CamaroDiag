@@ -666,4 +666,6 @@
     <string name="mileage_source_generic">Kilde %1$s</string>
     <string name="mileage_details_unavailable">Tekniske detaljer er ikke tilgængelige for denne kilde.</string>
     <string name="mileage_caveat_unavailable">Ingen yderligere lokaliserede oplysninger er tilgængelige for denne kilde.</string>
+    <string name="obd_physical_can_scope">Fysisk CAN-svarenhed: 0x%1$s. Scanningen omfatter kun den valgte OBD-styreenhed, ikke en funktionel scanning af alle moduler. Der er ikke sendt GM-programmerings- eller aktuatorkommandoer.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Aktivér sletning af emissionsrelaterede DTC’er i Windows-broen, forbind igen, stop motoren og bekræft nulstillingen. Emissionsberedskabsdata nulstilles; permanente koder slettes ikke.</string>
 </resources>
