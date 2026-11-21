@@ -48,6 +48,8 @@ typedef struct {
 } cd_flash_controller;
 
 bool cd_flash_init(cd_flash_controller *controller, const cd_flash_bus *bus);
+cd_flash_result cd_flash_probe_program(cd_flash_controller *controller,
+    uint32_t address, uint32_t size);
 cd_flash_result cd_flash_erase(cd_flash_controller *controller,
     uint32_t address, uint32_t size);
 cd_flash_result cd_flash_program(cd_flash_controller *controller,

@@ -97,6 +97,14 @@ static cd_flash_result finish_pulse(cd_flash_controller *c, uint32_t mode)
     return CD_FLASH_OK;
 }
 
+cd_flash_result cd_flash_probe_program(cd_flash_controller *c,
+    uint32_t address, uint32_t size)
+{
+    cd_flash_block block;
+    if (c == NULL || !cd_e39_program_span(address, size, &block)) return CD_FLASH_INVALID;
+    return require_ready(c, &block);
+}
+
 cd_flash_result cd_flash_erase(cd_flash_controller *c, uint32_t address, uint32_t size)
 {
     cd_flash_block block;
