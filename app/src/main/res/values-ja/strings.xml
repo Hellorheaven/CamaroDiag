@@ -858,4 +858,17 @@
     <string name="cal_archive_verified">2 回の読み取り結果が一致し、保存された範囲の SHA-256 ハッシュも一致しました。</string>
     <string name="cal_archive_partial">バックアップには要求したメモリの一部のみが含まれています。</string>
     <string name="cal_archive_failed">ZIP を検証できませんでした。展開後のサイズの上限は 32 MiB です。</string>
+    <string name="tab_functional_tests">機能テスト</string>
+    <string name="functional_tests_title">機能テスト — ECU と OBD</string>
+    <string name="functional_tests_readonly">接続中の実機アダプターで可能な読み取り専用テストを実行します。他の接続方式と未検証の ECU は未テストと表示します。消去や書き込みは行いません。</string>
+    <string name="functional_tests_run">すべて実行</string>
+    <string name="functional_tests_stop">停止</string>
+    <string name="functional_tests_export">JSON を出力</string>
+    <string name="functional_tests_summary">成功 %1$d 件 · 失敗 %2$d 件 · 未テスト %3$d 件</string>
+    <string name="functional_tests_passed">成功（実機で確認）</string>
+    <string name="functional_tests_failed">失敗</string>
+    <string name="functional_tests_skipped">未テスト</string>
+    <string name="functional_tests_denied">アクセス拒否：許可された Google アカウントでログインしてください。</string>
+    <string name="functional_tests_not_connected">実機 OBD アダプターが未接続のため、他のテストは実行されません。</string>
+    <string name="functional_tests_cancelled">テストを中止しました。</string>
 </resources>
