@@ -19,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -153,6 +154,48 @@ private object CamaroDiagUpdateChecker {
             ?.map { it.toCharsString() }?.toSet()
         return !downloadedSigners.isNullOrEmpty() && downloadedSigners == installedSigners
     }
+
+    /** Return the DownloadManager state without requiring direct public-file access. */
+    suspend fun downloadStatus(context: Context, downloadId: Long): Int? =
+        withContext(Dispatchers.IO) {
+            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            manager.query(DownloadManager.Query().setFilterById(downloadId)).use { cursor ->
+                val index = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                if (!cursor.moveToFirst() || index < 0) null else cursor.getInt(index)
+            }
+        }
+
+    /**
+     * Stage an owned, completed public-Downloads APK in private cache before the
+     * installer starts. Never trust a path from an external broadcast.
+     */
+    suspend fun stageVerifiedDownload(context: Context, downloadId: Long): File? =
+        withContext(Dispatchers.IO) {
+            val version = CamaroDiagUpdateCleanup.targetVersion(context, downloadId)
+                ?: return@withContext null
+            if (downloadStatus(context, downloadId) != DownloadManager.STATUS_SUCCESSFUL) {
+                return@withContext null
+            }
+            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val file = CamaroDiagUpdateCleanup.verifiedInstallFile(context, downloadId)
+            try {
+                check(file.parentFile?.mkdirs() == true || file.parentFile?.isDirectory == true) {
+                    "Unable to create verified update cache."
+                }
+                manager.openDownloadedFile(downloadId).use { descriptor ->
+                    FileInputStream(descriptor.fileDescriptor).use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+                check(signatureMatches(context, file, version)) {
+                    "Downloaded APK certificate, package or version does not match."
+                }
+                file
+            } catch (_: Exception) {
+                file.delete()
+                null
+            }
+        }
 }
 
 @Composable
@@ -243,26 +286,9 @@ fun AboutUpdateCard() {
                         return@launch
                     }
 
-                    val verifiedFile = withContext(Dispatchers.IO) {
-                        val target = CamaroDiagUpdateCleanup.verifiedInstallFile(context, completedId)
-                        try {
-                            check(target.parentFile?.mkdirs() == true || target.parentFile?.isDirectory == true) {
-                                "Unable to prepare private verification directory."
-                            }
-                            manager.openDownloadedFile(completedId).use { descriptor ->
-                                FileInputStream(descriptor.fileDescriptor).use { input ->
-                                    target.outputStream().use { output -> input.copyTo(output) }
-                                }
-                            }
-                            check(CamaroDiagUpdateChecker.signatureMatches(
-                                context, target, targetVersion
-                            )) { "APK package, certificate or version does not match." }
-                            target
-                        } catch (_: Exception) {
-                            target.delete()
-                            null
-                        }
-                    }
+                    val verifiedFile = CamaroDiagUpdateChecker.stageVerifiedDownload(
+                        context, completedId
+                    )
                     if (verifiedFile == null) {
                         withContext(Dispatchers.IO) {
                             CamaroDiagUpdateCleanup.discardInvalidDownload(context, completedId)
