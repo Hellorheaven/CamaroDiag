@@ -574,4 +574,10 @@
     <string name="can_sniffer_capture_failed">CAN-kaappaus epäonnistui tai sovitin lakkasi vastaamasta.</string>
     <string name="can_sniffer_frame_count">Kaapattuja kehyksiä: %1$d</string>
     <string name="can_sniffer_filtered_count">Näytetään %1$d/%2$d kehystä</string>
+    <string name="msg_live_recording_real_started">Todellisten OBD-tietojen tallennus alkoi.</string>
+    <string name="msg_live_recording_started">Tallennus käynnissä. Näytteitä: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Tallennus päättyi. Tallennettuja näytteitä: %1$d.</string>
+    <string name="msg_live_csv_exported">CSV-loki vietiin. Näytteitä: %1$d.</string>
+    <string name="msg_live_csv_export_failed">CSV-lokin vienti epäonnistui.</string>
+    <string name="msg_live_recording_max_samples">Turvaraja (%1$d) saavutettiin. Tallennus päättyi automaattisesti.</string>
 </resources>
