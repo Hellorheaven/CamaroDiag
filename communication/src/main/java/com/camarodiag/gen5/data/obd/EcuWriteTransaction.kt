@@ -280,6 +280,30 @@ internal class EcuWriteExecutionEngine(
                 )
                 verified++
             }
+            // A later erase/program operation can disturb an already verified
+            // sector. Re-acquire every changed sector after ALL writes, before
+            // reporting completion. Journal records remain historical evidence.
+            for (sector in preview.affectedSectors) {
+                currentAddress = sector.absoluteAddress
+                val region = EcuProgrammingDriverContract.RegionRequest(
+                    request.region, sector.absoluteAddress, sector.patchedBytes.size.toLong()
+                )
+                if (!powerMonitor.isStable() ||
+                    driver.identify() != request.expectedIdentity ||
+                    !driver.independentReadback(region).contentEquals(sector.patchedBytes)
+                ) {
+                    return EcuWriteTransaction.Outcome(
+                        EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
+                        verifiedSectors = verified, failedAddress = currentAddress
+                    )
+                }
+            }
+            if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) {
+                return EcuWriteTransaction.Outcome(
+                    EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
+                    verifiedSectors = verified, failedAddress = currentAddress
+                )
+            }
             return EcuWriteTransaction.Outcome(
                 EcuWriteTransaction.Status.COMPLETED, verifiedSectors = verified
             )
