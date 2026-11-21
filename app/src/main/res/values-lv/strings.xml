@@ -602,4 +602,10 @@
     <string name="dtc_gm_monitor_failure">Kļūmju skaitītājs / apstiprināšanas biežums: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL klasifikācija: %1$s</string>
     <string name="dtc_gm_monitor_source">Avots: GM %1$s, %2$d. lpp.</string>
+    <string name="module_bus_hscan">HS-CAN (500 kbit/s)</string>
+    <string name="module_bus_swcan">SW-CAN GMLAN (33,3 kbit/s)</string>
+    <string name="module_bus_unknown">Nosakāmā kopne</string>
+    <string name="units_metric_details">Metriskās vienības (km, °C, kPa)</string>
+    <string name="units_imperial_details">Imperiālās vienības (mi, °F, psi)</string>
+    <string name="cal_tcp_port">TCP ports</string>
 </resources>
