@@ -406,4 +406,15 @@
     <string name="license_owner">Sid: il-permessi kollha</string>
     <string name="license_premium">Liċenzja sħiħa attiva</string>
     <string name="license_title">Liċenzja CamaroDiag</string>
+    <!-- LFX 2012 ECU safety and verification guidance -->
+    <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012: identifikazzjoni tal-ECU (qari biss)</string>
+    <string name="flexfuel_lfx2012_checks">Kundizzjonijiet li għadhom jipprevjenu bidliet fil-kalibrazzjoni</string>
+    <string name="flexfuel_preflight_vehicle_missing">Ma ntgħażilx profil tal-vettura</string>
+    <string name="flexfuel_preflight_wrong_vehicle">Il-vettura mhix Camaro LFX tal-2012</string>
+    <string name="flexfuel_preflight_vin">Il-VIN irid jinqara mill-ECU u jaqbel ma\' dak tal-vettura ssejvjata</string>
+    <string name="flexfuel_preflight_ecu">Ir-referenza attwali tal-kontrollur ECU trid tiġi identifikata</string>
+    <string name="flexfuel_preflight_firmware">Il-firmware eżatt tal-ECU għadu ma ġiex ivverifikat</string>
+    <string name="flexfuel_preflight_recovery">Il-proċedura ta\' rkupru għadha ma ġietx ivverifikata</string>
+    <string name="flexfuel_lfx2012_audit_title">LFX 2012: verifika qabel u wara l-ipprogrammar (qari biss)</string>
+    <string name="flexfuel_lfx2012_audit_post_not_performed">Ma saritx il-verifika wara l-ipprogrammar. La l-ipprogrammar tal-ECU u lanqas it-test tal-vettura wara l-kitba ma ġew ivvalidati.</string>
 </resources>
