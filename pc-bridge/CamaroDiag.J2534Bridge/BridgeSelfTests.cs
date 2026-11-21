@@ -164,6 +164,7 @@ internal static class BridgeSelfTests
         checks += NativeE39RamLoaderSelfTests.Run();
         checks += NativeE39ImageInspectorSelfTests.Run();
         checks += NativeE39FlashCommandsSelfTests.Run();
+        checks += NativeE39SecuritySelfTests.Run();
         Console.WriteLine($"PASS: {checks} hardware-free J2534 bridge self-tests.");
         return 0;
     }
