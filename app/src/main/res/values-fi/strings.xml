@@ -497,4 +497,21 @@
     <string name="mileage_caveat_unavailable">Tästä lähteestä ei ole saatavilla lisää lokalisoitua tietoa.</string>
     <string name="obd_physical_can_scope">Fyysinen CAN-vastaaja: 0x%1$s. Skannaus kattaa vain valitun OBD-ohjainlaitteen, ei kaikkien moduulien toiminnallista skannausta. GM-ohjelmointi- tai toimilaitekomentoja ei lähetetty.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Ota päästöihin liittyvien DTC-koodien poisto käyttöön Windows-sillassa, yhdistä uudelleen, sammuta moottori ja vahvista nollaus. Päästöjärjestelmän valmiustiedot nollataan; pysyviä koodeja ei poisteta.</string>
+    <string name="units_metric">SI / metrijärjestelmä</string>
+    <string name="units_imperial">Brittiläiset yksiköt</string>
+    <string name="live_pause">Keskeytä</string>
+    <string name="live_recording_status">Näytteet: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Imunokka-akselin asennon toimilaitteen virtapiiri (sylinteriryhmä 1)</string>
+    <string name="dtc_desc_p0011">Imunokka-akselin ajoitus liian aikainen (sylinteriryhmä 1)</string>
+    <string name="dtc_desc_p0014">Pakonokka-akselin ajoitus liian aikainen (sylinteriryhmä 1)</string>
+    <string name="dtc_desc_p0087">Polttoainekiskon tai polttoainejärjestelmän paine liian alhainen</string>
+    <string name="dtc_desc_p0089">Polttoaineen paineensäätimen toimintahäiriö</string>
+    <string name="dtc_desc_p0191">Polttoainekiskon paineanturin virtapiirin alue tai toiminta</string>
+    <string name="dtc_desc_p0299">Turboahtimen tai mekaanisen ahtimen liian alhainen ahtopaine</string>
+    <string name="cal_engine_profile">Moottoriprofiili: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Luetteloidut moottorit vuodelle %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Binääriluku: %2$s • Validoidut moottoritaulukot: %3$s • ECU-ohjelmointi: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • pyyntö %2$s / vastaus %3$s • väli %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • määrä=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Vain laitteistoprofiili; virallinen Android SDK/API tai dokumentoitu silta tarvitaan edelleen.</string>
 </resources>
