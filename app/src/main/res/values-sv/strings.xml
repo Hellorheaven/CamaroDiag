@@ -489,4 +489,21 @@
     <string name="mileage_caveat_unavailable">Ingen ytterligare lokaliserad information finns tillgänglig för denna källa.</string>
     <string name="obd_physical_can_scope">Fysisk CAN-svarsenhet: 0x%1$s. Avsökningen omfattar endast vald OBD-styrenhet, inte en funktionell avsökning av alla moduler. Inga GM-programmerings- eller ställdonskommandon skickades.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Aktivera radering av emissionsrelaterade DTC i Windows-bryggan, anslut igen, stäng av motorn och bekräfta återställningen. Emissionssystemens beredskapsdata återställs; permanenta koder raderas inte.</string>
+    <string name="units_metric">SI / metriska</string>
+    <string name="units_imperial">Brittiska enheter</string>
+    <string name="live_pause">Pausa</string>
+    <string name="live_recording_status">Mätvärden: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Krets för insugskamaxelns positionsställdon (bank 1)</string>
+    <string name="dtc_desc_p0011">För tidig insugskamaxeltidpunkt (bank 1)</string>
+    <string name="dtc_desc_p0014">För tidig avgaskamaxeltidpunkt (bank 1)</string>
+    <string name="dtc_desc_p0087">För lågt tryck i bränsleskenan eller bränslesystemet</string>
+    <string name="dtc_desc_p0089">Funktionsfel i bränsletrycksregulatorn</string>
+    <string name="dtc_desc_p0191">Bränsleskenans tryckgivarkrets utanför område eller funktionskrav</string>
+    <string name="dtc_desc_p0299">För lågt laddtryck från turbo eller kompressor</string>
+    <string name="cal_engine_profile">Motorprofil: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Motorer i katalogen för %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Binär läsning: %2$s • Validerade motortabeller: %3$s • ECU-programmering: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • begäran %2$s / svar %3$s • intervall %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • antal=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Endast hårdvaruprofil; ett officiellt Android SDK/API eller en dokumenterad brygga krävs fortfarande.</string>
 </resources>
