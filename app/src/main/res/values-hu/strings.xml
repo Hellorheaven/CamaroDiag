@@ -497,4 +497,21 @@
     <string name="mileage_caveat_unavailable">Ehhez a forráshoz nem érhető el további lokalizált információ.</string>
     <string name="obd_physical_can_scope">Fizikai CAN-válaszadó: 0x%1$s. A vizsgálat csak a kiválasztott OBD ECU-ra terjed ki, nem az összes modul funkcionális vizsgálatára. Nem történt GM-programozási vagy működtetőparancs küldése.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Engedélyezze az emissziós DTC-k törlését a Windows-hídon, csatlakozzon újra, állítsa le a motort és erősítse meg a visszaállítást. Az emissziós készenléti adatok törlődnek; az állandó kódok nem törlődnek.</string>
+    <string name="units_metric">SI / metrikus</string>
+    <string name="units_imperial">Angolszász</string>
+    <string name="live_pause">Szünet</string>
+    <string name="live_recording_status">Minták: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Szívó vezérműtengely helyzetállító áramköre (1. hengersor)</string>
+    <string name="dtc_desc_p0011">Túl korai szívó vezérműtengely-időzítés (1. hengersor)</string>
+    <string name="dtc_desc_p0014">Túl korai kipufogó vezérműtengely-időzítés (1. hengersor)</string>
+    <string name="dtc_desc_p0087">Túl alacsony üzemanyag-elosztócső- vagy rendszernyomás</string>
+    <string name="dtc_desc_p0089">Üzemanyagnyomás-szabályozó működési hibája</string>
+    <string name="dtc_desc_p0191">Az üzemanyag-elosztócső nyomásérzékelő áramkörének tartománya vagy működése</string>
+    <string name="dtc_desc_p0299">Turbófeltöltő vagy mechanikus feltöltő túl alacsony töltőnyomása</string>
+    <string name="cal_engine_profile">Motorprofil: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Katalógusban szereplő motorok %1$d évben: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Bináris kiolvasás: %2$s • Validált motortáblák: %3$s • ECU-programozás: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • kérés %2$s / válasz %3$s • időköz %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • darabszám=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Csak hardverprofil; hivatalos Android SDK/API vagy dokumentált híd továbbra is szükséges.</string>
 </resources>
