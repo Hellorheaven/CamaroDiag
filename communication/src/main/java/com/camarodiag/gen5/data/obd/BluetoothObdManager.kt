@@ -763,6 +763,7 @@ class BluetoothObdManager(context: Context) {
         responseCanId: Int,
         protocolNumber: Int = 33,
         timeoutMs: Long = 3000L,
+        readDids: Set<Int> = emptySet(),
         block: suspend (UdsClient) -> T
     ): T {
         val requestedEpoch = transportSessionEpoch.capture()
@@ -781,7 +782,7 @@ class BluetoothObdManager(context: Context) {
             ) { command, commandTimeout ->
                 sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
             }
-            val result = block(UdsClient(transport, UdsAccessPolicy.readOnly(), timeoutMs))
+            val result = block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
             transportSessionEpoch.requireCurrent(requestedEpoch)
             result
         }
