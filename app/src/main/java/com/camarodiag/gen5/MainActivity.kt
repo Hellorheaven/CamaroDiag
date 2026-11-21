@@ -41,8 +41,14 @@ class MainActivity : ComponentActivity() {
                     CamaroAuthGate(
                         onAccountChanged = viewModel::onAccountSessionChanged,
                         onAccountDeleted = viewModel::onAccountDeleted
-                    ) { openAccount, ownerTestsAllowed ->
-                        CamaroDiagApp(viewModel, systemLocale, openAccount, ownerTestsAllowed)
+                    ) { openAccount, accessLevel, refreshLicense ->
+                        LaunchedEffect(accessLevel, viewModel.activeAccountUid.value) {
+                            viewModel.setLicenseLevel(accessLevel, viewModel.activeAccountUid.value)
+                        }
+                        CamaroDiagApp(
+                            viewModel, systemLocale, openAccount,
+                            accessLevel, refreshLicense
+                        )
                     }
                 }
             }
