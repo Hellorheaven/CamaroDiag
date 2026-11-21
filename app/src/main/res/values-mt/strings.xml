@@ -579,4 +579,11 @@
     <string name="vin_photo_not_found">Ma nstab ebda VIN validu ta’ 17-il karattru. Daħħlu manwalment jew ħu ritratt ieħor.</string>
     <string name="vin_photo_error">Il-VIN ma setax jinqara mir-ritratt. Erġa’ pprova b’dawl aħjar u b’fokus aktar ċar.</string>
     <string name="vehicle_vin_placeholder">17-il karattru</string>
+    <string name="can_sniffer_start">Ibda l-qbid</string>
+    <string name="can_sniffer_stop">Waqqaf il-qbid</string>
+    <string name="can_sniffer_empty">S’issa ma nqabad ebda qafas CAN.</string>
+    <string name="can_sniffer_capture_complete">Il-qbid tal-frejms CAN tlesta.</string>
+    <string name="can_sniffer_capture_failed">Il-qbid tal-frejms CAN falla jew l-adapter waqaf jirrispondi.</string>
+    <string name="can_sniffer_frame_count">Frejms maqbuda: %1$d</string>
+    <string name="can_sniffer_filtered_count">Qed jintwerew %1$d minn %2$d frejm</string>
 </resources>
