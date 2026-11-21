@@ -1,0 +1,87 @@
+name: Export PR70 source code to one file
+
+on:
+  push:
+    branches:
+      - feat/ecu-backup-integrity
+    paths:
+      - .github/workflows/export-pr70-source.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: Create complete annotated source export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+      - name: Combine every tracked readable file and list binary assets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import hashlib
+          from datetime import datetime, timezone
+
+          output = Path("CamaroDiag_PR70_code_integral.txt")
+          names = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+          sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          files = []
+          binary = []
+          for raw in names:
+              if not raw:
+                  continue
+              rel = raw.decode("utf-8", "surrogateescape")
+              p = Path(rel)
+              if not p.is_file():
+                  continue
+              data = p.read_bytes()
+              digest = hashlib.sha256(data).hexdigest()
+              if b"\0" in data:
+                  binary.append((rel, len(data), digest))
+                  continue
+              try:
+                  decoded = data.decode("utf-8")
+                  encoding = "UTF-8"
+              except UnicodeDecodeError:
+                  decoded = data.decode("latin-1")
+                  encoding = "Latin-1 (converted to UTF-8 for this export)"
+              files.append((rel, decoded, encoding, len(data), digest))
+          with output.open("w", encoding="utf-8", newline="\n") as f:
+              f.write("CamaroDiag – COMPLETE CODE EXPORT\n")
+              f.write("Repository: Hellorheaven/CamaroDiag\n")
+              f.write("Branch: feat/ecu-backup-integrity (PR #70)\n")
+              f.write("Commit: " + sha + "\n")
+              f.write("Generated UTC: " + datetime.now(timezone.utc).isoformat() + "\n")
+              f.write(f"Readable tracked files: {len(files)}; Binary assets listed only: {len(binary)}\n")
+              f.write("All readable tracked files follow with full relative paths and complete content.\n")
+              f.write("Binary files are listed by path, byte size and SHA-256 but not embedded.\n\n")
+              f.write("========== TREE / FILE INDEX ==========\n")
+              for path, _, _, _, _ in files:
+                  f.write(path + "\n")
+              f.write("\n========== BINARY ASSETS (not source code) ==========\n")
+              for path, size, digest in binary:
+                  f.write(f"{path} | {size} bytes | sha256={digest}\n")
+              f.write("\n========== FULL SOURCE CONTENTS ==========\n")
+              for path, content, encoding, size, digest in files:
+                  f.write(f"\n\n========== START FILE: {path} ==========\n")
+                  f.write(f"Source encoding: {encoding}; Original size: {size} bytes; SHA-256: {digest}\n")
+                  f.write("---------- CONTENT BEGIN ----------\n")
+                  f.write(content)
+                  if not content.endswith("\n"):
+                      f.write("\n")
+                  f.write(f"---------- CONTENT END: {path} ----------\n")
+          print(f"Wrote {output}: {output.stat().st_size:,} bytes; {len(files)} text files; {len(binary)} binary assets")
+          PY
+      - name: Upload unique combined TXT
+        uses: actions/upload-artifact@v4
+        with:
+          name: CamaroDiag-PR70-code-integral
+          path: CamaroDiag_PR70_code_integral.txt
+          if-no-files-found: error
+          retention-days: 90
