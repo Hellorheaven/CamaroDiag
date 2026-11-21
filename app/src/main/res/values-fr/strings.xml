@@ -171,7 +171,7 @@
     <string name="cal_read_uds_did">Lire le DID UDS</string>
     <string name="cal_read_uds_dtcs">Lire les DTC UDS</string>
     <string name="cal_uds_trouble_codes">Défauts UDS (0x19)</string>
-    <string name="cal_native_catalog_title">CATALOGUE NATIF CAMARODIAG</string>
+    <string name="cal_native_catalog_title">CATALOGUE NATIF CamaroDiag</string>
     <string name="cal_native_catalog_explanation">Définitions maintenues par CamaroDiag, indépendantes des catalogues communautaires. Une définition proposée ou documentée n\'est jamais envoyée à un calculateur.</string>
     <string name="cal_native_catalog_loading">Chargement du catalogue natif…</string>
     <string name="cal_native_catalog_empty">Aucun DID propriétaire Camaro n\'est actuellement déclaré comme exploitable. Les adresses et facteurs inconnus ne sont pas inventés.</string>
