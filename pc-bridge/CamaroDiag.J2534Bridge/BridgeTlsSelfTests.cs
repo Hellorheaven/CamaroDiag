@@ -21,8 +21,10 @@ internal static class BridgeTlsSelfTests
                 identity.Fingerprint, StringComparison.Ordinal))
             throw new InvalidOperationException("TLS pairing fingerprint differs from certificate.");
 
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
+        try
+        {
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         var server = Task.Run(async () =>
         {
@@ -62,5 +64,10 @@ internal static class BridgeTlsSelfTests
         }
         server.GetAwaiter().GetResult();
         return 3;
+        }
+        finally
+        {
+            listener.Stop();
+        }
     }
 }
