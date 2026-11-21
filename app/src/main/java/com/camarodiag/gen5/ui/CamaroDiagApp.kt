@@ -361,7 +361,7 @@ fun CamaroDiagApp(
                 title = {
                     Column {
                         Text(
-                            text = "CAMARODIAG",
+                            text = stringResource(R.string.app_name),
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 19.sp,
                             color = CamaroAmber,
