@@ -617,4 +617,6 @@
     <string name="units_metric_details">Unitajiet metriċi (km, °C, kPa)</string>
     <string name="units_imperial_details">Unitajiet imperjali (mi, °F, psi)</string>
     <string name="cal_tcp_port">Port TCP</string>
+    <string name="msg_refresh_adapters_failed">Il-lista tal-adapters ma setgħetx tiġi aġġornata.</string>
+    <string name="msg_usb_identifier_unavailable">L-identifikatur tal-apparat USB mhuwiex disponibbli</string>
 </resources>
