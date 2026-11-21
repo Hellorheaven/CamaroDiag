@@ -327,4 +327,27 @@
     <string name="cal_live_memory_save">Læs ECU-hukommelsen to gange og gem som ZIP</string>
     <string name="cal_live_memory_saved">ECU-hukommelsen er gemt efter to identiske læsninger.</string>
     <string name="cal_live_memory_failed">Læsning af ECU-hukommelse mislykkedes. Ingen verificeret sikkerhedskopi blev oprettet.</string>
+    <string name="cal_import_file">Importér kalibreringsfil</string>
+    <string name="cal_hex_preview">Hexvisning (første 64 byte)</string>
+    <string name="cal_file_inspection">Filkontrol: %1$s</string>
+    <string name="cal_payload_size">Datastørrelse: %1$d B</string>
+    <string name="cal_record_count">Poster: %1$d</string>
+    <string name="cal_checksum_validation">Validering af formatets kontrolsum: %1$s</string>
+    <string name="cal_export_file">Eksportér / download fil</string>
+    <string name="cal_import_second_bin">Importér en anden BIN til sammenligning</string>
+    <string name="cal_binary_compare_limit">Sammenligning byte for byte understøttes kun for rå BIN-billeder.</string>
+    <string name="cal_comparison_name">Sammenligning: %1$s</string>
+    <string name="cal_comparison_byte_counts">Ændrede byte: %1$d • Tilføjede: %2$d • Manglende: %3$d</string>
+    <string name="cal_images_identical">Billederne er identiske</string>
+    <string name="cal_remove_files">Fjern filer</string>
+    <string name="cal_table_editor">Editor til kalibreringstabeller</string>
+    <string name="cal_import_table_definitions">Importér tabeldefinitioner (.csv / .tsv)</string>
+    <string name="cal_export_table_template">Eksportér TSV-definitionsskabelon</string>
+    <string name="cal_select_table">Vælg tabel</string>
+    <string name="cal_table_values">Tabelværdier</string>
+    <string name="cal_unsaved_edits">Ikke-gemte ændringer</string>
+    <string name="cal_loaded">Indlæst</string>
+    <string name="cal_x_axis">X-akse: %1$s</string>
+    <string name="cal_discard_changes">Kassér ændringer</string>
+    <string name="cal_apply_to_file">Anvend på fil</string>
 </resources>
