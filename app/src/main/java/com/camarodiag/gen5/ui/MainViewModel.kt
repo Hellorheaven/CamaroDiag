@@ -3199,23 +3199,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return if (isFr) entry.second else entry.first
     }
 
-        fun clearDtcs() {
+    fun clearDtcs() {
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        fun current() = isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration
         viewModelScope.launch {
+            if (!current()) return@launch
             beginBusyOperation()
             try {
                 if (obdManager.isSimulationActive) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_demo_cleared)
+                } else if (obdManager.isJ2534StandardObdClearAvailable()) {
+                    obdManager.clearJ2534StandardDtcs()
+                    if (!current()) return@launch
+                    // Mode 04 does not erase permanent emissions DTCs. Preserve
+                    // all other module records and require a new scan to refresh.
+                    _dtcs.value = _dtcs.value.filterNot {
+                        it.module.equals("ECM", ignoreCase = true) &&
+                            !it.statusEn.equals("Permanent", ignoreCase = true)
+                    }
+                    _connectionMessage.value = null
                 } else if (!obdManager.isObdCommandChannelAvailable) {
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
                         localizedContext.getString(R.string.msg_dtc_clear_j2534_unavailable)
                     else localizedContext.getString(R.string.msg_dtc_clear_adapter_required)
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
+                    if (!current()) return@launch
                     if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
                         // SAE Mode 04 clears standardized emissions DTCs only.
                         // Preserve enhanced UDS records from other ECUs: no GM UDS clear is issued here.
-                        _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
+                        _dtcs.value = _dtcs.value.filterNot {
+                            it.module.equals("ECM", ignoreCase = true) &&
+                                !it.statusEn.equals("Permanent", ignoreCase = true)
+                        }
                         _connectionMessage.value = null
                     } else {
                         _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_not_confirmed, response)
@@ -3224,8 +3242,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                reportConnectionLoss(error)
-                _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_failed)
+                if (current()) {
+                    reportConnectionLoss(error)
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_failed)
+                }
             } finally {
                 endBusyOperation()
             }
