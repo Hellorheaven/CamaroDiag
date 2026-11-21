@@ -524,4 +524,23 @@
     <string name="adapter_vxdiag_profiles">Deklarirani profili vmesnikov VXDIAG</string>
     <string name="adapter_vxdiag_profiles_hint">Profili razlikujejo različice strojne opreme in povezav. Ne potrjujejo razpoložljivosti gonilnika Android ali komunikacije z vozilom.</string>
     <string name="adapter_simulation_profiles">Simulirani profili strojne opreme (preizkus na mizi)</string>
+    <string name="modules_vehicle_title">Krmilni moduli vozila</string>
+    <string name="module_accessible">Dostopen</string>
+    <string name="module_requires_swcan">Zahteva SW-CAN (pin 1)</string>
+    <string name="module_blocked_adapter">Adapter blokira</string>
+    <string name="module_not_equipped">Ni vgrajen</string>
+    <string name="module_discovery_required">Potrebno je odkrivanje modulov vozila</string>
+    <string name="live_engine_telemetry">Telemetrija motorja v živo</string>
+    <string name="live_resume">Nadaljuj</string>
+    <string name="live_stop_recording">Ustavi snemanje</string>
+    <string name="live_record">Snemaj podatke v živo</string>
+    <string name="live_export_csv">Izvozi CSV</string>
+    <string name="live_recording_notice">Snemalnik zapisuje prikazane vrednosti OBD (metrične) s časovnimi žigi. Ne spreminja kalibracijskih tabel ECU.</string>
+    <string name="dtc_title">Diagnostične kode napak</string>
+    <string name="dtc_clear_warning">Brisanje v načinu 04 odstrani kode napak, povezane z emisijami, in ponastavi nekatere monitorje pripravljenosti. Pred nadaljevanjem shranite poročilo. Način 04 ne izbriše razširjenih DTC v drugih modulih vozila.</string>
+    <string name="dtc_none_returned">Zadnji pregled ni vrnil kod napak.</string>
+    <string name="dtc_confirm_clear">Potrdite brisanje DTC?</string>
+    <string name="dtc_clear_description">To pošlje način OBD 04 v ECU. Podatki pripravljenosti se lahko ponastavijo. S tem se ne odpravi vzrok napake.</string>
+    <string name="dtc_clear_action">Izbriši kode</string>
+    <string name="common_save">Shrani</string>
 </resources>
