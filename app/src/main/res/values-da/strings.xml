@@ -524,4 +524,34 @@
     <string name="debug_builds_created">Oprettet</string>
     <string name="debug_builds_expires">Udløber</string>
     <string name="debug_builds_no_browser">Der findes ingen browser til at åbne downloadlinket.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Valgt sprog: %1$s</string>
+    <string name="settings_adapter_not_connected">Ingen adapter tilsluttet</string>
+    <string name="settings_last_connection">Seneste forbindelsesprofil</string>
+    <string name="settings_no_last_connection">Der er endnu ingen gemt forbindelsesprofil.</string>
+    <string name="saved_vehicle_profiles_title">Gemte køretøjsprofiler</string>
+    <string name="saved_vehicle_name_label">Profilnavn</string>
+    <string name="saved_vehicle_name_placeholder">f.eks. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Gem aktuelt køretøj</string>
+    <string name="saved_vehicle_empty">Der er endnu ingen gemte køretøjsprofiler.</string>
+    <string name="saved_vehicle_delete">Slet</string>
+    <string name="saved_vehicle_requires_review">Profilen blev oprettet ud fra ECU\'ens VIN. Kontrollér modelår, motor og gearkasse før diagnosticering.</string>
+    <string name="saved_vehicle_ecu_default_name">Køretøj fra ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Indtast et profilnavn.</string>
+    <string name="msg_vehicle_profile_saved">Køretøjsprofilen er gemt.</string>
+    <string name="msg_vehicle_profile_review_required">En profil blev oprettet ud fra ECU\'ens VIN. Kontrollér årgang, motor og gearkasse før diagnosticering.</string>
+    <string name="msg_vehicle_profile_loaded">Indlæst køretøjsprofil: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU\'en returnerede ikke et gyldigt VIN på 17 tegn. Ingen profil blev oprettet.</string>
+    <string name="cal_vin_matches_profile">VIN fra ECU\'en stemmer overens med den valgte køretøjsprofil.</string>
+    <string name="cal_vin_mismatch_detected">UOVERENSSTEMMELSE I VIN — profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Den valgte køretøjsprofil indeholder ikke et gyldigt VIN.</string>
+    <string name="cal_vin_mismatch_title">Uoverensstemmelse i VIN registreret</string>
+    <string name="cal_vin_mismatch_confirmation">Den valgte profils VIN er %1$s, men ECU\'en returnerede %2$s. Der kan være tale om forskellige køretøjer. Opret en særskilt profil for at bevare det valgte køretøj, eller synkronisér først efter kontrol af det fysiske køretøj.</string>
+    <string name="cal_vin_create_vehicle">Opret køretøjsprofil</string>
+    <string name="cal_vin_sync_existing">Synkronisér den valgte profils VIN</string>
+    <string name="cal_vin_sync_warning_title">Bekræft udskiftning af VIN?</string>
+    <string name="cal_vin_sync_warning_message">Dette erstatter VIN i den valgte profil (%1$s) med VIN fra ECU\'en (%2$s). Årgang, motor, gearkasse og marked ændres ikke. Gør det kun efter at have bekræftet, at den tilsluttede bil er den tilsigtede.</string>
+    <string name="cal_vin_sync_confirm">Erstat VIN</string>
+    <string name="vin_photo_capture">Fotografér VIN</string>
 </resources>
