@@ -310,7 +310,15 @@ jobs:
                   if issue.get("severity", "").lower() in {"warning", "error", "fatal"}:
                       findings.append((module, issue))
           for module, issue in findings:
-              print(f"{module}: {issue.get('severity')}: {issue.get('id')}: {issue.get('message')}")
+              locations = issue.findall("location")
+              rendered = ", ".join(
+                  f"{loc.get('file', '?')}:{loc.get('line', '?')}:{loc.get('column', '?')}"
+                  for loc in locations[:3]
+              ) or "no location"
+              print(
+                  f"{module}: {issue.get('severity')}: {issue.get('id')}: "
+                  f"{issue.get('message')} @ {rendered}"
+              )
           for report in missing:
               print(f"Missing Android lint report: {report}", file=sys.stderr)
           if findings or missing:
