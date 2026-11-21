@@ -148,10 +148,10 @@
     <string name="cal_can_profile">Profil CAN : 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_uds_did">DID UDS (F190 = VIN)</string>
     <string name="cal_j2534_bridge_title">PONT PC J2534 • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">Lance CamaroDiag.J2534Bridge.exe sur le PC Windows, puis saisis son IP et le jeton affiché dans la console. Le PC doit être sur le même réseau local.</string>
-    <string name="cal_j2534_security_notice">Sécurité : jeton non chiffré par TLS. Utilise un réseau privé de confiance et n\'expose jamais ce port à Internet.</string>
+    <string name="cal_j2534_launch_instructions">Lance CamaroDiag.J2534Bridge.exe sur le PC Windows. Saisis son IP et le code complet (jeton.empreinte TLS) affiché dans la console. Utilise un réseau local de confiance.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ et la vérification de son empreinte sont obligatoires. Les anciens jetons seuls sont refusés. Ne rends jamais ce port accessible depuis Internet.</string>
     <string name="cal_pc_ip_address">Adresse IP du PC</string>
-    <string name="cal_pc_pairing_token">Jeton d\'appairage du PC</string>
+    <string name="cal_pc_pairing_token">Code TLS (jeton.empreinte)</string>
     <string name="cal_connect_j2534">Connecter le pont J2534</string>
     <string name="cal_disconnect_pc_bridge">Déconnecter le pont PC</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Pont actuel : HS-CAN ISO15765 250/500 kbit/s et SW-ISO15765 J2534-2 si le pilote le prend en charge. CAN FD reste désactivé.</string>
