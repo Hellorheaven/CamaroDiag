@@ -501,4 +501,6 @@
     <string name="mileage_source_generic">Źródło %1$s</string>
     <string name="mileage_details_unavailable">Szczegóły techniczne tego źródła są niedostępne.</string>
     <string name="mileage_caveat_unavailable">Brak dodatkowych informacji w wybranym języku dla tego źródła.</string>
+    <string name="obd_physical_can_scope">Fizyczny węzeł CAN odpowiadający na żądanie: 0x%1$s. Skanowanie obejmuje tylko wybrany sterownik OBD, a nie funkcjonalne skanowanie wszystkich modułów. Nie wysyłano poleceń programowania GM ani elementów wykonawczych.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Włącz kasowanie DTC emisji w moście Windows, połącz ponownie, wyłącz silnik i potwierdź reset. Dane gotowości układu emisji zostaną zresetowane; kody trwałe nie zostaną usunięte.</string>
 </resources>
