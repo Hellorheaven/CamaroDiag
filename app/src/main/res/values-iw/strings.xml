@@ -149,7 +149,7 @@
     <string name="cal_read_uds_did">קרא DID של UDS</string>
     <string name="cal_read_uds_dtcs">קרא קודי DTC של UDS</string>
     <string name="cal_uds_trouble_codes">קודי תקלה UDS ‏(0x19)</string>
-    <string name="cal_native_catalog_title">קטלוג מקורי של CAMARODIAG</string>
+    <string name="cal_native_catalog_title">קטלוג מקורי של CamaroDiag</string>
     <string name="cal_native_catalog_explanation">הגדרות שמתוחזקות על ידי CamaroDiag ונפרדות מקטלוגים קהילתיים. הגדרות מוצעות או מתועדות לעולם אינן נשלחות למחשב הרכב.</string>
     <string name="cal_native_catalog_loading">טוען קטלוג מקורי…</string>
     <string name="cal_native_catalog_empty">כרגע לא הוגדר DID קנייני של Camaro כניתן לשימוש. כתובות ומקדמי קנה מידה לא ידועים אינם מומצאים.</string>
