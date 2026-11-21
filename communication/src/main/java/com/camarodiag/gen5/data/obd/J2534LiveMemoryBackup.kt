@@ -131,6 +131,10 @@ object J2534LiveMemoryBackup {
                     require(ping.size >= 2 && ping[0] == 0x7E.toByte()) {
                         "ECU no longer confirms its active diagnostic session."
                     }
+                    // A live socket can remain connected while the interface is
+                    // reattached to a different ECU. TesterPresent alone cannot
+                    // prove identity; recheck the hardware VIN periodically.
+                    liveVin()
                 }
                 val length = minOf(request.chunkBytes, image.size - offset)
                 val response = transport.exchange(
@@ -162,6 +166,9 @@ object J2534LiveMemoryBackup {
                 enteredExtended = true
             }
             val first = pass(1)
+            // Reject a swapped ECU BEFORE starting the second acquisition;
+            // two matching byte arrays do not establish physical identity.
+            liveVin()
             // A second independent hardware acquisition is compulsory.
             val second = pass(2)
             // VIN could change after a session replacement or reconnect.
