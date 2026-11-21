@@ -31,7 +31,9 @@ class PersistentEcuWriteJournal private constructor(
         NO_ERASE_RECORDED,
         ERASE_OR_WRITE_MAY_BE_INCOMPLETE,
         ADDITIONAL_BASELINES_NOT_WRITTEN,
-        ALL_RECORDED_SECTORS_VERIFIED
+        ALL_RECORDED_SECTORS_VERIFIED,
+        FINAL_READBACK_INCOMPLETE,
+        TRANSACTION_COMPLETION_RECORDED
     }
 
     data class Audit(
@@ -41,7 +43,9 @@ class PersistentEcuWriteJournal private constructor(
         val baselineSectors: Int = 0,
         val verifiedSectors: Int = 0,
         val uncertainAddress: Long? = null,
-        val uncertainRegion: EcuBackupCoverage.Region? = null
+        val uncertainRegion: EcuBackupCoverage.Region? = null,
+        val finalReadbackSectors: Int = 0,
+        val completionRecorded: Boolean = false
     ) {
         /** Journal evidence only, never authorization to retry, restore or program. */
         val recoveryDisposition: RecoveryDisposition
@@ -50,6 +54,8 @@ class PersistentEcuWriteJournal private constructor(
                 uncertainAddress != null -> RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE
                 verifiedSectors == 0 -> RecoveryDisposition.NO_ERASE_RECORDED
                 verifiedSectors < baselineSectors -> RecoveryDisposition.ADDITIONAL_BASELINES_NOT_WRITTEN
+                completionRecorded -> RecoveryDisposition.TRANSACTION_COMPLETION_RECORDED
+                finalReadbackSectors > 0 -> RecoveryDisposition.FINAL_READBACK_INCOMPLETE
                 else -> RecoveryDisposition.ALL_RECORDED_SECTORS_VERIFIED
             }
     }
@@ -133,6 +139,8 @@ class PersistentEcuWriteJournal private constructor(
         private val completed = mutableSetOf<Sector>()
         private var inFlight: Sector? = null
         private var erasePhase = false
+        private var finalReadbacks = 0
+        private var completionRecorded = false
 
         fun audit(records: Int, lastStage: EcuWriteTransaction.Stage?) = Audit(
             valid = true,
@@ -141,10 +149,13 @@ class PersistentEcuWriteJournal private constructor(
             baselineSectors = baseline.size,
             verifiedSectors = completed.size,
             uncertainAddress = inFlight?.address,
-            uncertainRegion = inFlight?.region
+            uncertainRegion = inFlight?.region,
+            finalReadbackSectors = finalReadbacks,
+            completionRecorded = completionRecorded
         )
 
         fun accept(record: EcuWriteTransaction.Record): Boolean {
+            if (completionRecorded) return false
             val sector = Sector(
                 record.region, record.address,
                 record.originalSha256.lowercase(), record.updatedSha256.lowercase()
@@ -175,6 +186,26 @@ class PersistentEcuWriteJournal private constructor(
                     } else {
                         inFlight = null
                         completed += sector
+                        true
+                    }
+                }
+                EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED -> {
+                    if (inFlight != null || baseline.isEmpty() ||
+                        completed.size != baseline.size ||
+                        baseline.getOrNull(finalReadbacks) != sector) {
+                        false
+                    } else {
+                        finalReadbacks++
+                        true
+                    }
+                }
+                EcuWriteTransaction.Stage.TRANSACTION_COMPLETED -> {
+                    if (inFlight != null || baseline.isEmpty() ||
+                        finalReadbacks != baseline.size || completed.size != baseline.size ||
+                        baseline.last() != sector) {
+                        false
+                    } else {
+                        completionRecorded = true
                         true
                     }
                 }
