@@ -605,4 +605,10 @@
     <string name="dtc_gm_monitor_failure">Gedimų skaitiklis / patvirtinimo dažnis: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL klasifikacija: %1$s</string>
     <string name="dtc_gm_monitor_source">Šaltinis: GM %1$s, p. %2$d</string>
+    <string name="module_bus_hscan">HS-CAN (500 kbit/s)</string>
+    <string name="module_bus_swcan">SW-CAN GMLAN (33,3 kbit/s)</string>
+    <string name="module_bus_unknown">Neatpažinta magistralė</string>
+    <string name="units_metric_details">Metriniai vienetai (km, °C, kPa)</string>
+    <string name="units_imperial_details">Imperiniai vienetai (mi, °F, psi)</string>
+    <string name="cal_tcp_port">TCP prievadas</string>
 </resources>
