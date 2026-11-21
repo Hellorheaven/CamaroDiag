@@ -122,3 +122,8 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Une déclaration de carte mémoire « vérifiée », de checksum OEM ou de sauvegarde ne constitue **pas une preuve matérielle**. Pour activer une écriture réelle, il faudra intégrer des sources de validation spécifiques à l'ECU, un véritable pilote/programmeur compatible, un journal persistant, la surveillance de tension et des tests sur banc.
 - **Pas de remise à zéro automatique, pas de nouvelle tentative d'effacement ou d'écriture après un résultat incertain**. L'état `STOPPED_REQUIRES_ASSESSMENT` nécessite une inspection et ne signifie jamais récupération garantie.
 - Contrôle Android/Windows et tests sur le HEAD final requis avant fusion ; ne pas déduire de la simulation une compatibilité LFX 2012 démontrée.
+
+## Nom du produit — invariant dans toutes les traductions (21/11/2026)
+- Le nom propre **CamaroDiag** est conservé caractère pour caractère, y compris la casse, dans toutes les langues : pas de traduction, translittération, majuscules intégrales ni terminaison grammaticale directement accolée.
+- Correction des titres du catalogue natif dans 14 ressources localisées où le nom apparaissait sous forme `CAMARODIAG` ou avec un suffixe ajouté.
+- Test de non-régression `camaroDiagBrandSpellingIsImmutableInEveryLanguage` ajouté à `LocaleResourcesIntegrityTest` : vérifie `app_name` et toutes les occurrences du nom dans les 30 langues. À contrôler dans CI avant toute fusion.
