@@ -573,4 +573,11 @@
     <string name="vin_photo_not_found">Nerastas galiojantis 17 ženklų VIN. Įveskite jį ranka arba nufotografuokite dar kartą.</string>
     <string name="vin_photo_error">VIN nepavyko nuskaityti iš nuotraukos. Pabandykite geriau apšviesti ir sufokusuoti vaizdą.</string>
     <string name="vehicle_vin_placeholder">17 ženklų</string>
+    <string name="can_sniffer_start">Pradėti įrašymą</string>
+    <string name="can_sniffer_stop">Stabdyti įrašymą</string>
+    <string name="can_sniffer_empty">Kol kas neįrašyta jokių CAN kadrų.</string>
+    <string name="can_sniffer_capture_complete">CAN kadrų įrašymas baigtas.</string>
+    <string name="can_sniffer_capture_failed">Nepavyko įrašyti CAN kadrų arba adapteris nustojo atsakyti.</string>
+    <string name="can_sniffer_frame_count">Įrašyta kadrų: %1$d</string>
+    <string name="can_sniffer_filtered_count">Rodoma %1$d iš %2$d kadrų</string>
 </resources>
