@@ -89,3 +89,10 @@ Pour contrôler une sauvegarde, ouvrez la section des fichiers de cartographie e
 - SW-CAN indisponible : le matériel ou le pilote peut ne pas exposer le protocole J2534-2 requis.
 
 Le pont est un transport de diagnostic. Il ne certifie ni la compatibilité d'un calculateur ni l'aptitude d'une interface à programmer un véhicule.
+
+
+### Vérifier réellement le pilote J2534 Windows
+
+Dans PowerShell, avec le boîtier branché en USB et son pilote constructeur installé, exécuter le pont avec `--probe-drivers` (exemple : `CamaroDiag.J2534Bridge.exe --probe-drivers`). Le contrôle vérifie pour chaque DLL déclarée dans Windows les fonctions J2534 indispensables, l'ouverture physique de l'interface (`PassThruOpen`), la lecture des versions API/DLL/firmware (`PassThruReadVersion`), puis referme le boîtier (`PassThruClose`). Utiliser la version x86 ou x64 correspondant au pilote. Le code de sortie est `0` si tous les pilotes détectés passent, `3` si aucun pilote n'est trouvé et `7` si au moins un pilote est inutilisable. Aucune commande ECU n'est envoyée.
+
+**Limite :** ce test confirme seulement le pilote et son adaptateur, pas la programmation d'un calculateur. Pour activer l'écriture sur un E39/E39A, il faut encore valider sur banc l'identification exacte, les commandes de programmation propres au firmware, les checksums GM, l'alimentation, la sauvegarde restaurable et la récupération en cas de coupure. Un boîtier J2534 compatible avec SPS2 ne fournit pas à lui seul ces algorithmes à CamaroDiag.
