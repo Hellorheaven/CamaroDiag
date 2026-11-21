@@ -107,8 +107,8 @@ internal static class NativeE39ImageInspectorSelfTests
                "Incorrect image length rejected before pointer dereference");
 
         byte[] words = [0, 1, 0, 2, 0, 3, 0, 4];
-        Assert(NativeE39ImageInspector.ComputeSum(words, (0, 7)) == 0xFFFA,
-            "GM 16-bit two's-complement checksum over declared end-exclusive word pairs");
+        Assert(NativeE39ImageInspector.ComputeSum(words, (0, 7)) == 0xFFF6,
+            "GM 16-bit two's-complement checksum over inclusive checksum block byte range");
         var knownCrc = System.Text.Encoding.ASCII.GetBytes("123456789");
         Assert(NativeE39ImageInspector.ComputeCvn(knownCrc, (0, 8)) == 0x3DBB,
             "CRC16 reflected A001/zero initial value with GM byte-swapped storage");
