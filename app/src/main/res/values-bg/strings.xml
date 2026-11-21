@@ -616,4 +616,34 @@
     <string name="debug_builds_created">Създаден</string>
     <string name="debug_builds_expires">Изтича</string>
     <string name="debug_builds_no_browser">Няма наличен браузър за отваряне на изтеглянето.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Избран език: %1$s</string>
+    <string name="settings_adapter_not_connected">Няма свързан адаптер</string>
+    <string name="settings_last_connection">Последен профил на връзката</string>
+    <string name="settings_no_last_connection">Все още няма запазен профил на връзката.</string>
+    <string name="saved_vehicle_profiles_title">Запазени профили на автомобили</string>
+    <string name="saved_vehicle_name_label">Име на профила</string>
+    <string name="saved_vehicle_name_placeholder">напр. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Запази текущия автомобил</string>
+    <string name="saved_vehicle_empty">Все още няма запазени профили на автомобили.</string>
+    <string name="saved_vehicle_delete">Изтрий</string>
+    <string name="saved_vehicle_requires_review">Профилът е създаден от VIN на ECU. Проверете моделната година, двигателя и трансмисията преди диагностиката.</string>
+    <string name="saved_vehicle_ecu_default_name">Автомобил от ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Въведете име на профила.</string>
+    <string name="msg_vehicle_profile_saved">Профилът на автомобила е запазен.</string>
+    <string name="msg_vehicle_profile_review_required">Създаден е профил от VIN на ECU. Проверете годината, двигателя и трансмисията преди диагностиката.</string>
+    <string name="msg_vehicle_profile_loaded">Зареден профил на автомобила: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU не върна валиден 17-знаков VIN. Не е създаден профил.</string>
+    <string name="cal_vin_matches_profile">VIN от ECU съвпада с избрания профил на автомобила.</string>
+    <string name="cal_vin_mismatch_detected">НЕСЪОТВЕТСТВИЕ НА VIN — профил: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Избраният профил на автомобила не съдържа валиден VIN.</string>
+    <string name="cal_vin_mismatch_title">Открито е несъответствие на VIN</string>
+    <string name="cal_vin_mismatch_confirmation">VIN на избрания профил е %1$s, но ECU върна %2$s. Възможно е това да са различни автомобили. Създайте отделен профил, за да запазите избрания автомобил, или синхронизирайте само след проверка на действителния автомобил.</string>
+    <string name="cal_vin_create_vehicle">Създай профил на автомобил</string>
+    <string name="cal_vin_sync_existing">Синхронизирай VIN на избрания профил</string>
+    <string name="cal_vin_sync_warning_title">Потвърждавате ли замяната на VIN?</string>
+    <string name="cal_vin_sync_warning_message">Това ще замени VIN в избрания профил (%1$s) с VIN от ECU (%2$s). Годината, двигателят, трансмисията и пазарът няма да се променят. Направете го само след потвърждение, че свързаният автомобил е правилният.</string>
+    <string name="cal_vin_sync_confirm">Замени VIN</string>
+    <string name="vin_photo_capture">Снимай VIN</string>
 </resources>
