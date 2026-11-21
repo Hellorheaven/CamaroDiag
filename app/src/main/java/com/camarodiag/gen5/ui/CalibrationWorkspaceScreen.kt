@@ -223,6 +223,7 @@ fun CalibrationWorkspaceScreen(
     isConnected: Boolean,
     canReadEnhancedUds: Boolean,
     onReadIdentification: () -> Unit,
+    onReadGmlanIdentification: () -> Unit,
     onExportIdentification: () -> Unit,
     onCreateVehicleFromEcuVin: (String) -> Unit,
     onSyncVehicleVinFromEcu: (String) -> Unit,
@@ -672,6 +673,41 @@ fun CalibrationWorkspaceScreen(
                                 color = TextMuted, fontSize = 10.sp
                             )
                             HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                            if (state.isJ2534BridgeConnected) {
+                                OutlinedButton(
+                                    onClick = onReadGmlanIdentification,
+                                    enabled = !state.isGmlanReading && !state.isJ2534MemoryCapturing &&
+                                        !state.isReading && !state.isUdsReading,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (state.isGmlanReading) CircularProgressIndicator()
+                                    else Text(stringResource(R.string.cal_gmlan_read_identity))
+                                }
+                                Text(stringResource(R.string.cal_gmlan_identity_notice),
+                                    color = TextMuted, fontSize = 10.sp)
+                                if (state.gmlanIdentityFailed) {
+                                    Text(stringResource(R.string.cal_gmlan_identity_failed),
+                                        color = WarnRed, fontSize = 11.sp)
+                                }
+                                state.gmlanIdentity?.let { identity ->
+                                    Text(stringResource(R.string.cal_gmlan_osid, identity.operatingSystemId),
+                                        color = CamaroAmber, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(stringResource(R.string.cal_gmlan_vin_can, identity.vin, identity.responseCanId),
+                                        color = TextPrimary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                                    val selectedVin = vehicle.vin.trim().uppercase()
+                                    if (selectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
+                                        if (selectedVin == identity.vin) {
+                                            Text(stringResource(R.string.cal_vin_matches_profile),
+                                                color = OkGreen, fontSize = 11.sp)
+                                        } else {
+                                            Text(stringResource(R.string.cal_vin_mismatch_detected, selectedVin, identity.vin),
+                                                color = WarnRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    } else Text(stringResource(R.string.cal_vin_profile_not_set),
+                                        color = CamaroAmber, fontSize = 11.sp)
+                                }
+                                HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                            }
                             Text(stringResource(R.string.cal_live_memory_title),
                                 color = CamaroAmber, fontWeight = FontWeight.Bold)
                             Text(stringResource(R.string.cal_live_memory_notice),

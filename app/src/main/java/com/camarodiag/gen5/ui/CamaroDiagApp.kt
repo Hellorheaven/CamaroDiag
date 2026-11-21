@@ -676,6 +676,7 @@ fun CamaroDiagApp(
                         adapter.tier != AdapterTier.DISCONNECTED,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onReadGmlanIdentification = { viewModel.readGmlanIdentification() },
                     onExportIdentification = {
                         ecuIdentityExporter.launch(
                             "CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json"
