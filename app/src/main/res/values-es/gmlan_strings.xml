@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_gmlan_read_identity">Leer VIN y OSID de GM (J2534)</string>
+    <string name="cal_gmlan_osid">ID del sistema operativo GM: %1$d</string>
+    <string name="cal_gmlan_vin_can">VIN de GM: %1$s • CAN 0x%2$s</string>
+    <string name="cal_gmlan_identity_notice">Identificación de solo lectura del respondedor CAN físico seleccionado. No valida el hardware de la ECU, la geometría de la memoria flash ni el procedimiento de recuperación.</string>
+    <string name="cal_gmlan_identity_failed">No se pudo leer un VIN y un OSID de GM verificados en este canal J2534.</string>
+</resources>
