@@ -40,6 +40,7 @@ class EcuWriteTransactionTest {
     ) : EcuProgrammingDriverContract {
         val memory = initial.copyOf()
         var eraseCalls = 0
+        var identityAfterErases: Pair<Int, EcuProgrammingDriverContract.Identity>? = null
         val writes = mutableListOf<EcuProgrammingDriverContract.RegionRequest>()
         val writeCalls: Int get() = writes.size
         var failWriteAt: Long? = null
@@ -64,7 +65,8 @@ class EcuWriteTransactionTest {
             return start
         }
 
-        override suspend fun identify() = identity
+        override suspend fun identify(): EcuProgrammingDriverContract.Identity =
+            identityAfterErases?.takeIf { eraseCalls >= it.first }?.second ?: identity
         override suspend fun read(request: EcuProgrammingDriverContract.RegionRequest): ByteArray {
             val start = start(request)
             return memory.copyOfRange(start, start + request.length.toInt())
@@ -184,6 +186,31 @@ class EcuWriteTransactionTest {
             assertEquals(0, device.eraseCalls)
             assertEquals(0, device.writeCalls)
         }
+    }
+
+    @Test fun invalidTargetVinIsBlockedDuringPreflight() {
+        for (vin in listOf(null, "", "NOT_A_VIN", "2G1I0000000000001")) {
+            val result = EcuWriteTransaction.prepare(
+                request().copy(expectedIdentity = expectedIdentity.copy(vin = vin))
+            )
+            assertTrue(EcuWriteTransaction.Blocker.UNKNOWN_TARGET in result.blockers)
+        }
+    }
+
+    @Test fun controllerIdentityChangedAfterFirstSectorStopsBeforeNextErase() = runBlocking {
+        val updated = original.copyOf().also { it[2] = 100; it[10] = 110 }
+        val device = FakeDriver(original, expectedIdentity)
+        device.identityAfterErases = 1 to expectedIdentity.copy(vin = "2G1TEST0000000002")
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+        ).run(request(updated))
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, outcome.verifiedSectors)
+        assertEquals(0x1008L, outcome.failedAddress)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(4, device.writeCalls)
+        assertEquals(1, records.count { it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE })
     }
 
     @Test fun baselineMismatchStopsBeforeAnyErase() = runBlocking {
