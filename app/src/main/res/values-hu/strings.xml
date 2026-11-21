@@ -367,4 +367,19 @@
     <string name="cal_j2534_launch_instructions">Indítsd el a CamaroDiag.J2534Bridge.exe programot Windows alatt. Add meg a PC IP-címét és a konzolon látható teljes kódot (token.TLS-ujjlenyomat). Használj megbízható helyi hálózatot.</string>
     <string name="cal_j2534_security_notice">TLS 1.2+ és a tanúsítvány ujjlenyomatának ellenőrzése kötelező. A régi, csak tokent tartalmazó kódok nem használhatók. Ne tedd elérhetővé a portot az interneten.</string>
     <string name="cal_pc_pairing_token">TLS-kód (token.ujjlenyomat)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Funkcionális tesztek</string>
+    <string name="functional_tests_title">Funkcionális tesztek — ECU és OBD</string>
+    <string name="functional_tests_readonly">Futtassa az összes elérhető, csak olvasási ellenőrzést a csatlakoztatott fizikai adapteren. A többi adapter és a nem ellenőrzött ECU NEM TESZTELT állapotú marad. Nincs törlés, vezérlés vagy programozás.</string>
+    <string name="functional_tests_run">Összes futtatása</string>
+    <string name="functional_tests_stop">Leállítás</string>
+    <string name="functional_tests_export">JSON exportálása</string>
+    <string name="functional_tests_summary">%1$d sikeres · %2$d sikertelen · %3$d nem tesztelt</string>
+    <string name="functional_tests_passed">SIKERES (fizikai bizonyíték)</string>
+    <string name="functional_tests_failed">SIKERTELEN</string>
+    <string name="functional_tests_skipped">NEM TESZTELT</string>
+    <string name="functional_tests_denied">Hozzáférés megtagadva: jelentkezzen be az engedélyezett Google-fiókkal, majd csatlakozzon újra.</string>
+    <string name="functional_tests_not_connected">Nincs csatlakoztatott fizikai OBD-adapter. A további ellenőrzések nem futottak le.</string>
+    <string name="functional_tests_cancelled">A tesztsorozat megszakadt.</string>
 </resources>
