@@ -619,8 +619,8 @@
     <string name="module_note_ecm_obd_missing">Nebyla zaznamenána standardní odpověď OBD 7E8. ECM zůstává neověřena až do potvrzení skutečným funkčním skenováním.</string>
     <string name="module_note_tcm_gen5">Přítomnost, adresu a podporovaná data je nutné zjistit ve vozidle.</string>
     <string name="module_note_tcm_gen6">Adresu modulu a podporované služby je nutné zjistit ve vozidle; nelze je odvodit z topologie 5. generace.</string>
-    <string name="module_note_bcm_gen5">Bulletin GM 07-08-49-020I označuje BCM za modul pro uložení stavu počítadla kilometrů Camaro 2010–2015. Přesné diagnostické adresování a DID pro čtení nejsou předpokládány.</string>
-    <string name="module_note_bcm_gen6_to2018">Bulletin GM 07-08-49-020M uvádí BCM jako modul pro uložení stavu počítadla kilometrů Camaro do roku 2018. Diagnostickou adresu a DID pro čtení je stále nutné ověřit pro konkrétní VIN.</string>
+    <string name="module_note_bcm_gen5">Bulletin GM 07–08–49–020I označuje BCM za modul pro uložení stavu počítadla kilometrů Camaro 2010–2015. Přesné diagnostické adresování a DID pro čtení nejsou předpokládány.</string>
+    <string name="module_note_bcm_gen6_to2018">Bulletin GM 07–08–49–020M uvádí BCM jako modul pro uložení stavu počítadla kilometrů Camaro do roku 2018. Diagnostickou adresu a DID pro čtení je stále nutné ověřit pro konkrétní VIN.</string>
     <string name="module_note_bcm_2019">Pro roky 2019–2024 nejprve ověřte architekturu ukládání stavu počítadla kilometrů a diagnostické identifikátory pro tento VIN.</string>
     <string name="module_note_ipc_gen5">Servisní informace pro Camaro 2012 popisují IPC jako sekundární úložiště stavu počítadla kilometrů. Přesná čtená data a adresu je nutné ověřit.</string>
     <string name="module_note_ipc_gen6">Sekundární úložiště stavu počítadla kilometrů je popsáno v servisních informacích pro Camaro 2012; před porovnáním ověřte konkrétní data modulu a vztah k VIN.</string>
