@@ -82,9 +82,13 @@ fun CamaroAuthGate(
         // screen every five minutes. Only an identity change hides old data.
         val identityChanged = readyAccountUid != user?.uid ||
             (validatedUser != null && validatedUser !== user)
-        // Never retain a paid entitlement while its server freshness is being checked.
-        accessLevel = LicenseLevel.FREE
+        // Preserve the current account's verified tier during a periodic token
+        // refresh: otherwise owner-only Debug tabs disappear every five minutes
+        // and ongoing diagnostic navigation is interrupted. Account changes
+        // still revoke all privileges immediately. A failed refresh below
+        // separately revokes owner privileges and applies offline-grace rules.
         if (identityChanged) {
+            accessLevel = LicenseLevel.FREE
             readyAccountUid = null
             validatedAccountUid = null
             validatedUser = null
