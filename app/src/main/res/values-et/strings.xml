@@ -514,4 +514,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • päring %2$s / vastus %3$s • intervall %4$d s</string>
     <string name="cal_axis_values">0x%1$s • arv=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Ainult riistvaraprofiil; vajalik on ametlik Android SDK/API või dokumenteeritud sild.</string>
+    <string name="obd_scan_description">SAE J1979 kirjutuskaitstud kontroll: jõuülekande andmed, veakoodid, külmutatud kaader ja ECU identifitseerimine.</string>
+    <string name="obd_responding_can_ids">Vastanud CAN-ID-d</string>
+    <string name="obd_can_id_limit_explanation">CAN-ID-d pärinevad OBD funktsionaalse päringu 0100 vastustest. Need ei võimalda tuvastada moodulit (BCM, TCM, ABS, IPC, SDM) ega lubada GM-i laiendatud teenuseid.</string>
+    <string name="obd_trigger_dtc">Külmutatud kaadri põhjustanud DTC</string>
+    <string name="obd_real_scan_scope">Ulatus: tulemused pärinevad ainult OBD-II kaudu kättesaadava ECU tegelikest vastustest. Skannimine ei küsi BCM-i, IPC-d, ABS-i, SDM-i ega teisi GM-i mooduleid ega käivita täituri- või programmeerimiskäske.</string>
+    <string name="connection_busy">Ühendamine või toiming käib…</string>
+    <string name="swcan_wiring_verified">SW-CAN juhtmestik kontrollitud (kontakt 1)</string>
+    <string name="long_response_mode">Pika vastuse režiim (ATAL)</string>
+    <string name="adapter_none_detected">Adapterit ei tuvastatud. Siduge OBDLink MX+, MX, LX ja muud klassikalise Bluetoothi adapterid; CX tuvastatakse läheduses BLE kaudu.</string>
+    <string name="usb_connection_title">USB-ühendus (OBDLink EX / SX, ELM327 ja jadaadapterid)</string>
+    <string name="adapter_connect_label">Ühenda: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: transpordiarhitektuur on ette valmistatud, kuid J2534 liideste Androidi ühilduvust ei kinnitata ilma mudeli ametliku Android SDK-ta. J2534 ligipääsu ei simuleerita.</string>
+    <string name="adapter_vxdiag_profiles">Deklareeritud VXDIAG liideseprofiilid</string>
+    <string name="adapter_vxdiag_profiles_hint">Profiilid eristavad riistvara ja ühenduse variante. Need ei tõenda Androidi draiveri ega sõidukiga suhtluse olemasolu.</string>
+    <string name="adapter_simulation_profiles">Simuleeritud riistvaraprofiilid (pingikatse)</string>
 </resources>
