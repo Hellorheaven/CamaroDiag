@@ -607,4 +607,13 @@
     <string name="flexfuel_preflight_recovery">Процедурата за възстановяване не е проверена</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: проверка преди/след програмиране (само четене)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Проверката след програмиране не е извършена. Нито програмирането на ECU, нито тестът на автомобила след записа са валидирани.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Изтеглете последните Debug артефакти от PR #70. Влезте в GitHub с разрешен профил. Изтеглените файлове са ZIP архиви за разархивиране.</string>
+    <string name="debug_builds_android_archive">ZIP архив с Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP архив с инсталатори за Windows x64 и x86.</string>
+    <string name="debug_builds_caution">Артефактите изтичат след 30 дни. Наличността им не доказва успешна компилация или тестове с автомобил. Подписите на Debug APK може да се различават от публичните версии.</string>
+    <string name="debug_builds_created">Създаден</string>
+    <string name="debug_builds_expires">Изтича</string>
+    <string name="debug_builds_no_browser">Няма наличен браузър за отваряне на изтеглянето.</string>
 </resources>
