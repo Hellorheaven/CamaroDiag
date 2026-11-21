@@ -207,6 +207,7 @@ fun CalibrationWorkspaceScreen(
     vehicleLabel: String,
     ecmType: String,
     isConnected: Boolean,
+    canReadEnhancedUds: Boolean,
     onReadIdentification: () -> Unit,
     onExportIdentification: () -> Unit,
     onCreateVehicleFromEcuVin: (String) -> Unit,
@@ -784,7 +785,7 @@ fun CalibrationWorkspaceScreen(
                     }
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
-                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
+                        enabled = canReadEnhancedUds && !state.isUdsReading &&
                             canIdsMatchProfile && udsDid.length == 4 &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
@@ -799,7 +800,7 @@ fun CalibrationWorkspaceScreen(
                     }
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
-                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
+                        enabled = canReadEnhancedUds && !state.isUdsReading &&
                             canIdsMatchProfile &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
@@ -980,7 +981,7 @@ fun CalibrationWorkspaceScreen(
                         }
                         Button(
                             onClick = { onReadObdbSignal(signal.id, udsCanProtocol) },
-                            enabled = (isConnected || state.isJ2534BridgeConnected) &&
+                            enabled = canReadEnhancedUds &&
                                 signal.hasSupportedPhysicalCanAddressing &&
                                 !profileUses29BitIds &&
                                 signal.service == 0x22 &&
