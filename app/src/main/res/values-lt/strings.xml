@@ -503,4 +503,21 @@
     <string name="mileage_caveat_unavailable">Papildoma lokalizuota informacija apie šį šaltinį nepasiekiama.</string>
     <string name="obd_physical_can_scope">Fizinis CAN atsakiklis: 0x%1$s. Nuskaitymas apima tik pasirinktą OBD ECU, o ne visų modulių funkcinį nuskaitymą. GM programavimo ar vykdiklių komandų nesiųsta.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Įjunkite su emisijomis susijusių DTC ištrynimą Windows tilte, prisijunkite iš naujo, išjunkite variklį ir patvirtinkite atkūrimą. Emisijų parengties duomenys bus atstatyti; nuolatiniai kodai neištrinami.</string>
+    <string name="units_metric">SI / metrinė</string>
+    <string name="units_imperial">Imperinė</string>
+    <string name="live_pause">Pristabdyti</string>
+    <string name="live_recording_status">Mėginiai: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Įsiurbimo skirstomojo veleno padėties vykdiklio grandinė (1 cilindrų eilė)</string>
+    <string name="dtc_desc_p0011">Per ankstyvas įsiurbimo skirstomojo veleno fazių nustatymas (1 cilindrų eilė)</string>
+    <string name="dtc_desc_p0014">Per ankstyvas išmetimo skirstomojo veleno fazių nustatymas (1 cilindrų eilė)</string>
+    <string name="dtc_desc_p0087">Per mažas degalų magistralės arba sistemos slėgis</string>
+    <string name="dtc_desc_p0089">Degalų slėgio reguliatoriaus veikimo sutrikimas</string>
+    <string name="dtc_desc_p0191">Degalų magistralės slėgio jutiklio grandinės diapazonas arba veikimas</string>
+    <string name="dtc_desc_p0299">Per mažas turbokompresoriaus arba mechaninio kompresoriaus slėgis</string>
+    <string name="cal_engine_profile">Variklio profilis: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Katalogo varikliai %1$d metams: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Dvejetainis skaitymas: %2$s • Patvirtintos variklio lentelės: %3$s • ECU programavimas: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • užklausa %2$s / atsakymas %3$s • intervalas %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • kiekis=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Tik aparatinės įrangos profilis; vis dar reikalingas oficialus Android SDK/API arba dokumentuotas tiltas.</string>
 </resources>
