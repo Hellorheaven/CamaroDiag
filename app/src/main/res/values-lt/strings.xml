@@ -373,4 +373,19 @@
     <string name="cal_j2534_launch_instructions">Paleiskite CamaroDiag.J2534Bridge.exe sistemoje Windows. Įveskite kompiuterio IP ir visą kodą (žetonas.TLS atspaudas) iš konsolės. Naudokite patikimą vietinį tinklą.</string>
     <string name="cal_j2534_security_notice">Privalomi TLS 1.2+ ir sertifikato atspaudo patikra. Seni žetonai be atspaudo atmetami. Niekada neatverkite prievado internetui.</string>
     <string name="cal_pc_pairing_token">TLS kodas (žetonas.atspaudas)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Funkciniai testai</string>
+    <string name="functional_tests_title">Funkciniai testai — ECU ir OBD</string>
+    <string name="functional_tests_readonly">Atlikite visas prieinamas tik skaitymo patikras per prijungtą fizinį adapterį. Kiti adapteriai ir nepatikrinti ECU pažymimi kaip NETESTUOTA. Jokio trynimo, valdymo ar programavimo.</string>
+    <string name="functional_tests_run">Vykdyti visus</string>
+    <string name="functional_tests_stop">Stabdyti</string>
+    <string name="functional_tests_export">Eksportuoti JSON</string>
+    <string name="functional_tests_summary">%1$d pavyko · %2$d nepavyko · %3$d netestuota</string>
+    <string name="functional_tests_passed">PAVYKO (fizinis patvirtinimas)</string>
+    <string name="functional_tests_failed">NEPAVYKO</string>
+    <string name="functional_tests_skipped">NETESTUOTA</string>
+    <string name="functional_tests_denied">Prieiga uždrausta: prisijunkite įgaliota Google paskyra ir bandykite dar kartą.</string>
+    <string name="functional_tests_not_connected">Neprijungtas fizinis OBD adapteris. Likę patikrinimai neatlikti.</string>
+    <string name="functional_tests_cancelled">Bandymų sesija atšaukta.</string>
 </resources>
