@@ -185,4 +185,25 @@
     <string name="obd_sensor_ok">OK</string>
     <string name="obd_sensor_not_measured">Nije mjereno u ovom skeniranju</string>
     <string name="live_selected_sensors">Prikazani senzori (%1$d/%2$d)</string>
+    <string name="obd_scan_description">Provjera samo za čitanje prema SAE J1979: podaci pogonskog sklopa, kodovi grešaka, zamrznuti okvir i identifikacija ECU-a.</string>
+    <string name="obd_responding_can_ids">CAN identifikatori koji odgovaraju</string>
+    <string name="obd_can_id_limit_explanation">CAN identifikatori su odgovori zabilježeni na funkcionalni OBD zahtjev 0100. Nisu dovoljni za identifikaciju modula (BCM, TCM, ABS, IPC, SDM) niti za odobravanje proširenih GM usluga.</string>
+    <string name="obd_trigger_dtc">DTC koji je pokrenuo zapis</string>
+    <string name="obd_real_scan_scope">Opseg: rezultati potječu samo iz odgovora koje je stvarno vratio ECU dostupan putem OBD-II. Ovo skeniranje ne ispituje BCM, IPC, ABS, SDM ni druge GM module i ne izvršava naredbe aktuatora ili programiranja.</string>
+    <string name="connection_busy">Povezivanje ili radnja u tijeku…</string>
+    <string name="swcan_wiring_verified">Provjereno ožičenje SW-CAN-a (pin 1)</string>
+    <string name="long_response_mode">Način dugih odgovora (ATAL)</string>
+    <string name="adapter_none_detected">Adapter nije pronađen. Uparite OBDLink MX+, MX, LX ili druge klasične Bluetooth adaptere; CX se otkriva u blizini putem BLE-a.</string>
+    <string name="usb_connection_title">USB veza (OBDLink EX / SX, ELM327 i serijski adapteri)</string>
+    <string name="adapter_connect_label">Poveži: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: prijenosna arhitektura je pripremljena, ali se bez službenog Android SDK-a za određeni model ne tvrdi da su J2534 sučelja kompatibilna s Androidom. Pristup J2534 ne simulira se.</string>
+    <string name="adapter_vxdiag_profiles">Deklarirani profili sučelja VXDIAG</string>
+    <string name="adapter_vxdiag_profiles_hint">Ovi profili razlikuju inačice hardvera i veze. Ne znače da su dostupni Android upravljački program ili komunikacija s vozilom.</string>
+    <string name="adapter_simulation_profiles">Simulirani hardverski profili (ispitivanje na stolu)</string>
+    <string name="control_vehicle_title">Upravljanje vozilom</string>
+    <string name="control_vehicle_label">Camaro %1$s • %2$s • %3$s</string>
+    <string name="control_gm_body_notice">GM naredbe za karoserijske sustave ovise o VIN-u, BCM-u i kalibraciji. Ostaju onemogućene dok se DID-ovi, sigurnosne sesije i slijedovi naredbi ne provjere na ovom vozilu.</string>
+    <string name="status_available">DOSTUPNO</string>
+    <string name="status_not_equipped">NIJE UGRAĐENO</string>
+    <string name="control_no_actuation_notice">Prema zadanim postavkama ne šalju se naredbe za prozore, otključavanje ni aktuatore. Time se sprječavaju pogrešne ili opasne naredbe.</string>
 </resources>
