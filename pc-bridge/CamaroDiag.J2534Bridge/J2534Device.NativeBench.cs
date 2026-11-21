@@ -28,6 +28,7 @@ internal sealed partial class J2534Device
     /// </summary>
     internal static async Task<NativeE39WriteSequence.Result> RunQualifiedNativeE39BenchAsync(
         J2534Adapter adapter, J2534MemoryReadScope scope,
+        NativeE39PhysicalAdmission.QualifiedChannel channel,
         NativeE39BenchWorkflow.Policy policy,
         byte[] original, byte[] target, byte[] kernel,
         NativeE39WriteSequence.IDurableJournal journal, CancellationToken token)
@@ -36,6 +37,7 @@ internal sealed partial class J2534Device
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(journal);
+        NativeE39PhysicalAdmission.RequireMatch(adapter, scope, channel);
         NativeE39BackupQualification.RequireFullScope(scope);
         if (scope.ExpectedVin != policy.Session.ExpectedVin || scope.ProtocolNumber is not (33 or 34))
             throw new UnauthorizedAccessException("Native E39 bench requires the exact VIN and qualified HS-CAN channel.");

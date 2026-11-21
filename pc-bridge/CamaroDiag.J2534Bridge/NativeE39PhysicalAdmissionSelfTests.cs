@@ -1,0 +1,45 @@
+using System.Security.Cryptography;
+
+namespace CamaroDiag.J2534Bridge;
+
+internal static class NativeE39PhysicalAdmissionSelfTests
+{
+    internal static int Run()
+    {
+        var path = Path.GetTempFileName();
+        int checks = 0;
+        void Check(bool ok, string message) { checks++; if (!ok) throw new InvalidOperationException(message); }
+        static bool Rejected(Action action)
+        {
+            try { action(); return false; }
+            catch (UnauthorizedAccessException) { return true; }
+        }
+        try
+        {
+            byte[] sample = [1, 2, 3, 4];
+            File.WriteAllBytes(path,sample);
+            var adapter = new J2534Adapter("test-only",path,"fixture","Registry64");
+            var scope = new J2534MemoryReadScope("1G1FA1RXXR0123456",0x7E0,0x7E8,33,
+                0,NativeE39ImageInspector.ImageBytes,64,3);
+            var channel = new NativeE39PhysicalAdmission.QualifiedChannel(
+                Convert.ToHexString(SHA256.HashData(sample)),"Registry64",0x7E0,0x7E8,33,64,3);
+            void Match(J2534Adapter a, NativeE39PhysicalAdmission.QualifiedChannel c) =>
+                NativeE39PhysicalAdmission.RequireMatch(a,scope,c);
+            Match(adapter,channel);
+            Check(true,"Exact test driver/channel admitted");
+            Check(Rejected(() => Match(adapter,channel with { ResponseCanId = 0x7E9 })),
+                "Wrong responder rejected");
+            Check(Rejected(() => Match(adapter,channel with { MaximumStockReadBytes = 32 })),
+                "Unqualified stock block size rejected");
+            Check(Rejected(() => Match(adapter,channel with { StockReadSession = 1 })),
+                "Different diagnostic session rejected");
+            Check(Rejected(() => Match(adapter with { RegistryView = "Registry32" },channel)),
+                "Driver architecture mismatch rejected");
+            File.WriteAllBytes(path,[1,2,3,5]);
+            Check(Rejected(() => Match(adapter,channel)),"Driver update requires bench requalification");
+        }
+        finally { File.Delete(path); }
+        Console.WriteLine($"PASS: {checks} qualified J2534 channel checks.");
+        return checks;
+    }
+}
