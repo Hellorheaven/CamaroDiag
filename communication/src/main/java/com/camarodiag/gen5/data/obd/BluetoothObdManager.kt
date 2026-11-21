@@ -787,6 +787,20 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /** Read GM legacy VIN/OSID on the exact active physical J2534 channel. */
+    suspend fun readGmlanIdentification(): GmlanIdentityEvidence {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534BridgeConnected())
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534BridgeConnected())
+            val bridge = checkNotNull(j2534BridgeTransport)
+            val identity = bridge.readGmlanIdentification()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            identity
+        }
+    }
+
     fun isJ2534MemoryReadAvailable(): Boolean =
         isJ2534BridgeConnected() &&
             j2534BridgeTransport?.isScopedMemoryReadEnabled == true

@@ -27,6 +27,7 @@ class J2534BridgeTransport(
     private var reader: BufferedReader? = null
     private var writer: BufferedWriter? = null
     @Volatile private var opened = false
+    private var connectedResponseCanId: String? = null
     @Volatile private var scopedMemoryReadEnabled = false
 
     /** True only when the authenticated PC bridge confirmed a VIN-bound memory scope. */
@@ -80,6 +81,14 @@ class J2534BridgeTransport(
                         .put("protocolNumber", protocolNumber),
                     10_000
                 )
+                val requestLabel = requestCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
+                val responseLabel = responseCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
+                check(response.opt("readOnly") == true &&
+                    response.optString("requestCanId") == requestLabel &&
+                    response.optString("responseCanId") == responseLabel &&
+                    response.optInt("protocolNumber", -1) == protocolNumber
+                ) { "The PC bridge did not confirm the selected read-only CAN channel." }
+                connectedResponseCanId = responseLabel
                 scopedMemoryReadEnabled = response.optBoolean("scopedPhysicalMemoryRead", false)
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
@@ -110,6 +119,37 @@ class J2534BridgeTransport(
                 calibrationVerificationNumbers = records("cvns"),
                 ecuNames = records("ecuNames"),
                 respondingEcuAddresses = listOf(data.getString("responseCanId"))
+            )
+        }
+    }
+
+    suspend fun readGmlanIdentification(): GmlanIdentityEvidence = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureOpen()
+            val expected = checkNotNull(connectedResponseCanId)
+            val response = request(
+                JSONObject().put("op", "identifyGmlan").put("token", tlsPairing.token),
+                15_000
+            )
+            val data = response.getJSONObject("identity")
+            fun integer(name: String): Long {
+                val value = data.opt(name)
+                require(value is Number && value.toDouble() == value.toLong().toDouble()) {
+                    "Invalid GM numeric identity field."
+                }
+                return value.toLong()
+            }
+            val did = integer("OsDid")
+            require(did in 0L..255L)
+            GmlanIdentityEvidence.validate(
+                vin = data.getString("Vin"),
+                osId = integer("OperatingSystemId"),
+                osDid = did.toInt(),
+                responseId = response.getString("responseCanId"),
+                expectedResponseId = expected,
+                physicalRead = data.opt("PhysicalRead") == true,
+                readOnly = response.opt("readOnly") == true,
+                flashQualified = response.opt("flashQualified") != false
             )
         }
     }
@@ -207,6 +247,7 @@ class J2534BridgeTransport(
         reader = null
         writer = null
         socket = null
+        connectedResponseCanId = null
         opened = false
         scopedMemoryReadEnabled = false
     }
