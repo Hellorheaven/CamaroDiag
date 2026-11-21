@@ -569,4 +569,10 @@
     <string name="can_sniffer_capture_failed">Zajem CAN ni uspel ali pa se je vmesnik prenehal odzivati.</string>
     <string name="can_sniffer_frame_count">Zajeti okvirji: %1$d</string>
     <string name="can_sniffer_filtered_count">Prikazano %1$d od %2$d okvirjev</string>
+    <string name="msg_live_recording_real_started">Začelo se je snemanje dejanskih podatkov OBD.</string>
+    <string name="msg_live_recording_started">Snemanje poteka. Število vzorcev: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Snemanje je ustavljeno. Število zajetih vzorcev: %1$d.</string>
+    <string name="msg_live_csv_exported">Dnevnik CSV je izvožen. Število vzorcev: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Dnevnika CSV ni bilo mogoče izvoziti.</string>
+    <string name="msg_live_recording_max_samples">Dosežena je varnostna meja (%1$d). Snemanje se je samodejno ustavilo.</string>
 </resources>
