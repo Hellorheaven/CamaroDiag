@@ -557,4 +557,9 @@
     <string name="update_later">Pozneje</string>
     <string name="update_ready_to_install">CamaroDiag – pripravljeno za namestitev</string>
     <string name="update_version_channel">Različica %1$s • %2$s</string>
+    <string name="vin_photo_cancelled">Fotografiranje številke VIN je preklicano.</string>
+    <string name="vin_photo_success">VIN je prepoznan in kopiran v profil vozila. Preverite vsak znak.</string>
+    <string name="vin_photo_not_found">Veljavne 17-mestne številke VIN ni bilo mogoče najti. Vnesite jo ročno ali posnemite novo fotografijo.</string>
+    <string name="vin_photo_error">Številke VIN s fotografije ni bilo mogoče prebrati. Poskusite znova pri boljši svetlobi in izostrite sliko.</string>
+    <string name="vehicle_vin_placeholder">17 znakov</string>
 </resources>
