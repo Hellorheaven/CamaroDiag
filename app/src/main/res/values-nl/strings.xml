@@ -875,4 +875,19 @@
     <string name="functional_tests_denied">Toegang geweigerd: meld u aan met het toegestane Google-account.</string>
     <string name="functional_tests_not_connected">Er is geen fysieke OBD-adapter aangesloten. Overige controles zijn niet uitgevoerd.</string>
     <string name="functional_tests_cancelled">Testreeks geannuleerd.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Debugversies</string>
+    <string name="tab_license">Licentie</string>
+    <string name="debug_builds_title">Privédebugversies</string>
+    <string name="debug_builds_refresh">Beschikbare versies vernieuwen</string>
+    <string name="debug_builds_download">Downloaden van GitHub</string>
+    <string name="debug_builds_unavailable">Geen geldig debugarchief beschikbaar.</string>
+    <string name="debug_builds_error">Debugversies konden niet van GitHub worden geladen.</string>
+    <string name="license_disabled">Het licentiesysteem is niet ingeschakeld.</string>
+    <string name="license_buy">Licentie kopen</string>
+    <string name="license_refresh">Licentie vernieuwen</string>
+    <string name="license_free">Gratis</string>
+    <string name="license_owner">Eigenaar: alle rechten</string>
+    <string name="license_premium">Volledige licentie actief</string>
+    <string name="license_title">CamaroDiag-licentie</string>
 </resources>
