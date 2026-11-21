@@ -350,4 +350,21 @@
     <string name="cal_x_axis">Osa X: %1$s</string>
     <string name="cal_discard_changes">Zahodit změny</string>
     <string name="cal_apply_to_file">Použít na soubor</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Popis není v místním slovníku; ověřte servisní dokumentaci GM pro toto VIN.</string>
+    <string name="dtc_desc_p0101">Snímač hmotnostního průtoku vzduchu: rozsah nebo funkce obvodu</string>
+    <string name="dtc_desc_p0102">Snímač hmotnostního průtoku vzduchu: nízký vstupní signál</string>
+    <string name="dtc_desc_p0103">Snímač hmotnostního průtoku vzduchu: vysoký vstupní signál</string>
+    <string name="dtc_desc_p0113">Snímač teploty nasávaného vzduchu 1: vysoký signál</string>
+    <string name="dtc_desc_p0128">Termostat chladicí kapaliny: teplota pod regulační hodnotou</string>
+    <string name="dtc_desc_p0442">Systém EVAP: zjištěna malá netěsnost</string>
+    <string name="dtc_desc_p0455">Systém EVAP: zjištěna velká netěsnost</string>
+    <string name="dtc_desc_p0496">Systém EVAP: průtok při neaktivním odvětrávání</string>
+    <string name="dtc_desc_p0507">Volnoběžné otáčky vyšší než očekávané</string>
+    <string name="dtc_desc_p06dd">Elektromagnet řízení tlaku motorového oleje: nesprávná funkce</string>
+    <string name="dtc_desc_p1101">Systém průtoku nasávaného vzduchu: nesprávná funkce</string>
+    <string name="cal_axis_x">Osa X</string>
+    <string name="cal_axis_y">Osa Y</string>
 </resources>

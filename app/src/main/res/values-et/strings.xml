@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Loe ECU mälu kaks korda ja salvesta ZIP-failina</string>
     <string name="cal_live_memory_saved">ECU mälu salvestati pärast kaht ühesugust lugemist.</string>
     <string name="cal_live_memory_failed">ECU mälu lugemine ebaõnnestus. Kontrollitud varukoopiat ei loodud.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Kirjeldus puudub kohalikust sõnastikust; kontrolli selle VIN-i GM-i hooldusandmeid.</string>
+    <string name="dtc_desc_p0101">Õhumassianduri ahela vahemik või töö häiritud</string>
+    <string name="dtc_desc_p0102">Õhumassianduri madal sisendsignaal</string>
+    <string name="dtc_desc_p0103">Õhumassianduri kõrge sisendsignaal</string>
+    <string name="dtc_desc_p0113">Sisselaskeõhu temperatuuriandur 1: kõrge signaal</string>
+    <string name="dtc_desc_p0128">Jahutusvedeliku termostaat: temperatuur alla reguleerimisväärtuse</string>
+    <string name="dtc_desc_p0442">EVAP-süsteemis tuvastatud väike leke</string>
+    <string name="dtc_desc_p0455">EVAP-süsteemis tuvastatud suur leke</string>
+    <string name="dtc_desc_p0496">EVAP-süsteemi vooluhulk ilma puhastusrežiimita</string>
+    <string name="dtc_desc_p0507">Tühikäigu pöörded on oodatust suuremad</string>
+    <string name="dtc_desc_p06dd">Mootori õlirõhu juhtsolenoidi talitlushäire</string>
+    <string name="dtc_desc_p1101">Sisselaskeõhu voolusüsteemi talitlushäire</string>
+    <string name="cal_axis_x">X-telg</string>
+    <string name="cal_axis_y">Y-telg</string>
 </resources>

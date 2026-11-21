@@ -482,4 +482,21 @@
     <string name="cal_live_memory_save">Прочети ECU паметта два пъти и запази ZIP</string>
     <string name="cal_live_memory_saved">ECU паметта е запазена след две еднакви прочитания.</string>
     <string name="cal_live_memory_failed">Четенето на ECU паметта е неуспешно. Няма проверено копие.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Няма описание в местния речник; проверете сервизната информация на GM за този VIN.</string>
+    <string name="dtc_desc_p0101">Дебитомер: сигнал извън обхват или неправилна работа</string>
+    <string name="dtc_desc_p0102">Дебитомер: нисък входен сигнал</string>
+    <string name="dtc_desc_p0103">Дебитомер: висок входен сигнал</string>
+    <string name="dtc_desc_p0113">Датчик за температура на входящия въздух 1: висок сигнал</string>
+    <string name="dtc_desc_p0128">Термостат: температурата на охлаждащата течност е под регулираната</string>
+    <string name="dtc_desc_p0442">EVAP: установен малък теч</string>
+    <string name="dtc_desc_p0455">EVAP: установен голям теч</string>
+    <string name="dtc_desc_p0496">EVAP: поток без активна продухваща команда</string>
+    <string name="dtc_desc_p0507">Оборотите на празен ход са по-високи от очакваните</string>
+    <string name="dtc_desc_p06dd">Клапан за управление на налягането на маслото: неправилна работа</string>
+    <string name="dtc_desc_p1101">Неправилна работа на системата за входящ въздух</string>
+    <string name="cal_axis_x">Ос X</string>
+    <string name="cal_axis_y">Ос Y</string>
 </resources>

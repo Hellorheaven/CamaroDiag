@@ -350,4 +350,21 @@
     <string name="cal_x_axis">Os X: %1$s</string>
     <string name="cal_discard_changes">Odbaci promjene</string>
     <string name="cal_apply_to_file">Primijeni na datoteku</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Opis nije dostupan u lokalnom rječniku; provjerite GM servisne podatke za ovaj VIN.</string>
+    <string name="dtc_desc_p0101">Senzor protoka zraka: raspon ili učinkovitost kruga</string>
+    <string name="dtc_desc_p0102">Senzor protoka zraka: nizak ulazni signal</string>
+    <string name="dtc_desc_p0103">Senzor protoka zraka: visok ulazni signal</string>
+    <string name="dtc_desc_p0113">Senzor temperature usisnog zraka 1: visok signal</string>
+    <string name="dtc_desc_p0128">Termostat rashladne tekućine: temperatura ispod regulacijske vrijednosti</string>
+    <string name="dtc_desc_p0442">EVAP sustav: otkriveno manje propuštanje</string>
+    <string name="dtc_desc_p0455">EVAP sustav: otkriveno veliko propuštanje</string>
+    <string name="dtc_desc_p0496">EVAP sustav: protok bez aktivnog pročišćavanja</string>
+    <string name="dtc_desc_p0507">Broj okretaja u praznom hodu veći od očekivanog</string>
+    <string name="dtc_desc_p06dd">Elektromagnetski ventil regulacije tlaka ulja: neispravan rad</string>
+    <string name="dtc_desc_p1101">Sustav protoka usisnog zraka: neispravan rad</string>
+    <string name="cal_axis_x">Os X</string>
+    <string name="cal_axis_y">Os Y</string>
 </resources>

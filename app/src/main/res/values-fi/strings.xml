@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Lue ECU-muisti kahdesti ja tallenna ZIP</string>
     <string name="cal_live_memory_saved">ECU-muisti tallennettu kahden yhtenevän lukukerran jälkeen.</string>
     <string name="cal_live_memory_failed">ECU-muistin luku epäonnistui. Vahvistettua varmuuskopiota ei luotu.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Kuvausta ei ole paikallisessa sanastossa; tarkista GM:n huoltotiedot tälle VIN-numerolle.</string>
+    <string name="dtc_desc_p0101">Ilmamassamittarin piirin toiminta-alue tai suorituskyky</string>
+    <string name="dtc_desc_p0102">Ilmamassamittarin alhainen tulosignaali</string>
+    <string name="dtc_desc_p0103">Ilmamassamittarin korkea tulosignaali</string>
+    <string name="dtc_desc_p0113">Imuilman lämpötila-anturi 1: korkea signaali</string>
+    <string name="dtc_desc_p0128">Jäähdytysnesteen termostaatti: lämpötila alle säätöarvon</string>
+    <string name="dtc_desc_p0442">EVAP-järjestelmässä havaittu pieni vuoto</string>
+    <string name="dtc_desc_p0455">EVAP-järjestelmässä havaittu suuri vuoto</string>
+    <string name="dtc_desc_p0496">EVAP-järjestelmän virtaus ilman huuhtelukomentoa</string>
+    <string name="dtc_desc_p0507">Tyhjäkäyntinopeus odotettua suurempi</string>
+    <string name="dtc_desc_p06dd">Moottoriöljyn paineensäädön magneettiventtiilin toimintahäiriö</string>
+    <string name="dtc_desc_p1101">Imuilman virtausjärjestelmän toimintahäiriö</string>
+    <string name="cal_axis_x">X-akseli</string>
+    <string name="cal_axis_y">Y-akseli</string>
 </resources>

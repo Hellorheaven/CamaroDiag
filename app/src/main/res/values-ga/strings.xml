@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Léigh cuimhne ECU faoi dhó agus sábháil mar ZIP</string>
     <string name="cal_live_memory_saved">Sábháladh cuimhne ECU tar éis dhá léamh chomhionanna.</string>
     <string name="cal_live_memory_failed">Theip ar léamh chuimhne ECU. Níor cruthaíodh cúltaca fíoraithe.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Níl cur síos sa bhfoclóir áitiúil; seiceáil eolas seirbhíse GM don VIN seo.</string>
+    <string name="dtc_desc_p0101">Ciorcad tomhais sreabhadh mais aeir: raon nó feidhmíocht</string>
+    <string name="dtc_desc_p0102">Ciorcad tomhais sreabhadh mais aeir: comhartha íseal</string>
+    <string name="dtc_desc_p0103">Ciorcad tomhais sreabhadh mais aeir: comhartha ard</string>
+    <string name="dtc_desc_p0113">Braiteoir teochta aeir iontógála 1: comhartha ard</string>
+    <string name="dtc_desc_p0128">Teirmeastat an chuisnitheora: teocht faoi bhun an luacha rialaithe</string>
+    <string name="dtc_desc_p0442">Córas EVAP: sceitheadh beag aimsithe</string>
+    <string name="dtc_desc_p0455">Córas EVAP: sceitheadh mór aimsithe</string>
+    <string name="dtc_desc_p0496">Córas EVAP: sreabhadh gan ordú glanta</string>
+    <string name="dtc_desc_p0507">Luas díomhaoin níos airde ná mar a bhíothas ag súil leis</string>
+    <string name="dtc_desc_p06dd">Solanóideach rialaithe brú ola an innill: mífheidhmiú</string>
+    <string name="dtc_desc_p1101">Córas sreabhadh aeir iontógála: mífheidhmiú</string>
+    <string name="cal_axis_x">Ais X</string>
+    <string name="cal_axis_y">Ais Y</string>
 </resources>

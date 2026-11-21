@@ -350,4 +350,21 @@
     <string name="cal_x_axis">X-akse: %1$s</string>
     <string name="cal_discard_changes">Kassér ændringer</string>
     <string name="cal_apply_to_file">Anvend på fil</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Beskrivelsen findes ikke i den lokale ordbog; se GM-servicedata for dette VIN.</string>
+    <string name="dtc_desc_p0101">Luftmassemåler: kredsløbets område eller funktion</string>
+    <string name="dtc_desc_p0102">Luftmassemåler: lavt indgangssignal</string>
+    <string name="dtc_desc_p0103">Luftmassemåler: højt indgangssignal</string>
+    <string name="dtc_desc_p0113">Indsugningslufttemperaturføler 1: højt signal</string>
+    <string name="dtc_desc_p0128">Kølevandstermostat: temperatur under reguleringsniveau</string>
+    <string name="dtc_desc_p0442">EVAP-system: mindre lækage registreret</string>
+    <string name="dtc_desc_p0455">EVAP-system: større lækage registreret</string>
+    <string name="dtc_desc_p0496">EVAP-system: flow uden aktiv udluftning</string>
+    <string name="dtc_desc_p0507">Tomgangsomdrejninger højere end forventet</string>
+    <string name="dtc_desc_p06dd">Magnetventil til olietryksregulering: funktionsfejl</string>
+    <string name="dtc_desc_p1101">Indsugningsluftsystem: funktionsfejl</string>
+    <string name="cal_axis_x">X-akse</string>
+    <string name="cal_axis_y">Y-akse</string>
 </resources>

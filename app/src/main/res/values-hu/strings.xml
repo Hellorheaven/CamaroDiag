@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">ECU-memória kétszeri olvasása és mentése ZIP-be</string>
     <string name="cal_live_memory_saved">Az ECU-memória két egyező olvasás után elmentve.</string>
     <string name="cal_live_memory_failed">Az ECU-memória olvasása sikertelen. Nem készült ellenőrzött biztonsági mentés.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">A helyi szótárban nincs leírás; ellenőrizd a GM szervizadatait ehhez a VIN-hez.</string>
+    <string name="dtc_desc_p0101">Légtömegáram-mérő áramkör: tartomány vagy működési hiba</string>
+    <string name="dtc_desc_p0102">Légtömegáram-mérő: alacsony bemeneti jel</string>
+    <string name="dtc_desc_p0103">Légtömegáram-mérő: magas bemeneti jel</string>
+    <string name="dtc_desc_p0113">Beszívott levegő hőmérséklet-érzékelő 1: magas jel</string>
+    <string name="dtc_desc_p0128">Hűtőfolyadék-termosztát: hőmérséklet a szabályozási érték alatt</string>
+    <string name="dtc_desc_p0442">EVAP-rendszer: kisebb szivárgás észlelve</string>
+    <string name="dtc_desc_p0455">EVAP-rendszer: nagy szivárgás észlelve</string>
+    <string name="dtc_desc_p0496">EVAP-rendszer: áramlás aktív átöblítés nélkül</string>
+    <string name="dtc_desc_p0507">Az alapjárati fordulatszám a vártnál magasabb</string>
+    <string name="dtc_desc_p06dd">Motorolajnyomás-szabályozó mágnesszelep működési hibája</string>
+    <string name="dtc_desc_p1101">Beszívott levegő áramlási rendszerének működési hibája</string>
+    <string name="cal_axis_x">X tengely</string>
+    <string name="cal_axis_y">Y tengely</string>
 </resources>
