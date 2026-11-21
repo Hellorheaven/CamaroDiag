@@ -279,46 +279,8 @@ internal sealed partial class BridgeDesktopForm
                     device.Open(scope.RequestCanId, scope.ResponseCanId, can29,
                         scope.ProtocolNumber); // VIN F190 physically checked inside Open()
                     var link = new ScopedTransport(device);
-                    var enteredExtended = false;
-                    try
-                    {
-                        if (scope.Session == 3)
-                        {
-                            cancellation.Token.ThrowIfCancellationRequested();
-                            var reply = device.Exchange([0x10, 0x03], 6000);
-                            if (reply.Length < 2 || reply[0] != 0x50 || reply[1] != 0x03)
-                                throw new InvalidDataException("ECU did not enter extended read session.");
-                            enteredExtended = true;
-                        }
-                        return await NativeScopedMemoryReader.ReadTwiceAsync(
-                            link, scope, progress, cancellation.Token);
-                    }
-                    finally
-                    {
-                        // Restore the ordinary diagnostic session only if the
-                        // same physical ECU still confirms its identity. Never
-                        // reconnect or send a session change to a replacement.
-                        if (enteredExtended && !cancellation.IsCancellationRequested)
-                        {
-                            try
-                            {
-                                await NativeScopedMemoryReader.RequireLiveVinAsync(
-                                    link, scope, cancellation.Token);
-                                var reply = device.Exchange([0x10, 0x01], 6000);
-                                if (reply.Length < 2 || reply[0] != 0x50 || reply[1] != 0x01)
-                                    throw new InvalidDataException(
-                                        "ECU did not confirm return to default diagnostic session.");
-                            }
-                            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
-                                or TimeoutException or InvalidOperationException or System.Runtime.InteropServices.ExternalException
-                                or OperationCanceledException)
-                            {
-                                // Do not retry on an uncertain connection. Closing
-                                // the device ends the local J2534 session.
-                                System.Diagnostics.Debug.WriteLine("Diagnostic session cleanup: " + ex.GetType().Name);
-                            }
-                        }
-                    }
+                    return await NativeScopedMemoryReader.ReadWithSessionAsync(
+                        link, scope, progress, cancellation.Token);
                 }, cancellation.Token);
                 // Cancellation after the final read must not create a file.
                 cancellation.Token.ThrowIfCancellationRequested();
