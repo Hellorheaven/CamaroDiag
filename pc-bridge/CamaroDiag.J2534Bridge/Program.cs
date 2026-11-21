@@ -20,6 +20,23 @@ internal static class Program
 
         if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
+        J2534MemoryReadScope? memoryReadScope = null;
+        var mapIndex = Array.FindIndex(args,
+            value => value.Equals("--memory-read-profile", StringComparison.OrdinalIgnoreCase));
+        if (mapIndex >= 0)
+        {
+            if (mapIndex + 1 >= args.Length)
+            {
+                Console.Error.WriteLine("Missing JSON path after --memory-read-profile.");
+                return 6;
+            }
+            try { memoryReadScope = J2534MemoryReadScope.Load(args[mapIndex + 1]); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Invalid ECU memory read profile: " + ex.Message);
+                return 6;
+            }
+        }
         var adapters = J2534Registry.Discover();
         if (adapters.Count == 0)
         {
@@ -53,11 +70,15 @@ internal static class Program
         Console.WriteLine($"Port: {port}");
         Console.WriteLine("The bridge only accepts UDS read services 0x22 / 0x19 and TesterPresent 0x3E.");
         Console.WriteLine("ECU writes, security access, actuator controls and flash programming are blocked.");
+        if (memoryReadScope != null)
+            Console.WriteLine("Memory read profile enabled: every 0x23 read is restricted to the configured " +
+                "range and requires an exact live ECU VIN match. No write privileges are granted.");
         Console.WriteLine();
 
         try
         {
-            await new BridgeServer(adapters[selectedIndex], token, port).RunAsync();
+            await new BridgeServer(
+                adapters[selectedIndex], token, port, memoryReadScope).RunAsync();
             return 0;
         }
         catch (SocketException ex)
