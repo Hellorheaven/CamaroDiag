@@ -94,6 +94,16 @@ class J2534LiveMemoryBackupTest {
         assertEquals(6, fake.reads)
     }
 
+    @Test fun reportsMonotonicProgressAcrossTwoActualReadPasses() = runBlocking {
+        val snapshots = mutableListOf<J2534LiveMemoryBackup.CaptureProgress>()
+        val fake = ScriptedEcu(baseline, vin)
+        val result = J2534LiveMemoryBackup.captureForTest(fake, request()) { snapshots += it }
+        assertTrue(result.verification.consistent)
+        assertEquals(listOf(1, 1, 2, 2), snapshots.map { it.pass })
+        assertEquals(listOf(0L, 300L, 300L, 600L), snapshots.map { it.totalBytesRead })
+        assertTrue(snapshots.all { it.requiredBytesRead == 600L })
+    }
+
     @Test fun extendedReadSessionIsClosedAfterDoubleCapture() = runBlocking {
         val fake = ScriptedEcu(baseline, vin)
         J2534LiveMemoryBackup.captureForTest(fake, request(session = 3))
