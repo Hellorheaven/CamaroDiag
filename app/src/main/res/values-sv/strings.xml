@@ -367,4 +367,19 @@
     <string name="cal_j2534_launch_instructions">Starta CamaroDiag.J2534Bridge.exe på Windows-datorn. Ange datorns IP och hela koden (token.TLS-fingeravtryck) från konsolen. Använd ett betrott lokalt nätverk.</string>
     <string name="cal_j2534_security_notice">TLS 1.2+ och kontroll av certifikatets fingeravtryck krävs. Äldre koder med bara token avvisas. Exponera aldrig porten mot internet.</string>
     <string name="cal_pc_pairing_token">TLS-kod (token.fingeravtryck)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Funktionstester</string>
+    <string name="functional_tests_title">Funktionstester — ECU och OBD</string>
+    <string name="functional_tests_readonly">Kör alla tillgängliga skrivskyddade kontroller via den anslutna fysiska adaptern. Andra adaptrar och ej verifierade ECU-enheter markeras som INTE TESTADE. Ingen radering, styrning eller programmering.</string>
+    <string name="functional_tests_run">Kör alla</string>
+    <string name="functional_tests_stop">Stoppa</string>
+    <string name="functional_tests_export">Exportera JSON</string>
+    <string name="functional_tests_summary">%1$d godkända · %2$d misslyckade · %3$d inte testade</string>
+    <string name="functional_tests_passed">GODKÄND (fysiskt bevis)</string>
+    <string name="functional_tests_failed">MISSLYCKAD</string>
+    <string name="functional_tests_skipped">INTE TESTAD</string>
+    <string name="functional_tests_denied">Åtkomst nekad: logga in med det godkända Google-kontot och anslut igen.</string>
+    <string name="functional_tests_not_connected">Ingen fysisk OBD-adapter är ansluten. Återstående kontroller utfördes inte.</string>
+    <string name="functional_tests_cancelled">Testomgången avbröts.</string>
 </resources>
