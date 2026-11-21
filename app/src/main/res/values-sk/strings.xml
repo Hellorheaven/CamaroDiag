@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Dvakrát prečítať pamäť ECU a uložiť ZIP</string>
     <string name="cal_live_memory_saved">Pamäť ECU uložená po dvoch zhodných čítaniach.</string>
     <string name="cal_live_memory_failed">Čítanie pamäte ECU zlyhalo. Overená záloha sa nevytvorila.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Opis nie je v miestnom slovníku; overte servisnú dokumentáciu GM pre toto VIN.</string>
+    <string name="dtc_desc_p0101">Snímač hmotnostného prietoku vzduchu: rozsah alebo funkcia obvodu</string>
+    <string name="dtc_desc_p0102">Snímač hmotnostného prietoku vzduchu: nízky vstupný signál</string>
+    <string name="dtc_desc_p0103">Snímač hmotnostného prietoku vzduchu: vysoký vstupný signál</string>
+    <string name="dtc_desc_p0113">Snímač teploty nasávaného vzduchu 1: vysoký signál</string>
+    <string name="dtc_desc_p0128">Termostat chladiacej kvapaliny: teplota pod regulačnou hodnotou</string>
+    <string name="dtc_desc_p0442">Systém EVAP: zistená malá netesnosť</string>
+    <string name="dtc_desc_p0455">Systém EVAP: zistená veľká netesnosť</string>
+    <string name="dtc_desc_p0496">Systém EVAP: prietok bez aktívneho odvetrávania</string>
+    <string name="dtc_desc_p0507">Voľnobežné otáčky vyššie než očakávané</string>
+    <string name="dtc_desc_p06dd">Elektromagnet riadenia tlaku motorového oleja: nesprávna funkcia</string>
+    <string name="dtc_desc_p1101">Systém prietoku nasávaného vzduchu: nesprávna funkcia</string>
+    <string name="cal_axis_x">Os X</string>
+    <string name="cal_axis_y">Os Y</string>
 </resources>

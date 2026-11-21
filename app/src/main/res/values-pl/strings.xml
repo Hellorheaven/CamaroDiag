@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Odczytaj pamięć ECU dwukrotnie i zapisz ZIP</string>
     <string name="cal_live_memory_saved">Pamięć ECU zapisano po dwóch zgodnych odczytach.</string>
     <string name="cal_live_memory_failed">Odczyt pamięci ECU nie powiódł się. Nie utworzono zweryfikowanej kopii.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Brak opisu w lokalnym słowniku; sprawdź dokumentację serwisową GM dla tego VIN.</string>
+    <string name="dtc_desc_p0101">Przepływomierz powietrza: nieprawidłowy zakres lub działanie obwodu</string>
+    <string name="dtc_desc_p0102">Przepływomierz powietrza: niski sygnał wejściowy</string>
+    <string name="dtc_desc_p0103">Przepływomierz powietrza: wysoki sygnał wejściowy</string>
+    <string name="dtc_desc_p0113">Czujnik temperatury powietrza dolotowego 1: wysoki sygnał</string>
+    <string name="dtc_desc_p0128">Termostat płynu chłodzącego: temperatura poniżej wartości regulacji</string>
+    <string name="dtc_desc_p0442">Układ EVAP: wykryto małą nieszczelność</string>
+    <string name="dtc_desc_p0455">Układ EVAP: wykryto dużą nieszczelność</string>
+    <string name="dtc_desc_p0496">Układ EVAP: przepływ bez aktywnego odpowietrzania</string>
+    <string name="dtc_desc_p0507">Prędkość biegu jałowego wyższa od oczekiwanej</string>
+    <string name="dtc_desc_p06dd">Elektrozawór sterowania ciśnieniem oleju silnika: nieprawidłowe działanie</string>
+    <string name="dtc_desc_p1101">Układ przepływu powietrza dolotowego: nieprawidłowe działanie</string>
+    <string name="cal_axis_x">Oś X</string>
+    <string name="cal_axis_y">Oś Y</string>
 </resources>

@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Citește memoria ECU de două ori și salvează ZIP</string>
     <string name="cal_live_memory_saved">Memoria ECU a fost salvată după două citiri identice.</string>
     <string name="cal_live_memory_failed">Citirea memoriei ECU a eșuat. Nu s-a creat nicio copie verificată.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Descrierea nu este în dicționarul local; consultați informațiile de service GM pentru acest VIN.</string>
+    <string name="dtc_desc_p0101">Debitmetru de aer: interval sau performanță incorectă a circuitului</string>
+    <string name="dtc_desc_p0102">Debitmetru de aer: semnal de intrare prea mic</string>
+    <string name="dtc_desc_p0103">Debitmetru de aer: semnal de intrare prea mare</string>
+    <string name="dtc_desc_p0113">Senzor temperatură aer admisie 1: semnal ridicat</string>
+    <string name="dtc_desc_p0128">Termostat lichid răcire: temperatura sub valoarea de reglare</string>
+    <string name="dtc_desc_p0442">Sistem EVAP: detectată o scurgere mică</string>
+    <string name="dtc_desc_p0455">Sistem EVAP: detectată o scurgere mare</string>
+    <string name="dtc_desc_p0496">Sistem EVAP: debit fără comandă activă de purjare</string>
+    <string name="dtc_desc_p0507">Turația la ralanti este mai mare decât cea așteptată</string>
+    <string name="dtc_desc_p06dd">Electrovalvă control presiune ulei motor: funcționare necorespunzătoare</string>
+    <string name="dtc_desc_p1101">Sistem debit aer de admisie: funcționare necorespunzătoare</string>
+    <string name="cal_axis_x">Axa X</string>
+    <string name="cal_axis_y">Axa Y</string>
 </resources>

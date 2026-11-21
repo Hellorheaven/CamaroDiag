@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Du kartus nuskaityti ECU atmintį ir išsaugoti ZIP</string>
     <string name="cal_live_memory_saved">ECU atmintis išsaugota po dviejų sutampančių skaitymų.</string>
     <string name="cal_live_memory_failed">Nepavyko nuskaityti ECU atminties. Patvirtinta atsarginė kopija nesukurta.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Aprašymo vietiniame žodyne nėra; patikrinkite GM techninės priežiūros informaciją pagal šį VIN.</string>
+    <string name="dtc_desc_p0101">Oro masės srauto jutiklio grandinės diapazono arba veikimo sutrikimas</string>
+    <string name="dtc_desc_p0102">Oro masės srauto jutiklis: žemas įėjimo signalas</string>
+    <string name="dtc_desc_p0103">Oro masės srauto jutiklis: aukštas įėjimo signalas</string>
+    <string name="dtc_desc_p0113">Įsiurbiamo oro temperatūros jutiklis 1: aukštas signalas</string>
+    <string name="dtc_desc_p0128">Aušinimo skysčio termostatas: temperatūra žemiau reguliavimo ribos</string>
+    <string name="dtc_desc_p0442">EVAP sistema: aptiktas nedidelis nuotėkis</string>
+    <string name="dtc_desc_p0455">EVAP sistema: aptiktas didelis nuotėkis</string>
+    <string name="dtc_desc_p0496">EVAP sistema: srautas nevykstant prapūtimui</string>
+    <string name="dtc_desc_p0507">Tuščiosios eigos apsukos didesnės nei tikėtasi</string>
+    <string name="dtc_desc_p06dd">Variklio alyvos slėgio valdymo solenoido veikimo sutrikimas</string>
+    <string name="dtc_desc_p1101">Įsiurbiamo oro srauto sistemos veikimo sutrikimas</string>
+    <string name="cal_axis_x">X ašis</string>
+    <string name="cal_axis_y">Y ašis</string>
 </resources>

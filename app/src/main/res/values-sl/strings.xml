@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Dvakrat preberi pomnilnik ECU in shrani ZIP</string>
     <string name="cal_live_memory_saved">Pomnilnik ECU je bil shranjen po dveh enakih branjih.</string>
     <string name="cal_live_memory_failed">Branje pomnilnika ECU ni uspelo. Preverjena varnostna kopija ni bila ustvarjena.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Opis ni na voljo v lokalnem slovarju; preverite servisne podatke GM za ta VIN.</string>
+    <string name="dtc_desc_p0101">Merilnik masnega pretoka zraka: območje ali delovanje tokokroga</string>
+    <string name="dtc_desc_p0102">Merilnik masnega pretoka zraka: nizek vhodni signal</string>
+    <string name="dtc_desc_p0103">Merilnik masnega pretoka zraka: visok vhodni signal</string>
+    <string name="dtc_desc_p0113">Tipalo temperature sesalnega zraka 1: visok signal</string>
+    <string name="dtc_desc_p0128">Termostat hladilne tekočine: temperatura pod nastavljeno vrednostjo</string>
+    <string name="dtc_desc_p0442">Sistem EVAP: zaznano manjše puščanje</string>
+    <string name="dtc_desc_p0455">Sistem EVAP: zaznano veliko puščanje</string>
+    <string name="dtc_desc_p0496">Sistem EVAP: pretok brez aktivnega čiščenja</string>
+    <string name="dtc_desc_p0507">Vrtljaji v prostem teku višji od pričakovanih</string>
+    <string name="dtc_desc_p06dd">Elektromagnetni ventil za tlak motornega olja: nepravilno delovanje</string>
+    <string name="dtc_desc_p1101">Sistem pretoka sesalnega zraka: nepravilno delovanje</string>
+    <string name="cal_axis_x">Os X</string>
+    <string name="cal_axis_y">Os Y</string>
 </resources>

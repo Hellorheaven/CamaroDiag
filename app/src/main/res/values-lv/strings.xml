@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Divreiz nolasīt ECU atmiņu un saglabāt ZIP</string>
     <string name="cal_live_memory_saved">ECU atmiņa saglabāta pēc diviem vienādiem nolasījumiem.</string>
     <string name="cal_live_memory_failed">ECU atmiņas nolasīšana neizdevās. Pārbaudīta rezerves kopija netika izveidota.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Apraksts nav pieejams vietējā vārdnīcā; pārbaudiet GM apkopes informāciju šim VIN.</string>
+    <string name="dtc_desc_p0101">Gaisa masas plūsmas devēja ķēdes diapazona vai darbības kļūda</string>
+    <string name="dtc_desc_p0102">Gaisa masas plūsmas devējs: zems ieejas signāls</string>
+    <string name="dtc_desc_p0103">Gaisa masas plūsmas devējs: augsts ieejas signāls</string>
+    <string name="dtc_desc_p0113">Ieplūdes gaisa temperatūras devējs 1: augsts signāls</string>
+    <string name="dtc_desc_p0128">Dzesēšanas šķidruma termostats: temperatūra zem regulēšanas vērtības</string>
+    <string name="dtc_desc_p0442">EVAP sistēma: konstatēta neliela noplūde</string>
+    <string name="dtc_desc_p0455">EVAP sistēma: konstatēta liela noplūde</string>
+    <string name="dtc_desc_p0496">EVAP sistēma: plūsma bez aktīvas attīrīšanas</string>
+    <string name="dtc_desc_p0507">Tukšgaitas apgriezieni pārsniedz paredzēto</string>
+    <string name="dtc_desc_p06dd">Motoreļļas spiediena regulēšanas solenoīda darbības kļūda</string>
+    <string name="dtc_desc_p1101">Ieplūdes gaisa plūsmas sistēmas darbības kļūda</string>
+    <string name="cal_axis_x">X ass</string>
+    <string name="cal_axis_y">Y ass</string>
 </resources>

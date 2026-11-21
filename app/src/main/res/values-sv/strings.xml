@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Läs ECU-minnet två gånger och spara som ZIP</string>
     <string name="cal_live_memory_saved">ECU-minnet sparades efter två likadana läsningar.</string>
     <string name="cal_live_memory_failed">Läsning av ECU-minnet misslyckades. Ingen verifierad säkerhetskopia skapades.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Beskrivningen saknas i den lokala ordlistan; kontrollera GM:s serviceinformation för detta VIN.</string>
+    <string name="dtc_desc_p0101">Luftmassemätare: kretsens mätområde eller funktion</string>
+    <string name="dtc_desc_p0102">Luftmassemätare: låg insignal</string>
+    <string name="dtc_desc_p0103">Luftmassemätare: hög insignal</string>
+    <string name="dtc_desc_p0113">Insugslufttemperaturgivare 1: hög signal</string>
+    <string name="dtc_desc_p0128">Kylvätsketermostat: temperatur under regleringsvärdet</string>
+    <string name="dtc_desc_p0442">EVAP-system: mindre läckage upptäckt</string>
+    <string name="dtc_desc_p0455">EVAP-system: större läckage upptäckt</string>
+    <string name="dtc_desc_p0496">EVAP-system: flöde utan aktiv avluftning</string>
+    <string name="dtc_desc_p0507">Tomgångsvarvtal högre än förväntat</string>
+    <string name="dtc_desc_p06dd">Magnetventil för motoroljans tryckreglering: funktionsfel</string>
+    <string name="dtc_desc_p1101">Insugningsluftsystem: funktionsfel</string>
+    <string name="cal_axis_x">X-axel</string>
+    <string name="cal_axis_y">Y-axel</string>
 </resources>

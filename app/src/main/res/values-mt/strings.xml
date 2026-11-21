@@ -240,4 +240,21 @@
     <string name="cal_live_memory_save">Aqra l-memorja ECU darbtejn u ssejvjaha bħala ZIP</string>
     <string name="cal_live_memory_saved">Il-memorja ECU ġiet salvata wara żewġ qari identiċi.</string>
     <string name="cal_live_memory_failed">Il-qari tal-memorja ECU falla. Ma nħolqot l-ebda kopja ta\' riżerva verifikata.</string>
+
+    <!-- ECU diagnostic fault description translations -->
+    <string name="app_name">CamaroDiag</string>
+    <string name="dtc_description_unavailable">Id-deskrizzjoni mhix fid-dizzjunarju lokali; iċċekkja l-informazzjoni tas-servizz GM għal dan il-VIN.</string>
+    <string name="dtc_desc_p0101">Ċirkwit tas-sensor tal-fluss tal-arja: medda jew prestazzjoni ħażina</string>
+    <string name="dtc_desc_p0102">Sensor tal-fluss tal-arja: sinjal tad-dħul baxx</string>
+    <string name="dtc_desc_p0103">Sensor tal-fluss tal-arja: sinjal tad-dħul għoli</string>
+    <string name="dtc_desc_p0113">Sensor tat-temperatura tal-arja tad-dħul 1: sinjal għoli</string>
+    <string name="dtc_desc_p0128">Termostat tal-likwidu li jkessaħ: temperatura taħt il-livell ta\' regolazzjoni</string>
+    <string name="dtc_desc_p0442">Sistema EVAP: instabet tnixxija żgħira</string>
+    <string name="dtc_desc_p0455">Sistema EVAP: instabet tnixxija kbira</string>
+    <string name="dtc_desc_p0496">Sistema EVAP: fluss mingħajr tindif attiv</string>
+    <string name="dtc_desc_p0507">Veloċità tal-magna f\'idle ogħla milli mistenni</string>
+    <string name="dtc_desc_p06dd">Solenojd tal-kontroll tal-pressjoni taż-żejt tal-magna: ħsara fil-prestazzjoni</string>
+    <string name="dtc_desc_p1101">Sistema tal-fluss tal-arja tad-dħul: ħsara fil-prestazzjoni</string>
+    <string name="cal_axis_x">Assi X</string>
+    <string name="cal_axis_y">Assi Y</string>
 </resources>
