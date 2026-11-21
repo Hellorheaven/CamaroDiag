@@ -121,6 +121,20 @@ internal static class BridgeSelfTests
         Assert(J2534Device.DecodeReceivedPayload(6,0,7,0,[0,0,7,0xE8,0x41,0x0C,0],6,0x7E8,[1,0x0D]) is null,
             "Stale Mode 01 PID rejected");
 
+        Assert(StandardObdPhysicalPolicy.CanClear(true,true,[0x41,0x0D,0],[0x41,0x0C,0,0]),
+            "Locally enabled emissions reset requires zero speed and RPM");
+        Assert(!StandardObdPhysicalPolicy.CanClear(false,true,[0x41,0x0D,0],[0x41,0x0C,0,0]),
+            "Local operator permission is mandatory");
+        Assert(!StandardObdPhysicalPolicy.CanClear(true,true,[0x41,0x0D,1],[0x41,0x0C,0,0]),
+            "Moving vehicle cannot clear");
+        Assert(!StandardObdPhysicalPolicy.CanClear(true,true,[0x41,0x0D,0],[0x41,0x0C,0,1]),
+            "Running engine cannot clear");
+        Assert(!StandardObdPhysicalPolicy.CanClear(true,true,[0x7F,1,0x12],[0x41,0x0C,0,0]),
+            "Missing speed evidence cannot clear");
+        Assert(StandardObdPhysicalPolicy.IsClearAcknowledged([0x44]) &&
+            !StandardObdPhysicalPolicy.IsClearAcknowledged([0x44,0]),
+            "Only exact positive clear acknowledgment accepted");
+
         var cvns = J2534Device.DecodeIdentityRecords(6, Convert.FromHexString("49060201020304000000A0"));
         Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
         Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,

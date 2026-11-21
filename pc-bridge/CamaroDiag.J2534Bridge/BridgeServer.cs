@@ -19,10 +19,12 @@ internal sealed class BridgeServer
     private readonly J2534MemoryReadScope? _memoryReadScope;
     private readonly BridgeTlsIdentity _tlsIdentity;
     private readonly Action? _onListening;
+    private readonly bool _allowStandardObdClear;
 
     public BridgeServer(
         J2534Adapter adapter, string token, int port, BridgeTlsIdentity tlsIdentity,
-        J2534MemoryReadScope? memoryReadScope = null, Action? onListening = null)
+        J2534MemoryReadScope? memoryReadScope = null, Action? onListening = null,
+        bool allowStandardObdClear = false)
     {
         _adapter = adapter;
         _token = token;
@@ -30,6 +32,7 @@ internal sealed class BridgeServer
         _tlsIdentity = tlsIdentity;
         _memoryReadScope = memoryReadScope;
         _onListening = onListening;
+        _allowStandardObdClear = allowStandardObdClear;
     }
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
@@ -158,7 +161,8 @@ internal sealed class BridgeServer
                             batteryMillivolts = device.ReadBatteryMillivolts(),
                             readOnly = true,
                             scopedPhysicalMemoryRead = device.IsMemoryReadEnabled,
-                            standardObdPhysicalRead = device.IsStandardObdReadEnabled
+                            standardObdPhysicalRead = device.IsStandardObdReadEnabled,
+                            standardObdClear = _allowStandardObdClear && device.IsStandardObdReadEnabled
                         }));
                         break;
                     }
@@ -181,6 +185,20 @@ internal sealed class BridgeServer
                             responseCanId = device.ResponseCanIdLabel,
                             readOnly = true,
                             flashQualified = false
+                        }));
+                        break;
+                    }
+                    case "clearStandardObdDtcs":
+                    {
+                        if (!_allowStandardObdClear || !device.IsStandardObdReadEnabled ||
+                            !root.TryGetProperty("confirmed", out var confirmation) ||
+                            confirmation.ValueKind != JsonValueKind.True)
+                            throw new UnauthorizedAccessException("Explicit emissions DTC clear consent is required.");
+                        await Task.Run(() => device.ClearStandardObdDtcs(_allowStandardObdClear), cancellationToken);
+                        await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                        {
+                            ok = true, payloadHex = "44", responseCanId = device.ResponseCanIdLabel,
+                            permanentDtcsCleared = false
                         }));
                         break;
                     }

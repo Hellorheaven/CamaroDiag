@@ -361,6 +361,24 @@ internal sealed partial class J2534Device : IDisposable
         return records;
     }
 
+    /// <summary>Explicit emissions DTC reset only; no UDS clear or flash.</summary>
+    internal void ClearStandardObdDtcs(bool locallyEnabled)
+    {
+        EnsureOpen();
+        if (!locallyEnabled || !IsStandardObdReadEnabled)
+            throw new UnauthorizedAccessException("Standard OBD clear is not enabled for this physical channel.");
+        // No guessed engine state. Require actual zero-speed and zero-RPM
+        // positive Mode 01 responses just before the irreversible reset.
+        byte[] speed = Exchange([0x01,0x0D], 1800);
+        byte[] rpm = Exchange([0x01,0x0C], 1800);
+        if (!StandardObdPhysicalPolicy.CanClear(locallyEnabled, IsStandardObdReadEnabled, speed, rpm))
+            throw new InvalidOperationException("Stop the vehicle and engine before an emissions diagnostic reset.");
+        ClearNativeReceiveQueue();
+        var ack = ExchangeCore([0x04], 2500, nativeBenchReply: false);
+        if (!StandardObdPhysicalPolicy.IsClearAcknowledged(ack))
+            throw new IOException("Standard OBD clear not confirmed by exact positive Mode 04 response.");
+    }
+
     public void SendOnly(byte[] payload)
     {
         EnsureOpen();
