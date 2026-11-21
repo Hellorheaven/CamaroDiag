@@ -576,4 +576,11 @@
     <string name="vin_photo_not_found">Níor aimsíodh VIN bailí 17 gcarachtar. Cuir isteach de láimh é nó glac grianghraf eile.</string>
     <string name="vin_photo_error">Níorbh fhéidir an VIN a léamh ón ngrianghraf. Bain triail eile as le soilsiú níos fearr agus fócas níos géire.</string>
     <string name="vehicle_vin_placeholder">17 gcarachtar</string>
+    <string name="can_sniffer_start">Tosaigh an ghabháil</string>
+    <string name="can_sniffer_stop">Stop an ghabháil</string>
+    <string name="can_sniffer_empty">Níor gabhadh aon fhrámaí CAN fós.</string>
+    <string name="can_sniffer_capture_complete">Tá an ghabháil CAN críochnaithe.</string>
+    <string name="can_sniffer_capture_failed">Theip ar an ngabháil CAN nó stop an cuibheoir ag freagairt.</string>
+    <string name="can_sniffer_frame_count">Frámaí a gabhadh: %1$d</string>
+    <string name="can_sniffer_filtered_count">%1$d fráma as %2$d á dtaispeáint</string>
 </resources>
