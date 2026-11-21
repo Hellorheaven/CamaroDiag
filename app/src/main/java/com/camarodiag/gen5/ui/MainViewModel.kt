@@ -1105,6 +1105,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val accountGeneration = accountSessionGeneration
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isJ2534MemoryCapturing = true,
+            j2534MemoryCaptureBytesRead = 0L,
+            j2534MemoryCaptureTotalBytes = request.lengthBytes.toLong() * 2,
             j2534MemoryCaptureMessage = ""
         )
         viewModelScope.launch(Dispatchers.IO) {
@@ -1119,7 +1121,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val target = resolver.openOutputStream(destinationUri, "w")
                     ?: error("Unable to open ECU backup destination.")
                 target.use { output ->
-                    obdManager.captureAndExportJ2534Memory(request, output)
+                    obdManager.captureAndExportJ2534Memory(request, output) { progress ->
+                        check(accountGeneration == accountSessionGeneration &&
+                            request.expectedVin == _vehicle.value.vin.uppercase()
+                        ) { "Vehicle or account changed while ECU memory was being read." }
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            j2534MemoryCaptureBytesRead = progress.totalBytesRead,
+                            j2534MemoryCaptureTotalBytes = progress.requiredBytesRead
+                        )
+                    }
                 }
                 check(accountGeneration == accountSessionGeneration &&
                     request.expectedVin == _vehicle.value.vin.uppercase()) {
