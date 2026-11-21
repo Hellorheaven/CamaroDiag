@@ -744,4 +744,6 @@
     <string name="msg_usb_identifier_unavailable">Identifikátor zařízení USB není dostupný</string>
     <string name="msg_simulation_activation_failed">Režim simulace se nepodařilo aktivovat.</string>
     <string name="msg_live_simulation_active">Simulace je aktivní. Zobrazené hodnoty nepocházejí z vozidla.</string>
+    <string name="msg_mileage_audit_failed">Při kontrole nájezdu se nepodařilo přečíst údaje.</string>
+    <string name="msg_session_delete_failed">Uloženou relaci se nepodařilo odstranit.</string>
 </resources>
