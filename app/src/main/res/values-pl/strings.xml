@@ -611,4 +611,6 @@
     <string name="units_metric_details">Jednostki metryczne (km, °C, kPa)</string>
     <string name="units_imperial_details">Jednostki imperialne (mi, °F, psi)</string>
     <string name="cal_tcp_port">Port TCP</string>
+    <string name="msg_refresh_adapters_failed">Nie udało się odświeżyć listy adapterów.</string>
+    <string name="msg_usb_identifier_unavailable">Identyfikator urządzenia USB jest niedostępny</string>
 </resources>
