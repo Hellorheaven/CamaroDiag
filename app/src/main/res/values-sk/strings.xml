@@ -575,4 +575,11 @@
     <string name="msg_live_csv_exported">Denník CSV bol exportovaný. Počet vzoriek: %1$d.</string>
     <string name="msg_live_csv_export_failed">Denník CSV sa nepodarilo exportovať.</string>
     <string name="msg_live_recording_max_samples">Dosiahol sa bezpečnostný limit (%1$d). Záznam sa automaticky zastavil.</string>
+    <string name="msg_cal_file_import_failed">Kalibračný súbor sa nepodarilo importovať.</string>
+    <string name="msg_cal_file_export_failed">Kalibračný súbor sa nepodarilo exportovať.</string>
+    <string name="msg_cal_comparison_failed">Kalibračné súbory sa nepodarilo porovnať.</string>
+    <string name="msg_cal_template_export_failed">Šablónu TSV sa nepodarilo exportovať.</string>
+    <string name="msg_cal_definitions_import_failed">Definície tabuliek sa nepodarilo importovať.</string>
+    <string name="msg_cal_map_read_failed">Vybranú tabuľku sa nepodarilo prečítať.</string>
+    <string name="msg_cal_table_edit_failed">Kalibračnú tabuľku sa nepodarilo upraviť.</string>
 </resources>
