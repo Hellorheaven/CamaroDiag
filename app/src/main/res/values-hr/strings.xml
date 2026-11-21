@@ -256,7 +256,7 @@
     <string name="cal_can_response_id">CAN ID odgovora (npr. 7E8)</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
     <string name="cal_j2534_security_notice">TLS 1.2+ i provjera otiska certifikata su obvezni. Stari tokeni bez otiska se odbijaju. Nikada ne izlažite port internetu.</string>
-    <string name="cal_native_catalog_title">VLASTITI KATALOG CAMARODIAG</string>
+    <string name="cal_native_catalog_title">VLASTITI KATALOG CamaroDiag</string>
     <string name="cal_native_catalog_explanation">Definicije održava CamaroDiag, neovisno o katalozima zajednice. Predložene ili dokumentirane definicije nikada se ne šalju ECU-u.</string>
     <string name="cal_native_catalog_loading">Učitavanje vlastitog kataloga…</string>
     <string name="cal_native_catalog_empty">Nijedan vlasnički Camaro DID trenutačno nije označen kao upotrebljiv. Nepoznate adrese i faktori skaliranja ne izmišljaju se.</string>
