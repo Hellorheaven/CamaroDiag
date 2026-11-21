@@ -596,4 +596,10 @@
     <string name="msg_cal_definitions_import_failed">Níorbh fhéidir sainmhínithe na dtáblaí a iompórtáil.</string>
     <string name="msg_cal_map_read_failed">Níorbh fhéidir an tábla roghnaithe a léamh.</string>
     <string name="msg_cal_table_edit_failed">Níorbh fhéidir an tábla calabrúcháin a chur in eagar.</string>
+    <string name="cal_expert_image_selected">Comhad iompórtáilte: %1$s</string>
+    <string name="cal_expert_patch_address">Seoladh tosaigh an réigiúin chuimhne (heicsidheachúlach)</string>
+    <string name="cal_expert_patch_erase_bytes">Méid na hearnála scriosta (bearta)</string>
+    <string name="cal_expert_patch_program_bytes">Méid an aonaid ríomhchláraithe (bearta)</string>
+    <string name="cal_expert_patch_preview_button">Réamhamharc ar na hearnálacha a dtéann an comhad BIN athraithe i bhfeidhm orthu</string>
+    <string name="cal_expert_patch_summary">Bearta athraithe: %1$d. Earnálacha scriosta lena mbaineann: %2$d. Níor fíoraíodh léarscáil chuimhne na crua-earraí. Níor scríobhadh aon sonraí.</string>
 </resources>
