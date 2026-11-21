@@ -9,6 +9,16 @@
     <string name="tab_live">Données</string>
     <string name="tab_dtcs">Diagnostic</string>
     <string name="tab_more">Plus</string>
+    <string name="tab_functional_tests">Tests fonctionnels</string>
+    <string name="functional_tests_title">Tests fonctionnels — calculateurs et OBD</string>
+    <string name="functional_tests_readonly">Lance les contrôles de lecture seule possibles sur l’interface physique connectée. Les autres interfaces et les calculateurs non vérifiés restent NON TESTÉS. Aucun effacement, actionneur ou flash.</string>
+    <string name="functional_tests_run">Tout lancer</string>
+    <string name="functional_tests_stop">Arrêter</string>
+    <string name="functional_tests_export">Exporter JSON</string>
+    <string name="functional_tests_summary">%1$d réussis · %2$d échecs · %3$d non testés</string>
+    <string name="functional_tests_passed">OK (preuve physique)</string>
+    <string name="functional_tests_failed">ÉCHEC</string>
+    <string name="functional_tests_skipped">NON TESTÉ</string>
     <string name="tab_modules">Calculateurs</string>
     <string name="tab_mileage">Odomètre</string>
     <string name="tab_calibration">ECU / Cartographie</string>
