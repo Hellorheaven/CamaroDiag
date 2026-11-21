@@ -327,4 +327,27 @@
     <string name="cal_live_memory_save">Dvaput pročitaj memoriju ECU-a i spremi ZIP</string>
     <string name="cal_live_memory_saved">Memorija ECU-a spremljena je nakon dva jednaka čitanja.</string>
     <string name="cal_live_memory_failed">Čitanje memorije ECU-a nije uspjelo. Nije stvorena potvrđena sigurnosna kopija.</string>
+    <string name="cal_import_file">Uvezi kalibracijsku datoteku</string>
+    <string name="cal_hex_preview">Heksadekadski pregled (prva 64 bajta)</string>
+    <string name="cal_file_inspection">Pregled datoteke: %1$s</string>
+    <string name="cal_payload_size">Veličina sadržaja: %1$d B</string>
+    <string name="cal_record_count">Zapisi: %1$d</string>
+    <string name="cal_checksum_validation">Provjera kontrolnog zbroja formata: %1$s</string>
+    <string name="cal_export_file">Izvezi / preuzmi datoteku</string>
+    <string name="cal_import_second_bin">Uvezi drugi BIN za usporedbu</string>
+    <string name="cal_binary_compare_limit">Usporedba bajt po bajt dostupna je samo za izvorne BIN slike.</string>
+    <string name="cal_comparison_name">Usporedba: %1$s</string>
+    <string name="cal_comparison_byte_counts">Promijenjeni bajtovi: %1$d • Dodani: %2$d • Nedostaju: %3$d</string>
+    <string name="cal_images_identical">Slike su identične</string>
+    <string name="cal_remove_files">Ukloni datoteke</string>
+    <string name="cal_table_editor">Uređivač kalibracijskih tablica</string>
+    <string name="cal_import_table_definitions">Uvezi definicije tablica (.csv / .tsv)</string>
+    <string name="cal_export_table_template">Izvezi TSV predložak definicije</string>
+    <string name="cal_select_table">Odaberi tablicu</string>
+    <string name="cal_table_values">Vrijednosti tablice</string>
+    <string name="cal_unsaved_edits">Nespremljene promjene</string>
+    <string name="cal_loaded">Učitano</string>
+    <string name="cal_x_axis">Os X: %1$s</string>
+    <string name="cal_discard_changes">Odbaci promjene</string>
+    <string name="cal_apply_to_file">Primijeni na datoteku</string>
 </resources>
