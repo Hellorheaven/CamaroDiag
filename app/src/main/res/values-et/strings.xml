@@ -497,4 +497,21 @@
     <string name="mileage_caveat_unavailable">Selle allika kohta pole täiendavat lokaliseeritud teavet.</string>
     <string name="obd_physical_can_scope">Füüsiline CAN-vastaja: 0x%1$s. Skannimine hõlmab ainult valitud OBD ECU-d, mitte kõigi moodulite funktsionaalset skannimist. GM-i programmeerimis- ega täiturikäske ei saadetud.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Lubage heitgaaside DTC-de kustutamine Windowsi sillal, ühendage uuesti, seisake mootor ja kinnitage lähtestamine. Heitgaasisüsteemide valmisolekuandmed lähtestatakse; püsikoode ei kustutata.</string>
+    <string name="units_metric">SI / meetermõõdustik</string>
+    <string name="units_imperial">Briti mõõtühikud</string>
+    <string name="live_pause">Peata</string>
+    <string name="live_recording_status">Proovid: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Sisselaske nukkvõlli asendi täituri ahel (silindririda 1)</string>
+    <string name="dtc_desc_p0011">Sisselaske nukkvõlli liiga varajane ajastus (silindririda 1)</string>
+    <string name="dtc_desc_p0014">Väljalaske nukkvõlli liiga varajane ajastus (silindririda 1)</string>
+    <string name="dtc_desc_p0087">Kütuselati või kütusesüsteemi rõhk liiga madal</string>
+    <string name="dtc_desc_p0089">Kütuserõhu regulaatori talitlushäire</string>
+    <string name="dtc_desc_p0191">Kütuselati rõhuanduri ahela vahemik või talitlus</string>
+    <string name="dtc_desc_p0299">Turboülelaaduri või kompressori ülelaaderõhk liiga madal</string>
+    <string name="cal_engine_profile">Mootori profiil: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Kataloogis olevad mootorid aastal %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Binaarlugemine: %2$s • Valideeritud mootoritabelid: %3$s • ECU programmeerimine: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • päring %2$s / vastus %3$s • intervall %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • arv=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Ainult riistvaraprofiil; vajalik on ametlik Android SDK/API või dokumenteeritud sild.</string>
 </resources>
