@@ -572,4 +572,11 @@
     <string name="msg_live_csv_exported">Jurnalul CSV a fost exportat. Număr de eșantioane: %1$d.</string>
     <string name="msg_live_csv_export_failed">Jurnalul CSV nu a putut fi exportat.</string>
     <string name="msg_live_recording_max_samples">S-a atins limita de siguranță (%1$d). Înregistrarea s-a oprit automat.</string>
+    <string name="msg_cal_file_import_failed">Fișierul de calibrare nu a putut fi importat.</string>
+    <string name="msg_cal_file_export_failed">Fișierul de calibrare nu a putut fi exportat.</string>
+    <string name="msg_cal_comparison_failed">Fișierele de calibrare nu au putut fi comparate.</string>
+    <string name="msg_cal_template_export_failed">Șablonul TSV nu a putut fi exportat.</string>
+    <string name="msg_cal_definitions_import_failed">Definițiile tabelelor nu au putut fi importate.</string>
+    <string name="msg_cal_map_read_failed">Tabelul selectat nu a putut fi citit.</string>
+    <string name="msg_cal_table_edit_failed">Tabelul de calibrare nu a putut fi editat.</string>
 </resources>
