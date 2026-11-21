@@ -2,7 +2,7 @@ package com.camarodiag.gen5.ui
 
 import android.content.Intent
 import android.content.ActivityNotFoundException
-import android.net.Uri
+import androidx.core.net.toUri
 import com.camarodiag.gen5.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
@@ -66,7 +66,7 @@ internal fun DebugDownloadsScreen() {
         // never accept an arbitrary URL from remote JSON.
         try {
             context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(artifact.downloadPage()))
+                Intent(Intent.ACTION_VIEW, artifact.downloadPage().toUri())
             )
         } catch (_: ActivityNotFoundException) {
             error = browserError
