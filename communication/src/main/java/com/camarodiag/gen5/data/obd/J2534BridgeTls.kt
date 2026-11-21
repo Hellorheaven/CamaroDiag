@@ -18,16 +18,25 @@ import javax.net.ssl.X509TrustManager
  * than learned over the network (TOFU would allow interception at first use).
  * Legacy token-only bridges and plaintext TCP are deliberately incompatible.
  */
+/**
+ * Public, transport-independent syntax check so Android cannot submit legacy
+ * token-only codes. The security decision is still made by the TLS parser and
+ * certificate pin check during the actual connection.
+ */
+object J2534BridgePairingCodeFormat {
+    private val pattern = Regex("^[A-Za-z0-9_-]{43}\\.[0-9a-fA-F]{64}$")
+
+    fun isValid(code: String): Boolean = pattern.matches(code.trim())
+}
+
 internal data class J2534BridgeTlsPairing(
     val token: String,
     val certificateSha256: ByteArray
 ) {
     companion object {
-        private val pattern = Regex("^[A-Za-z0-9_-]{43}\\.[0-9a-fA-F]{64}$")
-
         fun parse(pairingCode: String): J2534BridgeTlsPairing {
             val normalized = pairingCode.trim()
-            require(pattern.matches(normalized)) {
+            require(J2534BridgePairingCodeFormat.isValid(normalized)) {
                 "Appairage non sécurisé : recopier le code complet (jeton.empreinte TLS) affiché par le nouveau pont Windows."
             }
             val parts = normalized.split('.')
