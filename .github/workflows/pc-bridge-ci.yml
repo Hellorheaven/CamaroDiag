@@ -181,6 +181,19 @@ jobs:
 
           # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
           if [[ "$IS_DRAFT" == "true" ]]; then
+            # Never defer validation of TLS transport changes behind the
+            # routine 50-commit draft interval. Diff against the last actual
+            # successful Windows build, not merely the latest commit.
+            if ! git diff --quiet "$count_base" "$HEAD_SHA" -- \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeTlsIdentity.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeTlsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/Program.cs'; then
+              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+              echo "build_required=true" >> "$GITHUB_OUTPUT"
+              echo "TLS/security bridge changes require a full .NET build and self-tests."
+              exit 0
+            fi
             if [[ "$CURRENT_WINDOWS_CHANGED" != "true" ]]; then
               echo "validation_applies=false" >> "$GITHUB_OUTPUT"
               echo "build_required=false" >> "$GITHUB_OUTPUT"
