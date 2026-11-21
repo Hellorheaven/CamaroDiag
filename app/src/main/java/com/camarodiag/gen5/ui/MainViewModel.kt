@@ -3302,7 +3302,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } else {
                     val (a6Response, d3Response) = if (obdManager.isJ2534StandardObdAvailable()) {
-                        obdManager.readMode01PidIfSupported(0xA6) to obdManager.readMode01PidIfSupported(0xD3)
+                        obdManager.readJ2534OdometerPids()
                     } else obdManager.withObdCommandSession { engine ->
                         val supportedPids = engine.discoverSupportedPids()
                         engine.readMode01PidIfSupported(0xA6, supportedPids) to

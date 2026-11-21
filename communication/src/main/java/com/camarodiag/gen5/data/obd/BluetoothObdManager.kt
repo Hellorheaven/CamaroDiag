@@ -361,6 +361,25 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /** Read both available odometer PIDs from the same physical connection. */
+    suspend fun readJ2534OdometerPids(): Pair<String?, String?> {
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val bridge = checkNotNull(j2534BridgeTransport)
+            val supported = bridge.discoverStandardObdPids()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            suspend fun read(pid: Int): String? {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                val value = if (pid in supported) bridge.readStandardObdPid(pid) else null
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                return value
+            }
+            read(0xA6) to read(0xD3)
+        }
+    }
+
     suspend fun readJ2534StandardDtcs(): PhysicalObdDtcSnapshot {
         val epoch = transportSessionEpoch.capture()
         check(isJ2534StandardObdAvailable())
