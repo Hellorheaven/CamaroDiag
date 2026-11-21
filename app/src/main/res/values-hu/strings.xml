@@ -447,4 +447,26 @@
     <string name="cal_vin_sync_warning_message">Ez a kiválasztott profilban tárolt VIN-t (%1$s) az ECU VIN-jére (%2$s) cseréli. Az évjárat, a motor, a sebességváltó és a piac nem változik. Csak akkor végezze el, ha meggyőződött arról, hogy a megfelelő autó van csatlakoztatva.</string>
     <string name="cal_vin_sync_confirm">VIN cseréje</string>
     <string name="vin_photo_capture">VIN fényképezése</string>
+    <string name="control_interlock_assessment">Biztonsági reteszelések értékelése: %1$s</string>
+    <string name="control_conditions_confirmed">feltételek megerősítve</string>
+    <string name="control_windows_explanation">A GM-parancsot azonosítani és validálni kell az adott VIN BCM-jéhez. Nem feltételezünk univerzális keretet.</string>
+    <string name="control_sunroof_explanation">Csak megfelelő felszereltség és validált BCM-parancs esetén.</string>
+    <string name="control_door_locks_title">Ajtózárak</string>
+    <string name="control_door_locks_explanation">Védett karosszériaparancs: a címzést, a biztonságot és a jármű állapotát ellenőrizni kell.</string>
+    <string name="control_lights_title">Világítás</string>
+    <string name="control_lights_explanation">A világítási funkciók a BCM-től, a felszereltségtől és a piactól függenek.</string>
+    <string name="control_horn_explanation">A hangjelzés letiltva marad ellenőrzött GM-eljárás és felhasználói megerősítés nélkül.</string>
+    <string name="control_mirrors_title">Tükrök</string>
+    <string name="control_mirrors_explanation">A parancsot a felszereltséghez és a BCM-verzióhoz kell validálni.</string>
+    <string name="control_trunk_explanation">A parancsot a karosszériatípushoz, a BCM-hez és a jármű állapotához kell validálni.</string>
+    <string name="control_remote_start_title">Távoli indítás</string>
+    <string name="control_remote_start_explanation">Általános OBD-kerettel nem vezérelhető biztonságosan. Csak a gyártó által jóváhagyott távoli indítórendszert és biztonsági feltételeit használja (Park, rögzítőfék, zárt motorháztető, kritikus hibák hiánya). A CamaroDiag nem küld motorindítási parancsot.</string>
+    <string name="remote_start_blocker_gear">A sebességváltó Park állása nincs megerősítve.</string>
+    <string name="remote_start_blocker_hood">A motorháztető zárása nincs megerősítve.</string>
+    <string name="remote_start_blocker_locks">Az ajtók zárása nincs megerősítve.</string>
+    <string name="remote_start_blocker_hazards">A vészvillogó kikapcsolt állapota nincs megerősítve.</string>
+    <string name="remote_start_blocker_theft">A lopásvédelmi rendszer készenléte nincs megerősítve.</string>
+    <string name="remote_start_blocker_faults">A kritikus hibák hiánya nincs megerősítve.</string>
+    <string name="remote_start_blocker_stationary">A jármű álló helyzete nincs megerősítve.</string>
+    <string name="remote_start_blocker_equipment">A gyári távoli indítási felszereltség nincs megerősítve.</string>
 </resources>
