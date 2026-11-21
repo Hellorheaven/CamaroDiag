@@ -361,4 +361,10 @@
     <string name="live_pid_wbo2_b2s1">Lambda în bandă largă B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda în bandă largă B2S2</string>
     <string name="cal_uds_transport_hint">Transport STPX pentru adaptoare OBDLink STN compatibile sau punte J2534 pe PC pentru VXDIAG. Introdu identificatorii CAN fizici confirmați; nu se presupune nicio adresă GM.</string>
+    <string name="about_build">Număr compilare: %1$d</string>
+    <string name="about_channel_update_unavailable">Există o versiune mai nouă, dar nu a fost publicat un pachet de actualizare pentru acest canal de instalare.</string>
+    <string name="about_check_failed">Nu s-au putut verifica actualizările. Verifică conexiunea la internet.</string>
+    <string name="about_checking">Se verifică…</string>
+    <string name="about_update_found">Este disponibilă o versiune nouă.</string>
+    <string name="about_version">Versiune instalată: %1$s</string>
 </resources>

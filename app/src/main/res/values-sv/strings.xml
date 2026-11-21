@@ -358,4 +358,10 @@
     <string name="live_pid_wbo2_b2s1">Bredbandslambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Bredbandslambda B2S2</string>
     <string name="cal_uds_transport_hint">STPX-transport för kompatibla OBDLink STN-adaptrar eller en J2534-brygga på datorn för VXDIAG. Ange bekräftade fysiska CAN-ID:n; ingen GM-adress antas.</string>
+    <string name="about_build">Byggnummer: %1$d</string>
+    <string name="about_channel_update_unavailable">En nyare version finns, men inget uppdateringspaket har publicerats för den här installationskanalen.</string>
+    <string name="about_check_failed">Det gick inte att söka efter uppdateringar. Kontrollera internetanslutningen.</string>
+    <string name="about_checking">Söker…</string>
+    <string name="about_update_found">En ny version finns tillgänglig.</string>
+    <string name="about_version">Installerad version: %1$s</string>
 </resources>

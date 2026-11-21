@@ -364,4 +364,10 @@
     <string name="live_pid_wbo2_b2s1">Plačiajuostė lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Plačiajuostė lambda B2S2</string>
     <string name="cal_uds_transport_hint">STPX ryšys suderinamiems OBDLink STN adapteriams arba kompiuterio J2534 tiltas VXDIAG įrenginiui. Įveskite patvirtintus fizinius CAN identifikatorius; GM adresai nėra spėjami.</string>
+    <string name="about_build">Kompiliacijos numeris: %1$d</string>
+    <string name="about_channel_update_unavailable">Yra naujesnė versija, tačiau šiam diegimo kanalui nėra paskelbto naujinimo paketo.</string>
+    <string name="about_check_failed">Nepavyko patikrinti naujinimų. Patikrinkite interneto ryšį.</string>
+    <string name="about_checking">Tikrinama…</string>
+    <string name="about_update_found">Yra nauja versija.</string>
+    <string name="about_version">Įdiegta versija: %1$s</string>
 </resources>

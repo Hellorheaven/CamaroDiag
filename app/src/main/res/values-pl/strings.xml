@@ -364,4 +364,10 @@
     <string name="live_pid_wbo2_b2s1">Lambda szerokopasmowa B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda szerokopasmowa B2S2</string>
     <string name="cal_uds_transport_hint">Transmisja STPX dla zgodnych adapterów OBDLink STN lub most J2534 na komputerze dla VXDIAG. Wprowadź potwierdzone fizyczne identyfikatory CAN; nie zakłada się żadnego adresu GM.</string>
+    <string name="about_build">Numer kompilacji: %1$d</string>
+    <string name="about_channel_update_unavailable">Dostępna jest nowsza wersja, ale dla tego kanału instalacji nie opublikowano pakietu aktualizacji.</string>
+    <string name="about_check_failed">Nie udało się sprawdzić aktualizacji. Sprawdź połączenie z Internetem.</string>
+    <string name="about_checking">Sprawdzanie…</string>
+    <string name="about_update_found">Dostępna jest nowa wersja.</string>
+    <string name="about_version">Zainstalowana wersja: %1$s</string>
 </resources>

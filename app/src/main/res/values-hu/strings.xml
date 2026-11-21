@@ -358,4 +358,10 @@
     <string name="live_pid_wbo2_b2s1">Szélessávú lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Szélessávú lambda B2S2</string>
     <string name="cal_uds_transport_hint">STPX-kapcsolat a kompatibilis OBDLink STN adapterekhez vagy PC-s J2534-híd a VXDIAG eszközhöz. Add meg az ellenőrzött fizikai CAN-azonosítókat; GM-címet nem feltételezünk.</string>
+    <string name="about_build">Buildszám: %1$d</string>
+    <string name="about_channel_update_unavailable">Újabb verzió érhető el, de ehhez a telepítési csatornához nem adtak ki frissítőcsomagot.</string>
+    <string name="about_check_failed">Nem sikerült ellenőrizni a frissítéseket. Ellenőrizd az internetkapcsolatot.</string>
+    <string name="about_checking">Ellenőrzés…</string>
+    <string name="about_update_found">Új verzió érhető el.</string>
+    <string name="about_version">Telepített verzió: %1$s</string>
 </resources>

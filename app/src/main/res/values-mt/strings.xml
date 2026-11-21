@@ -367,4 +367,10 @@
     <string name="live_pid_wbo2_b2s1">Lambda ta’ medda wiesgħa B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda ta’ medda wiesgħa B2S2</string>
     <string name="cal_uds_transport_hint">Trasport STPX għal adapters OBDLink STN kompatibbli jew pont J2534 fuq PC għal VXDIAG. Daħħal l\'ID fiżiċi CAN ikkonfermati; ma tiġi preżunta ebda indirizz GM.</string>
+    <string name="about_build">Numru tal-binja: %1$d</string>
+    <string name="about_channel_update_unavailable">Hemm verżjoni aktar ġdida, iżda ma ġie ppubblikat l-ebda pakkett ta’ aġġornament għal dan il-kanal ta’ installazzjoni.</string>
+    <string name="about_check_failed">Ma setgħux jiġu ċċekkjati l-aġġornamenti. Iċċekkja l-konnessjoni mal-Internet tiegħek.</string>
+    <string name="about_checking">Qed jiġi ċċekkjat…</string>
+    <string name="about_update_found">Verżjoni ġdida hija disponibbli.</string>
+    <string name="about_version">Verżjoni installata: %1$s</string>
 </resources>

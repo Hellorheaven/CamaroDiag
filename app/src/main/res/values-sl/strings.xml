@@ -364,4 +364,10 @@
     <string name="live_pid_wbo2_b2s1">Širokopasovna lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Širokopasovna lambda B2S2</string>
     <string name="cal_uds_transport_hint">Prenos STPX za združljive vmesnike OBDLink STN ali računalniški most J2534 za VXDIAG. Vnesite potrjene fizične identifikatorje CAN; naslov GM ni predpostavljen.</string>
+    <string name="about_build">Številka gradnje: %1$d</string>
+    <string name="about_channel_update_unavailable">Na voljo je novejša različica, vendar paket posodobitve za ta namestitveni kanal še ni objavljen.</string>
+    <string name="about_check_failed">Preverjanje posodobitev ni uspelo. Preverite internetno povezavo.</string>
+    <string name="about_checking">Preverjanje…</string>
+    <string name="about_update_found">Na voljo je nova različica.</string>
+    <string name="about_version">Nameščena različica: %1$s</string>
 </resources>

@@ -358,4 +358,10 @@
     <string name="live_pid_wbo2_b2s1">Laajakaistalambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Laajakaistalambda B2S2</string>
     <string name="cal_uds_transport_hint">STPX-yhteys yhteensopiville OBDLink STN -sovittimille tai tietokoneen J2534-silta VXDIAGille. Anna vahvistetut fyysiset CAN-tunnisteet; GM-osoitteita ei oleteta.</string>
+    <string name="about_build">Koontiversio: %1$d</string>
+    <string name="about_channel_update_unavailable">Uudempi versio on saatavilla, mutta tälle asennuskanavalle ei ole julkaistu päivityspakettia.</string>
+    <string name="about_check_failed">Päivitysten tarkistus epäonnistui. Tarkista internetyhteytesi.</string>
+    <string name="about_checking">Tarkistetaan…</string>
+    <string name="about_update_found">Uusi versio on saatavilla.</string>
+    <string name="about_version">Asennettu versio: %1$s</string>
 </resources>

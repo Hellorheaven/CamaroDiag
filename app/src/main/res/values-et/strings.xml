@@ -358,4 +358,10 @@
     <string name="live_pid_wbo2_b2s1">Lairiba lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lairiba lambda B2S2</string>
     <string name="cal_uds_transport_hint">STPX-ühendus ühilduvatele OBDLink STN adapteritele või arvuti J2534-sild VXDIAG jaoks. Sisesta kinnitatud füüsilised CAN-ID-d; GM-aadresse ei eeldata.</string>
+    <string name="about_build">Järgu number: %1$d</string>
+    <string name="about_channel_update_unavailable">Saadaval on uuem versioon, kuid selle paigalduskanali jaoks pole värskenduspaketti avaldatud.</string>
+    <string name="about_check_failed">Värskenduste kontrollimine ebaõnnestus. Kontrolli internetiühendust.</string>
+    <string name="about_checking">Kontrollimine…</string>
+    <string name="about_update_found">Saadaval on uus versioon.</string>
+    <string name="about_version">Paigaldatud versioon: %1$s</string>
 </resources>
