@@ -420,4 +420,34 @@
     <string name="debug_builds_created">Izveidots</string>
     <string name="debug_builds_expires">Derīgs līdz</string>
     <string name="debug_builds_no_browser">Nav pieejama pārlūkprogramma lejupielādes atvēršanai.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Izvēlētā valoda: %1$s</string>
+    <string name="settings_adapter_not_connected">Nav pievienots neviens adapteris</string>
+    <string name="settings_last_connection">Pēdējais savienojuma profils</string>
+    <string name="settings_no_last_connection">Vēl nav saglabāta savienojuma profila.</string>
+    <string name="saved_vehicle_profiles_title">Saglabātie transportlīdzekļu profili</string>
+    <string name="saved_vehicle_name_label">Profila nosaukums</string>
+    <string name="saved_vehicle_name_placeholder">piem., Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Saglabāt pašreizējo transportlīdzekli</string>
+    <string name="saved_vehicle_empty">Vēl nav saglabātu transportlīdzekļu profilu.</string>
+    <string name="saved_vehicle_delete">Dzēst</string>
+    <string name="saved_vehicle_requires_review">Profils izveidots no ECU VIN. Pirms diagnostikas pārbaudiet modeļa gadu, dzinēju un pārnesumkārbu.</string>
+    <string name="saved_vehicle_ecu_default_name">Transportlīdzeklis no ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Ievadiet profila nosaukumu.</string>
+    <string name="msg_vehicle_profile_saved">Transportlīdzekļa profils saglabāts.</string>
+    <string name="msg_vehicle_profile_review_required">Profils izveidots no ECU VIN. Pirms diagnostikas pārbaudiet gadu, dzinēju un pārnesumkārbu.</string>
+    <string name="msg_vehicle_profile_loaded">Ielādēts transportlīdzekļa profils: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU neatgrieza derīgu 17 rakstzīmju VIN. Profils netika izveidots.</string>
+    <string name="cal_vin_matches_profile">ECU VIN atbilst izvēlētajam transportlīdzekļa profilam.</string>
+    <string name="cal_vin_mismatch_detected">VIN NEATBILSTĪBA — profils: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Izvēlētajā transportlīdzekļa profilā nav derīga VIN.</string>
+    <string name="cal_vin_mismatch_title">Konstatēta VIN neatbilstība</string>
+    <string name="cal_vin_mismatch_confirmation">Izvēlētā profila VIN ir %1$s, bet ECU atgrieza %2$s. Tie var būt dažādi transportlīdzekļi. Izveidojiet atsevišķu profilu, lai saglabātu izvēlēto transportlīdzekli, vai sinhronizējiet tikai pēc faktiskā transportlīdzekļa pārbaudes.</string>
+    <string name="cal_vin_create_vehicle">Izveidot transportlīdzekļa profilu</string>
+    <string name="cal_vin_sync_existing">Sinhronizēt izvēlētā profila VIN</string>
+    <string name="cal_vin_sync_warning_title">Apstiprināt VIN aizstāšanu?</string>
+    <string name="cal_vin_sync_warning_message">Izvēlētajā profilā saglabātais VIN (%1$s) tiks aizstāts ar ECU VIN (%2$s). Gads, dzinējs, pārnesumkārba un tirgus nemainīsies. Dariet to tikai pēc pārliecināšanās, ka pievienots pareizais transportlīdzeklis.</string>
+    <string name="cal_vin_sync_confirm">Aizstāt VIN</string>
+    <string name="vin_photo_capture">Fotografēt VIN</string>
 </resources>
