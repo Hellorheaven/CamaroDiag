@@ -65,11 +65,21 @@ class EcuFamilyCatalogCompatibilityTest {
             writeTargets = setOf(first, second)
         )
         assertTrue(driver.supportsFamilyProtocol("E39", EcuProgrammingDriverContract.Transport.J2534))
+        assertTrue(driver.supportsFamilyProtocol(" e39 ", EcuProgrammingDriverContract.Transport.J2534))
+        assertTrue(driver.supportsFamilyProtocol("e39", EcuProgrammingDriverContract.Transport.J2534))
+        assertFalse(driver.supportsFamilyProtocol("", EcuProgrammingDriverContract.Transport.J2534))
+        // Another family/generation must still require its own protocol evidence.
+        assertFalse(driver.supportsFamilyProtocol("E39A", EcuProgrammingDriverContract.Transport.J2534))
         assertFalse(driver.supportsFamilyProtocol("E92", EcuProgrammingDriverContract.Transport.J2534))
         assertFalse(driver.supportsFamilyProtocol("E39", EcuProgrammingDriverContract.Transport.BENCH))
         assertTrue(driver.supportsWrite(first, EcuProgrammingDriverContract.Transport.J2534))
         assertTrue(driver.supportsWrite(second, EcuProgrammingDriverContract.Transport.J2534))
         assertFalse(driver.supportsWrite(unknown, EcuProgrammingDriverContract.Transport.J2534))
+        // A tolerant protocol lookup NEVER broadens destructive firmware approval.
+        assertFalse(driver.supportsWrite(
+            first.copy(controllerFamily = "e39"),
+            EcuProgrammingDriverContract.Transport.J2534
+        ))
 
         val unvalidated = driver.copy(physicalHardwareValidated = false)
         assertTrue(unvalidated.supportsFamilyProtocol("E39", EcuProgrammingDriverContract.Transport.J2534))
