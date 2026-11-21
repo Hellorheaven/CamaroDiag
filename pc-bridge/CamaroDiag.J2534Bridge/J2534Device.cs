@@ -54,6 +54,8 @@ internal sealed class J2534Device : IDisposable
     private delegate uint PassThruGetLastErrorDelegate(StringBuilder description);
 
     private readonly J2534Adapter _adapter;
+    private readonly J2534MemoryReadScope? _memoryReadScope;
+    private bool _memoryReadVinVerified;
     private IntPtr _library;
     private PassThruOpenDelegate? _open;
     private PassThruCloseDelegate? _close;
@@ -75,15 +77,25 @@ internal sealed class J2534Device : IDisposable
     private bool _channelConnected;
     private bool _opened;
 
-    public J2534Device(J2534Adapter adapter) => _adapter = adapter;
+    public J2534Device(J2534Adapter adapter, J2534MemoryReadScope? memoryReadScope = null)
+    {
+        _adapter = adapter;
+        _memoryReadScope = memoryReadScope;
+    }
 
     public string AdapterName => _adapter.Name;
     public string DriverPath => _adapter.FunctionLibrary;
     public bool IsOpen => _opened;
+    public bool IsMemoryReadEnabled => _memoryReadScope != null && _memoryReadVinVerified;
 
     public void Open(int requestCanId, int responseCanId, bool can29Bit, int protocolNumber)
     {
         if (_opened) Close();
+        _memoryReadVinVerified = false;
+        if (_memoryReadScope != null &&
+            !_memoryReadScope.MatchesChannel(requestCanId, responseCanId, protocolNumber))
+            throw new UnauthorizedAccessException(
+                "Configured CAN IDs and protocol do not match the VIN-bound memory read profile.");
         var isSwCan = protocolNumber is 63 or 64;
         var maxId = can29Bit ? 0x1FFFFFFF : 0x7FF;
         var baudRate = protocolNumber switch
@@ -132,6 +144,19 @@ internal sealed class J2534Device : IDisposable
                 "PassThruStartMsgFilter(FLOW_CONTROL_FILTER)");
             _filterId = filter;
             _opened = true;
+            if (_memoryReadScope != null)
+            {
+                // Read live VIN via an already allowed, non-destructive DID before
+                // exposing any memory command. No identity -> no 0x23 permission.
+                var vinResponse = Exchange(new byte[] { 0x22, 0xF1, 0x90 }, 6000);
+                if (vinResponse.Length < 20 || vinResponse[0] != 0x62 ||
+                    vinResponse[1] != 0xF1 || vinResponse[2] != 0x90 ||
+                    !string.Equals(Encoding.ASCII.GetString(vinResponse, 3, 17),
+                        _memoryReadScope.ExpectedVin, StringComparison.OrdinalIgnoreCase))
+                    throw new UnauthorizedAccessException(
+                        "The live ECU VIN does not match the approved memory read profile.");
+                _memoryReadVinVerified = true;
+            }
         }
         catch
         {
@@ -192,14 +217,20 @@ internal sealed class J2534Device : IDisposable
         if (count != 1) throw new IOException("J2534 driver did not queue the UDS message.");
     }
 
-    private static void ValidateReadOnlyService(byte[] payload, bool allowNoResponse)
+    private void ValidateReadOnlyService(byte[] payload, bool allowNoResponse)
     {
         var service = payload[0];
         if (service == 0x22 || service == 0x19) return;
-        if (service == 0x3E && payload.Length >= 2 && payload[1] is 0x00 or 0x80) return;
+        if (service == 0x3E && payload.Length == 2 && payload[1] is 0x00 or 0x80) return;
+        if (!allowNoResponse && _memoryReadVinVerified && _memoryReadScope != null)
+        {
+            if (service == 0x23 && _memoryReadScope.AllowsReadMemory(payload)) return;
+            if (service == 0x10 && _memoryReadScope.AllowsSessionControl(payload)) return;
+        }
         throw new UnauthorizedAccessException(
-            $"PC bridge is read-only. UDS service 0x{service:X2} is not enabled. " +
-            "Only ReadDataByIdentifier (0x22), ReadDTCInformation (0x19) and TesterPresent (0x3E) are accepted.");
+            $"PC bridge denied UDS service 0x{service:X2}: " +
+            "writes and security access are permanently blocked; memory reads require " +
+            "the operator's approved address range, channel and matching live VIN.");
     }
 
     private PassThruMsg CreatePayloadMessage(int canId, byte[] payload)
@@ -273,6 +304,7 @@ internal sealed class J2534Device : IDisposable
         _deviceOpened = false;
         _channelConnected = false;
         _opened = false;
+        _memoryReadVinVerified = false;
         if (_library != IntPtr.Zero)
         {
             try { NativeLibrary.Free(_library); } catch { }
