@@ -133,7 +133,7 @@
     <string name="cal_read_ecu_ids">Ανάγνωση VIN / CAL ID / CVN ECU</string>
     <string name="cal_connect_obd_required">Συνδέστε προσαρμογέα OBD πριν διαβάσετε την πραγματική ECU.</string>
     <string name="cal_uds_can_title">UDS μέσω CAN</string>
-    <string name="cal_uds_transport_hint">Μεταφορά STPX για OBDLink MX+ ή γέφυρα PC J2534 για VXDIAG. Εισαγάγετε επιβεβαιωμένα φυσικά CAN ID: δεν θεωρείται δεδομένη καμία διεύθυνση GM.</string>
+    <string name="cal_uds_transport_hint">Μεταφορά STPX για OBDLink STN ή γέφυρα PC J2534 για VXDIAG. Εισαγάγετε επιβεβαιωμένα φυσικά CAN ID: δεν θεωρείται δεδομένη καμία διεύθυνση GM.</string>
     <string name="cal_can_request_id">CAN ID αιτήματος (π.χ. 7E0)</string>
     <string name="cal_can_response_id">CAN ID απόκρισης (π.χ. 7E8)</string>
     <string name="cal_can_profile">Προφίλ CAN: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>

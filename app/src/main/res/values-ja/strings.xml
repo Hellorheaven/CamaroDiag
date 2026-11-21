@@ -133,7 +133,7 @@
     <string name="cal_read_ecu_ids">ECUのVIN／CAL ID／CVNを読み取る</string>
     <string name="cal_connect_obd_required">実際のECUを読み取る前にOBDアダプターを接続してください。</string>
     <string name="cal_uds_can_title">CAN経由のUDS</string>
-    <string name="cal_uds_transport_hint">OBDLink MX+ではSTPX転送、VXDIAGではPC J2534ブリッジを使用します。確認済みの物理CAN IDを入力してください。GMアドレスを推測することはありません。</string>
+    <string name="cal_uds_transport_hint">OBDLink STNではSTPX転送、VXDIAGではPC J2534ブリッジを使用します。確認済みの物理CAN IDを入力してください。GMアドレスを推測することはありません。</string>
     <string name="cal_can_request_id">要求CAN ID（例：7E0）</string>
     <string name="cal_can_response_id">応答CAN ID（例：7E8）</string>
     <string name="cal_can_profile">CANプロファイル：33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>

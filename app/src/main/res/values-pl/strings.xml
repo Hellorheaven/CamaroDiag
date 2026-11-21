@@ -363,4 +363,5 @@
     <string name="live_pid_wbo2_b1s2">Lambda szerokopasmowa B1S2</string>
     <string name="live_pid_wbo2_b2s1">Lambda szerokopasmowa B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda szerokopasmowa B2S2</string>
+    <string name="cal_uds_transport_hint">Transmisja STPX dla zgodnych adapterów OBDLink STN lub most J2534 na komputerze dla VXDIAG. Wprowadź potwierdzone fizyczne identyfikatory CAN; nie zakłada się żadnego adresu GM.</string>
 </resources>

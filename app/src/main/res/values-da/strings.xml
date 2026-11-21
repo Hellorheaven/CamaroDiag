@@ -372,7 +372,7 @@
     <string name="cal_engine_profiles_hint">Alle registrerede motorprofiler vises. Den angivne ECM-familie er vejledende: CAL ID, CVN, hardwarenummer og operativsystem skal identificere den faktisk installerede ECU.</string>
     <string name="cal_capability_summary">CAL ID/CVN: standardlæsning • Binært udtræk, redigering og skrivning: ECU-proceduren skal verificeres</string>
     <string name="cal_obd_mode09_explanation">Læs identifikatorer via OBD-tilstand 09: VIN (PID 02), CAL ID (PID 04) og CVN (PID 06). Disse identifikatorer læser ikke det binære kalibreringskort.</string>
-    <string name="cal_uds_transport_hint">STPX-transport til OBDLink MX+ eller en J2534-pc-bro til VXDIAG. Angiv bekræftede fysiske CAN-id\'er; der antages ingen GM-adresse.</string>
+    <string name="cal_uds_transport_hint">STPX-transport til OBDLink STN eller en J2534-pc-bro til VXDIAG. Angiv bekræftede fysiske CAN-id\'er; der antages ingen GM-adresse.</string>
     <string name="cal_can_profile">CAN-profil: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_j2534_bridge_title">J2534-PC-BRO • VXDIAG VCX SE / NANO</string>
     <string name="cal_j2534_launch_instructions">Start CamaroDiag.J2534Bridge.exe på Windows-pc\'en, og indtast derefter dens IP-adresse og den token, der vises i konsollen. Begge enheder skal være på samme lokale netværk.</string>

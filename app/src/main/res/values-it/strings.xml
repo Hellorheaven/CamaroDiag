@@ -133,7 +133,7 @@
     <string name="cal_read_ecu_ids">Leggi VIN / CAL ID / CVN della centralina</string>
     <string name="cal_connect_obd_required">Collega un adattatore OBD prima di leggere la centralina reale.</string>
     <string name="cal_uds_can_title">Diagnostica UDS su CAN</string>
-    <string name="cal_uds_transport_hint">Trasporto STPX per OBDLink MX+ o bridge PC J2534 per VXDIAG. Inserisci gli ID CAN fisici confermati: non viene presunto alcun indirizzo GM.</string>
+    <string name="cal_uds_transport_hint">Trasporto STPX per OBDLink STN o bridge PC J2534 per VXDIAG. Inserisci gli ID CAN fisici confermati: non viene presunto alcun indirizzo GM.</string>
     <string name="cal_can_request_id">ID CAN richiesta (es. 7E0)</string>
     <string name="cal_can_response_id">ID CAN risposta (es. 7E8)</string>
     <string name="cal_can_profile">Profilo CAN: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>

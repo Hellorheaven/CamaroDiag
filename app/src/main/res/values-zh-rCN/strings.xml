@@ -133,7 +133,7 @@
     <string name="cal_read_ecu_ids">读取 ECU VIN / CAL ID / CVN</string>
     <string name="cal_connect_obd_required">读取真实 ECU 前，请先连接 OBD 适配器。</string>
     <string name="cal_uds_can_title">CAN 上的 UDS</string>
-    <string name="cal_uds_transport_hint">OBDLink MX+ 使用 STPX 传输，VXDIAG 使用 PC J2534 桥接。请输入已确认的物理 CAN ID；不会猜测 GM 地址。</string>
+    <string name="cal_uds_transport_hint">OBDLink STN 使用 STPX 传输，VXDIAG 使用 PC J2534 桥接。请输入已确认的物理 CAN ID；不会猜测 GM 地址。</string>
     <string name="cal_can_request_id">请求 CAN ID（例如 7E0）</string>
     <string name="cal_can_response_id">响应 CAN ID（例如 7E8）</string>
     <string name="cal_can_profile">CAN 配置：33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>

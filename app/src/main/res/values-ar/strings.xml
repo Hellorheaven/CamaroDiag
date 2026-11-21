@@ -133,7 +133,7 @@
     <string name="cal_read_ecu_ids">قراءة VIN وCAL ID وCVN لوحدة ECU</string>
     <string name="cal_connect_obd_required">قم بتوصيل محول OBD قبل قراءة بيانات ECU الحقيقية.</string>
     <string name="cal_uds_can_title">UDS عبر CAN</string>
-    <string name="cal_uds_transport_hint">يستخدم OBDLink MX+ نقل STPX، بينما يستخدم VXDIAG جسر J2534 على الكمبيوتر. أدخل معرّفات CAN المادية المؤكدة؛ لن يتم افتراض أي عنوان GM.</string>
+    <string name="cal_uds_transport_hint">يستخدم OBDLink STN نقل STPX، بينما يستخدم VXDIAG جسر J2534 على الكمبيوتر. أدخل معرّفات CAN المادية المؤكدة؛ لن يتم افتراض أي عنوان GM.</string>
     <string name="cal_can_request_id">معرّف CAN للطلب (مثل 7E0)</string>
     <string name="cal_can_response_id">معرّف CAN للاستجابة (مثل 7E8)</string>
     <string name="cal_can_profile">ملف CAN: ‏33/34 HS-CAN ‏500k • ‏35/36 HS-CAN ‏250k • ‏63/64 SW-CAN</string>

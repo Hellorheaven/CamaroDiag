@@ -366,4 +366,5 @@
     <string name="live_pid_wbo2_b1s2">Lambda leathanbhanda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Lambda leathanbhanda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda leathanbhanda B2S2</string>
+    <string name="cal_uds_transport_hint">Iompar STPX le haghaidh oiriúnaitheoirí comhoiriúnacha OBDLink STN nó droichead J2534 ríomhaire le haghaidh VXDIAG. Iontráil aitheantais fhisiciúla CAN atá deimhnithe; ní ghlactar le seoladh GM ar bith mar thoimhde.</string>
 </resources>

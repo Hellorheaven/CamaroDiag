@@ -142,7 +142,7 @@
     <string name="cal_read_ecu_ids">Прочитане на VIN / CAL ID / CVN от ECU</string>
     <string name="cal_connect_obd_required">Свържете OBD адаптер, преди да четете действителния ECU.</string>
     <string name="cal_uds_can_title">UDS по CAN</string>
-    <string name="cal_uds_transport_hint">STPX транспорт за OBDLink MX+ или компютърен мост J2534 за VXDIAG. Въведете потвърдени физически CAN идентификатори: не се предполага адрес на GM.</string>
+    <string name="cal_uds_transport_hint">STPX транспорт за OBDLink STN или компютърен мост J2534 за VXDIAG. Въведете потвърдени физически CAN идентификатори: не се предполага адрес на GM.</string>
     <string name="cal_can_request_id">CAN идентификатор на заявката (напр. 7E0)</string>
     <string name="cal_can_response_id">CAN идентификатор на отговора (напр. 7E8)</string>
     <string name="cal_can_profile">CAN профил: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>

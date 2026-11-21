@@ -133,7 +133,7 @@
     <string name="cal_read_ecu_ids">קרא VIN / CAL ID / CVN ממחשב הרכב</string>
     <string name="cal_connect_obd_required">חבר מתאם OBD לפני קריאה ממחשב הרכב האמיתי.</string>
     <string name="cal_uds_can_title">אבחון UDS דרך CAN</string>
-    <string name="cal_uds_transport_hint">תעבורת STPX עבור OBDLink MX+ או גשר J2534 במחשב עבור VXDIAG. הזן מזהי CAN פיזיים שאומתו; אין הנחה לגבי כתובת GM.</string>
+    <string name="cal_uds_transport_hint">תעבורת STPX עבור OBDLink STN או גשר J2534 במחשב עבור VXDIAG. הזן מזהי CAN פיזיים שאומתו; אין הנחה לגבי כתובת GM.</string>
     <string name="cal_can_request_id">מזהה CAN לבקשה (למשל 7E0)</string>
     <string name="cal_can_response_id">מזהה CAN לתשובה (למשל 7E8)</string>
     <string name="cal_can_profile">פרופיל CAN: ‏33/34 HS-CAN 500k • ‏35/36 HS-CAN 250k • ‏63/64 SW-CAN</string>

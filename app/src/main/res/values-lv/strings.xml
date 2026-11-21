@@ -360,4 +360,5 @@
     <string name="live_pid_wbo2_b1s2">Platjoslas lambda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Platjoslas lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Platjoslas lambda B2S2</string>
+    <string name="cal_uds_transport_hint">STPX sakari saderīgiem OBDLink STN adapteriem vai datora J2534 tilts VXDIAG ierīcei. Ievadiet apstiprinātus fiziskos CAN identifikatorus; GM adreses netiek pieņemtas pēc noklusējuma.</string>
 </resources>

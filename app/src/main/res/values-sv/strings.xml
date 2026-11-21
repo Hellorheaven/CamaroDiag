@@ -357,4 +357,5 @@
     <string name="live_pid_wbo2_b1s2">Bredbandslambda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Bredbandslambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Bredbandslambda B2S2</string>
+    <string name="cal_uds_transport_hint">STPX-transport för kompatibla OBDLink STN-adaptrar eller en J2534-brygga på datorn för VXDIAG. Ange bekräftade fysiska CAN-ID:n; ingen GM-adress antas.</string>
 </resources>

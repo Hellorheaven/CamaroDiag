@@ -357,4 +357,5 @@
     <string name="live_pid_wbo2_b1s2">Lairiba lambda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Lairiba lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lairiba lambda B2S2</string>
+    <string name="cal_uds_transport_hint">STPX-ühendus ühilduvatele OBDLink STN adapteritele või arvuti J2534-sild VXDIAG jaoks. Sisesta kinnitatud füüsilised CAN-ID-d; GM-aadresse ei eeldata.</string>
 </resources>
