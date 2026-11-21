@@ -74,7 +74,7 @@ internal sealed class J2534MemoryReadScope
 
     public bool AllowsSessionControl(byte[] payload) =>
         Session == 0x03 && payload.Length == 2 &&
-        payload[0] == 0x10 && payload[1] == 0x03;
+        payload[0] == 0x10 && (payload[1] == 0x03 || payload[1] == 0x01);
 
     public static J2534MemoryReadScope Load(string path)
     {
