@@ -726,4 +726,34 @@
     <string name="debug_builds_created">Stvoreno</string>
     <string name="debug_builds_expires">Istječe</string>
     <string name="debug_builds_no_browser">Nema dostupnog preglednika za otvaranje preuzimanja.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Odabrani jezik: %1$s</string>
+    <string name="settings_adapter_not_connected">Nema povezanog adaptera</string>
+    <string name="settings_last_connection">Posljednji profil veze</string>
+    <string name="settings_no_last_connection">Još nema spremljenog profila veze.</string>
+    <string name="saved_vehicle_profiles_title">Spremljeni profili vozila</string>
+    <string name="saved_vehicle_name_label">Naziv profila</string>
+    <string name="saved_vehicle_name_placeholder">npr. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Spremi trenutno vozilo</string>
+    <string name="saved_vehicle_empty">Još nema spremljenih profila vozila.</string>
+    <string name="saved_vehicle_delete">Izbriši</string>
+    <string name="saved_vehicle_requires_review">Profil je stvoren iz VIN-a ECU-a. Prije dijagnostike provjerite modelsku godinu, motor i mjenjač.</string>
+    <string name="saved_vehicle_ecu_default_name">Vozilo iz ECU-a • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Unesite naziv profila.</string>
+    <string name="msg_vehicle_profile_saved">Profil vozila je spremljen.</string>
+    <string name="msg_vehicle_profile_review_required">Profil je stvoren iz VIN-a ECU-a. Prije dijagnostike provjerite godinu, motor i mjenjač.</string>
+    <string name="msg_vehicle_profile_loaded">Učitan profil vozila: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU nije vratio valjani VIN od 17 znakova. Profil nije stvoren.</string>
+    <string name="cal_vin_matches_profile">VIN iz ECU-a odgovara odabranom profilu vozila.</string>
+    <string name="cal_vin_mismatch_detected">NEPODUDARANJE VIN-a — profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Odabrani profil vozila ne sadrži valjani VIN.</string>
+    <string name="cal_vin_mismatch_title">Otkriveno nepodudaranje VIN-a</string>
+    <string name="cal_vin_mismatch_confirmation">VIN odabranog profila je %1$s, ali ECU je vratio %2$s. Možda je riječ o različitim vozilima. Stvorite zaseban profil kako biste sačuvali odabrano vozilo ili sinkronizirajte tek nakon provjere stvarnog vozila.</string>
+    <string name="cal_vin_create_vehicle">Stvori profil vozila</string>
+    <string name="cal_vin_sync_existing">Sinkroniziraj VIN odabranog profila</string>
+    <string name="cal_vin_sync_warning_title">Potvrditi zamjenu VIN-a?</string>
+    <string name="cal_vin_sync_warning_message">Time će se VIN spremljen u odabranom profilu (%1$s) zamijeniti VIN-om iz ECU-a (%2$s). Godina, motor, mjenjač i tržište neće se promijeniti. Učinite to samo nakon potvrde da je povezano odgovarajuće vozilo.</string>
+    <string name="cal_vin_sync_confirm">Zamijeni VIN</string>
+    <string name="vin_photo_capture">Fotografiraj VIN</string>
 </resources>
