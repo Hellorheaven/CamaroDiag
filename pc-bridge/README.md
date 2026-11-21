@@ -158,3 +158,21 @@ CamaroDiag.J2534Bridge.exe --repair-e39-cal-checksums original.bin calibration-m
 Le programme vérifie les deux images, refuse les changements en dehors des calibrations (y compris le boot protégé, le système d'exploitation et les zones non répertoriées), recalcule les sommes de contrôle et CVN des segments modifiés, puis crée un **nouveau** fichier complet. Il ne remplace jamais les fichiers d'entrée ou un fichier de sortie déjà existant. La sortie affiche l'OSID, les segments modifiés et les empreintes SHA-256. Un contrôle de relecture du résultat est effectué avant de déclarer la réussite. Code de sortie `0` en cas de succès, `10` en cas de refus/échec.
 
 **Cette commande n'écrit rien dans le calculateur**. Un fichier avec sommes de contrôle correctes n'est pas une preuve de compatibilité matérielle, ni une autorisation de flash ; la version réelle, l'alimentation et la récupération doivent être validées avec le boîtier J2534 et un calculateur de banc avant toute programmation.
+
+### Vérifier le calculateur physiquement avec une interface J2534 (lecture seule)
+
+Une fois le pilote Windows de l'interface installé et le calculateur correctement alimenté, vérifier d'abord la liste des interfaces :
+
+```powershell
+CamaroDiag.J2534Bridge.exe --probe-drivers
+```
+
+Puis lancer **en local**, sur le PC relié à l'interface, le test GMLAN :
+
+```powershell
+CamaroDiag.J2534Bridge.exe --probe-gmlan-ecu --adapter-index 0 --request-can-id 7E0 --response-can-id 7E8 --protocol 33
+```
+
+L'indice d'adaptateur, les identifiants CAN et le profil de liaison doivent être ceux du matériel réellement relié. Les valeurs ci-dessus sont seulement un **exemple courant de CAN haute vitesse 11 bits**, pas une adresse universellement validée pour chaque calculateur. Le programme refuse les paramètres manquants, incompatibles ou ambigus, puis lit deux fois le VIN et l'identifiant du logiciel ECU pour vérifier leur concordance. Il affiche la tension fournie par le pilote J2534 lorsque celui-ci le permet.
+
+Cette commande utilise la DLL du fabricant de l'interface, **sans PCM Hammer ni outil de flash tiers**. Elle n'active pas la session de programmation et ne demande ni déverrouillage, ni effacement, ni écriture. Une identité stable n'est **pas** une validation de programmation : la récupération et le programme de flash natif restent à qualifier sur banc.
