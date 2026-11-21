@@ -41,7 +41,9 @@ class MainActivity : ComponentActivity() {
                     CamaroAuthGate(
                         onAccountChanged = viewModel::onAccountSessionChanged,
                         onAccountDeleted = viewModel::onAccountDeleted
-                    ) { openAccount -> CamaroDiagApp(viewModel, systemLocale, openAccount) }
+                    ) { openAccount, ownerTestsAllowed ->
+                        CamaroDiagApp(viewModel, systemLocale, openAccount, ownerTestsAllowed)
+                    }
                 }
             }
         }
