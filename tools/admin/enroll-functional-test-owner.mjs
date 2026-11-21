@@ -1,77 +1,120 @@
 #!/usr/bin/env node
 /**
- * Private owner provisioning; never bundles email or hashing key into Android.
+ * Private provisioning for exactly TWO authorized Google accounts.
+ * Emails, the HMAC key, the HMAC allowlist and Firebase credentials are
+ * provided only at runtime and MUST NEVER be committed to source control.
  *
- * Mode "fingerprint": print HMAC-SHA256(normalized owner Google email).
- * Mode "grant": compare against independently configured expected HMAC,
- * remove this privileged claim from all other Firebase users, and grant it
- * only to the owner Google account. GOOGLE_APPLICATION_CREDENTIALS must
- * point to an administrator service account OUTSIDE the source tree.
+ * fingerprint: print indexed, secret-keyed HMAC-SHA256 fingerprints (no emails).
+ * grant: require matching fingerprints, validate both real Google
+ * identities BEFORE changing claims, revoke this claim from every other UID,
+ * and grant the signed Firebase owner_functional_tests claim to both.
  *
- * Environment:
- * CAMARODIAG_OWNER_GOOGLE_EMAIL  (runtime only; not committed)
- * CAMARODIAG_OWNER_HMAC_KEY      (>=32 chars; runtime only)
- * CAMARODIAG_OWNER_EXPECTED_HMAC (64-hex, grant mode)
+ * Environment (outside source control):
+ * CAMARODIAG_OWNER_GOOGLE_EMAILS  two Gmail addresses, comma-separated
+ * CAMARODIAG_OWNER_HMAC_KEY       secret key, at least 32 characters
+ * CAMARODIAG_OWNER_EXPECTED_HMACS two corresponding 64-hex HMACs, comma-separated
+ * GOOGLE_APPLICATION_CREDENTIALS Firebase Admin service account path
+ *
+ * Never log account emails, tokens, secrets or UIDs.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
+const REQUIRED_OWNER_COUNT = 2;
+const OWNER_CLAIM = 'owner_functional_tests';
 const mode = process.argv[2];
-const email = (process.env.CAMARODIAG_OWNER_GOOGLE_EMAIL ?? '')
-    .trim().normalize('NFKC').toLowerCase();
+
+function fail(message, code = 2) {
+    console.error(message);
+    process.exit(code);
+}
+
+if (!['fingerprint', 'grant'].includes(mode)) {
+    fail('Usage: node tools/admin/enroll-functional-test-owner.mjs fingerprint|grant');
+}
+
+const splitPair = (value) => (value ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+
+const emails = splitPair(process.env.CAMARODIAG_OWNER_GOOGLE_EMAILS)
+    .map((email) => email.normalize('NFKC').toLowerCase());
 const key = process.env.CAMARODIAG_OWNER_HMAC_KEY ?? '';
-if (!email.endsWith('@gmail.com') && !email.endsWith('@googlemail.com')) {
-    console.error('A Google Gmail address must be supplied privately.');
-    process.exit(2);
+
+if (emails.length !== REQUIRED_OWNER_COUNT ||
+    new Set(emails).size !== REQUIRED_OWNER_COUNT ||
+    !emails.every((email) => /^[^\s@,]+@(gmail\.com|googlemail\.com)$/.test(email))) {
+    fail('Expected exactly two distinct valid Gmail accounts in the private environment.');
 }
 if (key.length < 32) {
-    console.error('The private HMAC key must contain at least 32 characters.');
-    process.exit(2);
+    fail('The private HMAC key must contain at least 32 characters.');
 }
-const digest = createHmac('sha256', key).update(email, 'utf8').digest('hex');
+
+const fingerprints = emails.map((email) =>
+    createHmac('sha256', key).update(email, 'utf8').digest('hex')
+);
+
 if (mode === 'fingerprint') {
-    console.log(digest);
+    fingerprints.forEach((digest, index) => console.log((index + 1) + ':' + digest));
     process.exit(0);
 }
-if (mode !== 'grant') {
-    console.error('Usage: node enroll-functional-test-owner.mjs fingerprint|grant');
-    process.exit(2);
+
+const expected = splitPair(process.env.CAMARODIAG_OWNER_EXPECTED_HMACS)
+    .map((digest) => digest.toLowerCase());
+
+if (expected.length !== REQUIRED_OWNER_COUNT ||
+    !expected.every((value) => /^[0-9a-f]{64}$/.test(value)) ||
+    new Set(expected).size !== REQUIRED_OWNER_COUNT ||
+    !fingerprints.every((digest, index) =>
+        timingSafeEqual(Buffer.from(digest, 'hex'), Buffer.from(expected[index], 'hex'))
+    )
+) {
+    fail('Private owner fingerprint mismatch. No Firebase changes were made.', 3);
 }
-const expected = (process.env.CAMARODIAG_OWNER_EXPECTED_HMAC ?? '').toLowerCase();
-if (!/^[0-9a-f]{64}$/.test(expected) ||
-    !timingSafeEqual(Buffer.from(digest, 'hex'), Buffer.from(expected, 'hex'))) {
-    console.error('Owner HMAC mismatch: refusing any account changes.');
-    process.exit(3);
-}
+
 try {
     const { default: admin } = await import('firebase-admin');
-    if (!admin.apps.length) admin.initializeApp({
-        credential: admin.credential.applicationDefault()
-    });
-    const auth = admin.auth();
-    const target = await auth.getUserByEmail(email);
-    if (!target.providerData.some((p) => p.providerId === 'google.com')) {
-        console.error('Owner must link the authentic Google sign-in provider first.');
-        process.exit(4);
+    if (!admin.apps.length) {
+        admin.initializeApp({ credential: admin.credential.applicationDefault() });
     }
-    // Fail closed: any previous privileged owner is revoked, preserving other claims.
+    const auth = admin.auth();
+
+    // Validate ALL intended accounts before revoking or granting anybody.
+    const targetAccounts = await Promise.all(
+        emails.map((email) => auth.getUserByEmail(email))
+    );
+    if (new Set(targetAccounts.map((user) => user.uid)).size !== REQUIRED_OWNER_COUNT ||
+        !targetAccounts.every((user, index) =>
+            user.emailVerified === true &&
+            (user.email ?? '').normalize('NFKC').toLowerCase() === emails[index] &&
+            user.providerData.some((provider) => provider.providerId === 'google.com')
+        )
+    ) {
+        fail('Both Google-backed Firebase accounts must exist and be verified first.', 4);
+    }
+
+    const allowedUids = new Set(targetAccounts.map((user) => user.uid));
     let nextPageToken;
     do {
         const page = await auth.listUsers(1000, nextPageToken);
         for (const user of page.users) {
-            if (user.uid !== target.uid && user.customClaims?.owner_functional_tests === true) {
+            if (!allowedUids.has(user.uid) &&
+                user.customClaims?.[OWNER_CLAIM] === true) {
                 const claims = { ...user.customClaims };
-                delete claims.owner_functional_tests;
+                delete claims[OWNER_CLAIM];
                 await auth.setCustomUserClaims(user.uid, claims);
             }
         }
         nextPageToken = page.pageToken;
     } while (nextPageToken);
-    await auth.setCustomUserClaims(target.uid, {
-        ...target.customClaims,
-        owner_functional_tests: true
-    });
-    console.log('Owner entitlement provisioned for one Firebase UID. No email disclosed.');
+
+    for (const account of targetAccounts) {
+        await auth.setCustomUserClaims(account.uid, {
+            ...account.customClaims,
+            [OWNER_CLAIM]: true
+        });
+    }
+    console.log('Owner access provisioned for exactly two verified Google accounts.');
 } catch {
-    console.error('Provisioning failed. Verify Firebase Admin credentials and project access.');
-    process.exit(5);
+    fail('Firebase provisioning failed: verify project, admin privileges and accounts.', 5);
 }
