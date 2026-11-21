@@ -712,7 +712,8 @@ class BluetoothObdManager(context: Context) {
      */
     suspend fun captureAndExportJ2534Memory(
         request: J2534LiveMemoryBackup.Request,
-        output: OutputStream
+        output: OutputStream,
+        progress: (J2534LiveMemoryBackup.CaptureProgress) -> Unit = {}
     ): J2534LiveMemoryBackup.CaptureResult {
         check(isJ2534BridgeConnected() && isJ2534MemoryReadAvailable()) {
             "Connect a real Windows J2534 bridge with an approved VIN-bound memory read profile."
@@ -723,7 +724,7 @@ class BluetoothObdManager(context: Context) {
             check(isJ2534BridgeConnected() && bridge.isScopedMemoryReadEnabled) {
                 "The J2534 bridge has no approved physical ECU memory read scope."
             }
-            J2534LiveMemoryBackup.captureAndExport(bridge, request, output)
+            J2534LiveMemoryBackup.captureAndExport(bridge, request, output, progress)
         }
     }
 
