@@ -442,4 +442,26 @@
     <string name="cal_vin_sync_warning_message">VIN uložený vo vybranom profile (%1$s) bude nahradený VIN z ECU (%2$s). Rok, motor, prevodovka ani trh sa nezmenia. Urobte to až po potvrdení, že je pripojené správne vozidlo.</string>
     <string name="cal_vin_sync_confirm">Nahradiť VIN</string>
     <string name="vin_photo_capture">Odfotografovať VIN</string>
+    <string name="control_interlock_assessment">Posúdenie bezpečnostných podmienok: %1$s</string>
+    <string name="control_conditions_confirmed">podmienky potvrdené</string>
+    <string name="control_windows_explanation">Príkaz GM je potrebné identifikovať a overiť pre BCM tohto VIN. Nepredpokladá sa univerzálny rámec.</string>
+    <string name="control_sunroof_explanation">Len ak je výbava prítomná a je dostupný overený príkaz BCM.</string>
+    <string name="control_door_locks_title">Zámky dverí</string>
+    <string name="control_door_locks_explanation">Chránený príkaz karosérie: treba overiť adresovanie, zabezpečenie a stav vozidla.</string>
+    <string name="control_lights_title">Svetlá</string>
+    <string name="control_lights_explanation">Funkcie osvetlenia závisia od BCM, výbavy a trhu.</string>
+    <string name="control_horn_explanation">Zvuková signalizácia zostáva vypnutá bez overeného postupu GM a potvrdenia používateľa.</string>
+    <string name="control_mirrors_title">Zrkadlá</string>
+    <string name="control_mirrors_explanation">Príkaz musí byť overený pre výbavu a verziu BCM.</string>
+    <string name="control_trunk_explanation">Príkaz musí byť overený pre typ karosérie, BCM a stav vozidla.</string>
+    <string name="control_remote_start_title">Diaľkové štartovanie</string>
+    <string name="control_remote_start_explanation">Všeobecným rámcom OBD sa nedá bezpečne ovládať. Používajte iba systém diaľkového štartovania schválený výrobcom a jeho bezpečnostné podmienky (Park, parkovacia brzda, zatvorená kapota, bez kritických porúch). CamaroDiag neposiela príkaz na štart motora.</string>
+    <string name="remote_start_blocker_gear">Poloha Park prevodovky nie je potvrdená.</string>
+    <string name="remote_start_blocker_hood">Zatvorenie kapoty nie je potvrdené.</string>
+    <string name="remote_start_blocker_locks">Uzamknutie dverí nie je potvrdené.</string>
+    <string name="remote_start_blocker_hazards">Vypnutie výstražných svetiel nie je potvrdené.</string>
+    <string name="remote_start_blocker_theft">Pripravenosť systému proti krádeži nie je potvrdená.</string>
+    <string name="remote_start_blocker_faults">Neprítomnosť kritických porúch nie je potvrdená.</string>
+    <string name="remote_start_blocker_stationary">Státie vozidla nie je potvrdené.</string>
+    <string name="remote_start_blocker_equipment">Originálna výbava na diaľkové štartovanie nie je potvrdená.</string>
 </resources>
