@@ -20,6 +20,7 @@ internal static class NativeE39WriteSequenceSelfTests
         internal readonly List<byte[]> Requests = [];
         internal bool RejectDryRun;
         internal bool FailAfterErase;
+        internal bool UnexpectedFailureAfterErase;
         internal bool CorruptVerify;
         internal int Erases;
         private bool wroteAnything;
@@ -60,6 +61,7 @@ internal static class NativeE39WriteSequenceSelfTests
             if (request[1] == 0x00)
             {
                 if (FailAfterErase) throw new IOException("Bench transport disconnected.");
+                if (UnexpectedFailureAfterErase) throw new InvalidOperationException("Driver invalid state.");
                 Buffer.BlockCopy(request, 7, Memory, address - 0x20000, len);
                 wroteAnything = true;
             }
@@ -150,6 +152,15 @@ internal static class NativeE39WriteSequenceSelfTests
             "Transport loss after erase preserves explicit manual-recovery state");
         Assert(disconnected.Requests.Count(x => x[0] == 0x3D && x[1] == 0x05) == 1,
             "No automatic retry after destructive transport failure");
+
+        var unexpected = new TestEcu(origin) { UnexpectedFailureAfterErase = true };
+        var unexpectedJournal = new TestJournal();
+        Expect<InvalidOperationException>(() =>
+            NativeE39WriteSequence.RunBenchSequenceAsync(unexpected, unexpectedJournal,
+                plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(unexpected.Erases == 1 &&
+               unexpectedJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired,
+            "Unexpected driver exception after erase requires recovery too");
 
         var corruptEcu = new TestEcu(origin) { CorruptVerify = true };
         var verifyJournal = new TestJournal();

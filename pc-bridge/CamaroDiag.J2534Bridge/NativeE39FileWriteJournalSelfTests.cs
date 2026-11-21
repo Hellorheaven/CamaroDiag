@@ -43,23 +43,22 @@ internal static class NativeE39FileWriteJournalSelfTests
                 "Torn JSON entry cannot masquerade as a completed flash");
 
             File.Delete(path);
-            var completed = new NativeE39FileWriteJournal(path);
-            completed.AppendAsync(new(NativeE39WriteSequence.Phase.Prepared,
-                0x20000, "offline baseline"), CancellationToken.None)
-                .GetAwaiter().GetResult();
-            completed.AppendAsync(new(NativeE39WriteSequence.Phase.EraseStarted,
-                0x20000, "offline simulated erase"), CancellationToken.None)
-                .GetAwaiter().GetResult();
-            completed.AppendAsync(new(NativeE39WriteSequence.Phase.WrittenCrcVerified,
-                0x20000, "offline simulated CRC"), CancellationToken.None)
-                .GetAwaiter().GetResult();
-            completed.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,
-                0, "offline simulated success"), CancellationToken.None)
-                .GetAwaiter().GetResult();
-            completed.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            WriteScenario(path, true, false);
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
                 NativeE39FileWriteJournal.CompletionState.Completed,
-                "Durable last completed entry recognized");
+                "All sectors individually verified before completion");
+
+            File.Delete(path);
+            WriteScenario(path, false, false);
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Completion with one prepared but unwritten sector is rejected");
+
+            File.Delete(path);
+            WriteScenario(path, false, true);
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Verification for the wrong sector cannot complete a transaction");
 
             File.Delete(path);
             var forged = new NativeE39FileWriteJournal(path);
@@ -105,6 +104,34 @@ internal static class NativeE39FileWriteJournalSelfTests
         }
         Console.WriteLine($"PASS: {tests} native ECU durable journal self-tests.");
         return tests;
+    }
+
+    private static void WriteScenario(string path, bool writeSecond, bool wrongAddress)
+    {
+        var journal = new NativeE39FileWriteJournal(path);
+        void Add(NativeE39WriteSequence.Phase phase, uint address) =>
+            journal.AppendAsync(new(phase, address, "offline test"),
+                CancellationToken.None).GetAwaiter().GetResult();
+
+        uint[] addresses = [0x20000, 0x20010];
+        foreach (var address in addresses)
+            Add(NativeE39WriteSequence.Phase.Prepared, address);
+        foreach (var address in addresses)
+        {
+            Add(NativeE39WriteSequence.Phase.OriginalCrcVerified, address);
+            Add(NativeE39WriteSequence.Phase.TestWriteAccepted, address);
+        }
+
+        foreach (var address in writeSecond ? addresses : addresses.Take(1))
+        {
+            Add(NativeE39WriteSequence.Phase.EraseStarted, address);
+            Add(NativeE39WriteSequence.Phase.EraseAcknowledged, address);
+            Add(NativeE39WriteSequence.Phase.WriteStarted, address);
+            Add(NativeE39WriteSequence.Phase.WrittenCrcVerified,
+                wrongAddress ? 0x20010u : address);
+        }
+        Add(NativeE39WriteSequence.Phase.Completed, 0);
+        journal.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
     private static void AssertThrows<T>(Action action) where T : Exception

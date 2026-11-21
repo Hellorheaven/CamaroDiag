@@ -194,16 +194,26 @@ internal static class NativeE39WriteSequence
                 cancellationToken);
             return new Result(sectors.Count, writtenBytes);
         }
-        catch (Exception error) when (error is IOException or InvalidDataException or
-            OperationCanceledException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception error)
         {
             if (destructiveStarted)
             {
                 // Failure journal writes must ignore a previously cancelled
                 // operation's token, and must not restart the ECU write.
-                await journal.AppendAsync(
-                    new(Phase.RecoveryRequired, currentSector?.Address ?? 0, error.GetType().Name),
-                    CancellationToken.None);
+                try
+                {
+                    await journal.AppendAsync(
+                        new(Phase.RecoveryRequired, currentSector?.Address ?? 0, error.GetType().Name),
+                        CancellationToken.None);
+                }
+                catch (Exception journalError)
+                {
+                    // The durable EraseStarted marker still prevents declaring
+                    // success. Preserve both failures for manual recovery.
+                    throw new AggregateException(
+                        "ECU state uncertain and recovery journal append failed.",
+                        error, journalError);
+                }
             }
             throw;
         }

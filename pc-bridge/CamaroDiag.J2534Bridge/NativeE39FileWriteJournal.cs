@@ -65,14 +65,13 @@ internal sealed class NativeE39FileWriteJournal :
         var entries = File.ReadAllLines(path);
         if (entries.Length == 0)
             return CompletionState.NoEvents;
-        NativeE39WriteSequence.Phase? last = null;
-        var sawErase = false;
-        var sawVerifiedWrite = false;
-        var sawRecovery = false;
-        var sawCompletion = false;
+        var sectors = new Dictionary<uint, NativeE39WriteSequence.Phase>();
+        var preflightStarted = false;
+        var destructiveStarted = false;
+        uint? activeSector = null;
+        var completed = false;
         foreach (var entry in entries)
         {
-            // A torn/corrupted last line must NOT be interpreted as success.
             try
             {
                 using var json = JsonDocument.Parse(entry);
@@ -80,34 +79,85 @@ internal sealed class NativeE39FileWriteJournal :
                 if (node.GetProperty("Schema").GetInt32() != 1 ||
                     !Enum.TryParse<NativeE39WriteSequence.Phase>(
                         node.GetProperty("Phase").GetString(), out var phase) ||
-                    !Enum.IsDefined(phase))
+                    !Enum.IsDefined(phase) ||
+                    !node.GetProperty("Address").TryGetUInt32(out var address))
                     return CompletionState.Interrupted;
-                // A terminal success must be backed by an erase and an
-                // independently verified write, in that order. A recovery
-                // marker is sticky even if a later line claims completion.
-                if (sawCompletion || (phase == NativeE39WriteSequence.Phase.Completed &&
-                    (!sawErase || !sawVerifiedWrite || sawRecovery)) ||
-                    (phase == NativeE39WriteSequence.Phase.WrittenCrcVerified && !sawErase))
-                    return CompletionState.Interrupted;
-                if (phase == NativeE39WriteSequence.Phase.EraseStarted)
-                    sawErase = true;
-                if (phase == NativeE39WriteSequence.Phase.WrittenCrcVerified)
-                    sawVerifiedWrite = true;
+
+                // Recovery is terminal even if subsequent records claim success.
                 if (phase == NativeE39WriteSequence.Phase.RecoveryRequired)
-                    sawRecovery = true;
-                if (phase == NativeE39WriteSequence.Phase.Completed)
-                    sawCompletion = true;
-                last = phase;
+                    return CompletionState.RecoveryRequired;
+                if (completed) return CompletionState.Interrupted;
+
+                switch (phase)
+                {
+                    case NativeE39WriteSequence.Phase.Prepared:
+                        if (preflightStarted || !sectors.TryAdd(address, phase))
+                            return CompletionState.Interrupted;
+                        break;
+                    case NativeE39WriteSequence.Phase.OriginalCrcVerified:
+                        preflightStarted = true;
+                        if (destructiveStarted || !Advance(address,
+                            NativeE39WriteSequence.Phase.Prepared, phase))
+                            return CompletionState.Interrupted;
+                        break;
+                    case NativeE39WriteSequence.Phase.TestWriteAccepted:
+                        if (destructiveStarted || !Advance(address,
+                            NativeE39WriteSequence.Phase.OriginalCrcVerified, phase))
+                            return CompletionState.Interrupted;
+                        break;
+                    case NativeE39WriteSequence.Phase.EraseStarted:
+                        if (activeSector.HasValue || sectors.Count == 0 ||
+                            sectors.Values.Any(p => p != NativeE39WriteSequence.Phase.TestWriteAccepted &&
+                                p != NativeE39WriteSequence.Phase.WrittenCrcVerified) ||
+                            !Advance(address, NativeE39WriteSequence.Phase.TestWriteAccepted, phase))
+                            return CompletionState.Interrupted;
+                        destructiveStarted = true;
+                        activeSector = address;
+                        break;
+                    case NativeE39WriteSequence.Phase.EraseAcknowledged:
+                        if (activeSector != address || !Advance(address,
+                            NativeE39WriteSequence.Phase.EraseStarted, phase))
+                            return CompletionState.Interrupted;
+                        break;
+                    case NativeE39WriteSequence.Phase.WriteStarted:
+                        if (activeSector != address || !Advance(address,
+                            NativeE39WriteSequence.Phase.EraseAcknowledged, phase))
+                            return CompletionState.Interrupted;
+                        break;
+                    case NativeE39WriteSequence.Phase.WrittenCrcVerified:
+                        if (activeSector != address || !Advance(address,
+                            NativeE39WriteSequence.Phase.WriteStarted, phase))
+                            return CompletionState.Interrupted;
+                        activeSector = null;
+                        break;
+                    case NativeE39WriteSequence.Phase.Completed:
+                        if (address != 0 || !destructiveStarted || activeSector.HasValue ||
+                            sectors.Count == 0 || sectors.Values.Any(p =>
+                                p != NativeE39WriteSequence.Phase.WrittenCrcVerified))
+                            return CompletionState.Interrupted;
+                        completed = true;
+                        break;
+                    default:
+                        return CompletionState.Interrupted;
+                }
             }
             catch (Exception error) when (error is JsonException or
-                KeyNotFoundException or InvalidOperationException or FormatException)
+                KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
             {
                 return CompletionState.Interrupted;
             }
         }
-        if (sawRecovery) return CompletionState.RecoveryRequired;
-        return last == NativeE39WriteSequence.Phase.Completed && sawVerifiedWrite
-            ? CompletionState.Completed : CompletionState.Interrupted;
+
+        return completed ? CompletionState.Completed : CompletionState.Interrupted;
+
+        bool Advance(uint address, NativeE39WriteSequence.Phase expected,
+            NativeE39WriteSequence.Phase next)
+        {
+            if (!sectors.TryGetValue(address, out var current) || current != expected)
+                return false;
+            sectors[address] = next;
+            return true;
+        }
     }
 
     public async ValueTask DisposeAsync()
