@@ -22,7 +22,7 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const Stripe = require("stripe");
 const {
     normalizeEmail, verifiedFirebaseIdentity, isCurrentActiveLicense,
-    checkoutMatchesIdentity, canRevokeThisLicense
+    checkoutMatchesIdentity, canRevokeThisLicense, billingRolloutEnabled
 } = require("./licensing-policy");
 
 initializeApp();
@@ -33,13 +33,9 @@ const stripeWebhookSecret = defineSecret("CAMARODIAG_STRIPE_WEBHOOK_SECRET");
 const db = getFirestore();
 
 /**
- * Server-side independent kill switch. The repository contains the billing
- * implementation, but checkout and webhook processing are INACTIVE by default.
- * Activating this requires a deliberate server deploy and explicit approval.
+ * Billing entry points are inactive until the explicit server-side switch
+ * is enabled; a committed feature cannot process payment by itself.
  */
-function billingRolloutEnabled() {
-    return process.env.CAMARODIAG_LICENSES_ENABLED === "true";
-}
 
 function priceId() {
     const id = (process.env.CAMARODIAG_STRIPE_PRICE_ID ?? "").trim();
