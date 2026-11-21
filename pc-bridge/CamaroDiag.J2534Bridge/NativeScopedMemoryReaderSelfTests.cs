@@ -9,7 +9,11 @@ internal static class NativeScopedMemoryReaderSelfTests
         internal bool CorruptSecondPass;
         internal bool Deny;
         internal bool Truncate;
+        // Calls counts memory requests only; identity reads are independent.
         internal int Calls;
+        internal int VinCalls;
+        internal int? ChangeVinAfterMemoryCalls;
+        internal bool MalformedVin;
 
         internal FakeEcu(uint start, byte[] memory)
         {
@@ -20,6 +24,15 @@ internal static class NativeScopedMemoryReaderSelfTests
         public Task<byte[]> ExchangeAsync(byte[] request, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            if (request.SequenceEqual(new byte[] { 0x22, 0xF1, 0x90 }))
+            {
+                VinCalls++;
+                if (MalformedVin) return Task.FromResult(new byte[] { 0x62, 0xF1, 0x90 });
+                var vin = ChangeVinAfterMemoryCalls is int after && Calls >= after
+                    ? "1G1FA1RXXR0123457" : "1G1FA1RXXR0123456";
+                return Task.FromResult(new byte[] { 0x62, 0xF1, 0x90 }
+                    .Concat(System.Text.Encoding.ASCII.GetBytes(vin)).ToArray());
+            }
             Calls++;
             if (Deny) return Task.FromResult(new byte[] { 0x7F, 0x23, 0x31 });
             var address = ((uint)request[2] << 24) | ((uint)request[3] << 16) |
@@ -69,6 +82,8 @@ internal static class NativeScopedMemoryReaderSelfTests
             "Two physical reads return exactly the requested memory range");
         Assert(verified.BlocksPerPass == 3 && link.Calls == 6,
             "All three blocks were independently re-read");
+        Assert(link.VinCalls == 3,
+            "Live VIN is checked before each pass and after the final block");
         Assert(verified.Sha256.Length == 64 &&
                verified.StartAddress == 0x80001000 &&
                verified.ExpectedVin == "1G1FA1RXXR0123456",
@@ -91,6 +106,38 @@ internal static class NativeScopedMemoryReaderSelfTests
         Reject<UnauthorizedAccessException>(() =>
             NativeScopedMemoryReader.BuildReadRequest(scope, 0x80001120, 64));
         checks++;
+
+        var wrongVin = new FakeEcu(scope.StartAddress, memory) { ChangeVinAfterMemoryCalls = 0 };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                wrongVin, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(wrongVin.Calls == 0, "Incorrect initial VIN prevents every memory read");
+        var swapped = new FakeEcu(scope.StartAddress, memory) { ChangeVinAfterMemoryCalls = 3 };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                swapped, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(swapped.Calls == 3, "Changed VIN blocks the second acquisition");
+        var finalSwap = new FakeEcu(scope.StartAddress, memory) { ChangeVinAfterMemoryCalls = 6 };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                finalSwap, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(finalSwap.Calls == 6 && finalSwap.VinCalls == 3,
+            "Final VIN mismatch rejects even identical data");
+        var malformedVin = new FakeEcu(scope.StartAddress, memory) { MalformedVin = true };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                malformedVin, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(malformedVin.Calls == 0, "Truncated VIN is never considered verified");
+
+        var longMemory = new byte[5000];
+        var longScope = new J2534MemoryReadScope(
+            scope.ExpectedVin, scope.RequestCanId, scope.ResponseCanId, scope.ProtocolNumber,
+            scope.StartAddress, (uint)longMemory.Length, 128, 1);
+        var midReadSwap = new FakeEcu(scope.StartAddress, longMemory) { ChangeVinAfterMemoryCalls = 32 };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                midReadSwap, longScope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(midReadSwap.Calls == 32, "Periodic identity checkpoint stops long capture");
 
         var mismatch = new FakeEcu(scope.StartAddress, memory) { CorruptSecondPass = true };
         Reject<InvalidDataException>(() =>
@@ -115,7 +162,8 @@ internal static class NativeScopedMemoryReaderSelfTests
             Reject<OperationCanceledException>(() =>
                 NativeScopedMemoryReader.ReadTwiceAsync(
                     cancelled, scope, null, cts.Token).GetAwaiter().GetResult());
-            Assert(cancelled.Calls == 0, "Cancelled memory request sends no ECU traffic");
+            Assert(cancelled.Calls == 0 && cancelled.VinCalls == 0,
+                "Cancelled memory request sends no ECU traffic");
         }
         var oversized = new J2534MemoryReadScope(
             "1G1FA1RXXR0123456", 0x7E0, 0x7E8, 33, 0x80000000,
