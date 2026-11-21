@@ -56,6 +56,8 @@ import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.CanTraceDirection
 import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.data.obd.UdsNegativeResponse
+import com.camarodiag.gen5.data.obd.EcuBackupCoverage
+import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -286,6 +288,17 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         uri?.let { viewModel.exportEcuIdentification(it) }
+    }
+
+    var pendingJ2534MemoryCapture by remember { mutableStateOf<J2534LiveMemoryBackup.Request?>(null) }
+    val ecuMemoryArchiveExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        val request = pendingJ2534MemoryCapture
+        pendingJ2534MemoryCapture = null
+        if (uri != null && request != null) {
+            viewModel.captureJ2534Memory(uri, request)
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -600,6 +613,27 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                         viewModel.connectJ2534Bridge(host, port, token, requestId, responseId, baud)
                     },
                     onDisconnectJ2534Bridge = { viewModel.disconnectJ2534Bridge() },
+                    onCaptureJ2534Memory = { addressText, lengthText, session, region ->
+                        val address = addressText.toLongOrNull(16)
+                        val bytes = lengthText.toIntOrNull()
+                        if (address != null && bytes != null && bytes in 1..(4 * 1024 * 1024) &&
+                            address in 0L..0xFFFFFFFFL &&
+                            address + bytes <= 0x1_0000_0000L &&
+                            vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
+                        ) {
+                            pendingJ2534MemoryCapture = J2534LiveMemoryBackup.Request(
+                                expectedVin = vehicle.vin.uppercase(),
+                                region = region,
+                                address = address,
+                                lengthBytes = bytes,
+                                diagnosticSession = session,
+                                controllerLabel = ecmType
+                            )
+                            ecuMemoryArchiveExporter.launch(
+                                "CamaroDiag_ECU_memory_${System.currentTimeMillis()}.zip"
+                            )
+                        }
+                    },
                     onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportTrace = { canTracePicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel", "*/*")) },
