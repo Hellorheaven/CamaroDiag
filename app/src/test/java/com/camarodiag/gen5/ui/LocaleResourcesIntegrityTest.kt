@@ -58,8 +58,8 @@ class LocaleResourcesIntegrityTest {
      */
     @Test fun camaroDiagBrandSpellingIsImmutableInEveryLanguage() {
         val brandVariant = Regex("""(?i)(?:c|k)amarodiag""")
-        val splitBrand = Regex("""(?i)camaro[\\s_-]+diag""")
-        val cyrillicBrand = Regex("""(?iu)камаро[\\s_-]*диаг""")
+        val splitBrand = Regex("""(?i)camaro[\s_-]+diag""")
+        val cyrillicBrand = Regex("""(?iu)камаро[\s_-]*диаг""")
         for (locale in locales) {
             val translated = strings(locale)
             assertEquals("App brand must remain verbatim in $locale",
