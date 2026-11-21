@@ -703,4 +703,10 @@
     <string name="can_sniffer_capture_failed">CAN-optagelsen mislykkedes, eller adapteren holdt op med at svare.</string>
     <string name="can_sniffer_frame_count">Registrerede rammer: %1$d</string>
     <string name="can_sniffer_filtered_count">Viser %1$d af %2$d rammer</string>
+    <string name="msg_live_recording_real_started">Optagelse af faktiske OBD-data er startet.</string>
+    <string name="msg_live_recording_started">Optagelse i gang. Antal målinger: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Optagelsen er stoppet. Antal registrerede målinger: %1$d.</string>
+    <string name="msg_live_csv_exported">CSV-loggen er eksporteret. Antal målinger: %1$d.</string>
+    <string name="msg_live_csv_export_failed">CSV-loggen kunne ikke eksporteres.</string>
+    <string name="msg_live_recording_max_samples">Sikkerhedsgrænsen blev nået (%1$d). Optagelsen stoppede automatisk.</string>
 </resources>
