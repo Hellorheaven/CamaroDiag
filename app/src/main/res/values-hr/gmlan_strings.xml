@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_gmlan_read_identity">Očitaj GM VIN i OSID (J2534)</string>
+    <string name="cal_gmlan_osid">ID operacijskog sustava GM: %1$d</string>
+    <string name="cal_gmlan_vin_can">GM VIN: %1$s • CAN 0x%2$s</string>
+    <string name="cal_gmlan_identity_notice">Identifikacija samo za čitanje s odabranog fizičkog CAN čvora koji odgovara. Time se ne potvrđuje hardver ECU-a, geometrija flash memorije ni postupak oporavka.</string>
+    <string name="cal_gmlan_identity_failed">Nije moguće očitati provjereni GM VIN/OSID s ovog J2534 kanala.</string>
+</resources>
