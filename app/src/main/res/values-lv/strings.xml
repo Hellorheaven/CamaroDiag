@@ -590,4 +590,10 @@
     <string name="msg_cal_definitions_import_failed">Neizdevās importēt tabulu definīcijas.</string>
     <string name="msg_cal_map_read_failed">Neizdevās nolasīt atlasīto tabulu.</string>
     <string name="msg_cal_table_edit_failed">Neizdevās rediģēt kalibrēšanas tabulu.</string>
+    <string name="cal_expert_image_selected">Importētais fails: %1$s</string>
+    <string name="cal_expert_patch_address">Atmiņas apgabala sākuma adrese (heksadecimāli)</string>
+    <string name="cal_expert_patch_erase_bytes">Dzēšanas sektora lielums (baitos)</string>
+    <string name="cal_expert_patch_program_bytes">Programmēšanas vienības lielums (baitos)</string>
+    <string name="cal_expert_patch_preview_button">Priekšskatīt sektorus, kurus ietekmē mainītais BIN fails</string>
+    <string name="cal_expert_patch_summary">Mainīti baiti: %1$d. Ietekmētie dzēšanas sektori: %2$d. Aparatūras atmiņas karte nav pārbaudīta. Rakstīšana netika veikta.</string>
 </resources>
