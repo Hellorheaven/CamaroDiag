@@ -256,4 +256,20 @@
     <string name="cal_can_response_id">CAN-ID for svar (f.eks. 7E8)</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
     <string name="cal_j2534_security_notice">Sikkerhed: Tokenet er ikke TLS-krypteret. Brug et betroet privat netværk, og gør aldrig denne port tilgængelig fra internettet.</string>
+    <string name="cal_native_catalog_title">CAMARODIAGS EGET KATALOG</string>
+    <string name="cal_native_catalog_explanation">Definitionerne vedligeholdes af CamaroDiag uafhængigt af fællesskabets kataloger. Foreslåede eller dokumenterede definitioner sendes aldrig til en ECU.</string>
+    <string name="cal_native_catalog_loading">Indlæser eget katalog…</string>
+    <string name="cal_native_catalog_empty">Ingen proprietære Camaro-DID\'er er aktuelt godkendt til brug. Ukendte adresser og skaleringsfaktorer opfindes ikke.</string>
+    <string name="cal_native_catalog_read_disabled">Læsning fra køretøjet er deaktiveret, indtil adressering og afkodning er verificeret på en identisk konfiguration.</string>
+    <string name="cal_obdb_catalog_title">CAMARO-SPECIFIKKE SIGNALER • OBDb</string>
+    <string name="cal_obdb_catalog_explanation">Fællesskabets katalog er importeret med DID\'er, CAN-adresser, skaleringsfaktorer og filtre for modelår. Definitionerne er ikke godkendt af GM; kontrollér altid ECU\'ens svar.</string>
+    <string name="cal_obdb_catalog_loading">Indlæser Camaro-signalkatalog…</string>
+    <string name="cal_search_signal">Søg efter signal (navn, DID, system)</string>
+    <string name="cal_no_signal">Intet signal tilgængeligt</string>
+    <string name="cal_signal_debug">Signalet er markeret som DEBUG i OBDb-kilden.</string>
+    <string name="cal_signal_flow_control">Kildedefinitionen kræver flowkontrol.</string>
+    <string name="cal_signal_can_unresolved">CAN-adressen er ikke afklaret: læsning af dette signal er deaktiveret.</string>
+    <string name="cal_read_signal">Læs dette ECU-signal</string>
+    <string name="calibration_files">Kalibreringsfiler</string>
+    <string name="cal_file_inspection_hint">Importér en BIN-, HEX- eller anden hukommelsesdump for at kontrollere størrelse og SHA-256-fingeraftryk. Filen forbliver lokal; ingen skrivning til ECU\'en igangsættes.</string>
 </resources>
