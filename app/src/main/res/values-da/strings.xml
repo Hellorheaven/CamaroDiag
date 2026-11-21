@@ -317,4 +317,14 @@
     <string name="dtc_desc_p0175">For fed blanding (bank 2)</string>
     <string name="dtc_desc_p0420">Katalysatorens effektivitet under grænseværdien (bank 1)</string>
     <string name="dtc_desc_p0430">Katalysatorens effektivitet under grænseværdien (bank 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Læs ægte ECU-hukommelse (J2534)</string>
+    <string name="cal_live_memory_notice">Windows-broen kræver et godkendt hukommelseskort knyttet til VIN. Kun læsning; skrivning til ECU er deaktiveret.</string>
+    <string name="cal_live_memory_length">Antal byte at læse (maks. 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibrering</string>
+    <string name="cal_live_memory_extended">Udvidet diagnosesession (0x03)</string>
+    <string name="cal_live_memory_save">Læs ECU-hukommelsen to gange og gem som ZIP</string>
+    <string name="cal_live_memory_saved">ECU-hukommelsen er gemt efter to identiske læsninger.</string>
+    <string name="cal_live_memory_failed">Læsning af ECU-hukommelse mislykkedes. Ingen verificeret sikkerhedskopi blev oprettet.</string>
 </resources>

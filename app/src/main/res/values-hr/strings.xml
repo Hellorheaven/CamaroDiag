@@ -317,4 +317,14 @@
     <string name="dtc_desc_p0175">Prebogata smjesa (red 2)</string>
     <string name="dtc_desc_p0420">Učinkovitost katalizatora ispod praga (red 1)</string>
     <string name="dtc_desc_p0430">Učinkovitost katalizatora ispod praga (red 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Čitanje stvarne memorije ECU-a (J2534)</string>
+    <string name="cal_live_memory_notice">Windows most zahtijeva odobrenu memorijsku kartu povezanu s VIN-om. Samo čitanje; pisanje u ECU ostaje onemogućeno.</string>
+    <string name="cal_live_memory_length">Broj bajtova za čitanje (najviše 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibracija</string>
+    <string name="cal_live_memory_extended">Proširena dijagnostička sesija (0x03)</string>
+    <string name="cal_live_memory_save">Dvaput pročitaj memoriju ECU-a i spremi ZIP</string>
+    <string name="cal_live_memory_saved">Memorija ECU-a spremljena je nakon dva jednaka čitanja.</string>
+    <string name="cal_live_memory_failed">Čitanje memorije ECU-a nije uspjelo. Nije stvorena potvrđena sigurnosna kopija.</string>
 </resources>

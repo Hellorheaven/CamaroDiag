@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Liian rikas seos (lohko 2)</string>
     <string name="dtc_desc_p0420">Katalysaattorin tehokkuus alle raja-arvon (lohko 1)</string>
     <string name="dtc_desc_p0430">Katalysaattorin tehokkuus alle raja-arvon (lohko 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Todellisen ECU-muistin luku (J2534)</string>
+    <string name="cal_live_memory_notice">Windows-silta vaatii hyväksytyn VIN-tunnukseen sidotun muistikartan. Vain luku; kirjoitus ECU:hun on estetty.</string>
+    <string name="cal_live_memory_length">Luettavien tavujen määrä (enintään 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibrointi</string>
+    <string name="cal_live_memory_extended">Laajennettu diagnostiikkaistunto (0x03)</string>
+    <string name="cal_live_memory_save">Lue ECU-muisti kahdesti ja tallenna ZIP</string>
+    <string name="cal_live_memory_saved">ECU-muisti tallennettu kahden yhtenevän lukukerran jälkeen.</string>
+    <string name="cal_live_memory_failed">ECU-muistin luku epäonnistui. Vahvistettua varmuuskopiota ei luotu.</string>
 </resources>

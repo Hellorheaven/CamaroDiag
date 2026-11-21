@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Túl dús keverék (2. hengersor)</string>
     <string name="dtc_desc_p0420">A katalizátor hatásfoka a küszöb alatt (1. hengersor)</string>
     <string name="dtc_desc_p0430">A katalizátor hatásfoka a küszöb alatt (2. hengersor)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Valódi ECU-memória olvasása (J2534)</string>
+    <string name="cal_live_memory_notice">A Windows-hídhoz VIN-hez kötött, jóváhagyott memóriatérkép szükséges. Csak olvasás; az ECU írása továbbra is letiltott.</string>
+    <string name="cal_live_memory_length">Olvasandó bájtok száma (legfeljebb 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibráció</string>
+    <string name="cal_live_memory_extended">Kiterjesztett diagnosztikai munkamenet (0x03)</string>
+    <string name="cal_live_memory_save">ECU-memória kétszeri olvasása és mentése ZIP-be</string>
+    <string name="cal_live_memory_saved">Az ECU-memória két egyező olvasás után elmentve.</string>
+    <string name="cal_live_memory_failed">Az ECU-memória olvasása sikertelen. Nem készült ellenőrzött biztonsági mentés.</string>
 </resources>

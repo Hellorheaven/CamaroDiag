@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Pārāk bagāts maisījums (2. cilindru rinda)</string>
     <string name="dtc_desc_p0420">Katalizatora efektivitāte zem sliekšņa (1. cilindru rinda)</string>
     <string name="dtc_desc_p0430">Katalizatora efektivitāte zem sliekšņa (2. cilindru rinda)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Reālas ECU atmiņas nolasīšana (J2534)</string>
+    <string name="cal_live_memory_notice">Windows tiltam nepieciešama apstiprināta ar VIN saistīta atmiņas karte. Tikai lasīšana; rakstīšana ECU ir atspējota.</string>
+    <string name="cal_live_memory_length">Nolasāmo baitu skaits (līdz 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibrācija</string>
+    <string name="cal_live_memory_extended">Paplašināta diagnostikas sesija (0x03)</string>
+    <string name="cal_live_memory_save">Divreiz nolasīt ECU atmiņu un saglabāt ZIP</string>
+    <string name="cal_live_memory_saved">ECU atmiņa saglabāta pēc diviem vienādiem nolasījumiem.</string>
+    <string name="cal_live_memory_failed">ECU atmiņas nolasīšana neizdevās. Pārbaudīta rezerves kopija netika izveidota.</string>
 </resources>

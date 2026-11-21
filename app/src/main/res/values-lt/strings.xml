@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Per riebus mišinys (2 cilindrų eilė)</string>
     <string name="dtc_desc_p0420">Katalizatoriaus efektyvumas žemiau ribos (1 cilindrų eilė)</string>
     <string name="dtc_desc_p0430">Katalizatoriaus efektyvumas žemiau ribos (2 cilindrų eilė)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Tikros ECU atminties skaitymas (J2534)</string>
+    <string name="cal_live_memory_notice">Windows tiltui būtinas patvirtintas su VIN susietas atminties žemėlapis. Tik skaitymas; rašymas į ECU lieka išjungtas.</string>
+    <string name="cal_live_memory_length">Skaitytinų baitų skaičius (iki 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibravimas</string>
+    <string name="cal_live_memory_extended">Išplėstinis diagnostikos seansas (0x03)</string>
+    <string name="cal_live_memory_save">Du kartus nuskaityti ECU atmintį ir išsaugoti ZIP</string>
+    <string name="cal_live_memory_saved">ECU atmintis išsaugota po dviejų sutampančių skaitymų.</string>
+    <string name="cal_live_memory_failed">Nepavyko nuskaityti ECU atminties. Patvirtinta atsarginė kopija nesukurta.</string>
 </resources>

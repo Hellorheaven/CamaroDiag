@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Meascán róshaibhir (banc 2)</string>
     <string name="dtc_desc_p0420">Éifeachtúlacht an chatalaíoch faoi bhun na tairsí (banc 1)</string>
     <string name="dtc_desc_p0430">Éifeachtúlacht an chatalaíoch faoi bhun na tairsí (banc 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Léamh fíorchuimhne ECU (J2534)</string>
+    <string name="cal_live_memory_notice">Teastaíonn léarscáil chuimhne cheadaithe a bhaineann leis an VIN ón droichead Windows. Léamh amháin; tá scríobh chuig an ECU díchumasaithe.</string>
+    <string name="cal_live_memory_length">Bearta le léamh (uasmhéid 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Calabrú</string>
+    <string name="cal_live_memory_extended">Seisiún diagnóiseach leathnaithe (0x03)</string>
+    <string name="cal_live_memory_save">Léigh cuimhne ECU faoi dhó agus sábháil mar ZIP</string>
+    <string name="cal_live_memory_saved">Sábháladh cuimhne ECU tar éis dhá léamh chomhionanna.</string>
+    <string name="cal_live_memory_failed">Theip ar léamh chuimhne ECU. Níor cruthaíodh cúltaca fíoraithe.</string>
 </resources>

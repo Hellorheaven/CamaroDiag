@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Liiga rikas segu (plokk 2)</string>
     <string name="dtc_desc_p0420">Katalüsaatori tõhusus alla piirmäära (plokk 1)</string>
     <string name="dtc_desc_p0430">Katalüsaatori tõhusus alla piirmäära (plokk 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">ECU tegeliku mälu lugemine (J2534)</string>
+    <string name="cal_live_memory_notice">Windowsi sild vajab VIN-iga seotud kinnitatud mälukaarti. Ainult lugemine; ECU-sse kirjutamine on keelatud.</string>
+    <string name="cal_live_memory_length">Loetavate baitide arv (kuni 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibreering</string>
+    <string name="cal_live_memory_extended">Laiendatud diagnostikaseanss (0x03)</string>
+    <string name="cal_live_memory_save">Loe ECU mälu kaks korda ja salvesta ZIP-failina</string>
+    <string name="cal_live_memory_saved">ECU mälu salvestati pärast kaht ühesugust lugemist.</string>
+    <string name="cal_live_memory_failed">ECU mälu lugemine ebaõnnestus. Kontrollitud varukoopiat ei loodud.</string>
 </resources>
