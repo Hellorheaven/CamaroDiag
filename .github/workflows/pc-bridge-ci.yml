@@ -198,6 +198,8 @@ jobs:
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspectorSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommands.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommandsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39Security.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39SecuritySelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/Program.cs'; then
@@ -228,6 +230,8 @@ jobs:
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspectorSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommands.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommandsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39Security.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39SecuritySelfTests.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/J2534MemoryReadScope.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs'; then
