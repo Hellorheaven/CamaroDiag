@@ -72,8 +72,8 @@ internal static class NativeE39ImageInspector
             foreach (var spec in Specs)
             {
                 var start = CheckedImageAddress(Read32(data, spec.AddressPointer), data.Length);
-                var sumRanges = GetRanges(data, spec.SumTable, spec.SumRanges);
-                var cvnRanges = GetRanges(data, spec.CvnTable, spec.CvnRanges);
+                var sumRanges = GetRanges(data, spec.SumTable, spec.SumRanges, requireWords: true);
+                var cvnRanges = GetRanges(data, spec.CvnTable, spec.CvnRanges, requireWords: false);
                 var last = sumRanges[^1].Last;
                 if (last <= start ||
                     (spec.IsOs && start != OperatingSystemStart) ||
@@ -134,14 +134,17 @@ internal static class NativeE39ImageInspector
     private static ushort Read16(ReadOnlySpan<byte> bytes, int offset) =>
         BinaryPrimitives.ReadUInt16BigEndian(bytes.Slice(offset, 2));
 
-    private static SpanRange[] GetRanges(ReadOnlySpan<byte> image, int table, int count)
+    private static SpanRange[] GetRanges(ReadOnlySpan<byte> image, int table, int count, bool requireWords)
     {
         var ranges = new SpanRange[count];
         for (var i = 0; i < count; i++)
         {
             var first = CheckedImageAddress(Read32(image, table + 8 * i), image.Length);
             var last = CheckedImageAddress(Read32(image, table + 8 * i + 4), image.Length);
-            if (last <= first || (last - first + 1) % 2 != 0 ||
+            // SUM is a sequence of 16-bit words; CVN CRC16 counts bytes and
+            // can cover odd-length blocks in valid firmware layouts.
+            if (last < first ||
+                (requireWords && (last == first || (last - first + 1) % 2 != 0)) ||
                 first < ProtectedBootBytes)
                 throw new InvalidDataException("E39 checksum block boundaries are invalid.");
             ranges[i] = new SpanRange(first, last);
