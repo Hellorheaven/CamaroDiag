@@ -14,6 +14,10 @@ internal static class NativeScopedMemoryReaderSelfTests
         internal int VinCalls;
         internal int? ChangeVinAfterMemoryCalls;
         internal bool MalformedVin;
+        internal bool RejectDefaultSession;
+        internal bool MalformedExtendedReply;
+        internal Action? AfterRead;
+        internal readonly List<byte> Sessions = [];
 
         internal FakeEcu(uint start, byte[] memory)
         {
@@ -33,7 +37,17 @@ internal static class NativeScopedMemoryReaderSelfTests
                 return Task.FromResult(new byte[] { 0x62, 0xF1, 0x90 }
                     .Concat(System.Text.Encoding.ASCII.GetBytes(vin)).ToArray());
             }
+            if (request.Length == 2 && request[0] == 0x10)
+            {
+                Sessions.Add(request[1]);
+                if (request[1] == 0x03 && MalformedExtendedReply)
+                    return Task.FromResult(new byte[] { 0x50 });
+                if (request[1] == 0x01 && RejectDefaultSession)
+                    return Task.FromResult(new byte[] { 0x50, 0x03 });
+                return Task.FromResult(new byte[] { 0x50, request[1] });
+            }
             Calls++;
+            AfterRead?.Invoke();
             if (Deny) return Task.FromResult(new byte[] { 0x7F, 0x23, 0x31 });
             var address = ((uint)request[2] << 24) | ((uint)request[3] << 16) |
                 ((uint)request[4] << 8) | request[5];
@@ -173,6 +187,39 @@ internal static class NativeScopedMemoryReaderSelfTests
                 link, oversized, null, CancellationToken.None).GetAwaiter().GetResult());
         checks++;
 
+        var extended = new FakeEcu(scope.StartAddress, memory);
+        var result = NativeScopedMemoryReader.ReadWithSessionAsync(
+            extended, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(result.Bytes.SequenceEqual(memory) &&
+            extended.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+            "Successful extended capture restores the default diagnostic session");
+
+        var failedReset = new FakeEcu(scope.StartAddress, memory) { RejectDefaultSession = true };
+        Reject<InvalidDataException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            failedReset, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(failedReset.Calls == 6 && failedReset.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+            "Failed default-session confirmation prevents successful capture");
+
+        var failedEnter = new FakeEcu(scope.StartAddress, memory) { MalformedExtendedReply = true };
+        Reject<InvalidDataException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            failedEnter, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(failedEnter.Calls == 0 && failedEnter.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+            "Ambiguous extended-session response still triggers cleanup");
+
+        var replacement = new FakeEcu(scope.StartAddress, memory) { ChangeVinAfterMemoryCalls = 3 };
+        Reject<UnauthorizedAccessException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            replacement, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(replacement.Sessions.SequenceEqual(new byte[] { 3 }),
+            "Never send a session change to a replacement ECU");
+
+        using (var cts = new CancellationTokenSource())
+        {
+            var stopped = new FakeEcu(scope.StartAddress, memory) { AfterRead = cts.Cancel };
+            Reject<OperationCanceledException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+                stopped, scope, null, cts.Token).GetAwaiter().GetResult());
+            Assert(stopped.Calls == 1 && stopped.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+                "Cancellation restores the original ECU read session without restarting capture");
+        }
         Console.WriteLine($"PASS: {checks} native VIN-bound double-read memory self-tests.");
         return checks;
     }
