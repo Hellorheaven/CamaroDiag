@@ -51,6 +51,35 @@ class LocaleResourcesIntegrityTest {
         return values
     }
 
+    /**
+     * The product name is a trademark-like proper noun, NOT a translatable
+     * word. Languages may change the surrounding grammar but never its spelling,
+     * capitalization or add a declension suffix directly to the name.
+     */
+    @Test fun camaroDiagBrandSpellingIsImmutableInEveryLanguage() {
+        val brandVariant = Regex("""(?i)(?:c|k)amarodiag""")
+        val splitBrand = Regex("""(?i)camaro[\\s_-]+diag""")
+        val cyrillicBrand = Regex("""(?iu)камаро[\\s_-]*диаг""")
+        for (locale in locales) {
+            val translated = strings(locale)
+            assertEquals("App brand must remain verbatim in $locale",
+                "CamaroDiag", translated["app_name"])
+            for ((key, value) in translated) {
+                assertFalse("Split brand name in $locale/$key",
+                    splitBrand.containsMatchIn(value))
+                assertFalse("Transliterated brand name in $locale/$key",
+                    cyrillicBrand.containsMatchIn(value))
+                for (match in brandVariant.findAll(value)) {
+                    assertEquals("Brand spelling or case modified in $locale/$key",
+                        "CamaroDiag", match.value)
+                    val following = value.getOrNull(match.range.last + 1)
+                    assertFalse("Brand must not carry translated suffix in $locale/$key",
+                        following?.isLetter() == true)
+                }
+            }
+        }
+    }
+
     @Test fun allEuLanguagesAreDeclaredAndHaveResourceFiles() {
         val file = File("src/main/res/xml/locales_config.xml")
         val nodes = document(file).getElementsByTagName("locale")
