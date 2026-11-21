@@ -376,4 +376,19 @@
     <string name="cal_j2534_launch_instructions">Tosaigh CamaroDiag.J2534Bridge.exe ar Windows. Cuir isteach IP an ríomhaire agus an cód iomlán (comhartha.méarlorg TLS) ón gconsól. Úsáid líonra áitiúil iontaofa.</string>
     <string name="cal_j2534_security_notice">Tá TLS 1.2+ agus seiceáil mhéarlorg an teastais riachtanach. Diúltaítear do sheanchomharthaí gan mhéarlorg. Ná nocht an port don Idirlíon.</string>
     <string name="cal_pc_pairing_token">Cód TLS (comhartha.méarlorg)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Tástálacha feidhmiúla</string>
+    <string name="functional_tests_title">Tástálacha feidhmiúla — ECU agus OBD</string>
+    <string name="functional_tests_readonly">Rith gach seiceáil inléite amháin atá ar fáil leis an oiriúntóir fisiciúil atá nasctha. Marcáiltear oiriúnóirí eile agus ECUanna neamhfhíoraithe mar NÍOR TÁSTÁLADH. Gan scriosadh, gníomhachtú ná ríomhchlárú.</string>
+    <string name="functional_tests_run">Rith gach ceann</string>
+    <string name="functional_tests_stop">Stop</string>
+    <string name="functional_tests_export">Easpórtáil JSON</string>
+    <string name="functional_tests_summary">%1$d rite · %2$d teipthe · %3$d gan tástáil</string>
+    <string name="functional_tests_passed">RATHÚIL (fianaise fhisiciúil)</string>
+    <string name="functional_tests_failed">TEIPTHE</string>
+    <string name="functional_tests_skipped">GAN TÁSTÁIL</string>
+    <string name="functional_tests_denied">Rochtain diúltaithe: sínigh isteach leis an gcuntas Google údaraithe agus athcheangail.</string>
+    <string name="functional_tests_not_connected">Níl aon oiriúntóir fisiciúil OBD nasctha. Ní dhearnadh na seiceálacha eile.</string>
+    <string name="functional_tests_cancelled">Cuireadh an feachtas tástála ar ceal.</string>
 </resources>
