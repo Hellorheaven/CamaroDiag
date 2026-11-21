@@ -722,4 +722,10 @@
     <string name="msg_cal_definitions_import_failed">Definice tabulek se nepodařilo importovat.</string>
     <string name="msg_cal_map_read_failed">Vybranou tabulku se nepodařilo přečíst.</string>
     <string name="msg_cal_table_edit_failed">Kalibrační tabulku se nepodařilo upravit.</string>
+    <string name="cal_expert_image_selected">Importovaný soubor: %1$s</string>
+    <string name="cal_expert_patch_address">Počáteční adresa oblasti paměti (hex)</string>
+    <string name="cal_expert_patch_erase_bytes">Velikost sektoru pro mazání (bajty)</string>
+    <string name="cal_expert_patch_program_bytes">Velikost programovací jednotky (bajty)</string>
+    <string name="cal_expert_patch_preview_button">Zobrazit sektory ovlivněné upraveným souborem BIN</string>
+    <string name="cal_expert_patch_summary">Změněné bajty: %1$d. Dotčené sektory pro mazání: %2$d. Hardwarová mapa nebyla ověřena. Zápis neproběhl.</string>
 </resources>
