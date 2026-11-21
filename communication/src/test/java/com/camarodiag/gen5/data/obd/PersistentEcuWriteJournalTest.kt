@@ -188,4 +188,38 @@ class PersistentEcuWriteJournalTest {
         assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.INVALID_OR_UNREADABLE,
             audit.recoveryDisposition)
     }
+
+    @Test fun finalReadbackAndCompletionMustBeDurableAndOrdered() = runBlocking {
+        val (file, journal) = newJournal()
+        val next = record.copy(address = 0x1008)
+        val finalStage = EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED
+        val completedStage = EcuWriteTransaction.Stage.TRANSACTION_COMPLETED
+        journal.append(record)
+        journal.append(next)
+        for (sector in listOf(record, next)) {
+            journal.append(sector.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+            journal.append(sector.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        }
+        fun audit() = PersistentEcuWriteJournal.inspectExisting(file, target, vin)
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.ALL_RECORDED_SECTORS_VERIFIED,
+            audit().recoveryDisposition)
+        assertTrue(runCatching { journal.append(next.copy(stage = completedStage)) }.isFailure)
+        assertTrue(runCatching { journal.append(next.copy(stage = finalStage)) }.isFailure)
+        journal.append(record.copy(stage = finalStage))
+        assertEquals(1, audit().finalReadbackSectors)
+        assertFalse(audit().completionRecorded)
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.FINAL_READBACK_INCOMPLETE,
+            audit().recoveryDisposition)
+        assertTrue(runCatching { journal.append(record.copy(stage = finalStage)) }.isFailure)
+        journal.append(next.copy(stage = finalStage))
+        assertEquals(2, audit().finalReadbackSectors)
+        assertFalse(audit().completionRecorded)
+        assertTrue(runCatching { journal.append(record.copy(stage = completedStage)) }.isFailure)
+        journal.append(next.copy(stage = completedStage))
+        assertTrue(audit().completionRecorded)
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.TRANSACTION_COMPLETION_RECORDED,
+            audit().recoveryDisposition)
+        assertTrue(runCatching { journal.append(next.copy(stage = completedStage)) }.isFailure)
+        assertTrue(audit().valid)
+    }
 }
