@@ -193,6 +193,30 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun tlsBridgePairingAndSecurityGuidanceAreLocalizedInAllThirtyLocales() {
+        val keys = setOf(
+            "cal_j2534_launch_instructions", "cal_j2534_security_notice",
+            "cal_pc_pairing_token"
+        )
+        val english = strings("en")
+        assertTrue("English bridge warning must describe mandatory TLS",
+            english.getValue("cal_j2534_security_notice").contains("TLS 1.2+"))
+        assertFalse("Obsolete plaintext warning must not remain",
+            english.getValue("cal_j2534_security_notice").contains("not TLS-encrypted"))
+        for (locale in locales) {
+            val translated = strings(locale)
+            assertTrue("Missing secure bridge guidance in $locale: ${keys - translated.keys}",
+                translated.keys.containsAll(keys))
+            assertTrue("Empty secure bridge guidance in $locale",
+                keys.all { !translated.getValue(it).isBlank() })
+            if (locale != "en") {
+                assertTrue("Secure bridge warning was not localized in $locale",
+                    translated.getValue("cal_j2534_security_notice") !=
+                        english.getValue("cal_j2534_security_notice"))
+            }
+        }
+    }
+
     @Test fun phoneLanguageOptionIsTranslatedInAllThirtyLocales() {
         for (locale in locales) {
             val localized = strings(locale)
