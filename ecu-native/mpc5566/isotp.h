@@ -52,4 +52,25 @@ cd_isotp_rx_result cd_isotp_rx_frame(cd_isotp_rx *rx,
 cd_isotp_rx_result cd_isotp_rx_poll(cd_isotp_rx *rx, uint32_t now_us);
 void cd_isotp_rx_release(cd_isotp_rx *rx);
 
+typedef enum {
+    CD_ISOTP_TX_IDLE, CD_ISOTP_TX_WAIT_FLOW, CD_ISOTP_TX_SENDING,
+    CD_ISOTP_TX_COMPLETE, CD_ISOTP_TX_FAILED
+} cd_isotp_tx_state;
+
+typedef struct {
+    cd_isotp_channel channel;
+    const uint8_t *payload;
+    size_t size, sent;
+    uint32_t last_activity, not_before, separation_us;
+    uint8_t sequence, block_size, block_sent, wait_frames;
+    cd_isotp_tx_state state;
+} cd_isotp_tx;
+
+bool cd_isotp_tx_init(cd_isotp_tx *tx, const cd_isotp_channel *channel);
+bool cd_isotp_tx_start(cd_isotp_tx *tx, const uint8_t *payload,
+    size_t size, uint32_t now_us);
+void cd_isotp_tx_flow(cd_isotp_tx *tx, const cd_can_frame *frame, uint32_t now_us);
+cd_isotp_tx_state cd_isotp_tx_poll(cd_isotp_tx *tx, uint32_t now_us);
+void cd_isotp_tx_release(cd_isotp_tx *tx);
+
 #endif
