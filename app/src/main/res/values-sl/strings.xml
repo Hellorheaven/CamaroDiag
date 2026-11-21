@@ -562,4 +562,11 @@
     <string name="vin_photo_not_found">Veljavne 17-mestne številke VIN ni bilo mogoče najti. Vnesite jo ročno ali posnemite novo fotografijo.</string>
     <string name="vin_photo_error">Številke VIN s fotografije ni bilo mogoče prebrati. Poskusite znova pri boljši svetlobi in izostrite sliko.</string>
     <string name="vehicle_vin_placeholder">17 znakov</string>
+    <string name="can_sniffer_start">Začni zajem</string>
+    <string name="can_sniffer_stop">Ustavi zajem</string>
+    <string name="can_sniffer_empty">Zajet ni še noben okvir CAN.</string>
+    <string name="can_sniffer_capture_complete">Zajem okvirjev CAN je končan.</string>
+    <string name="can_sniffer_capture_failed">Zajem CAN ni uspel ali pa se je vmesnik prenehal odzivati.</string>
+    <string name="can_sniffer_frame_count">Zajeti okvirji: %1$d</string>
+    <string name="can_sniffer_filtered_count">Prikazano %1$d od %2$d okvirjev</string>
 </resources>
