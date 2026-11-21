@@ -96,6 +96,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
     CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
     OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
+    FUNCTIONAL_TESTS("Functional Tests", "Tests fonctionnels", R.string.tab_functional_tests),
     GUIDE("Guide", "Guide", R.string.tab_guide),
     CONTROL("Controls", "Pilotage", R.string.tab_controls),
     ABOUT("About", "À propos", R.string.about_title),
@@ -150,7 +151,10 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount: () -> Unit) {
+fun CamaroDiagApp(
+    viewModel: MainViewModel, systemLocale: Locale, onOpenAccount: () -> Unit,
+    ownerTestsAllowed: Boolean
+) {
     val lang by viewModel.language.collectAsState()
     val followSystemLanguage by viewModel.followSystemLanguage.collectAsState()
     val units by viewModel.unitSystem.collectAsState()
@@ -179,9 +183,16 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
     val obdScanReport by viewModel.obdScanReport.collectAsState()
     val obdScanMessage by viewModel.obdScanMessage.collectAsState()
     val isObdScanning by viewModel.isObdScanning.collectAsState()
+    val functionalTests by viewModel.functionalTestState.collectAsState()
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(ownerTestsAllowed) {
+        if (!ownerTestsAllowed && currentTab == DiagTab.FUNCTIONAL_TESTS) currentTab = DiagTab.SETUP
+    }
+    val functionalTestsExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) viewModel.exportFunctionalTests(uri) }
 
     val permissionContext = LocalContext.current
     var pendingBluetoothMac by remember { mutableStateOf<String?>(null) }
@@ -413,6 +424,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
                         DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
+                        DiagTab.FUNCTIONAL_TESTS,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.ABOUT,
@@ -433,8 +445,9 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
                     expanded = moreExpanded,
                     onDismissRequest = { moreExpanded = false }
                 ) {
-                    listOf(
-                        DiagTab.MODULES,
+                    (listOf(DiagTab.MODULES) +
+                        (if (ownerTestsAllowed) listOf(DiagTab.FUNCTIONAL_TESTS) else emptyList()) +
+                        listOf(
                         DiagTab.MILEAGE,
                         DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
@@ -442,7 +455,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.ABOUT
-                    ).forEach { tab ->
+                    )).forEach { tab ->
                         DropdownMenuItem(
                             text = {
                                 Text(stringResource(tab.labelResourceId))
@@ -550,6 +563,16 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
+                DiagTab.FUNCTIONAL_TESTS -> {
+                    if (ownerTestsAllowed) FunctionalTestsScreen(
+                        state = functionalTests,
+                        onRunAll = { viewModel.runFunctionalTests() },
+                        onStop = { viewModel.cancelFunctionalTests() },
+                        onExport = {
+                            functionalTestsExporter.launch("CamaroDiag_functional_tests_" + System.currentTimeMillis() + ".json")
+                        }
+                    )
+                }
                 DiagTab.LIVE -> LiveDataScreen(
                     pids = livePids,
                     units = units,
