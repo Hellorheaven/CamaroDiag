@@ -12,7 +12,7 @@ namespace CamaroDiag.J2534Bridge;
 /// No third-party ECU software, WebView, extra installer or service is used.
 /// All destructive programming operations remain disconnected.
 /// </summary>
-internal sealed class BridgeDesktopForm : Form
+internal sealed partial class BridgeDesktopForm : Form
 {
     private sealed record AdapterChoice(J2534Adapter Adapter)
     {
@@ -77,6 +77,10 @@ internal sealed class BridgeDesktopForm : Form
         var tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(12, 7) };
         tabs.TabPages.Add(BuildConnectionTab());
         tabs.TabPages.Add(BuildEcuTab());
+        tabs.TabPages.Add(BuildConsoleTab());
+        tabs.TabPages.Add(BuildMemoryTab());
+        tabs.TabPages.Add(BuildDiagnosticsTab());
+        tabs.TabPages.Add(BuildUpdatesTab());
         tabs.TabPages.Add(BuildHelpTab());
         Controls.Add(tabs);
 
