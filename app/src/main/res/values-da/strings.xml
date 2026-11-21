@@ -613,8 +613,8 @@
     <string name="module_note_ecm_obd_missing">Intet standard OBD 7E8-svar observeret. ECM forbliver ubekræftet, indtil en reel funktionel scanning bekræfter den.</string>
     <string name="module_note_tcm_gen5">Tilstedeværelse, adresse og understøttede data skal findes på køretøjet.</string>
     <string name="module_note_tcm_gen6">Moduladresse og understøttede tjenester skal findes på køretøjet; de antages ikke ud fra 5. generations topologi.</string>
-    <string name="module_note_bcm_gen5">GM-bulletin 07-08-49-020I identificerer BCM som modulet til lagring af kilometertælleren i Camaro 2010–2015. Præcis diagnoseadresse og læse-DID antages ikke.</string>
-    <string name="module_note_bcm_gen6_to2018">GM-bulletin 07-08-49-020M angiver BCM som modulet til lagring af kilometertælleren i Camaro til og med 2018. Diagnoseadresse og læse-DID kræver stadig VIN-specifik verifikation.</string>
+    <string name="module_note_bcm_gen5">GM-bulletin 07–08–49–020I identificerer BCM som modulet til lagring af kilometertælleren i Camaro 2010–2015. Præcis diagnoseadresse og læse-DID antages ikke.</string>
+    <string name="module_note_bcm_gen6_to2018">GM-bulletin 07–08–49–020M angiver BCM som modulet til lagring af kilometertælleren i Camaro til og med 2018. Diagnoseadresse og læse-DID kræver stadig VIN-specifik verifikation.</string>
     <string name="module_note_bcm_2019">For 2019–2024 skal arkitektur for lagring af kilometertælleren og diagnoseidentifikatorer bekræftes for dette VIN før læsning.</string>
     <string name="module_note_ipc_gen5">Serviceinformation for Camaro 2012 beskriver IPC som sekundær lagring af kilometertælleren. Præcise læsedata og adresse skal verificeres.</string>
     <string name="module_note_ipc_gen6">Sekundær lagring af kilometertælleren beskrives i serviceinformation for Camaro 2012; verificér de præcise moduldata og relationen til VIN før sammenligning.</string>
