@@ -158,6 +158,43 @@ internal static class BridgeSelfTests
         Assert(!noDevice.DriverOperational && !noDevice.EcuWriteValidated,
             "A missing physical adapter cannot pass the driver probe");
 
+        // No native tool or connected ECU is needed to test the *operator*
+        // safety envelope of the optional PCM Hammer CLI handoff.
+        var authorizedSha = new string('A', 64);
+        var handoffArguments = new[]
+        {
+            "--pcmhammer-program", "--pcmhammer-exe", "C:\\Tool\\PcmHammerCLI.exe",
+            "--image", "C:\\Images\\target.bin", "--device", "VXDIAG",
+            "--vin", "1G1FA1RXXR0123456", "--sha256", authorizedSha,
+            "--backup", "C:\\Images\\original.bin", "--mode", "calibration"
+        };
+        var parsed = PcmHammerProgrammingHandoff.Parse(handoffArguments);
+        Assert(parsed.Mode == "calibration" && parsed.Vin == "1G1FA1RXXR0123456",
+            "Explicit target, image and calibration mode parsed");
+        Assert(!PcmHammerProgrammingHandoff.IsExpectedController(
+            "E39A programming target", parsed.Vin), "E39 label without live VIN rejected");
+        Assert(!PcmHammerProgrammingHandoff.IsExpectedController(
+            "1G1FA1RXXR0123456 E92", parsed.Vin), "VIN from wrong ECU family rejected");
+        Assert(PcmHammerProgrammingHandoff.IsExpectedController(
+            "Detected E39a VIN: 1G1FA1RXXR0123456", parsed.Vin),
+            "Exact E39a family and VIN accepted");
+        var parseRejected = false;
+        try
+        {
+            PcmHammerProgrammingHandoff.Parse(handoffArguments
+                .Select(value => value == "calibration" ? "unsafe-mode" : value).ToArray());
+        }
+        catch (ArgumentException) { parseRejected = true; }
+        Assert(parseRejected, "Unknown destructive mode refused");
+        parseRejected = false;
+        try
+        {
+            PcmHammerProgrammingHandoff.Parse(handoffArguments.Concat(
+                new[] { "--force", "true" }).ToArray());
+        }
+        catch (ArgumentException) { parseRejected = true; }
+        Assert(parseRejected, "Force or unknown bypass flags refused");
+
         checks += BridgeTlsSelfTests.Run();
         Console.WriteLine($"PASS: {checks} hardware-free J2534 bridge self-tests.");
         return 0;
