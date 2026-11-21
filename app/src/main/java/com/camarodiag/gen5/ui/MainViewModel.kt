@@ -2770,6 +2770,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** USB discovery does not require Bluetooth or location permissions. */
+    fun refreshUsbDevices() {
+        viewModelScope.launch {
+            try {
+                _usbDevices.value = obdManager.getUsbDevices()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _connectionMessage.value = localizedContext.getString(R.string.msg_refresh_adapters_failed)
+            }
+        }
+    }
+
     fun refreshPairedDevices() {
         viewModelScope.launch {
             try {
