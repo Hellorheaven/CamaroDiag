@@ -185,14 +185,14 @@ private fun localizedAxisSummary(
     val details = if (axis == null) {
         stringResource(R.string.cal_axis_undefined)
     } else {
-        stringResource(R.string.cal_axis_values)
-            .replace("%1\u0024s", axis.fileOffset.toString(16).uppercase())
-            .replace("%2\u0024d", axis.count.toString())
-            .replace("%3\u0024s", axis.unit.orEmpty())
+        stringResource(
+            R.string.cal_axis_values,
+            axis.fileOffset.toString(16).uppercase(),
+            axis.count,
+            axis.unit.orEmpty()
+        )
     }
-    return stringResource(R.string.cal_axis_summary)
-        .replace("%1\u0024s", axisLabel)
-        .replace("%2\u0024s", details)
+    return stringResource(R.string.cal_axis_summary, axisLabel, details)
 }
 
 @Composable
@@ -274,10 +274,9 @@ fun CalibrationWorkspaceScreen(
     var selectedObdbSignalId by remember { mutableStateOf("") }
     val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
         ?: state.obdbSignals.firstOrNull()
-    val profileUses29BitIds = udsCanProtocol in setOf("34", "36", "64")
-    val canIdsMatchProfile = udsRequestCanId.length == udsResponseCanId.length &&
-        (udsRequestCanId.length == 8) == profileUses29BitIds &&
-        udsRequestCanId.length in setOf(3, 8)
+    val canIdsMatchProfile = J2534CanProfileValidation.isValid(
+        udsRequestCanId, udsResponseCanId, udsCanProtocol
+    )
     val filteredObdbSignals = state.obdbSignals.filter {
         obdbSignalSearch.isBlank() ||
             it.name.contains(obdbSignalSearch, true) ||
@@ -1142,7 +1141,11 @@ fun CalibrationWorkspaceScreen(
                     state.importedFileName?.let { name ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(name, color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text(pluralStringResource(R.plurals.cal_file_size_bytes, (state.importedFileSize ?: 0L).toInt(), state.importedFileSize ?: 0L), color = TextPrimary, fontSize = 12.sp)
+                        Text(pluralStringResource(
+                            R.plurals.cal_file_size_bytes,
+                            (state.importedFileSize ?: 0L).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
+                            state.importedFileSize ?: 0L
+                        ), color = TextPrimary, fontSize = 12.sp)
                         Text(stringResource(R.string.cal_file_hash_label), color = TextMuted, fontSize = 11.sp)
                         Text(state.importedFileSha256.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                         Text(stringResource(R.string.cal_hex_preview), color = TextMuted, fontSize = 11.sp)
