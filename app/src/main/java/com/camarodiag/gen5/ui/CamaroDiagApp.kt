@@ -97,6 +97,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
     OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
     FUNCTIONAL_TESTS("Functional Tests", "Tests fonctionnels", R.string.tab_functional_tests),
+    DEBUG_DOWNLOADS("Debug Builds", "Versions Debug", R.string.tab_functional_tests),
     GUIDE("Guide", "Guide", R.string.tab_guide),
     CONTROL("Controls", "Pilotage", R.string.tab_controls),
     ABOUT("About", "À propos", R.string.about_title),
@@ -188,7 +189,7 @@ fun CamaroDiagApp(
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(ownerTestsAllowed) {
-        if (!ownerTestsAllowed && currentTab == DiagTab.FUNCTIONAL_TESTS) currentTab = DiagTab.SETUP
+        if (!ownerTestsAllowed && currentTab in setOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS)) currentTab = DiagTab.SETUP
     }
     val functionalTestsExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -425,6 +426,7 @@ fun CamaroDiagApp(
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
                         DiagTab.FUNCTIONAL_TESTS,
+                        DiagTab.DEBUG_DOWNLOADS,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.ABOUT,
@@ -446,7 +448,7 @@ fun CamaroDiagApp(
                     onDismissRequest = { moreExpanded = false }
                 ) {
                     (listOf(DiagTab.MODULES) +
-                        (if (ownerTestsAllowed) listOf(DiagTab.FUNCTIONAL_TESTS) else emptyList()) +
+                        (if (ownerTestsAllowed) listOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS) else emptyList()) +
                         listOf(
                         DiagTab.MILEAGE,
                         DiagTab.CAN_SNIFFER,
@@ -458,7 +460,9 @@ fun CamaroDiagApp(
                     )).forEach { tab ->
                         DropdownMenuItem(
                             text = {
-                                Text(stringResource(tab.labelResourceId))
+                                Text(if (tab == DiagTab.DEBUG_DOWNLOADS) {
+                                    if (systemLocale.language == "fr") "Versions Debug" else "Debug builds"
+                                } else stringResource(tab.labelResourceId))
                             },
                             onClick = {
                                 currentTab = tab
@@ -563,6 +567,9 @@ fun CamaroDiagApp(
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
+                DiagTab.DEBUG_DOWNLOADS -> {
+                    if (ownerTestsAllowed) DebugDownloadsScreen()
+                }
                 DiagTab.FUNCTIONAL_TESTS -> {
                     if (ownerTestsAllowed) FunctionalTestsScreen(
                         state = functionalTests,
