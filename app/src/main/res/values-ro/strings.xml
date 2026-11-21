@@ -566,4 +566,10 @@
     <string name="can_sniffer_capture_failed">Captura CAN a eșuat sau adaptorul nu mai răspunde.</string>
     <string name="can_sniffer_frame_count">Cadre capturate: %1$d</string>
     <string name="can_sniffer_filtered_count">Se afișează %1$d din %2$d cadre</string>
+    <string name="msg_live_recording_real_started">A început înregistrarea datelor OBD reale.</string>
+    <string name="msg_live_recording_started">Înregistrare în curs. Număr de eșantioane: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Înregistrare oprită. Număr de eșantioane capturate: %1$d.</string>
+    <string name="msg_live_csv_exported">Jurnalul CSV a fost exportat. Număr de eșantioane: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Jurnalul CSV nu a putut fi exportat.</string>
+    <string name="msg_live_recording_max_samples">S-a atins limita de siguranță (%1$d). Înregistrarea s-a oprit automat.</string>
 </resources>
