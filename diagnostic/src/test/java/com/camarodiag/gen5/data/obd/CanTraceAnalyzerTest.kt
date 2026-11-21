@@ -1027,4 +1027,9 @@ class CanTraceAnalyzerTest {
         assertTrue(read("byte1,data1,data2").frames.isEmpty())
         assertTrue(read("byte0,byte2,byte3").frames.isEmpty())
     }
+    @Test
+    fun readsDecimalCommaTimestampsInSemicolonCsv() {
+        val report = CanTraceAnalyzer.analyze("time;id;data\n1,25;7E8;02 41 00", "capture.csv")
+        assertEquals(1.25, report.frames.single().timestampSeconds!!, 0.0)
+    }
 }

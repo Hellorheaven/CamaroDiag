@@ -572,7 +572,8 @@ object CanTraceAnalyzer {
             val timestampText = if (timestampIndex >= 0) field(timestampIndex) else ""
             val timestamp = when {
                 timestampIndex < 0 || timestampText.isBlank() -> null
-                else -> timestampText.toDoubleOrNull()?.takeIf { it.isFinite() }
+                else -> (if (delimiter == ';') timestampText.replace(',', '.') else timestampText)
+                    .toDoubleOrNull()?.takeIf { it.isFinite() }
             }
             if (timestampIndex >= 0 && timestampText.isNotBlank() && timestamp == null) {
                 errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
