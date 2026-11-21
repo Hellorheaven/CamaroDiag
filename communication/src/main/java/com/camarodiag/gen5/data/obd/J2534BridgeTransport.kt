@@ -28,6 +28,7 @@ class J2534BridgeTransport(
     private var writer: BufferedWriter? = null
     @Volatile private var opened = false
     private var connectedResponseCanId: String? = null
+    private var standardObdAdapterInfo: Map<String, String> = emptyMap()
     @Volatile private var scopedMemoryReadEnabled = false
     @Volatile private var standardObdPhysicalReadEnabled = false
     @Volatile private var standardObdClearEnabled = false
@@ -102,6 +103,11 @@ class J2534BridgeTransport(
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
                 val voltage = response.optLong("batteryMillivolts", -1L)
+                standardObdAdapterInfo = buildMap {
+                    put("IDENTIFICATION", adapter)
+                    put("PROTOCOL", "J2534 / ISO 15765-4 • " + response.optInt("baudRate") + " bit/s")
+                    if (voltage >= 0) put("VOLTAGE", String.format(Locale.ROOT, "%.2f V", voltage / 1000.0))
+                }
                 val voltageLabel = if (voltage >= 0) {
                     String.format(Locale.getDefault(), " • %.2f V", voltage / 1000.0)
                 } else ""
@@ -191,6 +197,45 @@ class J2534BridgeTransport(
         suspend fun read(mode: Int): List<ObdDtc> =
             J2534StandardObd.dtcs(mode, exchange(byteArrayOf(mode.toByte()), 2500))
         return Triple(read(3), read(7), read(10))
+    }
+
+    /** Physical scan uses only exact read payloads, never AT commands. */
+    suspend fun fullStandardObdScan(): ObdScanReport {
+        check(isStandardObdPhysicalReadEnabled)
+        val responder = checkNotNull(connectedResponseCanId)
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, timeout ->
+            require(command.matches(Regex("[0-9A-F]{2,6}")) && command.length % 2 == 0)
+            val payload = command.hexToBytes()
+            val mode = payload[0].toInt() and 0xFF
+            require(when (mode) {
+                1 -> payload.size == 2
+                2 -> payload.size == 3 && payload[2] == 0.toByte()
+                3,7,10 -> payload.size == 1
+                6 -> payload.size == 2 && payload[1] == 0.toByte()
+                9 -> payload.size == 2 && (payload[1].toInt() and 0xFF) in setOf(2,4,6,10)
+                else -> false
+            }) { "Unsupported physical OBD scan command." }
+            val reply = exchange(payload, timeout)
+            if (J2534StandardObd.isExplicitlyUnsupported(mode, reply) &&
+                mode !in setOf(3,7,10) && !(mode == 1 && payload[1] == 0.toByte())) {
+                // Keep the actual negative response in the scan log; the
+                // read decoder treats the requested service as unavailable.
+                reply.toHex()
+            } else {
+                require(reply.isNotEmpty() && (reply[0].toInt() and 0xFF) == mode + 0x40) {
+                    "Negative or invalid response during physical OBD scan."
+                }
+                if (mode == 1) {
+                    val pid = payload[1].toInt() and 0xFF
+                    if (pid % 32 == 0) J2534StandardObd.supportPage(pid,reply)
+                    else J2534StandardObd.pidData(pid,reply)
+                }
+                reply.toHex()
+            }
+        })
+        return engine.fullPhysicalCanScan(responder, standardObdAdapterInfo) { mode, raw ->
+            J2534StandardObd.dtcs(mode, raw.hexToBytes())
+        }
     }
 
     suspend fun clearStandardObdDtcs() = withContext(Dispatchers.IO) {
@@ -302,6 +347,7 @@ class J2534BridgeTransport(
         writer = null
         socket = null
         connectedResponseCanId = null
+        standardObdAdapterInfo = emptyMap()
         opened = false
         scopedMemoryReadEnabled = false
         standardObdPhysicalReadEnabled = false

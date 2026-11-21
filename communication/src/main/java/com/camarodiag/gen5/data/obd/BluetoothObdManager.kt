@@ -373,6 +373,18 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    suspend fun fullJ2534StandardObdScan(): ObdScanReport {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534StandardObdAvailable())
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val report = checkNotNull(j2534BridgeTransport).fullStandardObdScan()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            report
+        }
+    }
+
     fun isJ2534StandardObdClearAvailable(): Boolean =
         isJ2534StandardObdAvailable() && j2534BridgeTransport?.isStandardObdClearEnabled == true
 
