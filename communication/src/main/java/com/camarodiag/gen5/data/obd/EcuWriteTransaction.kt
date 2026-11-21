@@ -29,7 +29,11 @@ object EcuWriteTransaction {
         val originalImage: ByteArray,
         val updatedImage: ByteArray,
         val evidence: SafetyEvidence
-    )
+    ) {
+        internal val firmwareTarget get() = EcuProgrammingDriverContract.FirmwareTarget(
+            controllerFamily, expectedIdentity.controllerId, expectedIdentity.firmwareId
+        )
+    }
 
     enum class Blocker {
         UNKNOWN_TARGET, DIAGNOSTIC_ONLY_TRANSPORT, UNVERIFIED_MEMORY_MAP,
@@ -119,16 +123,7 @@ object EcuWriteTransaction {
         }
         if (preparation.changedBytes == 0L) return Outcome(Status.NO_CHANGE)
         val driver = EcuProgrammingDriverContract.registeredHardwareDrivers.firstOrNull {
-            it.descriptor.physicalHardwareValidated &&
-                request.controllerFamily in it.descriptor.controllerFamilies &&
-                it.descriptor.transport == request.transport &&
-                setOf(
-                    EcuProgrammingDriverContract.Capability.IDENTIFY,
-                    EcuProgrammingDriverContract.Capability.READ_REGION,
-                    EcuProgrammingDriverContract.Capability.ERASE_REGION,
-                    EcuProgrammingDriverContract.Capability.WRITE_REGION,
-                    EcuProgrammingDriverContract.Capability.READBACK_VERIFY
-                ).all(it.descriptor.capabilities::contains)
+            it.descriptor.supportsWrite(request.firmwareTarget, request.transport)
         } ?: return Outcome(Status.BLOCKED, setOf(Blocker.NO_VALIDATED_DRIVER))
         return EcuWriteExecutionEngine(driver, journal, powerMonitor).run(request)
     }
@@ -157,18 +152,7 @@ internal class EcuWriteExecutionEngine(
         val original = request.originalImage.copyOf()
         val updated = request.updatedImage.copyOf()
         val preview = EcuPartialWritePlanner.preview(request.layout, original, updated)
-        val requiredCapabilities = setOf(
-            EcuProgrammingDriverContract.Capability.IDENTIFY,
-            EcuProgrammingDriverContract.Capability.READ_REGION,
-            EcuProgrammingDriverContract.Capability.ERASE_REGION,
-            EcuProgrammingDriverContract.Capability.WRITE_REGION,
-            EcuProgrammingDriverContract.Capability.READBACK_VERIFY
-        )
-        if (!driver.descriptor.physicalHardwareValidated ||
-            request.controllerFamily !in driver.descriptor.controllerFamilies ||
-            driver.descriptor.transport != request.transport ||
-            !driver.descriptor.capabilities.containsAll(requiredCapabilities)
-        ) {
+        if (!driver.descriptor.supportsWrite(request.firmwareTarget, request.transport)) {
             return EcuWriteTransaction.Outcome(
                 EcuWriteTransaction.Status.BLOCKED,
                 setOf(EcuWriteTransaction.Blocker.NO_VALIDATED_DRIVER)

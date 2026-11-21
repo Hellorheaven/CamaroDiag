@@ -51,7 +51,11 @@ class EcuWriteTransactionTest {
             transport = EcuProgrammingDriverContract.Transport.J2534,
             capabilities = EcuProgrammingDriverContract.Capability.values().toSet(),
             controllerFamilies = setOf("E39"),
-            physicalHardwareValidated = validated
+            physicalHardwareValidated = validated,
+            writeTargets = setOf(
+                EcuProgrammingDriverContract.FirmwareTarget("E39", "E39-test", "firmware-test"),
+                EcuProgrammingDriverContract.FirmwareTarget("E39", "E39-test", "firmware-update")
+            )
         )
 
         private fun start(request: EcuProgrammingDriverContract.RegionRequest): Int {
@@ -136,6 +140,35 @@ class EcuWriteTransactionTest {
         assertEquals(4, records.count { it.stage == EcuWriteTransaction.Stage.BASELINE_CHECKED ||
             it.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE })
         assertEquals(2, records.count { it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE })
+    }
+
+    @Test fun sameDriverAcceptsBothDocumentedFirmwareVersions() = runBlocking {
+        for (firmware in listOf("firmware-test", "firmware-update")) {
+            val identity = expectedIdentity.copy(firmwareId = firmware)
+            val device = FakeDriver(original, identity)
+            val req = request().copy(expectedIdentity = identity)
+            val result = EcuWriteExecutionEngine(
+                device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true }
+            ).run(req)
+            assertEquals(EcuWriteTransaction.Status.COMPLETED, result.status)
+            assertArrayEquals(req.updatedImage, device.memory)
+        }
+    }
+
+    @Test fun matchingLiveIdentityStillRequiresACoveredControllerAndFirmwarePair() = runBlocking {
+        for (identity in listOf(
+            expectedIdentity.copy(firmwareId = "unlisted-firmware"),
+            expectedIdentity.copy(controllerId = "other-controller")
+        )) {
+            val device = FakeDriver(original, identity)
+            val result = EcuWriteExecutionEngine(
+                device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true }
+            ).run(request().copy(expectedIdentity = identity))
+            assertEquals(EcuWriteTransaction.Status.BLOCKED, result.status)
+            assertTrue(EcuWriteTransaction.Blocker.NO_VALIDATED_DRIVER in result.blockers)
+            assertEquals(0, device.eraseCalls)
+            assertEquals(0, device.writeCalls)
+        }
     }
 
     @Test fun baselineMismatchStopsBeforeAnyErase() = runBlocking {

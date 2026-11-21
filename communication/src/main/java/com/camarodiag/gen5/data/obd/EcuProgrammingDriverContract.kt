@@ -10,13 +10,22 @@ interface EcuProgrammingDriverContract {
         IDENTIFY, READ_REGION, ERASE_REGION, WRITE_REGION, READBACK_VERIFY, RESET
     }
 
+    /** Identifiers reported by the ECU. Service numbers and broadcast codes are catalog aliases. */
+    data class FirmwareTarget(val controllerFamily: String, val controllerId: String, val firmwareId: String)
+
     data class Descriptor(
         val id: String,
         val transport: Transport,
         val capabilities: Set<Capability>,
         val controllerFamilies: Set<String>,
-        val physicalHardwareValidated: Boolean
-    )
+        val physicalHardwareValidated: Boolean,
+        val writeTargets: Set<FirmwareTarget> = emptySet()
+    ) {
+        fun supportsWrite(target: FirmwareTarget, requestedTransport: Transport): Boolean =
+            physicalHardwareValidated && transport == requestedTransport &&
+                target.controllerFamily in controllerFamilies && target in writeTargets &&
+                capabilities.containsAll(requiredWriteCapabilities)
+    }
 
     data class Identity(val controllerId: String, val firmwareId: String, val vin: String?)
     data class RegionRequest(
@@ -34,6 +43,11 @@ interface EcuProgrammingDriverContract {
     suspend fun resetController()
 
     companion object {
+        private val requiredWriteCapabilities = setOf(
+            Capability.IDENTIFY, Capability.READ_REGION, Capability.ERASE_REGION,
+            Capability.WRITE_REGION, Capability.READBACK_VERIFY
+        )
+
         /**
          * No experimental or user-declared adapter may silently become a
          * registered writer. Add a hardware-validated implementation only after
@@ -42,14 +56,10 @@ interface EcuProgrammingDriverContract {
         val registeredHardwareDrivers: List<EcuProgrammingDriverContract> = emptyList()
 
         fun hasValidatedWriteDriver(controllerFamily: String, transport: Transport): Boolean =
-            registeredHardwareDrivers.any {
-                it.descriptor.physicalHardwareValidated &&
-                    controllerFamily in it.descriptor.controllerFamilies &&
-                    it.descriptor.transport == transport &&
-                    Capability.ERASE_REGION in it.descriptor.capabilities &&
-                    Capability.WRITE_REGION in it.descriptor.capabilities &&
-                    Capability.READBACK_VERIFY in it.descriptor.capabilities &&
-                    Capability.READ_REGION in it.descriptor.capabilities
+            registeredHardwareDrivers.any { driver ->
+                driver.descriptor.writeTargets.any { target ->
+                    target.controllerFamily == controllerFamily && driver.descriptor.supportsWrite(target, transport)
+                }
             }
     }
 }
