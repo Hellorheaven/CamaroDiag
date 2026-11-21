@@ -34,16 +34,16 @@ internal static class BridgeSelfTests
             return BridgeServer.ReadBoundedLineAsync(reader, CancellationToken.None)
                 .GetAwaiter().GetResult();
         }
-        Assert(ReadWire("{\\"op\\":\\"open\\"}\\r\\n") == "{\\"op\\":\\"open\\"}", "CRLF bridge request");
+        Assert(ReadWire("{\"op\":\"open\"}\r\n") == "{\"op\":\"open\"}", "CRLF bridge request");
         Assert(ReadWire("") is null, "Clean EOF on empty client");
-        Assert(ReadWire(new string('A', 64 * 1024) + "\\n")?.Length == 64 * 1024,
+        Assert(ReadWire(new string('A', 64 * 1024) + "\n")?.Length == 64 * 1024,
             "Maximum request accepted");
         var tooLongRejected = false;
-        try { ReadWire(new string('A', 64 * 1024 + 1) + "\\n"); }
+        try { ReadWire(new string('A', 64 * 1024 + 1) + "\n"); }
         catch (InvalidDataException) { tooLongRejected = true; }
         Assert(tooLongRejected, "Oversized request rejected before JSON parsing");
         var partialRequestRejected = false;
-        try { ReadWire("{\\"op\\":\\"open\\"}"); }
+        try { ReadWire("{\"op\":\"open\"}"); }
         catch (IOException) { partialRequestRejected = true; }
         Assert(partialRequestRejected, "Unterminated request rejected");
 
