@@ -596,4 +596,10 @@
     <string name="cal_expert_patch_program_bytes">Programmēšanas vienības lielums (baitos)</string>
     <string name="cal_expert_patch_preview_button">Priekšskatīt sektorus, kurus ietekmē mainītais BIN fails</string>
     <string name="cal_expert_patch_summary">Mainīti baiti: %1$d. Ietekmētie dzēšanas sektori: %2$d. Aparatūras atmiņas karte nav pārbaudīta. Rakstīšana netika veikta.</string>
+    <string name="dtc_gm_monitor_title">GM dzinēja uzraudzība – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Kļūdas koda reģistrēšanas kritēriji: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Aktivizēšanas nosacījumi: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Kļūmju skaitītājs / apstiprināšanas biežums: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL klasifikācija: %1$s</string>
+    <string name="dtc_gm_monitor_source">Avots: GM %1$s, %2$d. lpp.</string>
 </resources>
