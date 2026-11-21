@@ -289,7 +289,10 @@ fun AboutUpdateCard() {
             context,
             receiver,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_NOT_EXPORTED
+            // DownloadManager may broadcast from a privileged process outside
+            // system UID. Ignore spoofed events: only our persisted download
+            // ID and an APK with matching signature/version can be installed.
+            ContextCompat.RECEIVER_EXPORTED
         )
         onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
