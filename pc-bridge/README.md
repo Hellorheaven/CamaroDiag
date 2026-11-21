@@ -129,3 +129,20 @@ CamaroDiag génère désormais directement les primitives GM du **chargeur exéc
 L'algorithme de calcul de clé GMLAN **0xDC** propre au profil E39/E39A a été réécrit en opérations arithmétiques 16 bits et vérifié par des vecteurs de test. Le module gère la lecture de graine `27 01`, la préparation de la réponse `27 02`, les acquittements et les refus de l'ECU. Il n'embarque ni interpréteur ni table d'algorithmes issue d'un autre projet. Il ne tente pas d'autres clés en cas de refus et ne court-circuite pas les temporisations de sécurité.
 
 Le calcul de clé n'est utilisable physiquement qu'après identification du calculateur et entrée dans la session constructeur appropriée. Les fonctions destructives restent inaccessibles à travers la console distante tant que le pilote, le kernel de flash original et la récupération ne sont pas qualifiés sur banc.
+
+
+### Précontrôle et inspection autonome des images E39/E39A
+
+Dans le terminal Windows, l'exécutable CamaroDiag J2534 accepte désormais `CamaroDiag.J2534Bridge.exe --inspect-e39-image image.bin`. Cette commande **ne nécessite ni interface OBD ni driver matériel** : elle vérifie une image brute de 3 Mio, l'OSID, les six segments, les sommes GM et leurs CVN. Codes de sortie : `0` pour une structure et des sommes/CVN corrects, `9` pour des CVN divergents, `10` pour une image incorrecte/incomplète. Aucun contenu n'est modifié.
+
+Le précontrôle natif `NativeE39ImagePreflight` compare séparément l'image originale et l'image modifiée. Il refuse de préparer une écriture si l'OSID ne correspond pas à celui relevé sur le calculateur, si le boot protégé est modifié, si les checksums/CVN sont incohérents, si une calibration est modifiée hors d'une région reconnue ou si la géométrie des secteurs n'est pas explicitement qualifiée pour le firmware exact.
+
+### Transactions natives de secteurs et journal de récupération
+
+Le séquenceur `NativeE39WriteSequence`, testable hors matériel, vérifie **tous les secteurs avant le premier effacement** : CRC de l'original lu via le kernel, écriture d'essai sans programmation, journalisation persistante avant effacement et écriture, programmation par blocs, puis comparaison CRC indépendante après chaque secteur. Sur perte de liaison ou échec après effacement, il enregistre `RecoveryRequired` et **ne recommence jamais aveuglément**. `NativeE39FileWriteJournal` utilise un fichier JSONL nouveau, en ajout uniquement et avec vidage forcé des données, sans écraser un journal précédent.
+
+Ces composants sont des parties concrètes du futur pilote : **ils ne sont pas encore raccordés à une opération destructive du pont**. Ils exigent un kernel RAM original, une géométrie de flash attestée, un ECU de banc et une procédure de récupération matériellement démontrée.
+
+### Identification physique GMLAN en lecture seule
+
+Après l'ouverture d'un canal J2534, l'opération TLS du pont `identifyGmlan` interroge les DID GM `0x90` (VIN) et `0xC1`/`0xC9` (identifiant OS). Le service `0x1A` est autorisé **uniquement pour ces trois identifiants**, en lecture seule. Le résultat indique le VIN, l'OSID, le DID retenu et précise que l'écriture physique n'est pas qualifiée. C'est une lecture réellement pilotée par la DLL J2534 de l'interface, et non une valeur simulée, lorsqu'elle est utilisée sur un PC équipé d'un boîtier connecté.
