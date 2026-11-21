@@ -521,4 +521,13 @@
     <string name="flexfuel_preflight_recovery">Postup obnovy nebyl ověřen</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: kontrola před a po programování (pouze čtení)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Kontrola po programování nebyla provedena. Programování ECU ani zkouška vozidla po zápisu nebyly ověřeny.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Stáhněte nejnovější Debug artefakty z PR #70. Přihlaste se na GitHub autorizovaným účtem. Stažené soubory jsou archivy ZIP, které je nutné rozbalit.</string>
+    <string name="debug_builds_android_archive">ZIP obsahující Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP obsahující instalační programy Windows x64 a x86.</string>
+    <string name="debug_builds_caution">Platnost artefaktů končí po 30 dnech. Jejich dostupnost nedokládá úspěšné sestavení ani testování na vozidle. Podpisy Debug APK se mohou lišit od veřejných verzí.</string>
+    <string name="debug_builds_created">Vytvořeno</string>
+    <string name="debug_builds_expires">Platnost do</string>
+    <string name="debug_builds_no_browser">Pro otevření staženého souboru není k dispozici prohlížeč.</string>
 </resources>
