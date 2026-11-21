@@ -696,4 +696,11 @@
     <string name="vin_photo_not_found">Intet gyldigt VIN på 17 tegn fundet. Indtast det manuelt, eller tag et nyt foto.</string>
     <string name="vin_photo_error">VIN kunne ikke læses på billedet. Prøv igen med bedre lys og fokus.</string>
     <string name="vehicle_vin_placeholder">17 tegn</string>
+    <string name="can_sniffer_start">Start optagelse</string>
+    <string name="can_sniffer_stop">Stop optagelse</string>
+    <string name="can_sniffer_empty">Der er endnu ikke registreret nogen CAN-rammer.</string>
+    <string name="can_sniffer_capture_complete">CAN-optagelsen er færdig.</string>
+    <string name="can_sniffer_capture_failed">CAN-optagelsen mislykkedes, eller adapteren holdt op med at svare.</string>
+    <string name="can_sniffer_frame_count">Registrerede rammer: %1$d</string>
+    <string name="can_sniffer_filtered_count">Viser %1$d af %2$d rammer</string>
 </resources>
