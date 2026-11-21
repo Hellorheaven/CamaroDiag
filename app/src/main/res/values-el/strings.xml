@@ -869,4 +869,8 @@
     <string name="cal_live_memory_save">Διπλή ανάγνωση και αποθήκευση μνήμης ECU σε ZIP</string>
     <string name="cal_live_memory_saved">Η μνήμη ECU αποθηκεύτηκε μετά από δύο ίδιες αναγνώσεις.</string>
     <string name="cal_live_memory_failed">Η ανάγνωση μνήμης ECU απέτυχε. Δεν δημιουργήθηκε επαληθευμένο αντίγραφο.</string>
+    <string name="cal_archive_verify">Έλεγχος αντιγράφου ασφαλείας ECU σε ZIP</string>
+    <string name="cal_archive_verified">Οι δύο αναγνώσεις συμφωνούν και οι τιμές SHA-256 είναι έγκυρες για τις αποθηκευμένες περιοχές.</string>
+    <string name="cal_archive_partial">Το αντίγραφο καλύπτει μόνο μέρος της μνήμης που ζητήθηκε.</string>
+    <string name="cal_archive_failed">Ο έλεγχος του ZIP απέτυχε. Το όριο μετά την αποσυμπίεση είναι 32 MiB.</string>
 </resources>

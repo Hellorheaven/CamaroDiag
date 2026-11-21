@@ -871,4 +871,8 @@
     <string name="cal_live_memory_save">Leggi due volte e salva la memoria ECU in ZIP</string>
     <string name="cal_live_memory_saved">Memoria ECU salvata dopo due letture identiche.</string>
     <string name="cal_live_memory_failed">Lettura memoria ECU non riuscita. Nessun backup verificato creato.</string>
+    <string name="cal_archive_verify">Verifica il backup ZIP della centralina</string>
+    <string name="cal_archive_verified">Le due letture coincidono e gli hash SHA-256 degli intervalli archiviati sono validi.</string>
+    <string name="cal_archive_partial">Il backup contiene solo una parte della memoria richiesta.</string>
+    <string name="cal_archive_failed">Impossibile verificare lo ZIP. Il limite dopo la decompressione è di 32 MiB.</string>
 </resources>

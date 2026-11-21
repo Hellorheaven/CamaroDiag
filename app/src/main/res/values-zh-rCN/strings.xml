@@ -854,4 +854,8 @@
     <string name="cal_live_memory_save">读取两次并将 ECU 存储器保存为 ZIP</string>
     <string name="cal_live_memory_saved">两次读取结果一致，ECU 存储器已保存。</string>
     <string name="cal_live_memory_failed">ECU 存储器读取失败，未创建经过验证的备份。</string>
+    <string name="cal_archive_verify">校验 ECU 备份 ZIP 文件</string>
+    <string name="cal_archive_verified">两次读取的数据一致，归档地址范围的 SHA-256 哈希值校验通过。</string>
+    <string name="cal_archive_partial">备份仅包含所请求内存的一部分。</string>
+    <string name="cal_archive_failed">无法校验此 ZIP 文件。解压后的大小上限为 32 MiB。</string>
 </resources>

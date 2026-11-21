@@ -507,4 +507,8 @@
     <string name="mileage_source_ecm_total">Ukupna kilometraža iz ECM-a</string>
     <string name="mileage_source_ecm_a6">OBD brojač kilometara (PID A6)</string>
     <string name="mileage_source_ecm_d3">Brojač kilometara motora (PID D3)</string>
+    <string name="cal_archive_verify">Provjeri ZIP sa sigurnosnom kopijom ECU-a</string>
+    <string name="cal_archive_verified">Oba se očitanja podudaraju, a sažeci SHA-256 za spremljene raspone su valjani.</string>
+    <string name="cal_archive_partial">Sigurnosna kopija obuhvaća samo dio zatražene memorije.</string>
+    <string name="cal_archive_failed">Provjera ZIP-a nije uspjela. Ograničenje nakon raspakiravanja iznosi 32 MiB.</string>
 </resources>

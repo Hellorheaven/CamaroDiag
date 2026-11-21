@@ -63,6 +63,7 @@ import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
+import com.camarodiag.gen5.data.obd.EcuBackupManifest
 import com.camarodiag.gen5.data.obd.EcuBackupCoverage
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
@@ -71,6 +72,12 @@ import com.camarodiag.gen5.data.obd.CamaroSignalDefinition
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.domain.model.VehicleProfile
 import com.camarodiag.gen5.domain.model.VehicleVinComparison
+
+sealed interface ArchiveVerification {
+    data object Reading : ArchiveVerification
+    data object Failed : ArchiveVerification
+    data class Verified(val manifest: EcuBackupManifest.Manifest) : ArchiveVerification
+}
 
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
@@ -105,6 +112,7 @@ data class CalibrationWorkspaceState(
     val isTraceAnalyzing: Boolean = false,
     val traceMessage: String = "",
     val canTraceReport: CanTraceAnalysisReport? = null,
+    val archiveVerification: ArchiveVerification? = null,
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -220,6 +228,7 @@ fun CalibrationWorkspaceScreen(
     onReadObdbSignal: (String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
+    onVerifyEcuBackup: () -> Unit,
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onPreviewPartialWrite: (Long, Int, Int) -> Unit,
@@ -1104,6 +1113,32 @@ fun CalibrationWorkspaceScreen(
                         stringResource(R.string.cal_import_supported_formats),
                         color = TextMuted, fontSize = 11.sp
                     )
+                    OutlinedButton(
+                        onClick = onVerifyEcuBackup,
+                        enabled = state.archiveVerification != ArchiveVerification.Reading,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(stringResource(R.string.cal_archive_verify)) }
+                    when (val check = state.archiveVerification) {
+                        ArchiveVerification.Reading -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        ArchiveVerification.Failed -> Text(stringResource(R.string.cal_archive_failed), color = WarnRed)
+                        is ArchiveVerification.Verified -> {
+                            val manifest = check.manifest
+                            Text(stringResource(R.string.cal_archive_verified), color = OkGreen)
+                            if (manifest.coverage.status == EcuBackupCoverage.Status.PARTIAL) {
+                                Text(stringResource(R.string.cal_archive_partial), color = CamaroAmber)
+                            }
+                            manifest.vehicleVin?.let { Text("${stringResource(R.string.obd_vin)} $it", color = TextPrimary) }
+                            Text(stringResource(R.string.cal_payload_size, manifest.coverage.capturedBytes), color = TextPrimary)
+                            for (entry in manifest.entries) {
+                                val end = entry.startAddress + entry.bytesCaptured - 1
+                                Text(stringResource(R.string.cal_address_range,
+                                    entry.startAddress.toString(16).uppercase(), end.toString(16).uppercase(),
+                                    entry.bytesCaptured), color = TextMuted, fontSize = 11.sp)
+                                Text(entry.sha256, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            }
+                        }
+                        null -> Unit
+                    }
                     state.importedFileName?.let { name ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(name, color = CamaroAmber, fontWeight = FontWeight.Bold)

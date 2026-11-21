@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Insugningsluftsystem: funktionsfel</string>
     <string name="cal_axis_x">X-axel</string>
     <string name="cal_axis_y">Y-axel</string>
+    <string name="cal_archive_verify">Verifiera ZIP-fil med ECU-säkerhetskopia</string>
+    <string name="cal_archive_verified">Båda avläsningarna stämmer överens och SHA-256-hashvärdena för de arkiverade områdena är giltiga.</string>
+    <string name="cal_archive_partial">Säkerhetskopian innehåller bara en del av det begärda minnet.</string>
+    <string name="cal_archive_failed">Det gick inte att verifiera ZIP-filen. Gränsen efter uppackning är 32 MiB.</string>
 </resources>

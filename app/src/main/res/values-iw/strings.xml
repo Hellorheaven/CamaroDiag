@@ -860,4 +860,8 @@
     <string name="cal_live_memory_save">קרא פעמיים ושמור זיכרון ECU בקובץ ZIP</string>
     <string name="cal_live_memory_saved">זיכרון ECU נשמר לאחר שתי קריאות זהות.</string>
     <string name="cal_live_memory_failed">קריאת זיכרון ECU נכשלה. לא נוצר גיבוי מאומת.</string>
+    <string name="cal_archive_verify">בדיקת גיבוי ECU בקובץ ZIP</string>
+    <string name="cal_archive_verified">שתי הקריאות תואמות וערכי SHA-256 תקינים עבור טווחי הזיכרון שבארכיון.</string>
+    <string name="cal_archive_partial">הגיבוי מכסה רק חלק מטווח הזיכרון המבוקש.</string>
+    <string name="cal_archive_failed">בדיקת קובץ ה-ZIP נכשלה. הגודל המרבי לאחר חילוץ הוא 32 MiB.</string>
 </resources>

@@ -858,4 +858,8 @@
     <string name="cal_live_memory_save">ECU-geheugen tweemaal lezen en als ZIP opslaan</string>
     <string name="cal_live_memory_saved">ECU-geheugen opgeslagen na twee overeenkomende lezingen.</string>
     <string name="cal_live_memory_failed">Lezen van ECU-geheugen mislukt. Geen geverifieerde back-up gemaakt.</string>
+    <string name="cal_archive_verify">ZIP-bestand met ECU-back-up verifiëren</string>
+    <string name="cal_archive_verified">Beide uitlezingen komen overeen en de SHA-256-hashes van de opgeslagen bereiken zijn geldig.</string>
+    <string name="cal_archive_partial">De back-up bevat slechts een deel van het opgevraagde geheugen.</string>
+    <string name="cal_archive_failed">Het ZIP-bestand kon niet worden geverifieerd. Uitgepakt geldt een limiet van 32 MiB.</string>
 </resources>

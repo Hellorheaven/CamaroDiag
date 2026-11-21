@@ -854,4 +854,8 @@
     <string name="cal_live_memory_save">ECUメモリーを2回読み取りZIPで保存</string>
     <string name="cal_live_memory_saved">2回の読み取り結果が一致し、ECUメモリーを保存しました。</string>
     <string name="cal_live_memory_failed">ECUメモリーの読み取りに失敗しました。検証済みバックアップは作成されませんでした。</string>
+    <string name="cal_archive_verify">ECU バックアップの ZIP を検証</string>
+    <string name="cal_archive_verified">2 回の読み取り結果が一致し、保存された範囲の SHA-256 ハッシュも一致しました。</string>
+    <string name="cal_archive_partial">バックアップには要求したメモリの一部のみが含まれています。</string>
+    <string name="cal_archive_failed">ZIP を検証できませんでした。展開後のサイズの上限は 32 MiB です。</string>
 </resources>

@@ -384,4 +384,8 @@
     <string name="cal_read_uds_did">Læs UDS DID</string>
     <string name="cal_read_uds_dtcs">Læs UDS-fejlkoder</string>
     <string name="cal_uds_trouble_codes">UDS-fejlkoder (0x19)</string>
+    <string name="cal_archive_verify">Kontrollér ZIP-fil med ECU-sikkerhedskopi</string>
+    <string name="cal_archive_verified">De to aflæsninger stemmer overens, og SHA-256-hashværdierne for de arkiverede områder er gyldige.</string>
+    <string name="cal_archive_partial">Sikkerhedskopien dækker kun en del af den ønskede hukommelse.</string>
+    <string name="cal_archive_failed">ZIP-filen kunne ikke kontrolleres. Grænsen efter udpakning er 32 MiB.</string>
 </resources>

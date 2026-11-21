@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Beszívott levegő áramlási rendszerének működési hibája</string>
     <string name="cal_axis_x">X tengely</string>
     <string name="cal_axis_y">Y tengely</string>
+    <string name="cal_archive_verify">Az ECU biztonsági mentését tartalmazó ZIP ellenőrzése</string>
+    <string name="cal_archive_verified">A két kiolvasás megegyezik, és az archivált tartományok SHA-256 kivonatai érvényesek.</string>
+    <string name="cal_archive_partial">A mentés csak a kért memória egy részét fedi le.</string>
+    <string name="cal_archive_failed">A ZIP nem ellenőrizhető. A méretkorlát kicsomagolás után 32 MiB.</string>
 </resources>

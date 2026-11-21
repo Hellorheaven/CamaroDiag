@@ -874,4 +874,8 @@
     <string name="cal_live_memory_save">Lire deux fois et sauvegarder la mémoire ECU en ZIP</string>
     <string name="cal_live_memory_saved">Mémoire ECU sauvegardée après deux lectures identiques.</string>
     <string name="cal_live_memory_failed">Échec de lecture mémoire ECU. Aucune sauvegarde vérifiée créée.</string>
+    <string name="cal_archive_verify">Vérifier le ZIP de sauvegarde du calculateur</string>
+    <string name="cal_archive_verified">Les deux lectures concordent et les empreintes SHA-256 sont valides pour les plages archivées.</string>
+    <string name="cal_archive_partial">La sauvegarde ne couvre qu’une partie de la mémoire demandée.</string>
+    <string name="cal_archive_failed">Impossible de vérifier ce ZIP. La limite est de 32 Mio après décompression.</string>
 </resources>

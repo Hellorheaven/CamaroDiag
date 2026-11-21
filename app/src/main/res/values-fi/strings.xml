@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Imuilman virtausjärjestelmän toimintahäiriö</string>
     <string name="cal_axis_x">X-akseli</string>
     <string name="cal_axis_y">Y-akseli</string>
+    <string name="cal_archive_verify">Tarkista ECU-varmuuskopion ZIP-tiedosto</string>
+    <string name="cal_archive_verified">Molemmat lukutulokset täsmäävät ja tallennettujen alueiden SHA-256-tiivisteet ovat kelvollisia.</string>
+    <string name="cal_archive_partial">Varmuuskopio kattaa vain osan pyydetystä muistista.</string>
+    <string name="cal_archive_failed">ZIP-tiedoston tarkistus epäonnistui. Puretun tiedoston kokoraja on 32 MiB.</string>
 </resources>

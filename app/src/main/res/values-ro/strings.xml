@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Sistem debit aer de admisie: funcționare necorespunzătoare</string>
     <string name="cal_axis_x">Axa X</string>
     <string name="cal_axis_y">Axa Y</string>
+    <string name="cal_archive_verify">Verifică arhiva ZIP a copiei de siguranță ECU</string>
+    <string name="cal_archive_verified">Cele două citiri coincid, iar valorile SHA-256 sunt valide pentru intervalele arhivate.</string>
+    <string name="cal_archive_partial">Copia conține doar o parte din memoria solicitată.</string>
+    <string name="cal_archive_failed">Arhiva ZIP nu a putut fi verificată. Limita după decomprimare este de 32 MiB.</string>
 </resources>

@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Sisselaskeõhu voolusüsteemi talitlushäire</string>
     <string name="cal_axis_x">X-telg</string>
     <string name="cal_axis_y">Y-telg</string>
+    <string name="cal_archive_verify">Kontrolli ECU varukoopia ZIP-faili</string>
+    <string name="cal_archive_verified">Mõlemad lugemid kattuvad ja arhiveeritud vahemike SHA-256 räsid on õiged.</string>
+    <string name="cal_archive_partial">Varukoopia hõlmab ainult osa soovitud mälust.</string>
+    <string name="cal_archive_failed">ZIP-faili ei saanud kontrollida. Lahtipakitud mahu piir on 32 MiB.</string>
 </resources>

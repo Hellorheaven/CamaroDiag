@@ -19,6 +19,7 @@ import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
+import com.camarodiag.gen5.data.obd.EcuBackupArchive
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
 import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
@@ -2148,6 +2149,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             CalibrationFileFormat.EXTERNAL_DEFINITION -> listOf(context.getString(R.string.cal_warning_external_definition))
             CalibrationFileFormat.INTEL_HEX -> if (inspection.warnings.isNotEmpty()) listOf(context.getString(R.string.cal_warning_address_span_large)) else emptyList()
             CalibrationFileFormat.MOTOROLA_S_RECORD -> emptyList()
+        }
+    }
+
+    fun verifyEcuBackup(uri: Uri) {
+        if (_calibrationWorkspace.value.archiveVerification == ArchiveVerification.Reading) return
+        val generation = accountSessionGeneration
+        _calibrationWorkspace.update { it.copy(archiveVerification = ArchiveVerification.Reading) }
+        viewModelScope.launch {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    val stream = requireNotNull(resolver.openInputStream(uri))
+                    // The mobile importer keeps both reads in memory. The limit includes the manifest.
+                    val manifest = stream.use { EcuBackupArchive.import(it, 32L * 1024 * 1024).manifest }
+                    ArchiveVerification.Verified(manifest)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                ArchiveVerification.Failed
+            }
+            if (generation == accountSessionGeneration) {
+                _calibrationWorkspace.update { it.copy(archiveVerification = result) }
+            }
         }
     }
 

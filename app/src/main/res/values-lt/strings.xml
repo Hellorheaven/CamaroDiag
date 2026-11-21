@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Įsiurbiamo oro srauto sistemos veikimo sutrikimas</string>
     <string name="cal_axis_x">X ašis</string>
     <string name="cal_axis_y">Y ašis</string>
+    <string name="cal_archive_verify">Tikrinti ECU atsarginės kopijos ZIP failą</string>
+    <string name="cal_archive_verified">Abiejų nuskaitymų duomenys sutampa, o išsaugotų diapazonų SHA-256 maišos reikšmės galioja.</string>
+    <string name="cal_archive_partial">Kopija apima tik dalį prašytos atminties.</string>
+    <string name="cal_archive_failed">Nepavyko patikrinti ZIP failo. Išskleistų duomenų dydis negali viršyti 32 MiB.</string>
 </resources>

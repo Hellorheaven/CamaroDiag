@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Ieplūdes gaisa plūsmas sistēmas darbības kļūda</string>
     <string name="cal_axis_x">X ass</string>
     <string name="cal_axis_y">Y ass</string>
+    <string name="cal_archive_verify">Pārbaudīt ECU dublējuma ZIP failu</string>
+    <string name="cal_archive_verified">Abi nolasījumi sakrīt, un arhivēto diapazonu SHA-256 jaucējvērtības ir derīgas.</string>
+    <string name="cal_archive_partial">Dublējumā ir tikai daļa pieprasītās atmiņas.</string>
+    <string name="cal_archive_failed">Neizdevās pārbaudīt ZIP failu. Pēc atspiešanas izmēra ierobežojums ir 32 MiB.</string>
 </resources>

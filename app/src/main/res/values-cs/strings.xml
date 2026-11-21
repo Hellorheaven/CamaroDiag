@@ -384,4 +384,8 @@
     <string name="cal_read_uds_did">Načíst UDS DID</string>
     <string name="cal_read_uds_dtcs">Načíst chybové kódy UDS</string>
     <string name="cal_uds_trouble_codes">Chybové kódy UDS (0x19)</string>
+    <string name="cal_archive_verify">Ověřit ZIP se zálohou ECU</string>
+    <string name="cal_archive_verified">Obě čtení se shodují a otisky SHA-256 uložených rozsahů jsou platné.</string>
+    <string name="cal_archive_partial">Záloha obsahuje pouze část požadované paměti.</string>
+    <string name="cal_archive_failed">Archiv ZIP se nepodařilo ověřit. Limit po rozbalení je 32 MiB.</string>
 </resources>

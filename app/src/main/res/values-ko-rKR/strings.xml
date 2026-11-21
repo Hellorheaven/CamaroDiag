@@ -854,4 +854,8 @@
     <string name="cal_live_memory_save">ECU 메모리를 두 번 읽고 ZIP 저장</string>
     <string name="cal_live_memory_saved">두 번의 읽기 결과가 일치하여 ECU 메모리를 저장했습니다.</string>
     <string name="cal_live_memory_failed">ECU 메모리 읽기 실패. 검증된 백업이 생성되지 않았습니다.</string>
+    <string name="cal_archive_verify">ECU 백업 ZIP 검증</string>
+    <string name="cal_archive_verified">두 번 읽은 결과가 일치하며 보관된 범위의 SHA-256 해시도 유효합니다.</string>
+    <string name="cal_archive_partial">백업에는 요청한 메모리의 일부만 포함되어 있습니다.</string>
+    <string name="cal_archive_failed">ZIP을 검증할 수 없습니다. 압축 해제 후 크기 제한은 32 MiB입니다.</string>
 </resources>

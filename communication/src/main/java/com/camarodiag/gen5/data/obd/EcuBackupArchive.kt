@@ -104,7 +104,8 @@ object EcuBackupArchive {
         }
     }
 
-    fun import(input: InputStream): Imported {
+    fun import(input: InputStream, maxUncompressedBytes: Long = MAX_ARCHIVE_BYTES): Imported {
+        require(maxUncompressedBytes in 1..MAX_ARCHIVE_BYTES) { "Invalid archive size limit" }
         val files = linkedMapOf<String, ByteArray>()
         var total = 0L
         ZipInputStream(input).use { zip ->
@@ -124,7 +125,7 @@ object EcuBackupArchive {
                     val n = zip.read(buffer)
                     if (n < 0) break
                     total += n
-                    require(total <= MAX_ARCHIVE_BYTES && data.size() + n <= entryLimit) {
+                    require(total <= maxUncompressedBytes && data.size() + n <= entryLimit) {
                         "Archive exceeds size limit"
                     }
                     data.write(buffer, 0, n)

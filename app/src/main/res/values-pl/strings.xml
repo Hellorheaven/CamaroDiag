@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Układ przepływu powietrza dolotowego: nieprawidłowe działanie</string>
     <string name="cal_axis_x">Oś X</string>
     <string name="cal_axis_y">Oś Y</string>
+    <string name="cal_archive_verify">Sprawdź plik ZIP z kopią zapasową ECU</string>
+    <string name="cal_archive_verified">Oba odczyty są zgodne, a skróty SHA-256 zapisanych zakresów są prawidłowe.</string>
+    <string name="cal_archive_partial">Kopia obejmuje tylko część żądanego obszaru pamięci.</string>
+    <string name="cal_archive_failed">Nie udało się zweryfikować pliku ZIP. Limit rozmiaru po rozpakowaniu wynosi 32 MiB.</string>
 </resources>

@@ -868,4 +868,8 @@
     <string name="cal_live_memory_save">ECU-Speicher zweimal lesen und als ZIP speichern</string>
     <string name="cal_live_memory_saved">ECU-Speicher nach zwei übereinstimmenden Lesevorgängen gespeichert.</string>
     <string name="cal_live_memory_failed">ECU-Speicherlesen fehlgeschlagen. Kein geprüftes Backup erstellt.</string>
+    <string name="cal_archive_verify">ECU-Sicherungsarchiv prüfen</string>
+    <string name="cal_archive_verified">Beide Lesungen stimmen überein. Die SHA-256-Prüfsummen der archivierten Bereiche sind gültig.</string>
+    <string name="cal_archive_partial">Die Sicherung enthält nur einen Teil des angeforderten Speichers.</string>
+    <string name="cal_archive_failed">Das ZIP-Archiv konnte nicht geprüft werden. Entpackt sind höchstens 32 MiB zulässig.</string>
 </resources>

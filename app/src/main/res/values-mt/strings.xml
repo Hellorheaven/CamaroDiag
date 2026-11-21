@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Sistema tal-fluss tal-arja tad-dħul: ħsara fil-prestazzjoni</string>
     <string name="cal_axis_x">Assi X</string>
     <string name="cal_axis_y">Assi Y</string>
+    <string name="cal_archive_verify">Ivverifika l-fajl ZIP tal-kopja ta’ riżerva tal-ECU</string>
+    <string name="cal_archive_verified">Iż-żewġ qari jaqblu u l-valuri SHA-256 għall-meded maħżuna fl-arkivju huma validi.</string>
+    <string name="cal_archive_partial">Il-kopja ta’ riżerva tkopri biss parti mill-memorja mitluba.</string>
+    <string name="cal_archive_failed">Ma setax jiġi vverifikat il-fajl ZIP. Il-limitu wara d-dekompressjoni huwa ta’ 32 MiB.</string>
 </resources>

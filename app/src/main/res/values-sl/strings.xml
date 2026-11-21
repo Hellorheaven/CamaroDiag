@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Sistem pretoka sesalnega zraka: nepravilno delovanje</string>
     <string name="cal_axis_x">Os X</string>
     <string name="cal_axis_y">Os Y</string>
+    <string name="cal_archive_verify">Preveri datoteko ZIP z varnostno kopijo ECU</string>
+    <string name="cal_archive_verified">Obe branji se ujemata in zgoščene vrednosti SHA-256 shranjenih območij so veljavne.</string>
+    <string name="cal_archive_partial">Varnostna kopija zajema le del zahtevanega pomnilnika.</string>
+    <string name="cal_archive_failed">Datoteke ZIP ni bilo mogoče preveriti. Omejitev po razširitvi je 32 MiB.</string>
 </resources>

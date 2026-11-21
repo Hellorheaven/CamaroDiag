@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Systém prietoku nasávaného vzduchu: nesprávna funkcia</string>
     <string name="cal_axis_x">Os X</string>
     <string name="cal_axis_y">Os Y</string>
+    <string name="cal_archive_verify">Overiť ZIP so zálohou ECU</string>
+    <string name="cal_archive_verified">Obe čítania sa zhodujú a odtlačky SHA-256 uložených rozsahov sú platné.</string>
+    <string name="cal_archive_partial">Záloha obsahuje iba časť požadovanej pamäte.</string>
+    <string name="cal_archive_failed">Archív ZIP sa nepodarilo overiť. Limit po rozbalení je 32 MiB.</string>
 </resources>

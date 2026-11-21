@@ -871,4 +871,8 @@
     <string name="cal_live_memory_save">Read twice and save ECU memory ZIP</string>
     <string name="cal_live_memory_saved">ECU memory saved after two matching reads.</string>
     <string name="cal_live_memory_failed">ECU memory reading failed. No verified backup was created.</string>
+    <string name="cal_archive_verify">Verify ECU backup ZIP</string>
+    <string name="cal_archive_verified">Both reads match and the SHA-256 hashes are valid for the archived ranges.</string>
+    <string name="cal_archive_partial">The backup covers only part of the requested memory.</string>
+    <string name="cal_archive_failed">Could not verify this ZIP. The limit is 32 MiB uncompressed.</string>
 </resources>

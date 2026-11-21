@@ -499,4 +499,8 @@
     <string name="dtc_desc_p1101">Неправилна работа на системата за входящ въздух</string>
     <string name="cal_axis_x">Ос X</string>
     <string name="cal_axis_y">Ос Y</string>
+    <string name="cal_archive_verify">Проверка на ZIP архив с резервно копие на ECU</string>
+    <string name="cal_archive_verified">Двата прочита съвпадат и хешовете SHA-256 на архивираните диапазони са валидни.</string>
+    <string name="cal_archive_partial">Копието съдържа само част от заявената памет.</string>
+    <string name="cal_archive_failed">ZIP архивът не може да бъде проверен. Ограничението след разархивиране е 32 MiB.</string>
 </resources>

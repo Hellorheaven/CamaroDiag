@@ -863,4 +863,8 @@
     <string name="cal_live_memory_save">Дважды прочитать память ЭБУ и сохранить ZIP</string>
     <string name="cal_live_memory_saved">Память ЭБУ сохранена после двух совпадающих чтений.</string>
     <string name="cal_live_memory_failed">Ошибка чтения памяти ЭБУ. Проверенная копия не создана.</string>
+    <string name="cal_archive_verify">Проверить ZIP-архив резервной копии ЭБУ</string>
+    <string name="cal_archive_verified">Оба чтения совпадают. Хеши SHA-256 для сохранённых диапазонов верны.</string>
+    <string name="cal_archive_partial">Копия охватывает только часть запрошенной памяти.</string>
+    <string name="cal_archive_failed">Не удалось проверить ZIP-архив. Предельный размер после распаковки — 32 МиБ.</string>
 </resources>

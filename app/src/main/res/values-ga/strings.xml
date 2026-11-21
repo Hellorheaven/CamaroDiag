@@ -257,4 +257,8 @@
     <string name="dtc_desc_p1101">Córas sreabhadh aeir iontógála: mífheidhmiú</string>
     <string name="cal_axis_x">Ais X</string>
     <string name="cal_axis_y">Ais Y</string>
+    <string name="cal_archive_verify">Fíoraigh comhad ZIP chúltaca an ECU</string>
+    <string name="cal_archive_verified">Is ionann an dá léamh agus tá haisluachanna SHA-256 na raonta sa chartlann bailí.</string>
+    <string name="cal_archive_partial">Ní chumhdaíonn an cúltaca ach cuid den chuimhne a iarradh.</string>
+    <string name="cal_archive_failed">Níorbh fhéidir an comhad ZIP a fhíorú. Is é 32 MiB an teorainn tar éis dí-chomhbhrú.</string>
 </resources>

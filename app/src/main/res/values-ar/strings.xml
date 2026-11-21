@@ -869,4 +869,8 @@
     <string name="cal_live_memory_save">قراءة ذاكرة ECU مرتين وحفظها في ZIP</string>
     <string name="cal_live_memory_saved">تم حفظ ذاكرة ECU بعد قراءتين متطابقتين.</string>
     <string name="cal_live_memory_failed">فشلت قراءة ذاكرة ECU. لم تُنشأ نسخة احتياطية متحقق منها.</string>
+    <string name="cal_archive_verify">التحقق من ملف ZIP لنسخة وحدة التحكم الاحتياطية</string>
+    <string name="cal_archive_verified">تتطابق القراءتان وقيم SHA-256 صحيحة لنطاقات الذاكرة المحفوظة.</string>
+    <string name="cal_archive_partial">تشمل النسخة الاحتياطية جزءًا فقط من الذاكرة المطلوبة.</string>
+    <string name="cal_archive_failed">تعذّر التحقق من ملف ZIP. الحد الأقصى بعد فك الضغط هو 32 MiB.</string>
 </resources>

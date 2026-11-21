@@ -256,6 +256,19 @@ class EcuBackupArchiveTest {
         }.isFailure)
     }
 
+    @Test fun mobileImportBudgetCountsTheManifestAndBothReads() {
+        val source = ByteArrayOutputStream()
+        EcuBackupArchive.export(source, listOf(capture()), setOf(capture().region))
+        val archive = source.toByteArray()
+        val size = java.util.zip.ZipInputStream(archive.inputStream()).use { zip ->
+            var total = 0L
+            while (zip.nextEntry != null) total += zip.readBytes().size
+            total
+        }
+        assertTrue(EcuBackupArchive.import(archive.inputStream(), size).verification.consistent)
+        assertTrue(runCatching { EcuBackupArchive.import(archive.inputStream(), size - 1) }.isFailure)
+    }
+
     @Test fun archiveSizeIncludesManifestAndCannotCrossImportLimit() {
         val limit = 256L * 1024 * 1024
         assertTrue(EcuBackupArchive.fitsUncompressedLimit(limit - 64L, 64L))

@@ -241,6 +241,10 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
         uri?.let { viewModel.importCalibrationFile(it) }
     }
 
+    val ecuBackupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::verifyEcuBackup)
+    }
+
     val canTracePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -635,6 +639,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                         }
                     },
                     onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
+                    onVerifyEcuBackup = { ecuBackupPicker.launch(arrayOf("application/zip", "application/octet-stream")) },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportTrace = { canTracePicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel", "*/*")) },
                     onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
