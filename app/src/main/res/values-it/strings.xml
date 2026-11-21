@@ -875,4 +875,17 @@
     <string name="cal_archive_verified">Le due letture coincidono e gli hash SHA-256 degli intervalli archiviati sono validi.</string>
     <string name="cal_archive_partial">Il backup contiene solo una parte della memoria richiesta.</string>
     <string name="cal_archive_failed">Impossibile verificare lo ZIP. Il limite dopo la decompressione è di 32 MiB.</string>
+    <string name="tab_functional_tests">Test funzionali</string>
+    <string name="functional_tests_title">Test funzionali — centraline e OBD</string>
+    <string name="functional_tests_readonly">Avvia le verifiche disponibili in sola lettura con l\'adattatore fisico collegato. Le altre interfacce e le centraline non verificate restano NON TESTATE. Nessuna cancellazione o programmazione.</string>
+    <string name="functional_tests_run">Avvia tutti</string>
+    <string name="functional_tests_stop">Interrompi</string>
+    <string name="functional_tests_export">Esporta JSON</string>
+    <string name="functional_tests_summary">%1$d superati · %2$d non superati · %3$d non testati</string>
+    <string name="functional_tests_passed">SUPERATO (prova fisica)</string>
+    <string name="functional_tests_failed">ERRORE</string>
+    <string name="functional_tests_skipped">NON TESTATO</string>
+    <string name="functional_tests_denied">Accesso negato: accedere con l\'account Google autorizzato.</string>
+    <string name="functional_tests_not_connected">Nessun adattatore OBD fisico collegato. Le altre verifiche non sono state eseguite.</string>
+    <string name="functional_tests_cancelled">Sessione di test annullata.</string>
 </resources>
