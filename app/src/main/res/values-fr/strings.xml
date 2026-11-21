@@ -891,4 +891,19 @@
     <string name="cal_archive_verified">Les deux lectures concordent et les empreintes SHA-256 sont valides pour les plages archivées.</string>
     <string name="cal_archive_partial">La sauvegarde ne couvre qu’une partie de la mémoire demandée.</string>
     <string name="cal_archive_failed">Impossible de vérifier ce ZIP. La limite est de 32 Mio après décompression.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Versions Debug</string>
+    <string name="tab_license">Licence</string>
+    <string name="debug_builds_title">Versions Debug privées</string>
+    <string name="debug_builds_refresh">Actualiser les versions</string>
+    <string name="debug_builds_download">Télécharger sur GitHub</string>
+    <string name="debug_builds_unavailable">Aucune archive Debug valide disponible.</string>
+    <string name="debug_builds_error">Impossible de charger les versions Debug depuis GitHub.</string>
+    <string name="license_disabled">Le système de licences n\'est pas activé.</string>
+    <string name="license_buy">Acheter une licence</string>
+    <string name="license_refresh">Actualiser la licence</string>
+    <string name="license_free">Gratuit</string>
+    <string name="license_owner">Propriétaire : tous les droits</string>
+    <string name="license_premium">Licence complète active</string>
+    <string name="license_title">Licence CamaroDiag</string>
 </resources>
