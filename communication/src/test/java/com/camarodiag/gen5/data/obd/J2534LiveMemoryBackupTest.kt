@@ -2,6 +2,8 @@ package com.camarodiag.gen5.data.obd
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -169,5 +171,79 @@ class J2534LiveMemoryBackupTest {
             fake, request().copy(diagnosticSession = 2)
         ) }.isFailure)
         assertTrue(fake.sent.isEmpty())
+    }
+
+    @Test fun cancellationClosesExtendedSessionOnTheOriginalEcu() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val job = launch {
+            J2534LiveMemoryBackup.captureForTest(ecu, request(session = 3)) { progress ->
+                if (progress.pass == 1 && progress.completedBytes == 0) this@launch.cancel()
+            }
+        }
+        job.join()
+        assertTrue(job.isCancelled)
+        assertEquals(0, ecu.reads)
+        assertEquals(listOf(3, 1), ecu.sent.filter { it[0] == 0x10.toByte() }.map { it[1].toInt() })
+    }
+
+    @Test fun extendedSessionIsNeverResetAfterLiveVinMismatch() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val replacement = ScriptedEcu(baseline, "1G1FA1RXXR0123457")
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (ecu.reads >= 3) replacement.exchange(payload, timeoutMs)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.isFailure)
+        assertEquals(3, ecu.reads)
+        assertTrue(replacement.sent.none { it[0] == 0x10.toByte() })
+    }
+
+    @Test fun malformedDefaultSessionReplyPreventsSuccessfulExport() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload.contentEquals(byteArrayOf(0x10, 0x01))) byteArrayOf(0x50, 0x03)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.isFailure)
+        assertEquals(6, ecu.reads)
+    }
+
+    @Test fun malformedExtendedSessionReplyStillTriggersIdentityBoundCleanup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val attempted = mutableListOf<Int>()
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                if (payload[0] == 0x10.toByte()) {
+                    attempted += payload[1].toInt()
+                    if (payload[1] == 0x03.toByte()) return byteArrayOf(0x50)
+                }
+                return ecu.exchange(payload, timeoutMs)
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.isFailure)
+        assertEquals(listOf(3, 1), attempted)
+        assertEquals(0, ecu.reads)
+    }
+
+    @Test fun wrongTesterPresentSubfunctionStopsLongCapture() = runBlocking {
+        val data = ByteArray(5000) { it.toByte() }
+        val ecu = ScriptedEcu(data, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload[0] == 0x3E.toByte()) byteArrayOf(0x7E, 0x01)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(length = data.size))
+        }.isFailure)
+        assertEquals(32, ecu.reads)
     }
 }
