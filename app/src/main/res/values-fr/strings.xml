@@ -855,10 +855,10 @@
     <string name="live_pid_fuel_press">Pression carburant</string>
     <string name="live_pid_timing">Avance à l\'allumage</string>
     <string name="live_pid_eq_ratio">Rapport d\'équivalence demandé</string>
-    <string name="live_pid_o2_b1s1">Sonde lambda B1S1 - tension</string>
-    <string name="live_pid_o2_b1s2">Sonde lambda B1S2 - tension</string>
-    <string name="live_pid_o2_b1s3">Sonde lambda B1S3 - tension</string>
-    <string name="live_pid_o2_b1s4">Sonde lambda B1S4 - tension</string>
+    <string name="live_pid_o2_b1s1">Sonde lambda B1S1 – tension</string>
+    <string name="live_pid_o2_b1s2">Sonde lambda B1S2 – tension</string>
+    <string name="live_pid_o2_b1s3">Sonde lambda B1S3 – tension</string>
+    <string name="live_pid_o2_b1s4">Sonde lambda B1S4 – tension</string>
     <string name="live_pid_wbo2_b1s1">Lambda large bande B1S1</string>
     <string name="live_pid_wbo2_b1s2">Lambda large bande B1S2</string>
     <string name="live_pid_wbo2_b2s1">Lambda large bande B2S1</string>
