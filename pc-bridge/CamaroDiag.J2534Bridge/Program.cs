@@ -18,6 +18,11 @@ internal static class Program
         if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
             return BridgeSelfTests.Run();
 
+        // Driver verification is explicitly requested by the operator. Do not
+        // contact an ECU, start the network bridge or run the updater here.
+        if (args.Contains("--probe-drivers", StringComparer.OrdinalIgnoreCase))
+            return J2534DriverProbe.RunAll();
+
         if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
         J2534MemoryReadScope? memoryReadScope = null;
