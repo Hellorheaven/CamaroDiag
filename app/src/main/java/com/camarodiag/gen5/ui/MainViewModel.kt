@@ -3278,8 +3278,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun runMileageAudit() {
         if (!requirePremiumLicense()) return
         val startedGeneration = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val selectedVin = _vehicle.value.vin
+        fun current() = isCurrentAccountGeneration(startedGeneration) &&
+            connection == connectionAttemptGeneration && selectedVin == _vehicle.value.vin
         viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+            if (!current()) return@launch
             beginBusyOperation()
             _mileageReport.value = null
             val readings = mutableListOf<MileageSourceReading>()
@@ -3338,15 +3342,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Donnée IPC non interrogée : aucun profil VIN avec adresse/DID vérifié n'est installé."
                     )
                 }
-                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-                _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
+                if (!current()) return@launch
+                _mileageReport.value = MileageAuditEngine.evaluate(selectedVin, readings)
                 _connectionMessage.value = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentAccountGeneration(startedGeneration)) {
+                if (current()) {
                     reportConnectionLoss(error)
-                    _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
+                    _mileageReport.value = MileageAuditEngine.evaluate(selectedVin, readings)
                     _connectionMessage.value = localizedContext.getString(R.string.msg_mileage_audit_failed)
                 }
             } finally {
