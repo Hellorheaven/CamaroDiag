@@ -613,4 +613,6 @@
     <string name="cal_tcp_port">Port TCP</string>
     <string name="msg_refresh_adapters_failed">Nie udało się odświeżyć listy adapterów.</string>
     <string name="msg_usb_identifier_unavailable">Identyfikator urządzenia USB jest niedostępny</string>
+    <string name="msg_simulation_activation_failed">Nie udało się włączyć trybu symulacji.</string>
+    <string name="msg_live_simulation_active">Symulacja jest aktywna. Wyświetlane wartości nie pochodzą z pojazdu.</string>
 </resources>
