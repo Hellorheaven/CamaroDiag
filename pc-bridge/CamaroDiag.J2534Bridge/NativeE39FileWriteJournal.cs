@@ -11,6 +11,7 @@ namespace CamaroDiag.J2534Bridge;
 internal sealed class NativeE39FileWriteJournal :
     NativeE39WriteSequence.IDurableJournal, IAsyncDisposable
 {
+    private const int MaximumJournalBytes = 8 * 1024 * 1024;
     private readonly FileStream stream;
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool disposed;
@@ -47,6 +48,8 @@ internal sealed class NativeE39FileWriteJournal :
                 Detail = evidence.Detail
             });
             var encoded = Encoding.UTF8.GetBytes(entry + "\n");
+            if (encoded.Length > MaximumJournalBytes - stream.Length)
+                throw new IOException("ECU journal size limit reached; refusing further programming.");
             await stream.WriteAsync(encoded, cancellationToken);
             // Flush(true) propagates file buffers to the storage subsystem.
             // Filesystem/drive caches are still a hardware-dependent boundary.
@@ -62,9 +65,25 @@ internal sealed class NativeE39FileWriteJournal :
     {
         if (!File.Exists(path))
             throw new FileNotFoundException("No ECU programming journal exists.", path);
-        var entries = File.ReadAllLines(path);
-        if (entries.Length == 0)
-            return CompletionState.NoEvents;
+        // Read a bounded snapshot, not an unbounded or changing text file.
+        // A concurrently appended record may be absent from this snapshot;
+        // the result is strictly evidence from the captured journal prefix.
+        byte[] snapshot;
+        using (var source = new FileStream(path, FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite))
+        {
+            var length = source.Length;
+            if (length == 0) return CompletionState.NoEvents;
+            if (length > MaximumJournalBytes) return CompletionState.Interrupted;
+            snapshot = new byte[(int)length];
+            try { source.ReadExactly(snapshot); }
+            catch (EndOfStreamException) { return CompletionState.Interrupted; }
+        }
+        string text;
+        try { text = new UTF8Encoding(false, true).GetString(snapshot); }
+        catch (DecoderFallbackException) { return CompletionState.Interrupted; }
+        var terminated = text.EndsWith('\n');
+        var entries = terminated ? text[..^1].Split('\n') : text.Split('\n');
         // A durable explicit recovery marker wins over malformed older records.
         // Do not interpret invalid JSON as evidence of success or erase its warning.
         foreach (var entry in entries)
@@ -85,6 +104,10 @@ internal sealed class NativeE39FileWriteJournal :
             }
             catch (JsonException) { /* still evaluate subsequent complete records */ }
         }
+        // A complete-looking JSON object without its record terminator can
+        // represent an interrupted append. It is not evidence of completion.
+        if (!terminated) return CompletionState.Interrupted;
+
         var sectors = new Dictionary<uint, NativeE39WriteSequence.Phase>();
         var preflightStarted = false;
         var destructiveStarted = false;
@@ -96,10 +119,14 @@ internal sealed class NativeE39FileWriteJournal :
             {
                 using var json = JsonDocument.Parse(entry);
                 var node = json.RootElement;
-                if (node.GetProperty("Schema").GetInt32() != 3 ||
+                if (node.ValueKind != JsonValueKind.Object ||
+                    node.EnumerateObject().GroupBy(p => p.Name, StringComparer.Ordinal)
+                        .Any(g => g.Count() != 1) ||
+                    node.GetProperty("Schema").GetInt32() != 3 ||
                     !Enum.TryParse<NativeE39WriteSequence.Phase>(
                         node.GetProperty("Phase").GetString(), out var phase) ||
                     !Enum.IsDefined(phase) ||
+                    node.GetProperty("Phase").GetString() != phase.ToString() ||
                     !node.GetProperty("Address").TryGetUInt32(out var address))
                     return CompletionState.Interrupted;
 
