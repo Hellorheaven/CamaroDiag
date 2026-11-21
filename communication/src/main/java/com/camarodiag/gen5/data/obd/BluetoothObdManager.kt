@@ -750,8 +750,47 @@ class BluetoothObdManager(context: Context) {
             j2534BridgeTransport?.isConnected == true
 
     /**
-     * Creates a UDS client through the adapter's documented STPX ISO-TP implementation.
-     * Only a positively identified OBDLink MX+ is enabled; generic ELM clones are rejected.
+     * Read-only UDS transaction over a physically connected OBDLink STN adapter.
+     * STPX's hardware identification (STI + STDI) is still checked by the transport.
+     *
+     * Keep the adapter configuration and all UDS requests under one exclusive
+     * command session. This prevents telemetry, a CAN console or a queued OBD
+     * command from changing STP/filters between ISO-TP request and response.
+     * Only the documented UDS/ISO-TP transport is used; this is not ECU flashing.
+     */
+    suspend fun <T> withStnUdsSession(
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int = 33,
+        timeoutMs: Long = 3000L,
+        block: suspend (UdsClient) -> T
+    ): T {
+        val requestedEpoch = transportSessionEpoch.capture()
+        check(StnUdsSessionAdmission.allowsRead(
+            activeAdapterCapabilities, isObdCommandChannelAvailable
+        )) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
+            check(StnUdsSessionAdmission.allowsRead(
+                activeAdapterCapabilities, isObdCommandChannelAvailable
+            )) { "The physical STN adapter disconnected while waiting for the UDS session." }
+            val transport = StnUdsPayloadTransport(
+                requestCanId = requestCanId,
+                responseCanId = responseCanId,
+                protocolNumber = protocolNumber
+            ) { command, commandTimeout ->
+                sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
+            }
+            val result = block(UdsClient(transport, UdsAccessPolicy.readOnly(), timeoutMs))
+            transportSessionEpoch.requireCurrent(requestedEpoch)
+            result
+        }
+    }
+
+    /**
+     * Legacy single-operation STN client; callers requiring more than one
+     * exchange should use withStnUdsSession to prevent interleaved adapter setup.
+     * Actual STDI validation still occurs before the first UDS command.
      */
     fun createStnUdsClient(
         requestCanId: Int,
@@ -760,14 +799,9 @@ class BluetoothObdManager(context: Context) {
         policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
         timeoutMs: Long = 3000L
     ): UdsClient {
-        val capabilities = activeAdapterCapabilities
-            ?: error("No real adapter has been probed.")
-        check(!isDemoMode && !isSimulationActive) { "UDS CAN is disabled in demo mode." }
-        check(capabilities.tier == AdapterTier.PRO_STN &&
-            capabilities.supportsCanHeaders &&
-            capabilities.deviceName.contains("OBDLink MX+", ignoreCase = true)) {
-            "The STPX UDS provider is currently validated only for a connected OBDLink MX+ STN adapter with CAN headers enabled."
-        }
+        check(StnUdsSessionAdmission.allowsRead(
+            activeAdapterCapabilities, isObdCommandChannelAvailable
+        )) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
         val transport = StnUdsPayloadTransport(
             requestCanId = requestCanId,
             responseCanId = responseCanId,
