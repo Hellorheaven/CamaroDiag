@@ -136,6 +136,28 @@ internal static class BridgeSelfTests
         }
         finally { File.Delete(scopedFile); }
 
+        // Required vendor PassThru ABI: test the same export gate used by the
+        // real --probe-drivers command, without loading an unknown DLL in CI.
+        Assert(J2534DriverProbe.MissingRequiredExports(_ => true).Count == 0,
+            "Complete native J2534 export set accepted");
+        var allMissing = J2534DriverProbe.MissingRequiredExports(_ => false);
+        Assert(allMissing.Count == 11, "Every required J2534 API entry point enforced");
+        Assert(allMissing.Contains("PassThruReadVersion") &&
+               allMissing.Contains("PassThruWriteMsgs") &&
+               allMissing.Contains("PassThruStartMsgFilter"),
+            "Version, transport writes and filter APIs required");
+        var missingVersion = J2534DriverProbe.MissingRequiredExports(
+            name => name != "PassThruReadVersion");
+        Assert(missingVersion.SequenceEqual(new[] { "PassThruReadVersion" }),
+            "Missing version API detected precisely");
+        var transportReady = new J2534DriverProbe.ProbeResult(
+            "mock-driver", true, true, true, "1.0", "1.0", "04.04", "mock");
+        Assert(transportReady.DriverOperational && !transportReady.EcuWriteValidated,
+            "An operational J2534 driver must not be mistaken for certified ECU flash");
+        var noDevice = transportReady with { DeviceOpened = false };
+        Assert(!noDevice.DriverOperational && !noDevice.EcuWriteValidated,
+            "A missing physical adapter cannot pass the driver probe");
+
         checks += BridgeTlsSelfTests.Run();
         Console.WriteLine($"PASS: {checks} hardware-free J2534 bridge self-tests.");
         return 0;
