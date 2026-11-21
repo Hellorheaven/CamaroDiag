@@ -535,4 +535,23 @@
     <string name="adapter_vxdiag_profiles">Zadeklarowane profile interfejsów VXDIAG</string>
     <string name="adapter_vxdiag_profiles_hint">Profile rozróżniają wersje sprzętu i połączeń. Nie potwierdzają dostępności sterownika Android ani komunikacji z pojazdem.</string>
     <string name="adapter_simulation_profiles">Symulowane profile sprzętowe (test stanowiskowy)</string>
+    <string name="modules_vehicle_title">Moduły sterujące pojazdu</string>
+    <string name="module_accessible">Dostępny</string>
+    <string name="module_requires_swcan">Wymaga SW-CAN (pin 1)</string>
+    <string name="module_blocked_adapter">Zablokowany przez adapter</string>
+    <string name="module_not_equipped">Brak wyposażenia</string>
+    <string name="module_discovery_required">Wymagane wykrywanie modułów pojazdu</string>
+    <string name="live_engine_telemetry">Telemetria silnika na żywo</string>
+    <string name="live_resume">Wznów</string>
+    <string name="live_stop_recording">Zatrzymaj nagrywanie</string>
+    <string name="live_record">Rejestruj dane na żywo</string>
+    <string name="live_export_csv">Eksportuj CSV</string>
+    <string name="live_recording_notice">Rejestrator zapisuje wyświetlane wartości OBD (metryczne) wraz ze znacznikami czasu. Nie zmienia tabel kalibracji ECU.</string>
+    <string name="dtc_title">Diagnostyczne kody usterek</string>
+    <string name="dtc_clear_warning">Kasowanie w trybie 04 usuwa kody usterek związanych z emisjami i resetuje niektóre monitory gotowości. Zapisz raport przed kontynuowaniem. Tryb 04 nie kasuje rozszerzonych kodów DTC zapisanych w innych modułach pojazdu.</string>
+    <string name="dtc_none_returned">Ostatnie skanowanie nie zwróciło kodów usterek.</string>
+    <string name="dtc_confirm_clear">Potwierdzić kasowanie DTC?</string>
+    <string name="dtc_clear_description">Polecenie wysyła do ECU tryb OBD 04. Dane gotowości mogą zostać zresetowane. Nie usuwa to przyczyny usterki.</string>
+    <string name="dtc_clear_action">Kasuj kody</string>
+    <string name="common_save">Zapisz</string>
 </resources>
