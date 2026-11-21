@@ -96,12 +96,17 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+            // A draft PR can generate hundreds of successful checkpoint-only
+            // runs. Paginating every run and querying every job makes each
+            // subsequent PR update hang for minutes. Bound lookup at 30 runs:
+            // if the last real build is older, prefer a fresh build (safe).
+            const response = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner, repo: context.repo.repo,
               workflow_id: 'android-ci.yml', branch: pr.head.ref,
-              event: 'pull_request', status: 'completed', per_page: 100
+              event: 'pull_request', status: 'completed', per_page: 30,
+              page: 1
             });
-            const candidates = runs
+            const candidates = response.data.workflow_runs
               .filter(run => run.head_sha !== pr.head.sha &&
                 (run.pull_requests || []).some(item => item.number === pr.number))
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
