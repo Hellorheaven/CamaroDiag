@@ -456,4 +456,26 @@
     <string name="cal_vin_sync_warning_message">Cuirfear VIN an ECU (%2$s) in ionad an VIN atá stóráilte sa phróifíl roghnaithe (%1$s). Ní athrófar an bhliain, an t-inneall, an giarbhosca ná an margadh. Ná déan é seo ach amháin tar éis a dheimhniú gurb í an fheithicil cheangailte an fheithicil cheart.</string>
     <string name="cal_vin_sync_confirm">Athsholáthair VIN</string>
     <string name="vin_photo_capture">Glac grianghraf den VIN</string>
+    <string name="control_interlock_assessment">Measúnú ar idirghlais: %1$s</string>
+    <string name="control_conditions_confirmed">coinníollacha deimhnithe</string>
+    <string name="control_windows_explanation">Ní mór ordú GM a aithint agus a bhailíochtú do BCM an VIN seo. Ní ghlactar le fráma uilíoch.</string>
+    <string name="control_sunroof_explanation">Ach amháin má tá an trealamh ann agus ordú bailíochtaithe BCM ar fáil.</string>
+    <string name="control_door_locks_title">Glais dorais</string>
+    <string name="control_door_locks_explanation">Ordú cosanta coirp: ní mór seoladh, slándáil agus staid na feithicle a fhíorú.</string>
+    <string name="control_lights_title">Soilse</string>
+    <string name="control_lights_explanation">Braitheann feidhmeanna soilsithe ar BCM, ar threalamh agus ar an margadh.</string>
+    <string name="control_horn_explanation">Fanann an gníomh fuaime díchumasaithe gan nós imeachta fíoraithe GM agus deimhniú úsáideora.</string>
+    <string name="control_mirrors_title">Scátháin</string>
+    <string name="control_mirrors_explanation">Ní mór an t-ordú a bhailíochtú don trealamh agus do leagan BCM.</string>
+    <string name="control_trunk_explanation">Ní mór an t-ordú a bhailíochtú do chineál coirp, BCM agus staid na feithicle.</string>
+    <string name="control_remote_start_title">Cianthosú</string>
+    <string name="control_remote_start_explanation">Ní féidir é a rialú go sábháilte le fráma cineálach OBD. Ná húsáid ach córas cianthosaithe atá ceadaithe ag an monaróir agus a idirghlais (Park, coscán páirceála, boinéad dúnta, gan lochtanna criticiúla). Ní sheolann CamaroDiag ordú tosaithe innill.</string>
+    <string name="remote_start_blocker_gear">Níl suíomh Park an ghiarbhosca deimhnithe.</string>
+    <string name="remote_start_blocker_hood">Níl dúnadh an bhoinéid deimhnithe.</string>
+    <string name="remote_start_blocker_locks">Níl glasáil na ndoirse deimhnithe.</string>
+    <string name="remote_start_blocker_hazards">Níl sé deimhnithe go bhfuil na soilse guaise múchta.</string>
+    <string name="remote_start_blocker_theft">Níl ullmhacht an chórais frithghadaíochta deimhnithe.</string>
+    <string name="remote_start_blocker_faults">Níl easpa lochtanna criticiúla deimhnithe.</string>
+    <string name="remote_start_blocker_stationary">Níl sé deimhnithe go bhfuil an fheithicil stadach.</string>
+    <string name="remote_start_blocker_equipment">Níl trealamh cianthosaithe an mhonaróra deimhnithe.</string>
 </resources>
