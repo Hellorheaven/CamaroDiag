@@ -44,6 +44,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -163,6 +164,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         authenticatedAccountUid = accountUid
         currentLicenseLevel = LicenseLevel.FREE
         accountSessionGeneration++
+        traceAnalysisJob?.cancel()
         functionalTestGeneration++
         functionalTestJob?.cancel()
         functionalTestJob = null
@@ -824,6 +826,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var traceAnalysisJob: Job? = null
     private var calibrationIdentityGeneration = 0L
     private var gmlanIdentityGeneration = 0L
 
@@ -1602,36 +1605,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Imports and analyzes a local Vector ASC or CSV CAN trace without connecting to a vehicle. */
     fun analyzeCanTrace(uri: Uri) {
         if (!requirePremiumLicense()) return
-        viewModelScope.launch(Dispatchers.IO) {
+        traceAnalysisJob?.cancel()
+        traceAnalysisJob = viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isTraceAnalyzing = true,
                 canTraceReport = null,
                 traceMessage = ""
             )
             try {
-                val resolver = getApplication<Application>().contentResolver
-                val displayName = resolver.query(
-                    uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) cursor.getString(0) else null
-                } ?: uri.lastPathSegment ?: "can-trace.asc"
-                val bytes = resolver.openInputStream(uri)?.use { input ->
-                    val output = java.io.ByteArrayOutputStream()
-                    val buffer = ByteArray(8192)
-                    var total = 0
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        require(total <= 32 * 1024 * 1024) {
-                            localizedContext.getString(R.string.msg_trace_too_large)
+                val report = withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    val displayName = resolver.query(
+                        uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    } ?: uri.lastPathSegment ?: "can-trace.asc"
+                    val bytes = resolver.openInputStream(uri)?.use { input ->
+                        val output = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        var total = 0
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            require(total <= 32 * 1024 * 1024) {
+                                localizedContext.getString(R.string.msg_trace_too_large)
+                            }
+                            output.write(buffer, 0, count)
                         }
-                        output.write(buffer, 0, count)
-                    }
-                    output.toByteArray()
-                } ?: error(localizedContext.getString(R.string.msg_trace_open_failed))
-                require(bytes.isNotEmpty()) { localizedContext.getString(R.string.msg_trace_empty) }
-                val report = CanTraceAnalyzer.analyze(bytes.toString(Charsets.UTF_8), displayName)
+                        output.toByteArray()
+                    } ?: error(localizedContext.getString(R.string.msg_trace_open_failed))
+                    require(bytes.isNotEmpty()) { localizedContext.getString(R.string.msg_trace_empty) }
+                    CanTraceAnalyzer.analyze(bytes.toString(Charsets.UTF_8), displayName)
+                }
                 val localizedErrors = report.errors.map(::localizedCanTraceError)
                 val localizedReport = report.copy(errors = localizedErrors)
                 val summary = if (report.frames.isEmpty()) {
@@ -1652,7 +1659,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     traceMessage = summary
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isTraceAnalyzing = false)
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
