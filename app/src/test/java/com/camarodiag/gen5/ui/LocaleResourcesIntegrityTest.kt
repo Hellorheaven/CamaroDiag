@@ -360,4 +360,33 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+
+    /** Debug tools and the dormant licensing screen must be translated in all 30 locales. */
+    @Test fun privateBuildsAndStagedLicensingLabelsExistInAllLocales() {
+        val keys = setOf(
+            "tab_debug_builds", "tab_license", "debug_builds_title",
+            "debug_builds_refresh", "debug_builds_download",
+            "debug_builds_unavailable", "debug_builds_error",
+            "license_disabled", "license_buy", "license_refresh",
+            "license_free", "license_owner", "license_premium", "license_title"
+        )
+        assertEquals(14, keys.size)
+        val english = strings("en")
+        for (locale in locales) {
+            val translated = strings(locale)
+            assertTrue(
+                "Missing licensing/Debug UI labels in $locale: ${keys - translated.keys}",
+                translated.keys.containsAll(keys)
+            )
+            assertTrue("Blank licensing/Debug labels in $locale",
+                keys.all { !translated.getValue(it).isBlank() })
+            if (locale != "en") {
+                assertTrue(
+                    "Licensing/Debug UI has no actual translation for $locale",
+                    keys.any { translated.getValue(it) != english.getValue(it) }
+                )
+            }
+        }
+    }
+
 }
