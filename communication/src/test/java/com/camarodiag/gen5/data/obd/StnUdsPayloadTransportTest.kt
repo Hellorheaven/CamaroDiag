@@ -194,6 +194,37 @@ class StnUdsPayloadTransportTest {
         )
     }
 
+    @Test fun rejectsAResponseForAnotherUdsServiceOnTheCorrectCanId() = runBlocking {
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") -> "7E8 59 02 FF"
+                else -> "OK"
+            }
+        }
+        assertTrue(runCatching {
+            transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), 1000)
+        }.isFailure)
+    }
+
+    @Test fun rejectsResponsePendingThatBelongsToAnotherService() = runBlocking {
+        val commands = mutableListOf<String>()
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+            commands += command
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") -> "7E8 7F 19 78"
+                else -> "OK"
+            }
+        }
+        assertTrue(runCatching {
+            transport.exchange(byteArrayOf(0x22, 0x12, 0x34), 1000)
+        }.isFailure)
+        assertFalse(commands.contains("STMA 1"))
+    }
+
     @Test fun rejectsCanIdentifierAndProtocolFormatMismatch() {
         assertTrue(runCatching { StnUdsPayloadTransport(0x7E0, 0x7E8, 34) { _, _ -> "OK" } }.isFailure)
         assertTrue(runCatching { StnUdsPayloadTransport(0x18DA10F1, 0x18DAF110, 34) { _, _ -> "OK" } }.isSuccess)
