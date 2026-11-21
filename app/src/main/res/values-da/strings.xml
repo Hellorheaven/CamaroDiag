@@ -621,4 +621,26 @@
     <string name="module_note_ebcm_gen5">Udvidet GM-adressering antages ikke; udfør en verificeret modulscanning.</string>
     <string name="module_note_ebcm_gen6">Udvidet modulscanning er endnu ikke bekræftet for dette VIN.</string>
     <string name="module_note_sdm">Adgang til sikkerhedsmoduler er køretøjsspecifik og skal forblive skrivebeskyttet.</string>
+    <string name="control_interlock_assessment">Vurdering af sikkerhedsbetingelser: %1$s</string>
+    <string name="control_conditions_confirmed">betingelser bekræftet</string>
+    <string name="control_windows_explanation">GM-kommandoen skal identificeres og valideres til BCM for dette VIN. Der antages ingen universel ramme.</string>
+    <string name="control_sunroof_explanation">Kun hvis udstyret findes, og en valideret BCM-kommando er tilgængelig.</string>
+    <string name="control_door_locks_title">Dørlåse</string>
+    <string name="control_door_locks_explanation">Beskyttet karrosserikommando: adressering, sikkerhed og køretøjets tilstand skal verificeres.</string>
+    <string name="control_lights_title">Lygter</string>
+    <string name="control_lights_explanation">Lysfunktioner afhænger af BCM, udstyr og marked.</string>
+    <string name="control_horn_explanation">Hornaktivering forbliver deaktiveret uden en verificeret GM-procedure og brugerens bekræftelse.</string>
+    <string name="control_mirrors_title">Spejle</string>
+    <string name="control_mirrors_explanation">Kommandoen skal valideres til udstyret og BCM-versionen.</string>
+    <string name="control_trunk_explanation">Kommandoen skal valideres til karrosseritype, BCM og køretøjets tilstand.</string>
+    <string name="control_remote_start_title">Fjernstart</string>
+    <string name="control_remote_start_explanation">Kan ikke styres sikkert med en generisk OBD-ramme. Brug kun det producentgodkendte fjernstartsystem og dets sikkerhedsbetingelser (Park, parkeringsbremse, lukket motorhjelm, ingen kritiske fejl). CamaroDiag sender ingen motorstartkommando.</string>
+    <string name="remote_start_blocker_gear">Gearkassens Park-position er ikke bekræftet.</string>
+    <string name="remote_start_blocker_hood">Lukket motorhjelm er ikke bekræftet.</string>
+    <string name="remote_start_blocker_locks">Dørlåsene er ikke bekræftet.</string>
+    <string name="remote_start_blocker_hazards">Det er ikke bekræftet, at havariblink er slukket.</string>
+    <string name="remote_start_blocker_theft">Tyverisikringens beredskab er ikke bekræftet.</string>
+    <string name="remote_start_blocker_faults">Fravær af kritiske fejl er ikke bekræftet.</string>
+    <string name="remote_start_blocker_stationary">Det er ikke bekræftet, at køretøjet står stille.</string>
+    <string name="remote_start_blocker_equipment">Originalt fjernstartudstyr er ikke bekræftet.</string>
 </resources>
