@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_gmlan_read_identity">GM VIN と OSID を読み取る（J2534）</string>
+    <string name="cal_gmlan_osid">GM オペレーティングシステム ID：%1$d</string>
+    <string name="cal_gmlan_vin_can">GM VIN：%1$s • CAN 0x%2$s</string>
+    <string name="cal_gmlan_identity_notice">選択した物理 CAN 応答ノードからの読み取り専用識別です。ECU ハードウェア、フラッシュメモリの構成、復旧手順を検証するものではありません。</string>
+    <string name="cal_gmlan_identity_failed">この J2534 チャネルから検証済みの GM VIN と OSID を読み取れませんでした。</string>
+</resources>
