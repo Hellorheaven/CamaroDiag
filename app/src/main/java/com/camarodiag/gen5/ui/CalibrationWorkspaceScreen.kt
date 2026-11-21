@@ -27,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DropdownMenu
@@ -92,6 +93,8 @@ data class CalibrationWorkspaceState(
     val isJ2534MemoryReadAvailable: Boolean = false,
     val j2534BridgeMessage: String = "",
     val isJ2534MemoryCapturing: Boolean = false,
+    val j2534MemoryCaptureBytesRead: Long = 0L,
+    val j2534MemoryCaptureTotalBytes: Long = 0L,
     val j2534MemoryCaptureMessage: String = "",
     val nativeSignals: List<CamaroSignalDefinition> = emptyList(),
     val nativeSignalMessage: String = "",
@@ -735,6 +738,23 @@ fun CalibrationWorkspaceScreen(
                             ) {
                                 if (state.isJ2534MemoryCapturing) CircularProgressIndicator()
                                 else Text(stringResource(R.string.cal_live_memory_save))
+                            }
+                            if (state.isJ2534MemoryCapturing &&
+                                state.j2534MemoryCaptureTotalBytes > 0L
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = {
+                                        (state.j2534MemoryCaptureBytesRead.toFloat() /
+                                            state.j2534MemoryCaptureTotalBytes.toFloat())
+                                            .coerceIn(0f, 1f)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Text(
+                                    "${state.j2534MemoryCaptureBytesRead} / " +
+                                        "${state.j2534MemoryCaptureTotalBytes} bytes",
+                                    color = TextMuted, fontSize = 11.sp
+                                )
                             }
                             if (state.j2534MemoryCaptureMessage.isNotBlank()) {
                                 Text(state.j2534MemoryCaptureMessage,
