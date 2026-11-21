@@ -89,7 +89,7 @@ internal static class BridgeSelfTests
             Assert(loaded.StartAddress == 0x80001000u, "Unsigned 32-bit memory region parsed");
             Assert(loaded.AllowsReadMemory(new byte[] {
                 0x23, 0x14, 0x80, 0x00, 0x10, 0x00, 0x20 }), "Parsed read profile usable");
-            File.WriteAllText(scopedFile, scopedJson[..^1] + ",\\\"allowWrite\\\":true}");
+            File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"allowWrite\":true}");
             var rejected = false;
             try { J2534MemoryReadScope.Load(scopedFile); }
             catch (ArgumentException) { rejected = true; }
