@@ -899,4 +899,6 @@
     <string name="debug_builds_created">Aangemaakt</string>
     <string name="debug_builds_expires">Verloopt</string>
     <string name="debug_builds_no_browser">Geen webbrowser beschikbaar om deze download te openen.</string>
+    <string name="obd_physical_can_scope">Fysieke CAN-responder: 0x%1$s. Deze scan betreft alleen de geselecteerde OBD-ECU, geen functionele scan van alle modules. Er zijn geen GM-programmeer- of actuatorcommando’s verzonden.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Schakel het wissen van emissie-DTC’s in de Windows-bridge in, maak opnieuw verbinding, zet de motor uit en bevestig de reset. De emissiegereedheidsgegevens worden gereset; permanente codes worden niet gewist.</string>
 </resources>
