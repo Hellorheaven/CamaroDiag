@@ -62,11 +62,16 @@ internal static class Program
             }
         }
 
+        // New TLS identity and token on each launch: no unencrypted fallback,
+        // no private key persistence, and no reuse of a previously leaked code.
+        using var tlsIdentity = BridgeTlsIdentity.Create();
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
         var token = Convert.ToBase64String(tokenBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         Console.WriteLine();
         Console.WriteLine($"Selected: {adapters[selectedIndex].Name}");
-        Console.WriteLine($"Pairing token: {token}");
+        Console.WriteLine($"Secure pairing code (paste in Android token field): {token}.{tlsIdentity.Fingerprint}");
+        Console.WriteLine("TLS: required (minimum version 1.2); certificate SHA-256 pinned in pairing code.");
+        Console.WriteLine("A new pairing code is required every time the bridge restarts.");
         Console.WriteLine($"Port: {port}");
         Console.WriteLine("Available: OBD Mode 09 identity, UDS reads and TesterPresent.");
         Console.WriteLine("ECU writes, security access, actuator controls and flash programming are blocked.");
@@ -78,7 +83,7 @@ internal static class Program
         try
         {
             await new BridgeServer(
-                adapters[selectedIndex], token, port, memoryReadScope).RunAsync();
+                adapters[selectedIndex], token, port, tlsIdentity, memoryReadScope).RunAsync();
             return 0;
         }
         catch (SocketException ex)
