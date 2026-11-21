@@ -3629,9 +3629,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun runFullObdScan() {
         if (!requirePremiumLicense()) return
+        if (_isObdScanning.value) return
         val startedGeneration = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val selectedVin = _vehicle.value.vin
+        fun current() = isCurrentAccountGeneration(startedGeneration) &&
+            connection == connectionAttemptGeneration && selectedVin == _vehicle.value.vin
         viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+            if (!current()) return@launch
             if (!obdManager.isSimulationActive && !obdManager.isStandardObdReadAvailable()) {
                 _obdScanReport.value = null
                 _obdScanMessage.value = if (obdManager.isJ2534BridgeConnected())
@@ -3639,7 +3644,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 else localizedContext.getString(R.string.msg_full_scan_adapter_required)
                 return@launch
             }
+            if (_isObdScanning.value) return@launch
             _isObdScanning.value = true
+            _obdScanReport.value = null
             _obdScanMessage.value = null
             try {
                 val report = if (obdManager.isSimulationActive) {
@@ -3651,7 +3658,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         engine.fullReadOnlyScan()
                     }
                 }
-                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                if (!current()) return@launch
                 _obdScanReport.value = report
                 if (report.physicalCanResponder == null) {
                     _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
@@ -3676,7 +3683,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentAccountGeneration(startedGeneration)) {
+                if (current()) {
                     reportConnectionLoss(error)
                     _obdScanMessage.value = localizedContext.getString(R.string.msg_full_scan_failed)
                 }
