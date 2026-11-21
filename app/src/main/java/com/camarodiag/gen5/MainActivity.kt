@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, true)
         setContent {
             val language by viewModel.language.collectAsState()
+            val activeAccountUid by viewModel.activeAccountUid.collectAsState()
             val followSystem by viewModel.followSystemLanguage.collectAsState()
             val systemLocale = LocalConfiguration.current.locales[0]
             LaunchedEffect(followSystem, systemLocale) { viewModel.refreshSystemLanguage(systemLocale) }
@@ -42,8 +43,8 @@ class MainActivity : ComponentActivity() {
                         onAccountChanged = viewModel::onAccountSessionChanged,
                         onAccountDeleted = viewModel::onAccountDeleted
                     ) { openAccount, accessLevel, refreshLicense ->
-                        LaunchedEffect(accessLevel, viewModel.activeAccountUid.value) {
-                            viewModel.setLicenseLevel(accessLevel, viewModel.activeAccountUid.value)
+                        LaunchedEffect(accessLevel, activeAccountUid) {
+                            viewModel.setLicenseLevel(accessLevel, activeAccountUid)
                         }
                         CamaroDiagApp(
                             viewModel, systemLocale, openAccount,
