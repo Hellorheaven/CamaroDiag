@@ -442,4 +442,26 @@
     <string name="cal_vin_sync_warning_message">VIN, shranjen v izbranem profilu (%1$s), bo zamenjan z VIN-om iz ECU (%2$s). Leto, motor, menjalnik in trg se ne bodo spremenili. To storite šele, ko potrdite, da je povezano pravo vozilo.</string>
     <string name="cal_vin_sync_confirm">Zamenjaj VIN</string>
     <string name="vin_photo_capture">Fotografiraj VIN</string>
+    <string name="control_interlock_assessment">Ocena varnostnih blokad: %1$s</string>
+    <string name="control_conditions_confirmed">pogoji potrjeni</string>
+    <string name="control_windows_explanation">Ukaz GM je treba identificirati in potrditi za BCM tega VIN. Univerzalni okvir ni predpostavljen.</string>
+    <string name="control_sunroof_explanation">Samo če je oprema nameščena in je na voljo potrjen ukaz BCM.</string>
+    <string name="control_door_locks_title">Ključavnice vrat</string>
+    <string name="control_door_locks_explanation">Zaščiten ukaz karoserije: preveriti je treba naslavljanje, varnost in stanje vozila.</string>
+    <string name="control_lights_title">Luči</string>
+    <string name="control_lights_explanation">Funkcije osvetlitve so odvisne od BCM, opreme in trga.</string>
+    <string name="control_horn_explanation">Zvočni signal ostane onemogočen brez preverjenega postopka GM in potrditve uporabnika.</string>
+    <string name="control_mirrors_title">Ogledala</string>
+    <string name="control_mirrors_explanation">Ukaz mora biti potrjen za opremo in različico BCM.</string>
+    <string name="control_trunk_explanation">Ukaz mora biti potrjen za vrsto karoserije, BCM in stanje vozila.</string>
+    <string name="control_remote_start_title">Daljinski zagon</string>
+    <string name="control_remote_start_explanation">S splošnim okvirom OBD ni mogoče varno upravljati. Uporabljajte samo sistem daljinskega zagona, ki ga je odobril proizvajalec, in njegove varnostne pogoje (Park, parkirna zavora, zaprt pokrov motorja, brez kritičnih napak). CamaroDiag ne pošlje ukaza za zagon motorja.</string>
+    <string name="remote_start_blocker_gear">Položaj Park menjalnika ni potrjen.</string>
+    <string name="remote_start_blocker_hood">Zaprtje pokrova motorja ni potrjeno.</string>
+    <string name="remote_start_blocker_locks">Zaklepanje vrat ni potrjeno.</string>
+    <string name="remote_start_blocker_hazards">Izklop varnostnih utripalk ni potrjen.</string>
+    <string name="remote_start_blocker_theft">Pripravljenost sistema proti kraji ni potrjena.</string>
+    <string name="remote_start_blocker_faults">Odsotnost kritičnih napak ni potrjena.</string>
+    <string name="remote_start_blocker_stationary">Mirovanje vozila ni potrjeno.</string>
+    <string name="remote_start_blocker_equipment">Originalna oprema za daljinski zagon ni potrjena.</string>
 </resources>
