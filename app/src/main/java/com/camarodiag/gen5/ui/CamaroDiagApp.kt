@@ -100,8 +100,8 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
     OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
     FUNCTIONAL_TESTS("Functional Tests", "Tests fonctionnels", R.string.tab_functional_tests),
-    DEBUG_DOWNLOADS("Debug Builds", "Versions Debug", R.string.tab_functional_tests),
-    LICENSE("License", "Licence", R.string.tab_settings),
+    DEBUG_DOWNLOADS("Debug Builds", "Versions Debug", R.string.tab_debug_builds),
+    LICENSE("License", "Licence", R.string.tab_license),
     GUIDE("Guide", "Guide", R.string.tab_guide),
     CONTROL("Controls", "Pilotage", R.string.tab_controls),
     ABOUT("About", "À propos", R.string.about_title),
@@ -481,14 +481,8 @@ fun CamaroDiagApp(
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    if (tab == DiagTab.DEBUG_DOWNLOADS) {
-                                        if (systemLocale.language == "fr") "Versions Debug" else "Debug builds"
-                                    } else if (tab == DiagTab.LICENSE) {
-                                        if (systemLocale.language == "fr") "Licence" else "License"
-                                    } else {
-                                        (if (!premiumAllowed && tab in premiumTabs) "🔒 " else "") +
-                                            stringResource(tab.labelResourceId)
-                                    }
+                                    (if (!premiumAllowed && tab in premiumTabs) "🔒 " else "") +
+                                        stringResource(tab.labelResourceId)
                                 )
                             },
                             onClick = {
