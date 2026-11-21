@@ -712,6 +712,37 @@ class BluetoothObdManager(context: Context) {
     }
 
     /**
+     * Runs one real J2534 read-only UDS operation under the same transaction
+     * lock used by ECU memory backups, identification and OBD command sessions.
+     * Prevents DID/DTC reads from interrupting a two-pass physical backup.
+     *
+     * Both the queued session and the completed result are tied to the current
+     * connection epoch, so reconnects cannot reuse an obsolete bridge.
+     */
+    suspend fun <T> withJ2534BridgeUdsSession(
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int,
+        timeoutMs: Long = 5000L,
+        readDids: Set<Int> = emptySet(),
+        block: suspend (UdsClient) -> T
+    ): T {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534BridgeConnected()) { "A real connected J2534 bridge is required." }
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534BridgeConnected()) { "J2534 bridge disconnected while waiting for UDS." }
+            val client = createJ2534BridgeUdsClient(
+                requestCanId, responseCanId, protocolNumber,
+                UdsAccessPolicy.readOnly(readDids), timeoutMs
+            )
+            val result = block(client)
+            transportSessionEpoch.requireCurrent(epoch)
+            result
+        }
+    }
+
+    /**
      * Physically acquire and archive a documented ECU memory region via the
      * connected Windows J2534 adapter. The Windows bridge independently
      * enforces its VIN-bound address allowlist; this API cannot flash an ECU.
