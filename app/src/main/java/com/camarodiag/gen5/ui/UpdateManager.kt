@@ -218,6 +218,52 @@ fun AboutUpdateCard() {
     val latestInstallRequested = rememberUpdatedState(installRequested)
     val latestDownloadedApk = rememberUpdatedState(downloadedApk)
 
+    // The DownloadManager broadcast is not guaranteed while this Compose
+    // screen is absent or the process is killed. Recover *owned* downloads
+    // from durable IDs without starting a second download or silently
+    // relaunching the installer.
+    LaunchedEffect(context) {
+        val pending = withContext(Dispatchers.IO) {
+            CamaroDiagUpdateCleanup.cleanupAfterSuccessfulInstall(context)
+            CamaroDiagUpdateCleanup.pendingDownloads(context).firstOrNull()
+        }
+        if (pending != null) {
+            val downloadState = CamaroDiagUpdateChecker.downloadStatus(context, pending.downloadId)
+            when (downloadState) {
+                DownloadManager.STATUS_SUCCESSFUL -> {
+                    val staged = CamaroDiagUpdateChecker.stageVerifiedDownload(
+                        context, pending.downloadId
+                    )
+                    if (staged != null) {
+                        downloadId = pending.downloadId
+                        downloadedApk = staged
+                        downloading = false
+                        status = context.getString(R.string.update_download_complete)
+                    } else {
+                        withContext(Dispatchers.IO) {
+                            CamaroDiagUpdateCleanup.discardInvalidDownload(context, pending.downloadId)
+                        }
+                        status = context.getString(R.string.update_download_invalid_signature)
+                    }
+                }
+                DownloadManager.STATUS_PENDING,
+                DownloadManager.STATUS_RUNNING,
+                DownloadManager.STATUS_PAUSED -> {
+                    downloadId = pending.downloadId
+                    downloading = true
+                    status = context.getString(R.string.update_downloading)
+                }
+                DownloadManager.STATUS_FAILED -> {
+                    withContext(Dispatchers.IO) {
+                        CamaroDiagUpdateCleanup.discardInvalidDownload(context, pending.downloadId)
+                    }
+                    status = context.getString(R.string.update_download_failed)
+                }
+                else -> Unit
+            }
+        }
+    }
+
     fun launchInstaller(file: File) {
         if (!context.packageManager.canRequestPackageInstalls()) {
             installRequested = true
@@ -393,6 +439,21 @@ fun AboutUpdateCard() {
                                 else R.string.update_install_update
                             )
                         )
+                    }
+                }
+                val staged = downloadedApk
+                if (staged != null && staged.isFile) {
+                    Button(
+                        enabled = !checking && !downloading,
+                        onClick = {
+                            try {
+                                launchInstaller(staged)
+                            } catch (_: Exception) {
+                                status = context.getString(R.string.update_download_failed)
+                            }
+                        }
+                    ) {
+                        Text(stringResource(R.string.update_install_update))
                     }
                 }
             }
