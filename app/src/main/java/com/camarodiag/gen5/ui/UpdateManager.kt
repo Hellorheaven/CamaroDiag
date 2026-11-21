@@ -107,7 +107,11 @@ private object CamaroDiagUpdateChecker {
     @Suppress("DEPRECATION")
     fun enqueue(context: Context, update: CamaroDiagUpdate): Long {
         // Public, visible top-level Downloads directory, NOT Android/data/<package>/files.
-        val fileName = "CamaroDiag-${update.channel}-${update.version}.apk"
+        // Distinct filename allows retry after cancelled installation without
+        // colliding with an older APK the user deliberately kept in Downloads.
+        val safeVersion = update.version.replace(Regex("[^A-Za-z0-9._-]"), "_").take(64)
+        require(safeVersion.isNotBlank()) { "Missing update version." }
+        val fileName = "CamaroDiag-${update.channel}-${safeVersion}-${System.currentTimeMillis()}.apk"
         val request = DownloadManager.Request(update.url.toUri())
             .setTitle(context.getString(R.string.update_notification_title, update.version))
             .setMimeType("application/vnd.android.package-archive")
