@@ -593,4 +593,10 @@
     <string name="msg_cal_definitions_import_failed">Nepavyko importuoti lentelių apibrėžčių.</string>
     <string name="msg_cal_map_read_failed">Nepavyko nuskaityti pasirinktos lentelės.</string>
     <string name="msg_cal_table_edit_failed">Nepavyko redaguoti kalibravimo lentelės.</string>
+    <string name="cal_expert_image_selected">Importuotas failas: %1$s</string>
+    <string name="cal_expert_patch_address">Atminties srities pradžios adresas (šešioliktainis)</string>
+    <string name="cal_expert_patch_erase_bytes">Trynimo sektoriaus dydis (baitais)</string>
+    <string name="cal_expert_patch_program_bytes">Programavimo vieneto dydis (baitais)</string>
+    <string name="cal_expert_patch_preview_button">Peržiūrėti sektorius, kuriuos paveikia pakeistas BIN failas</string>
+    <string name="cal_expert_patch_summary">Pakeista baitų: %1$d. Paveikta trynimo sektorių: %2$d. Aparatinės įrangos atminties žemėlapis nepatikrintas. Duomenys neįrašyti.</string>
 </resources>
