@@ -520,4 +520,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • užklausa %2$s / atsakymas %3$s • intervalas %4$d s</string>
     <string name="cal_axis_values">0x%1$s • kiekis=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Tik aparatinės įrangos profilis; vis dar reikalingas oficialus Android SDK/API arba dokumentuotas tiltas.</string>
+    <string name="obd_scan_description">SAE J1979 patikra tik skaitant: jėgos agregato duomenys, gedimų kodai, sustabdytas kadras ir ECU identifikavimas.</string>
+    <string name="obd_responding_can_ids">Atsakiusių įrenginių CAN ID</string>
+    <string name="obd_can_id_limit_explanation">CAN identifikatoriai yra atsakymai, gauti į funkcinę OBD užklausą 0100. Jų nepakanka moduliui (BCM, TCM, ABS, IPC, SDM) identifikuoti ar išplėstinėms GM paslaugoms leisti.</string>
+    <string name="obd_trigger_dtc">Sustabdyto kadro priežasties DTC</string>
+    <string name="obd_real_scan_scope">Apimtis: rezultatai gaunami tik iš per OBD-II pasiekiamo ECU faktinių atsakymų. Nuskaitymas neapklausia BCM, IPC, ABS, SDM ar kitų GM modulių ir nevykdo vykdiklių arba programavimo komandų.</string>
+    <string name="connection_busy">Jungiamasi arba vykdoma operacija…</string>
+    <string name="swcan_wiring_verified">SW-CAN laidai patikrinti (1 kontaktas)</string>
+    <string name="long_response_mode">Ilgų atsakymų režimas (ATAL)</string>
+    <string name="adapter_none_detected">Adapteris neaptiktas. Susiekite OBDLink MX+, MX, LX ir kitus klasikinio Bluetooth adapterius; CX aptinkamas netoliese per BLE.</string>
+    <string name="usb_connection_title">USB jungtis (OBDLink EX / SX, ELM327 ir nuoseklieji adapteriai)</string>
+    <string name="adapter_connect_label">Prisijungti: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: perdavimo architektūra paruošta, tačiau J2534 sąsajų suderinamumas su Android nepatvirtinamas be oficialaus modelio Android SDK. J2534 prieiga neimituojama.</string>
+    <string name="adapter_vxdiag_profiles">Deklaruoti VXDIAG sąsajų profiliai</string>
+    <string name="adapter_vxdiag_profiles_hint">Profiliai skiria aparatinės įrangos ir ryšio variantus. Jie nepatvirtina Android tvarkyklės arba ryšio su transporto priemone prieinamumo.</string>
+    <string name="adapter_simulation_profiles">Imituojami aparatinės įrangos profiliai (stendinis bandymas)</string>
 </resources>
