@@ -752,7 +752,7 @@ fun CalibrationWorkspaceScreen(
                                 )
                                 Text(
                                     "${state.j2534MemoryCaptureBytesRead} / " +
-                                        "${state.j2534MemoryCaptureTotalBytes} bytes",
+                                        "${state.j2534MemoryCaptureTotalBytes}",
                                     color = TextMuted, fontSize = 11.sp
                                 )
                             }
