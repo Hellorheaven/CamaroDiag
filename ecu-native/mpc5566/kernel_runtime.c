@@ -84,8 +84,15 @@ bool cd_kernel_runtime_step(cd_kernel_runtime *r,
         cd_kernel_runtime_link_failure(r);
         return false;
     }
-    if (rx == CD_ISOTP_RECEIVING && r->write_idle_armed)
+    if (rx == CD_ISOTP_RECEIVING && r->write_idle_armed) {
+        /* A fragmented read or arbitrary request cannot keep a partially
+         * erased sector alive. The first frame already includes service/mode. */
+        if (r->rx.used < 2 || r->request[0] != 0x36 || r->request[1] != 0x00) {
+            cd_kernel_runtime_link_failure(r);
+            return false;
+        }
         r->write_idle_since = now_us;
+    }
     if (rx != CD_ISOTP_COMPLETE) return true;
 
     bool destructive = potential_write(r->request, r->rx.used);

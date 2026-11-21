@@ -79,6 +79,16 @@ int main(void)
     assert(cd_kernel_runtime_step(&runtime, NULL, 4000000));
     assert(!cd_kernel_runtime_step(&runtime, NULL, 5000000));
     assert(flash.recovery_required);
+    /* Fragmented unrelated requests cannot extend an incomplete write window. */
+    init_model(&m);
+    flash = controller_for(&m);
+    link.count = 0;
+    assert(cd_kernel_runtime_init(&runtime, &flash, &channel, 4, 1));
+    assert(cd_kernel_runtime_step(&runtime, &erase, 1));
+    const cd_can_frame unrelated = {0x7E0,false,8,{0x10,0x08,0x23,0x24,0,2,0,0}};
+    assert(!cd_kernel_runtime_step(&runtime, &unrelated, 2));
+    assert(flash.recovery_required && runtime.link_failed && m.pulses == 1);
+
     puts("PASS: native runtime CAN-to-flash dispatch and response-loss handling");
     return 0;
 }
