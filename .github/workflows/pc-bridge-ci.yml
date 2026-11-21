@@ -26,7 +26,7 @@ on:
       target_ref:
         description: "Branch or commit to validate"
         required: true
-        default: "feat/live-can-monitor"
+        default: "feat/ecu-backup-integrity"
         type: string
       pr_number:
         description: "Pull request number (optional)"
@@ -188,6 +188,7 @@ jobs:
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeTlsIdentity.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeTlsSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/Program.cs'; then
               echo "validation_applies=true" >> "$GITHUB_OUTPUT"
               echo "build_required=true" >> "$GITHUB_OUTPUT"
