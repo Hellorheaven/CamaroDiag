@@ -873,4 +873,17 @@
     <string name="cal_archive_verified">تتطابق القراءتان وقيم SHA-256 صحيحة لنطاقات الذاكرة المحفوظة.</string>
     <string name="cal_archive_partial">تشمل النسخة الاحتياطية جزءًا فقط من الذاكرة المطلوبة.</string>
     <string name="cal_archive_failed">تعذّر التحقق من ملف ZIP. الحد الأقصى بعد فك الضغط هو 32 MiB.</string>
+    <string name="tab_functional_tests">الاختبارات الوظيفية</string>
+    <string name="functional_tests_title">الاختبارات الوظيفية — وحدات التحكم وOBD</string>
+    <string name="functional_tests_readonly">تشغيل اختبارات القراءة فقط المتاحة عبر المحول الفعلي المتصل. تظهر المحولات والوحدات غير المتحقق منها كغير مختبرة. دون مسح أو برمجة.</string>
+    <string name="functional_tests_run">تشغيل الكل</string>
+    <string name="functional_tests_stop">إيقاف</string>
+    <string name="functional_tests_export">تصدير JSON</string>
+    <string name="functional_tests_summary">%1$d ناجح · %2$d فاشل · %3$d غير مختبر</string>
+    <string name="functional_tests_passed">ناجح (تحقق فعلي)</string>
+    <string name="functional_tests_failed">فشل</string>
+    <string name="functional_tests_skipped">غير مختبر</string>
+    <string name="functional_tests_denied">تم رفض الوصول: سجّل الدخول بحساب Google المصرح له.</string>
+    <string name="functional_tests_not_connected">لا يوجد محول OBD فعلي متصل. لم تنفذ الاختبارات الأخرى.</string>
+    <string name="functional_tests_cancelled">تم إلغاء الاختبارات.</string>
 </resources>
