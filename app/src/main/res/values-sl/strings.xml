@@ -509,4 +509,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • zahteva %2$s / odgovor %3$s • interval %4$d s</string>
     <string name="cal_axis_values">0x%1$s • število=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Samo profil strojne opreme; še vedno je potreben uradni Android SDK/API ali dokumentiran most.</string>
+    <string name="obd_scan_description">Pregled samo za branje po SAE J1979: podatki pogonskega sklopa, kode napak, zamrznjeni okvir in identifikacija ECU.</string>
+    <string name="obd_responding_can_ids">Identifikatorji CAN odzivnih enot</string>
+    <string name="obd_can_id_limit_explanation">Identifikatorji CAN izvirajo iz odgovorov na funkcionalno zahtevo OBD 0100. Ne zadoščajo za identifikacijo modula (BCM, TCM, ABS, IPC, SDM) ali dovoljenje razširjenih storitev GM.</string>
+    <string name="obd_trigger_dtc">DTC, ki je sprožil zamrznjeni okvir</string>
+    <string name="obd_real_scan_scope">Obseg: rezultati izvirajo izključno iz dejanskih odgovorov ECU, dostopne prek OBD-II. Pregled ne poizveduje po BCM, IPC, ABS, SDM ali drugih modulih GM in ne izvaja ukazov za aktuatorje ali programiranje.</string>
+    <string name="connection_busy">Povezovanje ali postopek poteka…</string>
+    <string name="swcan_wiring_verified">Ožičenje SW-CAN preverjeno (pin 1)</string>
+    <string name="long_response_mode">Način dolgih odgovorov (ATAL)</string>
+    <string name="adapter_none_detected">Zaznan ni bil noben adapter. Seznanite OBDLink MX+, MX, LX in druge adapterje Bluetooth Classic; CX se v bližini zazna prek BLE.</string>
+    <string name="usb_connection_title">Povezava USB (OBDLink EX / SX, ELM327 in serijski adapterji)</string>
+    <string name="adapter_connect_label">Poveži: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: arhitektura prenosa je pripravljena, vendar združljivost vmesnikov J2534 z Androidom ni potrjena brez uradnega Android SDK za model. Dostop J2534 se ne simulira.</string>
+    <string name="adapter_vxdiag_profiles">Deklarirani profili vmesnikov VXDIAG</string>
+    <string name="adapter_vxdiag_profiles_hint">Profili razlikujejo različice strojne opreme in povezav. Ne potrjujejo razpoložljivosti gonilnika Android ali komunikacije z vozilom.</string>
+    <string name="adapter_simulation_profiles">Simulirani profili strojne opreme (preizkus na mizi)</string>
 </resources>
