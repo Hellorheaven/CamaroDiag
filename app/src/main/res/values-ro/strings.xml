@@ -409,4 +409,34 @@
     <string name="debug_builds_created">Creat</string>
     <string name="debug_builds_expires">Expiră</string>
     <string name="debug_builds_no_browser">Niciun browser disponibil pentru deschiderea descărcării.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Limba selectată: %1$s</string>
+    <string name="settings_adapter_not_connected">Niciun adaptor conectat</string>
+    <string name="settings_last_connection">Ultimul profil de conexiune</string>
+    <string name="settings_no_last_connection">Nu există încă niciun profil de conexiune salvat.</string>
+    <string name="saved_vehicle_profiles_title">Profiluri de vehicule salvate</string>
+    <string name="saved_vehicle_name_label">Numele profilului</string>
+    <string name="saved_vehicle_name_placeholder">de ex. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Salvează vehiculul curent</string>
+    <string name="saved_vehicle_empty">Nu există încă profiluri de vehicule salvate.</string>
+    <string name="saved_vehicle_delete">Șterge</string>
+    <string name="saved_vehicle_requires_review">Profilul a fost creat din VIN-ul ECU. Verificați anul modelului, motorul și transmisia înainte de diagnosticare.</string>
+    <string name="saved_vehicle_ecu_default_name">Vehicul din ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Introduceți un nume pentru profil.</string>
+    <string name="msg_vehicle_profile_saved">Profilul vehiculului a fost salvat.</string>
+    <string name="msg_vehicle_profile_review_required">A fost creat un profil din VIN-ul ECU. Verificați anul, motorul și transmisia înainte de diagnosticare.</string>
+    <string name="msg_vehicle_profile_loaded">Profil vehicul încărcat: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU nu a returnat un VIN valid de 17 caractere. Nu a fost creat niciun profil.</string>
+    <string name="cal_vin_matches_profile">VIN-ul ECU corespunde profilului de vehicul selectat.</string>
+    <string name="cal_vin_mismatch_detected">NECONCORDANȚĂ VIN — profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Profilul vehiculului selectat nu conține un VIN valid.</string>
+    <string name="cal_vin_mismatch_title">Neconcordanță VIN detectată</string>
+    <string name="cal_vin_mismatch_confirmation">VIN-ul profilului selectat este %1$s, dar ECU a returnat %2$s. Pot fi vehicule diferite. Creați un profil separat pentru a păstra vehiculul selectat sau sincronizați numai după verificarea vehiculului fizic.</string>
+    <string name="cal_vin_create_vehicle">Creează profil de vehicul</string>
+    <string name="cal_vin_sync_existing">Sincronizează VIN-ul profilului selectat</string>
+    <string name="cal_vin_sync_warning_title">Confirmați înlocuirea VIN-ului?</string>
+    <string name="cal_vin_sync_warning_message">VIN-ul stocat în profilul selectat (%1$s) va fi înlocuit cu VIN-ul ECU (%2$s). Anul, motorul, transmisia și piața nu se vor modifica. Faceți acest lucru numai după confirmarea că vehiculul conectat este cel dorit.</string>
+    <string name="cal_vin_sync_confirm">Înlocuiește VIN-ul</string>
+    <string name="vin_photo_capture">Fotografiază VIN-ul</string>
 </resources>
