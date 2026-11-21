@@ -848,4 +848,14 @@
     <string name="cal_expert_patch_preview_button">Voorbeeld van sectoren beïnvloed door gewijzigde BIN</string>
     <string name="cal_expert_patch_summary">Gewijzigde bytes: %1$d. Betrokken wissectoren: %2$d. Hardwaregeheugenkaart niet geverifieerd; geen schrijfactie.</string>
     <string name="cal_expert_patch_invalid">Offline voorbeeld niet beschikbaar: ongeldige bestanden, geheugengrenzen of wis-/programmeerparameters. Er is niet geschreven.</string>
+
+    <!-- Live physical J2534 ECU memory capture -->
+    <string name="cal_live_memory_title">Echt ECU-geheugen lezen (J2534)</string>
+    <string name="cal_live_memory_notice">De Windows-bridge vereist een goedgekeurde geheugenkaart gekoppeld aan het VIN. Alleen-lezen; ECU-schrijven blijft uitgeschakeld.</string>
+    <string name="cal_live_memory_length">Te lezen bytes (max. 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibratie</string>
+    <string name="cal_live_memory_extended">Uitgebreide diagnosesessie (0x03)</string>
+    <string name="cal_live_memory_save">ECU-geheugen tweemaal lezen en als ZIP opslaan</string>
+    <string name="cal_live_memory_saved">ECU-geheugen opgeslagen na twee overeenkomende lezingen.</string>
+    <string name="cal_live_memory_failed">Lezen van ECU-geheugen mislukt. Geen geverifieerde back-up gemaakt.</string>
 </resources>

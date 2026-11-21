@@ -851,4 +851,14 @@
     <string name="cal_expert_patch_preview_button">Pré-visualizar setores afetados pelo BIN alterado</string>
     <string name="cal_expert_patch_summary">Bytes alterados: %1$d. Setores de apagamento afetados: %2$d. Mapa de hardware não verificado; sem escrita.</string>
     <string name="cal_expert_patch_invalid">Pré-visualização offline indisponível: ficheiros, intervalo de memória ou parâmetros de apagamento/programação inválidos. Não foi tentada escrita.</string>
+
+    <!-- Live physical J2534 ECU memory capture -->
+    <string name="cal_live_memory_title">Leitura real da memória ECU (J2534)</string>
+    <string name="cal_live_memory_notice">A ponte Windows precisa de um mapa de memória aprovado e associado ao VIN. Apenas leitura; escrita ECU desativada.</string>
+    <string name="cal_live_memory_length">Bytes a ler (máx. 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Calibração</string>
+    <string name="cal_live_memory_extended">Sessão de diagnóstico alargada (0x03)</string>
+    <string name="cal_live_memory_save">Ler duas vezes e guardar memória ECU em ZIP</string>
+    <string name="cal_live_memory_saved">Memória ECU guardada após duas leituras idênticas.</string>
+    <string name="cal_live_memory_failed">Falha na leitura da memória ECU. Nenhuma cópia verificada foi criada.</string>
 </resources>

@@ -858,4 +858,14 @@
     <string name="cal_expert_patch_preview_button">Betroffene Sektoren der geänderten BIN anzeigen</string>
     <string name="cal_expert_patch_summary">Geänderte Bytes: %1$d. Betroffene Löschsektoren: %2$d. Hardware-Speicherkarte nicht verifiziert; kein Schreiben.</string>
     <string name="cal_expert_patch_invalid">Offline-Vorschau nicht verfügbar: ungültige Dateien, Speicherbereiche oder Lösch-/Programmierparameter. Kein Schreibversuch.</string>
+
+    <!-- Live physical J2534 ECU memory capture -->
+    <string name="cal_live_memory_title">Echten ECU-Speicher lesen (J2534)</string>
+    <string name="cal_live_memory_notice">Die Windows-Brücke benötigt eine freigegebene Speicherkarte mit VIN-Bindung. Nur Lesen; ECU-Schreiben bleibt gesperrt.</string>
+    <string name="cal_live_memory_length">Zu lesende Bytes (max. 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibrierung</string>
+    <string name="cal_live_memory_extended">Erweiterte Diagnosesitzung (0x03)</string>
+    <string name="cal_live_memory_save">ECU-Speicher zweimal lesen und als ZIP speichern</string>
+    <string name="cal_live_memory_saved">ECU-Speicher nach zwei übereinstimmenden Lesevorgängen gespeichert.</string>
+    <string name="cal_live_memory_failed">ECU-Speicherlesen fehlgeschlagen. Kein geprüftes Backup erstellt.</string>
 </resources>

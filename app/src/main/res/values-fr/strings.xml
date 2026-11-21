@@ -864,4 +864,14 @@
     <string name="live_pid_wbo2_b2s1">Lambda large bande B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda large bande B2S2</string>
     <string name="system_language_follow_phone">Suivre la langue du téléphone</string>
+
+    <!-- Live physical J2534 ECU memory capture -->
+    <string name="cal_live_memory_title">Lecture réelle de la mémoire ECU (J2534)</string>
+    <string name="cal_live_memory_notice">La passerelle Windows doit disposer d’une carte mémoire approuvée et liée au VIN. Lecture seule, sans écriture ECU.</string>
+    <string name="cal_live_memory_length">Octets à lire (4 Mio maximum)</string>
+    <string name="cal_live_memory_region_calibration">Calibration</string>
+    <string name="cal_live_memory_extended">Session de diagnostic étendue (0x03)</string>
+    <string name="cal_live_memory_save">Lire deux fois et sauvegarder la mémoire ECU en ZIP</string>
+    <string name="cal_live_memory_saved">Mémoire ECU sauvegardée après deux lectures identiques.</string>
+    <string name="cal_live_memory_failed">Échec de lecture mémoire ECU. Aucune sauvegarde vérifiée créée.</string>
 </resources>

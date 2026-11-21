@@ -859,4 +859,14 @@
     <string name="cal_expert_patch_preview_button">Προεπισκόπηση τομέων που επηρεάζονται από τροποποιημένο BIN</string>
     <string name="cal_expert_patch_summary">Τροποποιημένα byte: %1$d. Επηρεαζόμενοι τομείς διαγραφής: %2$d. Μη επαληθευμένος χάρτης υλικού· καμία εγγραφή.</string>
     <string name="cal_expert_patch_invalid">Η προεπισκόπηση εκτός σύνδεσης δεν είναι διαθέσιμη: μη έγκυρα αρχεία, όρια μνήμης ή παράμετροι διαγραφής/προγραμματισμού. Δεν επιχειρήθηκε εγγραφή.</string>
+
+    <!-- Live physical J2534 ECU memory capture -->
+    <string name="cal_live_memory_title">Πραγματική ανάγνωση μνήμης ECU (J2534)</string>
+    <string name="cal_live_memory_notice">Η γέφυρα Windows απαιτεί εγκεκριμένο χάρτη μνήμης δεσμευμένο με VIN. Μόνο ανάγνωση· η εγγραφή ECU παραμένει απενεργοποιημένη.</string>
+    <string name="cal_live_memory_length">Byte για ανάγνωση (μέγ. 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Βαθμονόμηση</string>
+    <string name="cal_live_memory_extended">Εκτεταμένη διαγνωστική συνεδρία (0x03)</string>
+    <string name="cal_live_memory_save">Διπλή ανάγνωση και αποθήκευση μνήμης ECU σε ZIP</string>
+    <string name="cal_live_memory_saved">Η μνήμη ECU αποθηκεύτηκε μετά από δύο ίδιες αναγνώσεις.</string>
+    <string name="cal_live_memory_failed">Η ανάγνωση μνήμης ECU απέτυχε. Δεν δημιουργήθηκε επαληθευμένο αντίγραφο.</string>
 </resources>

@@ -861,4 +861,14 @@
     <string name="cal_expert_patch_preview_button">Vista previa de sectores afectados por BIN modificado</string>
     <string name="cal_expert_patch_summary">Bytes cambiados: %1$d. Sectores de borrado afectados: %2$d. Mapa de hardware no verificado; no se escribe.</string>
     <string name="cal_expert_patch_invalid">Vista previa offline no disponible: archivos, rango de memoria o geometría de borrado/programación no válidos. No se intentó escribir.</string>
+
+    <!-- Live physical J2534 ECU memory capture -->
+    <string name="cal_live_memory_title">Lectura real de memoria ECU (J2534)</string>
+    <string name="cal_live_memory_notice">El puente Windows necesita un mapa de memoria aprobado y vinculado al VIN. Solo lectura; la escritura ECU permanece desactivada.</string>
+    <string name="cal_live_memory_length">Bytes que leer (máx. 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Calibración</string>
+    <string name="cal_live_memory_extended">Sesión de diagnóstico extendida (0x03)</string>
+    <string name="cal_live_memory_save">Leer dos veces y guardar memoria ECU en ZIP</string>
+    <string name="cal_live_memory_saved">Memoria ECU guardada tras dos lecturas idénticas.</string>
+    <string name="cal_live_memory_failed">Error al leer la memoria ECU. No se creó una copia verificada.</string>
 </resources>
