@@ -4,6 +4,7 @@ package com.camarodiag.gen5.data.obd
  * Separate physical GM identity observation. An OSID is not a CAL ID, a
  * service part number, or authorization to write an ECU.
  */
+@ConsistentCopyVisibility
 data class GmlanIdentityEvidence private constructor(
     val vin: String,
     val operatingSystemId: Long,

@@ -132,3 +132,11 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - 589 traductions supplémentaires intégrées directement aux ressources ; croate désormais 868/868 clés. 15 langues sur 30 ont toutes les clés, 6 333 traductions manquent encore dans les autres. Noms propres conservés. Contrôle statique : aucune clé inconnue ou dupliquée ni paramètre divergent.
 - Sauvegarde mémoire Windows : vérification réitérée du VIN pendant la double lecture, refus en cas de changement, export annulable sans fichier partiel, contrôle de l'empreinte SHA-256 après écriture sur disque.
 - Gestion d'erreurs et tests de la licence préparée ; activation et facturation toujours désactivées. Aucune écriture ECU réelle validée. CI finale requise.
+
+## Mise à jour, licence et identification ECU
+
+- Les messages de téléchargement et d’installation des mises à jour sont disponibles dans les 30 langues. Le message d’accès à une fonction sous licence utilise aussi la langue de l’application.
+- L’export d’identification accepte un nom de calculateur lu seul. Une lecture vide, même après changement de langue, ne permet plus de produire un rapport. Une réponse tardive de la connexion précédente est écartée.
+- Au commit `31e6e7e8`, le contrôle Android compte 192 tests du module application réussis sur 193. Le test de couverture des traductions échoue encore pour 14 langues (4 456 traductions manquantes au total). Le noyau ECU a passé ses tests sur hôte. La qualification E39/E39A sur banc reste ouverte.
+- La méthode de copie de l’identité GMLAN est désormais privée, comme son constructeur. Cette correction traite l’avertissement du compilateur Kotlin relevé au même commit.
+- Sur `31e6e7e8`, le lint des sept modules Android est passé sans avertissement. Les APK Debug et de tests instrumentés ont été compilés et les artefacts vérifiés. Le test de traduction en échec empêche le lancement des tests sur émulateur.
