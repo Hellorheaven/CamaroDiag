@@ -580,4 +580,10 @@
     <string name="can_sniffer_capture_failed">Nepavyko įrašyti CAN kadrų arba adapteris nustojo atsakyti.</string>
     <string name="can_sniffer_frame_count">Įrašyta kadrų: %1$d</string>
     <string name="can_sniffer_filtered_count">Rodoma %1$d iš %2$d kadrų</string>
+    <string name="msg_live_recording_real_started">Pradėtas tikrųjų OBD duomenų įrašymas.</string>
+    <string name="msg_live_recording_started">Įrašoma. Mėginių skaičius: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Įrašymas sustabdytas. Įrašytų mėginių skaičius: %1$d.</string>
+    <string name="msg_live_csv_exported">CSV žurnalas eksportuotas. Mėginių skaičius: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Nepavyko eksportuoti CSV žurnalo.</string>
+    <string name="msg_live_recording_max_samples">Pasiekta saugos riba (%1$d). Įrašymas automatiškai sustabdytas.</string>
 </resources>
