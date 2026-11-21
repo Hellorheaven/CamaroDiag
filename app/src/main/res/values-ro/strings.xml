@@ -591,4 +591,10 @@
     <string name="dtc_gm_monitor_failure">Contor de defecțiuni / rată de validare: %1$s</string>
     <string name="dtc_gm_monitor_mil">Clasificare MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Sursă: GM %1$s, pagina %2$d</string>
+    <string name="module_bus_hscan">HS-CAN (500 kbit/s)</string>
+    <string name="module_bus_swcan">SW-CAN GMLAN (33,3 kbit/s)</string>
+    <string name="module_bus_unknown">Magistrală de identificat</string>
+    <string name="units_metric_details">Unități metrice (km, °C, kPa)</string>
+    <string name="units_imperial_details">Unități imperiale (mi, °F, psi)</string>
+    <string name="cal_tcp_port">Port TCP</string>
 </resources>
