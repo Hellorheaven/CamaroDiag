@@ -302,6 +302,7 @@ class BluetoothObdManager(context: Context) {
      * The support bitmap is cached for the lifetime of the current adapter connection.
      */
     suspend fun readMode01PidIfSupported(pid: Int): String? {
+        if (isJ2534StandardObdAvailable()) return readJ2534PidIfSupported(pid)
         check(isObdCommandChannelAvailable) {
             "No ELM/OBD-II command channel is available on the active transport."
         }
@@ -323,6 +324,52 @@ class BluetoothObdManager(context: Context) {
         }
         return withObdCommandSession { engine ->
             engine.readMode01PidIfSupported(pid, supported)
+        }
+    }
+
+    /** The standard OBD capability is not an ELM/AT command channel. */
+    fun isJ2534StandardObdAvailable(): Boolean =
+        isJ2534BridgeConnected() && j2534BridgeTransport?.isStandardObdPhysicalReadEnabled == true
+
+    fun isStandardObdReadAvailable(): Boolean =
+        isObdCommandChannelAvailable || isJ2534StandardObdAvailable()
+
+    private suspend fun readJ2534PidIfSupported(pid: Int): String? {
+        require(pid in 1..255)
+        val epoch = transportSessionEpoch.capture()
+        return supportedMode01PidsMutex.withLock {
+            commandSessionMutex.withLock session@{
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                check(isJ2534StandardObdAvailable())
+                val bridge = checkNotNull(j2534BridgeTransport)
+                val age = System.currentTimeMillis() - cachedSupportedMode01PidsAtMillis
+                val cached = cachedSupportedMode01Pids
+                val supported = if (cached != null && (cached.isNotEmpty() || age < 10_000L)) {
+                    cached
+                } else {
+                    bridge.discoverStandardObdPids().also {
+                        transportSessionEpoch.requireQueuedCurrent(epoch)
+                        cachedSupportedMode01Pids = it
+                        cachedSupportedMode01PidsAtMillis = System.currentTimeMillis()
+                    }
+                }
+                if (pid !in supported) return@session null
+                val result = bridge.readStandardObdPid(pid)
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                result
+            }
+        }
+    }
+
+    suspend fun readJ2534StandardDtcs(): Triple<List<ObdDtc>, List<ObdDtc>, List<ObdDtc>> {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534StandardObdAvailable())
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val result = checkNotNull(j2534BridgeTransport).readStandardObdDtcs()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            result
         }
     }
 
