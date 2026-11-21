@@ -131,7 +131,6 @@ jobs:
           ./gradlew testDebugUnitTest -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
           ./gradlew lintDebug lintRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
           ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
-          ./gradlew app:assembleDebug -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
 
       - name: Reject Android lint errors and warnings in every release variant
         shell: bash
@@ -179,7 +178,6 @@ jobs:
             - GitHub may also show automatic source-code archives (zip/tar.gz); these are not Windows installers. Download the .exe Setup or Android .apk assets only.
           files: |
             app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/CamaroDiag-debug.apk
           draft: false
           prerelease: false
         env:
