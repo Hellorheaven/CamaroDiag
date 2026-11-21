@@ -327,4 +327,27 @@
     <string name="cal_live_memory_save">Dvakrát přečíst paměť ECU a uložit ZIP</string>
     <string name="cal_live_memory_saved">Paměť ECU byla uložena po dvou shodných čteních.</string>
     <string name="cal_live_memory_failed">Čtení paměti ECU selhalo. Ověřená záloha nebyla vytvořena.</string>
+    <string name="cal_import_file">Importovat kalibrační soubor</string>
+    <string name="cal_hex_preview">Hexadecimální náhled (prvních 64 bajtů)</string>
+    <string name="cal_file_inspection">Kontrola souboru: %1$s</string>
+    <string name="cal_payload_size">Velikost dat: %1$d B</string>
+    <string name="cal_record_count">Záznamy: %1$d</string>
+    <string name="cal_checksum_validation">Ověření kontrolního součtu formátu: %1$s</string>
+    <string name="cal_export_file">Exportovat / stáhnout soubor</string>
+    <string name="cal_import_second_bin">Importovat druhý BIN pro porovnání</string>
+    <string name="cal_binary_compare_limit">Porovnání bajt po bajtu je dostupné pouze pro surové obrazy BIN.</string>
+    <string name="cal_comparison_name">Porovnání: %1$s</string>
+    <string name="cal_comparison_byte_counts">Změněné bajty: %1$d • Přidané: %2$d • Chybějící: %3$d</string>
+    <string name="cal_images_identical">Obrazy jsou totožné</string>
+    <string name="cal_remove_files">Odebrat soubory</string>
+    <string name="cal_table_editor">Editor kalibračních tabulek</string>
+    <string name="cal_import_table_definitions">Importovat definice tabulek (.csv / .tsv)</string>
+    <string name="cal_export_table_template">Exportovat šablonu definice TSV</string>
+    <string name="cal_select_table">Vybrat tabulku</string>
+    <string name="cal_table_values">Hodnoty tabulky</string>
+    <string name="cal_unsaved_edits">Neuložené změny</string>
+    <string name="cal_loaded">Načteno</string>
+    <string name="cal_x_axis">Osa X: %1$s</string>
+    <string name="cal_discard_changes">Zahodit změny</string>
+    <string name="cal_apply_to_file">Použít na soubor</string>
 </resources>
