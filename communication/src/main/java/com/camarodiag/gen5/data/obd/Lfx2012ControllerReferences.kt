@@ -193,7 +193,10 @@ object Lfx2012ControllerReferences {
         if (rawAddresses.isEmpty()) return ResponderAttribution.NO_VALID_CAN_ADDRESS
         val validAddress = Regex("(?:[0-9A-F]{3}|[0-9A-F]{8})")
         val normalized = rawAddresses.map { it.uppercase().removePrefix("0X") }
-        if (normalized.any { !validAddress.matches(it) }) {
+        if (normalized.any { address ->
+                !validAddress.matches(address) ||
+                    address.toLong(16) > if (address.length == 3) 0x7FFL else 0x1FFFFFFFL
+            }) {
             return ResponderAttribution.NO_VALID_CAN_ADDRESS
         }
         return if (normalized.distinct().size == 1) {
