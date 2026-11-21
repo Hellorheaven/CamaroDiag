@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_gmlan_read_identity">GM-VIN und OSID lesen (J2534)</string>
+    <string name="cal_gmlan_osid">GM-Betriebssystem-ID: %1$d</string>
+    <string name="cal_gmlan_vin_can">GM-VIN: %1$s • CAN 0x%2$s</string>
+    <string name="cal_gmlan_identity_notice">Schreibgeschützte Identifikation des ausgewählten physischen CAN-Teilnehmers. Sie bestätigt weder die Steuergerätehardware noch die Flash-Geometrie oder das Wiederherstellungsverfahren.</string>
+    <string name="cal_gmlan_identity_failed">Auf diesem J2534-Kanal konnten keine verifizierte GM-VIN und OSID gelesen werden.</string>
+</resources>
