@@ -691,4 +691,9 @@
     <string name="update_later">Senere</string>
     <string name="update_ready_to_install">CamaroDiag – klar til installation</string>
     <string name="update_version_channel">Version %1$s • %2$s</string>
+    <string name="vin_photo_cancelled">Fotografering af VIN blev annulleret.</string>
+    <string name="vin_photo_success">VIN blev fundet og kopieret til køretøjets profil. Kontrollér hvert tegn.</string>
+    <string name="vin_photo_not_found">Intet gyldigt VIN på 17 tegn fundet. Indtast det manuelt, eller tag et nyt foto.</string>
+    <string name="vin_photo_error">VIN kunne ikke læses på billedet. Prøv igen med bedre lys og fokus.</string>
+    <string name="vehicle_vin_placeholder">17 tegn</string>
 </resources>
