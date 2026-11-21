@@ -585,4 +585,10 @@
     <string name="cal_expert_patch_program_bytes">Programmeringsenhetens storlek (byte)</string>
     <string name="cal_expert_patch_preview_button">Förhandsvisa sektorer som påverkas av den ändrade BIN-filen</string>
     <string name="cal_expert_patch_summary">Ändrade byte: %1$d. Berörda raderingssektorer: %2$d. Hårdvarans minneskarta har inte verifierats. Ingen skrivning har utförts.</string>
+    <string name="dtc_gm_monitor_title">GM-motorövervakning – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Villkor för att sätta felkoden: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Aktiveringsvillkor: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Felräknare / valideringsfrekvens: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL-klassificering: %1$s</string>
+    <string name="dtc_gm_monitor_source">Källa: GM %1$s, sida %2$d</string>
 </resources>
