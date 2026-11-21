@@ -42,7 +42,8 @@ data class ObdScanReport(
     val adapterInfo: Map<String, String>,
     val respondingEcuAddresses: List<String>,
     val rawLog: List<String>,
-    val freezeFrameDtc: ObdDtc? = null
+    val freezeFrameDtc: ObdDtc? = null,
+    val physicalCanResponder: String? = null
 )
 
 /**
@@ -288,9 +289,37 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         log.clear()
         val adapter = initialize()
         val respondingEcus = discoverFunctionalObdResponders()
+        return collectReadOnlyScan(adapter, respondingEcus, readDtcRecords = { readDtcs() })
+    }
+
+    /**
+     * Direct ISO 15765-4 physical scan of a single selected responder.
+     * No AT commands, ELM initialization or functional discovery is performed.
+     * The transport validates CAN framing and supplies its counted DTC decoder.
+     */
+    suspend fun fullPhysicalCanScan(
+        responderCanId: String,
+        adapterInfo: Map<String, String>,
+        decodeDtcPayload: (Int, String) -> List<ObdDtc>
+    ): ObdScanReport {
+        require(responderCanId.matches(Regex("[0-9A-F]{3}|[0-9A-F]{8}")))
+        log.clear()
+        return collectReadOnlyScan(adapterInfo, listOf(responderCanId),
+            physicalCanResponder = responderCanId, readDtcRecords = {
+                Triple(decodeDtcPayload(3, ask("03")),
+                    decodeDtcPayload(7, ask("07")), decodeDtcPayload(10, ask("0A")))
+            })
+    }
+
+    private suspend fun collectReadOnlyScan(
+        adapter: Map<String, String>,
+        respondingEcus: List<String>,
+        physicalCanResponder: String? = null,
+        readDtcRecords: suspend () -> Triple<List<ObdDtc>, List<ObdDtc>, List<ObdDtc>>
+    ): ObdScanReport {
         val supported = discoverSupportedPids()
         val live = readLiveData(supported)
-        val (confirmed, pending, permanent) = readDtcs()
+        val (confirmed, pending, permanent) = readDtcRecords()
         val freezeFrameDtc = readFreezeFrameDtc()
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
         val freeze = if (freezeFrameDtc != null) readFreezeFrame(freezeFrameSupported) else emptyMap()
@@ -299,7 +328,9 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         val cvns = readCalibrationVerificationNumbers()
         val ecuNames = readEcuName()
         val readiness = readReadiness()
-        val mode06 = readMonitorTests()
+        val mode06 = readMonitorTests()?.takeIf {
+            physicalCanResponder == null || payload(it, 0x46, 0x00) != null
+        }
         return ObdScanReport(
             supportedPids = supported,
             liveData = live,
@@ -316,7 +347,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             adapterInfo = adapter,
             respondingEcuAddresses = respondingEcus,
             rawLog = log.toList(),
-            freezeFrameDtc = freezeFrameDtc
+            freezeFrameDtc = freezeFrameDtc,
+            physicalCanResponder = physicalCanResponder
         )
     }
 
