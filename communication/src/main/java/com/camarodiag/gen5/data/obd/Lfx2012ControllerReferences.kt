@@ -15,6 +15,33 @@ object Lfx2012ControllerReferences {
     const val servicePartsReference =
         "https://www.gmpartsgiant.com/parts-list/2012-chevrolet-camaro-coupe/fuel_system_exhaust_emission_system/e_c_m_module_wiring_harness.html"
 
+    data class ServicePartGroup(
+        val servicePart: String,
+        val replaces: List<String>,
+        val exampleLabel: String,
+        val catalogBootFile: String? = null
+    )
+
+    // Camaro MY2012 V6 catalog supersessions. A predecessor can also appear on
+    // other models. The label on one donor identifies only that physical part.
+    // 12653998 is deliberately excluded: GM bulletin PIC5696A limits it to MY2013.
+    val servicePartGroups = listOf(
+        // GMPartsGiant 2012 Camaro ECM catalog; Ovoko donor EVY6479.
+        ServicePartGroup(
+            servicePart = currentServicePart,
+            replaces = listOf(supersededServicePart),
+            exampleLabel = "Serv# 12643248 · 12648906 · AA69",
+            catalogBootFile = associatedMainBootFile
+        ),
+        // https://www.chevypartsdeal.com/oem/gm~engine-control-module-w-2nd-mpu~12651993
+        // Camaro donor label: https://www.ebay.com/itm/235840055258
+        ServicePartGroup(
+            servicePart = "12651993",
+            replaces = listOf("12637106", "12642665", "12650256", "12616889"),
+            exampleLabel = "Serv# 12637106 · 12637489 · AAMU"
+        )
+    )
+
     data class ObservedIdentity(
         val ecuName: String?,
         val calibrationIds: List<String>,
@@ -94,5 +121,5 @@ object Lfx2012ControllerReferences {
     }
 
     fun describedServiceParts(): List<String> =
-        listOf(currentServicePart, supersededServicePart)
+        servicePartGroups.flatMap { listOf(it.servicePart) + it.replaces }
 }

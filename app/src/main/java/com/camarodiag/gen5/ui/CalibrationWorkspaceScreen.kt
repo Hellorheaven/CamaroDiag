@@ -339,11 +339,17 @@ fun CalibrationWorkspaceScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.flexfuel_lfx2012_title),
                             color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.flexfuel_lfx2012_parts,
-                            Lfx2012ControllerReferences.controllerFamily,
-                            Lfx2012ControllerReferences.currentServicePart,
-                            Lfx2012ControllerReferences.supersededServicePart),
-                            color = TextPrimary, fontSize = 12.sp)
+                        Lfx2012ControllerReferences.servicePartGroups.forEach { group ->
+                            Text(stringResource(R.string.flexfuel_lfx2012_parts,
+                                Lfx2012ControllerReferences.controllerFamily, group.servicePart,
+                                group.replaces.joinToString(", ")),
+                                color = TextPrimary, fontSize = 12.sp)
+                            Text(group.exampleLabel, color = TextMuted, fontSize = 11.sp)
+                            group.catalogBootFile?.let { bootFile ->
+                                Text(stringResource(R.string.flexfuel_lfx2012_boot, bootFile),
+                                    color = TextMuted, fontSize = 11.sp)
+                            }
+                        }
                         Text(stringResource(R.string.flexfuel_lfx2012_parts_warning),
                             color = TextMuted, fontSize = 11.sp)
                         Text(stringResource(R.string.flexfuel_lfx2012_calid_label,
@@ -378,9 +384,6 @@ fun CalibrationWorkspaceScreen(
                                 fontSize = 11.sp
                             )
                         }
-                        Text(stringResource(R.string.flexfuel_lfx2012_boot,
-                            Lfx2012ControllerReferences.associatedMainBootFile),
-                            color = TextMuted, fontSize = 11.sp)
                         Text(stringResource(R.string.flexfuel_lfx2012_checks),
                             color = CamaroAmber, fontWeight = FontWeight.SemiBold)
                         missing.forEach { missingRequirement ->
