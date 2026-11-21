@@ -3035,7 +3035,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             stopLiveRecording()
             return
         }
-        if (!obdManager.isObdCommandChannelAvailable) {
+        if (!obdManager.isStandardObdReadAvailable()) {
             _liveRecordingState.value = _liveRecordingState.value.copy(
                 message = localizedContext.getString(if (obdManager.isJ2534BridgeConnected()) R.string.msg_live_recording_j2534_block else R.string.msg_live_recording_unavailable)
             )
@@ -3094,7 +3094,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun captureLiveTelemetrySample(values: List<LivePidValue>) {
         if (!_liveRecordingState.value.isRecording) return
-        if (!obdManager.isObdCommandChannelAvailable) {
+        if (!obdManager.isStandardObdReadAvailable()) {
             stopLiveRecording()
             _liveRecordingState.value = _liveRecordingState.value.copy(
                 message = localizedContext.getString(R.string.msg_live_recording_channel_lost)
@@ -3137,19 +3137,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         obdManager.createSimulatedObd2FeatureEngine().readDtcs()
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_simulated_lfx)
-                } else if (!obdManager.isObdCommandChannelAvailable) {
+                } else if (!obdManager.isStandardObdReadAvailable()) {
                     // No SAE OBD channel is available; keep independently read UDS ECU records.
                     _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
                         localizedContext.getString(R.string.msg_dtc_j2534_unavailable)
                     else localizedContext.getString(R.string.msg_dtc_adapter_required)
                 } else {
-                    val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
+                    val (confirmed, pending, permanent) = if (obdManager.isJ2534StandardObdAvailable()) {
+                        obdManager.readJ2534StandardDtcs()
+                    } else obdManager.withObdCommandSession { engine ->
                         engine.readDtcs()
                     }
                     if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                     _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } +
                         mapObdDtcs(confirmed + pending + permanent)
+                    _connectionMessage.value = null
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -3755,7 +3758,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 _livePids.value = emptyList()
                                 _liveTelemetryMessage.value = localizedContext.getString(R.string.msg_live_no_adapter)
                             }
-                            !obdManager.isObdCommandChannelAvailable -> {
+                            !obdManager.isStandardObdReadAvailable() -> {
                                 _livePids.value = emptyList()
                                 _liveTelemetryMessage.value = localizedContext.getString(R.string.msg_live_j2534_only)
                             }
