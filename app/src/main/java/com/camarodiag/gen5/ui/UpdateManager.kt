@@ -44,10 +44,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-private data class CamaroDiagUpdate(val version: String, val channel: String, val url: String)
+private data class CamaroDiagUpdate(val version: String, val channel: String, val url: String, val versionCode: Long)
 private data class CamaroDiagUpdateCheck(val update: CamaroDiagUpdate?, val hasNewerVersion: Boolean)
 
 private object CamaroDiagUpdateChecker {
@@ -93,7 +94,9 @@ private object CamaroDiagUpdateChecker {
             val safeUrl = downloadUrl?.takeIf { it.startsWith("https://github.com/") }
                 ?: return@withContext CamaroDiagUpdateCheck(null, true)
             CamaroDiagUpdateCheck(
-                CamaroDiagUpdate(json.optString("tag_name").removePrefix("v"), channel, safeUrl),
+                CamaroDiagUpdate(
+                    json.optString("tag_name").removePrefix("v"), channel, safeUrl, versionCode
+                ),
                 true
             )
         } finally {
@@ -101,21 +104,36 @@ private object CamaroDiagUpdateChecker {
         }
     }
 
+    @Suppress("DEPRECATION")
     fun enqueue(context: Context, update: CamaroDiagUpdate): Long {
+        // Public, visible top-level Downloads directory, NOT Android/data/<package>/files.
         val fileName = "CamaroDiag-${update.channel}-${update.version}.apk"
         val request = DownloadManager.Request(update.url.toUri())
             .setTitle(context.getString(R.string.update_notification_title, update.version))
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
-        return (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val id = manager.enqueue(request)
+        // Persist BEFORE starting the installer; only the installer success (new
+        // installed versionCode) permits automatic deletion of this download.
+        if (!CamaroDiagUpdateCleanup.recordDownload(
+                context, PendingCamaroDiagApk(id, update.versionCode)
+            )
+        ) {
+            manager.remove(id)
+            error("Unable to persist APK cleanup record.")
+        }
+        return id
     }
 
-    fun signatureMatches(context: Context, file: File): Boolean {
+    fun signatureMatches(context: Context, file: File, expectedVersionCode: Long): Boolean {
         val flags = PackageManager.GET_SIGNING_CERTIFICATES
         val downloaded = context.packageManager.getPackageArchiveInfo(file.absolutePath, flags)
             ?: return false
-        if (downloaded.packageName != context.packageName) return false
+        if (downloaded.packageName != context.packageName ||
+            downloaded.longVersionCode != expectedVersionCode
+        ) return false
         val installed = if (Build.VERSION.SDK_INT >= 33) {
             context.packageManager.getPackageInfo(
                 context.packageName,
@@ -195,33 +213,71 @@ fun AboutUpdateCard() {
                 val completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
                 if (completedId != latestDownloadId.value || completedId < 0L) return
 
-                val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                manager.query(DownloadManager.Query().setFilterById(completedId)).use { cursor ->
-                    if (!cursor.moveToFirst()) {
+                // DownloadManager owns the public file on Android 10-16. Read
+                // using its file descriptor, not raw /storage/... access, which
+                // scoped storage can reject. A private verification copy is used
+                // for signature inspection and FileProvider installation.
+                scope.launch {
+                    val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                    val targetVersion = CamaroDiagUpdateCleanup.targetVersion(context, completedId)
+                    val successful = withContext(Dispatchers.IO) {
+                        manager.query(DownloadManager.Query().setFilterById(completedId)).use { cursor ->
+                            if (!cursor.moveToFirst()) false
+                            else {
+                                val statusColumn = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                                statusColumn >= 0 &&
+                                    cursor.getInt(statusColumn) == DownloadManager.STATUS_SUCCESSFUL
+                            }
+                        }
+                    }
+                    if (!successful || targetVersion == null) {
+                        withContext(Dispatchers.IO) {
+                            CamaroDiagUpdateCleanup.discardInvalidDownload(context, completedId)
+                        }
                         setDownloading.value(false)
                         setStatus.value(context.getString(R.string.update_download_failed))
-                        return
+                        return@launch
                     }
-                    val statusColumn = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
-                    val uriColumn = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
-                    val file = if (uriColumn >= 0) {
-                        cursor.getString(uriColumn)?.toUri()?.path?.let(::File)
-                    } else {
-                        null
+
+                    val verifiedFile = withContext(Dispatchers.IO) {
+                        val target = CamaroDiagUpdateCleanup.verifiedInstallFile(context, completedId)
+                        try {
+                            check(target.parentFile?.mkdirs() == true || target.parentFile?.isDirectory == true) {
+                                "Unable to prepare private verification directory."
+                            }
+                            manager.openDownloadedFile(completedId).use { descriptor ->
+                                FileInputStream(descriptor.fileDescriptor).use { input ->
+                                    target.outputStream().use { output -> input.copyTo(output) }
+                                }
+                            }
+                            check(CamaroDiagUpdateChecker.signatureMatches(
+                                context, target, targetVersion
+                            )) { "APK package, certificate or version does not match." }
+                            target
+                        } catch (_: Exception) {
+                            target.delete()
+                            null
+                        }
                     }
-                    if (statusColumn < 0 ||
-                        cursor.getInt(statusColumn) != DownloadManager.STATUS_SUCCESSFUL ||
-                        file == null || !file.isFile ||
-                        !CamaroDiagUpdateChecker.signatureMatches(context, file)
-                    ) {
+                    if (verifiedFile == null) {
+                        withContext(Dispatchers.IO) {
+                            CamaroDiagUpdateCleanup.discardInvalidDownload(context, completedId)
+                        }
+                        setDownloadedApk.value(null)
                         setDownloading.value(false)
                         setStatus.value(context.getString(R.string.update_download_invalid_signature))
-                        return
+                        return@launch
                     }
-                    setDownloadedApk.value(file)
+                    setDownloadedApk.value(verifiedFile)
                     setDownloading.value(false)
                     setStatus.value(context.getString(R.string.update_download_complete))
-                    launchInstaller(file)
+                    try {
+                        launchInstaller(verifiedFile)
+                    } catch (_: Exception) {
+                        // Installation not launched: preserve public APK so the
+                        // user may retry. NEVER delete merely on installer open.
+                        setStatus.value(context.getString(R.string.update_download_failed))
+                    }
                 }
             }
         }
