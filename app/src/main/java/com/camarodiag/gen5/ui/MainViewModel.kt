@@ -772,7 +772,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var calibrationIdentityGeneration = 0L
+
     private fun clearVehicleEvidence() {
+        calibrationIdentityGeneration++
         discardCanMonitor()
         detachCanRequest()
         _liveCanMonitorState.value = LiveCanMonitorState()
@@ -792,6 +795,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _obdScanMessage.value = null
         _liveTelemetryMessage.value = null
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isReading = false,
             ecuVinResponse = "",
             ecuIdentityFromSimulation = false,
             vinComparison = null,
@@ -1395,9 +1399,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun readCalibrationIdentification() {
         val startedGeneration = accountSessionGeneration
+        val requestId = ++calibrationIdentityGeneration
         val startedConnection = connectionAttemptGeneration
         viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration) return@launch
+            if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration ||
+                requestId != calibrationIdentityGeneration) return@launch
             if (!obdManager.isObdCommandChannelAvailable && !obdManager.isJ2534BridgeConnected()) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
@@ -1428,7 +1434,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
                 val identity = obdManager.readCalibrationIdentification()
-                if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration) return@launch
+                if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration ||
+                requestId != calibrationIdentityGeneration) return@launch
                 val ecuVin = identity.vin
                 val validCal = identity.calibrationIds.isNotEmpty()
                 val validCvn = identity.calibrationVerificationNumbers.isNotEmpty()
@@ -1452,7 +1459,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration) return@launch
+                if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration ||
+                requestId != calibrationIdentityGeneration) return@launch
                 reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
