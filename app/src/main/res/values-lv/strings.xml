@@ -608,4 +608,6 @@
     <string name="units_metric_details">Metriskās vienības (km, °C, kPa)</string>
     <string name="units_imperial_details">Imperiālās vienības (mi, °F, psi)</string>
     <string name="cal_tcp_port">TCP ports</string>
+    <string name="msg_refresh_adapters_failed">Neizdevās atsvaidzināt adapteru sarakstu.</string>
+    <string name="msg_usb_identifier_unavailable">USB ierīces identifikators nav pieejams</string>
 </resources>
