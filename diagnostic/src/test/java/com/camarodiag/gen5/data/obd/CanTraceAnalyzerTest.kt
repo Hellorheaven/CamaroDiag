@@ -1015,4 +1015,9 @@ class CanTraceAnalyzerTest {
         val report = CanTraceAnalyzer.analyze("\uFEFFcan_id,data\n7E8,02 41 00", "capture.csv")
         assertEquals(0x7E8, report.frames.single().canId)
     }
+    @Test
+    fun readsVectorExtendedIdSuffix() {
+        val report = CanTraceAnalyzer.analyze("0.0 1 18DAF110x Rx d 3 02 41 00")
+        assertEquals(0x18DAF110, report.frames.single().canId)
+    }
 }

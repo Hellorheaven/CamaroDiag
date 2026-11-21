@@ -177,7 +177,7 @@ object CanTraceAnalyzer {
     private const val MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS = 1.0
 
     private val ascFrameRegex = Regex(
-        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
+        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})(?:x)?\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
         RegexOption.IGNORE_CASE
     )
 
