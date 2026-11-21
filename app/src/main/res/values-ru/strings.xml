@@ -895,4 +895,13 @@
     <string name="license_owner">Владелец: все права</string>
     <string name="license_premium">Полная лицензия активна</string>
     <string name="license_title">Лицензия CamaroDiag</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Скачайте последние Debug-артефакты PR #70. Войдите на GitHub под разрешённой учётной записью. Загрузки представляют собой ZIP-архивы, которые нужно распаковать.</string>
+    <string name="debug_builds_android_archive">ZIP-архив с Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP-архив с установщиками Windows x64 и x86.</string>
+    <string name="debug_builds_caution">Артефакты удаляются через 30 дней. Наличие архива не подтверждает успешную сборку или испытания на автомобиле. Подписи Debug APK могут отличаться от публичных выпусков.</string>
+    <string name="debug_builds_created">Создан</string>
+    <string name="debug_builds_expires">Истекает</string>
+    <string name="debug_builds_no_browser">Нет браузера для открытия загрузки.</string>
 </resources>
