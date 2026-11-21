@@ -5,6 +5,14 @@ internal static class NativeE39ProgrammingSessionSelfTests
     private sealed class FakeTransport : NativeE39ProgrammingSession.ITransport
     {
         internal readonly List<string> Trace = [];
+        internal uint? Supply = 13500;
+        internal int LoseSupplyAfterFrames = int.MaxValue;
+
+        public Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            return Task.FromResult(Trace.Count >= LoseSupplyAfterFrames ? (uint?)null : Supply);
+        }
         internal byte[] SeedReply = [0x67, 0x01, 0x12, 0x34];
         internal byte[] SessionReply = [0x50, 0x02];
         internal byte[] CommunicationReply = [0x68];
@@ -48,7 +56,7 @@ internal static class NativeE39ProgrammingSessionSelfTests
         var identity = new NativeGmlanIdentification.Identity(
             vin, 12664221, 0xC1, true, "Live read identity");
         var q = new NativeE39ProgrammingSession.Qualification(
-            vin, 12664221, true, true, true);
+            vin, 12664221, true, true, true, 12000, 15000);
         var checks = 0;
         void Assert(bool pass, string reason)
         {
@@ -104,6 +112,21 @@ internal static class NativeE39ProgrammingSessionSelfTests
         Reject<UnauthorizedAccessException>(() =>
             Prepare(notPhysical, identity with { PhysicalRead = false }, q));
         Assert(notPhysical.Trace.Count == 0, "Synthetic ECU identity cannot authorize physical session");
+
+        foreach (uint? value in new uint?[] { null, 11000, 16000 })
+        {
+            var voltage = new FakeTransport { Supply = value };
+            Reject<IOException>(() => Prepare(voltage, identity, q));
+            Assert(voltage.Trace.Count == 0, "Unsafe or missing supply prevents entering programming mode");
+        }
+        var lostVoltage = new FakeTransport { LoseSupplyAfterFrames = 7 };
+        Reject<IOException>(() => Prepare(lostVoltage, identity, q));
+        Assert(!lostVoltage.Trace.Contains("S:A503"), "Supply loss before final transition stops programming");
+        var invalidVoltageWindow = new FakeTransport();
+        Reject<ArgumentException>(() => Prepare(invalidVoltageWindow, identity, q with {
+            MaximumSupplyMillivolts = q.MinimumSupplyMillivolts
+        }));
+        Assert(invalidVoltageWindow.Trace.Count == 0, "Invalid supply window prevents ECU traffic");
 
         var badSession = new FakeTransport { SessionReply = [0x7F, 0x10, 0x22] };
         Reject<IOException>(() => Prepare(badSession, identity, q));
