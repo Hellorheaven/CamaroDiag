@@ -506,4 +506,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • cerere %2$s / răspuns %3$s • interval %4$d s</string>
     <string name="cal_axis_values">0x%1$s • număr=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Doar profil hardware; este necesar în continuare un SDK/API Android oficial sau o punte documentată.</string>
+    <string name="obd_scan_description">Inspecție SAE J1979 numai pentru citire: date ale grupului motopropulsor, coduri de eroare, cadru înghețat și identificarea ECU.</string>
+    <string name="obd_responding_can_ids">Identificatori CAN care au răspuns</string>
+    <string name="obd_can_id_limit_explanation">Identificatorii CAN sunt răspunsuri observate la cererea funcțională OBD 0100. Nu sunt suficienți pentru identificarea unui modul (BCM, TCM, ABS, IPC, SDM) sau autorizarea serviciilor GM avansate.</string>
+    <string name="obd_trigger_dtc">DTC declanșator al cadrului înghețat</string>
+    <string name="obd_real_scan_scope">Domeniu: rezultatele provin exclusiv din răspunsurile reale ale ECU accesibil prin OBD-II. Scanarea nu interoghează BCM, IPC, ABS, SDM sau alte module GM și nu execută comenzi de acționare ori programare.</string>
+    <string name="connection_busy">Conectare sau operațiune în curs…</string>
+    <string name="swcan_wiring_verified">Cablaj SW-CAN verificat (pinul 1)</string>
+    <string name="long_response_mode">Mod răspuns lung (ATAL)</string>
+    <string name="adapter_none_detected">Nu s-a detectat niciun adaptor. Asociați OBDLink MX+, MX, LX și alte adaptoare Bluetooth Classic; CX este detectat în apropiere prin BLE.</string>
+    <string name="usb_connection_title">Conexiune USB (OBDLink EX / SX, ELM327 și adaptoare seriale)</string>
+    <string name="adapter_connect_label">Conectare: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: arhitectura de transport este pregătită, dar compatibilitatea Android a interfețelor J2534 nu este declarată fără SDK-ul Android oficial al modelului. Accesul J2534 nu este simulat.</string>
+    <string name="adapter_vxdiag_profiles">Profiluri declarate ale interfețelor VXDIAG</string>
+    <string name="adapter_vxdiag_profiles_hint">Profilurile diferențiază variantele hardware și de conexiune. Nu confirmă disponibilitatea unui driver Android sau a comunicației cu vehiculul.</string>
+    <string name="adapter_simulation_profiles">Profiluri hardware simulate (test pe banc)</string>
 </resources>
