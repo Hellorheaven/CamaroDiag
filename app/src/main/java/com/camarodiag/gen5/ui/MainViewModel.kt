@@ -922,18 +922,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val requestId = signal.requestCanId!!
                 val responseId = signal.responseCanId!!
                 val did = signal.identifierHex.toInt(16)
-                val policy = UdsAccessPolicy.readOnly(setOf(did))
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
                 val raw = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(
+                    obdManager.withJ2534BridgeUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
-                        policy = policy,
-                        timeoutMs = 5000L
-                    ).readDataByIdentifier(did)
+                        timeoutMs = 5000L,
+                        readDids = setOf(did)
+                    ) { client -> client.readDataByIdentifier(did) }
                 } else {
                     obdManager.withStnUdsSession(
                         requestCanId = requestId,
@@ -1193,12 +1192,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
                 val data = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(
+                    obdManager.withJ2534BridgeUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
-                        timeoutMs = 5000L
-                    ).readDataByIdentifier(did)
+                        timeoutMs = 5000L,
+                        readDids = setOf(did)
+                    ) { client -> client.readDataByIdentifier(did) }
                 } else {
                     obdManager.withStnUdsSession(
                         requestCanId = requestId,
@@ -1257,12 +1257,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
                 val report = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(
+                    obdManager.withJ2534BridgeUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L
-                    ).readDtcReport()
+                    ) { client -> client.readDtcReport() }
                 } else {
                     obdManager.withStnUdsSession(
                         requestCanId = requestId,
