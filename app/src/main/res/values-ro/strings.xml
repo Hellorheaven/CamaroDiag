@@ -439,4 +439,26 @@
     <string name="cal_vin_sync_warning_message">VIN-ul stocat în profilul selectat (%1$s) va fi înlocuit cu VIN-ul ECU (%2$s). Anul, motorul, transmisia și piața nu se vor modifica. Faceți acest lucru numai după confirmarea că vehiculul conectat este cel dorit.</string>
     <string name="cal_vin_sync_confirm">Înlocuiește VIN-ul</string>
     <string name="vin_photo_capture">Fotografiază VIN-ul</string>
+    <string name="control_interlock_assessment">Evaluarea interblocărilor de siguranță: %1$s</string>
+    <string name="control_conditions_confirmed">condiții confirmate</string>
+    <string name="control_windows_explanation">Comanda GM trebuie identificată și validată pentru BCM-ul acestui VIN. Nu se presupune un cadru universal.</string>
+    <string name="control_sunroof_explanation">Numai dacă dotarea există și este disponibilă o comandă BCM validată.</string>
+    <string name="control_door_locks_title">Încuietori uși</string>
+    <string name="control_door_locks_explanation">Comandă de caroserie protejată: adresarea, securitatea și starea vehiculului trebuie verificate.</string>
+    <string name="control_lights_title">Lumini</string>
+    <string name="control_lights_explanation">Funcțiile de iluminare depind de BCM, echipare și piață.</string>
+    <string name="control_horn_explanation">Semnalul sonor rămâne dezactivat fără o procedură GM verificată și confirmarea utilizatorului.</string>
+    <string name="control_mirrors_title">Oglinzi</string>
+    <string name="control_mirrors_explanation">Comanda trebuie validată pentru echipare și versiunea BCM.</string>
+    <string name="control_trunk_explanation">Comanda trebuie validată pentru tipul caroseriei, BCM și starea vehiculului.</string>
+    <string name="control_remote_start_title">Pornire de la distanță</string>
+    <string name="control_remote_start_explanation">Nu poate fi comandată în siguranță printr-un cadru OBD generic. Folosiți doar sistemul de pornire de la distanță aprobat de producător și interblocările sale (Park, frână de parcare, capotă închisă, fără defecțiuni critice). CamaroDiag nu transmite comenzi de pornire a motorului.</string>
+    <string name="remote_start_blocker_gear">Poziția Park a transmisiei nu este confirmată.</string>
+    <string name="remote_start_blocker_hood">Închiderea capotei nu este confirmată.</string>
+    <string name="remote_start_blocker_locks">Blocarea ușilor nu este confirmată.</string>
+    <string name="remote_start_blocker_hazards">Stingerea luminilor de avarie nu este confirmată.</string>
+    <string name="remote_start_blocker_theft">Disponibilitatea sistemului antifurt nu este confirmată.</string>
+    <string name="remote_start_blocker_faults">Absența defecțiunilor critice nu este confirmată.</string>
+    <string name="remote_start_blocker_stationary">Staționarea vehiculului nu este confirmată.</string>
+    <string name="remote_start_blocker_equipment">Dotarea originală pentru pornire de la distanță nu este confirmată.</string>
 </resources>
