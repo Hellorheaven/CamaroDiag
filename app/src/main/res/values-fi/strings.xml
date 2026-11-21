@@ -382,4 +382,19 @@
     <string name="functional_tests_denied">Pääsy evätty: kirjaudu hyväksytyllä Google-tilillä ja yhdistä uudelleen.</string>
     <string name="functional_tests_not_connected">Fyysistä OBD-sovitinta ei ole liitetty. Muita tarkistuksia ei suoritettu.</string>
     <string name="functional_tests_cancelled">Testisarja peruutettiin.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Virheenjäljitysversiot</string>
+    <string name="tab_license">Lisenssi</string>
+    <string name="debug_builds_title">Yksityiset virheenjäljitysversiot</string>
+    <string name="debug_builds_refresh">Päivitä saatavilla olevat versiot</string>
+    <string name="debug_builds_download">Lataa GitHubista</string>
+    <string name="debug_builds_unavailable">Kelvollista virheenjäljitysarkistoa ei ole saatavilla.</string>
+    <string name="debug_builds_error">Virheenjäljitysversioita ei voitu ladata GitHubista.</string>
+    <string name="license_disabled">Lisenssijärjestelmä ei ole käytössä.</string>
+    <string name="license_buy">Osta lisenssi</string>
+    <string name="license_refresh">Päivitä lisenssi</string>
+    <string name="license_free">Maksuton</string>
+    <string name="license_owner">Omistaja: kaikki oikeudet</string>
+    <string name="license_premium">Täysi lisenssi käytössä</string>
+    <string name="license_title">CamaroDiag-lisenssi</string>
 </resources>
