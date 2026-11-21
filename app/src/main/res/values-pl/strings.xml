@@ -615,4 +615,6 @@
     <string name="msg_usb_identifier_unavailable">Identyfikator urządzenia USB jest niedostępny</string>
     <string name="msg_simulation_activation_failed">Nie udało się włączyć trybu symulacji.</string>
     <string name="msg_live_simulation_active">Symulacja jest aktywna. Wyświetlane wartości nie pochodzą z pojazdu.</string>
+    <string name="msg_mileage_audit_failed">Nie udało się odczytać danych do kontroli przebiegu.</string>
+    <string name="msg_session_delete_failed">Nie udało się usunąć zapisanej sesji.</string>
 </resources>
