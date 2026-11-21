@@ -101,3 +101,16 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Lint du run `44835334117` : 1 seul warning `TypographyDashes` sur la chaîne bulgare `cal_bridge_capabilities`, qui contient des identifiants de bus `HS-CAN` / `J2534-2`. `ea13192` applique une exception lint **sur cette chaîne uniquement**, sans modifier ces identifiants techniques.
 - Nouveau run Android CI `44836250219` démarré après correction ; résultat final non confirmé pendant cette passe.
 - **Non achevé :** 30 traductions intégrales (822 clés EN actuellement), builds sans avertissement, Windows et essais ECU matériels. Aucune fusion autorisée tant que les exigences ne sont pas validées.
+
+
+## Internationalisation en lots massifs — 21 novembre 2026
+
+- **3 724 traductions réellement ajoutées dans cette passe** aux 28 fichiers de langue partiels, sans recopier les textes anglais comme substitut. Les quatre lots transversaux couvrent 22 textes console/connexion/sécurité, 24 libellés PID OBD, 20 protections CAN/ECU et 20 libellés du mode expert.
+- Cinquième lot : 31 textes d'historique CAN, traces ISO-TP, sélecteur de capteurs et formats numériques (29 clés pour plusieurs locales où deux chaînes existaient déjà).
+- Dernier lot : 40 textes supplémentaires LFX FlexFuel 2012, identification ECU et aperçu mémoire pour les 12 langues historiques.
+- **14/30 langues à parité exacte de clés avec l'anglais : 822/822** : anglais, français, allemand, italien, espagnol, hébreu, russe, chinois simplifié, japonais, coréen, arabe, portugais, néerlandais, grec.
+- Au contrôle de cette passe : bulgare **426/822** ; croate, tchèque, danois, estonien, finnois, hongrois, irlandais, letton, lituanien, maltais, polonais, roumain, slovaque, slovène et suédois **185/822** chacun. Ces 16 langues restent **incomplètes**.
+- Contrôles statiques effectués sur les 30 fichiers : aucune clé dupliquée, inconnue ou différence de signature des placeholders Android dans les chaînes présentes. Une revue humaine de la qualité linguistique et de l'interface RTL reste à effectuer.
+- Tests de non-régression ajoutés à `LocaleResourcesIntegrityTest` : 66 libellés CAN/capteurs/sécurité, 20 champs experts, 31 textes de traces et sélection, parité intégrale des 14 langues terminées.
+- La règle `allAdvertisedLocalesCoverEveryStringKey` reste délibérément **bloquante** tant que les 16 autres langues ne sont pas complètes. Aucun build vert ni fusion ne doit être annoncé sur ce seul travail.
+- **Périmètre exclusivement CamaroDiag**. Aucune modification de CamaroDiagConnectors, aucun accès programmation ECU ou validation matérielle ajouté.
