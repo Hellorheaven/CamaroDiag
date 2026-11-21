@@ -98,6 +98,49 @@ class StnUdsPayloadTransportTest {
         assertTrue(commands.contains("STP 63"))
     }
 
+    @Test fun documentedObdLinkModelsUseIsoTpForHsCanDiagnostics() = runBlocking {
+        for (model in listOf("EX", "CX", "LX", "SX", "MX")) {
+            val commands = mutableListOf<String>()
+            val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+                commands += command
+                when {
+                    command == "STI" -> "STN2100 v5.10.3"
+                    command == "STDI" -> "OBDLink $model r3.2.1"
+                    command.startsWith("STPX") -> "7E8 62 12 34"
+                    else -> "OK"
+                }
+            }
+            assertArrayEquals(
+                "HS-CAN UDS must work for OBDLink $model",
+                byteArrayOf(0x62, 0x12, 0x34),
+                transport.exchange(byteArrayOf(0x22, 0x12, 0x34), 1000)
+            )
+            assertTrue("Expected ISO-TP on $model", commands.contains("STP 33"))
+            assertTrue("Expected actual UDS transaction on $model",
+                commands.any { it.startsWith("STPX h:7E0, d:221234") })
+        }
+    }
+
+    @Test fun swCanIsRejectedBeforeProtocolSelectionOnUnsupportedObdLinkModels() = runBlocking {
+        for (model in listOf("EX", "CX", "LX", "SX")) {
+            val commands = mutableListOf<String>()
+            val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 63) { command, _ ->
+                commands += command
+                when (command) {
+                    "STI" -> "STN2100 v5.10.3"
+                    "STDI" -> "OBDLink $model r3.2.1"
+                    else -> "OK"
+                }
+            }
+            val result = runCatching {
+                transport.exchange(byteArrayOf(0x22, 0x12, 0x34), 1000)
+            }
+            assertTrue("GM SW-CAN must fail on $model", result.isFailure)
+            assertFalse("Unsupported SW-CAN must not be selected on $model",
+                commands.any { it.startsWith("STP ") || it.startsWith("STPX") })
+        }
+    }
+
     @Test fun rejectsCanIdentifierAndProtocolFormatMismatch() {
         assertTrue(runCatching { StnUdsPayloadTransport(0x7E0, 0x7E8, 34) { _, _ -> "OK" } }.isFailure)
         assertTrue(runCatching { StnUdsPayloadTransport(0x18DA10F1, 0x18DAF110, 34) { _, _ -> "OK" } }.isSuccess)
