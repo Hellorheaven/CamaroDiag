@@ -589,4 +589,11 @@
     <string name="msg_live_csv_exported">Easpórtáladh an loga CSV. Líon na samplaí: %1$d.</string>
     <string name="msg_live_csv_export_failed">Níorbh fhéidir an loga CSV a easpórtáil.</string>
     <string name="msg_live_recording_max_samples">Sroicheadh an teorainn sábháilteachta (%1$d). Stopadh an taifeadadh go huathoibríoch.</string>
+    <string name="msg_cal_file_import_failed">Níorbh fhéidir an comhad calabrúcháin a iompórtáil.</string>
+    <string name="msg_cal_file_export_failed">Níorbh fhéidir an comhad calabrúcháin a easpórtáil.</string>
+    <string name="msg_cal_comparison_failed">Níorbh fhéidir na comhaid chalabrúcháin a chur i gcomparáid.</string>
+    <string name="msg_cal_template_export_failed">Níorbh fhéidir an teimpléad TSV a easpórtáil.</string>
+    <string name="msg_cal_definitions_import_failed">Níorbh fhéidir sainmhínithe na dtáblaí a iompórtáil.</string>
+    <string name="msg_cal_map_read_failed">Níorbh fhéidir an tábla roghnaithe a léamh.</string>
+    <string name="msg_cal_table_edit_failed">Níorbh fhéidir an tábla calabrúcháin a chur in eagar.</string>
 </resources>
