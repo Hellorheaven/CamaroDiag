@@ -567,4 +567,11 @@
     <string name="vin_photo_not_found">Kehtivat 17-märgilist VIN-koodi ei leitud. Sisestage see käsitsi või tehke uus foto.</string>
     <string name="vin_photo_error">VIN-koodi ei saanud fotolt lugeda. Proovige uuesti parema valgustusega ja teravustage pilt.</string>
     <string name="vehicle_vin_placeholder">17 märki</string>
+    <string name="can_sniffer_start">Alusta salvestamist</string>
+    <string name="can_sniffer_stop">Peata salvestamine</string>
+    <string name="can_sniffer_empty">CAN-kaadreid pole veel salvestatud.</string>
+    <string name="can_sniffer_capture_complete">CAN-kaadrite salvestamine lõppes.</string>
+    <string name="can_sniffer_capture_failed">CAN-kaadrite salvestamine nurjus või adapter lakkas vastamast.</string>
+    <string name="can_sniffer_frame_count">Salvestatud kaadreid: %1$d</string>
+    <string name="can_sniffer_filtered_count">Kuvatakse %1$d kaadrit %2$d-st</string>
 </resources>
