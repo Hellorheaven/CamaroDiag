@@ -123,3 +123,9 @@ Les éléments de protocole ont été étudiés en consultant des implémentatio
 CamaroDiag génère désormais directement les primitives GM du **chargeur exécuté en RAM** : demande d'effacement par secteur `3D 05`, transmission de blocs `36` avec adresse, taille et somme des octets, écriture d'essai `36 44`, et contrôle indépendant CRC32 `3D 02`. Toutes ces trames sont encadrées par des contrôles de taille, d'adresse, de zone de boot protégée et de réponses négatives. Le CRC32 utilisé ici correspond au mode GM non réfléchi (polynôme `04C11DB7`, initialisation nulle), distinct du CRC32 ZIP.
 
 **Ces primitives ne sont pas un kernel exécutable** : elles requièrent encore un chargeur RAM *original CamaroDiag* pour piloter correctement la mémoire C90FL de l'ECU ainsi qu'une implémentation native de l'authentification, de la gestion d'alimentation et de la récupération. Aucun accès à ces commandes n'est ouvert par le pont Android tant que ces étapes et les essais sur calculateur de banc ne sont pas terminés.
+
+### Accès sécurisé GM E39/E39A en code natif
+
+L'algorithme de calcul de clé GMLAN **0xDC** propre au profil E39/E39A a été réécrit en opérations arithmétiques 16 bits et vérifié par des vecteurs de test. Le module gère la lecture de graine `27 01`, la préparation de la réponse `27 02`, les acquittements et les refus de l'ECU. Il n'embarque ni interpréteur ni table d'algorithmes issue d'un autre projet. Il ne tente pas d'autres clés en cas de refus et ne court-circuite pas les temporisations de sécurité.
+
+Le calcul de clé n'est utilisable physiquement qu'après identification du calculateur et entrée dans la session constructeur appropriée. Les fonctions destructives restent inaccessibles à travers la console distante tant que le pilote, le kernel de flash original et la récupération ne sont pas qualifiés sur banc.
