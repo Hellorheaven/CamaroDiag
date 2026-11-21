@@ -94,9 +94,18 @@ internal static class NativeE39FileWriteJournalSelfTests
                 0, "forged success after recovery"), CancellationToken.None)
                 .GetAwaiter().GetResult();
             stale.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            Assert(NativeE39FileWriteJournal.Inspect(path) !=
-                NativeE39FileWriteJournal.CompletionState.Completed,
-                "Recovery-required state cannot be overwritten by later success");
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.RecoveryRequired,
+                "Recovery-required state cannot be hidden by invalid earlier transitions or later success");
+
+            File.Delete(path);
+            File.WriteAllLines(path, [
+                "{broken earlier record",
+                "{\"Schema\":2,\"Phase\":\"RecoveryRequired\",\"Address\":131072}"
+            ]);
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.RecoveryRequired,
+                "Legacy recovery record remains visible after malformed history");
 
             File.Delete(path);
             var failed = new NativeE39FileWriteJournal(path);

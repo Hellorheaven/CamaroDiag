@@ -65,6 +65,26 @@ internal sealed class NativeE39FileWriteJournal :
         var entries = File.ReadAllLines(path);
         if (entries.Length == 0)
             return CompletionState.NoEvents;
+        // A durable explicit recovery marker wins over malformed older records.
+        // Do not interpret invalid JSON as evidence of success or erase its warning.
+        foreach (var entry in entries)
+        {
+            try
+            {
+                using var json = JsonDocument.Parse(entry);
+                var node = json.RootElement;
+                if (node.ValueKind == JsonValueKind.Object &&
+                    node.TryGetProperty("Schema", out var schema) &&
+                    schema.ValueKind == JsonValueKind.Number && schema.TryGetInt32(out var version) &&
+                    version is 1 or 2 or 3 &&
+                    node.TryGetProperty("Phase", out var phase) && phase.ValueKind == JsonValueKind.String &&
+                    phase.GetString() == nameof(NativeE39WriteSequence.Phase.RecoveryRequired) &&
+                    node.TryGetProperty("Address", out var address) && address.ValueKind == JsonValueKind.Number &&
+                    address.TryGetUInt32(out _))
+                    return CompletionState.RecoveryRequired;
+            }
+            catch (JsonException) { /* still evaluate subsequent complete records */ }
+        }
         var sectors = new Dictionary<uint, NativeE39WriteSequence.Phase>();
         var preflightStarted = false;
         var destructiveStarted = false;
