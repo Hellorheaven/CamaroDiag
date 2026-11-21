@@ -453,4 +453,26 @@
     <string name="cal_vin_sync_warning_message">Pasirinktame profilyje išsaugotas VIN (%1$s) bus pakeistas ECU VIN (%2$s). Metai, variklis, pavarų dėžė ir rinka nepasikeis. Tai atlikite tik įsitikinę, kad prijungta tinkama transporto priemonė.</string>
     <string name="cal_vin_sync_confirm">Pakeisti VIN</string>
     <string name="vin_photo_capture">Nufotografuoti VIN</string>
+    <string name="control_interlock_assessment">Apsauginių blokavimo sąlygų įvertinimas: %1$s</string>
+    <string name="control_conditions_confirmed">sąlygos patvirtintos</string>
+    <string name="control_windows_explanation">GM komandą reikia identifikuoti ir patvirtinti šio VIN BCM. Universali žinutė nenumatoma.</string>
+    <string name="control_sunroof_explanation">Tik jei įranga sumontuota ir yra patvirtinta BCM komanda.</string>
+    <string name="control_door_locks_title">Durų užraktai</string>
+    <string name="control_door_locks_explanation">Apsaugota kėbulo komanda: būtina patikrinti adresavimą, saugą ir automobilio būklę.</string>
+    <string name="control_lights_title">Žibintai</string>
+    <string name="control_lights_explanation">Apšvietimo funkcijos priklauso nuo BCM, komplektacijos ir rinkos.</string>
+    <string name="control_horn_explanation">Garsinis signalas lieka išjungtas, jei nėra patikrintos GM procedūros ir naudotojo patvirtinimo.</string>
+    <string name="control_mirrors_title">Veidrodėliai</string>
+    <string name="control_mirrors_explanation">Komandą reikia patvirtinti atsižvelgiant į įrangą ir BCM versiją.</string>
+    <string name="control_trunk_explanation">Komandą reikia patvirtinti pagal kėbulo tipą, BCM ir automobilio būklę.</string>
+    <string name="control_remote_start_title">Nuotolinis paleidimas</string>
+    <string name="control_remote_start_explanation">Bendra OBD žinute saugiai valdyti negalima. Naudokite tik gamintojo patvirtintą nuotolinio paleidimo sistemą ir jos saugos sąlygas (Park, stovėjimo stabdys, uždarytas variklio gaubtas, nėra kritinių gedimų). CamaroDiag nesiunčia variklio paleidimo komandos.</string>
+    <string name="remote_start_blocker_gear">Nepatvirtinta pavarų dėžės Park padėtis.</string>
+    <string name="remote_start_blocker_hood">Nepatvirtintas variklio gaubto uždarymas.</string>
+    <string name="remote_start_blocker_locks">Nepatvirtintas durų užrakinimas.</string>
+    <string name="remote_start_blocker_hazards">Nepatvirtinta, kad avarinės šviesos išjungtos.</string>
+    <string name="remote_start_blocker_theft">Nepatvirtinta apsaugos nuo vagystės sistemos parengtis.</string>
+    <string name="remote_start_blocker_faults">Nepatvirtinta, kad nėra kritinių gedimų.</string>
+    <string name="remote_start_blocker_stationary">Nepatvirtinta, kad automobilis stovi.</string>
+    <string name="remote_start_blocker_equipment">Nepatvirtinta gamyklinė nuotolinio paleidimo įranga.</string>
 </resources>
