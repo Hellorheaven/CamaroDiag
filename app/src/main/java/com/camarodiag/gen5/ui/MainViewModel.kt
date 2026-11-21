@@ -999,6 +999,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = true,
                 isJ2534BridgeConnected = false,
+                isJ2534MemoryReadAvailable = false,
                 j2534BridgeMessage = ""
             )
             try {
@@ -1040,6 +1041,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534BridgeConnecting = false,
                     isJ2534BridgeConnected = true,
+                    isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
                     j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_j2534_connected, result)
                 )
             } catch (cancelled: CancellationException) {
@@ -1052,6 +1054,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         isJ2534BridgeConnecting = false,
                         isJ2534BridgeConnected = false,
+                        isJ2534MemoryReadAvailable = false,
                         j2534BridgeMessage = getApplication<Application>().getString(R.string.msg_j2534_bridge_connect_failed)
                     )
                 }
@@ -1086,6 +1089,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = false,
                 isJ2534BridgeConnected = false,
+                isJ2534MemoryReadAvailable = false,
                 j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_pc_bridge_disconnected)
             )
         }
