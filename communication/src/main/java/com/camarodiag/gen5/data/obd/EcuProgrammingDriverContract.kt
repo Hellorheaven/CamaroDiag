@@ -30,7 +30,11 @@ interface EcuProgrammingDriverContract {
     ) {
         /** Shared protocol-family match; neither a firmware nor a service number is required. */
         fun supportsFamilyProtocol(controllerFamily: String, requestedTransport: Transport): Boolean =
-            transport == requestedTransport && controllerFamily in controllerFamilies &&
+            transport == requestedTransport &&
+                controllerFamily.isNotBlank() &&
+                controllerFamilies.any { family ->
+                    family.trim().equals(controllerFamily.trim(), ignoreCase = true)
+                } &&
                 Capability.IDENTIFY in capabilities
 
         /**
