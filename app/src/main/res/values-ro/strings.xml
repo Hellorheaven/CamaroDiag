@@ -385,4 +385,19 @@
     <string name="functional_tests_denied">Acces refuzat: conectează-te cu contul Google autorizat și reconectează adaptorul.</string>
     <string name="functional_tests_not_connected">Nu este conectat niciun adaptor OBD fizic. Restul verificărilor nu au fost efectuate.</string>
     <string name="functional_tests_cancelled">Sesiunea de teste a fost anulată.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Versiuni de depanare</string>
+    <string name="tab_license">Licență</string>
+    <string name="debug_builds_title">Versiuni private de depanare</string>
+    <string name="debug_builds_refresh">Actualizează versiunile disponibile</string>
+    <string name="debug_builds_download">Descarcă de pe GitHub</string>
+    <string name="debug_builds_unavailable">Nu este disponibilă nicio arhivă de depanare validă.</string>
+    <string name="debug_builds_error">Nu se pot încărca versiunile de depanare de pe GitHub.</string>
+    <string name="license_disabled">Sistemul de licențiere nu este activat.</string>
+    <string name="license_buy">Cumpără o licență</string>
+    <string name="license_refresh">Actualizează licența</string>
+    <string name="license_free">Gratuit</string>
+    <string name="license_owner">Proprietar: toate permisiunile</string>
+    <string name="license_premium">Licență completă activă</string>
+    <string name="license_title">Licență CamaroDiag</string>
 </resources>
