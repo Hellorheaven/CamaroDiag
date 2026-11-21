@@ -892,4 +892,13 @@
     <string name="license_owner">בעלים: כל ההרשאות</string>
     <string name="license_premium">רישיון מלא פעיל</string>
     <string name="license_title">רישיון CamaroDiag</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">הורידו את קובצי Debug האחרונים של PR #70. התחברו ל-GitHub באמצעות חשבון מורשה. ההורדות הן ארכיוני ZIP שיש לחלץ.</string>
+    <string name="debug_builds_android_archive">קובץ ZIP הכולל APK של Android Debug.</string>
+    <string name="debug_builds_windows_archive">קובץ ZIP הכולל מתקיני Windows ל-x64 ול-x86.</string>
+    <string name="debug_builds_caution">קובצי הבנייה פגים לאחר 30 יום. זמינותם אינה מוכיחה בנייה מוצלחת או בדיקה ברכב. חתימות APK של Debug עשויות להיות שונות מחתימות הגרסאות הציבוריות.</string>
+    <string name="debug_builds_created">נוצר</string>
+    <string name="debug_builds_expires">תוקף עד</string>
+    <string name="debug_builds_no_browser">אין דפדפן זמין לפתיחת ההורדה.</string>
 </resources>
