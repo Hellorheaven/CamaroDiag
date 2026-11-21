@@ -85,6 +85,46 @@ object Lfx2012ControllerReferences {
         }
     }
 
+    /**
+     * Service numbers can be superseded and printed part numbers/BCC labels may
+     * represent different calibrations on the same ECU protocol family.
+     * Resolve them to the catalogued family without pretending that they are
+     * separate communication drivers or proven identical circuit boards.
+     */
+    enum class CatalogReferenceKind {
+        CURRENT_SERVICE_NUMBER, SUPERSEDED_SERVICE_NUMBER, PRINTED_PART_NUMBER, BROADCAST_CODE
+    }
+
+    data class CatalogReference(
+        val family: String,
+        val serviceGroup: String,
+        val kind: CatalogReferenceKind,
+        val queriedReference: String
+    ) {
+        /** A matching catalogue reference must never grant flash permission. */
+        val authorizesProgramming: Boolean get() = false
+    }
+
+    fun resolveCatalogReference(reference: String): List<CatalogReference> {
+        val query = reference.trim().uppercase()
+        if (query.isEmpty()) return emptyList()
+        return servicePartGroups.mapNotNull { group ->
+            val knownServiceNumbers = (group.replaces + group.servicePart).toSet()
+            val match = when {
+                query == group.servicePart -> CatalogReferenceKind.CURRENT_SERVICE_NUMBER
+                query in group.replaces -> CatalogReferenceKind.SUPERSEDED_SERVICE_NUMBER
+                catalogLabels.any {
+                    it.serviceNumber in knownServiceNumbers && it.partNumber == query
+                } -> CatalogReferenceKind.PRINTED_PART_NUMBER
+                catalogLabels.any {
+                    it.serviceNumber in knownServiceNumbers && it.bcc.equals(query, ignoreCase = true)
+                } -> CatalogReferenceKind.BROADCAST_CODE
+                else -> null
+            }
+            match?.let { CatalogReference(controllerFamily, group.servicePart, it, query) }
+        }
+    }
+
     data class ObservedIdentity(
         val ecuName: String?,
         val calibrationIds: List<String>,
