@@ -579,4 +579,10 @@
     <string name="msg_cal_definitions_import_failed">Definițiile tabelelor nu au putut fi importate.</string>
     <string name="msg_cal_map_read_failed">Tabelul selectat nu a putut fi citit.</string>
     <string name="msg_cal_table_edit_failed">Tabelul de calibrare nu a putut fi editat.</string>
+    <string name="cal_expert_image_selected">Fișier importat: %1$s</string>
+    <string name="cal_expert_patch_address">Adresa de început a regiunii de memorie (hexazecimal)</string>
+    <string name="cal_expert_patch_erase_bytes">Dimensiunea sectorului de ștergere (octeți)</string>
+    <string name="cal_expert_patch_program_bytes">Dimensiunea unității de programare (octeți)</string>
+    <string name="cal_expert_patch_preview_button">Previzualizează sectoarele afectate de fișierul BIN modificat</string>
+    <string name="cal_expert_patch_summary">Octeți modificați: %1$d. Sectoare de ștergere afectate: %2$d. Harta memoriei hardware nu a fost verificată. Nu s-au scris date.</string>
 </resources>
