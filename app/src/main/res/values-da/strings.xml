@@ -504,4 +504,15 @@
     <string name="license_owner">Ejer: alle rettigheder</string>
     <string name="license_premium">Fuld licens aktiv</string>
     <string name="license_title">CamaroDiag-licens</string>
+    <!-- LFX 2012 ECU safety and verification guidance -->
+    <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012: ECU-identifikation (kun læsning)</string>
+    <string name="flexfuel_lfx2012_checks">Betingelser, som stadig forhindrer ændringer af kalibreringen</string>
+    <string name="flexfuel_preflight_vehicle_missing">Ingen køretøjsprofil er valgt</string>
+    <string name="flexfuel_preflight_wrong_vehicle">Køretøjet er ikke en Camaro LFX fra 2012</string>
+    <string name="flexfuel_preflight_vin">VIN skal læses fra ECU\'en og stemme overens med det gemte køretøj</string>
+    <string name="flexfuel_preflight_ecu">Den faktiske ECU-styreenhedsreference skal identificeres</string>
+    <string name="flexfuel_preflight_firmware">Den nøjagtige ECU-firmware er ikke verificeret</string>
+    <string name="flexfuel_preflight_recovery">Gendannelsesproceduren er ikke verificeret</string>
+    <string name="flexfuel_lfx2012_audit_title">LFX 2012: kontrol før og efter programmering (kun læsning)</string>
+    <string name="flexfuel_lfx2012_audit_post_not_performed">Kontrol efter programmering er ikke udført. Hverken ECU-programmering eller køretøjstest efter skrivning er valideret.</string>
 </resources>
