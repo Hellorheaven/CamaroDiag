@@ -23,10 +23,6 @@ internal static class Program
         if (args.Contains("--probe-drivers", StringComparer.OrdinalIgnoreCase))
             return J2534DriverProbe.RunAll();
 
-        // Intentionally a *local Windows console* command, never a network
-        // bridge operation. The external GPLv3 CLI is not bundled.
-        if (args.Contains("--pcmhammer-program", StringComparer.OrdinalIgnoreCase))
-            return await PcmHammerProgrammingHandoff.RunAsync(args);
 
         if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
