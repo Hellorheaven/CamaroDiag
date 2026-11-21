@@ -514,4 +514,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • pyyntö %2$s / vastaus %3$s • väli %4$d s</string>
     <string name="cal_axis_values">0x%1$s • määrä=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Vain laitteistoprofiili; virallinen Android SDK/API tai dokumentoitu silta tarvitaan edelleen.</string>
+    <string name="obd_scan_description">SAE J1979 -standardin mukainen vain luku -tarkastus: voimansiirtotiedot, vikakoodit, pysäytyskuva ja ECU-tunnisteet.</string>
+    <string name="obd_responding_can_ids">Vastanneet CAN-tunnisteet</string>
+    <string name="obd_can_id_limit_explanation">CAN-tunnisteet ovat toiminnalliseen OBD 0100 -pyyntöön havaittuja vastauksia. Ne eivät riitä moduulin (BCM, TCM, ABS, IPC, SDM) tunnistamiseen tai GM:n laajennettujen palvelujen sallimiseen.</string>
+    <string name="obd_trigger_dtc">Pysäytyskuvan aiheuttanut DTC</string>
+    <string name="obd_real_scan_scope">Laajuus: tulokset perustuvat vain OBD-II:n kautta tavoitettavan ECU:n todellisiin vastauksiin. Skannaus ei kysy BCM:ää, IPC:tä, ABS:ää, SDM:ää tai muita GM-moduuleja eikä suorita toimilaite- tai ohjelmointikomentoja.</string>
+    <string name="connection_busy">Yhdistäminen tai toiminto käynnissä…</string>
+    <string name="swcan_wiring_verified">SW-CAN-johdotus varmistettu (nasta 1)</string>
+    <string name="long_response_mode">Pitkien vastausten tila (ATAL)</string>
+    <string name="adapter_none_detected">Sovitinta ei havaittu. Muodosta pariliitos OBDLink MX+-, MX-, LX- ja muiden Classic Bluetooth -sovittimien kanssa; CX löydetään lähistöltä BLE:n kautta.</string>
+    <string name="usb_connection_title">USB-yhteys (OBDLink EX / SX, ELM327 ja sarjaliikennesovittimet)</string>
+    <string name="adapter_connect_label">Yhdistä: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: siirtoarkkitehtuuri on valmisteltu, mutta J2534-liitäntöjen Android-yhteensopivuutta ei vahvisteta ilman mallin virallista Android SDK:ta. J2534-yhteyttä ei simuloida.</string>
+    <string name="adapter_vxdiag_profiles">Ilmoitetut VXDIAG-liitäntäprofiilit</string>
+    <string name="adapter_vxdiag_profiles_hint">Profiilit erottavat laitteisto- ja yhteysvaihtoehdot. Ne eivät takaa Android-ajurin tai ajoneuvoyhteyden saatavuutta.</string>
+    <string name="adapter_simulation_profiles">Simuloidut laitteistoprofiilit (penkkitesti)</string>
 </resources>
