@@ -19,6 +19,9 @@
     <string name="functional_tests_passed">PASSED (physical evidence)</string>
     <string name="functional_tests_failed">FAILED</string>
     <string name="functional_tests_skipped">NOT TESTED</string>
+    <string name="functional_tests_denied">Access denied: sign in with the authorized Google account and reconnect.</string>
+    <string name="functional_tests_not_connected">No physical OBD adapter is connected. Remaining checks were not performed.</string>
+    <string name="functional_tests_cancelled">Test campaign cancelled.</string>
     <string name="tab_modules">Modules</string>
     <string name="tab_mileage">Mileage</string>
     <string name="tab_calibration">ECU / Maps</string>
