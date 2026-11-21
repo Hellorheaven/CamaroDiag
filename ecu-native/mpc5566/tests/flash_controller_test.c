@@ -89,6 +89,15 @@ int main(void)
     m.lose_idle_status = true;
     assert(cd_flash_program(&c, 0x20000, data, 8) == CD_FLASH_RECOVERY_REQUIRED);
     assert(c.recovery_required && m.words[0] == 0x01020304);
+    for (unsigned high = 0; high < 2; ++high) {
+        init_model(&m);
+        c = controller_for(&m);
+        m.stuck_selection_after_erase = true;
+        assert(cd_flash_erase(&c, high ? 0x80000 : 0x20000, high ? 0x20000 : 0x10000)
+            == CD_FLASH_RECOVERY_REQUIRED);
+        assert(m.pulses == 1 && c.recovery_required);
+        assert(cd_flash_probe_program(&c, 0x20000, 8) == CD_FLASH_RECOVERY_REQUIRED);
+    }
     /* Independently exercise middle and high select bits, including last block. */
     const uint32_t addresses[] = {0x40000, 0x60000, 0x80000, 0x2E0000};
     const uint32_t lm[] = {0x10000, 0x20000, 0, 0};

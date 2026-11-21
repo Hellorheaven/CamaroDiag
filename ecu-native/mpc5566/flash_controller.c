@@ -147,7 +147,9 @@ cd_flash_result cd_flash_erase(cd_flash_controller *c, uint32_t address, uint32_
     cd_flash_result completed = finish_pulse(c, CD_MCR_ERS);
     if (completed != CD_FLASH_OK) return completed;
     c->recovery_required = true;
-    if (!write_reg(c, CD_LMSR, 0) || !write_reg(c, CD_HSR, 0))
+    if (!write_reg(c, CD_LMSR, 0) || !write_reg(c, CD_HSR, 0) ||
+        !read_reg(c, CD_LMSR, &selected_lm) || !read_reg(c, CD_HSR, &selected_high) ||
+        (selected_lm & LM_MASK) != 0 || (selected_high & HIGH_MASK) != 0)
         return fail_uncertain(c);
     for (uint32_t offset = 0; offset < size; offset += 4u) {
         uint32_t actual;

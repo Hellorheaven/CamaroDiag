@@ -27,6 +27,8 @@ static bool write_reg(void *ctx, uint32_t offset, uint32_t value)
         m->regs[offset / 4] = value | 1u;
         return true;
     }
+    if (m->stuck_selection_after_erase && m->pulses && value == 0 &&
+        (offset == CD_LMSR || offset == CD_HSR)) return true;
     if (offset != CD_MCR) {
         m->regs[offset / 4] = value;
         return true;
