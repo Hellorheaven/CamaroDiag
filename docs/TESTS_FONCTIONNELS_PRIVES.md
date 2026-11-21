@@ -6,14 +6,14 @@ L'onglet **Tests fonctionnels** sur Android n'apparaît qu'avec une session **Go
 
 Sur Windows, l'onglet **Tests fonctionnels privés** reste verrouillé jusqu'à la connexion à ce même compte Google dans le navigateur système. L'autorisation repose sur la signature du jeton Firebase, le projet, sa durée de validité et le droit signé. Elle expire au plus tard dix minutes après connexion ; aucune adresse Gmail n'est codée dans l'application.
 
-## Comment activer le compte propriétaire (une seule fois)
+## Comment activer les deux comptes propriétaires (une seule fois)
 
 L'administrateur Firebase procède **sur son poste d'administration**, jamais depuis l'application, sans mettre l'adresse ni les mots de passe dans les dépôts :
 
 1. Installer `firebase-admin` dans un environnement Node.js privé ; préparer les identifiants d'un compte de service Firebase Admin **hors du dépôt** avec `GOOGLE_APPLICATION_CREDENTIALS`.
-2. Définir les variables d'environnement privées `CAMARODIAG_OWNER_GOOGLE_EMAIL` (le Gmail à autoriser) et `CAMARODIAG_OWNER_HMAC_KEY` (clé aléatoire et secrète d'au moins 32 caractères).
-3. Exécuter `node tools/admin/enroll-functional-test-owner.mjs fingerprint` pour calculer l'empreinte **HMAC-SHA256**. Conserver cette empreinte et la clé hors de GitHub.
-4. Définir `CAMARODIAG_OWNER_EXPECTED_HMAC` avec cette empreinte et exécuter `node tools/admin/enroll-functional-test-owner.mjs grant`. Le script vérifie l'empreinte en temps constant, révoque cet accès aux autres comptes puis autorise l'unique compte Google cible. Aucun Gmail n'est affiché dans la confirmation.
+2. Définir les variables d'environnement privées `CAMARODIAG_OWNER_GOOGLE_EMAILS` (exactement deux adresses Gmail séparées par une virgule, sans les publier) et `CAMARODIAG_OWNER_HMAC_KEY` (clé aléatoire secrète d'au moins 32 caractères).
+3. Exécuter `node tools/admin/enroll-functional-test-owner.mjs fingerprint` pour calculer les **deux empreintes HMAC-SHA256** (repérées par leur numéro, sans afficher les adresses). Conserver les deux empreintes et la clé hors de GitHub.
+4. Définir `CAMARODIAG_OWNER_EXPECTED_HMACS` avec les **deux empreintes dans le même ordre**, séparées par une virgule, puis exécuter `node tools/admin/enroll-functional-test-owner.mjs grant`. Le script vérifie les deux empreintes, l'existence et la vérification des deux utilisateurs Firebase liés à Google **avant toute modification**, révoque ce droit pour les autres utilisateurs, puis attribue l'autorisation aux **deux comptes**. Aucun Gmail n'est affiché dans la confirmation.
 5. Se déconnecter/reconnecter sur Android pour rafraîchir le jeton. Le simple hash public d'une adresse est **interdit** : il permettrait de retrouver l'adresse par essais.
 
 **Windows uniquement :** configurer, dans l'environnement privé du poste, `CAMARODIAG_GOOGLE_DESKTOP_CLIENT_ID` (client OAuth Google de type *Desktop* autorisant la boucle locale), `CAMARODIAG_FIREBASE_WEB_API_KEY` et `CAMARODIAG_FIREBASE_PROJECT_ID`. Certaines configurations Google exigent aussi `CAMARODIAG_GOOGLE_DESKTOP_CLIENT_SECRET` (identifiant OAuth public d'application native, pas un secret d'authentification propriétaire). Ces valeurs ne contiennent pas l'adresse du propriétaire. Google Sign-In et le fournisseur Google de Firebase doivent être configurés dans le même projet. Sans configuration, l'onglet reste **verrouillé**.
@@ -41,4 +41,4 @@ Le compte administrateur Firebase et les clés privées doivent rester protégé
 - **Limite de confidentialité :** le claim Firebase protège l'accès aux **onglets** dans le client officiel ; les artefacts d'un dépôt GitHub public ne deviennent pas privés du seul fait que le bouton est masqué. Pour des fichiers Debug confidentiels accessibles uniquement au propriétaire, utiliser à l'avenir un stockage privé et un service de distribution validant le jeton Firebase sur chaque requête, sans lien public.
 - **Limite de validation :** les fichiers peuvent exister même si le contrôle global CI a échoué. Un artefact publié n'implique pas une build validée, un calculateur testé, ou une application signée de manière interchangeable avec la version Release.
 
-Pour définir l'identité propriétaire, l'administrateur renseigne **en privé** le Gmail transmis par le propriétaire dans `CAMARODIAG_OWNER_GOOGLE_EMAIL`, exécute la procédure ci-dessus et vérifie l'apparition des deux onglets. Ne jamais inscrire le Gmail en clair dans le code ni dans un secret de l'APK.
+Pour autoriser les **deux comptes Google définis par le propriétaire**, l'administrateur renseigne leurs adresses **en privé** dans `CAMARODIAG_OWNER_GOOGLE_EMAILS`, exécute la procédure ci-dessus et vérifie les onglets privés sur chacun des comptes. Ne jamais inscrire les adresses en clair dans le code, un commit GitHub ou un secret de l'APK. L'attribution réelle des droits Firebase n'est pas effectuée par le commit de ce script.
