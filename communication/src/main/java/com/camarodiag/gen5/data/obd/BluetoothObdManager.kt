@@ -705,6 +705,28 @@ class BluetoothObdManager(context: Context) {
         return UdsClient(transport, policy, timeoutMs)
     }
 
+    /**
+     * Physically acquire and archive a documented ECU memory region via the
+     * connected Windows J2534 adapter. The Windows bridge independently
+     * enforces its VIN-bound address allowlist; this API cannot flash an ECU.
+     */
+    suspend fun captureAndExportJ2534Memory(
+        request: J2534LiveMemoryBackup.Request,
+        output: OutputStream
+    ): J2534LiveMemoryBackup.CaptureResult {
+        check(isJ2534BridgeConnected()) {
+            "Connect a real Windows J2534 bridge before reading ECU memory."
+        }
+        return commandSessionMutex.withLock {
+            val bridge = j2534BridgeTransport
+                ?: error("The J2534 bridge was disconnected.")
+            check(isJ2534BridgeConnected() && bridge.isConnected) {
+                "The J2534 bridge is not connected."
+            }
+            J2534LiveMemoryBackup.captureAndExport(bridge, request, output)
+        }
+    }
+
     fun isJ2534BridgeConnected(): Boolean =
         activeTransport == "J2534_BRIDGE" &&
             !isDemoMode && !isSimulationActive &&
