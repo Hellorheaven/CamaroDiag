@@ -602,4 +602,6 @@
     <string name="cal_tcp_port">Vrata TCP</string>
     <string name="msg_refresh_adapters_failed">Seznama vmesnikov ni bilo mogoče osvežiti.</string>
     <string name="msg_usb_identifier_unavailable">Identifikator naprave USB ni na voljo</string>
+    <string name="msg_simulation_activation_failed">Načina simulacije ni bilo mogoče vklopiti.</string>
+    <string name="msg_live_simulation_active">Simulacija je vključena. Prikazane vrednosti niso iz vozila.</string>
 </resources>
