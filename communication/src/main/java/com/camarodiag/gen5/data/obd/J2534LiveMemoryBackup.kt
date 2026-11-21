@@ -1,6 +1,11 @@
 package com.camarodiag.gen5.data.obd
 
 import java.io.OutputStream
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 /**
  * Real, non-destructive memory capture over a connected Windows J2534 PassThru bridge.
@@ -101,7 +106,8 @@ object J2534LiveMemoryBackup {
             "Only default and extended read sessions are supported."
         }
 
-        suspend fun liveVin(): String {
+        var identityLost = false
+        suspend fun liveVin(): String = try {
             val response = transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), TIMEOUT_MS)
             require(response.size == 20 &&
                 response[0] == 0x62.toByte() &&
@@ -109,7 +115,11 @@ object J2534LiveMemoryBackup {
             ) { "ECU did not respond to DID F190 with a valid VIN." }
             val vin = response.copyOfRange(3, 20).toString(Charsets.US_ASCII)
             require(vin == request.expectedVin) { "Live ECU VIN differs from selected vehicle." }
-            return vin
+            vin
+        } catch (failure: Exception) {
+            // Never send a session change to a target whose identity is uncertain.
+            identityLost = true
+            throw failure
         }
 
         fun memoryRequest(address: Long, bytes: Int): ByteArray =
@@ -126,9 +136,10 @@ object J2534LiveMemoryBackup {
             progress(CaptureProgress(passNumber, 0, image.size))
             var blocks = 0
             while (offset < image.size) {
+                currentCoroutineContext().ensureActive()
                 if (blocks > 0 && blocks % 32 == 0) {
                     val ping = transport.exchange(byteArrayOf(0x3E, 0x00), TIMEOUT_MS)
-                    require(ping.size >= 2 && ping[0] == 0x7E.toByte()) {
+                    require(ping.size == 2 && ping[0] == 0x7E.toByte() && ping[1] == 0x00.toByte()) {
                         "ECU no longer confirms its active diagnostic session."
                     }
                     // A live socket can remain connected while the interface is
@@ -155,15 +166,17 @@ object J2534LiveMemoryBackup {
         }
 
         liveVin()
-        var enteredExtended = false
+        var extendedRequested = false
+        var captureCompleted = false
         try {
             if (request.diagnosticSession == 3) {
+                // A lost or malformed positive response can still mean the ECU changed session.
+                extendedRequested = true
                 val response = transport.exchange(byteArrayOf(0x10, 0x03), TIMEOUT_MS)
                 require(response.size >= 2 && response[0] == 0x50.toByte() &&
                     response[1] == 0x03.toByte()) {
                     "ECU did not accept the extended read session."
                 }
-                enteredExtended = true
             }
             val first = pass(1)
             // Reject a swapped ECU BEFORE starting the second acquisition;
@@ -190,12 +203,29 @@ object J2534LiveMemoryBackup {
             )
             val verification = EcuBackupIntegrity.verify(manifest, listOf(capture), required)
             check(verification.consistent) { "Physical ECU memory backup failed integrity checks." }
+            currentCoroutineContext().ensureActive()
+            captureCompleted = true
             return CaptureResult(manifest, capture, verification)
         } finally {
-            if (enteredExtended) {
-                // Best-effort return to default session. If the bridge vanished,
-                // there must be no automatic reconnect or write/recovery attempt.
-                runCatching { transport.exchange(byteArrayOf(0x10, 0x01), TIMEOUT_MS) }
+            if (extendedRequested && !identityLost) {
+                // Cleanup on the original transport even after cancellation. Each
+                // exchange has a bounded timeout. Never reconnect, and recheck VIN
+                // before changing session so a replacement ECU is not reset.
+                val reset = withContext(NonCancellable) {
+                    runCatching {
+                        withTimeout(2 * (TIMEOUT_MS + 3000L) + 1000L) {
+                            liveVin()
+                            val response = transport.exchange(byteArrayOf(0x10, 0x01), TIMEOUT_MS)
+                            require(response.size >= 2 && response[0] == 0x50.toByte() &&
+                                response[1] == 0x01.toByte()) {
+                                "ECU did not confirm return to the default diagnostic session."
+                            }
+                        }
+                    }
+                }
+                // Preserve the original failure/cancellation. A nominally successful
+                // extended capture is not reported as successful if cleanup failed.
+                if (captureCompleted) reset.getOrThrow()
             }
         }
     }
