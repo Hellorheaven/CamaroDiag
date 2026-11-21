@@ -535,4 +535,23 @@
     <string name="adapter_vxdiag_profiles">Deklaruoti VXDIAG sąsajų profiliai</string>
     <string name="adapter_vxdiag_profiles_hint">Profiliai skiria aparatinės įrangos ir ryšio variantus. Jie nepatvirtina Android tvarkyklės arba ryšio su transporto priemone prieinamumo.</string>
     <string name="adapter_simulation_profiles">Imituojami aparatinės įrangos profiliai (stendinis bandymas)</string>
+    <string name="modules_vehicle_title">Transporto priemonės valdymo moduliai</string>
+    <string name="module_accessible">Pasiekiamas</string>
+    <string name="module_requires_swcan">Reikalingas SW-CAN (1 kontaktas)</string>
+    <string name="module_blocked_adapter">Blokuoja adapteris</string>
+    <string name="module_not_equipped">Neįrengtas</string>
+    <string name="module_discovery_required">Reikia aptikti transporto priemonės modulius</string>
+    <string name="live_engine_telemetry">Variklio telemetrija realiuoju laiku</string>
+    <string name="live_resume">Tęsti</string>
+    <string name="live_stop_recording">Sustabdyti įrašymą</string>
+    <string name="live_record">Įrašyti tiesioginius duomenis</string>
+    <string name="live_export_csv">Eksportuoti CSV</string>
+    <string name="live_recording_notice">Registratorius įrašo rodomas OBD vertes (metriniais vienetais) su laiko žymomis. Jis nekeičia ECU kalibravimo lentelių.</string>
+    <string name="dtc_title">Diagnostiniai gedimų kodai</string>
+    <string name="dtc_clear_warning">04 režimo išvalymas pašalina su emisijomis susijusius gedimų kodus ir atstato kai kuriuos parengties monitorius. Prieš tęsdami išsaugokite ataskaitą. 04 režimas neištrina kituose transporto priemonės moduliuose saugomų išplėstinių DTC.</string>
+    <string name="dtc_none_returned">Paskutinis nuskaitymas nepateikė gedimų kodų.</string>
+    <string name="dtc_confirm_clear">Patvirtinti DTC ištrynimą?</string>
+    <string name="dtc_clear_description">Ši komanda siunčia OBD 04 režimą į ECU. Parengties duomenys gali būti atstatyti. Gedimo priežastis nepašalinama.</string>
+    <string name="dtc_clear_action">Ištrinti kodus</string>
+    <string name="common_save">Išsaugoti</string>
 </resources>
