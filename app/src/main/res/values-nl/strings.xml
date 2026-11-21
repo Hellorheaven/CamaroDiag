@@ -862,4 +862,17 @@
     <string name="cal_archive_verified">Beide uitlezingen komen overeen en de SHA-256-hashes van de opgeslagen bereiken zijn geldig.</string>
     <string name="cal_archive_partial">De back-up bevat slechts een deel van het opgevraagde geheugen.</string>
     <string name="cal_archive_failed">Het ZIP-bestand kon niet worden geverifieerd. Uitgepakt geldt een limiet van 32 MiB.</string>
+    <string name="tab_functional_tests">Functionele tests</string>
+    <string name="functional_tests_title">Functionele tests — ECU’s en OBD</string>
+    <string name="functional_tests_readonly">Voer alle beschikbare alleen-lezencontroles uit met de aangesloten fysieke adapter. Andere adapters en niet-geverifieerde ECU’s blijven NIET GETEST. Geen wissen of flashen.</string>
+    <string name="functional_tests_run">Alles starten</string>
+    <string name="functional_tests_stop">Stoppen</string>
+    <string name="functional_tests_export">JSON exporteren</string>
+    <string name="functional_tests_summary">%1$d geslaagd · %2$d mislukt · %3$d niet getest</string>
+    <string name="functional_tests_passed">GESLAAGD (fysiek bevestigd)</string>
+    <string name="functional_tests_failed">MISLUKT</string>
+    <string name="functional_tests_skipped">NIET GETEST</string>
+    <string name="functional_tests_denied">Toegang geweigerd: meld u aan met het toegestane Google-account.</string>
+    <string name="functional_tests_not_connected">Er is geen fysieke OBD-adapter aangesloten. Overige controles zijn niet uitgevoerd.</string>
+    <string name="functional_tests_cancelled">Testreeks geannuleerd.</string>
 </resources>
