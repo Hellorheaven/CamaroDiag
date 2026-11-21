@@ -788,10 +788,8 @@ class BluetoothObdManager(context: Context) {
             ) { command, commandTimeout ->
                 sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
             }
-            try {
-                val result = block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
-                transportSessionEpoch.requireCurrent(requestedEpoch)
-                result
+            val result = try {
+                block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
             } finally {
                 // STPX changes the adapter's CAN filter, protocol and ISO-TP
                 // segmentation settings. Always restore functional OBD mode
@@ -812,6 +810,10 @@ class BluetoothObdManager(context: Context) {
                     }
                 }
             }
+            // A connection replaced during cleanup must not have its old
+            // diagnostic bytes shown as a result of the successor session.
+            transportSessionEpoch.requireCurrent(requestedEpoch)
+            result
         }
     }
 
