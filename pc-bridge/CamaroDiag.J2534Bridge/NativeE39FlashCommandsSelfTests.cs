@@ -44,6 +44,12 @@ internal static class NativeE39FlashCommandsSelfTests
             "Preflight write-test command is distinct from physical programming");
         NativeE39FlashCommands.RequireWriteSuccess([0x76]);
         assertions++;
+        ExpectFailure<InvalidDataException>(() =>
+            NativeE39FlashCommands.RequireWriteSuccess([0x76,0x00]));
+        assertions++;
+        ExpectFailure<InvalidDataException>(() =>
+            NativeE39FlashCommands.RequireWriteSuccess([0x76,0x7F,0x36,0x72]));
+        assertions++;
         ExpectFailure<IOException>(() =>
             NativeE39FlashCommands.RequireWriteSuccess([0x7F, 0x36, 0x72]));
         assertions++;

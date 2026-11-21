@@ -74,7 +74,7 @@ internal static class NativeE39FlashCommands
     {
         ArgumentNullException.ThrowIfNull(reply);
         RequireNoNegativeResponse(reply);
-        if (reply.Length == 0 || reply[0] != 0x76)
+        if (reply.Length != 1 || reply[0] != 0x76)
             throw new InvalidDataException("No E39 flash block write acknowledgement.");
     }
 
