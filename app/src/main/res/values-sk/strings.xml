@@ -373,4 +373,19 @@
     <string name="cal_j2534_launch_instructions">Spustite CamaroDiag.J2534Bridge.exe vo Windows. Zadajte IP počítača a úplný kód (token.odtlačok TLS) z konzoly. Použite dôveryhodnú lokálnu sieť.</string>
     <string name="cal_j2534_security_notice">TLS 1.2+ a overenie odtlačku certifikátu sú povinné. Staré tokeny bez odtlačku sa odmietajú. Port nikdy nevystavujte internetu.</string>
     <string name="cal_pc_pairing_token">Kód TLS (token.odtlačok)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Funkčné testy</string>
+    <string name="functional_tests_title">Funkčné testy — ECU a OBD</string>
+    <string name="functional_tests_readonly">Spustite všetky dostupné kontroly iba na čítanie cez pripojený fyzický adaptér. Ostatné adaptéry a neoverené ECU budú označené ako NETESTOVANÉ. Bez mazania, ovládania alebo programovania.</string>
+    <string name="functional_tests_run">Spustiť všetko</string>
+    <string name="functional_tests_stop">Zastaviť</string>
+    <string name="functional_tests_export">Exportovať JSON</string>
+    <string name="functional_tests_summary">%1$d úspešných · %2$d neúspešných · %3$d netestovaných</string>
+    <string name="functional_tests_passed">ÚSPEŠNÉ (fyzický dôkaz)</string>
+    <string name="functional_tests_failed">NEÚSPEŠNÉ</string>
+    <string name="functional_tests_skipped">NETESTOVANÉ</string>
+    <string name="functional_tests_denied">Prístup odmietnutý: prihláste sa autorizovaným účtom Google a znova sa pripojte.</string>
+    <string name="functional_tests_not_connected">Nie je pripojený fyzický OBD adaptér. Ostatné kontroly sa nevykonali.</string>
+    <string name="functional_tests_cancelled">Testovanie bolo zrušené.</string>
 </resources>
