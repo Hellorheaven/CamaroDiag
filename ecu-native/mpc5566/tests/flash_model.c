@@ -42,6 +42,9 @@ static bool write_reg(void *ctx, uint32_t offset, uint32_t value)
             cd_flash_block block;
             assert(cd_flash_block_for(m->interlock, &block));
             assert(m->interlock == block.start);
+            m->last_erase_lm = m->regs[CD_LMSR / 4];
+            m->last_erase_high = m->regs[CD_HSR / 4];
+            m->last_erase_address = m->interlock;
             assert(m->regs[CD_LMSR / 4] == block.lm_select);
             assert(m->regs[CD_HSR / 4] == block.h_select);
             unsigned start = (m->interlock - CD_E39_PROTECTED_END) / 4u;

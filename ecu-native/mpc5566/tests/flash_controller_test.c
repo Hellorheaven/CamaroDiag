@@ -75,6 +75,26 @@ int main(void)
     assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_RECOVERY_REQUIRED);
     assert(m.words[0] == UINT32_MAX && (m.regs[0] & CD_MCR_EER));
     assert(c.recovery_required); /* correct bytes alone cannot prove a valid erase */
+    /* Independently exercise middle and high select bits, including last block. */
+    const uint32_t addresses[] = {0x40000, 0x60000, 0x80000, 0x2E0000};
+    const uint32_t lm[] = {0x10000, 0x20000, 0, 0};
+    const uint32_t hi[] = {0, 0, 1, 0x80000};
+    for (unsigned i = 0; i < 4; ++i) {
+        init_model(&m);
+        c = controller_for(&m);
+        uint32_t addr = addresses[i];
+        uint32_t start = (addr - CD_E39_PROTECTED_END) / 4u;
+        uint32_t end = start + 0x20000 / 4u;
+        assert(cd_flash_erase(&c, addr, 0x20000) == CD_FLASH_OK);
+        assert(m.last_erase_address == addr && m.last_erase_lm == lm[i] &&
+            m.last_erase_high == hi[i] && m.pulses == 1);
+        assert(m.words[start - 1] == 0 && m.words[start] == UINT32_MAX &&
+            m.words[end - 1] == UINT32_MAX);
+        if (end < CD_MODEL_FLASH_BYTES / 4u) assert(m.words[end] == 0);
+        assert(cd_flash_program(&c, addr + 0x1FFF8, data, 8) == CD_FLASH_OK);
+        assert(m.words[end - 2] == 0x01020304 && m.words[end - 1] == 0xA0B0C0D0);
+        assert(!c.recovery_required);
+    }
     puts("PASS: MPC5566 register-level erase/program model");
     return 0;
 }

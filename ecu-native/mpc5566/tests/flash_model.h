@@ -9,6 +9,7 @@ typedef struct {
     uint32_t regs[6];
     uint32_t words[CD_MODEL_FLASH_BYTES / 4u];
     uint32_t interlock;
+    uint32_t last_erase_lm, last_erase_high, last_erase_address;
     uint32_t pending[2];
     unsigned word_writes, register_writes, pulses, pending_count;
     bool busy_timeout, bad_peg, erase_corruption, selection_error, ecc_after_pulse;
