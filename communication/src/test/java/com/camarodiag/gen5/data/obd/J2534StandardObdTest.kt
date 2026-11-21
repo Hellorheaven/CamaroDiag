@@ -34,6 +34,20 @@ class J2534StandardObdTest {
         assertFalse(J2534StandardObd.isExplicitlyUnsupported(7,bytes(0x7F,7,0x22)))
         assertFalse(J2534StandardObd.isExplicitlyUnsupported(7,bytes(0x7F,3,0x11)))
     }
+    @Test fun unavailableOptionalModesAreNotEmptyPositiveResponses() {
+        assertNull(J2534StandardObd.optionalDtcs(7,bytes(0x7F,7,0x11)))
+        assertEquals(emptyList<ObdDtc>(),J2534StandardObd.optionalDtcs(7,bytes(0x47,0)))
+        assertNull(J2534StandardObd.optionalDtcs(10,bytes(0x7F,10,0x12)))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.optionalDtcs(3,bytes(0x7F,3,0x11))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.optionalDtcs(10,bytes(0x7F,10,0x22))
+        }
+        val snapshot = PhysicalObdDtcSnapshot(listOf(ObdDtc("P0300","confirmed")),null,emptyList())
+        assertEquals(setOf(7),snapshot.unavailableModes)
+        assertEquals(listOf(ObdDtc("P0300","confirmed")),snapshot.records)
+    }
     @Test fun noFunctionalOrSwCanChannel() {
         assertTrue(J2534StandardObd.supportsChannel(0x7E0,0x7E8,33))
         assertTrue(J2534StandardObd.supportsChannel(0x18DA10F1,0x18DAF110,34))
