@@ -149,7 +149,7 @@
     <string name="cal_read_uds_did">读取 UDS DID</string>
     <string name="cal_read_uds_dtcs">读取 UDS 故障码</string>
     <string name="cal_uds_trouble_codes">UDS 故障码（0x19）</string>
-    <string name="cal_native_catalog_title">CAMARODIAG 官方目录</string>
+    <string name="cal_native_catalog_title">CamaroDiag 官方目录</string>
     <string name="cal_native_catalog_explanation">这些定义由 CamaroDiag 独立维护，与社区目录无关。建议或文档化的定义绝不会发送到 ECU。</string>
     <string name="cal_native_catalog_loading">正在加载官方目录…</string>
     <string name="cal_native_catalog_empty">目前尚无声明为可用的 Camaro 专有 DID。不会编造未知地址或缩放系数。</string>
