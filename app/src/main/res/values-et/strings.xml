@@ -607,4 +607,6 @@
     <string name="cal_tcp_port">TCP-port</string>
     <string name="msg_refresh_adapters_failed">Adapterite loendi värskendamine nurjus.</string>
     <string name="msg_usb_identifier_unavailable">USB-seadme tunnus pole saadaval</string>
+    <string name="msg_simulation_activation_failed">Simulatsioonirežiimi aktiveerimine nurjus.</string>
+    <string name="msg_live_simulation_active">Simulatsioon on aktiivne. Kuvatavad väärtused ei pärine sõidukist.</string>
 </resources>
