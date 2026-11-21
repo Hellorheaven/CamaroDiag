@@ -487,4 +487,6 @@
     <string name="mileage_source_generic">Sursă %1$s</string>
     <string name="mileage_details_unavailable">Detaliile tehnice nu sunt disponibile pentru această sursă.</string>
     <string name="mileage_caveat_unavailable">Nu există informații localizate suplimentare pentru această sursă.</string>
+    <string name="obd_physical_can_scope">Nod CAN fizic care a răspuns: 0x%1$s. Scanarea acoperă numai ECU OBD selectată, nu o scanare funcțională a tuturor modulelor. Nu au fost trimise comenzi de programare GM sau de acționare.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Activați ștergerea DTC de emisii în puntea Windows, reconectați-vă, opriți motorul și confirmați resetarea. Datele de disponibilitate ale sistemelor de emisii vor fi resetate; codurile permanente nu sunt șterse.</string>
 </resources>
