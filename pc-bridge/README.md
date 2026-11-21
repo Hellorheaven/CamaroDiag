@@ -4,6 +4,30 @@ Le pont partage désormais l'identité visuelle CamaroDiag : Camaro Synergy Gree
 
 Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru installé sur un PC Windows. Il peut fonctionner avec des pilotes VXDIAG VCX SE ou VCX Nano lorsque le modèle exact, le pilote et le protocole sont compatibles.
 
+## Interface Windows : toutes les fonctions sans ligne de commande
+
+**Lancez CamaroDiag J2534 Bridge normalement depuis le menu Démarrer Windows : l'interface graphique s'ouvre automatiquement.** Les commandes terminal restent présentes uniquement pour les diagnostics automatisés et la compatibilité avec les scripts existants.
+
+| Onglet | Fonctions disponibles |
+|---|---|
+| **Connexion Android** | Choisir et actualiser les pilotes J2534 installés, adresse IP locale du PC, port TLS, profil mémoire facultatif, démarrer/arrêter le pont, copier séparément l'IP, le port et le code d'appairage TLS complet, ou copier les trois valeurs ensemble |
+| **Outils ECU E39/E39A** | Lire deux fois l'identification GM VIN/OSID (CAN IDs/profil explicites), inspecter une image brute de 3 Mio, recalculer les checksums GM SUM/CVN des calibrations et enregistrer un nouveau fichier sans écraser les originaux |
+| **Console CAN / OBD** | Ouvrir/fermer le canal J2534, envoyer des trames **autorisées en lecture**, afficher distinctement les trames TX et RX, envoyer les trames sans réponse autorisées, identification OBD Mode 09/GM GMLAN, tension du pilote, sauvegarder l'historique |
+| **Lecture mémoire ECU** | Créer/charger un profil de lecture avec VIN, plage mémoire, tailles de blocs, session et CAN IDs ; effectuer une lecture UDS 0x23, relire toute la plage, refuser les divergences, annuler, et exporter un nouveau fichier binaire à couverture déclarée |
+| **Pilotes et diagnostics** | Tester un ou tous les pilotes (ABI, connexion USB, version firmware/DLL/API), lancer les autotests du pont et copier le diagnostic |
+| **Mises à jour / À propos** | Voir la version du pont, rechercher les releases officielles, télécharger/installateur x86/x64 sans commande terminal, consulter le compte rendu d'installation |
+| **Aide et utilisation** | Instructions intégrées pas à pas pour toutes les fonctions, sécurité TLS et résolution des pannes courantes |
+
+### Mise en relation de l'application Android
+
+1. Installer le pilote fabricant de l'interface J2534, connecter Windows et Android au même réseau privé.
+2. Dans **Connexion Android**, sélectionner l'interface puis l'adresse IP accessible depuis le téléphone.
+3. Cliquer **Démarrer le pont** et attendre **En écoute**.
+4. Recopier, avec les boutons Copier, l'**adresse IP**, le **port** et le **code sécurisé complet** (jeton + point + empreinte du certificat SHA-256) dans les champs du connecteur Windows/J2534 de CamaroDiag Android.
+5. La liaison est obligatoirement TLS et le code change à chaque redémarrage. Ne pas ouvrir le port sur Internet.
+
+**La console Windows, les contrôles de pilote et les lectures locales utilisent exclusivement le canal J2534.** Il faut donc arrêter le serveur Android avant de les utiliser, puis le redémarrer. Le pont autorise uniquement les commandes diagnostiques déjà prévues par son allowlist. **Aucune commande de programmation flash, SecurityAccess, effacement ou actionneur n'est rendue accessible par cette interface.** Les composants E39 natifs non qualifiés physiquement restent isolés jusqu'à un essai sur ECU de banc et une récupération démontrée.
+
 ## Fonctionnalités
 
 - Connexion à un fournisseur J2534 Windows enregistré.
