@@ -9,7 +9,7 @@ internal static class NativeE39ImageInspectorSelfTests
     private static void Put32(byte[] image, int index, uint value) =>
         BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(index, 4), value);
 
-    private static byte[] Fixture()
+    internal static byte[] Fixture()
     {
         var image = new byte[NativeE39ImageInspector.ImageBytes];
         Put32(image, Table + 5, 12664221u);
