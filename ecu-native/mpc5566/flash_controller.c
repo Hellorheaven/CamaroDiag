@@ -48,13 +48,19 @@ static bool write_word(cd_flash_controller *c, uint32_t address, uint32_t v)
 
 /* A read can itself raise EER or RWE. A matching word is insufficient if
  * the physical controller reports an ECC/bus fault during that read. */
+static bool idle_status(uint32_t status)
+{
+    return (status & CD_MCR_GEOMETRY_MASK) == CD_MCR_MPC5566_GEOMETRY &&
+        (status & (CD_MCR_DONE | CD_MCR_PEG)) == (CD_MCR_DONE | CD_MCR_PEG) &&
+        (status & (ACTIVE_MASK | ERROR_MASK | CD_MCR_PEAS)) == 0;
+}
+
 static bool read_confirmed_word(cd_flash_controller *c, uint32_t address, uint32_t *v)
 {
     uint32_t status;
     return c->bus.read_word(c->bus.context, address, v) &&
         read_reg(c, CD_MCR, &status) &&
-        (status & (ERROR_MASK | ACTIVE_MASK)) == 0 &&
-        (status & CD_MCR_GEOMETRY_MASK) == CD_MCR_MPC5566_GEOMETRY;
+        idle_status(status);
 }
 
 static bool change_mcr(cd_flash_controller *c, uint32_t set, uint32_t clear)
@@ -79,9 +85,7 @@ static cd_flash_result require_ready(cd_flash_controller *c, const cd_flash_bloc
     if (!c->bus.service(c->bus.context) || !read_reg(c, CD_MCR, &mcr) ||
         !read_reg(c, CD_LMLR, &lm) || !read_reg(c, CD_SLMLR, &slm) ||
         !read_reg(c, CD_HLR, &hi)) return CD_FLASH_IO_FAILURE;
-    if ((mcr & CD_MCR_GEOMETRY_MASK) != CD_MCR_MPC5566_GEOMETRY ||
-        (mcr & (ACTIVE_MASK | ERROR_MASK | CD_MCR_PEAS)) != 0 ||
-        (mcr & (CD_MCR_DONE | CD_MCR_PEG)) != (CD_MCR_DONE | CD_MCR_PEG))
+    if (!idle_status(mcr))
         return CD_FLASH_NOT_READY;
     /* Primary + secondary locks both apply to low/mid blocks. */
     if (((lm | slm) & block->lm_select) != 0 || (hi & block->h_select) != 0)
@@ -109,7 +113,7 @@ static cd_flash_result finish_pulse(cd_flash_controller *c, uint32_t mode)
     if (!change_mcr(c, 0, CD_MCR_EHV) || !change_mcr(c, 0, mode))
         return fail_uncertain(c);
     if (!read_reg(c, CD_MCR, &status) ||
-        (status & (ACTIVE_MASK | ERROR_MASK)) != 0 || !success)
+        !idle_status(status) || !success)
         return fail_uncertain(c);
     c->recovery_required = false;
     return CD_FLASH_OK;

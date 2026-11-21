@@ -75,6 +75,20 @@ int main(void)
     assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_RECOVERY_REQUIRED);
     assert(m.words[0] == UINT32_MAX && (m.regs[0] & CD_MCR_EER));
     assert(c.recovery_required); /* correct bytes alone cannot prove a valid erase */
+    init_model(&m);
+    c = controller_for(&m);
+    m.lose_idle_status = true;
+    assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_RECOVERY_REQUIRED);
+    assert(c.recovery_required && m.pulses == 1 && m.words[0] == UINT32_MAX);
+    assert(cd_flash_program(&c, 0x20000, data, 8) == CD_FLASH_RECOVERY_REQUIRED);
+    assert(m.pulses == 1);
+
+    init_model(&m);
+    c = controller_for(&m);
+    assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_OK);
+    m.lose_idle_status = true;
+    assert(cd_flash_program(&c, 0x20000, data, 8) == CD_FLASH_RECOVERY_REQUIRED);
+    assert(c.recovery_required && m.words[0] == 0x01020304);
     /* Independently exercise middle and high select bits, including last block. */
     const uint32_t addresses[] = {0x40000, 0x60000, 0x80000, 0x2E0000};
     const uint32_t lm[] = {0x10000, 0x20000, 0, 0};

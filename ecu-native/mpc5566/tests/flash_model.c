@@ -33,6 +33,8 @@ static bool write_reg(void *ctx, uint32_t offset, uint32_t value)
     }
     uint32_t old = m->regs[0];
     m->regs[0] = value;
+    if (m->lose_idle_status && m->pulses && (old & (CD_MCR_PGM | CD_MCR_ERS)) &&
+        !(value & (CD_MCR_PGM | CD_MCR_ERS))) m->regs[0] &= ~CD_MCR_PEG;
     if ((value & CD_MCR_EHV) && !(old & CD_MCR_EHV)) {
         ++m->pulses;
         m->regs[0] &= ~(CD_MCR_DONE | CD_MCR_PEG);
