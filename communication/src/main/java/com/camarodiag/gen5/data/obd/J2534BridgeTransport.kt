@@ -9,12 +9,11 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
-import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.Locale
 
 /**
- * JSON-lines TCP client for the Windows J2534 bridge.
+ * Certificate-pinned TLS (JSON lines) client for the Windows J2534 bridge.
  * J2534 performs ISO-TP framing on the PC; this class exchanges complete UDS payloads.
  */
 class J2534BridgeTransport(
@@ -23,6 +22,7 @@ class J2534BridgeTransport(
     private val pairingToken: String
 ) : UdsPayloadTransport {
     private val mutex = Mutex()
+    private val tlsPairing by lazy { J2534BridgeTlsPairing.parse(pairingToken) }
     @Volatile private var socket: Socket? = null
     private var reader: BufferedReader? = null
     private var writer: BufferedWriter? = null
@@ -52,7 +52,8 @@ class J2534BridgeTransport(
             externallyClosed = false
             require(host.isNotBlank()) { "Adresse IP du PC manquante." }
             require(port in 1024..65535) { "Port du pont PC invalide." }
-            require(pairingToken.isNotBlank()) { "Jeton d'appairage du pont PC manquant." }
+            // Parse before network I/O: legacy token-only pairing must fail closed.
+            val pairing = tlsPairing
             require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN J2534 non pris en charge." }
             val maxId = if (can29Bit) 0x1FFFFFFF else 0x7FF
             require(requestCanId in 0..maxId && responseCanId in 0..maxId && requestCanId != responseCanId) {
@@ -62,19 +63,17 @@ class J2534BridgeTransport(
                 "La largeur des identifiants CAN ne correspond pas au profil sélectionné."
             }
             try {
-                val connected = Socket()
-                // Track the descriptor before connect: the failure path must
-                // close it even when TCP establishment never completes.
+                // TLS handshake (including SHA-256 certificate pin verification)
+                // completes BEFORE the first pairing token or UDS command is sent.
+                val connected = pairing.openSocket(host, port)
                 socket = connected
-                connected.tcpNoDelay = true
-                connected.connect(InetSocketAddress(host, port), 5000)
                 connected.soTimeout = 12_000
                 reader = BufferedReader(InputStreamReader(connected.getInputStream(), Charsets.UTF_8))
                 writer = BufferedWriter(OutputStreamWriter(connected.getOutputStream(), Charsets.UTF_8))
                 val response = request(
                     JSONObject()
                         .put("op", "open")
-                        .put("token", pairingToken)
+                        .put("token", tlsPairing.token)
                         .put("requestCanId", requestCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0'))
                         .put("responseCanId", responseCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0'))
                         .put("can29Bit", can29Bit)
@@ -99,7 +98,7 @@ class J2534BridgeTransport(
     suspend fun readCalibrationIdentification(): ObdEcuIdentification = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            val data = request(JSONObject().put("op", "identify").put("token", pairingToken), 15_000)
+            val data = request(JSONObject().put("op", "identify").put("token", tlsPairing.token), 15_000)
                 .getJSONObject("identity")
             fun records(name: String): List<String> {
                 val values = data.getJSONArray(name)
@@ -124,7 +123,7 @@ class J2534BridgeTransport(
             val response = request(
                 JSONObject()
                     .put("op", "exchange")
-                    .put("token", pairingToken)
+                    .put("token", tlsPairing.token)
                     .put("payloadHex", payload.toHex())
                     .put("timeoutMs", boundedTimeout),
                 boundedTimeout + 3000
@@ -148,7 +147,7 @@ class J2534BridgeTransport(
             request(
                 JSONObject()
                     .put("op", "sendOnly")
-                    .put("token", pairingToken)
+                    .put("token", tlsPairing.token)
                     .put("payloadHex", payload.toHex())
                     .put("timeoutMs", boundedTimeout),
                 boundedTimeout + 3000
