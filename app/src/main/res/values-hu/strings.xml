@@ -382,4 +382,19 @@
     <string name="functional_tests_denied">Hozzáférés megtagadva: jelentkezzen be az engedélyezett Google-fiókkal, majd csatlakozzon újra.</string>
     <string name="functional_tests_not_connected">Nincs csatlakoztatott fizikai OBD-adapter. A további ellenőrzések nem futottak le.</string>
     <string name="functional_tests_cancelled">A tesztsorozat megszakadt.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Hibakereső verziók</string>
+    <string name="tab_license">Licenc</string>
+    <string name="debug_builds_title">Privát hibakereső verziók</string>
+    <string name="debug_builds_refresh">Elérhető verziók frissítése</string>
+    <string name="debug_builds_download">Letöltés a GitHubról</string>
+    <string name="debug_builds_unavailable">Nincs elérhető érvényes hibakereső archívum.</string>
+    <string name="debug_builds_error">Nem sikerült betölteni a hibakereső verziókat a GitHubról.</string>
+    <string name="license_disabled">A licencrendszer nincs aktiválva.</string>
+    <string name="license_buy">Licenc vásárlása</string>
+    <string name="license_refresh">Licenc frissítése</string>
+    <string name="license_free">Ingyenes</string>
+    <string name="license_owner">Tulajdonos: minden jogosultság</string>
+    <string name="license_premium">Teljes licenc aktív</string>
+    <string name="license_title">CamaroDiag licenc</string>
 </resources>
