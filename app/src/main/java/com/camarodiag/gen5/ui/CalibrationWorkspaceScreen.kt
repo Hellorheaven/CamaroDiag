@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import com.camarodiag.gen5.R
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
@@ -631,7 +632,8 @@ fun CalibrationWorkspaceScreen(
                                 label = { Text(stringResource(R.string.cal_pc_pairing_token)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                                visualTransformation = PasswordVisualTransformation()
                             )
                             if (!state.isJ2534BridgeConnected) {
                                 Button(
