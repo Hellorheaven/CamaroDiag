@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Gratis: livegegevens en DTC’s lezen en wissen. Een persoonlijke licentie ontgrendelt geavanceerde functies. Debugtools zijn alleen voor de eigenaar.</string>
+    <string name="license_account_link">De licentie is gekoppeld aan je Firebase-account en geverifieerde aanmeldadres.</string>
+    <string name="license_no_browser">Geen browser beschikbaar.</string>
+    <string name="license_checkout_unavailable">Aankoop niet beschikbaar. Firebase/Stripe-facturering moet worden ingesteld.</string>
+    <string name="license_activation_help">De licentie wordt actief nadat de server de betaling heeft bevestigd. Keer terug en tik op Vernieuwen. Een doorverwijzing alleen verleent geen licentie.</string>
+</resources>

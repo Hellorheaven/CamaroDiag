@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Ingyenes: élő adatok, DTC-kódok olvasása és törlése. A személyes licenc feloldja a speciális funkciókat. A hibakereső eszközök csak a tulajdonos számára elérhetők.</string>
+    <string name="license_account_link">A licenc a Firebase-fiókodhoz és az ellenőrzött belépési e-mail-címedhez kötődik.</string>
+    <string name="license_no_browser">Nincs elérhető böngésző.</string>
+    <string name="license_checkout_unavailable">A vásárlás nem érhető el. Be kell állítani a Firebase/Stripe számlázást.</string>
+    <string name="license_activation_help">A licenc a fizetés szerveroldali visszaigazolása után aktiválódik. Térj vissza ide, és koppints a Frissítés gombra. Az átirányítás önmagában nem ad licencet.</string>
+</resources>

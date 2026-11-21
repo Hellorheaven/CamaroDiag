@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Free: live data and reading/clearing DTCs. A personal license unlocks advanced features. Debug tools remain owner-only.</string>
+    <string name="license_account_link">The license is linked to your Firebase account and verified sign-in email.</string>
+    <string name="license_no_browser">No browser available.</string>
+    <string name="license_checkout_unavailable">Checkout is unavailable. Firebase/Stripe billing must be configured.</string>
+    <string name="license_activation_help">The license activates after server confirmation of payment. Return here and tap Refresh. A redirect alone never grants a license.</string>
+</resources>

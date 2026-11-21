@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Brezplačno: podatki v živo ter branje in brisanje DTC. Osebna licenca odklene napredne funkcije. Orodja za odpravljanje napak so samo za lastnika.</string>
+    <string name="license_account_link">Licenca je povezana z računom Firebase in preverjenim e-poštnim naslovom za prijavo.</string>
+    <string name="license_no_browser">Brskalnik ni na voljo.</string>
+    <string name="license_checkout_unavailable">Nakup ni na voljo. Nastaviti je treba obračunavanje Firebase/Stripe.</string>
+    <string name="license_activation_help">Licenca se aktivira, ko strežnik potrdi plačilo. Vrnite se sem in tapnite Osveži. Sama preusmeritev ne dodeli licence.</string>
+</resources>

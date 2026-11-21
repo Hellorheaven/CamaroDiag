@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Bla ħlas: dejta diretta, qari u tħassir tad-DTC. Liċenzja personali tiftaħ il-funzjonijiet avvanzati. L-għodod tad-debugging huma għas-sid biss.</string>
+    <string name="license_account_link">Il-liċenzja hija marbuta mal-kont Firebase tiegħek u mal-email ivverifikata tad-dħul.</string>
+    <string name="license_no_browser">Ebda browser disponibbli.</string>
+    <string name="license_checkout_unavailable">Ix-xiri mhux disponibbli. Il-ħlasijiet Firebase/Stripe iridu jiġu kkonfigurati.</string>
+    <string name="license_activation_help">Il-liċenzja tiġi attivata wara li s-server jikkonferma l-ħlas. Erġa’ lura hawn u agħfas Aġġorna. Ridirezzjoni waħedha ma tagħtix liċenzja.</string>
+</resources>

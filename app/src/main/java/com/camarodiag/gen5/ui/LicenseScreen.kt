@@ -19,7 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.camarodiag.gen5.R
@@ -35,14 +34,13 @@ import com.google.firebase.functions.FirebaseFunctions
  */
 @Composable
 fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
-    val french = LocalConfiguration.current.locales[0].language == "fr"
     if (!LicenseRolloutConfig.ENABLED) {
         Text(stringResource(R.string.license_disabled))
         return
     }
     val context = LocalContext.current
     var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<Int?>(null) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Text(
@@ -63,21 +61,11 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                     }
                     Text(status, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        if (french)
-                            "Sans licence : données temps réel, lecture et effacement des codes DTC. " +
-                                "Une licence personnelle débloque les fonctions avancées. " +
-                                "Les outils Debug restent réservés au propriétaire."
-                        else
-                            "Without a license: live data and reading/clearing DTCs. " +
-                                "A personal license unlocks advanced features. " +
-                                "Debug tools remain owner-only.",
+                        stringResource(R.string.license_feature_summary),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        if (french)
-                            "La licence est associée à votre compte Firebase et à l’adresse e-mail vérifiée utilisée pour vous connecter. "
-                        else
-                            "The license is associated with your Firebase account and its verified sign-in email.",
+                        stringResource(R.string.license_account_link),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -109,19 +97,12 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                                             Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                         )
                                     } catch (_: ActivityNotFoundException) {
-                                        error = if (french)
-                                            "Aucun navigateur disponible."
-                                        else "No browser available."
+                                        error = R.string.license_no_browser
                                     } catch (_: SecurityException) {
-                                        error = if (french)
-                                            "Aucun navigateur disponible."
-                                        else "No browser available."
+                                        error = R.string.license_no_browser
                                     }
                                 } else {
-                                    error = if (french)
-                                        "L’achat est momentanément indisponible. Le service Firebase/Stripe doit être configuré."
-                                    else
-                                        "Checkout is unavailable. Firebase/Stripe billing must be configured."
+                                    error = R.string.license_checkout_unavailable
                                 }
                             }
                     }
@@ -138,16 +119,11 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
             ) {
                 Text(stringResource(R.string.license_refresh))
             }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
         }
         item {
             Text(
-                if (french)
-                    "L’activation est automatique après confirmation du paiement par le serveur. " +
-                        "Revenez ici et choisissez « Actualiser » ; un simple retour de la page d’achat ne délivre jamais de licence."
-                else
-                    "Your license activates after the payment is confirmed by the server. " +
-                        "Return here and tap Refresh; a checkout redirect alone never grants a license.",
+                stringResource(R.string.license_activation_help),
                 style = MaterialTheme.typography.bodySmall
             )
         }

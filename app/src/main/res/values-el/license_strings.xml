@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Δωρεάν: ζωντανά δεδομένα, ανάγνωση και διαγραφή DTC. Μια προσωπική άδεια ξεκλειδώνει προηγμένες λειτουργίες. Τα εργαλεία αποσφαλμάτωσης είναι μόνο για τον ιδιοκτήτη.</string>
+    <string name="license_account_link">Η άδεια συνδέεται με τον λογαριασμό Firebase και την επαληθευμένη διεύθυνση email σύνδεσης.</string>
+    <string name="license_no_browser">Δεν υπάρχει διαθέσιμο πρόγραμμα περιήγησης.</string>
+    <string name="license_checkout_unavailable">Η αγορά δεν είναι διαθέσιμη. Απαιτείται ρύθμιση χρέωσης Firebase/Stripe.</string>
+    <string name="license_activation_help">Η άδεια ενεργοποιείται μετά την επιβεβαίωση πληρωμής από τον διακομιστή. Επιστρέψτε εδώ και πατήστε Ανανέωση. Η ανακατεύθυνση από μόνη της δεν χορηγεί άδεια.</string>
+</resources>

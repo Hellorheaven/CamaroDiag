@@ -37,16 +37,19 @@ class LocaleResourcesIntegrityTest {
     }
 
     private fun strings(tag: String): Map<String, String> {
-        val file = File("src/main/res/${directory(tag)}/strings.xml")
-        assertTrue("Missing strings.xml for $tag: ${file.path}", file.isFile)
-        val nodes = document(file).getElementsByTagName("string")
+        val base = File("src/main/res/${directory(tag)}")
+        assertTrue("Missing strings.xml for $tag", File(base, "strings.xml").isFile)
+        assertTrue("Missing license_strings.xml for $tag", File(base, "license_strings.xml").isFile)
         val values = mutableMapOf<String, String>()
-        for (i in 0 until nodes.length) {
+        for (file in listOf(File(base, "strings.xml"), File(base, "license_strings.xml"))) {
+            val nodes = document(file).getElementsByTagName("string")
+            for (i in 0 until nodes.length) {
             val element = nodes.item(i) as Element
             val key = element.getAttribute("name")
             assertTrue("Empty resource key in $tag", key.isNotBlank())
             assertFalse("Duplicate resource $key in $tag", values.containsKey(key))
             values[key] = element.textContent
+            }
         }
         return values
     }
@@ -403,9 +406,10 @@ class LocaleResourcesIntegrityTest {
             "debug_builds_refresh", "debug_builds_download",
             "debug_builds_unavailable", "debug_builds_error",
             "license_disabled", "license_buy", "license_refresh",
-            "license_free", "license_owner", "license_premium", "license_title"
+            "license_free", "license_owner", "license_premium", "license_title",
+            "license_feature_summary", "license_account_link", "license_no_browser", "license_checkout_unavailable", "license_activation_help"
         )
-        assertEquals(14, keys.size)
+        assertEquals(19, keys.size)
         val english = strings("en")
         for (locale in locales) {
             val translated = strings(locale)

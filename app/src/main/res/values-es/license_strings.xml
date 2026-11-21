@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Gratis: datos en tiempo real, lectura y borrado de DTC. Una licencia personal desbloquea funciones avanzadas. Las herramientas de depuración son exclusivas del propietario.</string>
+    <string name="license_account_link">La licencia está vinculada a tu cuenta de Firebase y al correo de acceso verificado.</string>
+    <string name="license_no_browser">No hay navegador disponible.</string>
+    <string name="license_checkout_unavailable">Compra no disponible. Debe configurarse la facturación de Firebase/Stripe.</string>
+    <string name="license_activation_help">La licencia se activa cuando el servidor confirma el pago. Vuelve aquí y pulsa Actualizar. Una redirección por sí sola no concede una licencia.</string>
+</resources>

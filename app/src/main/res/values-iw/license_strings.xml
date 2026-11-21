@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">חינם: נתונים בזמן אמת, קריאה ומחיקה של קודי DTC. רישיון אישי פותח תכונות מתקדמות. כלי ניפוי שגיאות שמורים לבעלים.</string>
+    <string name="license_account_link">הרישיון מקושר לחשבון Firebase ולכתובת הדוא״ל המאומתת שלך.</string>
+    <string name="license_no_browser">אין דפדפן זמין.</string>
+    <string name="license_checkout_unavailable">הרכישה אינה זמינה. יש להגדיר חיוב ב-Firebase/Stripe.</string>
+    <string name="license_activation_help">הרישיון מופעל לאחר אישור התשלום בשרת. חזור לכאן ולחץ על רענון. הפניה לבדה אינה מעניקה רישיון.</string>
+</resources>

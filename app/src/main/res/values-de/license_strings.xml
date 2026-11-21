@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Kostenlos: Live-Daten sowie DTC lesen und löschen. Eine persönliche Lizenz schaltet erweiterte Funktionen frei. Debug-Werkzeuge bleiben dem Eigentümer vorbehalten.</string>
+    <string name="license_account_link">Die Lizenz ist mit Ihrem Firebase-Konto und Ihrer bestätigten Anmelde-E-Mail verknüpft.</string>
+    <string name="license_no_browser">Kein Browser verfügbar.</string>
+    <string name="license_checkout_unavailable">Kauf nicht verfügbar. Die Firebase/Stripe-Abrechnung muss konfiguriert werden.</string>
+    <string name="license_activation_help">Die Lizenz wird nach Zahlungsbestätigung durch den Server aktiviert. Kehren Sie zurück und wählen Sie Aktualisieren. Eine Weiterleitung allein erteilt keine Lizenz.</string>
+</resources>

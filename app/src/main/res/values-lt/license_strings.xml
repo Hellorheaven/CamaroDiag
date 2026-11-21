@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Nemokamai: tiesioginiai duomenys, DTC skaitymas ir trynimas. Asmeninė licencija atrakina išplėstines funkcijas. Derinimo įrankiai skirti tik savininkui.</string>
+    <string name="license_account_link">Licencija susieta su Firebase paskyra ir patvirtintu prisijungimo el. pašto adresu.</string>
+    <string name="license_no_browser">Nėra pasiekiamos naršyklės.</string>
+    <string name="license_checkout_unavailable">Pirkti negalima. Būtina sukonfigūruoti Firebase/Stripe atsiskaitymus.</string>
+    <string name="license_activation_help">Licencija aktyvinama serveriui patvirtinus mokėjimą. Grįžkite čia ir palieskite Atnaujinti. Vien nukreipimas licencijos nesuteikia.</string>
+</resources>

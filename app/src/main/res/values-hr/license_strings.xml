@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Besplatno: podaci uživo, čitanje i brisanje DTC-ova. Osobna licenca otključava napredne funkcije. Alati za otklanjanje pogrešaka dostupni su samo vlasniku.</string>
+    <string name="license_account_link">Licenca je povezana s Firebase računom i potvrđenom adresom e-pošte za prijavu.</string>
+    <string name="license_no_browser">Nema dostupnog preglednika.</string>
+    <string name="license_checkout_unavailable">Kupnja nije dostupna. Potrebno je konfigurirati naplatu Firebase/Stripe.</string>
+    <string name="license_activation_help">Licenca se aktivira nakon što poslužitelj potvrdi plaćanje. Vratite se i dodirnite Osvježi. Samo preusmjeravanje ne dodjeljuje licencu.</string>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Бесплатно: данные в реальном времени, чтение и удаление DTC. Персональная лицензия открывает расширенные функции. Инструменты отладки доступны только владельцу.</string>
+    <string name="license_account_link">Лицензия привязана к учётной записи Firebase и подтверждённому адресу электронной почты.</string>
+    <string name="license_no_browser">Нет доступного браузера.</string>
+    <string name="license_checkout_unavailable">Покупка недоступна. Необходимо настроить оплату Firebase/Stripe.</string>
+    <string name="license_activation_help">Лицензия активируется после подтверждения оплаты сервером. Вернитесь и нажмите Обновить. Одно перенаправление не выдаёт лицензию.</string>
+</resources>
