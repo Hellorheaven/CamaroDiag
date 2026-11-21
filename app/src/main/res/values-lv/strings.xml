@@ -610,4 +610,6 @@
     <string name="cal_tcp_port">TCP ports</string>
     <string name="msg_refresh_adapters_failed">Neizdevās atsvaidzināt adapteru sarakstu.</string>
     <string name="msg_usb_identifier_unavailable">USB ierīces identifikators nav pieejams</string>
+    <string name="msg_simulation_activation_failed">Neizdevās aktivizēt simulācijas režīmu.</string>
+    <string name="msg_live_simulation_active">Simulācija ir aktīva. Parādītās vērtības nav iegūtas no transportlīdzekļa.</string>
 </resources>
