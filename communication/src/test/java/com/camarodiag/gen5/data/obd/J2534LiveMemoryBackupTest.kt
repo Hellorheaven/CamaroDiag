@@ -93,11 +93,42 @@ class J2534LiveMemoryBackupTest {
         val replacement = ScriptedEcu(baseline, "1G1FA1RXXR0123457")
         val transport = object : UdsPayloadTransport by ecu {
             override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
-                if (payload[0] == 0x22.toByte() && ecu.reads > 0) replacement.exchange(payload, timeoutMs)
+                if (payload[0] == 0x22.toByte() && ecu.reads >= 6) replacement.exchange(payload, timeoutMs)
                 else ecu.exchange(payload, timeoutMs)
         }
         assertTrue(runCatching { J2534LiveMemoryBackup.captureForTest(transport, request()) }.isFailure)
         assertEquals(6, ecu.reads)
+    }
+
+    @Test fun vinChangeBetweenReadPassesStopsBeforeSecondRead() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val replacement = ScriptedEcu(baseline, "1G1FA1RXXR0123457")
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload[0] == 0x22.toByte() && ecu.reads >= 3)
+                    replacement.exchange(payload, timeoutMs)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertEquals("Second acquisition must not begin on a different ECU", 3, ecu.reads)
+    }
+
+    @Test fun vinChangeDuringLongAcquisitionStopsAtFirstIdentityCheckpoint() = runBlocking {
+        val data = ByteArray(5_000) { it.toByte() }
+        val ecu = ScriptedEcu(data, vin)
+        val replacement = ScriptedEcu(data, "1G1FA1RXXR0123457")
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload[0] == 0x22.toByte() && ecu.reads >= 32)
+                    replacement.exchange(payload, timeoutMs)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(length = data.size))
+        }.isFailure)
+        assertEquals("Reading must stop at the first periodic VIN check", 32, ecu.reads)
     }
 
     @Test fun divergentSecondPassRejectsTheEntireCapture() = runBlocking {
