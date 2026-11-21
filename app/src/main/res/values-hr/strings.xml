@@ -231,4 +231,29 @@
     <string name="mileage_reread">Ponovno očitaj</string>
     <string name="common_save">Spremi</string>
     <string name="mileage_engineering_summary">Tehnički sažetak (VIN: %1$s)</string>
+    <string name="guide_title">Vodič za kupnju OBD-II opreme i GM GMLAN</string>
+    <string name="guide_recommended_mxplus">1. Preporučeno: OBDLink MX+ (čip STN2255)</string>
+    <string name="guide_hscan_alternative">2. Alternativa za HS-CAN: vLinker MC+ / OBDLink LX</string>
+    <string name="guide_clone_limitations">3. Ograničenja generičkih klonova ELM327 v2.1</string>
+    <string name="about_version">Instalirana verzija: %1$s</string>
+    <string name="about_build">Broj izrade: %1$d</string>
+    <string name="about_checking">Provjera…</string>
+    <string name="about_update_found">Dostupna je nova verzija.</string>
+    <string name="about_channel_update_unavailable">Postoji novija verzija, ali za ovaj kanal instalacije nije objavljen paket ažuriranja.</string>
+    <string name="about_check_failed">Provjera ažuriranja nije uspjela. Provjerite internetsku vezu.</string>
+    <string name="settings_title">Postavke i spremljena izvješća</string>
+    <string name="settings_unit_system">Mjerne jedinice</string>
+    <string name="settings_saved_sessions">Spremljene dijagnostičke sesije (lokalna baza Room)</string>
+    <string name="settings_no_sessions">Još nema spremljenih sesija. Upotrijebite „Spremi” na kartici „Kilometraža”.</string>
+    <string name="cal_workspace_title">RADNI PROSTOR ECU / KALIBRACIJA</string>
+    <string name="cal_ecm_family">Okvirna obitelj upravljačkih jedinica: %1$s</string>
+    <string name="cal_engine_coverage">Podržani motori Camaro Gen 5 / Gen 6</string>
+    <string name="cal_ecu_identification">Identifikacija ECU-a</string>
+    <string name="cal_read_ecu_ids">Očitaj VIN / CAL ID / CVN iz ECU-a</string>
+    <string name="cal_connect_obd_required">Prije očitavanja stvarnog ECU-a povežite OBD adapter.</string>
+    <string name="cal_uds_can_title">UDS putem CAN-a</string>
+    <string name="cal_can_request_id">CAN ID zahtjeva (npr. 7E0)</string>
+    <string name="cal_can_response_id">CAN ID odgovora (npr. 7E8)</string>
+    <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
+    <string name="cal_j2534_security_notice">Sigurnost: token nije šifriran TLS-om. Koristite pouzdanu privatnu mrežu i nikada ne izlažite ovaj priključak internetu.</string>
 </resources>
