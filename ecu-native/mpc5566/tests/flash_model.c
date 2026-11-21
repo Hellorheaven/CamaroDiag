@@ -70,8 +70,9 @@ static bool read_word(void *ctx, uint32_t address, uint32_t *out)
     model *m = ctx;
     if ((m->regs[0] & CD_MCR_EHV) || address < CD_E39_PROTECTED_END ||
         address >= CD_MPC5566_FLASH_SIZE || address % 4) return false;
+    ++m->word_reads;
     *out = m->words[(address - 0x20000) / 4];
-    if (m->ecc_after_pulse && m->pulses) m->regs[0] |= CD_MCR_EER;
+    if (m->ecc_on_read || (m->ecc_after_pulse && m->pulses)) m->regs[0] |= CD_MCR_EER;
     return true;
 }
 

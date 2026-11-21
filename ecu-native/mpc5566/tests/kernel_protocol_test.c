@@ -86,6 +86,27 @@ int main(void)
         ((uint32_t)out[4] << 8) | out[5];
     uint8_t expected[8]; memset(expected, 0x55, sizeof(expected));
     assert(observed == independent_crc(expected, sizeof(expected)));
+    m.words[0] = 0x01234567u;
+    m.words[1] = 0x89ABCDEFu;
+    const uint8_t unaligned[] = {0x23, 0x14, 0, 2, 0, 1, 6};
+    unsigned reads_before = m.word_reads;
+    assert(process(&kernel, unaligned, sizeof(unaligned), out) == 7);
+    assert(!memcmp(out, (uint8_t[]){0x63,0x23,0x45,0x67,0x89,0xAB,0xCD}, 7));
+    assert(m.word_reads - reads_before == 2);
+    const uint8_t unaligned_crc[] = {0x3D,2,0,0,6,2,0,1};
+    reads_before = m.word_reads;
+    assert(process(&kernel, unaligned_crc, sizeof(unaligned_crc), out) == 6);
+    observed = ((uint32_t)out[2] << 24) | ((uint32_t)out[3] << 16) |
+        ((uint32_t)out[4] << 8) | out[5];
+    assert(observed == independent_crc((uint8_t[]){0x23,0x45,0x67,0x89,0xAB,0xCD},6));
+    assert(m.word_reads - reads_before == 2);
+    m.ecc_on_read = true;
+    assert(process(&kernel, unaligned, sizeof(unaligned), out) == 3 && out[2] == 0x22);
+    m.ecc_on_read = false;
+    m.regs[CD_MCR / 4] &= ~CD_MCR_EER; /* test fixture reset only */
+    m.regs[CD_MCR / 4] ^= 0x01000000u;
+    assert(process(&kernel, crc, sizeof(crc), out) == 3 && out[2] == 0x22);
+    m.regs[CD_MCR / 4] ^= 0x01000000u;
     const uint8_t shadow[] = {0x23, 0x14, 0, 0xFF, 0xFC, 0, 8};
     assert(process(&kernel, shadow, sizeof(shadow), out) == 3 && out[2] == 0x31);
     const uint8_t bad[] = {0x36, 0, 0xFF, 0xFF, 2, 0, 0, 0, 0};

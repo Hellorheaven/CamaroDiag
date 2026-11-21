@@ -33,20 +33,25 @@ static bool read_status(cd_kernel *k)
     return !k->flash->recovery_required &&
         bus->service(bus->context) &&
         bus->read_reg(bus->context, CD_MCR, &status) &&
-        (status & CD_MCR_DONE) != 0 &&
+        (status & CD_MCR_GEOMETRY_MASK) == CD_MCR_MPC5566_GEOMETRY &&
+        (status & (CD_MCR_DONE | CD_MCR_PEG)) == (CD_MCR_DONE | CD_MCR_PEG) &&
+        (status & CD_MCR_PEAS) == 0 &&
         (status & (CD_MCR_EHV | CD_MCR_PGM | CD_MCR_ERS | CD_MCR_PSUS |
                    CD_MCR_ESUS | CD_MCR_STOP | CD_MCR_RWE | CD_MCR_EER)) == 0;
 }
 
-static bool byte_at(cd_kernel *k, uint32_t address, uint8_t *out)
+/* Read each aligned word once, even for unaligned byte ranges. Check
+ * controller status immediately after each read to catch flash ECC faults. */
+static bool read_confirmed_word(cd_kernel *k, uint32_t address, uint32_t *word)
 {
     cd_flash_bus *bus = &k->flash->bus;
-    uint32_t word;
-    if (!bus->service(bus->context) ||
-        !bus->read_word(bus->context, address & ~UINT32_C(3), &word))
-        return false;
-    *out = (uint8_t)(word >> (8u * (3u - (address & 3u))));
-    return true;
+    return bus->service(bus->context) &&
+        bus->read_word(bus->context, address & ~UINT32_C(3), word) &&
+        read_status(k);
+}
+static uint8_t extract_byte(uint32_t word, uint32_t address)
+{
+    return (uint8_t)(word >> (8u * (3u - (address & 3u))));
 }
 
 bool cd_kernel_init(cd_kernel *k, cd_flash_controller *flash)
@@ -66,12 +71,13 @@ static size_t flash_crc(cd_kernel *k, const uint8_t *req, size_t n,
     if (!readable(address, length)) return negative(out, cap, 0x3D, NRC_RANGE);
     if (cap < 6) return 0;
     if (!read_status(k)) return negative(out, cap, 0x3D, NRC_CONDITIONS);
-    uint32_t crc = 0;
+    uint32_t crc = 0, word = 0;
     for (uint32_t offset = 0; offset < length; ++offset) {
-        uint8_t byte;
-        if (!byte_at(k, address + offset, &byte))
+        const uint32_t current = address + offset;
+        if ((offset == 0 || (current & 3u) == 0) &&
+            !read_confirmed_word(k, current, &word))
             return negative(out, cap, 0x3D, NRC_CONDITIONS);
-        crc ^= (uint32_t)byte << 24;
+        crc ^= (uint32_t)extract_byte(word, current) << 24;
         for (unsigned bit = 0; bit < 8; ++bit)
             crc = (crc << 1) ^ ((crc & UINT32_C(0x80000000)) ?
                 UINT32_C(0x04C11DB7) : 0);
@@ -93,9 +99,14 @@ static size_t flash_read(cd_kernel *k, const uint8_t *req, size_t n,
         return negative(out, cap, 0x23, NRC_RANGE);
     if (cap < length + 1u) return 0;
     if (!read_status(k)) return negative(out, cap, 0x23, NRC_CONDITIONS);
-    for (uint32_t i = 0; i < length; ++i)
-        if (!byte_at(k, address + i, out + 1 + i))
+    uint32_t word = 0;
+    for (uint32_t i = 0; i < length; ++i) {
+        const uint32_t current = address + i;
+        if ((i == 0 || (current & 3u) == 0) &&
+            !read_confirmed_word(k, current, &word))
             return negative(out, cap, 0x23, NRC_CONDITIONS);
+        out[1 + i] = extract_byte(word, current);
+    }
     if (!read_status(k)) return negative(out, cap, 0x23, NRC_CONDITIONS);
     out[0] = 0x63;
     return length + 1u;
