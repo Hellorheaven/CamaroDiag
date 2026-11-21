@@ -450,4 +450,26 @@
     <string name="cal_vin_sync_warning_message">Izvēlētajā profilā saglabātais VIN (%1$s) tiks aizstāts ar ECU VIN (%2$s). Gads, dzinējs, pārnesumkārba un tirgus nemainīsies. Dariet to tikai pēc pārliecināšanās, ka pievienots pareizais transportlīdzeklis.</string>
     <string name="cal_vin_sync_confirm">Aizstāt VIN</string>
     <string name="vin_photo_capture">Fotografēt VIN</string>
+    <string name="control_interlock_assessment">Drošības bloķēšanas nosacījumu novērtējums: %1$s</string>
+    <string name="control_conditions_confirmed">nosacījumi apstiprināti</string>
+    <string name="control_windows_explanation">GM komanda jāidentificē un jāvalidē šī VIN BCM. Universāls kadrs netiek pieņemts.</string>
+    <string name="control_sunroof_explanation">Tikai tad, ja aprīkojums ir uzstādīts un pieejama validēta BCM komanda.</string>
+    <string name="control_door_locks_title">Durvju slēdzenes</string>
+    <string name="control_door_locks_explanation">Aizsargāta virsbūves komanda: jāpārbauda adresācija, drošība un transportlīdzekļa stāvoklis.</string>
+    <string name="control_lights_title">Lukturi</string>
+    <string name="control_lights_explanation">Apgaismojuma funkcijas ir atkarīgas no BCM, aprīkojuma un tirgus.</string>
+    <string name="control_horn_explanation">Skaņas signāls paliek atspējots bez pārbaudītas GM procedūras un lietotāja apstiprinājuma.</string>
+    <string name="control_mirrors_title">Spoguļi</string>
+    <string name="control_mirrors_explanation">Komanda jāvalidē aprīkojumam un BCM versijai.</string>
+    <string name="control_trunk_explanation">Komanda jāvalidē virsbūves tipam, BCM un transportlīdzekļa stāvoklim.</string>
+    <string name="control_remote_start_title">Attālā iedarbināšana</string>
+    <string name="control_remote_start_explanation">Ar vispārīgu OBD kadru droši vadīt nevar. Izmantojiet tikai ražotāja apstiprinātu attālās iedarbināšanas sistēmu un tās drošības nosacījumus (Park, stāvbremze, aizvērts motora pārsegs, nav kritisku kļūmju). CamaroDiag nesūta dzinēja iedarbināšanas komandu.</string>
+    <string name="remote_start_blocker_gear">Pārnesumkārbas Park pozīcija nav apstiprināta.</string>
+    <string name="remote_start_blocker_hood">Motora pārsega aizvēršana nav apstiprināta.</string>
+    <string name="remote_start_blocker_locks">Durvju aizslēgšana nav apstiprināta.</string>
+    <string name="remote_start_blocker_hazards">Avārijas gaismu izslēgšana nav apstiprināta.</string>
+    <string name="remote_start_blocker_theft">Pretaizdzīšanas sistēmas gatavība nav apstiprināta.</string>
+    <string name="remote_start_blocker_faults">Kritisku kļūmju neesamība nav apstiprināta.</string>
+    <string name="remote_start_blocker_stationary">Nav apstiprināts, ka transportlīdzeklis stāv.</string>
+    <string name="remote_start_blocker_equipment">Ražotāja attālās iedarbināšanas aprīkojums nav apstiprināts.</string>
 </resources>
