@@ -373,6 +373,31 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /** Independent, fresh physical capability probe for the owner test suite. */
+    suspend fun probeJ2534StandardPids(): Set<Int> {
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val pids = checkNotNull(j2534BridgeTransport).discoverStandardObdPids()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            pids
+        }
+    }
+
+    suspend fun probeJ2534StandardReadiness(): ByteArray {
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val response = checkNotNull(j2534BridgeTransport).exchange(byteArrayOf(1,1), 1800)
+            val data = J2534StandardObd.pidData(1,response)
+            require(data.size == 4) { "Invalid physical readiness payload." }
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            data
+        }
+    }
+
     suspend fun fullJ2534StandardObdScan(): ObdScanReport {
         val epoch = transportSessionEpoch.capture()
         check(isJ2534StandardObdAvailable())
