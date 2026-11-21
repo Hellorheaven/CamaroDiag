@@ -480,4 +480,19 @@
     <string name="live_pid_wbo2_b1s2">Širokopásmová lambda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Širokopásmová lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Širokopásmová lambda B2S2</string>
+
+    <!-- Private functional-test laboratory: genuine cs translations -->
+    <string name="tab_functional_tests">Funkční testy</string>
+    <string name="functional_tests_title">Funkční testy — ECU a OBD</string>
+    <string name="functional_tests_readonly">Spustí všechny dostupné kontroly pouze pro čtení přes právě připojený fyzický adaptér. Ostatní adaptéry a neověřené ECU jsou označeny jako NETESTOVÁNO. Bez mazání, ovládání ani programování.</string>
+    <string name="functional_tests_run">Spustit vše</string>
+    <string name="functional_tests_stop">Zastavit</string>
+    <string name="functional_tests_export">Exportovat JSON</string>
+    <string name="functional_tests_summary">%1$d úspěšných · %2$d neúspěšných · %3$d netestovaných</string>
+    <string name="functional_tests_passed">ÚSPĚCH (fyzický důkaz)</string>
+    <string name="functional_tests_failed">NEÚSPĚCH</string>
+    <string name="functional_tests_skipped">NETESTOVÁNO</string>
+    <string name="functional_tests_denied">Přístup odepřen: přihlaste se autorizovaným účtem Google a znovu se připojte.</string>
+    <string name="functional_tests_not_connected">Není připojen fyzický adaptér OBD. Zbývající kontroly neproběhly.</string>
+    <string name="functional_tests_cancelled">Testovací série byla zrušena.</string>
 </resources>
