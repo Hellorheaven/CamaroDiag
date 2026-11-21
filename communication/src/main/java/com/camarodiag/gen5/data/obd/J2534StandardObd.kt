@@ -1,0 +1,60 @@
+package com.camarodiag.gen5.data.obd
+
+import java.util.Locale
+
+/**
+ * ISO 15765-4 payloads are already assembled by J2534. Do not pass them
+ * through an ELM line parser: CAN DTC responses contain a count byte.
+ * The caller supplies a physical channel and must correlate its CAN ID.
+ */
+internal object J2534StandardObd {
+    fun supportsChannel(request: Int, response: Int, protocol: Int): Boolean =
+        (protocol in setOf(33, 35) && request == 0x7E0 && response == 0x7E8) ||
+            (protocol in setOf(34, 36) && request == 0x18DA10F1 && response == 0x18DAF110)
+
+    private fun ByteArray.u(index: Int): Int = this[index].toInt() and 0xFF
+
+    fun pidData(pid: Int, reply: ByteArray): ByteArray {
+        require(pid in 0..255)
+        require(reply.size >= 3 && reply.u(0) == 0x41 && reply.u(1) == pid) {
+            "Invalid or negative Mode 01 response."
+        }
+        return reply.copyOfRange(2, reply.size)
+    }
+
+    /** Bit 31 announces another support bitmap, not a sensor PID. */
+    fun supportPage(base: Int, reply: ByteArray): Pair<Set<Int>, Boolean> {
+        require(base in 0..0xE0 && base % 32 == 0)
+        val bitmap = pidData(base, reply)
+        require(bitmap.size == 4) { "Mode 01 support bitmap must be exactly four bytes." }
+        val pids = (0 until 31).filter { index ->
+            bitmap.u(index / 8) and (1 shl (7 - index % 8)) != 0
+        }.map { base + it + 1 }.toSet()
+        return pids to (base < 0xE0 && bitmap.u(3) and 1 != 0)
+    }
+
+    fun dtcs(mode: Int, reply: ByteArray): List<ObdDtc> {
+        val status = when (mode) {
+            3 -> "confirmed"
+            7 -> "pending"
+            10 -> "permanent"
+            else -> throw IllegalArgumentException("Unsupported DTC read mode.")
+        }
+        require(reply.size >= 2 && reply.u(0) == mode + 0x40) {
+            "Invalid or negative CAN DTC response."
+        }
+        val count = reply.u(1)
+        require(reply.size == 2 + count * 2) { "CAN DTC count does not match payload length." }
+        return List(count) { index ->
+            val hi = reply.u(2 + 2 * index)
+            val lo = reply.u(3 + 2 * index)
+            require(hi != 0 || lo != 0) { "Zero DTC inside a declared CAN DTC record." }
+            val code = "%c%d%X%02X".format(Locale.ROOT, "PCBU"[hi shr 6], (hi shr 4) and 3, hi and 15, lo)
+            ObdDtc(code, status)
+        }
+    }
+
+    fun isExplicitlyUnsupported(mode: Int, reply: ByteArray): Boolean =
+        reply.size == 3 && reply.u(0) == 0x7F && reply.u(1) == mode &&
+            reply.u(2) in setOf(0x11, 0x12, 0x31)
+}
