@@ -709,4 +709,10 @@
     <string name="can_sniffer_capture_failed">Záznam CAN selhal nebo adaptér přestal odpovídat.</string>
     <string name="can_sniffer_frame_count">Počet zachycených rámců: %1$d</string>
     <string name="can_sniffer_filtered_count">Zobrazeno %1$d z %2$d rámců</string>
+    <string name="msg_live_recording_real_started">Záznam skutečných dat OBD byl zahájen.</string>
+    <string name="msg_live_recording_started">Probíhá záznam. Počet vzorků: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Záznam byl zastaven. Počet získaných vzorků: %1$d.</string>
+    <string name="msg_live_csv_exported">Protokol CSV byl exportován. Počet vzorků: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Protokol CSV se nepodařilo exportovat.</string>
+    <string name="msg_live_recording_max_samples">Bylo dosaženo bezpečnostního limitu (%1$d). Záznam se automaticky zastavil.</string>
 </resources>
