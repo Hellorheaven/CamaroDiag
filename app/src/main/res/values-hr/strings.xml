@@ -691,4 +691,19 @@
     <string name="functional_tests_denied">Pristup odbijen: prijavite se ovlaštenim Google računom i ponovno se povežite.</string>
     <string name="functional_tests_not_connected">Nije spojen fizički OBD adapter. Preostale provjere nisu provedene.</string>
     <string name="functional_tests_cancelled">Testiranje je otkazano.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Debug verzije</string>
+    <string name="tab_license">Licenca</string>
+    <string name="debug_builds_title">Privatne Debug verzije</string>
+    <string name="debug_builds_refresh">Osvježi dostupne verzije</string>
+    <string name="debug_builds_download">Preuzmi s GitHuba</string>
+    <string name="debug_builds_unavailable">Nije dostupna valjana Debug arhiva.</string>
+    <string name="debug_builds_error">Nije moguće učitati Debug verzije s GitHuba.</string>
+    <string name="license_disabled">Sustav licenciranja nije aktiviran.</string>
+    <string name="license_buy">Kupi licencu</string>
+    <string name="license_refresh">Osvježi licencu</string>
+    <string name="license_free">Besplatno</string>
+    <string name="license_owner">Vlasnik: sva dopuštenja</string>
+    <string name="license_premium">Puna licenca aktivna</string>
+    <string name="license_title">Licenca CamaroDiag</string>
 </resources>
