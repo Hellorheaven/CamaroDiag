@@ -495,4 +495,6 @@
     <string name="mileage_source_generic">Forrás %1$s</string>
     <string name="mileage_details_unavailable">Ehhez a forráshoz nem érhetők el műszaki részletek.</string>
     <string name="mileage_caveat_unavailable">Ehhez a forráshoz nem érhető el további lokalizált információ.</string>
+    <string name="obd_physical_can_scope">Fizikai CAN-válaszadó: 0x%1$s. A vizsgálat csak a kiválasztott OBD ECU-ra terjed ki, nem az összes modul funkcionális vizsgálatára. Nem történt GM-programozási vagy működtetőparancs küldése.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Engedélyezze az emissziós DTC-k törlését a Windows-hídon, csatlakozzon újra, állítsa le a motort és erősítse meg a visszaállítást. Az emissziós készenléti adatok törlődnek; az állandó kódok nem törlődnek.</string>
 </resources>
