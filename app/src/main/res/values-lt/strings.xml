@@ -611,4 +611,6 @@
     <string name="units_metric_details">Metriniai vienetai (km, °C, kPa)</string>
     <string name="units_imperial_details">Imperiniai vienetai (mi, °F, psi)</string>
     <string name="cal_tcp_port">TCP prievadas</string>
+    <string name="msg_refresh_adapters_failed">Nepavyko atnaujinti adapterių sąrašo.</string>
+    <string name="msg_usb_identifier_unavailable">USB įrenginio identifikatorius nepasiekiamas</string>
 </resources>
