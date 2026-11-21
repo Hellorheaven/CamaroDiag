@@ -644,13 +644,13 @@ object CanTraceAnalyzer {
 
     private fun parseHexBytes(text: String): List<Int>? {
         val cleaned = text.trim()
-            .replace(Regex("(?i)0x"), "")
             .replace(Regex("[\\[\\]{}():|]"), " ")
         if (cleaned.isBlank()) return emptyList()
         val tokens = cleaned.split(Regex("[\\s,;]+")).filter(String::isNotBlank)
         val bytes = mutableListOf<Int>()
-        for (token in tokens) {
-            if (token.length % 2 != 0 || token.any { it.digitToIntOrNull(16) == null }) return null
+        for (raw in tokens) {
+            val token = raw.removePrefix("0x").removePrefix("0X")
+            if (token.isEmpty() || token.length % 2 != 0 || token.any { it.digitToIntOrNull(16) == null }) return null
             token.chunked(2).forEach { pair -> bytes += pair.toInt(16) }
         }
         return bytes

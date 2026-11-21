@@ -1050,4 +1050,9 @@ class CanTraceAnalyzerTest {
         val csv = CanTraceAnalyzer.analyze("id,data,\"note;;;;\"\n7E9,02 41 01,x", "capture.csv")
         assertEquals(0x7E9, csv.frames.single().canId)
     }
+    @Test
+    fun rejectsEmbeddedHexPrefixes() {
+        val report = CanTraceAnalyzer.analyze("id,data\n7E8,020x4100\n7E9,0x\n7EA,0x02 0X41 00", "capture.csv")
+        assertEquals(0x7EA, report.frames.single().canId)
+    }
 }
