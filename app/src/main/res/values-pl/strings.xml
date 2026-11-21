@@ -520,4 +520,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • żądanie %2$s / odpowiedź %3$s • okres %4$d s</string>
     <string name="cal_axis_values">0x%1$s • liczba=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Tylko profil sprzętu; nadal wymagane są oficjalne Android SDK/API lub udokumentowany most.</string>
+    <string name="obd_scan_description">Kontrola tylko do odczytu zgodna z SAE J1979: dane układu napędowego, kody usterek, zamrożona ramka i identyfikacja ECU.</string>
+    <string name="obd_responding_can_ids">Identyfikatory CAN odpowiadających jednostek</string>
+    <string name="obd_can_id_limit_explanation">Identyfikatory CAN pochodzą z odpowiedzi na funkcjonalne żądanie OBD 0100. Nie wystarczają do identyfikacji modułu (BCM, TCM, ABS, IPC, SDM) ani do autoryzacji rozszerzonych usług GM.</string>
+    <string name="obd_trigger_dtc">DTC wyzwalający zamrożoną ramkę</string>
+    <string name="obd_real_scan_scope">Zakres: wyniki pochodzą wyłącznie z rzeczywistych odpowiedzi ECU dostępnego przez OBD-II. Skan nie odpytuje BCM, IPC, ABS, SDM ani innych modułów GM i nie wykonuje poleceń aktuatorów ani programowania.</string>
+    <string name="connection_busy">Trwa łączenie lub wykonywanie operacji…</string>
+    <string name="swcan_wiring_verified">Okablowanie SW-CAN zweryfikowane (pin 1)</string>
+    <string name="long_response_mode">Tryb długich odpowiedzi (ATAL)</string>
+    <string name="adapter_none_detected">Nie wykryto adaptera. Sparuj OBDLink MX+, MX, LX i inne adaptery Bluetooth Classic; CX jest wykrywany w pobliżu przez BLE.</string>
+    <string name="usb_connection_title">Połączenie USB (OBDLink EX / SX, ELM327 i adaptery szeregowe)</string>
+    <string name="adapter_connect_label">Połącz: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: architektura transportu jest przygotowana, ale zgodność J2534 z Androidem nie jest potwierdzona bez oficjalnego SDK Android dla danego modelu. Dostęp J2534 nie jest symulowany.</string>
+    <string name="adapter_vxdiag_profiles">Zadeklarowane profile interfejsów VXDIAG</string>
+    <string name="adapter_vxdiag_profiles_hint">Profile rozróżniają wersje sprzętu i połączeń. Nie potwierdzają dostępności sterownika Android ani komunikacji z pojazdem.</string>
+    <string name="adapter_simulation_profiles">Symulowane profile sprzętowe (test stanowiskowy)</string>
 </resources>
