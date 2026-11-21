@@ -148,6 +148,13 @@ internal static class BridgeSelfTests
         Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
         Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,
             "Unavailable optional identity");
+        foreach (byte nrc in new byte[] { 0x21, 0x22, 0x33, 0x78 })
+        {
+            bool failed = false;
+            try { J2534Device.DecodeIdentityRecords(6, new byte[] { 0x7F, 9, nrc }); }
+            catch (IOException) { failed = true; }
+            Assert(failed, "Transient or denied identity read must not appear unsupported");
+        }
         var vin = J2534Device.DecodeIdentityRecords(2, new byte[] { 0x49, 2, 1 }
             .Concat(System.Text.Encoding.ASCII.GetBytes("1G1FA1RXXR0123456")).ToArray());
         Assert(vin.Single() == "1G1FA1RXXR0123456", "Physical VIN");

@@ -336,7 +336,10 @@ internal sealed partial class J2534Device : IDisposable
         int width = pid switch { 0x02 => 17, 0x04 => 16, 0x06 => 4, 0x0A => 20,
             _ => throw new ArgumentOutOfRangeException(nameof(pid)) };
         if (reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x09)
-            return Array.Empty<string>();
+        {
+            if (reply[2] is 0x11 or 0x12 or 0x31) return Array.Empty<string>();
+            throw new IOException($"Mode 09 identity temporarily refused or failed (NRC 0x{reply[2]:X2}).");
+        }
         if (reply.Length < 3 || reply[0] != 0x49 || reply[1] != pid ||
             reply.Length != 3 + reply[2] * width || (pid == 2 && reply[2] != 1))
             throw new InvalidDataException("Malformed Mode 09 identity response.");
