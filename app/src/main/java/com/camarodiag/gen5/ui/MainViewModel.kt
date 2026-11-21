@@ -3261,7 +3261,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _mileageReport.value = null
             val readings = mutableListOf<MileageSourceReading>()
             try {
-                if (!obdManager.isObdCommandChannelAvailable) {
+                if (!obdManager.isStandardObdReadAvailable()) {
                     if (obdManager.isJ2534BridgeConnected()) {
                         readings += MileageSourceReading(
                             "J2534", "J2534 bridge (UDS only)", "Pont J2534 (UDS uniquement)",
@@ -3278,7 +3278,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 } else {
-                    val (a6Response, d3Response) = obdManager.withObdCommandSession { engine ->
+                    val (a6Response, d3Response) = if (obdManager.isJ2534StandardObdAvailable()) {
+                        obdManager.readMode01PidIfSupported(0xA6) to obdManager.readMode01PidIfSupported(0xD3)
+                    } else obdManager.withObdCommandSession { engine ->
                         val supportedPids = engine.discoverSupportedPids()
                         engine.readMode01PidIfSupported(0xA6, supportedPids) to
                             engine.readMode01PidIfSupported(0xD3, supportedPids)
@@ -3567,7 +3569,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
             if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-            if (!obdManager.isSimulationActive && !obdManager.isObdCommandChannelAvailable) {
+            if (!obdManager.isSimulationActive && !obdManager.isStandardObdReadAvailable()) {
                 _obdScanReport.value = null
                 _obdScanMessage.value = if (obdManager.isJ2534BridgeConnected())
                     localizedContext.getString(R.string.msg_full_scan_j2534_only)
@@ -3579,6 +3581,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val report = if (obdManager.isSimulationActive) {
                     obdManager.createSimulatedObd2FeatureEngine().fullReadOnlyScan()
+                } else if (obdManager.isJ2534StandardObdAvailable()) {
+                    obdManager.fullJ2534StandardObdScan()
                 } else {
                     obdManager.withObdCommandSession { engine ->
                         engine.fullReadOnlyScan()
@@ -3586,10 +3590,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (!isCurrentAccountGeneration(startedGeneration)) return@launch
                 _obdScanReport.value = report
-                _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
-                    topology = _modules.value,
-                    respondingAddresses = report.respondingEcuAddresses
-                )
+                if (report.physicalCanResponder == null) {
+                    _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
+                        topology = _modules.value,
+                        respondingAddresses = report.respondingEcuAddresses
+                    )
+                }
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
                 _dtcs.value = if (obdManager.isSimulationActive) {
                     mapObdDtcs(allDtcs)

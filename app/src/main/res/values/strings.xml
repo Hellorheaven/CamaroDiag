@@ -912,4 +912,5 @@
     <string name="debug_builds_created">Created</string>
     <string name="debug_builds_expires">Expires</string>
     <string name="debug_builds_no_browser">No web browser is available to open this download.</string>
+    <string name="obd_physical_can_scope">Physical CAN responder: 0x%1$s. This scan covers only the selected OBD ECU, not a functional scan of all modules. No GM programming or actuator commands were sent.</string>
 </resources>
