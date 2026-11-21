@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">För fet blandning (bank 2)</string>
     <string name="dtc_desc_p0420">Katalysatorns verkningsgrad under gränsvärdet (bank 1)</string>
     <string name="dtc_desc_p0430">Katalysatorns verkningsgrad under gränsvärdet (bank 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Läs verkligt ECU-minne (J2534)</string>
+    <string name="cal_live_memory_notice">Windows-bryggan kräver en godkänd minneskarta kopplad till VIN. Endast läsning; skrivning till ECU förblir avstängd.</string>
+    <string name="cal_live_memory_length">Antal byte att läsa (högst 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibrering</string>
+    <string name="cal_live_memory_extended">Utökad diagnossession (0x03)</string>
+    <string name="cal_live_memory_save">Läs ECU-minnet två gånger och spara som ZIP</string>
+    <string name="cal_live_memory_saved">ECU-minnet sparades efter två likadana läsningar.</string>
+    <string name="cal_live_memory_failed">Läsning av ECU-minnet misslyckades. Ingen verifierad säkerhetskopia skapades.</string>
 </resources>

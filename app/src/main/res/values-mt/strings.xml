@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Taħlita rikka wisq (bank 2)</string>
     <string name="dtc_desc_p0420">Effiċjenza tal-katalizzatur taħt il-limitu (bank 1)</string>
     <string name="dtc_desc_p0430">Effiċjenza tal-katalizzatur taħt il-limitu (bank 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Qari tal-memorja ECU reali (J2534)</string>
+    <string name="cal_live_memory_notice">Il-pont Windows jeħtieġ mappa tal-memorja approvata marbuta mal-VIN. Qari biss; il-kitba fl-ECU tibqa\' diżattivata.</string>
+    <string name="cal_live_memory_length">Bytes biex jinqraw (massimu 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibrazzjoni</string>
+    <string name="cal_live_memory_extended">Sessjoni dijanjostika estiża (0x03)</string>
+    <string name="cal_live_memory_save">Aqra l-memorja ECU darbtejn u ssejvjaha bħala ZIP</string>
+    <string name="cal_live_memory_saved">Il-memorja ECU ġiet salvata wara żewġ qari identiċi.</string>
+    <string name="cal_live_memory_failed">Il-qari tal-memorja ECU falla. Ma nħolqot l-ebda kopja ta\' riżerva verifikata.</string>
 </resources>

@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Príliš bohatá zmes (rad 2)</string>
     <string name="dtc_desc_p0420">Účinnosť katalyzátora pod prahovou hodnotou (rad 1)</string>
     <string name="dtc_desc_p0430">Účinnosť katalyzátora pod prahovou hodnotou (rad 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Čítanie skutočnej pamäte ECU (J2534)</string>
+    <string name="cal_live_memory_notice">Most Windows vyžaduje schválenú mapu pamäte viazanú na VIN. Iba čítanie; zápis do ECU zostáva vypnutý.</string>
+    <string name="cal_live_memory_length">Počet bajtov na čítanie (max. 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibrácia</string>
+    <string name="cal_live_memory_extended">Rozšírená diagnostická relácia (0x03)</string>
+    <string name="cal_live_memory_save">Dvakrát prečítať pamäť ECU a uložiť ZIP</string>
+    <string name="cal_live_memory_saved">Pamäť ECU uložená po dvoch zhodných čítaniach.</string>
+    <string name="cal_live_memory_failed">Čítanie pamäte ECU zlyhalo. Overená záloha sa nevytvorila.</string>
 </resources>

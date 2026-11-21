@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Preveč bogata mešanica (vrsta 2)</string>
     <string name="dtc_desc_p0420">Učinkovitost katalizatorja pod mejo (vrsta 1)</string>
     <string name="dtc_desc_p0430">Učinkovitost katalizatorja pod mejo (vrsta 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Branje pravega pomnilnika ECU (J2534)</string>
+    <string name="cal_live_memory_notice">Most Windows zahteva potrjen pomnilniški zemljevid, povezan z VIN. Samo branje; pisanje v ECU ostane onemogočeno.</string>
+    <string name="cal_live_memory_length">Število bajtov za branje (največ 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibracija</string>
+    <string name="cal_live_memory_extended">Razširjena diagnostična seja (0x03)</string>
+    <string name="cal_live_memory_save">Dvakrat preberi pomnilnik ECU in shrani ZIP</string>
+    <string name="cal_live_memory_saved">Pomnilnik ECU je bil shranjen po dveh enakih branjih.</string>
+    <string name="cal_live_memory_failed">Branje pomnilnika ECU ni uspelo. Preverjena varnostna kopija ni bila ustvarjena.</string>
 </resources>

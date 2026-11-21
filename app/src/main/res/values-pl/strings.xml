@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Zbyt bogata mieszanka (bank 2)</string>
     <string name="dtc_desc_p0420">Sprawność katalizatora poniżej progu (bank 1)</string>
     <string name="dtc_desc_p0430">Sprawność katalizatora poniżej progu (bank 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Odczyt rzeczywistej pamięci ECU (J2534)</string>
+    <string name="cal_live_memory_notice">Most Windows wymaga zatwierdzonej mapy pamięci powiązanej z VIN. Tylko odczyt; zapis do ECU pozostaje wyłączony.</string>
+    <string name="cal_live_memory_length">Liczba bajtów do odczytu (maks. 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Kalibracja</string>
+    <string name="cal_live_memory_extended">Rozszerzona sesja diagnostyczna (0x03)</string>
+    <string name="cal_live_memory_save">Odczytaj pamięć ECU dwukrotnie i zapisz ZIP</string>
+    <string name="cal_live_memory_saved">Pamięć ECU zapisano po dwóch zgodnych odczytach.</string>
+    <string name="cal_live_memory_failed">Odczyt pamięci ECU nie powiódł się. Nie utworzono zweryfikowanej kopii.</string>
 </resources>

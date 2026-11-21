@@ -230,4 +230,14 @@
     <string name="dtc_desc_p0175">Amestec prea bogat (bancul 2)</string>
     <string name="dtc_desc_p0420">Eficiența catalizatorului sub prag (bancul 1)</string>
     <string name="dtc_desc_p0430">Eficiența catalizatorului sub prag (bancul 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Citirea memoriei ECU reale (J2534)</string>
+    <string name="cal_live_memory_notice">Puntea Windows necesită o hartă de memorie aprobată și asociată cu VIN. Doar citire; scrierea ECU rămâne dezactivată.</string>
+    <string name="cal_live_memory_length">Număr de octeți de citit (maximum 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Calibrare</string>
+    <string name="cal_live_memory_extended">Sesiune de diagnoză extinsă (0x03)</string>
+    <string name="cal_live_memory_save">Citește memoria ECU de două ori și salvează ZIP</string>
+    <string name="cal_live_memory_saved">Memoria ECU a fost salvată după două citiri identice.</string>
+    <string name="cal_live_memory_failed">Citirea memoriei ECU a eșuat. Nu s-a creat nicio copie verificată.</string>
 </resources>
