@@ -609,4 +609,6 @@
     <string name="msg_usb_identifier_unavailable">Az USB-eszköz azonosítója nem érhető el</string>
     <string name="msg_simulation_activation_failed">Nem sikerült bekapcsolni a szimulációs módot.</string>
     <string name="msg_live_simulation_active">A szimuláció aktív. A megjelenített értékek nem a járműből származnak.</string>
+    <string name="msg_mileage_audit_failed">A futásteljesítmény ellenőrzéséhez szükséges adatok olvasása sikertelen.</string>
+    <string name="msg_session_delete_failed">Nem sikerült törölni a mentett munkamenetet.</string>
 </resources>
