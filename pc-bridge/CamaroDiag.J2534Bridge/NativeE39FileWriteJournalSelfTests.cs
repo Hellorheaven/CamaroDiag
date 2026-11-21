@@ -48,6 +48,34 @@ internal static class NativeE39FileWriteJournalSelfTests
                 NativeE39FileWriteJournal.CompletionState.Completed,
                 "All sectors individually verified before completion");
 
+            // A full JSON object without the flushed line terminator is not
+            // sufficient to declare the flash complete.
+            var completeText = File.ReadAllText(path);
+            File.WriteAllText(path, completeText.TrimEnd('\r', '\n'));
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Completion without record terminator is interrupted");
+
+            File.WriteAllText(path, completeText.Replace(
+                "\"Schema\":3,", "\"Schema\":2,\"Schema\":3,"));
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Duplicate schema keys cannot masquerade as completion");
+
+            File.WriteAllText(path, completeText.Replace(
+                "\"Phase\":\"Completed\"", "\"Phase\":\"" +
+                ((int)NativeE39WriteSequence.Phase.Completed).ToString() + "\""));
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Numeric enum spelling is not an accepted phase name");
+
+            File.Delete(path);
+            using (var oversized = new FileStream(path, FileMode.CreateNew))
+                oversized.SetLength(8L * 1024 * 1024 + 1);
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Oversized journal never authorizes completion");
+
             File.Delete(path);
             WriteScenario(path, false, false);
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
