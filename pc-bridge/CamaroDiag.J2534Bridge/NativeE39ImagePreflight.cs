@@ -22,12 +22,24 @@ internal static class NativeE39ImagePreflight
         byte[] modified,
         NativeEcuSectorPlanner.Layout exactFirmwareLayout,
         uint expectedLiveOsId,
-        bool calibrationOnly)
+        bool calibrationOnly) =>
+        Analyze(original, modified, exactFirmwareLayout, expectedLiveOsId, calibrationOnly, requireQualifiedMap: true);
+
+    internal static Report Preview(
+        byte[] original, byte[] modified,
+        NativeEcuSectorPlanner.Layout proposedLayout,
+        uint originalOsId, bool calibrationOnly) =>
+        Analyze(original, modified, proposedLayout with { VerifiedForExactFirmware = false },
+            originalOsId, calibrationOnly, requireQualifiedMap: false);
+
+    private static Report Analyze(
+        byte[] original, byte[] modified, NativeEcuSectorPlanner.Layout exactFirmwareLayout,
+        uint expectedLiveOsId, bool calibrationOnly, bool requireQualifiedMap)
     {
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(modified);
         ArgumentNullException.ThrowIfNull(exactFirmwareLayout);
-        if (!exactFirmwareLayout.VerifiedForExactFirmware ||
+        if ((requireQualifiedMap && !exactFirmwareLayout.VerifiedForExactFirmware) ||
             exactFirmwareLayout.RegionStartAddress != 0 ||
             exactFirmwareLayout.RegionSize != NativeE39ImageInspector.ImageBytes)
             throw new UnauthorizedAccessException(
@@ -44,6 +56,11 @@ internal static class NativeE39ImagePreflight
             after.OsIdentifier != expectedLiveOsId)
             throw new UnauthorizedAccessException(
                 "Image OS identifiers do not match the live ECU operating-system ID.");
+        if (!before.Segments.SequenceEqual(after.Segments) ||
+            !original.AsSpan(NativeE39ImageInspector.MasterChecksumTable, 0x10A).SequenceEqual(
+                modified.AsSpan(NativeE39ImageInspector.MasterChecksumTable, 0x10A)))
+            throw new UnauthorizedAccessException(
+                "The checksum table or segment boundaries differ from the original firmware.");
         if (!original.AsSpan(0, NativeE39ImageInspector.ProtectedBootBytes).SequenceEqual(
             modified.AsSpan(0, NativeE39ImageInspector.ProtectedBootBytes)))
             throw new UnauthorizedAccessException(
@@ -70,7 +87,7 @@ internal static class NativeE39ImagePreflight
 
         var plan = NativeEcuSectorPlanner.Preview(
             exactFirmwareLayout, original, modified);
-        if (!plan.CanAttemptPhysicalWrite || plan.ChangedBytes == 0)
+        if ((requireQualifiedMap && !plan.CanAttemptPhysicalWrite) || plan.ChangedBytes == 0)
             throw new InvalidOperationException("No approved ECU change to prepare.");
         return new Report(
             expectedLiveOsId,

@@ -49,6 +49,9 @@ internal static class Program
         if (args.Contains(NativeE39BackupQualification.Command, StringComparer.OrdinalIgnoreCase))
             return await NativeE39BackupQualification.RunAsync(args);
 
+        if (args.Contains(NativeE39WritePreviewCli.Command, StringComparer.OrdinalIgnoreCase))
+            return NativeE39WritePreviewCli.Run(args);
+
         // Offline image check: native, no ECU, no vendor driver or network.
         if (args.Contains("--inspect-e39-image", StringComparer.OrdinalIgnoreCase))
             return InspectE39Image(args);

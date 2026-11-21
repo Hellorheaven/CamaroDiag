@@ -62,6 +62,23 @@ internal static class NativeE39ImagePreflightSelfTests
                 expectedLiveOsId: 12664221u, calibrationOnly: true));
         count++;
 
+        var preview = NativeE39ImagePreflight.Preview(original, modified, layout,
+            12664221u, calibrationOnly: true);
+        Assert(preview.SectorPlan.Sectors.Count == 1 &&
+            !preview.SectorPlan.CanAttemptPhysicalWrite && !preview.SectorPlan.VerifiedMemoryMap,
+            "Offline preview never qualifies a caller-provided geometry");
+
+        var changedTable = modified.ToArray();
+        // Shrink a zero-filled OS CVN range, leaving the checksums valid.
+        BinaryPrimitives.WriteUInt32BigEndian(changedTable.AsSpan(0xCB02E + 4, 4), 0x8004Eu);
+        Assert(NativeE39ImageInspector.Inspect(changedTable).Status ==
+            NativeE39ImageInspector.Verdict.Valid,
+            "Synthetic edited checksum table still passes isolated checksum inspection");
+        Expect<UnauthorizedAccessException>(() =>
+            NativeE39ImagePreflight.Prepare(original, changedTable, layout,
+                expectedLiveOsId: 12664221u, calibrationOnly: false));
+        count++;
+
         var forbiddenBoot = modified.ToArray();
         forbiddenBoot[0] = 1;
         Expect<UnauthorizedAccessException>(() =>
