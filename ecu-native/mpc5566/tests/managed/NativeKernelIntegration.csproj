@@ -13,5 +13,6 @@
     <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommands.cs" Link="NativeE39FlashCommands.cs" />
     <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspector.cs" Link="NativeE39ImageInspector.cs" />
     <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeEcuSectorPlanner.cs" Link="NativeEcuSectorPlanner.cs" />
+    <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeMpc5566FlashMap.cs" Link="NativeMpc5566FlashMap.cs" />
   </ItemGroup>
 </Project>

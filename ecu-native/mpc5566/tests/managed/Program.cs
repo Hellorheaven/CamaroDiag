@@ -93,8 +93,47 @@ internal static class Program
                 }
                 Console.WriteLine("PASS: actual C / C# integration " + scenario);
             }
+            await TestPhysicalBlocksAsync(folder, options);
         }
         finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    private static async Task TestPhysicalBlocksAsync(string folder, NativeE39WriteSequence.Options options)
+    {
+        const int start = NativeMpc5566FlashMap.ProtectedE39Prefix;
+        byte[] original = Enumerable.Repeat((byte)0xFF,
+            NativeMpc5566FlashMap.MainFlashBytes - start).ToArray();
+        original[0x3FFFF - start] = 0x11;
+        original[0x60000 - start] = 0x22;
+        original[0x2DFFFF - start] = 0x33;
+        byte[] target = original.ToArray();
+        target[0x40000 - start] = 0x41;
+        target[^1] = 0x42;
+        var map = new NativeEcuSectorPlanner.Layout(start, original.Length, 0, 8, [], true,
+            NativeMpc5566FlashMap.Blocks().Where(b => b.Start >= start).ToArray());
+        var plan = NativeEcuSectorPlanner.Preview(map, original, target);
+        Check(plan.Sectors.Select(s => s.Address).SequenceEqual(new uint[] { 0x40000, 0x2E0000 }),
+            "Nonuniform physical erase map produced wrong sectors.");
+        Check(Model.cd_sim_init(original, (uint)original.Length) == 1, "Full model initialization failed.");
+        var link = new NativeE39KernelLink(Exchange, _ => Task.FromResult<uint?>(13500), 1024);
+        await link.ProbeAsync(CancellationToken.None);
+        string journalPath = Path.Combine(folder, "physical-blocks.jsonl");
+        await using (var journal = new NativeE39FileWriteJournal(journalPath))
+        {
+            var result = await NativeE39WriteSequence.RunBenchSequenceAsync(link, journal,
+                plan, options, CancellationToken.None);
+            Check(result.SectorsWritten == 2 && result.BytesWritten == 0x40000, "Unexpected physical block count.");
+        }
+        foreach (var sector in plan.Sectors)
+            Check((await link.ReadFlashBytesAsync(sector.Address, sector.Length, CancellationToken.None))
+                .SequenceEqual(sector.Updated), "Physical sector readback mismatch.");
+        foreach (uint address in new uint[] { 0x3FFF8, 0x60000, 0x2DFFF8 })
+            Check((await link.ReadFlashBytesAsync(address, 8, CancellationToken.None))
+                .SequenceEqual(original.Skip((int)address - start).Take(8)), "Adjacent block was changed.");
+        Check(Model.cd_sim_remaining() == 0 && Model.cd_sim_recovery() == 0 &&
+            NativeE39FileWriteJournal.Inspect(journalPath) == NativeE39FileWriteJournal.CompletionState.Completed,
+            "Full map transaction did not complete.");
+        Console.WriteLine("PASS: C / C# integration nonuniform middle and last high block");
     }
 
     private static Task<byte[]> Exchange(byte[] request, CancellationToken token)
