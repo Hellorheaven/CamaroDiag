@@ -82,7 +82,7 @@ jobs:
             echo "Android-relevant changes detected:"
             git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
           fi
-          if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- "${paths[@]}"; then
+          if git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- "${paths[@]}"; then
             echo "current_android_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "current_android_changed=true" >> "$GITHUB_OUTPUT"
@@ -192,7 +192,7 @@ jobs:
               # validation and cleanup after package replacement. Always
               # compile and lint it immediately, irrespective of the normal
               # draft checkpoint used for ordinary Android edits.
-              if ! git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- \
+              if ! git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- \
                   'app/src/main/java/com/camarodiag/gen5/ui/UpdateManager.kt' \
                   'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagUpdateCleanup.kt' \
                   'app/src/main/AndroidManifest.xml' \
@@ -253,7 +253,7 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: 14742923
-          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
+          packages: "platform-tools platforms;android-35 platforms;android-36 build-tools;36.0.0"
 
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.11.1
