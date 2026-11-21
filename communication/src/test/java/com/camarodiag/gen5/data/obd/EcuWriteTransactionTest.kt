@@ -109,6 +109,21 @@ class EcuWriteTransactionTest {
         assertTrue(records.isEmpty())
     }
 
+    @Test fun publicWriteEntryPointRejectsUnvalidatedHardwareBeforeCreatingJournal() = runBlocking {
+        val directory = java.nio.file.Files.createTempDirectory("camarodiag-ecu-write")
+        try {
+            val file = directory.resolve("write-journal.log").toFile()
+            val outcome = EcuWriteTransaction.execute(
+                request(), file, EcuWriteTransaction.PowerMonitor { true }
+            )
+            assertEquals(EcuWriteTransaction.Status.BLOCKED, outcome.status)
+            assertTrue(EcuWriteTransaction.Blocker.NO_VALIDATED_DRIVER in outcome.blockers)
+            assertFalse("No journal should be created for an unvalidated driver", file.exists())
+        } finally {
+            java.nio.file.Files.deleteIfExists(directory)
+        }
+    }
+
     @Test fun preparationRejectsElmMissingChecksAndUnverifiedMap() {
         val invalid = request(evidence = EcuWriteTransaction.SafetyEvidence()).copy(
             transport = EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS,
