@@ -674,4 +674,21 @@
     <string name="mileage_caveat_unavailable">Pro tento zdroj nejsou dostupné další lokalizované informace.</string>
     <string name="obd_physical_can_scope">Fyzický odpovídající uzel CAN: 0x%1$s. Skenování zahrnuje pouze vybranou OBD jednotku, nikoli funkční skenování všech modulů. Nebyly odeslány žádné příkazy programování GM ani akčních členů.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Povolte mazání emisních DTC v mostu Windows, znovu se připojte, vypněte motor a potvrďte reset. Údaje o připravenosti emisních systémů budou resetovány; trvalé kódy se nemažou.</string>
+    <string name="units_metric">SI / metrické</string>
+    <string name="units_imperial">Imperiální</string>
+    <string name="live_pause">Pozastavit</string>
+    <string name="live_recording_status">Vzorky: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Obvod akčního členu polohy sacího vačkového hřídele (řada 1)</string>
+    <string name="dtc_desc_p0011">Příliš pokročilé časování sacího vačkového hřídele (řada 1)</string>
+    <string name="dtc_desc_p0014">Příliš pokročilé časování výfukového vačkového hřídele (řada 1)</string>
+    <string name="dtc_desc_p0087">Příliš nízký tlak v palivové liště nebo soustavě</string>
+    <string name="dtc_desc_p0089">Nesprávná funkce regulátoru tlaku paliva</string>
+    <string name="dtc_desc_p0191">Rozsah nebo funkce obvodu snímače tlaku palivové lišty</string>
+    <string name="dtc_desc_p0299">Nedostatečný plnicí tlak turbodmychadla nebo kompresoru</string>
+    <string name="cal_engine_profile">Profil motoru: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Motory v katalogu pro rok %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Binární čtení: %2$s • Ověřené tabulky motoru: %3$s • Programování ECU: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • požadavek %2$s / odpověď %3$s • interval %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • počet=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Pouze profil hardwaru; stále je potřeba oficiální Android SDK/API nebo dokumentovaný most.</string>
 </resources>
