@@ -397,4 +397,15 @@
     <string name="license_owner">Omanik: kõik õigused</string>
     <string name="license_premium">Täislitsents aktiivne</string>
     <string name="license_title">CamaroDiagi litsents</string>
+    <!-- LFX 2012 ECU safety and verification guidance -->
+    <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012: ECU tuvastamine (ainult lugemine)</string>
+    <string name="flexfuel_lfx2012_checks">Tingimused, mis endiselt takistavad kalibreeringu muutmist</string>
+    <string name="flexfuel_preflight_vehicle_missing">Sõiduki profiili pole valitud</string>
+    <string name="flexfuel_preflight_wrong_vehicle">Sõiduk ei ole 2012. aasta Camaro LFX</string>
+    <string name="flexfuel_preflight_vin">VIN tuleb lugeda ECU-st ja see peab vastama salvestatud sõidukile</string>
+    <string name="flexfuel_preflight_ecu">ECU juhtploki tegelik viitenumber tuleb tuvastada</string>
+    <string name="flexfuel_preflight_firmware">ECU täpne püsivara pole kontrollitud</string>
+    <string name="flexfuel_preflight_recovery">Taasteprotseduuri pole kontrollitud</string>
+    <string name="flexfuel_lfx2012_audit_title">LFX 2012: kontroll enne ja pärast programmeerimist (ainult lugemine)</string>
+    <string name="flexfuel_lfx2012_audit_post_not_performed">Programmeerimisjärgset kontrolli pole tehtud. ECU programmeerimist ega sõiduki testi pärast kirjutamist pole valideeritud.</string>
 </resources>
