@@ -585,4 +585,10 @@
     <string name="cal_expert_patch_program_bytes">Dimensiunea unității de programare (octeți)</string>
     <string name="cal_expert_patch_preview_button">Previzualizează sectoarele afectate de fișierul BIN modificat</string>
     <string name="cal_expert_patch_summary">Octeți modificați: %1$d. Sectoare de ștergere afectate: %2$d. Harta memoriei hardware nu a fost verificată. Nu s-au scris date.</string>
+    <string name="dtc_gm_monitor_title">Monitor motor GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Criterii de înregistrare a codului: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Condiții de activare: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Contor de defecțiuni / rată de validare: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Clasificare MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Sursă: GM %1$s, pagina %2$d</string>
 </resources>
