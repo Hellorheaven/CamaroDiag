@@ -49,7 +49,10 @@ object EcuWriteTransaction {
         val canAttemptWithValidatedHardware: Boolean get() = blockers.isEmpty()
     }
 
-    enum class Stage { BASELINE_CHECKED, BEFORE_ERASE, VERIFIED_AFTER_WRITE }
+    enum class Stage {
+        BASELINE_CHECKED, BEFORE_ERASE, VERIFIED_AFTER_WRITE,
+        FINAL_READBACK_VERIFIED, TRANSACTION_COMPLETED
+    }
     data class Record(
         val stage: Stage,
         val region: EcuBackupCoverage.Region,
@@ -297,6 +300,13 @@ internal class EcuWriteExecutionEngine(
                         verifiedSectors = verified, failedAddress = currentAddress
                     )
                 }
+                journal.append(
+                    EcuWriteTransaction.Record(
+                        EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED,
+                        request.region, sector.absoluteAddress,
+                        sector.originalSha256, sector.updatedSha256
+                    )
+                )
             }
             if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) {
                 return EcuWriteTransaction.Outcome(
@@ -304,6 +314,13 @@ internal class EcuWriteExecutionEngine(
                     verifiedSectors = verified, failedAddress = currentAddress
                 )
             }
+            // This terminal marker binds completion to the final sector and
+            // must be durably stored before returning a completed outcome.
+            val last = preview.affectedSectors.last()
+            journal.append(EcuWriteTransaction.Record(
+                EcuWriteTransaction.Stage.TRANSACTION_COMPLETED,
+                request.region, last.absoluteAddress, last.originalSha256, last.updatedSha256
+            ))
             return EcuWriteTransaction.Outcome(
                 EcuWriteTransaction.Status.COMPLETED, verifiedSectors = verified
             )
