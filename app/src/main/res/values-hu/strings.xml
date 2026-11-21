@@ -593,4 +593,10 @@
     <string name="cal_expert_patch_program_bytes">Programozási egység mérete (bájt)</string>
     <string name="cal_expert_patch_preview_button">A módosított BIN által érintett szektorok előnézete</string>
     <string name="cal_expert_patch_summary">Módosult bájtok: %1$d. Érintett törlési szektorok: %2$d. A hardver memóriatérképe nincs ellenőrizve. Írás nem történt.</string>
+    <string name="dtc_gm_monitor_title">GM motorfelügyelet – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">A hibakód beállításának feltételei: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Engedélyezési feltételek: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Hibaszámláló / ellenőrzési gyakoriság: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL-besorolás: %1$s</string>
+    <string name="dtc_gm_monitor_source">Forrás: GM %1$s, %2$d. oldal</string>
 </resources>
