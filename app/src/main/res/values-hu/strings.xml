@@ -514,4 +514,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • kérés %2$s / válasz %3$s • időköz %4$d s</string>
     <string name="cal_axis_values">0x%1$s • darabszám=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Csak hardverprofil; hivatalos Android SDK/API vagy dokumentált híd továbbra is szükséges.</string>
+    <string name="obd_scan_description">SAE J1979 szerinti csak olvasási ellenőrzés: hajtásláncadatok, hibakódok, rögzített keret és ECU-azonosítás.</string>
+    <string name="obd_responding_can_ids">Válaszoló CAN-azonosítók</string>
+    <string name="obd_can_id_limit_explanation">A CAN-azonosítók a funkcionális 0100 OBD-kérésre megfigyelt válaszok. Nem elegendők a modul (BCM, TCM, ABS, IPC, SDM) azonosításához vagy a bővített GM-szolgáltatások engedélyezéséhez.</string>
+    <string name="obd_trigger_dtc">Rögzített keretet kiváltó DTC</string>
+    <string name="obd_real_scan_scope">Hatókör: az eredmények kizárólag az OBD-II-n elérhető ECU valódi válaszaiból származnak. A vizsgálat nem kérdezi le a BCM, IPC, ABS, SDM vagy más GM-modulokat, és nem hajt végre működtető- vagy programozási parancsokat.</string>
+    <string name="connection_busy">Csatlakozás vagy művelet folyamatban…</string>
+    <string name="swcan_wiring_verified">SW-CAN bekötés ellenőrizve (1. érintkező)</string>
+    <string name="long_response_mode">Hosszú válaszok módja (ATAL)</string>
+    <string name="adapter_none_detected">Nem észlelhető adapter. Párosítsa az OBDLink MX+, MX, LX és más Classic Bluetooth adaptereket; a CX a közelben BLE-n keresztül észlelhető.</string>
+    <string name="usb_connection_title">USB-kapcsolat (OBDLink EX / SX, ELM327 és soros adapterek)</string>
+    <string name="adapter_connect_label">Csatlakozás: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: az átviteli architektúra előkészült, de a J2534 interfészek Android-kompatibilitását nem állítjuk a modell hivatalos Android SDK-ja nélkül. J2534-hozzáférés nincs szimulálva.</string>
+    <string name="adapter_vxdiag_profiles">Deklarált VXDIAG interfészprofilok</string>
+    <string name="adapter_vxdiag_profiles_hint">Ezek a profilok a hardver- és kapcsolatváltozatokat különböztetik meg. Nem igazolják Android-illesztőprogram vagy járműkommunikáció elérhetőségét.</string>
+    <string name="adapter_simulation_profiles">Szimulált hardverprofilok (próbapadi teszt)</string>
 </resources>
