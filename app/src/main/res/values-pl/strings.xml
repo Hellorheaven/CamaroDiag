@@ -414,4 +414,13 @@
     <string name="flexfuel_preflight_recovery">Procedura odzyskiwania nie została zweryfikowana</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: kontrola przed i po programowaniu (tylko odczyt)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Nie przeprowadzono kontroli po programowaniu. Nie zweryfikowano programowania ECU ani testu pojazdu po zapisie.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Pobierz najnowsze artefakty Debug z PR #70. Zaloguj się do GitHub przy użyciu uprawnionego konta. Pliki są archiwami ZIP wymagającymi rozpakowania.</string>
+    <string name="debug_builds_android_archive">Archiwum ZIP z Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">Archiwum ZIP z instalatorami Windows x64 i x86.</string>
+    <string name="debug_builds_caution">Artefakty wygasają po 30 dniach. Ich dostępność nie dowodzi poprawnej kompilacji ani testów na pojeździe. Podpis APK Debug może różnić się od wydania publicznego.</string>
+    <string name="debug_builds_created">Utworzono</string>
+    <string name="debug_builds_expires">Wygasa</string>
+    <string name="debug_builds_no_browser">Brak przeglądarki do otwarcia pobierania.</string>
 </resources>
