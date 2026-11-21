@@ -80,6 +80,7 @@ internal sealed partial class BridgeDesktopForm : Form
         tabs.TabPages.Add(BuildConsoleTab());
         tabs.TabPages.Add(BuildMemoryTab());
         tabs.TabPages.Add(BuildDiagnosticsTab());
+        tabs.TabPages.Add(BuildFunctionalTestsTab());
         tabs.TabPages.Add(BuildUpdatesTab());
         tabs.TabPages.Add(BuildHelpTab());
         Controls.Add(tabs);
@@ -94,6 +95,7 @@ internal sealed partial class BridgeDesktopForm : Form
         FormClosing += (_, _) =>
         {
             bridgeCancellation?.Cancel();
+            functionalCancellation?.Cancel();
             consoleDevice?.Dispose();
             consoleDevice = null;
         };
