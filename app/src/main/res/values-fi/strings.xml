@@ -587,4 +587,10 @@
     <string name="msg_cal_definitions_import_failed">Taulukkomääritysten tuonti epäonnistui.</string>
     <string name="msg_cal_map_read_failed">Valittua taulukkoa ei voitu lukea.</string>
     <string name="msg_cal_table_edit_failed">Kalibrointitaulukon muokkaus epäonnistui.</string>
+    <string name="cal_expert_image_selected">Tuotu tiedosto: %1$s</string>
+    <string name="cal_expert_patch_address">Muistialueen alkuosoite (heksadesimaali)</string>
+    <string name="cal_expert_patch_erase_bytes">Tyhjennyssektorin koko (tavua)</string>
+    <string name="cal_expert_patch_program_bytes">Ohjelmointiyksikön koko (tavua)</string>
+    <string name="cal_expert_patch_preview_button">Esikatsele muokatun BIN-tiedoston vaikutusta sektoreihin</string>
+    <string name="cal_expert_patch_summary">Muuttuneita tavuja: %1$d. Muutoksen kohteena olevia tyhjennyssektoreita: %2$d. Laitteen muistikarttaa ei ole vahvistettu. Mitään ei kirjoitettu.</string>
 </resources>
