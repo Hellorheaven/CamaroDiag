@@ -3291,11 +3291,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             ("Réponse OBD physique : " + pids.size + " PID pris en charge.")
                     }
                     checkRead("service:dtcs") {
-                        val (confirmed, pending, permanent) =
-                            obdManager.withObdCommandSession { it.readDtcs() }
+                        val (dtcResults, positiveResponse) =
+                            obdManager.withObdCommandSession { it.readDtcsWithPositiveResponseProof() }
+                        require(positiveResponse) { "No positive physical DTC service response" }
+                        val (confirmed, pending, permanent) = dtcResults
                         val count = confirmed.size + pending.size + permanent.size
-                        ("Read-only DTC request completed: " + count + " codes.") to
-                            ("Lecture DTC terminée sans effacement : " + count + " défauts.")
+                        ("Physical DTC response verified: " + count + " codes, no clearing.") to
+                            ("Réponse physique DTC vérifiée : " + count + " défauts, sans effacement.")
                     }
                     checkRead("service:readiness") {
                         val response = obdManager.withObdCommandSession { it.readReadiness() }
