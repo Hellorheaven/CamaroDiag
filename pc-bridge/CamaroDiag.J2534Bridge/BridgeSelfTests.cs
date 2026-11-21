@@ -135,6 +135,15 @@ internal static class BridgeSelfTests
             !StandardObdPhysicalPolicy.IsClearAcknowledged([0x44,0]),
             "Only exact positive clear acknowledgment accepted");
 
+        Assert(StandardObdPhysicalPolicy.AllowsRead([2,2,0]), "Standard freeze-frame DTC request");
+        Assert(StandardObdPhysicalPolicy.AllowsRead([6,0]), "Standard Mode 06 supported monitor query");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([2,2,1]), "Only freeze frame 00 is scoped");
+        Assert(!StandardObdPhysicalPolicy.AllowsRead([6,1]), "Unimplemented monitor read scope rejected");
+        Assert(J2534Device.DecodeReceivedPayload(6,0,9,0,[0,0,7,0xE8,0x42,2,1,3,0],6,0x7E8,[2,2,0]) is null,
+            "Wrong freeze-frame number rejected");
+        Assert(J2534Device.DecodeReceivedPayload(6,0,7,0,[0,0,7,0xE8,0x46,1,0],6,0x7E8,[6,0]) is null,
+            "Wrong monitor test identifier rejected");
+
         var cvns = J2534Device.DecodeIdentityRecords(6, Convert.FromHexString("49060201020304000000A0"));
         Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
         Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,
