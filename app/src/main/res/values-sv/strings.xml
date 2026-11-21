@@ -559,4 +559,11 @@
     <string name="vin_photo_not_found">Inget giltigt VIN med 17 tecken hittades. Ange det manuellt eller ta ett nytt foto.</string>
     <string name="vin_photo_error">VIN kunde inte läsas från fotot. Försök igen med bättre ljus och skärpa.</string>
     <string name="vehicle_vin_placeholder">17 tecken</string>
+    <string name="can_sniffer_start">Starta fångst</string>
+    <string name="can_sniffer_stop">Stoppa fångst</string>
+    <string name="can_sniffer_empty">Inga CAN-ramar har fångats ännu.</string>
+    <string name="can_sniffer_capture_complete">CAN-fångsten är klar.</string>
+    <string name="can_sniffer_capture_failed">CAN-fångsten misslyckades eller adaptern slutade svara.</string>
+    <string name="can_sniffer_frame_count">Fångade ramar: %1$d</string>
+    <string name="can_sniffer_filtered_count">Visar %1$d av %2$d ramar</string>
 </resources>
