@@ -56,8 +56,8 @@ class StnUdsPayloadTransport(
         ensureConfigured(timeoutMs)
         val command = "STPX h:${formatId(requestCanId)}, d:${payload.toHex()}, t:${timeoutMs.coerceIn(1L, 65535L)}, r:0"
         val result = sendCommand(command, timeoutMs)
-        if (result.contains("?", ignoreCase = true) || result.contains("CAN ERROR", ignoreCase = true)) {
-            error("STN adapter rejected the UDS no-response transmission: $result")
+        check(result.lines().any { it.trim().equals("OK", ignoreCase = true) }) {
+            "STN did not acknowledge the UDS no-response transmission: $result"
         }
     }
 
@@ -99,7 +99,9 @@ class StnUdsPayloadTransport(
     }
 
     private fun requireOk(response: String, operation: String) {
-        require(response.contains("OK", true)) { "STN adapter failed to $operation: $response" }
+        require(response.replace('\\r', '\\n').lines().any { it.trim().equals("OK", ignoreCase = true) }) {
+            "STN adapter failed to $operation: $response"
+        }
     }
 
     private fun isMatchingUdsService(response: ByteArray, requestedService: Byte): Boolean {
