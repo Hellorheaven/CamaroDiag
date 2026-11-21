@@ -586,4 +586,11 @@
     <string name="msg_live_csv_exported">Wyeksportowano dziennik CSV. Liczba próbek: %1$d.</string>
     <string name="msg_live_csv_export_failed">Nie udało się wyeksportować dziennika CSV.</string>
     <string name="msg_live_recording_max_samples">Osiągnięto limit bezpieczeństwa (%1$d). Rejestrowanie zatrzymano automatycznie.</string>
+    <string name="msg_cal_file_import_failed">Nie udało się zaimportować pliku kalibracji.</string>
+    <string name="msg_cal_file_export_failed">Nie udało się wyeksportować pliku kalibracji.</string>
+    <string name="msg_cal_comparison_failed">Nie udało się porównać plików kalibracji.</string>
+    <string name="msg_cal_template_export_failed">Nie udało się wyeksportować szablonu TSV.</string>
+    <string name="msg_cal_definitions_import_failed">Nie udało się zaimportować definicji tabel.</string>
+    <string name="msg_cal_map_read_failed">Nie udało się odczytać wybranej tabeli.</string>
+    <string name="msg_cal_table_edit_failed">Nie udało się edytować tabeli kalibracji.</string>
 </resources>
