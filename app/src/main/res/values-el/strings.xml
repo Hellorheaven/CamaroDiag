@@ -149,7 +149,7 @@
     <string name="cal_read_uds_did">Ανάγνωση UDS DID</string>
     <string name="cal_read_uds_dtcs">Ανάγνωση UDS DTC</string>
     <string name="cal_uds_trouble_codes">Κωδικοί βλάβης UDS (0x19)</string>
-    <string name="cal_native_catalog_title">ΚΑΤΑΛΟΓΟΣ CAMARODIAG</string>
+    <string name="cal_native_catalog_title">ΚΑΤΑΛΟΓΟΣ CamaroDiag</string>
     <string name="cal_native_catalog_explanation">Ορισμοί που συντηρούνται από το CamaroDiag, ανεξάρτητα από καταλόγους κοινότητας. Προτεινόμενοι ή τεκμηριωμένοι ορισμοί δεν αποστέλλονται ποτέ σε ECU.</string>
     <string name="cal_native_catalog_loading">Φόρτωση καταλόγου…</string>
     <string name="cal_native_catalog_empty">Δεν έχει δηλωθεί προς το παρόν κανένα ιδιόκτητο Camaro DID ως αξιοποιήσιμο. Δεν επινοούνται άγνωστες διευθύνσεις ή συντελεστές κλίμακας.</string>
