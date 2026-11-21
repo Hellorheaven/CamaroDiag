@@ -1,5 +1,7 @@
 package com.camarodiag.gen5.ui
 
+import com.camarodiag.gen5.auth.LicenseLevel
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -98,6 +100,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
     FUNCTIONAL_TESTS("Functional Tests", "Tests fonctionnels", R.string.tab_functional_tests),
     DEBUG_DOWNLOADS("Debug Builds", "Versions Debug", R.string.tab_functional_tests),
+    LICENSE("License", "Licence", R.string.tab_settings),
     GUIDE("Guide", "Guide", R.string.tab_guide),
     CONTROL("Controls", "Pilotage", R.string.tab_controls),
     ABOUT("About", "À propos", R.string.about_title),
@@ -154,8 +157,17 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 @Composable
 fun CamaroDiagApp(
     viewModel: MainViewModel, systemLocale: Locale, onOpenAccount: () -> Unit,
-    ownerTestsAllowed: Boolean
+    licenseLevel: LicenseLevel,
+    onRefreshLicense: () -> Unit
 ) {
+    val ownerTestsAllowed = licenseLevel == LicenseLevel.OWNER
+    val premiumAllowed = licenseLevel != LicenseLevel.FREE
+    val premiumTabs = remember {
+        setOf(
+            DiagTab.MODULES, DiagTab.CAN_SNIFFER, DiagTab.MILEAGE,
+            DiagTab.CALIBRATION, DiagTab.OBD_SCAN, DiagTab.CONTROL
+        )
+    }
     val lang by viewModel.language.collectAsState()
     val followSystemLanguage by viewModel.followSystemLanguage.collectAsState()
     val units by viewModel.unitSystem.collectAsState()
@@ -188,8 +200,11 @@ fun CamaroDiagApp(
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
-    LaunchedEffect(ownerTestsAllowed) {
-        if (!ownerTestsAllowed && currentTab in setOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS)) currentTab = DiagTab.SETUP
+    LaunchedEffect(licenseLevel) {
+        if (!ownerTestsAllowed &&
+            currentTab in setOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS)
+        ) currentTab = DiagTab.LICENSE
+        if (!premiumAllowed && currentTab in premiumTabs) currentTab = DiagTab.LICENSE
     }
     val functionalTestsExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -427,6 +442,7 @@ fun CamaroDiagApp(
                         DiagTab.OBD_SCAN,
                         DiagTab.FUNCTIONAL_TESTS,
                         DiagTab.DEBUG_DOWNLOADS,
+                        DiagTab.LICENSE,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.ABOUT,
@@ -450,6 +466,7 @@ fun CamaroDiagApp(
                     (listOf(DiagTab.MODULES) +
                         (if (ownerTestsAllowed) listOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS) else emptyList()) +
                         listOf(
+                        DiagTab.LICENSE,
                         DiagTab.MILEAGE,
                         DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
@@ -460,12 +477,20 @@ fun CamaroDiagApp(
                     )).forEach { tab ->
                         DropdownMenuItem(
                             text = {
-                                Text(if (tab == DiagTab.DEBUG_DOWNLOADS) {
-                                    if (systemLocale.language == "fr") "Versions Debug" else "Debug builds"
-                                } else stringResource(tab.labelResourceId))
+                                Text(
+                                    if (tab == DiagTab.DEBUG_DOWNLOADS) {
+                                        if (systemLocale.language == "fr") "Versions Debug" else "Debug builds"
+                                    } else if (tab == DiagTab.LICENSE) {
+                                        if (systemLocale.language == "fr") "Licence" else "License"
+                                    } else {
+                                        (if (!premiumAllowed && tab in premiumTabs) "🔒 " else "") +
+                                            stringResource(tab.labelResourceId)
+                                    }
+                                )
                             },
                             onClick = {
-                                currentTab = tab
+                                currentTab = if (!premiumAllowed && tab in premiumTabs)
+                                    DiagTab.LICENSE else tab
                                 moreExpanded = false
                             }
                         )
@@ -539,7 +564,8 @@ fun CamaroDiagApp(
                     }
                 }
             Box(modifier = Modifier.fillMaxSize().weight(1f)) {
-            when (currentTab) {
+            when (if (!premiumAllowed && currentTab in premiumTabs)
+                DiagTab.LICENSE else currentTab) {
                 DiagTab.SETUP -> VehicleSetupScreen(
                     vehicle = vehicle,
                     savedVehicles = savedVehicles,
@@ -567,6 +593,7 @@ fun CamaroDiagApp(
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
+                DiagTab.LICENSE -> LicenseScreen(licenseLevel, onRefreshLicense)
                 DiagTab.DEBUG_DOWNLOADS -> {
                     if (ownerTestsAllowed) DebugDownloadsScreen()
                 }
@@ -601,9 +628,13 @@ fun CamaroDiagApp(
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
                     },
-                    onToggleRecording = { viewModel.toggleLiveRecording() },
+                    onToggleRecording = {
+                        if (premiumAllowed) viewModel.toggleLiveRecording()
+                        else currentTab = DiagTab.LICENSE
+                    },
                     onExportRecording = {
-                        liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
+                        if (!premiumAllowed) currentTab = DiagTab.LICENSE
+                        else liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
                     }
                 )
                 DiagTab.CAN_SNIFFER -> CanSnifferScreen(
