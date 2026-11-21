@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 import java.security.MessageDigest
+import kotlin.coroutines.resume
 import java.io.File
 import java.util.UUID
 import org.json.JSONArray
@@ -122,6 +123,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (authenticatedAccountUid == accountUid) return
         authenticatedAccountUid = accountUid
         accountSessionGeneration++
+        functionalTestGeneration++
+        functionalTestJob?.cancel()
+        functionalTestJob = null
+        _functionalTestState.value = FunctionalTestState()
         // A connection started under another Firebase account must never
         // complete after the garage and session ownership have changed.
         connectionAttemptGeneration++
@@ -400,6 +405,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         activeBusyOperations = (activeBusyOperations - 1).coerceAtLeast(0)
         _isBusy.value = activeBusyOperations > 0
     }
+
+    private val _functionalTestState = MutableStateFlow(FunctionalTestState())
+    val functionalTestState: StateFlow<FunctionalTestState> = _functionalTestState.asStateFlow()
+    private var functionalTestJob: Job? = null
+    private var functionalTestGeneration: Long = 0L
 
     private val _modules = MutableStateFlow<List<EcuModule>>(emptyList())
     val modules: StateFlow<List<EcuModule>> = _modules.asStateFlow()
@@ -3170,6 +3180,204 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Executes a complete, standards-based read-only OBD-II scan on the connected Camaro. */
+
+    /**
+     * Owner-only read-only hardware verification.
+     * A valid Firebase ID token with a backend-issued custom claim is required
+     * for EACH run. UI visibility alone is never treated as authorization.
+     */
+    private suspend fun confirmFunctionalTestOwner(expectedUid: String): Boolean =
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            val user = FirebaseAuth.getInstance().currentUser
+            if (user == null || user.uid != expectedUid) {
+                continuation.resume(false)
+                return@suspendCancellableCoroutine
+            }
+            user.getIdToken(true).addOnCompleteListener { task ->
+                if (continuation.isActive) {
+                    continuation.resume(
+                        task.isSuccessful &&
+                            FirebaseAuth.getInstance().currentUser?.uid == expectedUid &&
+                            com.camarodiag.gen5.auth.OwnerFunctionalTestPolicy.isAllowed(
+                                user.providerData.map { it.providerId },
+                                task.result?.claims.orEmpty()
+                            )
+                    )
+                }
+            }
+        }
+
+    fun runFunctionalTests() {
+        if (functionalTestJob?.isActive == true) return
+        val accountUid = authenticatedAccountUid ?: return
+        val sessionGeneration = accountSessionGeneration
+        val execution = ++functionalTestGeneration
+        functionalTestJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(accountUid)) {
+                if (execution == functionalTestGeneration) {
+                    _functionalTestState.value = FunctionalTestState(
+                        error = localizedContext.getString(R.string.functional_tests_denied)
+                    )
+                }
+                return@launch
+            }
+            if (!isCurrentAccountGeneration(sessionGeneration) || execution != functionalTestGeneration) {
+                return@launch
+            }
+            val connected = !obdManager.isDemoMode && !obdManager.isSimulationActive &&
+                (obdManager.isObdCommandChannelAvailable || obdManager.isJ2534BridgeConnected())
+            val transport = obdManager.currentTransportKind
+            val topology = _modules.value.ifEmpty {
+                CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
+            }
+            _functionalTestState.value = FunctionalTestState(
+                running = true, startedAtMillis = System.currentTimeMillis(),
+                checks = FunctionalTestPlanner.initial(topology, transport, connected)
+            )
+            fun current(): Boolean = execution == functionalTestGeneration &&
+                isCurrentAccountGeneration(sessionGeneration)
+            fun mark(
+                key: String, outcome: FunctionalTestOutcome,
+                english: String, french: String
+            ) {
+                if (current()) {
+                    _functionalTestState.value = _functionalTestState.value.copy(
+                        checks = FunctionalTestPlanner.updated(
+                            _functionalTestState.value.checks, key, outcome, english, french
+                        )
+                    )
+                }
+            }
+            suspend fun checkRead(
+                key: String, read: suspend () -> Pair<String, String>
+            ) {
+                if (!current()) throw CancellationException("Account or run changed")
+                try {
+                    val (english, french) = read()
+                    if (!current()) throw CancellationException("Account or run changed")
+                    mark(key, FunctionalTestOutcome.PASSED, english, french)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    mark(
+                        key, FunctionalTestOutcome.FAILED,
+                        "Physical read failed (" + failure.javaClass.simpleName + ").",
+                        "Lecture physique échouée (" + failure.javaClass.simpleName + ")."
+                    )
+                }
+            }
+            try {
+                if (!connected) {
+                    if (current()) _functionalTestState.value = _functionalTestState.value.copy(
+                        error = localizedContext.getString(R.string.functional_tests_not_connected)
+                    )
+                } else if (obdManager.isObdCommandChannelAvailable) {
+                    checkRead("service:vin") {
+                        val vin = obdManager.withObdCommandSession { it.readVin() }
+                            ?.trim()?.uppercase(java.util.Locale.ROOT)
+                            ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                            ?: error("VIN missing from physical response")
+                        val chosen = _vehicle.value.vin.trim().uppercase(java.util.Locale.ROOT)
+                        require(chosen.isEmpty() || chosen == vin) {
+                            "VIN mismatch"
+                        }
+                        "Vehicle VIN read and checked against selected profile." to
+                            "VIN physique lu et comparé au véhicule sélectionné."
+                    }
+                    checkRead("service:pids") {
+                        val pids = obdManager.withObdCommandSession { it.discoverSupportedPids() }
+                        require(pids.isNotEmpty()) { "No supported PID response" }
+                        ("ECU responded with " + pids.size + " supported PIDs.") to
+                            ("Réponse OBD physique : " + pids.size + " PID pris en charge.")
+                    }
+                    checkRead("service:dtcs") {
+                        val (confirmed, pending, permanent) =
+                            obdManager.withObdCommandSession { it.readDtcs() }
+                        val count = confirmed.size + pending.size + permanent.size
+                        ("Read-only DTC request completed: " + count + " codes.") to
+                            ("Lecture DTC terminée sans effacement : " + count + " défauts.")
+                    }
+                    checkRead("service:readiness") {
+                        val response = obdManager.withObdCommandSession { it.readReadiness() }
+                        require(!response.isNullOrBlank()) { "Readiness response missing" }
+                        "Physical emissions readiness response received." to
+                            "Réponse physique des moniteurs antipollution reçue."
+                    }
+                    // Functional 7DF/Mode 09 responses cannot prove which individual
+                    // GM controller answered. Keep all per-ECU rows NOT TESTED until
+                    // VIN-specific physical addresses have been independently verified.
+                } else if (obdManager.isJ2534BridgeConnected()) {
+                    checkRead("service:vin") {
+                        val identity = obdManager.readCalibrationIdentification()
+                        val vin = identity.vin?.trim()?.uppercase(java.util.Locale.ROOT)
+                            ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                            ?: error("J2534 ECU VIN missing")
+                        val chosen = _vehicle.value.vin.trim().uppercase(java.util.Locale.ROOT)
+                        require(chosen.isEmpty() || chosen == vin) { "VIN mismatch" }
+                        "ECU VIN received over the selected physical J2534 UDS profile." to
+                            "VIN reçu via le profil UDS J2534 physique sélectionné."
+                    }
+                    // J2534 does not expose an SAE J1979/ELM channel. Do not
+                    // claim PID, DTC or readiness coverage it has not performed.
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                if (current()) _functionalTestState.value = _functionalTestState.value.copy(
+                    running = false, finishedAtMillis = System.currentTimeMillis()
+                )
+            }
+        }
+    }
+
+    fun cancelFunctionalTests() {
+        functionalTestGeneration++
+        functionalTestJob?.cancel()
+        functionalTestJob = null
+        if (_functionalTestState.value.running) {
+            _functionalTestState.value = _functionalTestState.value.copy(
+                running = false,
+                finishedAtMillis = System.currentTimeMillis(),
+                error = localizedContext.getString(R.string.functional_tests_cancelled)
+            )
+        }
+    }
+
+    fun exportFunctionalTests(destinationUri: Uri) {
+        val accountUid = authenticatedAccountUid ?: return
+        val sessionGeneration = accountSessionGeneration
+        viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(accountUid) ||
+                !isCurrentAccountGeneration(sessionGeneration)) return@launch
+            val snapshot = _functionalTestState.value
+            if (snapshot.running || snapshot.finishedAtMillis == null) return@launch
+            val json = JSONObject()
+                .put("schema", "camarodiag-functional-test-v1")
+                .put("startedAtMillis", snapshot.startedAtMillis)
+                .put("finishedAtMillis", snapshot.finishedAtMillis)
+                .put("vin", _vehicle.value.vin)
+                .put("adapter", _adapter.value.deviceName)
+                .put("transport", obdManager.currentTransportKind)
+                .put("warning", "NOT_TESTED is not a PASS. No write or actuation was tested.")
+            val checks = JSONArray()
+            snapshot.checks.forEach { check ->
+                checks.put(
+                    JSONObject()
+                        .put("key", check.key)
+                        .put("group", check.group)
+                        .put("outcome", check.outcome.name)
+                        .put("label", check.labelEn)
+                        .put("detail", check.detailEn)
+                )
+            }
+            json.put("checks", checks)
+            withContext(Dispatchers.IO) {
+                getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
+                    ?.use { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
+            }
+        }
+    }
+
     fun runFullObdScan() {
         val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
