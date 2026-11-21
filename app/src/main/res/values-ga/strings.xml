@@ -426,4 +426,34 @@
     <string name="debug_builds_created">Cruthaithe</string>
     <string name="debug_builds_expires">In éag</string>
     <string name="debug_builds_no_browser">Níl brabhsálaí ar fáil chun an íoslódáil a oscailt.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Teanga roghnaithe: %1$s</string>
+    <string name="settings_adapter_not_connected">Níl cuibheoir ceangailte</string>
+    <string name="settings_last_connection">Próifíl cheangail dheireanach</string>
+    <string name="settings_no_last_connection">Níl aon phróifíl cheangail sábháilte fós.</string>
+    <string name="saved_vehicle_profiles_title">Próifílí feithicle sábháilte</string>
+    <string name="saved_vehicle_name_label">Ainm na próifíle</string>
+    <string name="saved_vehicle_name_placeholder">m.sh. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Sábháil an fheithicil reatha</string>
+    <string name="saved_vehicle_empty">Níl aon phróifíl feithicle sábháilte fós.</string>
+    <string name="saved_vehicle_delete">Scrios</string>
+    <string name="saved_vehicle_requires_review">Cruthaíodh an phróifíl ó VIN an ECU. Seiceáil samhailbhliain, inneall agus giarbhosca roimh dhiagnóisiú.</string>
+    <string name="saved_vehicle_ecu_default_name">Feithicil ón ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Cuir isteach ainm próifíle.</string>
+    <string name="msg_vehicle_profile_saved">Sábháladh próifíl na feithicle.</string>
+    <string name="msg_vehicle_profile_review_required">Cruthaíodh próifíl ó VIN an ECU. Seiceáil an bhliain, an t-inneall agus an giarbhosca roimh dhiagnóisiú.</string>
+    <string name="msg_vehicle_profile_loaded">Próifíl feithicle luchtaithe: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">Níor thug an ECU VIN bailí 17 gcarachtar ar ais. Níor cruthaíodh próifíl.</string>
+    <string name="cal_vin_matches_profile">Meaitseálann VIN an ECU próifíl roghnaithe na feithicle.</string>
+    <string name="cal_vin_mismatch_detected">VIN NEAMHRÉIREACH — próifíl: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Níl VIN bailí sa phróifíl feithicle roghnaithe.</string>
+    <string name="cal_vin_mismatch_title">Braitheadh neamhréir VIN</string>
+    <string name="cal_vin_mismatch_confirmation">Is é %1$s VIN na próifíle roghnaithe, ach thug an ECU %2$s ar ais. D’fhéadfadh gur feithiclí éagsúla iad. Cruthaigh próifíl ar leith chun an fheithicil roghnaithe a choinneáil, nó sioncronaigh tar éis an fheithicil fhisiciúil a fhíorú amháin.</string>
+    <string name="cal_vin_create_vehicle">Cruthaigh próifíl feithicle</string>
+    <string name="cal_vin_sync_existing">Sioncronaigh VIN na próifíle roghnaithe</string>
+    <string name="cal_vin_sync_warning_title">Deimhnigh athsholáthar VIN?</string>
+    <string name="cal_vin_sync_warning_message">Cuirfear VIN an ECU (%2$s) in ionad an VIN atá stóráilte sa phróifíl roghnaithe (%1$s). Ní athrófar an bhliain, an t-inneall, an giarbhosca ná an margadh. Ná déan é seo ach amháin tar éis a dheimhniú gurb í an fheithicil cheangailte an fheithicil cheart.</string>
+    <string name="cal_vin_sync_confirm">Athsholáthair VIN</string>
+    <string name="vin_photo_capture">Glac grianghraf den VIN</string>
 </resources>
