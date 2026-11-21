@@ -591,4 +591,10 @@
     <string name="dtc_gm_monitor_failure">Felräknare / valideringsfrekvens: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL-klassificering: %1$s</string>
     <string name="dtc_gm_monitor_source">Källa: GM %1$s, sida %2$d</string>
+    <string name="module_bus_hscan">HS-CAN (500 kbit/s)</string>
+    <string name="module_bus_swcan">SW-CAN GMLAN (33,3 kbit/s)</string>
+    <string name="module_bus_unknown">Buss som ska identifieras</string>
+    <string name="units_metric_details">Metriska enheter (km, °C, kPa)</string>
+    <string name="units_imperial_details">Brittiska enheter (mi, °F, psi)</string>
+    <string name="cal_tcp_port">TCP-port</string>
 </resources>
