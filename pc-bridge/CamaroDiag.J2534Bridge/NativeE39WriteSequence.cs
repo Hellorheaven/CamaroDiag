@@ -35,13 +35,16 @@ internal static class NativeE39WriteSequence
     internal interface IKernelLink
     {
         Task<byte[]> ExchangeAsync(byte[] request, CancellationToken cancellationToken);
+        Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken cancellationToken);
     }
 
     internal sealed record Options(
         int MaximumWriteBytes,
         int ProgramUnitBytes,
         bool BenchProtocolValidated,
-        bool RecoveryProcedureTested);
+        bool RecoveryProcedureTested,
+        uint MinimumSupplyMillivolts,
+        uint MaximumSupplyMillivolts);
 
     internal sealed record Result(int SectorsWritten, int BytesWritten);
 
@@ -81,6 +84,11 @@ internal static class NativeE39WriteSequence
             !options.BenchProtocolValidated || !options.RecoveryProcedureTested)
             throw new UnauthorizedAccessException(
                 "E39 write cannot run without a verified exact-firmware map, bench protocol and tested recovery.");
+        // Limits must come from the exact qualified ECU / bench profile,
+        // not assumptions or an arbitrary user-configured default.
+        if (options.MinimumSupplyMillivolts == 0 ||
+            options.MaximumSupplyMillivolts <= options.MinimumSupplyMillivolts)
+            throw new ArgumentException("No qualified ECU supply-voltage window.");
         if (plan.Sectors.Count == 0)
             throw new InvalidOperationException("No changed ECU sectors.");
         // Precalculate all outgoing packets before ANY ECU traffic.
@@ -117,6 +125,8 @@ internal static class NativeE39WriteSequence
                     new(Phase.Prepared, item.Sector.Address, item.Sector.OriginalSha256),
                     cancellationToken);
 
+            await RequireSupplyAsync();
+
             // COMPLETE preflight of the transaction, across ALL sectors,
             // must succeed before the very first erase command.
             foreach (var item in sectors)
@@ -152,11 +162,14 @@ internal static class NativeE39WriteSequence
                 cancellationToken.ThrowIfCancellationRequested();
                 var s = item.Sector;
                 currentSector = s;
+                await RequireSupplyAsync();
                 // No network, retransmission or automatic recovery here: the
                 // caller's journal must persist the decision before erase.
                 await journal.AppendAsync(
                     new(Phase.EraseStarted, s.Address, s.OriginalSha256),
                     cancellationToken);
+                // Recheck after durable journal I/O as it can take time.
+                await RequireSupplyAsync();
                 destructiveStarted = true;
                 NativeE39FlashCommands.RequireEraseSuccess(
                     await link.ExchangeAsync(
@@ -171,10 +184,12 @@ internal static class NativeE39WriteSequence
                 foreach (var frame in item.Write)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    await RequireSupplyAsync();
                     NativeE39FlashCommands.RequireWriteSuccess(
                         await link.ExchangeAsync(frame, cancellationToken));
                 }
 
+                await RequireSupplyAsync();
                 var verify = NativeE39FlashCommands.BuildFlashCrcQuery(
                     s.Address, (uint)s.Length);
                 var actual = NativeE39FlashCommands.ParseFlashCrcReply(
@@ -216,6 +231,17 @@ internal static class NativeE39WriteSequence
                 }
             }
             throw;
+        }
+
+        async Task RequireSupplyAsync()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var millivolts = await link.ReadSupplyMillivoltsAsync(cancellationToken);
+            if (!millivolts.HasValue ||
+                millivolts.Value < options.MinimumSupplyMillivolts ||
+                millivolts.Value > options.MaximumSupplyMillivolts)
+                throw new IOException(
+                    "ECU supply voltage is unavailable or outside the qualified programming window.");
         }
     }
 }

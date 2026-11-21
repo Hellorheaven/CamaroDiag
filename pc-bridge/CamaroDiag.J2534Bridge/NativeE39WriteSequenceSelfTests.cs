@@ -23,6 +23,17 @@ internal static class NativeE39WriteSequenceSelfTests
         internal bool UnexpectedFailureAfterErase;
         internal bool CorruptVerify;
         internal int Erases;
+        internal uint? SupplyMillivolts = 13500;
+        internal bool LoseSupplyAfterErase;
+        internal int VoltageReads;
+
+        public Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            VoltageReads++;
+            return Task.FromResult(LoseSupplyAfterErase && Erases > 0
+                ? (uint?)null : SupplyMillivolts);
+        }
         private bool wroteAnything;
         internal TestEcu(byte[] initial) => Memory = initial.ToArray();
 
@@ -91,7 +102,7 @@ internal static class NativeE39WriteSequenceSelfTests
         var layout = new NativeEcuSectorPlanner.Layout(
             0x20000, 32, 16, 2, [], true);
         var plan = NativeEcuSectorPlanner.Preview(layout, origin, updated);
-        var opts = new NativeE39WriteSequence.Options(8, 2, true, true);
+        var opts = new NativeE39WriteSequence.Options(8, 2, true, true, 12000, 15000);
         var ecu = new TestEcu(origin);
         var journal = new TestJournal();
         var result = NativeE39WriteSequence.RunBenchSequenceAsync(
@@ -124,6 +135,27 @@ internal static class NativeE39WriteSequenceSelfTests
                 plan, opts with { RecoveryProcedureTested = false }, CancellationToken.None)
                 .GetAwaiter().GetResult());
         Assert(noTraffic.Requests.Count == 0, "No recovery proof means no ECU I/O");
+
+        Assert(ecu.VoltageReads >= 7,
+            "Supply voltage checked before and during destructive operations");
+        foreach (uint? voltage in new uint?[] { null, 11000, 16000 })
+        {
+            var unsafeSupply = new TestEcu(origin) { SupplyMillivolts = voltage };
+            Expect<IOException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(unsafeSupply, new TestJournal(),
+                    plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+            Assert(unsafeSupply.Requests.Count == 0,
+                "Unavailable or out-of-window voltage blocks all ECU requests");
+        }
+        var lostSupply = new TestEcu(origin) { LoseSupplyAfterErase = true };
+        var lostSupplyJournal = new TestJournal();
+        Expect<IOException>(() =>
+            NativeE39WriteSequence.RunBenchSequenceAsync(lostSupply, lostSupplyJournal,
+                plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(lostSupply.Erases == 1 &&
+               lostSupplyJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
+               !lostSupply.Requests.Any(x => x[0] == 0x36 && x[1] == 0),
+            "Voltage loss after erase prevents programming and requires recovery");
 
         var wrongBaseline = origin.ToArray();
         wrongBaseline[1] ^= 0x05;
