@@ -582,4 +582,10 @@
     <string name="msg_cal_definitions_import_failed">Uvoz definicij tabel ni uspel.</string>
     <string name="msg_cal_map_read_failed">Branje izbrane tabele ni uspelo.</string>
     <string name="msg_cal_table_edit_failed">Urejanje kalibracijske tabele ni uspelo.</string>
+    <string name="cal_expert_image_selected">Uvožena datoteka: %1$s</string>
+    <string name="cal_expert_patch_address">Začetni naslov pomnilniškega območja (šestnajstiško)</string>
+    <string name="cal_expert_patch_erase_bytes">Velikost sektorja za brisanje (bajti)</string>
+    <string name="cal_expert_patch_program_bytes">Velikost programske enote za zapis (bajti)</string>
+    <string name="cal_expert_patch_preview_button">Predogled sektorjev, na katere vpliva spremenjena datoteka BIN</string>
+    <string name="cal_expert_patch_summary">Spremenjeni bajti: %1$d. Prizadeti sektorji za brisanje: %2$d. Pomnilniška mapa strojne opreme ni preverjena. Zapis ni bil izveden.</string>
 </resources>
