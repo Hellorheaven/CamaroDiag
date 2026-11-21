@@ -9,6 +9,16 @@
     <string name="tab_live">Live</string>
     <string name="tab_dtcs">DTCs</string>
     <string name="tab_more">More</string>
+    <string name="tab_functional_tests">Functional tests</string>
+    <string name="functional_tests_title">Functional tests — ECUs and OBD</string>
+    <string name="functional_tests_readonly">Run all available read-only checks on the currently connected physical adapter. Other connectors and unverified ECUs are listed as NOT TESTED. No erase, actuation or flashing.</string>
+    <string name="functional_tests_run">Run all</string>
+    <string name="functional_tests_stop">Stop</string>
+    <string name="functional_tests_export">Export JSON</string>
+    <string name="functional_tests_summary">%1$d passed · %2$d failed · %3$d not tested</string>
+    <string name="functional_tests_passed">PASSED (physical evidence)</string>
+    <string name="functional_tests_failed">FAILED</string>
+    <string name="functional_tests_skipped">NOT TESTED</string>
     <string name="tab_modules">Modules</string>
     <string name="tab_mileage">Mileage</string>
     <string name="tab_calibration">ECU / Maps</string>
