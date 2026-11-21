@@ -54,6 +54,12 @@ class BluetoothObdManager(context: Context) {
     val currentTransportKind: String
         get() = activeTransport
 
+    /** Actual read-only UDS availability for the currently connected STN hardware. */
+    val isStnUdsReadAvailable: Boolean
+        get() = StnUdsSessionAdmission.allowsRead(
+            activeAdapterCapabilities, isObdCommandChannelAvailable
+        )
+
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
     var isDemoMode: Boolean = true
