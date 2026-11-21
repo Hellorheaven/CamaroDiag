@@ -858,4 +858,17 @@
     <string name="cal_archive_verified">두 번 읽은 결과가 일치하며 보관된 범위의 SHA-256 해시도 유효합니다.</string>
     <string name="cal_archive_partial">백업에는 요청한 메모리의 일부만 포함되어 있습니다.</string>
     <string name="cal_archive_failed">ZIP을 검증할 수 없습니다. 압축 해제 후 크기 제한은 32 MiB입니다.</string>
+    <string name="tab_functional_tests">기능 테스트</string>
+    <string name="functional_tests_title">기능 테스트 — ECU 및 OBD</string>
+    <string name="functional_tests_readonly">연결된 실제 어댑터에서 가능한 읽기 전용 검사를 실행합니다. 다른 연결 방식과 확인되지 않은 ECU는 미검사로 표시합니다. 삭제나 플래싱은 수행하지 않습니다.</string>
+    <string name="functional_tests_run">전체 실행</string>
+    <string name="functional_tests_stop">중지</string>
+    <string name="functional_tests_export">JSON 내보내기</string>
+    <string name="functional_tests_summary">성공 %1$d건 · 실패 %2$d건 · 미검사 %3$d건</string>
+    <string name="functional_tests_passed">성공(실제 장비 확인)</string>
+    <string name="functional_tests_failed">실패</string>
+    <string name="functional_tests_skipped">미검사</string>
+    <string name="functional_tests_denied">접근 거부: 승인된 Google 계정으로 로그인하세요.</string>
+    <string name="functional_tests_not_connected">실제 OBD 어댑터가 연결되지 않아 나머지 검사를 실행하지 않았습니다.</string>
+    <string name="functional_tests_cancelled">테스트를 취소했습니다.</string>
 </resources>
