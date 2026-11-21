@@ -180,7 +180,7 @@ size_t cd_kernel_process(cd_kernel *k, const uint8_t *req, size_t n,
         out[2] = 'C'; out[3] = 'D'; out[4] = '3'; out[5] = '9';
         out[6] = CD_KERNEL_ABI_MAJOR; out[7] = CD_KERNEL_ABI_MINOR;
         out[8] = CD_MPC5566_BLOCK_COUNT;
-        out[9] = (uint8_t)(k->flash->recovery_required || k->remaining != 0);
+        out[9] = (uint8_t)(k->remaining != 0 || !read_status(k));
         return 10;
     }
     if (k->flash->recovery_required) return negative(out, cap, sid, NRC_CONDITIONS);

@@ -46,6 +46,15 @@ int main(void)
     assert(process(&kernel, handshake, sizeof(handshake), out) == 10);
     assert(!memcmp(out, (uint8_t[]){0x7D, 0, 'C', 'D', '3', '9', 1, 0, 28, 0}, 10));
 
+    /* The host must not mistake an unhealthy flash controller for a fresh kernel. */
+    m.regs[CD_MCR / 4] |= CD_MCR_EER;
+    assert(process(&kernel, handshake, sizeof(handshake), out) == 10 && out[9] == 1);
+    m.regs[CD_MCR / 4] &= ~CD_MCR_EER;
+    m.regs[CD_MCR / 4] &= ~CD_MCR_PEG;
+    assert(process(&kernel, handshake, sizeof(handshake), out) == 10 && out[9] == 1);
+    m.regs[CD_MCR / 4] |= CD_MCR_PEG;
+    assert(process(&kernel, handshake, sizeof(handshake), out) == 10 && out[9] == 0);
+    assert(m.pulses == 0);
     size_t n = build_write(0x44, 0x20000, 8, 0x55);
     assert(process(&kernel, req, n, out) == 1 && out[0] == 0x76);
     assert(m.word_writes == 0 && m.pulses == 0);
