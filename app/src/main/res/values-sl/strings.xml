@@ -490,4 +490,6 @@
     <string name="mileage_source_generic">Vir %1$s</string>
     <string name="mileage_details_unavailable">Tehnične podrobnosti tega vira niso na voljo.</string>
     <string name="mileage_caveat_unavailable">Za ta vir ni dodatnih lokaliziranih informacij.</string>
+    <string name="obd_physical_can_scope">Fizično odzivno vozlišče CAN: 0x%1$s. Pregled zajema samo izbrano enoto OBD, ne funkcionalnega pregleda vseh modulov. Ukazi za programiranje GM ali aktuatorje niso bili poslani.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Omogočite brisanje emisijskih DTC v mostu Windows, ponovno se povežite, ustavite motor in potrdite ponastavitev. Podatki pripravljenosti emisijskih sistemov bodo ponastavljeni; trajne kode se ne izbrišejo.</string>
 </resources>
