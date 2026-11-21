@@ -1,0 +1,17 @@
+name: Native ECU kernel tests
+on:
+  pull_request:
+    paths:
+      - 'ecu-native/**'
+      - '.github/workflows/native-ecu-kernel.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-flash-host-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test native C components and cross-compile PowerPC objects
+        run: bash ecu-native/mpc5566/verify.sh
