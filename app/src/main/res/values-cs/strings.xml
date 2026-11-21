@@ -740,4 +740,6 @@
     <string name="units_metric_details">Metrické (km, °C, kPa)</string>
     <string name="units_imperial_details">Imperiální (mi, °F, psi)</string>
     <string name="cal_tcp_port">Port TCP</string>
+    <string name="msg_refresh_adapters_failed">Seznam adaptérů se nepodařilo obnovit.</string>
+    <string name="msg_usb_identifier_unavailable">Identifikátor zařízení USB není dostupný</string>
 </resources>
