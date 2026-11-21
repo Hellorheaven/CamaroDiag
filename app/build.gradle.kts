@@ -112,15 +112,8 @@ android {
         disable += setOf("MissingTranslation", "ExtraTranslation")
     }
 
-    packaging {
-        jniLibs {
-            // These third-party binaries are distributed without strippable debug symbols.
-            keepDebugSymbols += setOf(
-                "**/libandroidx.graphics.path.so",
-                "**/libmlkit_google_ocr_pipeline.so"
-            )
-        }
-    }
+    // Allow Android Gradle Plugin to strip native debug symbols when supported.
+    // Libraries that cannot be stripped are packaged unchanged.
 
     buildFeatures {
         compose = true
