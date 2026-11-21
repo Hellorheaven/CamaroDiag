@@ -13,6 +13,7 @@ import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
+import com.camarodiag.gen5.auth.LicenseLevel
 import com.camarodiag.gen5.auth.AccountStorageKeys
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
@@ -91,6 +92,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsPreferences = application.getSharedPreferences("camarodiag_settings", Context.MODE_PRIVATE)
     private val obdManager = BluetoothObdManager(application)
     private var authenticatedAccountUid: String? = FirebaseAuth.getInstance().currentUser?.uid
+    @Volatile private var currentLicenseLevel: LicenseLevel = LicenseLevel.FREE
+
+    /**
+     * Only CamaroAuthGate supplies this tier, from a signed Firebase token
+     * and, for paying customers, a freshly fetched SERVER Firestore document.
+     * Device-side checks are defense in depth; the backend enforces billing.
+     */
+    fun setLicenseLevel(level: LicenseLevel, accountUid: String?) {
+        if (accountUid != authenticatedAccountUid) {
+            currentLicenseLevel = LicenseLevel.FREE
+            return
+        }
+        currentLicenseLevel = level
+        if (level == LicenseLevel.FREE) {
+            if (_liveRecordingState.value.isRecording) stopLiveRecording()
+            discardCanMonitor()
+            detachCanRequest()
+        }
+    }
+
+    private fun hasPremiumLicense(): Boolean =
+        authenticatedAccountUid != null &&
+            currentLicenseLevel != LicenseLevel.FREE &&
+            FirebaseAuth.getInstance().currentUser?.uid == authenticatedAccountUid
+
+    private fun requirePremiumLicense(): Boolean {
+        if (hasPremiumLicense()) return true
+        _connectionMessage.value =
+            "Licence requise : activez une licence sur le compte connecté."
+        return false
+    }
+
     private var accountSessionGeneration: Long = 0L
     private fun isCurrentAccountGeneration(started: Long): Boolean =
         started == accountSessionGeneration && authenticatedAccountUid != null
@@ -122,6 +155,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onAccountSessionChanged(accountUid: String?) {
         if (authenticatedAccountUid == accountUid) return
         authenticatedAccountUid = accountUid
+        currentLicenseLevel = LicenseLevel.FREE
         accountSessionGeneration++
         functionalTestGeneration++
         functionalTestJob?.cancel()
@@ -910,6 +944,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Reads and decodes one read-only Camaro signal from the imported OBDb signalset. */
     fun readObdbSignal(signalId: String, protocolNumberText: String) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isObdbSignalReading = true,
@@ -993,6 +1028,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         responseCanIdHex: String,
         protocolNumberText: String
     ) {
+        if (!requirePremiumLicense()) return
         val attempt = ++connectionAttemptGeneration
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
@@ -1118,6 +1154,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * must independently authorize the target VIN, channel and address map.
      */
     fun captureJ2534Memory(destinationUri: Uri, request: J2534LiveMemoryBackup.Request) {
+        if (!requirePremiumLicense()) return
         if (_calibrationWorkspace.value.isJ2534MemoryCapturing) return
         val accountGeneration = accountSessionGeneration
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -1180,6 +1217,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
     fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String, protocolNumberText: String) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
@@ -1246,6 +1284,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Reads UDS ReadDTCInformation (0x19/0x02) from the selected physical ECU. */
     fun readUdsDtcs(requestCanIdHex: String, responseCanIdHex: String, protocolNumberText: String) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
@@ -1332,6 +1371,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * backup and never grants any permission to write calibrations.
      */
     fun exportEcuIdentification(destinationUri: Uri) {
+        if (!requirePremiumLicense()) return
         val accountUid = authenticatedAccountUid ?: return
         val profile = _vehicle.value
         val observation = _calibrationWorkspace.value
@@ -1413,6 +1453,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun readCalibrationIdentification() {
+        if (!requirePremiumLicense()) return
         val startedGeneration = accountSessionGeneration
         val requestId = ++calibrationIdentityGeneration
         val startedConnection = connectionAttemptGeneration
@@ -1495,6 +1536,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Imports and analyzes a local Vector ASC or CSV CAN trace without connecting to a vehicle. */
     fun analyzeCanTrace(uri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isTraceAnalyzing = true,
@@ -1596,6 +1638,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
     fun startCanMonitor(durationMs: Long = Long.MAX_VALUE) {
+        if (!requirePremiumLicense()) return
         if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
             canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
         ) return
@@ -1812,6 +1855,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
     fun sendCanConsoleInput(input: String) {
+        if (!requirePremiumLicense()) return
         val frame = RawCanFrameParser.parse(input)
         if (frame == null) {
             sendSafeObdRequest(input)
@@ -2011,6 +2055,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Export the latest raw CAN capture without transforming adapter output. */
     fun exportCanCapture(destinationUri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val snapshot = _liveCanMonitorState.value
@@ -2169,6 +2214,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun verifyEcuBackup(uri: Uri) {
+        if (!requirePremiumLicense()) return
         if (_calibrationWorkspace.value.archiveVerification == ArchiveVerification.Reading) return
         val generation = accountSessionGeneration
         _calibrationWorkspace.update { it.copy(archiveVerification = ArchiveVerification.Reading) }
@@ -2193,6 +2239,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun importCalibrationFile(uri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val resolver = getApplication<Application>().contentResolver
@@ -2281,6 +2328,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Imports a second raw BIN image and compares it byte-for-byte with the loaded reference. */
     fun importComparisonCalibrationFile(uri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             var storedFile: File? = null
             try {
@@ -2378,6 +2426,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         eraseBlockBytes: Int,
         programBlockBytes: Int
     ) {
+        if (!requirePremiumLicense()) return
         val ownerGeneration = accountSessionGeneration
         viewModelScope.launch(Dispatchers.IO) {
             val snapshot = _calibrationWorkspace.value
@@ -2436,6 +2485,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun exportCalibrationDefinitionTemplate(destinationUri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch {
             try {
                 val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
@@ -2456,6 +2506,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Imports a semicolon-separated table-definition file supplied for the exact calibration image. */
     fun importCalibrationDefinitions(uri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val current = _calibrationWorkspace.value
@@ -2528,6 +2579,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectCalibrationMap(mapId: String) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             val current = _calibrationWorkspace.value
             try {
@@ -2557,6 +2609,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateCalibrationCell(row: Int, column: Int, value: String) {
+        if (!requirePremiumLicense()) return
         val current = _calibrationWorkspace.value
         if (row !in current.mapValues.indices || column !in current.mapValues[row].indices) return
         val updated = current.mapValues.mapIndexed { rowIndex, cells ->
@@ -2573,6 +2626,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Saves edited cells to a new local BIN image. No ECU programming command is sent. */
     fun applyCalibrationTableEdits() {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             var createdFile: File? = null
             try {
@@ -2679,6 +2733,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Exports the selected local calibration file through Android's Storage Access Framework. */
     fun exportCalibrationFile(destinationUri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val sourcePath = _calibrationWorkspace.value.activeFilePath
@@ -2905,6 +2960,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Records actual live OBD samples; demo values are deliberately excluded. */
     fun toggleLiveRecording() {
+        if (!requirePremiumLicense()) return
         if (_liveRecordingState.value.isRecording) {
             stopLiveRecording()
             return
@@ -2936,6 +2992,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun exportLiveRecording(destinationUri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch {
             try {
                 if (_liveRecordingState.value.isRecording) stopLiveRecording()
@@ -3103,6 +3160,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun runMileageAudit() {
+        if (!requirePremiumLicense()) return
         val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
             if (!isCurrentAccountGeneration(startedGeneration)) return@launch
@@ -3412,6 +3470,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun runFullObdScan() {
+        if (!requirePremiumLicense()) return
         val startedGeneration = accountSessionGeneration
         viewModelScope.launch {
             if (!isCurrentAccountGeneration(startedGeneration)) return@launch
