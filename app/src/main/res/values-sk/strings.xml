@@ -370,4 +370,7 @@
     <string name="about_checking">Kontroluje sa…</string>
     <string name="about_update_found">Je dostupná nová verzia.</string>
     <string name="about_version">Nainštalovaná verzia: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Spustite CamaroDiag.J2534Bridge.exe vo Windows. Zadajte IP počítača a úplný kód (token.odtlačok TLS) z konzoly. Použite dôveryhodnú lokálnu sieť.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ a overenie odtlačku certifikátu sú povinné. Staré tokeny bez odtlačku sa odmietajú. Port nikdy nevystavujte internetu.</string>
+    <string name="cal_pc_pairing_token">Kód TLS (token.odtlačok)</string>
 </resources>

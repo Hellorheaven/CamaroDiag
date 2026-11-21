@@ -370,4 +370,7 @@
     <string name="about_checking">Sprawdzanie…</string>
     <string name="about_update_found">Dostępna jest nowa wersja.</string>
     <string name="about_version">Zainstalowana wersja: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Uruchom CamaroDiag.J2534Bridge.exe na komputerze Windows. Wpisz adres IP komputera i pełny kod (token.odcisk TLS) z konsoli. Korzystaj z zaufanej sieci lokalnej.</string>
+    <string name="cal_j2534_security_notice">Wymagane są TLS 1.2+ i weryfikacja odcisku certyfikatu. Stare kody zawierające tylko token są odrzucane. Nie udostępniaj portu w internecie.</string>
+    <string name="cal_pc_pairing_token">Kod TLS (token.odcisk)</string>
 </resources>

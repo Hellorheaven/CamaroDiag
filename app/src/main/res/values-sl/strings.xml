@@ -370,4 +370,7 @@
     <string name="about_checking">Preverjanje…</string>
     <string name="about_update_found">Na voljo je nova različica.</string>
     <string name="about_version">Nameščena različica: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Zaženite CamaroDiag.J2534Bridge.exe v sistemu Windows. Vnesite IP računalnika in celotno kodo (žeton.odtis TLS) iz konzole. Uporabite zaupanja vredno lokalno omrežje.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ in preverjanje odtisa potrdila sta obvezna. Stari žetoni brez odtisa so zavrnjeni. Vrat nikoli ne izpostavite internetu.</string>
+    <string name="cal_pc_pairing_token">Koda TLS (žeton.odtis)</string>
 </resources>

@@ -367,4 +367,7 @@
     <string name="about_checking">Se verifică…</string>
     <string name="about_update_found">Este disponibilă o versiune nouă.</string>
     <string name="about_version">Versiune instalată: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Pornește CamaroDiag.J2534Bridge.exe pe Windows. Introdu IP-ul PC-ului și codul complet (token.amprentă TLS) afișat în consolă. Folosește o rețea locală de încredere.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ și verificarea amprentei certificatului sunt obligatorii. Tokenurile vechi fără amprentă sunt respinse. Nu expune portul pe internet.</string>
+    <string name="cal_pc_pairing_token">Cod TLS (token.amprentă)</string>
 </resources>

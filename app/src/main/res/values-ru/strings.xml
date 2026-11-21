@@ -139,10 +139,10 @@
     <string name="cal_can_profile">Профиль CAN: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
     <string name="cal_j2534_bridge_title">МОСТ J2534 ДЛЯ ПК • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">Запустите CamaroDiag.J2534Bridge.exe на ПК с Windows, затем введите его IP-адрес и токен, показанный в консоли. Оба устройства должны находиться в одной локальной сети.</string>
-    <string name="cal_j2534_security_notice">Безопасность: токен не шифруется TLS. Используйте доверенную частную сеть и никогда не открывайте этот порт в Интернет.</string>
+    <string name="cal_j2534_launch_instructions">Запустите CamaroDiag.J2534Bridge.exe на ПК с Windows. Введите IP компьютера и полный код (токен.отпечаток TLS) из консоли. Используйте доверенную локальную сеть.</string>
+    <string name="cal_j2534_security_notice">Требуются TLS 1.2+ и проверка отпечатка сертификата. Старые коды только с токеном отклоняются. Не открывайте порт в интернет.</string>
     <string name="cal_pc_ip_address">IP-адрес ПК</string>
-    <string name="cal_pc_pairing_token">Токен сопряжения ПК</string>
+    <string name="cal_pc_pairing_token">Код TLS (токен.отпечаток)</string>
     <string name="cal_connect_j2534">Подключить мост J2534</string>
     <string name="cal_disconnect_pc_bridge">Отключить мост ПК</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Мост: HS-CAN ISO15765 250/500 кбит/с и J2534-2 SW-ISO15765 при поддержке драйвером. CAN FD остается отключенным.</string>

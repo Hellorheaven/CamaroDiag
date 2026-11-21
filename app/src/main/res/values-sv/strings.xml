@@ -364,4 +364,7 @@
     <string name="about_checking">Söker…</string>
     <string name="about_update_found">En ny version finns tillgänglig.</string>
     <string name="about_version">Installerad version: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Starta CamaroDiag.J2534Bridge.exe på Windows-datorn. Ange datorns IP och hela koden (token.TLS-fingeravtryck) från konsolen. Använd ett betrott lokalt nätverk.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ och kontroll av certifikatets fingeravtryck krävs. Äldre koder med bara token avvisas. Exponera aldrig porten mot internet.</string>
+    <string name="cal_pc_pairing_token">TLS-kod (token.fingeravtryck)</string>
 </resources>

@@ -139,10 +139,10 @@
     <string name="cal_can_profile">CAN 配置：33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_uds_did">UDS DID（F190 = VIN）</string>
     <string name="cal_j2534_bridge_title">J2534 PC 桥接 • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">在 Windows 电脑上运行 CamaroDiag.J2534Bridge.exe，然后输入其 IP 地址以及控制台中显示的令牌。两台设备必须位于同一局域网。</string>
-    <string name="cal_j2534_security_notice">安全提示：令牌未经过 TLS 加密。请使用可信的专用网络，切勿将此端口暴露到互联网。</string>
+    <string name="cal_j2534_launch_instructions">在 Windows 电脑上启动 CamaroDiag.J2534Bridge.exe，输入电脑 IP 和控制台显示的完整配对码（令牌.TLS证书指纹）。仅在可信局域网内使用。</string>
+    <string name="cal_j2534_security_notice">必须使用 TLS 1.2 及以上版本并核验证书指纹。旧版仅令牌的配对码会被拒绝。切勿将桥接端口暴露到互联网。</string>
     <string name="cal_pc_ip_address">PC IP 地址</string>
-    <string name="cal_pc_pairing_token">PC 配对令牌</string>
+    <string name="cal_pc_pairing_token">TLS 配对码（令牌.指纹）</string>
     <string name="cal_connect_j2534">连接 J2534 桥接</string>
     <string name="cal_disconnect_pc_bridge">断开 PC 桥接</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">桥接支持：HS-CAN ISO15765 250/500 kbit/s；驱动支持时可使用 J2534-2 SW-ISO15765。CAN FD 仍保持禁用。</string>
