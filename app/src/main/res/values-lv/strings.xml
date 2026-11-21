@@ -498,4 +498,6 @@
     <string name="mileage_source_generic">Avots %1$s</string>
     <string name="mileage_details_unavailable">Šī avota tehniskā informācija nav pieejama.</string>
     <string name="mileage_caveat_unavailable">Šim avotam nav pieejama papildu lokalizēta informācija.</string>
+    <string name="obd_physical_can_scope">Fiziskais CAN atbildētājs: 0x%1$s. Skenēšana aptver tikai atlasīto OBD ECU, nevis visu moduļu funkcionālo skenēšanu. GM programmēšanas vai izpildmehānismu komandas netika sūtītas.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Iespējojiet emisiju DTC dzēšanu Windows tiltā, izveidojiet savienojumu no jauna, apturiet dzinēju un apstipriniet atiestatīšanu. Emisiju gatavības dati tiks atiestatīti; pastāvīgie kodi netiks dzēsti.</string>
 </resources>
