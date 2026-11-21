@@ -529,4 +529,23 @@
     <string name="adapter_vxdiag_profiles">Deklareeritud VXDIAG liideseprofiilid</string>
     <string name="adapter_vxdiag_profiles_hint">Profiilid eristavad riistvara ja ühenduse variante. Need ei tõenda Androidi draiveri ega sõidukiga suhtluse olemasolu.</string>
     <string name="adapter_simulation_profiles">Simuleeritud riistvaraprofiilid (pingikatse)</string>
+    <string name="modules_vehicle_title">Sõiduki juhtmoodulid</string>
+    <string name="module_accessible">Ligipääsetav</string>
+    <string name="module_requires_swcan">Nõuab SW-CAN-i (kontakt 1)</string>
+    <string name="module_blocked_adapter">Adapter blokeerib</string>
+    <string name="module_not_equipped">Pole paigaldatud</string>
+    <string name="module_discovery_required">Vajalik sõiduki moodulite tuvastamine</string>
+    <string name="live_engine_telemetry">Mootori reaalaja telemeetria</string>
+    <string name="live_resume">Jätka</string>
+    <string name="live_stop_recording">Lõpeta salvestamine</string>
+    <string name="live_record">Salvesta reaalaja andmed</string>
+    <string name="live_export_csv">Ekspordi CSV</string>
+    <string name="live_recording_notice">Logija salvestab kuvatud OBD väärtused (meetermõõdustik) koos ajatemplitega. See ei muuda ECU kalibreerimistabeleid.</string>
+    <string name="dtc_title">Diagnostilised veakoodid</string>
+    <string name="dtc_clear_warning">Režiimi 04 kustutamine eemaldab heitgaasidega seotud veakoodid ja lähtestab mõned valmisolekumonitorid. Salvesta aruanne enne jätkamist. Režiim 04 ei kustuta teiste sõidukimoodulite laiendatud DTC-sid.</string>
+    <string name="dtc_none_returned">Viimase skannimise käigus veakoode ei saadud.</string>
+    <string name="dtc_confirm_clear">Kinnita veakoodide kustutamine?</string>
+    <string name="dtc_clear_description">See saadab ECU-le OBD režiimi 04 käsu. Valmisolekuandmed võidakse lähtestada. See ei kõrvalda rikke põhjust.</string>
+    <string name="dtc_clear_action">Kustuta koodid</string>
+    <string name="common_save">Salvesta</string>
 </resources>
