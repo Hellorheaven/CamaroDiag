@@ -99,7 +99,7 @@ class StnUdsPayloadTransport(
     }
 
     private fun requireOk(response: String, operation: String) {
-        require(response.replace('\\r', '\\n').lines().any { it.trim().equals("OK", ignoreCase = true) }) {
+        require(response.replace('\r', '\n').lines().any { it.trim().equals("OK", ignoreCase = true) }) {
             "STN adapter failed to $operation: $response"
         }
     }
