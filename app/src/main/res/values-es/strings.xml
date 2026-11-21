@@ -875,4 +875,17 @@
     <string name="cal_archive_verified">Las dos lecturas coinciden y los hashes SHA-256 son válidos para los intervalos archivados.</string>
     <string name="cal_archive_partial">La copia solo contiene parte de la memoria solicitada.</string>
     <string name="cal_archive_failed">No se ha podido verificar el ZIP. El límite sin comprimir es de 32 MiB.</string>
+    <string name="tab_functional_tests">Pruebas funcionales</string>
+    <string name="functional_tests_title">Pruebas funcionales — centralitas y OBD</string>
+    <string name="functional_tests_readonly">Ejecuta las comprobaciones de solo lectura disponibles con el adaptador físico conectado. Los demás conectores y las centralitas sin verificar quedan SIN PROBAR. Sin borrado ni programación.</string>
+    <string name="functional_tests_run">Ejecutar todo</string>
+    <string name="functional_tests_stop">Detener</string>
+    <string name="functional_tests_export">Exportar JSON</string>
+    <string name="functional_tests_summary">%1$d correctas · %2$d fallidas · %3$d sin probar</string>
+    <string name="functional_tests_passed">CORRECTO (prueba física)</string>
+    <string name="functional_tests_failed">FALLO</string>
+    <string name="functional_tests_skipped">SIN PROBAR</string>
+    <string name="functional_tests_denied">Acceso denegado: inicia sesión con la cuenta de Google autorizada.</string>
+    <string name="functional_tests_not_connected">No hay adaptador OBD físico conectado. No se realizaron las demás pruebas.</string>
+    <string name="functional_tests_cancelled">Pruebas canceladas.</string>
 </resources>
