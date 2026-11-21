@@ -417,4 +417,13 @@
     <string name="flexfuel_preflight_recovery">Il-proċedura ta\' rkupru għadha ma ġietx ivverifikata</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: verifika qabel u wara l-ipprogrammar (qari biss)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Ma saritx il-verifika wara l-ipprogrammar. La l-ipprogrammar tal-ECU u lanqas it-test tal-vettura wara l-kitba ma ġew ivvalidati.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Niżżel l-aħħar fajls Debug tal-PR #70. Idħol f\'GitHub b\'kont awtorizzat. It-tniżżil huwa arkivji ZIP li jridu jiġu estratti.</string>
+    <string name="debug_builds_android_archive">Arkivju ZIP bl-APK Android Debug.</string>
+    <string name="debug_builds_windows_archive">Arkivju ZIP bl-installaturi Windows x64 u x86.</string>
+    <string name="debug_builds_caution">Il-fajls jiskadu wara 30 jum. Id-disponibbiltà ma tfissirx li l-bini rnexxa jew li saru testijiet fuq vettura. Il-firem tal-APK Debug jistgħu jkunu differenti minn dawk tal-verżjoni pubblika.</string>
+    <string name="debug_builds_created">Maħluq</string>
+    <string name="debug_builds_expires">Jiskadi</string>
+    <string name="debug_builds_no_browser">M\'hemmx browser biex tiftaħ it-tniżżil.</string>
 </resources>
