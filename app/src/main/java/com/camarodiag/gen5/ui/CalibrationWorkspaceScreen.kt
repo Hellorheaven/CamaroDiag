@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
@@ -61,6 +62,7 @@ import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
+import com.camarodiag.gen5.data.obd.EcuBackupCoverage
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
@@ -88,6 +90,8 @@ data class CalibrationWorkspaceState(
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
     val j2534BridgeMessage: String = "",
+    val isJ2534MemoryCapturing: Boolean = false,
+    val j2534MemoryCaptureMessage: String = "",
     val nativeSignals: List<CamaroSignalDefinition> = emptyList(),
     val nativeSignalMessage: String = "",
     val obdbSignals: List<ObdbCamaroSignal> = emptyList(),
@@ -207,6 +211,7 @@ fun CalibrationWorkspaceScreen(
     onReadUdsDtcs: (String, String, String) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
+    onCaptureJ2534Memory: (String, String, Int, EcuBackupCoverage.Region) -> Unit,
     onReadObdbSignal: (String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
@@ -229,6 +234,11 @@ fun CalibrationWorkspaceScreen(
     var j2534Host by remember { mutableStateOf("192.168.1.100") }
     var j2534Port by remember { mutableStateOf("35001") }
     var j2534Token by remember { mutableStateOf("") }
+    var memoryReadAddressHex by remember { mutableStateOf("") }
+    var memoryReadLengthText by remember { mutableStateOf("") }
+    var memoryReadSessionExtended by remember { mutableStateOf(false) }
+    var memoryReadRegion by remember { mutableStateOf(EcuBackupCoverage.Region.CALIBRATION) }
+    var memoryReadRegionMenuExpanded by remember { mutableStateOf(false) }
     var expertExpanded by remember { mutableStateOf(false) }
     var expertControllerFamily by remember { mutableStateOf("") }
     var expertChipMarking by remember { mutableStateOf("") }
@@ -621,6 +631,114 @@ fun CalibrationWorkspaceScreen(
                                 stringResource(R.string.cal_bridge_capabilities),
                                 color = TextMuted, fontSize = 10.sp
                             )
+                            HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                            Text(stringResource(R.string.cal_live_memory_title),
+                                color = CamaroAmber, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.cal_live_memory_notice),
+                                color = TextMuted, fontSize = 10.sp)
+                            OutlinedTextField(
+                                value = memoryReadAddressHex,
+                                onValueChange = {
+                                    memoryReadAddressHex = it.uppercase()
+                                        .filter { ch -> ch.isDigit() || ch in 'A'..'F' }.take(8)
+                                },
+                                label = { Text(stringResource(R.string.cal_expert_patch_address)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                            )
+                            OutlinedTextField(
+                                value = memoryReadLengthText,
+                                onValueChange = {
+                                    memoryReadLengthText = it.filter(Char::isDigit).take(7)
+                                },
+                                label = { Text(stringResource(R.string.cal_live_memory_length)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            Text(stringResource(R.string.cal_expert_region_title),
+                                color = TextPrimary, fontSize = 12.sp)
+                            Box {
+                                OutlinedButton(onClick = { memoryReadRegionMenuExpanded = true }) {
+                                    Text(when (memoryReadRegion) {
+                                        EcuBackupCoverage.Region.CALIBRATION ->
+                                            stringResource(R.string.cal_live_memory_region_calibration)
+                                        EcuBackupCoverage.Region.PROGRAM_FLASH ->
+                                            stringResource(R.string.cal_expert_region_pflash)
+                                        EcuBackupCoverage.Region.DATA_FLASH ->
+                                            stringResource(R.string.cal_expert_region_dflash)
+                                        EcuBackupCoverage.Region.EXTERNAL_EEPROM ->
+                                            stringResource(R.string.cal_expert_region_eeprom)
+                                        EcuBackupCoverage.Region.OTHER ->
+                                            stringResource(R.string.cal_expert_region_title)
+                                    })
+                                }
+                                DropdownMenu(
+                                    expanded = memoryReadRegionMenuExpanded,
+                                    onDismissRequest = { memoryReadRegionMenuExpanded = false }
+                                ) {
+                                    listOf(
+                                        EcuBackupCoverage.Region.CALIBRATION,
+                                        EcuBackupCoverage.Region.PROGRAM_FLASH,
+                                        EcuBackupCoverage.Region.DATA_FLASH,
+                                        EcuBackupCoverage.Region.EXTERNAL_EEPROM
+                                    ).forEach { region ->
+                                        DropdownMenuItem(
+                                            text = { Text(when (region) {
+                                                EcuBackupCoverage.Region.CALIBRATION ->
+                                                    stringResource(R.string.cal_live_memory_region_calibration)
+                                                EcuBackupCoverage.Region.PROGRAM_FLASH ->
+                                                    stringResource(R.string.cal_expert_region_pflash)
+                                                EcuBackupCoverage.Region.DATA_FLASH ->
+                                                    stringResource(R.string.cal_expert_region_dflash)
+                                                EcuBackupCoverage.Region.EXTERNAL_EEPROM ->
+                                                    stringResource(R.string.cal_expert_region_eeprom)
+                                                EcuBackupCoverage.Region.OTHER ->
+                                                    stringResource(R.string.cal_expert_region_title)
+                                            }) },
+                                            onClick = {
+                                                memoryReadRegion = region
+                                                memoryReadRegionMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = memoryReadSessionExtended,
+                                    onCheckedChange = { memoryReadSessionExtended = it }
+                                )
+                                Text(stringResource(R.string.cal_live_memory_extended),
+                                    color = TextPrimary, fontSize = 12.sp)
+                            }
+                            val memoryAddress = memoryReadAddressHex.toLongOrNull(16)
+                            val memoryBytes = memoryReadLengthText.toIntOrNull()
+                            OutlinedButton(
+                                onClick = {
+                                    onCaptureJ2534Memory(
+                                        memoryReadAddressHex, memoryReadLengthText,
+                                        if (memoryReadSessionExtended) 3 else 1,
+                                        memoryReadRegion
+                                    )
+                                },
+                                enabled = state.isJ2534BridgeConnected &&
+                                    !state.isJ2534MemoryCapturing &&
+                                    vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}")) &&
+                                    memoryAddress != null && memoryBytes != null &&
+                                    memoryBytes in 1..(4 * 1024 * 1024) &&
+                                    memoryAddress + memoryBytes <= 0x1_0000_0000L,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (state.isJ2534MemoryCapturing) CircularProgressIndicator()
+                                else Text(stringResource(R.string.cal_live_memory_save))
+                            }
+                            if (state.j2534MemoryCaptureMessage.isNotBlank()) {
+                                Text(state.j2534MemoryCaptureMessage,
+                                    color = if (state.isJ2534MemoryCapturing) CamaroAmber else TextPrimary,
+                                    fontSize = 11.sp)
+                            }
                         }
                     }
                     Button(
