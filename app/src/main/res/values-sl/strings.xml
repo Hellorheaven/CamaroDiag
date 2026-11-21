@@ -492,4 +492,21 @@
     <string name="mileage_caveat_unavailable">Za ta vir ni dodatnih lokaliziranih informacij.</string>
     <string name="obd_physical_can_scope">Fizično odzivno vozlišče CAN: 0x%1$s. Pregled zajema samo izbrano enoto OBD, ne funkcionalnega pregleda vseh modulov. Ukazi za programiranje GM ali aktuatorje niso bili poslani.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Omogočite brisanje emisijskih DTC v mostu Windows, ponovno se povežite, ustavite motor in potrdite ponastavitev. Podatki pripravljenosti emisijskih sistemov bodo ponastavljeni; trajne kode se ne izbrišejo.</string>
+    <string name="units_metric">SI / metrične</string>
+    <string name="units_imperial">Imperialne</string>
+    <string name="live_pause">Premor</string>
+    <string name="live_recording_status">Vzorci: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Tokokrog aktuatorja položaja sesalne odmične gredi (vrsta 1)</string>
+    <string name="dtc_desc_p0011">Prezgodnje krmiljenje sesalne odmične gredi (vrsta 1)</string>
+    <string name="dtc_desc_p0014">Prezgodnje krmiljenje izpušne odmične gredi (vrsta 1)</string>
+    <string name="dtc_desc_p0087">Prenizek tlak v razdelilniku ali sistemu goriva</string>
+    <string name="dtc_desc_p0089">Nepravilno delovanje regulatorja tlaka goriva</string>
+    <string name="dtc_desc_p0191">Območje ali delovanje tokokroga tipala tlaka razdelilnika goriva</string>
+    <string name="dtc_desc_p0299">Prenizek polnilni tlak turbopolnilnika ali kompresorja</string>
+    <string name="cal_engine_profile">Profil motorja: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Motorji v katalogu za leto %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Binarno branje: %2$s • Validirane tabele motorja: %3$s • Programiranje ECU: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • zahteva %2$s / odgovor %3$s • interval %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • število=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Samo profil strojne opreme; še vedno je potreben uradni Android SDK/API ali dokumentiran most.</string>
 </resources>
