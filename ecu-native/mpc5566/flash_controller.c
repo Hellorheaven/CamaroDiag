@@ -46,6 +46,17 @@ static bool write_word(cd_flash_controller *c, uint32_t address, uint32_t v)
     return true;
 }
 
+/* A read can itself raise EER or RWE. A matching word is insufficient if
+ * the physical controller reports an ECC/bus fault during that read. */
+static bool read_confirmed_word(cd_flash_controller *c, uint32_t address, uint32_t *v)
+{
+    uint32_t status;
+    return c->bus.read_word(c->bus.context, address, v) &&
+        read_reg(c, CD_MCR, &status) &&
+        (status & (ERROR_MASK | ACTIVE_MASK)) == 0 &&
+        (status & CD_MCR_GEOMETRY_MASK) == CD_MCR_MPC5566_GEOMETRY;
+}
+
 static bool change_mcr(cd_flash_controller *c, uint32_t set, uint32_t clear)
 {
     uint32_t value;
@@ -137,7 +148,7 @@ cd_flash_result cd_flash_erase(cd_flash_controller *c, uint32_t address, uint32_
     for (uint32_t offset = 0; offset < size; offset += 4u) {
         uint32_t actual;
         if (!c->bus.service(c->bus.context) ||
-            !c->bus.read_word(c->bus.context, address + offset, &actual) ||
+            !read_confirmed_word(c, address + offset, &actual) ||
             actual != UINT32_MAX) return fail_uncertain(c);
     }
     c->recovery_required = false;
@@ -164,7 +175,7 @@ cd_flash_result cd_flash_program(cd_flash_controller *c, uint32_t address,
     for (uint32_t offset = 0; offset < size; offset += 4u) {
         uint32_t actual;
         if (!c->bus.service(c->bus.context) ||
-            !c->bus.read_word(c->bus.context, address + offset, &actual))
+            !read_confirmed_word(c, address + offset, &actual))
             return CD_FLASH_IO_FAILURE;
         if (actual != UINT32_MAX) return CD_FLASH_NOT_ERASED;
     }
@@ -183,8 +194,8 @@ cd_flash_result cd_flash_program(cd_flash_controller *c, uint32_t address,
         cd_flash_result completed = finish_pulse(c, CD_MCR_PGM);
         if (completed != CD_FLASH_OK) return completed;
         c->recovery_required = true;
-        if (!c->bus.read_word(c->bus.context, address + offset, &actual_first) ||
-            !c->bus.read_word(c->bus.context, address + offset + 4u, &actual_second) ||
+        if (!read_confirmed_word(c, address + offset, &actual_first) ||
+            !read_confirmed_word(c, address + offset + 4u, &actual_second) ||
             actual_first != first || actual_second != second)
             return fail_uncertain(c);
         c->recovery_required = false;

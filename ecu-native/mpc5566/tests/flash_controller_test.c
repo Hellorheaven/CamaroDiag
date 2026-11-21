@@ -69,6 +69,12 @@ int main(void)
     m.erase_corruption = true;
     assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_RECOVERY_REQUIRED);
 
+    init_model(&m);
+    c = controller_for(&m);
+    m.ecc_after_pulse = true;
+    assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_RECOVERY_REQUIRED);
+    assert(m.words[0] == UINT32_MAX && (m.regs[0] & CD_MCR_EER));
+    assert(c.recovery_required); /* correct bytes alone cannot prove a valid erase */
     puts("PASS: MPC5566 register-level erase/program model");
     return 0;
 }

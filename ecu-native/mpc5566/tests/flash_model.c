@@ -65,6 +65,7 @@ static bool read_word(void *ctx, uint32_t address, uint32_t *out)
     if ((m->regs[0] & CD_MCR_EHV) || address < 0x20000 ||
         address >= 0x40000 || address % 4) return false;
     *out = m->words[(address - 0x20000) / 4];
+    if (m->ecc_after_pulse && m->pulses) m->regs[0] |= CD_MCR_EER;
     return true;
 }
 
