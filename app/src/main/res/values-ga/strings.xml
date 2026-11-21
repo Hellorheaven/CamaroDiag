@@ -614,4 +614,6 @@
     <string name="units_metric_details">Aonaid mhéadracha (km, °C, kPa)</string>
     <string name="units_imperial_details">Aonaid impiriúla (mi, °F, psi)</string>
     <string name="cal_tcp_port">Port TCP</string>
+    <string name="msg_refresh_adapters_failed">Níorbh fhéidir liosta na gcuibheoirí a athnuachan.</string>
+    <string name="msg_usb_identifier_unavailable">Níl aitheantóir an ghléis USB ar fáil</string>
 </resources>
