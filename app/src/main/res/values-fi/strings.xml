@@ -447,4 +447,26 @@
     <string name="cal_vin_sync_warning_message">Valittuun profiiliin tallennettu VIN-tunnus (%1$s) korvataan ECU:n VIN-tunnuksella (%2$s). Vuosi, moottori, vaihteisto ja markkina-alue eivät muutu. Tee tämä vain, kun olet varmistanut, että yhdistetty auto on oikea.</string>
     <string name="cal_vin_sync_confirm">Korvaa VIN-tunnus</string>
     <string name="vin_photo_capture">Kuvaa VIN-tunnus</string>
+    <string name="control_interlock_assessment">Turvaehtojen arviointi: %1$s</string>
+    <string name="control_conditions_confirmed">ehdot vahvistettu</string>
+    <string name="control_windows_explanation">GM-komento on tunnistettava ja validoitava tämän VIN-tunnuksen BCM:lle. Yleispätevää kehystä ei oleteta.</string>
+    <string name="control_sunroof_explanation">Vain jos varuste on asennettu ja validoitu BCM-komento on käytettävissä.</string>
+    <string name="control_door_locks_title">Ovilukot</string>
+    <string name="control_door_locks_explanation">Suojattu korinohjauskomento: osoitteistus, tietoturva ja ajoneuvon tila on varmistettava.</string>
+    <string name="control_lights_title">Valot</string>
+    <string name="control_lights_explanation">Valotoiminnot riippuvat BCM:stä, varustelusta ja markkina-alueesta.</string>
+    <string name="control_horn_explanation">Äänimerkki pysyy poissa käytöstä ilman varmennettua GM-menettelyä ja käyttäjän vahvistusta.</string>
+    <string name="control_mirrors_title">Peilit</string>
+    <string name="control_mirrors_explanation">Komento on validoitava varustelulle ja BCM-versiolle.</string>
+    <string name="control_trunk_explanation">Komento on validoitava korimallille, BCM:lle ja ajoneuvon tilalle.</string>
+    <string name="control_remote_start_title">Etäkäynnistys</string>
+    <string name="control_remote_start_explanation">Ei voida ohjata turvallisesti yleisellä OBD-kehyksellä. Käytä vain valmistajan hyväksymää etäkäynnistysjärjestelmää ja sen turvaehtoja (Park, seisontajarru, konepelti suljettu, ei kriittisiä vikoja). CamaroDiag ei lähetä moottorin käynnistyskomentoa.</string>
+    <string name="remote_start_blocker_gear">Vaihteiston Park-asentoa ei ole vahvistettu.</string>
+    <string name="remote_start_blocker_hood">Konepellin sulkemista ei ole vahvistettu.</string>
+    <string name="remote_start_blocker_locks">Ovien lukitusta ei ole vahvistettu.</string>
+    <string name="remote_start_blocker_hazards">Varoitusvilkkujen sammuttamista ei ole vahvistettu.</string>
+    <string name="remote_start_blocker_theft">Varkaudenestojärjestelmän valmiutta ei ole vahvistettu.</string>
+    <string name="remote_start_blocker_faults">Kriittisten vikojen puuttumista ei ole vahvistettu.</string>
+    <string name="remote_start_blocker_stationary">Ajoneuvon paikallaanoloa ei ole vahvistettu.</string>
+    <string name="remote_start_blocker_equipment">Alkuperäistä etäkäynnistysvarustetta ei ole vahvistettu.</string>
 </resources>
