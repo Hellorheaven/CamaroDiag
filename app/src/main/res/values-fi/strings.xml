@@ -367,4 +367,19 @@
     <string name="cal_j2534_launch_instructions">Käynnistä CamaroDiag.J2534Bridge.exe Windowsissa. Anna tietokoneen IP ja konsolissa näkyvä koko koodi (tunnus.TLS-sormenjälki). Käytä luotettua lähiverkkoa.</string>
     <string name="cal_j2534_security_notice">TLS 1.2+ ja varmenteen sormenjäljen tarkistus vaaditaan. Vanhat pelkät tunnukset hylätään. Älä avaa porttia internetiin.</string>
     <string name="cal_pc_pairing_token">TLS-koodi (tunnus.sormenjälki)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Toimintatestit</string>
+    <string name="functional_tests_title">Toimintatestit — ECU ja OBD</string>
+    <string name="functional_tests_readonly">Suorita kaikki käytettävissä olevat vain luku -tarkistukset liitetyllä fyysisellä sovittimella. Muut sovittimet ja vahvistamattomat ECU-yksiköt merkitään TESTAAMATON. Ei poistoa, ohjausta eikä ohjelmointia.</string>
+    <string name="functional_tests_run">Suorita kaikki</string>
+    <string name="functional_tests_stop">Pysäytä</string>
+    <string name="functional_tests_export">Vie JSON</string>
+    <string name="functional_tests_summary">%1$d hyväksytty · %2$d hylätty · %3$d testaamatta</string>
+    <string name="functional_tests_passed">HYVÄKSYTTY (fyysinen näyttö)</string>
+    <string name="functional_tests_failed">HYLÄTTY</string>
+    <string name="functional_tests_skipped">TESTAAMATON</string>
+    <string name="functional_tests_denied">Pääsy evätty: kirjaudu hyväksytyllä Google-tilillä ja yhdistä uudelleen.</string>
+    <string name="functional_tests_not_connected">Fyysistä OBD-sovitinta ei ole liitetty. Muita tarkistuksia ei suoritettu.</string>
+    <string name="functional_tests_cancelled">Testisarja peruutettiin.</string>
 </resources>
