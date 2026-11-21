@@ -62,6 +62,15 @@ int main(void)
     const cd_can_frame flow = {0x7E0, false, 8, {0x30, 0, 0}};
     assert(cd_kernel_runtime_step(&runtime, &flow, 3));
     assert(runtime.tx.state == CD_ISOTP_TX_IDLE && link.count == 2);
+    /* Two single-frame replies in immediate succession, with no idle poll. */
+    init_model(&m);
+    flash = controller_for(&m);
+    link.count = 0;
+    assert(cd_kernel_runtime_init(&runtime, &flash, &channel, 4, 1));
+    const cd_can_frame invalid = {0x7E0, false, 8, {1, 0xFF}};
+    assert(cd_kernel_runtime_step(&runtime, &invalid, 1));
+    assert(cd_kernel_runtime_step(&runtime, &invalid, 2));
+    assert(link.count == 2);
     puts("PASS: native runtime CAN-to-flash dispatch and response-loss handling");
     return 0;
 }

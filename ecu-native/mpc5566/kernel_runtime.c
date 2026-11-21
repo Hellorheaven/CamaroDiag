@@ -38,6 +38,11 @@ bool cd_kernel_runtime_step(cd_kernel_runtime *r,
         cd_kernel_runtime_link_failure(r);
         return false;
     }
+    /* A completed single-frame response must not consume the next request. */
+    if (r->tx.state == CD_ISOTP_TX_COMPLETE) {
+        cd_isotp_tx_release(&r->tx);
+        r->destructive_response = false;
+    }
     if (r->tx.state == CD_ISOTP_TX_WAIT_FLOW && incoming != NULL)
         cd_isotp_tx_flow(&r->tx, incoming, now_us);
     cd_isotp_tx_state tx = cd_isotp_tx_poll(&r->tx, now_us);
