@@ -871,4 +871,19 @@
     <string name="functional_tests_denied">拒绝访问：请使用已授权的 Google 帐号登录。</string>
     <string name="functional_tests_not_connected">未连接实体 OBD 适配器，其他检查未执行。</string>
     <string name="functional_tests_cancelled">测试已取消。</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">调试版本</string>
+    <string name="tab_license">许可证</string>
+    <string name="debug_builds_title">私人调试版本</string>
+    <string name="debug_builds_refresh">刷新可用版本</string>
+    <string name="debug_builds_download">从 GitHub 下载</string>
+    <string name="debug_builds_unavailable">暂无可用的有效调试压缩包。</string>
+    <string name="debug_builds_error">无法从 GitHub 加载调试版本。</string>
+    <string name="license_disabled">许可系统尚未启用。</string>
+    <string name="license_buy">购买许可证</string>
+    <string name="license_refresh">刷新许可证</string>
+    <string name="license_free">免费</string>
+    <string name="license_owner">所有者：全部权限</string>
+    <string name="license_premium">完整许可证已激活</string>
+    <string name="license_title">CamaroDiag 许可证</string>
 </resources>
