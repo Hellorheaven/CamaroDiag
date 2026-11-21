@@ -218,6 +218,33 @@ internal sealed class J2534Device : IDisposable
         throw new TimeoutException($"No ISO15765 response from CAN ID 0x{_responseCanId:X} within {timeoutMs} ms.");
     }
 
+    /// <summary>
+    /// Physical, read-only GM CAN identity: GMLAN service 1A rather than
+    /// standard UDS 22. This does not open any programming privilege.
+    /// </summary>
+    public NativeGmlanIdentification.Identity ReadGmlanIdentification()
+    {
+        EnsureOpen();
+        byte[] Read(byte did, bool required)
+        {
+            try
+            {
+                return Exchange(NativeGmlanIdentification.BuildRequest(did), 1500);
+            }
+            catch (TimeoutException) when (!required)
+            {
+                // Optional OSID candidate was silent; try the next
+                // documented GMLAN software-module identifier.
+                return [0x7F, 0x1A, 0x31];
+            }
+        }
+        return NativeGmlanIdentification.Compose(
+            Read(NativeGmlanIdentification.VinDid, required: true),
+            Read(NativeGmlanIdentification.OsModuleDid, required: false),
+            Read(NativeGmlanIdentification.OsFallbackDid, required: false),
+            physicalRead: true);
+    }
+
     public object ReadCalibrationIdentification()
     {
         EnsureOpen();
@@ -291,6 +318,8 @@ internal sealed class J2534Device : IDisposable
         var service = payload[0];
         if (!allowNoResponse && payload.Length == 2 && service == 0x09 &&
             payload[1] is 0x02 or 0x04 or 0x06 or 0x0A) return;
+        if (!allowNoResponse && payload.Length == 2 && service == 0x1A &&
+            payload[1] is 0x90 or 0xC1 or 0xC9) return;
         if (service == 0x22 || service == 0x19) return;
         if (service == 0x3E && payload.Length == 2 && payload[1] is 0x00 or 0x80) return;
         if (!allowNoResponse && _memoryReadVinVerified && _memoryReadScope != null)
