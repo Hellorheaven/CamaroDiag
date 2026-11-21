@@ -385,4 +385,19 @@
     <string name="functional_tests_denied">Piekļuve liegta: pierakstieties ar atļauto Google kontu un pieslēdzieties vēlreiz.</string>
     <string name="functional_tests_not_connected">Nav pievienots fizisks OBD adapteris. Pārējās pārbaudes nav veiktas.</string>
     <string name="functional_tests_cancelled">Testēšanas sesija atcelta.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Atkļūdošanas versijas</string>
+    <string name="tab_license">Licence</string>
+    <string name="debug_builds_title">Privātas atkļūdošanas versijas</string>
+    <string name="debug_builds_refresh">Atjaunināt pieejamās versijas</string>
+    <string name="debug_builds_download">Lejupielādēt no GitHub</string>
+    <string name="debug_builds_unavailable">Nav pieejams derīgs atkļūdošanas arhīvs.</string>
+    <string name="debug_builds_error">Neizdevās ielādēt atkļūdošanas versijas no GitHub.</string>
+    <string name="license_disabled">Licencēšanas sistēma nav aktivizēta.</string>
+    <string name="license_buy">Iegādāties licenci</string>
+    <string name="license_refresh">Atjaunināt licenci</string>
+    <string name="license_free">Bezmaksas</string>
+    <string name="license_owner">Īpašnieks: visas tiesības</string>
+    <string name="license_premium">Pilna licence ir aktīva</string>
+    <string name="license_title">CamaroDiag licence</string>
 </resources>
