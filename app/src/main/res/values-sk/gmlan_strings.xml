@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_gmlan_read_identity">Prečítať VIN a OSID GM (J2534)</string>
+    <string name="cal_gmlan_osid">Identifikátor operačného systému GM: %1$d</string>
+    <string name="cal_gmlan_vin_can">VIN GM: %1$s • CAN 0x%2$s</string>
+    <string name="cal_gmlan_identity_notice">Identifikácia iba na čítanie z vybraného fyzického odpovedajúceho uzla CAN. Neoveruje hardvér ECU, geometriu pamäte flash ani postup obnovy.</string>
+    <string name="cal_gmlan_identity_failed">Z tohto kanála J2534 sa nepodarilo prečítať overené VIN a OSID GM.</string>
+</resources>
