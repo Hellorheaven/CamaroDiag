@@ -901,4 +901,13 @@
     <string name="license_owner">المالك: جميع الصلاحيات</string>
     <string name="license_premium">الترخيص الكامل مفعل</string>
     <string name="license_title">ترخيص CamaroDiag</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">نزّل أحدث ملفات Debug الخاصة بطلب الدمج PR #70. سجّل الدخول إلى GitHub بحساب مخوّل. الملفات المحمّلة هي أرشيفات ZIP يجب استخراجها.</string>
+    <string name="debug_builds_android_archive">ملف ZIP يحتوي على تطبيق Android Debug بصيغة APK.</string>
+    <string name="debug_builds_windows_archive">ملف ZIP يحتوي على برامج تثبيت Windows ‏x64 وx86.</string>
+    <string name="debug_builds_caution">تنتهي صلاحية الملفات بعد 30 يومًا. توفرها لا يثبت نجاح البناء أو إجراء اختبارات على مركبة. قد تختلف توقيعات APK الخاصة بـ Debug عن الإصدارات العامة.</string>
+    <string name="debug_builds_created">تاريخ الإنشاء</string>
+    <string name="debug_builds_expires">تاريخ الانتهاء</string>
+    <string name="debug_builds_no_browser">لا يتوفر متصفح لفتح رابط التنزيل.</string>
 </resources>
