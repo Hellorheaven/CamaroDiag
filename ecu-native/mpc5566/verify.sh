@@ -7,6 +7,10 @@ cmake -S "$root" -B "$build/host" -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$build/host" --parallel
 ctest --test-dir "$build/host" --output-on-failure
 
+# Execute production C# protocol and transaction code against the actual C model.
+LD_LIBRARY_PATH="$build/host:${LD_LIBRARY_PATH:-}" dotnet run \
+    --project "$root/tests/managed/NativeKernelIntegration.csproj" --configuration Release
+
 # Cross-compile the actual MMIO component and its freestanding dependencies.
 # These are relocatable PowerPC objects only: no board startup, linker image,
 # upload binary or hardware compatibility is implied by this test.

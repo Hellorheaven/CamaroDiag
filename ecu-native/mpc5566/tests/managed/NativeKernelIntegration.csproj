@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39KernelLink.cs" Link="NativeE39KernelLink.cs" />
+    <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39WriteSequence.cs" Link="NativeE39WriteSequence.cs" />
+    <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39FileWriteJournal.cs" Link="NativeE39FileWriteJournal.cs" />
+    <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommands.cs" Link="NativeE39FlashCommands.cs" />
+    <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspector.cs" Link="NativeE39ImageInspector.cs" />
+    <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeEcuSectorPlanner.cs" Link="NativeEcuSectorPlanner.cs" />
+  </ItemGroup>
+</Project>
