@@ -580,4 +580,11 @@
     <string name="msg_live_csv_exported">CSV-logi eksporditi. Näitude arv: %1$d.</string>
     <string name="msg_live_csv_export_failed">CSV-logi eksportimine nurjus.</string>
     <string name="msg_live_recording_max_samples">Saavutati ohutuspiir (%1$d). Salvestamine peatati automaatselt.</string>
+    <string name="msg_cal_file_import_failed">Kalibreerimisfaili importimine nurjus.</string>
+    <string name="msg_cal_file_export_failed">Kalibreerimisfaili eksportimine nurjus.</string>
+    <string name="msg_cal_comparison_failed">Kalibreerimisfailide võrdlemine nurjus.</string>
+    <string name="msg_cal_template_export_failed">TSV-malli eksportimine nurjus.</string>
+    <string name="msg_cal_definitions_import_failed">Tabelimääratluste importimine nurjus.</string>
+    <string name="msg_cal_map_read_failed">Valitud tabeli lugemine nurjus.</string>
+    <string name="msg_cal_table_edit_failed">Kalibreerimistabeli muutmine nurjus.</string>
 </resources>
