@@ -361,7 +361,7 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
-    suspend fun readJ2534StandardDtcs(): Triple<List<ObdDtc>, List<ObdDtc>, List<ObdDtc>> {
+    suspend fun readJ2534StandardDtcs(): PhysicalObdDtcSnapshot {
         val epoch = transportSessionEpoch.capture()
         check(isJ2534StandardObdAvailable())
         return commandSessionMutex.withLock {

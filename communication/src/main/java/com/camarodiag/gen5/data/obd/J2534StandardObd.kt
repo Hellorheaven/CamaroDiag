@@ -54,6 +54,12 @@ internal object J2534StandardObd {
         }
     }
 
+    /** Optional modes may explicitly be unsupported; never treat malformed or
+     * other negative responses as successful empty records. */
+    fun optionalDtcs(mode: Int, reply: ByteArray): List<ObdDtc>? =
+        if (mode in setOf(7,10) && isExplicitlyUnsupported(mode,reply)) null
+        else dtcs(mode,reply)
+
     fun isExplicitlyUnsupported(mode: Int, reply: ByteArray): Boolean =
         reply.size == 3 && reply.u(0) == 0x7F && reply.u(1) == mode &&
             reply.u(2) in setOf(0x11, 0x12, 0x31)
