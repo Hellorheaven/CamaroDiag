@@ -587,4 +587,10 @@
     <string name="msg_cal_definitions_import_failed">Tabelimääratluste importimine nurjus.</string>
     <string name="msg_cal_map_read_failed">Valitud tabeli lugemine nurjus.</string>
     <string name="msg_cal_table_edit_failed">Kalibreerimistabeli muutmine nurjus.</string>
+    <string name="cal_expert_image_selected">Imporditud fail: %1$s</string>
+    <string name="cal_expert_patch_address">Mälupiirkonna algusaadress (kuueteistkümnendsüsteemis)</string>
+    <string name="cal_expert_patch_erase_bytes">Kustutussektori suurus (baitides)</string>
+    <string name="cal_expert_patch_program_bytes">Programmeerimisüksuse suurus (baitides)</string>
+    <string name="cal_expert_patch_preview_button">Kuva muudetud BIN-failist mõjutatud sektorid</string>
+    <string name="cal_expert_patch_summary">Muudetud baite: %1$d. Mõjutatud kustutussektoreid: %2$d. Riistvara mälukaart on kontrollimata. Kirjutamist ei toimunud.</string>
 </resources>
