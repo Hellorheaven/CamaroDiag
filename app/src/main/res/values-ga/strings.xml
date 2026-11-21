@@ -504,4 +504,6 @@
     <string name="mileage_source_generic">Foinse %1$s</string>
     <string name="mileage_details_unavailable">Níl sonraí teicniúla ar fáil don fhoinse seo.</string>
     <string name="mileage_caveat_unavailable">Níl tuilleadh faisnéise logánaithe ar fáil don fhoinse seo.</string>
+    <string name="obd_physical_can_scope">Freagróir fisiciúil CAN: 0x%1$s. Ní chlúdaíonn an scanadh seo ach an ECU OBD roghnaithe, ní scanadh feidhmiúil ar na modúil go léir. Níor seoladh aon orduithe ríomhchláraithe GM ná achtúirí.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Cumasaigh glanadh DTCanna astaíochtaí sa droichead Windows, athcheangail, stop an t-inneall agus deimhnigh an t-athshocrú. Athshocrófar sonraí ullmhachta astaíochtaí; ní scriostar cóid bhuana.</string>
 </resources>
