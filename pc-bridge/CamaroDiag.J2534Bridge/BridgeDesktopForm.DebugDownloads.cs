@@ -192,8 +192,8 @@ internal sealed partial class BridgeDesktopForm
                 (candidates.Any(x => x.Android) && candidates.Any(x => !x.Android))) break;
         }
         return new DebugArtifactListing(
-            candidates.Where(x => x.Android).MaxByOrDefault(x => x.Item.CreatedAt)?.Item,
-            candidates.Where(x => !x.Android).MaxByOrDefault(x => x.Item.CreatedAt)?.Item
+            candidates.Where(x => x.Android).Select(x => x.Item).OrderByDescending(x => x.CreatedAt).FirstOrDefault(),
+            candidates.Where(x => !x.Android).Select(x => x.Item).OrderByDescending(x => x.CreatedAt).FirstOrDefault()
         );
     }
 
