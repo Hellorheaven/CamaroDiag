@@ -88,6 +88,18 @@ internal sealed class J2534Device : IDisposable
     public bool IsOpen => _opened;
     public bool IsMemoryReadEnabled => _memoryReadScope != null && _memoryReadVinVerified;
 
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate uint ReadVoltageIoctl(uint deviceId, uint ioctlId, IntPtr input, out uint millivolts);
+
+    public uint? ReadBatteryMillivolts()
+    {
+        EnsureOpen();
+        if (!NativeLibrary.TryGetExport(_library, "PassThruIoctl", out var entry)) return null;
+        var ioctl = Marshal.GetDelegateForFunctionPointer<ReadVoltageIoctl>(entry);
+        const uint readVBatt = 0x03;
+        return ioctl(_deviceId, readVBatt, IntPtr.Zero, out var value) == StatusNoError ? value : null;
+    }
+
     public void Open(int requestCanId, int responseCanId, bool can29Bit, int protocolNumber)
     {
         if (_opened) Close();
