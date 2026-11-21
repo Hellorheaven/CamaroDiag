@@ -66,6 +66,10 @@ internal sealed class NativeE39FileWriteJournal :
         if (entries.Length == 0)
             return CompletionState.NoEvents;
         NativeE39WriteSequence.Phase? last = null;
+        var sawErase = false;
+        var sawVerifiedWrite = false;
+        var sawRecovery = false;
+        var sawCompletion = false;
         foreach (var entry in entries)
         {
             // A torn/corrupted last line must NOT be interpreted as success.
@@ -78,6 +82,21 @@ internal sealed class NativeE39FileWriteJournal :
                         node.GetProperty("Phase").GetString(), out var phase) ||
                     !Enum.IsDefined(phase))
                     return CompletionState.Interrupted;
+                // A terminal success must be backed by an erase and an
+                // independently verified write, in that order. A recovery
+                // marker is sticky even if a later line claims completion.
+                if (sawCompletion || (phase == NativeE39WriteSequence.Phase.Completed &&
+                    (!sawErase || !sawVerifiedWrite || sawRecovery)) ||
+                    (phase == NativeE39WriteSequence.Phase.WrittenCrcVerified && !sawErase))
+                    return CompletionState.Interrupted;
+                if (phase == NativeE39WriteSequence.Phase.EraseStarted)
+                    sawErase = true;
+                if (phase == NativeE39WriteSequence.Phase.WrittenCrcVerified)
+                    sawVerifiedWrite = true;
+                if (phase == NativeE39WriteSequence.Phase.RecoveryRequired)
+                    sawRecovery = true;
+                if (phase == NativeE39WriteSequence.Phase.Completed)
+                    sawCompletion = true;
                 last = phase;
             }
             catch (Exception error) when (error is JsonException or
@@ -86,12 +105,9 @@ internal sealed class NativeE39FileWriteJournal :
                 return CompletionState.Interrupted;
             }
         }
-        return last switch
-        {
-            NativeE39WriteSequence.Phase.Completed => CompletionState.Completed,
-            NativeE39WriteSequence.Phase.RecoveryRequired => CompletionState.RecoveryRequired,
-            _ => CompletionState.Interrupted
-        };
+        if (sawRecovery) return CompletionState.RecoveryRequired;
+        return last == NativeE39WriteSequence.Phase.Completed && sawVerifiedWrite
+            ? CompletionState.Completed : CompletionState.Interrupted;
     }
 
     public async ValueTask DisposeAsync()
