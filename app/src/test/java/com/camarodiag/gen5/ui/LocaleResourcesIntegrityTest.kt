@@ -40,8 +40,9 @@ class LocaleResourcesIntegrityTest {
         val base = File("src/main/res/${directory(tag)}")
         assertTrue("Missing strings.xml for $tag", File(base, "strings.xml").isFile)
         assertTrue("Missing license_strings.xml for $tag", File(base, "license_strings.xml").isFile)
+        assertTrue("Missing gmlan_strings.xml for $tag", File(base, "gmlan_strings.xml").isFile)
         val values = mutableMapOf<String, String>()
-        for (file in listOf(File(base, "strings.xml"), File(base, "license_strings.xml"))) {
+        for (file in listOf(File(base, "strings.xml"), File(base, "license_strings.xml"), File(base, "gmlan_strings.xml"))) {
             val nodes = document(file).getElementsByTagName("string")
             for (i in 0 until nodes.length) {
             val element = nodes.item(i) as Element
@@ -115,6 +116,19 @@ class LocaleResourcesIntegrityTest {
             }
         }
     }
+    @Test fun physicalGmlanIdentityLabelsAreCompleteInEveryLocale() {
+        val keys = setOf("cal_gmlan_read_identity", "cal_gmlan_osid", "cal_gmlan_vin_can",
+            "cal_gmlan_identity_notice", "cal_gmlan_identity_failed")
+        for (locale in locales) {
+            val values = strings(locale)
+            assertTrue("Missing physical GM identity label in $locale", keys.all { !values[it].isNullOrBlank() })
+            if (locale != "en") {
+                assertFalse("GM identity warning not localized in $locale",
+                    values["cal_gmlan_identity_notice"] == strings("en")["cal_gmlan_identity_notice"])
+            }
+        }
+    }
+
     @Test fun allDeclaredLocalesTranslatePrimaryNavigation() {
         val navigationKeys = setOf(
             "tab_vehicle", "tab_connect", "tab_live", "tab_dtcs", "tab_more",
