@@ -738,4 +738,6 @@
     <string name="msg_usb_identifier_unavailable">USB-enhedens id er ikke tilgængeligt</string>
     <string name="msg_simulation_activation_failed">Simuleringstilstanden kunne ikke aktiveres.</string>
     <string name="msg_live_simulation_active">Simulering er aktiv. De viste værdier kommer ikke fra køretøjet.</string>
+    <string name="msg_mileage_audit_failed">Data kunne ikke læses ved kontrol af kilometerstanden.</string>
+    <string name="msg_session_delete_failed">Den gemte session kunne ikke slettes.</string>
 </resources>
