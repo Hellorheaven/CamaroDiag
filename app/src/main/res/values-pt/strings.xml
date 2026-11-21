@@ -902,4 +902,6 @@
     <string name="debug_builds_created">Criado</string>
     <string name="debug_builds_expires">Expira</string>
     <string name="debug_builds_no_browser">Não existe navegador disponível para abrir esta transferência.</string>
+    <string name="obd_physical_can_scope">Respondente CAN físico: 0x%1$s. Esta análise abrange apenas a ECU OBD selecionada, não uma análise funcional de todos os módulos. Não foram enviados comandos de programação GM ou de atuadores.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Ative a eliminação de DTC de emissões na ponte Windows, volte a ligar, desligue o motor e confirme a reposição. Os dados de prontidão de emissões serão repostos; os códigos permanentes não são eliminados.</string>
 </resources>
