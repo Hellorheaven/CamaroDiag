@@ -152,7 +152,7 @@ internal static class BridgeUpdateManager
                 $"  Wait-Process -Id {Environment.ProcessId} -ErrorAction SilentlyContinue\n" +
                 $"  $installer='{Ps(temp)}'\n" +
                 $"  $target='{Ps(destination)}'\n" +
-                "  $arguments=@('/SILENT','/NORESTART',('/DIR="' + $target + '"'))\n" +
+                "  $arguments=@('/SILENT','/NORESTART',('/DIR=' + [char]34 + $target + [char]34))\n" +
                 "  $result=Start-Process -FilePath $installer -ArgumentList $arguments -PassThru -Wait\n" +
                 "  if ($result.ExitCode -ne 0) { throw ('Installer exit code: ' + $result.ExitCode) }\n" +
                 "  Set-Content -Path $log -Value 'Mise à jour CamaroDiag installée.'\n" +
