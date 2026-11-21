@@ -65,6 +65,7 @@ internal static class Program
 
         if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
+        var allowObdClear = args.Contains("--allow-obd-clear", StringComparer.OrdinalIgnoreCase);
         J2534MemoryReadScope? memoryReadScope = null;
         var mapIndex = Array.FindIndex(args,
             value => value.Equals("--memory-read-profile", StringComparison.OrdinalIgnoreCase));
@@ -118,7 +119,8 @@ internal static class Program
         Console.WriteLine("TLS: required (minimum version 1.2); certificate SHA-256 pinned in pairing code.");
         Console.WriteLine("A new pairing code is required every time the bridge restarts.");
         Console.WriteLine($"Port: {port}");
-        Console.WriteLine("Available: OBD Mode 09 identity, UDS reads and TesterPresent.");
+        Console.WriteLine("Available: physical standard OBD data/diagnostic reads, Mode 09 identity, UDS reads and TesterPresent.");
+        if (allowObdClear) Console.WriteLine("Explicit emissions DTC reset enabled; engine off and stationary required. Readiness data will be reset.");
         Console.WriteLine("ECU writes, security access, actuator controls and flash programming are blocked.");
         if (memoryReadScope != null)
             Console.WriteLine("Memory read profile enabled: every 0x23 read is restricted to the configured " +
@@ -128,7 +130,8 @@ internal static class Program
         try
         {
             await new BridgeServer(
-                adapters[selectedIndex], token, port, tlsIdentity, memoryReadScope).RunAsync();
+                adapters[selectedIndex], token, port, tlsIdentity, memoryReadScope,
+                allowStandardObdClear: allowObdClear).RunAsync();
             return 0;
         }
         catch (SocketException ex)

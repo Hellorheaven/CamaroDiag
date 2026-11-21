@@ -30,6 +30,11 @@ internal sealed partial class BridgeDesktopForm : Form
         ReadOnly = true, Dock = DockStyle.Fill, UseSystemPasswordChar = true
     };
     private readonly TextBox memoryProfile = new() { ReadOnly = true, Dock = DockStyle.Fill };
+    private readonly CheckBox allowStandardObdClear = new()
+    {
+        Text = "Autoriser l’effacement OBD des défauts antipollution (moteur arrêté)",
+        AutoSize = true, Dock = DockStyle.Left
+    };
     private readonly Label bridgeStatus = new()
     {
         Text = "Arrêté — aucune connexion Android possible",
@@ -161,6 +166,7 @@ internal sealed partial class BridgeDesktopForm : Form
         chooseProfile.Click += (_, _) => ChooseFile(memoryProfile, save: false,
             filter: "Profil de lecture (*.json)|*.json|Tous les fichiers (*.*)|*.*");
         Row(panel, "Lecture mémoire avancée", memoryProfile, chooseProfile);
+        WideRow(panel, allowStandardObdClear, 38);
         var commands = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight, Dock = DockStyle.Fill,
@@ -443,14 +449,14 @@ pas le port du pont sur Internet.",
                             bridgeStatus.Text = "En écoute — connexion Android chiffrée TLS active";
                             copyAll.Enabled = copyCode.Enabled = copyIp.Enabled = copyPort.Enabled = true;
                         }));
-                });
+                }, allowStandardObdClear: allowStandardObdClear.Checked);
             bridgeCancellation = stop;
             currentPairingCode = code;
             pairingCode.Text = code;
             bridgeListening = false;
             startBridge.Enabled = false;
             stopBridge.Enabled = true;
-            adapter.Enabled = lanAddress.Enabled = port.Enabled = memoryProfile.Enabled = false;
+            adapter.Enabled = lanAddress.Enabled = port.Enabled = memoryProfile.Enabled = allowStandardObdClear.Enabled = false;
             bridgeStatus.Text = "Démarrage du pont sécurisé...";
             var task = Task.Run(() => server.RunAsync(stop.Token));
             bridgeTask = task;
@@ -495,7 +501,8 @@ pas le port du pont sur Internet.",
         pairingCode.Clear();
         copyAll.Enabled = copyCode.Enabled = copyIp.Enabled = copyPort.Enabled = false;
         stopBridge.Enabled = false;
-        adapter.Enabled = lanAddress.Enabled = port.Enabled = memoryProfile.Enabled = true;
+        adapter.Enabled = lanAddress.Enabled = port.Enabled = memoryProfile.Enabled = allowStandardObdClear.Enabled = true;
+        allowStandardObdClear.Checked = false;
         bridgeStatus.Text = status;
         startBridge.Enabled = adapter.Items.Count > 0 && lanAddress.Items.Count > 0;
     }
