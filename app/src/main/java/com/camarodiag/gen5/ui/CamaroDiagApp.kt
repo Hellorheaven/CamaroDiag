@@ -206,7 +206,7 @@ fun CamaroDiagApp(
             currentTab = DiagTab.SETUP
         if (!ownerTestsAllowed &&
             currentTab in setOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS)
-        ) currentTab = DiagTab.LICENSE
+        ) currentTab = if (LicenseRolloutConfig.ENABLED) DiagTab.LICENSE else DiagTab.SETUP
         if (!premiumAllowed && currentTab in premiumTabs) currentTab = DiagTab.LICENSE
     }
     val functionalTestsExporter = rememberLauncherForActivityResult(
