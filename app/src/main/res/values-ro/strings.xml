@@ -599,4 +599,6 @@
     <string name="cal_tcp_port">Port TCP</string>
     <string name="msg_refresh_adapters_failed">Lista adaptoarelor nu a putut fi actualizată.</string>
     <string name="msg_usb_identifier_unavailable">Identificatorul dispozitivului USB nu este disponibil</string>
+    <string name="msg_simulation_activation_failed">Modul de simulare nu a putut fi activat.</string>
+    <string name="msg_live_simulation_active">Simularea este activă. Valorile afișate nu provin de la vehicul.</string>
 </resources>
