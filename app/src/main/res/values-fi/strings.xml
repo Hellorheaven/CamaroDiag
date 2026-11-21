@@ -562,4 +562,9 @@
     <string name="update_later">Myöhemmin</string>
     <string name="update_ready_to_install">CamaroDiag – valmis asennettavaksi</string>
     <string name="update_version_channel">Versio %1$s • %2$s</string>
+    <string name="vin_photo_cancelled">VIN-kuvan ottaminen peruutettiin.</string>
+    <string name="vin_photo_success">VIN tunnistettiin ja kopioitiin ajoneuvoprofiiliin. Tarkista jokainen merkki.</string>
+    <string name="vin_photo_not_found">Kelvollista 17 merkin VIN-tunnusta ei löytynyt. Syötä se käsin tai ota uusi kuva.</string>
+    <string name="vin_photo_error">VIN-tunnusta ei voitu lukea kuvasta. Yritä uudelleen paremmassa valossa ja tarkenna kuva.</string>
+    <string name="vehicle_vin_placeholder">17 merkkiä</string>
 </resources>
