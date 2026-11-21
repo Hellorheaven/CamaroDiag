@@ -489,4 +489,21 @@
     <string name="mileage_caveat_unavailable">Nu există informații localizate suplimentare pentru această sursă.</string>
     <string name="obd_physical_can_scope">Nod CAN fizic care a răspuns: 0x%1$s. Scanarea acoperă numai ECU OBD selectată, nu o scanare funcțională a tuturor modulelor. Nu au fost trimise comenzi de programare GM sau de acționare.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Activați ștergerea DTC de emisii în puntea Windows, reconectați-vă, opriți motorul și confirmați resetarea. Datele de disponibilitate ale sistemelor de emisii vor fi resetate; codurile permanente nu sunt șterse.</string>
+    <string name="units_metric">SI / metric</string>
+    <string name="units_imperial">Imperial</string>
+    <string name="live_pause">Pauză</string>
+    <string name="live_recording_status">Eșantioane: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Circuitul actuatorului de poziție al arborelui cu came de admisie (bancul 1)</string>
+    <string name="dtc_desc_p0011">Sincronizare prea avansată a arborelui cu came de admisie (bancul 1)</string>
+    <string name="dtc_desc_p0014">Sincronizare prea avansată a arborelui cu came de evacuare (bancul 1)</string>
+    <string name="dtc_desc_p0087">Presiune prea scăzută în rampa sau sistemul de combustibil</string>
+    <string name="dtc_desc_p0089">Funcționare necorespunzătoare a regulatorului de presiune a combustibilului</string>
+    <string name="dtc_desc_p0191">Domeniu sau performanță a circuitului senzorului de presiune din rampa de combustibil</string>
+    <string name="dtc_desc_p0299">Presiune de supraalimentare prea mică a turbocompresorului sau compresorului</string>
+    <string name="cal_engine_profile">Profil motor: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Motoare catalogate pentru %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Citire binară: %2$s • Tabele motor validate: %3$s • Programare ECU: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • cerere %2$s / răspuns %3$s • interval %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • număr=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Doar profil hardware; este necesar în continuare un SDK/API Android oficial sau o punte documentată.</string>
 </resources>
