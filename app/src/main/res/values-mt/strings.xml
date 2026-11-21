@@ -592,4 +592,11 @@
     <string name="msg_live_csv_exported">Ir-reġistru CSV ġie esportat. Għadd ta’ kampjuni: %1$d.</string>
     <string name="msg_live_csv_export_failed">Ir-reġistru CSV ma setax jiġi esportat.</string>
     <string name="msg_live_recording_max_samples">Intlaħaq il-limitu tas-sikurezza (%1$d). Ir-reġistrazzjoni waqfet awtomatikament.</string>
+    <string name="msg_cal_file_import_failed">Il-fajl tal-kalibrazzjoni ma setax jiġi importat.</string>
+    <string name="msg_cal_file_export_failed">Il-fajl tal-kalibrazzjoni ma setax jiġi esportat.</string>
+    <string name="msg_cal_comparison_failed">Il-fajls tal-kalibrazzjoni ma setgħux jitqabblu.</string>
+    <string name="msg_cal_template_export_failed">Il-mudell TSV ma setax jiġi esportat.</string>
+    <string name="msg_cal_definitions_import_failed">Id-definizzjonijiet tat-tabelli ma setgħux jiġu importati.</string>
+    <string name="msg_cal_map_read_failed">It-tabella magħżula ma setgħetx tinqara.</string>
+    <string name="msg_cal_table_edit_failed">It-tabella tal-kalibrazzjoni ma setgħetx tiġi editjata.</string>
 </resources>
