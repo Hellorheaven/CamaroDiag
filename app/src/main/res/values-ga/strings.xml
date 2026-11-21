@@ -616,4 +616,6 @@
     <string name="cal_tcp_port">Port TCP</string>
     <string name="msg_refresh_adapters_failed">Níorbh fhéidir liosta na gcuibheoirí a athnuachan.</string>
     <string name="msg_usb_identifier_unavailable">Níl aitheantóir an ghléis USB ar fáil</string>
+    <string name="msg_simulation_activation_failed">Níorbh fhéidir mód ionsamhlúcháin a ghníomhachtú.</string>
+    <string name="msg_live_simulation_active">Tá an t-ionsamhlúchán ar siúl. Ní ón bhfeithicil a thagann na luachanna ar an scáileán.</string>
 </resources>
