@@ -294,4 +294,25 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun canTraceFormatsHistoryAndSensorPickerAreLocalizedForAllLanguages() {
+        val keys = setOf(
+            "can_sniffer_request_examples", "can_sniffer_dtc_service", "can_sniffer_request_history", "can_sniffer_request_history_item",
+            "can_sniffer_request_history_response", "can_trace_id_filter", "can_trace_id_hint", "can_trace_data_prefix",
+            "can_trace_data_hint", "can_trace_nrc_detail", "can_trace_iso_tp_incomplete_count", "can_trace_flow_control_detail",
+            "can_trace_flow_stmin_ms", "can_trace_flow_stmin_us", "can_trace_flow_stmin_reserved", "can_trace_exchange_parameter_id",
+            "can_trace_exchange_summary", "can_trace_exchange_request", "can_trace_exchange_response", "can_trace_exchange_elapsed",
+            "can_console_input_hint", "can_console_adapter_ack", "saved_vehicle_import_legacy", "saved_vehicle_legacy_default_name",
+            "obd_dtc_help_close", "obd_choose_sensors", "obd_filter_sensors", "obd_sensor_ok",
+            "obd_sensor_cancel", "obd_sensor_not_measured", "live_selected_sensors"
+        )
+        assertEquals(31, keys.size)
+        for (locale in locales) {
+            val resources = strings(locale)
+            assertTrue("Missing CAN trace/sensor labels in $locale: ${keys - resources.keys}",
+                resources.keys.containsAll(keys))
+            assertTrue("Blank CAN trace/sensor label in $locale",
+                keys.all { resources.getValue(it).isNotBlank() })
+        }
+    }
+
 }
