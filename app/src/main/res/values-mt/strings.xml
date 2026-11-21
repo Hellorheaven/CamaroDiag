@@ -426,4 +426,34 @@
     <string name="debug_builds_created">Maħluq</string>
     <string name="debug_builds_expires">Jiskadi</string>
     <string name="debug_builds_no_browser">M\'hemmx browser biex tiftaħ it-tniżżil.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Lingwa magħżula: %1$s</string>
+    <string name="settings_adapter_not_connected">Ebda adapter konness</string>
+    <string name="settings_last_connection">L-aħħar profil tal-konnessjoni</string>
+    <string name="settings_no_last_connection">Għad m\'hemm l-ebda profil tal-konnessjoni ssejvjat.</string>
+    <string name="saved_vehicle_profiles_title">Profili tal-vetturi ssejvjati</string>
+    <string name="saved_vehicle_name_label">Isem il-profil</string>
+    <string name="saved_vehicle_name_placeholder">eż. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Issejvja l-vettura attwali</string>
+    <string name="saved_vehicle_empty">Għad m\'hemm l-ebda profil tal-vettura ssejvjat.</string>
+    <string name="saved_vehicle_delete">Ħassar</string>
+    <string name="saved_vehicle_requires_review">Il-profil inħoloq mill-VIN tal-ECU. Ivverifika s-sena tal-mudell, il-magna u t-trażmissjoni qabel id-dijanjosi.</string>
+    <string name="saved_vehicle_ecu_default_name">Vettura mill-ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Daħħal isem għall-profil.</string>
+    <string name="msg_vehicle_profile_saved">Il-profil tal-vettura ġie ssejvjat.</string>
+    <string name="msg_vehicle_profile_review_required">Inħoloq profil mill-VIN tal-ECU. Ivverifika s-sena, il-magna u t-trażmissjoni qabel id-dijanjosi.</string>
+    <string name="msg_vehicle_profile_loaded">Profil tal-vettura mgħobbi: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">L-ECU ma rritornax VIN validu ta\' 17-il karattru. Ma nħoloq ebda profil.</string>
+    <string name="cal_vin_matches_profile">Il-VIN tal-ECU jaqbel mal-profil tal-vettura magħżul.</string>
+    <string name="cal_vin_mismatch_detected">VIN MA JAQBILX — profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Il-profil tal-vettura magħżul ma fihx VIN validu.</string>
+    <string name="cal_vin_mismatch_title">Instab VIN li ma jaqbilx</string>
+    <string name="cal_vin_mismatch_confirmation">Il-VIN tal-profil magħżul huwa %1$s, iżda l-ECU rritorna %2$s. Jistgħu jkunu vetturi differenti. Oħloq profil separat biex iżżomm il-vettura magħżula, jew issinkronizza biss wara li tivverifika l-vettura fiżika.</string>
+    <string name="cal_vin_create_vehicle">Oħloq profil tal-vettura</string>
+    <string name="cal_vin_sync_existing">Issinkronizza l-VIN tal-profil magħżul</string>
+    <string name="cal_vin_sync_warning_title">Tikkonferma s-sostituzzjoni tal-VIN?</string>
+    <string name="cal_vin_sync_warning_message">Dan se jissostitwixxi l-VIN maħżun fil-profil magħżul (%1$s) bil-VIN tal-ECU (%2$s). Is-sena, il-magna, it-trażmissjoni u s-suq ma jinbidlux. Agħmel dan biss wara li tikkonferma li l-vettura konnessa hija dik mixtieqa.</string>
+    <string name="cal_vin_sync_confirm">Issostitwixxi l-VIN</string>
+    <string name="vin_photo_capture">Ħu ritratt tal-VIN</string>
 </resources>
