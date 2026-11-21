@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_gmlan_read_identity">Прочитане на VIN и OSID на GM (J2534)</string>
+    <string name="cal_gmlan_osid">Идентификатор на операционната система на GM: %1$d</string>
+    <string name="cal_gmlan_vin_can">VIN на GM: %1$s • CAN 0x%2$s</string>
+    <string name="cal_gmlan_identity_notice">Идентификация само за четене от избрания физически CAN модул, който отговаря. Това не потвърждава хардуера на ECU, геометрията на флаш паметта или процедурата за възстановяване.</string>
+    <string name="cal_gmlan_identity_failed">Неуспешно прочитане на проверени VIN/OSID на GM от този канал J2534.</string>
+</resources>
