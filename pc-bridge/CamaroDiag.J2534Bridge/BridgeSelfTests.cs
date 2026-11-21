@@ -159,6 +159,7 @@ internal static class BridgeSelfTests
             "A missing physical adapter cannot pass the driver probe");
 
         checks += BridgeTlsSelfTests.Run();
+        checks += NativeUdsDownloadSelfTests.Run();
         Console.WriteLine($"PASS: {checks} hardware-free J2534 bridge self-tests.");
         return 0;
     }
