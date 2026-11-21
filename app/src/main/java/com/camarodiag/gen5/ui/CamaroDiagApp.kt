@@ -56,7 +56,6 @@ import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.CanTraceDirection
 import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.data.obd.UdsNegativeResponse
-import com.camarodiag.gen5.data.obd.EcuBackupCoverage
 import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.ui.theme.*
 import java.text.SimpleDateFormat
@@ -627,7 +626,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                                 address = address,
                                 lengthBytes = bytes,
                                 diagnosticSession = session,
-                                controllerLabel = ecmType
+                                controllerLabel = vehicle.engine.ecmType
                             )
                             ecuMemoryArchiveExporter.launch(
                                 "CamaroDiag_ECU_memory_${System.currentTimeMillis()}.zip"
