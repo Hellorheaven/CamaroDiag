@@ -23,6 +23,11 @@ internal static class Program
         if (args.Contains("--probe-drivers", StringComparer.OrdinalIgnoreCase))
             return J2534DriverProbe.RunAll();
 
+        // Read-only local hardware test. Requires an explicit J2534 adapter,
+        // CAN addressing and transport profile. No TCP bridge or updater.
+        if (args.Contains(NativeGmlanBenchProbe.Command, StringComparer.OrdinalIgnoreCase))
+            return NativeGmlanBenchProbe.Run(args);
+
         // Offline image check: native, no ECU, no vendor driver or network.
         if (args.Contains("--inspect-e39-image", StringComparer.OrdinalIgnoreCase))
             return InspectE39Image(args);
