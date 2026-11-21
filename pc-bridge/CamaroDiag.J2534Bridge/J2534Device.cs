@@ -8,7 +8,7 @@ namespace CamaroDiag.J2534Bridge;
 /// Minimal SAE J2534-1 PassThru provider for ISO 15765-2 CAN.
 /// The installed adapter vendor DLL remains responsible for hardware access and timing.
 /// </summary>
-internal sealed class J2534Device : IDisposable
+internal sealed partial class J2534Device : IDisposable
 {
     private const uint ProtocolIso15765 = 6;
     private const uint ProtocolSwIso15765 = 0x8007;
@@ -193,6 +193,8 @@ internal sealed class J2534Device : IDisposable
     // The public network exchange above always remains read-only.
     private byte[] ExchangeCore(byte[] payload, int timeoutMs, bool nativeBenchReply)
     {
+        EnsureOpen();
+        if (nativeBenchReply) ClearNativeReceiveQueue();
         var tx = CreatePayloadMessage(_requestCanId, payload);
         var messages = new[] { tx };
         uint count = 1;
@@ -360,6 +362,12 @@ internal sealed class J2534Device : IDisposable
         EnsureOpen();
         if (payload.Length is < 1 or > 4091) throw new ArgumentOutOfRangeException(nameof(payload));
         ValidateReadOnlyService(payload, allowNoResponse: true);
+        SendCore(payload);
+    }
+
+    private void SendCore(byte[] payload)
+    {
+        EnsureOpen();
         var messages = new[] { CreatePayloadMessage(_requestCanId, payload) };
         uint count = 1;
         Check(_write!(_channelId, messages, ref count, 1000), "PassThruWriteMsgs");
