@@ -453,4 +453,26 @@
     <string name="cal_vin_sync_warning_message">VIN zapisany w wybranym profilu (%1$s) zostanie zastąpiony VIN z ECU (%2$s). Rok, silnik, skrzynia biegów i rynek nie ulegną zmianie. Zrób to dopiero po upewnieniu się, że podłączony samochód jest właściwym pojazdem.</string>
     <string name="cal_vin_sync_confirm">Zastąp VIN</string>
     <string name="vin_photo_capture">Zrób zdjęcie VIN</string>
+    <string name="control_interlock_assessment">Ocena blokad bezpieczeństwa: %1$s</string>
+    <string name="control_conditions_confirmed">warunki potwierdzone</string>
+    <string name="control_windows_explanation">Polecenie GM należy zidentyfikować i zweryfikować dla BCM tego VIN. Nie zakłada się uniwersalnej ramki.</string>
+    <string name="control_sunroof_explanation">Tylko przy odpowiednim wyposażeniu i dostępności zweryfikowanego polecenia BCM.</string>
+    <string name="control_door_locks_title">Zamki drzwi</string>
+    <string name="control_door_locks_explanation">Chronione polecenie nadwozia: należy zweryfikować adresowanie, zabezpieczenia i stan pojazdu.</string>
+    <string name="control_lights_title">Światła</string>
+    <string name="control_lights_explanation">Funkcje oświetlenia zależą od BCM, wyposażenia i rynku.</string>
+    <string name="control_horn_explanation">Sygnał dźwiękowy pozostaje nieaktywny bez zweryfikowanej procedury GM i potwierdzenia użytkownika.</string>
+    <string name="control_mirrors_title">Lusterka</string>
+    <string name="control_mirrors_explanation">Polecenie należy zweryfikować dla wyposażenia i wersji BCM.</string>
+    <string name="control_trunk_explanation">Polecenie należy zweryfikować dla rodzaju nadwozia, BCM i stanu pojazdu.</string>
+    <string name="control_remote_start_title">Zdalny rozruch</string>
+    <string name="control_remote_start_explanation">Nie można bezpiecznie sterować ogólną ramką OBD. Używaj wyłącznie zatwierdzonego przez producenta systemu zdalnego rozruchu i jego blokad (Park, hamulec postojowy, zamknięta maska, brak krytycznych usterek). CamaroDiag nie wysyła polecenia rozruchu silnika.</string>
+    <string name="remote_start_blocker_gear">Nie potwierdzono pozycji Park skrzyni biegów.</string>
+    <string name="remote_start_blocker_hood">Nie potwierdzono zamknięcia maski.</string>
+    <string name="remote_start_blocker_locks">Nie potwierdzono zamknięcia zamków drzwi.</string>
+    <string name="remote_start_blocker_hazards">Nie potwierdzono wyłączenia świateł awaryjnych.</string>
+    <string name="remote_start_blocker_theft">Nie potwierdzono gotowości systemu przeciwkradzieżowego.</string>
+    <string name="remote_start_blocker_faults">Nie potwierdzono braku krytycznych usterek.</string>
+    <string name="remote_start_blocker_stationary">Nie potwierdzono postoju pojazdu.</string>
+    <string name="remote_start_blocker_equipment">Nie potwierdzono fabrycznego wyposażenia do zdalnego rozruchu.</string>
 </resources>
