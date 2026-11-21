@@ -48,6 +48,18 @@ internal object J2534StandardObd {
         require(reply.size >= 3 && reply.u(0) == 0x41 && reply.u(1) == pid) {
             "Invalid or negative Mode 01 response."
         }
+        // Enforce exact data length for the standard signals used by the
+        // fuel/ethanol monitor. ISO-TP padding is not part of a J2534 payload.
+        val expected = when (pid) {
+            0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+            0x0D, 0x0E, 0x0F, 0x11, 0x45, 0x52 -> 1
+            0x0C, 0x10, 0x14, 0x15, 0x16, 0x17, 0x43, 0x44 -> 2
+            0x24, 0x25, 0x34, 0x35, 0xA6 -> 4
+            else -> null // do not guess lengths of other or manufacturer-specific PIDs
+        }
+        require(expected == null || reply.size == expected + 2) {
+            "Invalid Mode 01 data length for PID 0x" + "%02X".format(Locale.ROOT,pid)
+        }
         return reply.copyOfRange(2, reply.size)
     }
 

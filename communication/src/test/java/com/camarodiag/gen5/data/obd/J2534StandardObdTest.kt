@@ -67,6 +67,22 @@ class J2534StandardObdTest {
         assertEquals(setOf(7),snapshot.unavailableModes)
         assertEquals(listOf(ObdDtc("P0300","confirmed")),snapshot.records)
     }
+    @Test fun fuelAndEthanolTelemetryRejectsShortOrPaddedPayloads() {
+        assertArrayEquals(bytes(0),J2534StandardObd.pidData(0x52,bytes(0x41,0x52,0)))
+        assertArrayEquals(bytes(255),J2534StandardObd.pidData(0x52,bytes(0x41,0x52,255)))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.pidData(0x52,bytes(0x41,0x52,128,0))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.pidData(0x0C,bytes(0x41,0x0C,0x1A))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.pidData(0x44,bytes(0x41,0x44,0x80,0,0))
+        }
+        assertArrayEquals(bytes(0x80,0,0,0),
+            J2534StandardObd.pidData(0x34,bytes(0x41,0x34,0x80,0,0,0)))
+    }
+
     @Test fun noFunctionalOrSwCanChannel() {
         assertTrue(J2534StandardObd.supportsChannel(0x7E0,0x7E8,33))
         assertTrue(J2534StandardObd.supportsChannel(0x18DA10F1,0x18DAF110,34))
