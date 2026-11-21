@@ -886,4 +886,13 @@
     <string name="license_owner">所有者：全部权限</string>
     <string name="license_premium">完整许可证已激活</string>
     <string name="license_title">CamaroDiag 许可证</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">下载 PR #70 的最新 Debug 构建产物。请使用获得授权的 GitHub 账户登录。下载内容为需要解压的 ZIP 文件。</string>
+    <string name="debug_builds_android_archive">包含 Android Debug APK 的 ZIP 文件。</string>
+    <string name="debug_builds_windows_archive">包含 Windows x64 和 x86 安装程序的 ZIP 文件。</string>
+    <string name="debug_builds_caution">构建产物将在 30 天后过期。能够下载不代表编译成功或已完成实车测试。Debug APK 的签名可能与公开版本不同。</string>
+    <string name="debug_builds_created">创建于</string>
+    <string name="debug_builds_expires">过期于</string>
+    <string name="debug_builds_no_browser">没有可用的浏览器打开下载链接。</string>
 </resources>
