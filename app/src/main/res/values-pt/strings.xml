@@ -893,4 +893,13 @@
     <string name="license_owner">Proprietário: todas as permissões</string>
     <string name="license_premium">Licença completa ativa</string>
     <string name="license_title">Licença CamaroDiag</string>
+
+    <!-- Owner-only Debug download details -->
+    <string name="debug_builds_intro">Transfira os últimos artefactos Debug da PR #70. Inicie sessão no GitHub com uma conta autorizada. As transferências são arquivos ZIP a extrair.</string>
+    <string name="debug_builds_android_archive">ZIP que contém o APK Android Debug.</string>
+    <string name="debug_builds_windows_archive">ZIP que contém os instaladores Windows x64 e x86.</string>
+    <string name="debug_builds_caution">Os artefactos expiram após 30 dias. A disponibilidade não comprova uma compilação bem-sucedida nem testes no veículo. As assinaturas dos APK Debug podem diferir das versões públicas.</string>
+    <string name="debug_builds_created">Criado</string>
+    <string name="debug_builds_expires">Expira</string>
+    <string name="debug_builds_no_browser">Não existe navegador disponível para abrir esta transferência.</string>
 </resources>
