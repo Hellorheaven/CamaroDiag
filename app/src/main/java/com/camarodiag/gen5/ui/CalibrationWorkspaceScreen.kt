@@ -274,6 +274,7 @@ fun CalibrationWorkspaceScreen(
     var selectedObdbSignalId by remember { mutableStateOf("") }
     val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
         ?: state.obdbSignals.firstOrNull()
+    val profileUses29BitIds = udsCanProtocol in setOf("34", "36", "64")
     val canIdsMatchProfile = J2534CanProfileValidation.isValid(
         udsRequestCanId, udsResponseCanId, udsCanProtocol
     )
