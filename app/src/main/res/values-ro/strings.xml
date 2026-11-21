@@ -521,4 +521,23 @@
     <string name="adapter_vxdiag_profiles">Profiluri declarate ale interfețelor VXDIAG</string>
     <string name="adapter_vxdiag_profiles_hint">Profilurile diferențiază variantele hardware și de conexiune. Nu confirmă disponibilitatea unui driver Android sau a comunicației cu vehiculul.</string>
     <string name="adapter_simulation_profiles">Profiluri hardware simulate (test pe banc)</string>
+    <string name="modules_vehicle_title">Modulele de comandă ale vehiculului</string>
+    <string name="module_accessible">Accesibil</string>
+    <string name="module_requires_swcan">Necesită SW-CAN (pinul 1)</string>
+    <string name="module_blocked_adapter">Blocat de adaptor</string>
+    <string name="module_not_equipped">Neinstalat</string>
+    <string name="module_discovery_required">Este necesară detectarea modulelor vehiculului</string>
+    <string name="live_engine_telemetry">Telemetrie motor în timp real</string>
+    <string name="live_resume">Reia</string>
+    <string name="live_stop_recording">Oprește înregistrarea</string>
+    <string name="live_record">Înregistrează date în timp real</string>
+    <string name="live_export_csv">Exportă CSV</string>
+    <string name="live_recording_notice">Înregistratorul salvează valorile OBD afișate (metrice) cu marcaje temporale. Nu modifică tabelele de calibrare ECU.</string>
+    <string name="dtc_title">Coduri de eroare de diagnosticare</string>
+    <string name="dtc_clear_warning">Ștergerea în modul 04 elimină codurile de eroare legate de emisii și resetează unele monitoare de disponibilitate. Salvați raportul înainte de a continua. Modul 04 nu șterge codurile DTC avansate din alte module ale vehiculului.</string>
+    <string name="dtc_none_returned">Ultima scanare nu a returnat coduri de eroare.</string>
+    <string name="dtc_confirm_clear">Confirmați ștergerea codurilor DTC?</string>
+    <string name="dtc_clear_description">Se trimite modul OBD 04 către ECU. Datele de disponibilitate pot fi resetate. Aceasta nu remediază cauza defecțiunii.</string>
+    <string name="dtc_clear_action">Șterge codurile</string>
+    <string name="common_save">Salvează</string>
 </resources>
