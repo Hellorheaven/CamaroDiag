@@ -5,6 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.camarodiag.gen5.ui.CamaroDiagUpdateCleanup
 import com.camarodiag.gen5.auth.CamaroAuthGate
 import com.camarodiag.gen5.ui.CamaroDiagApp
 import com.camarodiag.gen5.ui.MainViewModel
