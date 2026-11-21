@@ -376,4 +376,19 @@
     <string name="cal_j2534_launch_instructions">Ħaddem CamaroDiag.J2534Bridge.exe fuq Windows. Daħħal l-IP tal-PC u l-kodiċi sħiħ (token.marka TLS) muri fil-console. Uża netwerk lokali fdat.</string>
     <string name="cal_j2534_security_notice">TLS 1.2+ u l-verifika tal-marka taċ-ċertifikat huma obbligatorji. Tokens antiki mingħajr marka jiġu miċħuda. Tesponix il-port għall-Internet.</string>
     <string name="cal_pc_pairing_token">Kodiċi TLS (token.marka)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Testijiet funzjonali</string>
+    <string name="functional_tests_title">Testijiet funzjonali — ECU u OBD</string>
+    <string name="functional_tests_readonly">Wettaq il-kontrolli kollha disponibbli għall-qari biss permezz tal-adapter fiżiku mqabbad. Adapters oħra u ECU mhux ivverifikati jintwerew bħala MHUX ITTESTJATI. Ebda tħassir, attivazzjoni jew programmar.</string>
+    <string name="functional_tests_run">Ibda kollha</string>
+    <string name="functional_tests_stop">Waqqaf</string>
+    <string name="functional_tests_export">Esporta JSON</string>
+    <string name="functional_tests_summary">%1$d għaddew · %2$d fallew · %3$d mhux ittestjati</string>
+    <string name="functional_tests_passed">GĦADDA (evidenza fiżika)</string>
+    <string name="functional_tests_failed">FALLA</string>
+    <string name="functional_tests_skipped">MHUX ITTESTJAT</string>
+    <string name="functional_tests_denied">Aċċess miċħud: idħol bil-kont Google awtorizzat u erġa qabbad.</string>
+    <string name="functional_tests_not_connected">L-ebda adapter OBD fiżiku mhu mqabbad. Il-kontrolli l-oħra ma sarux.</string>
+    <string name="functional_tests_cancelled">Is-sessjoni tat-testijiet ġiet ikkanċellata.</string>
 </resources>
