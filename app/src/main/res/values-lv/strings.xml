@@ -583,4 +583,11 @@
     <string name="msg_live_csv_exported">CSV žurnāls eksportēts. Mērījumu skaits: %1$d.</string>
     <string name="msg_live_csv_export_failed">Neizdevās eksportēt CSV žurnālu.</string>
     <string name="msg_live_recording_max_samples">Sasniegta drošības robeža (%1$d). Ierakstīšana automātiski apturēta.</string>
+    <string name="msg_cal_file_import_failed">Neizdevās importēt kalibrēšanas failu.</string>
+    <string name="msg_cal_file_export_failed">Neizdevās eksportēt kalibrēšanas failu.</string>
+    <string name="msg_cal_comparison_failed">Neizdevās salīdzināt kalibrēšanas failus.</string>
+    <string name="msg_cal_template_export_failed">Neizdevās eksportēt TSV veidni.</string>
+    <string name="msg_cal_definitions_import_failed">Neizdevās importēt tabulu definīcijas.</string>
+    <string name="msg_cal_map_read_failed">Neizdevās nolasīt atlasīto tabulu.</string>
+    <string name="msg_cal_table_edit_failed">Neizdevās rediģēt kalibrēšanas tabulu.</string>
 </resources>
