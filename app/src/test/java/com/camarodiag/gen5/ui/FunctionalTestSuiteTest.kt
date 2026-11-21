@@ -26,6 +26,25 @@ class FunctionalTestSuiteTest {
         }
     }
 
+    @Test fun exportRequiresCompletedRunWithCapturedEvidenceContext() {
+        val context = FunctionalTestContext("1G1FA1RXXR0123456","Test adapter","J2534_BRIDGE",42)
+        val rows = FunctionalTestPlanner.initial(modules,"J2534_BRIDGE",true)
+        val started = FunctionalTestState(running = true, startedAtMillis = 1,
+            checks = rows, context = context)
+        assertTrue(!started.canExport)
+        val completed = started.copy(running = false, finishedAtMillis = 2)
+        assertTrue(completed.canExport)
+        assertEquals(context,completed.context)
+        assertTrue(!completed.copy(context = null).canExport)
+        assertTrue(!completed.copy(checks = emptyList()).canExport)
+        assertTrue(!completed.copy(finishedAtMillis = null).canExport)
+        // Interrupted evidence may be exported, but does not become a PASS.
+        val interrupted = completed.copy(error = "Disconnected")
+        assertTrue(interrupted.canExport)
+        assertTrue(interrupted.checks.filter { it.group == "ecu" }
+            .all { it.outcome == FunctionalTestOutcome.NOT_TESTED })
+    }
+
     @Test fun updateChangesOnlyTheTarget() {
         val rows = FunctionalTestPlanner.initial(modules, "BLE", true)
         val updated = FunctionalTestPlanner.updated(
