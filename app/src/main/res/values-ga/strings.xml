@@ -391,4 +391,19 @@
     <string name="functional_tests_denied">Rochtain diúltaithe: sínigh isteach leis an gcuntas Google údaraithe agus athcheangail.</string>
     <string name="functional_tests_not_connected">Níl aon oiriúntóir fisiciúil OBD nasctha. Ní dhearnadh na seiceálacha eile.</string>
     <string name="functional_tests_cancelled">Cuireadh an feachtas tástála ar ceal.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Leaganacha dífhabhtaithe</string>
+    <string name="tab_license">Ceadúnas</string>
+    <string name="debug_builds_title">Leaganacha dífhabhtaithe príobháideacha</string>
+    <string name="debug_builds_refresh">Athnuaigh na leaganacha atá ar fáil</string>
+    <string name="debug_builds_download">Íoslódáil ó GitHub</string>
+    <string name="debug_builds_unavailable">Níl aon chartlann dífhabhtaithe bhailí ar fáil.</string>
+    <string name="debug_builds_error">Níorbh fhéidir na leaganacha dífhabhtaithe a luchtú ó GitHub.</string>
+    <string name="license_disabled">Níl an córas ceadúnaithe cumasaithe.</string>
+    <string name="license_buy">Ceannaigh ceadúnas</string>
+    <string name="license_refresh">Athnuaigh an ceadúnas</string>
+    <string name="license_free">Saor in aisce</string>
+    <string name="license_owner">Úinéir: gach cead</string>
+    <string name="license_premium">Ceadúnas iomlán gníomhach</string>
+    <string name="license_title">Ceadúnas CamaroDiag</string>
 </resources>
