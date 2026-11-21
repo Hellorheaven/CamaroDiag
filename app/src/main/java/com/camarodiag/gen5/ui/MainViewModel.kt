@@ -3250,7 +3250,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
                     if (!current()) return@launch
-                    if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
+                    if (com.camarodiag.gen5.data.obd.StandardObdClearEvidence.acknowledged(response)) {
                         // SAE Mode 04 clears standardized emissions DTCs only.
                         // Preserve enhanced UDS records from other ECUs: no GM UDS clear is issued here.
                         _dtcs.value = _dtcs.value.filterNot {
