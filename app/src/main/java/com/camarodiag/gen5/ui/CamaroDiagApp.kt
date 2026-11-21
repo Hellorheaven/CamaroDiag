@@ -1,7 +1,9 @@
 package com.camarodiag.gen5.ui
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.content.ContextCompat
 import android.widget.Toast
 import androidx.core.content.edit
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -181,16 +183,49 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
 
+    val permissionContext = LocalContext.current
+    var pendingBluetoothMac by remember { mutableStateOf<String?>(null) }
     val btPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        viewModel.refreshPairedDevices()
+    ) { results ->
+        if (results.values.all { it }) {
+            viewModel.refreshPairedDevices()
+            pendingBluetoothMac?.let(viewModel::connectRealBluetooth)
+        }
+        pendingBluetoothMac = null
     }
 
     val bleLocationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) viewModel.refreshPairedDevices()
+        if (granted) {
+            viewModel.refreshPairedDevices()
+            pendingBluetoothMac?.let(viewModel::connectRealBluetooth)
+        }
+        pendingBluetoothMac = null
+    }
+
+    // Bluetooth permissions are requested ONLY after the user explicitly
+    // refreshes paired devices or selects a Bluetooth adapter, never at app launch.
+    fun withBluetoothPermission(mac: String? = null) {
+        val required = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        if (required.all {
+            ContextCompat.checkSelfPermission(permissionContext, it) == PackageManager.PERMISSION_GRANTED
+        }) {
+            viewModel.refreshPairedDevices()
+            mac?.let(viewModel::connectRealBluetooth)
+        } else {
+            pendingBluetoothMac = mac
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                btPermLauncher.launch(required)
+            } else {
+                bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
     }
 
     val vinPhotoLauncher = rememberLauncherForActivityResult(
@@ -289,15 +324,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
-        } else {
-            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-    }
-
-    Scaffold(
+     Scaffold(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark),
@@ -514,8 +541,8 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
                     isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
-                    onRefreshDevices = { viewModel.refreshPairedDevices() },
-                    onConnectMac = { viewModel.connectRealBluetooth(it) },
+                    onRefreshDevices = { withBluetoothPermission() },
+                    onConnectMac = { mac -> withBluetoothPermission(mac) },
                     onSelectSim = { viewModel.selectSimulatedAdapter(it) },
                     usbDevices = usbDevices,
                     onRefreshUsb = { viewModel.refreshPairedDevices() },
