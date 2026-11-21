@@ -607,4 +607,6 @@
     <string name="cal_tcp_port">TCP-portti</string>
     <string name="msg_refresh_adapters_failed">Sovitinluettelon päivitys epäonnistui.</string>
     <string name="msg_usb_identifier_unavailable">USB-laitteen tunniste ei ole saatavilla</string>
+    <string name="msg_simulation_activation_failed">Simulointitilan käyttöönotto epäonnistui.</string>
+    <string name="msg_live_simulation_active">Simulointi on käytössä. Näytetyt arvot eivät ole peräisin ajoneuvosta.</string>
 </resources>
