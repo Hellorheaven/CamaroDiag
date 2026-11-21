@@ -521,4 +521,23 @@
     <string name="adapter_vxdiag_profiles">Deklarerade VXDIAG-gränssnittsprofiler</string>
     <string name="adapter_vxdiag_profiles_hint">Profilerna skiljer på hårdvaru- och anslutningsvarianter. De bekräftar inte tillgång till Android-drivrutin eller fordonskommunikation.</string>
     <string name="adapter_simulation_profiles">Simulerade hårdvaruprofiler (bänktest)</string>
+    <string name="modules_vehicle_title">Fordonets styrenheter</string>
+    <string name="module_accessible">Tillgänglig</string>
+    <string name="module_requires_swcan">Kräver SW-CAN (stift 1)</string>
+    <string name="module_blocked_adapter">Blockerad av adaptern</string>
+    <string name="module_not_equipped">Inte installerad</string>
+    <string name="module_discovery_required">Identifiering av fordonsmoduler krävs</string>
+    <string name="live_engine_telemetry">Motortelemetri i realtid</string>
+    <string name="live_resume">Återuppta</string>
+    <string name="live_stop_recording">Stoppa inspelning</string>
+    <string name="live_record">Spela in realtidsdata</string>
+    <string name="live_export_csv">Exportera CSV</string>
+    <string name="live_recording_notice">Loggaren registrerar visade OBD-värden (metriska) med tidsstämplar. Den ändrar inte ECU:ns kalibreringstabeller.</string>
+    <string name="dtc_title">Diagnostiska felkoder</string>
+    <string name="dtc_clear_warning">Radering i läge 04 tar bort emissionsrelaterade felkoder och återställer vissa beredskapsmonitorer. Spara rapporten innan du fortsätter. Läge 04 raderar inte utökade felkoder i andra fordonsmoduler.</string>
+    <string name="dtc_none_returned">Den senaste avsökningen returnerade inga felkoder.</string>
+    <string name="dtc_confirm_clear">Bekräfta radering av DTC?</string>
+    <string name="dtc_clear_description">Detta skickar OBD-läge 04 till ECU. Beredskapsdata kan återställas. Det åtgärdar inte orsaken till felet.</string>
+    <string name="dtc_clear_action">Radera koder</string>
+    <string name="common_save">Spara</string>
 </resources>
