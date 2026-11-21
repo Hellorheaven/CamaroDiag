@@ -109,10 +109,39 @@ object EcuWriteTransaction {
     }
 
     /**
-     * No externally supplied driver is accepted here. Until validated hardware
-     * drivers are explicitly registered, no erase/write call is possible.
+     * Public hardware entrypoint. The destination must be in persistent, app-private
+     * storage. No destructive operation is permitted without the journal being
+     * created and successfully synced; an earlier log is never overwritten.
+     * An ECU writer still needs to be explicitly registered after bench validation.
      */
     suspend fun execute(
+        request: Request,
+        journalFile: java.io.File,
+        powerMonitor: PowerMonitor
+    ): Outcome {
+        val preparation = prepare(request)
+        if (!preparation.canAttemptWithValidatedHardware) {
+            return Outcome(Status.BLOCKED, preparation.blockers)
+        }
+        if (preparation.changedBytes == 0L) return Outcome(Status.NO_CHANGE)
+        val driver = EcuProgrammingDriverContract.registeredHardwareDrivers.firstOrNull {
+            it.descriptor.supportsWrite(request.firmwareTarget, request.transport)
+        } ?: return Outcome(Status.BLOCKED, setOf(Blocker.NO_VALIDATED_DRIVER))
+        val journal = try {
+            PersistentEcuWriteJournal(
+                journalFile, request.firmwareTarget, requireNotNull(request.expectedIdentity.vin)
+            )
+        } catch (_: Exception) {
+            return Outcome(Status.STOPPED_REQUIRES_ASSESSMENT)
+        }
+        return EcuWriteExecutionEngine(driver, journal, powerMonitor).run(request)
+    }
+
+    /**
+     * Internal test harness. Application callers cannot supply a volatile journal:
+     * live programming must use the public file-backed entrypoint above.
+     */
+    internal suspend fun execute(
         request: Request,
         journal: Journal,
         powerMonitor: PowerMonitor
