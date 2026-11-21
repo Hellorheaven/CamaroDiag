@@ -600,4 +600,6 @@
     <string name="units_metric_details">Metrické jednotky (km, °C, kPa)</string>
     <string name="units_imperial_details">Imperiálne jednotky (mi, °F, psi)</string>
     <string name="cal_tcp_port">Port TCP</string>
+    <string name="msg_refresh_adapters_failed">Zoznam adaptérov sa nepodarilo obnoviť.</string>
+    <string name="msg_usb_identifier_unavailable">Identifikátor zariadenia USB nie je dostupný</string>
 </resources>
