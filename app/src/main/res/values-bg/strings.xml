@@ -566,4 +566,19 @@
     <string name="live_pid_wbo2_b1s2">Широколентова ламбда B1S2</string>
     <string name="live_pid_wbo2_b2s1">Широколентова ламбда B2S1</string>
     <string name="live_pid_wbo2_b2s2">Широколентова ламбда B2S2</string>
+
+    <!-- Private functional-test laboratory: genuine bg translations -->
+    <string name="tab_functional_tests">Функционални тестове</string>
+    <string name="functional_tests_title">Функционални тестове — ECU и OBD</string>
+    <string name="functional_tests_readonly">Изпълнете всички налични проверки само за четене през свързания физически адаптер. Другите адаптери и непотвърдените ECU се отбелязват като НЕТЕСТВАНИ. Без изтриване, управление или препрограмиране.</string>
+    <string name="functional_tests_run">Стартирай всички</string>
+    <string name="functional_tests_stop">Спри</string>
+    <string name="functional_tests_export">Експорт JSON</string>
+    <string name="functional_tests_summary">%1$d успешни · %2$d неуспешни · %3$d нетест­вани</string>
+    <string name="functional_tests_passed">УСПЕШЕН (физическо потвърждение)</string>
+    <string name="functional_tests_failed">НЕУСПЕШЕН</string>
+    <string name="functional_tests_skipped">НЕТЕСТВАН</string>
+    <string name="functional_tests_denied">Достъпът е отказан: влезте с разрешения Google акаунт и се свържете отново.</string>
+    <string name="functional_tests_not_connected">Няма свързан физически OBD адаптер. Останалите проверки не са изпълнени.</string>
+    <string name="functional_tests_cancelled">Тестовата кампания е отменена.</string>
 </resources>
