@@ -146,3 +146,15 @@ Ces composants sont des parties concrètes du futur pilote : **ils ne sont pas e
 ### Identification physique GMLAN en lecture seule
 
 Après l'ouverture d'un canal J2534, l'opération TLS du pont `identifyGmlan` interroge les DID GM `0x90` (VIN) et `0xC1`/`0xC9` (identifiant OS). Le service `0x1A` est autorisé **uniquement pour ces trois identifiants**, en lecture seule. Le résultat indique le VIN, l'OSID, le DID retenu et précise que l'écriture physique n'est pas qualifiée. C'est une lecture réellement pilotée par la DLL J2534 de l'interface, et non une valeur simulée, lorsqu'elle est utilisée sur un PC équipé d'un boîtier connecté.
+
+### Corriger les checksums d'une calibration E39/E39A (hors ligne)
+
+Sur Windows, avec une **sauvegarde brute complète et vérifiée du calculateur** et une image modifiée de même taille (3 Mio), exécuter :
+
+```powershell
+CamaroDiag.J2534Bridge.exe --repair-e39-cal-checksums original.bin calibration-modifiee.bin calibration-corrigee.bin
+```
+
+Le programme vérifie les deux images, refuse les changements en dehors des calibrations (y compris le boot protégé, le système d'exploitation et les zones non répertoriées), recalcule les sommes de contrôle et CVN des segments modifiés, puis crée un **nouveau** fichier complet. Il ne remplace jamais les fichiers d'entrée ou un fichier de sortie déjà existant. La sortie affiche l'OSID, les segments modifiés et les empreintes SHA-256. Un contrôle de relecture du résultat est effectué avant de déclarer la réussite. Code de sortie `0` en cas de succès, `10` en cas de refus/échec.
+
+**Cette commande n'écrit rien dans le calculateur**. Un fichier avec sommes de contrôle correctes n'est pas une preuve de compatibilité matérielle, ni une autorisation de flash ; la version réelle, l'alimentation et la récupération doivent être validées avec le boîtier J2534 et un calculateur de banc avant toute programmation.
