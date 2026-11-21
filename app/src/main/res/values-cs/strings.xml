@@ -649,4 +649,27 @@
     <string name="remote_start_blocker_faults">Nepřítomnost kritických závad není potvrzena.</string>
     <string name="remote_start_blocker_stationary">Stání vozidla není potvrzeno.</string>
     <string name="remote_start_blocker_equipment">Originální výbava pro dálkové startování není potvrzena.</string>
+    <string name="mileage_summary_discrepancy">Ověřené nezávislé zdroje se liší o %1$.1f km. Zkontrolujte výměnu nebo přeprogramování modulů a servisní historii. Jde o podnět k prověření, nikoli důkaz manipulace.</string>
+    <string name="mileage_summary_agreement">Ověřené nezávislé zdroje se shodují s odchylkou do %1$.1f km. To nezaručuje pravost historie najetých kilometrů.</string>
+    <string name="mileage_summary_no_data">Nebyla načtena spolehlivá hodnota celkového počítadla kilometrů. BCM a IPC zůstávají neověřeny; žádná hodnota není simulována.</string>
+    <string name="mileage_summary_insufficient">Použitelné údaje o kilometrech: %1$d; ověřené nezávislé ECU s vysokou mírou důvěry: %2$d. Pro porovnání chybí dostatek údajů.</string>
+    <string name="mileage_source_j2534">Most J2534 (pouze UDS)</string>
+    <string name="mileage_source_ecm_a6">Počítadlo kilometrů OBD (PID A6)</string>
+    <string name="mileage_source_ecm_d3">Počítadlo kilometrů motoru (PID D3)</string>
+    <string name="mileage_source_ecm_total">Celkové počítadlo ECM</string>
+    <string name="mileage_details_j2534">Režim 01 OBD-II není u tohoto přenosu dostupný</string>
+    <string name="mileage_details_pid">Režim 01 PID %1$s • %2$s</string>
+    <string name="mileage_pid_not_advertised">ECU jej neuvádí</string>
+    <string name="mileage_details_module_not_read">Nečteno: vyžaduje ověřený profil adresování/DID GM</string>
+    <string name="mileage_caveat_j2534">Připojený most PC poskytuje přenos UDS, nikoli příkazový kanál ELM/SAE J1979. PID počítadla kilometrů OBD nebyl dotazován.</string>
+    <string name="mileage_caveat_demo">Demo režim nikdy neukazuje skutečný stav počítadla vozidla.</string>
+    <string name="mileage_caveat_ecm_a6_valid">Hodnota počítadla OBD hlášená ECU. Jde o údaj jedné ECU, nikoli nezávislou kontrolu více modulů.</string>
+    <string name="mileage_caveat_ecm_a6_missing">ECU PID A6 neuvedla nebo nevrátila platnou odpověď.</string>
+    <string name="mileage_caveat_ecm_d3_valid">Pouze hodnota ECU motoru; nejde o nezávislé potvrzení BCM/IPC.</string>
+    <string name="mileage_caveat_ecm_d3_missing">ECU PID D3 neuvedla nebo nevrátila platnou odpověď.</string>
+    <string name="mileage_caveat_bcm">Údaje počítadla kilometrů BCM nebyly dotazovány: není nainstalován ověřený profil adresy/DID pro daný VIN.</string>
+    <string name="mileage_caveat_ipc">Údaje počítadla kilometrů IPC nebyly dotazovány: není nainstalován ověřený profil adresy/DID pro daný VIN.</string>
+    <string name="mileage_source_generic">Zdroj %1$s</string>
+    <string name="mileage_details_unavailable">Technické podrobnosti pro tento zdroj nejsou dostupné.</string>
+    <string name="mileage_caveat_unavailable">Pro tento zdroj nejsou dostupné další lokalizované informace.</string>
 </resources>
