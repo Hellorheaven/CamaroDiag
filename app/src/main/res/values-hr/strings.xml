@@ -255,7 +255,7 @@
     <string name="cal_can_request_id">CAN ID zahtjeva (npr. 7E0)</string>
     <string name="cal_can_response_id">CAN ID odgovora (npr. 7E8)</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
-    <string name="cal_j2534_security_notice">Sigurnost: token nije šifriran TLS-om. Koristite pouzdanu privatnu mrežu i nikada ne izlažite ovaj priključak internetu.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ i provjera otiska certifikata su obvezni. Stari tokeni bez otiska se odbijaju. Nikada ne izlažite port internetu.</string>
     <string name="cal_native_catalog_title">VLASTITI KATALOG CAMARODIAG</string>
     <string name="cal_native_catalog_explanation">Definicije održava CamaroDiag, neovisno o katalozima zajednice. Predložene ili dokumentirane definicije nikada se ne šalju ECU-u.</string>
     <string name="cal_native_catalog_loading">Učitavanje vlastitog kataloga…</string>
@@ -375,9 +375,9 @@
     <string name="cal_uds_transport_hint">STPX prijenos za OBDLink STN ili računalni most J2534 za VXDIAG. Unesite potvrđene fizičke CAN identifikatore; GM adrese ne pretpostavljaju se.</string>
     <string name="cal_can_profile">CAN profil: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_j2534_bridge_title">RAČUNALNI MOST J2534 • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">Pokrenite CamaroDiag.J2534Bridge.exe na računalu sa sustavom Windows, zatim unesite njegovu IP adresu i token prikazan u konzoli. Oba uređaja moraju biti na istoj lokalnoj mreži.</string>
+    <string name="cal_j2534_launch_instructions">Pokrenite CamaroDiag.J2534Bridge.exe na Windows računalu. Unesite IP računala i puni kod (token.TLS otisak) prikazan u konzoli. Koristite pouzdanu lokalnu mrežu.</string>
     <string name="cal_pc_ip_address">IP adresa računala</string>
-    <string name="cal_pc_pairing_token">Token za uparivanje računala</string>
+    <string name="cal_pc_pairing_token">TLS kod (token.otisak)</string>
     <string name="cal_connect_j2534">Poveži most J2534</string>
     <string name="cal_disconnect_pc_bridge">Prekini vezu s računalnim mostom</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Most: HS-CAN ISO15765 250/500 kbit/s i J2534-2 SW-ISO15765 ako ih upravljački program podržava. CAN FD ostaje isključen.</string>

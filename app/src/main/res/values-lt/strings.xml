@@ -370,4 +370,7 @@
     <string name="about_checking">Tikrinama…</string>
     <string name="about_update_found">Yra nauja versija.</string>
     <string name="about_version">Įdiegta versija: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Paleiskite CamaroDiag.J2534Bridge.exe sistemoje Windows. Įveskite kompiuterio IP ir visą kodą (žetonas.TLS atspaudas) iš konsolės. Naudokite patikimą vietinį tinklą.</string>
+    <string name="cal_j2534_security_notice">Privalomi TLS 1.2+ ir sertifikato atspaudo patikra. Seni žetonai be atspaudo atmetami. Niekada neatverkite prievado internetui.</string>
+    <string name="cal_pc_pairing_token">TLS kodas (žetonas.atspaudas)</string>
 </resources>

@@ -139,10 +139,10 @@
     <string name="cal_can_profile">פרופיל CAN: ‏33/34 HS-CAN 500k • ‏35/36 HS-CAN 250k • ‏63/64 SW-CAN</string>
     <string name="cal_uds_did">DID של UDS ‏(F190 = VIN)</string>
     <string name="cal_j2534_bridge_title">גשר J2534 למחשב • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">הפעל את CamaroDiag.J2534Bridge.exe במחשב Windows, ולאחר מכן הזן את כתובת ה-IP שלו ואת האסימון שמוצג במסוף. שני המכשירים חייבים להיות באותה רשת מקומית.</string>
-    <string name="cal_j2534_security_notice">אבטחה: האסימון אינו מוצפן באמצעות TLS. השתמש ברשת פרטית מהימנה ולעולם אל תחשוף יציאה זו לאינטרנט.</string>
+    <string name="cal_j2534_launch_instructions">הפעל את CamaroDiag.J2534Bridge.exe במחשב Windows. הזן את כתובת ה-IP של המחשב ואת הקוד המלא (אסימון.טביעת TLS) המוצג במסוף. השתמש ברשת מקומית מהימנה.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ ואימות טביעת האצבע של האישור הם חובה. אסימונים ישנים ללא טביעה נדחים. אין לחשוף את היציאה לאינטרנט.</string>
     <string name="cal_pc_ip_address">כתובת IP של המחשב</string>
-    <string name="cal_pc_pairing_token">אסימון צימוד של המחשב</string>
+    <string name="cal_pc_pairing_token">קוד TLS (אסימון.טביעה)</string>
     <string name="cal_connect_j2534">חבר גשר J2534</string>
     <string name="cal_disconnect_pc_bridge">נתק את גשר המחשב</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">גשר: ‏HS-CAN ISO15765 במהירות 250/500 kbit/s ו-SW-ISO15765 J2534-2 אם מנהל ההתקן תומך בכך. CAN FD נשאר מושבת.</string>

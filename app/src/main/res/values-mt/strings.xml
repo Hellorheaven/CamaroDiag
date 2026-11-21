@@ -373,4 +373,7 @@
     <string name="about_checking">Qed jiġi ċċekkjat…</string>
     <string name="about_update_found">Verżjoni ġdida hija disponibbli.</string>
     <string name="about_version">Verżjoni installata: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Ħaddem CamaroDiag.J2534Bridge.exe fuq Windows. Daħħal l-IP tal-PC u l-kodiċi sħiħ (token.marka TLS) muri fil-console. Uża netwerk lokali fdat.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ u l-verifika tal-marka taċ-ċertifikat huma obbligatorji. Tokens antiki mingħajr marka jiġu miċħuda. Tesponix il-port għall-Internet.</string>
+    <string name="cal_pc_pairing_token">Kodiċi TLS (token.marka)</string>
 </resources>

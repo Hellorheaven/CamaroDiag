@@ -364,4 +364,7 @@
     <string name="about_checking">Ellenőrzés…</string>
     <string name="about_update_found">Új verzió érhető el.</string>
     <string name="about_version">Telepített verzió: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Indítsd el a CamaroDiag.J2534Bridge.exe programot Windows alatt. Add meg a PC IP-címét és a konzolon látható teljes kódot (token.TLS-ujjlenyomat). Használj megbízható helyi hálózatot.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ és a tanúsítvány ujjlenyomatának ellenőrzése kötelező. A régi, csak tokent tartalmazó kódok nem használhatók. Ne tedd elérhetővé a portot az interneten.</string>
+    <string name="cal_pc_pairing_token">TLS-kód (token.ujjlenyomat)</string>
 </resources>

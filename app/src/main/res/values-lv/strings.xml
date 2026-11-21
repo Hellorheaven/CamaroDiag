@@ -367,4 +367,7 @@
     <string name="about_checking">Pārbauda…</string>
     <string name="about_update_found">Pieejama jauna versija.</string>
     <string name="about_version">Instalētā versija: %1$s</string>
+    <string name="cal_j2534_launch_instructions">Palaidiet CamaroDiag.J2534Bridge.exe Windows datorā. Ievadiet datora IP un pilno kodu (marķieris.TLS nospiedums) no konsoles. Izmantojiet uzticamu lokālo tīklu.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ un sertifikāta nospieduma pārbaude ir obligāta. Veci marķieri bez nospieduma tiek noraidīti. Nekad neatveriet portu internetam.</string>
+    <string name="cal_pc_pairing_token">TLS kods (marķieris.nospiedums)</string>
 </resources>

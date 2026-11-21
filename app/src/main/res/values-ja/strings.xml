@@ -139,10 +139,10 @@
     <string name="cal_can_profile">CANプロファイル：33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_uds_did">UDS DID（F190 = VIN）</string>
     <string name="cal_j2534_bridge_title">J2534 PCブリッジ • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">Windows PCでCamaroDiag.J2534Bridge.exeを起動し、PCのIPアドレスとコンソールに表示されたトークンを入力します。両方の機器を同じローカルネットワークに接続してください。</string>
-    <string name="cal_j2534_security_notice">セキュリティ：トークンはTLSで暗号化されません。信頼できるプライベートネットワークを使用し、このポートをインターネットに公開しないでください。</string>
+    <string name="cal_j2534_launch_instructions">Windows PCでCamaroDiag.J2534Bridge.exeを起動し、PCのIPとコンソールに表示された完全なコード（トークン.TLS証明書指紋）を入力してください。信頼できるローカルネットワークを使用してください。</string>
+    <string name="cal_j2534_security_notice">TLS 1.2以上と証明書指紋の照合が必須です。トークンのみの旧方式は拒否されます。ポートをインターネットに公開しないでください。</string>
     <string name="cal_pc_ip_address">PCのIPアドレス</string>
-    <string name="cal_pc_pairing_token">PCペアリングトークン</string>
+    <string name="cal_pc_pairing_token">TLSペアリングコード（トークン.指紋）</string>
     <string name="cal_connect_j2534">J2534ブリッジに接続</string>
     <string name="cal_disconnect_pc_bridge">PCブリッジを切断</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">ブリッジ：HS-CAN ISO15765 250/500 kbit/s、およびドライバー対応時のJ2534-2 SW-ISO15765。CAN FDは無効のままです。</string>
