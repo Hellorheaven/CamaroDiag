@@ -22,17 +22,6 @@ on:
       - 'gradlew.bat'
       - 'version.properties'
       - '.github/workflows/android-ci.yml'
-  workflow_dispatch:
-    inputs:
-      target_ref:
-        description: "Branch or commit to validate"
-        required: true
-        default: "feat/live-can-monitor"
-        type: string
-      pr_number:
-        description: "Pull request number (optional)"
-        required: false
-        type: string
 
 concurrency:
   group: android-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || inputs.target_ref || 'manual' }}
@@ -45,7 +34,7 @@ permissions:
 
 jobs:
   evaluate-build-checkpoint:
-    if: (github.event_name == 'workflow_dispatch' && inputs.target_ref != 'main' && inputs.target_ref != 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     outputs:
       validated_sha: ${{ steps.resolve_revision.outputs.sha }}
