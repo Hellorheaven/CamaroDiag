@@ -593,4 +593,10 @@
     <string name="msg_cal_definitions_import_failed">Nie udało się zaimportować definicji tabel.</string>
     <string name="msg_cal_map_read_failed">Nie udało się odczytać wybranej tabeli.</string>
     <string name="msg_cal_table_edit_failed">Nie udało się edytować tabeli kalibracji.</string>
+    <string name="cal_expert_image_selected">Zaimportowany plik: %1$s</string>
+    <string name="cal_expert_patch_address">Adres początkowy obszaru pamięci (szesnastkowo)</string>
+    <string name="cal_expert_patch_erase_bytes">Rozmiar sektora kasowania (bajty)</string>
+    <string name="cal_expert_patch_program_bytes">Rozmiar jednostki programowania (bajty)</string>
+    <string name="cal_expert_patch_preview_button">Pokaż sektory objęte zmianami w pliku BIN</string>
+    <string name="cal_expert_patch_summary">Zmienione bajty: %1$d. Sektory kasowania objęte zmianami: %2$d. Mapa pamięci sprzętu nie została zweryfikowana. Nie wykonano zapisu.</string>
 </resources>
