@@ -899,4 +899,6 @@
     <string name="cal_expert_patch_preview_button">Prikaži sektore zahvaćene izmijenjenom BIN datotekom</string>
     <string name="cal_expert_patch_summary">Izmijenjeni bajtovi: %1$d. Zahvaćeni sektori za brisanje: %2$d. Mapa hardvera nije provjerena; nema pisanja.</string>
     <string name="cal_expert_patch_invalid">Izvanmrežni pregled nije dostupan: nevaljane datoteke, raspon područja ili geometrija brisanja/programiranja. Pisanje nije pokušano.</string>
+    <string name="obd_physical_can_scope">Fizički CAN čvor koji odgovara: 0x%1$s. Skeniranje obuhvaća samo odabranu OBD upravljačku jedinicu, a ne funkcionalno skeniranje svih modula. Nisu poslane naredbe za programiranje GM-a ni aktivaciju aktuatora.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Omogućite brisanje DTC-ova emisija u Windows mostu, ponovno se povežite, ugasite motor i potvrdite resetiranje. Podaci o spremnosti sustava emisija bit će resetirani; trajni kodovi ne brišu se.</string>
 </resources>
