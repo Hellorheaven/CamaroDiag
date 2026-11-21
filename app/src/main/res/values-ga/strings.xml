@@ -538,4 +538,23 @@
     <string name="adapter_vxdiag_profiles">Próifílí dearbhaithe chomhéadain VXDIAG</string>
     <string name="adapter_vxdiag_profiles_hint">Déanann na próifílí idirdhealú idir leaganacha crua-earraí agus naisc. Ní dheimhníonn siad go bhfuil tiománaí Android ná cumarsáid feithicle ar fáil.</string>
     <string name="adapter_simulation_profiles">Próifílí crua-earraí ionsamhlaithe (tástáil ar bhinse)</string>
+    <string name="modules_vehicle_title">Modúil rialaithe na feithicle</string>
+    <string name="module_accessible">Inrochtana</string>
+    <string name="module_requires_swcan">SW-CAN de dhíth (biorán 1)</string>
+    <string name="module_blocked_adapter">Bac ag an gcuibheoir</string>
+    <string name="module_not_equipped">Gan a bheith feistithe</string>
+    <string name="module_discovery_required">Aithint modúl na feithicle de dhíth</string>
+    <string name="live_engine_telemetry">Teilimiotracht innill bheo</string>
+    <string name="live_resume">Atosaigh</string>
+    <string name="live_stop_recording">Stop an taifeadadh</string>
+    <string name="live_record">Taifead sonraí beo</string>
+    <string name="live_export_csv">Easpórtáil CSV</string>
+    <string name="live_recording_notice">Taifeadann an logálaí luachanna OBD atá ar taispeáint (méadrach) le stampaí ama. Ní athraíonn sé táblaí calabraithe ECU.</string>
+    <string name="dtc_title">Cóid lochtanna diagnóiseacha</string>
+    <string name="dtc_clear_warning">Baineann glanadh mhód 04 cóid lochtanna a bhaineann le hastaíochtaí agus athshocraíonn sé roinnt monatóirí ullmhachta. Sábháil an tuarascáil sula leanann tú ar aghaidh. Ní ghlanann mód 04 DTCanna ardleibhéil atá stóráilte i modúil eile na feithicle.</string>
+    <string name="dtc_none_returned">Níor thug an scanadh deireanach aon chóid lochtanna ar ais.</string>
+    <string name="dtc_confirm_clear">Deimhnigh glanadh DTCanna?</string>
+    <string name="dtc_clear_description">Seolann sé seo mód OBD 04 chuig an ECU. D’fhéadfaí sonraí ullmhachta a athshocrú. Ní dheisíonn sé cúis an locht.</string>
+    <string name="dtc_clear_action">Glan cóid</string>
+    <string name="common_save">Sábháil</string>
 </resources>
