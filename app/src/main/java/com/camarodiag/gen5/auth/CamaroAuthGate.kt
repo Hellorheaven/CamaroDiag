@@ -36,7 +36,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 fun CamaroAuthGate(
     onAccountChanged: (String?) -> Unit,
     onAccountDeleted: (String) -> Unit,
-    content: @Composable (onOpenAccount: () -> Unit) -> Unit
+    content: @Composable (onOpenAccount: () -> Unit, ownerTestsAllowed: Boolean) -> Unit
 ) {
     val auth = remember { FirebaseAuth.getInstance() }
     val context = LocalContext.current
@@ -57,6 +57,7 @@ fun CamaroAuthGate(
     var validatedAccountUid by remember { mutableStateOf<String?>(null) }
     var validatedUser by remember { mutableStateOf<com.google.firebase.auth.FirebaseUser?>(null) }
     var validationError by remember { mutableStateOf<String?>(null) }
+    var ownerTestsAllowed by remember { mutableStateOf(false) }
     var retryValidation by remember { mutableIntStateOf(0) }
     var validationGeneration by remember { mutableIntStateOf(0) }
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
@@ -80,6 +81,7 @@ fun CamaroAuthGate(
         val identityChanged = readyAccountUid != user?.uid ||
             (validatedUser != null && validatedUser !== user)
         if (identityChanged) {
+            ownerTestsAllowed = false
             readyAccountUid = null
             validatedAccountUid = null
             validatedUser = null
@@ -94,6 +96,9 @@ fun CamaroAuthGate(
                     return@addOnCompleteListener
                 }
                 if (task.isSuccessful) {
+                    ownerTestsAllowed = OwnerFunctionalTestPolicy.isAllowed(
+                        user.providerData.map { it.providerId }, task.result?.claims.orEmpty()
+                    )
                     validationPrefs.edit {
                         putLong("verified_$targetUid", System.currentTimeMillis())
                     }
@@ -101,6 +106,8 @@ fun CamaroAuthGate(
                     validatedUser = user
                     latestOnAccountChanged(targetUid)
                 } else {
+                    // An offline grace period can allow ordinary diagnostics, never owner tests.
+                    ownerTestsAllowed = false
                     val lastValidated = validationPrefs.getLong("verified_$targetUid", 0L)
                     val offlineGrace = task.exception is FirebaseNetworkException &&
                         OfflineSessionPolicy.allowsOfflineAccess(
@@ -176,7 +183,7 @@ fun CamaroAuthGate(
         val french = LocalConfiguration.current.locales[0].language == "fr"
         // Account action belongs to the app's TopAppBar; an overlay here would
         // overlap system bars and the title on narrow Android 15/16 devices.
-        content { accountOpen = true }
+        content({ accountOpen = true }, ownerTestsAllowed)
         if (accountOpen) {
             val googleLinked = remember(user, accountRevision) {
                 user.providerData.any { it.providerId == "google.com" }
