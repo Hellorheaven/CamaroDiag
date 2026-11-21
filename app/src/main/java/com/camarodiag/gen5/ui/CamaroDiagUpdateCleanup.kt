@@ -70,12 +70,16 @@ internal object CamaroDiagUpdateCleanup {
         return persistEntries(prefs, entries)
     }
 
-    fun targetVersion(context: Context, downloadId: Long): Long? {
-        if (downloadId <= 0) return null
-        return context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    /** All owned downloads, newest first. Never scan or modify unrelated files. */
+    fun pendingDownloads(context: Context): List<PendingCamaroDiagApk> =
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .getStringSet(PENDING_KEY, emptySet())
             .orEmpty().mapNotNull(PendingCamaroDiagApk::decode)
-            .firstOrNull { it.downloadId == downloadId }
+            .sortedByDescending { it.downloadId }
+
+    fun targetVersion(context: Context, downloadId: Long): Long? {
+        if (downloadId <= 0) return null
+        return pendingDownloads(context).firstOrNull { it.downloadId == downloadId }
             ?.targetVersionCode
     }
 
