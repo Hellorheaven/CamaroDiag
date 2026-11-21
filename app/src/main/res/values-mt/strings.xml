@@ -366,5 +366,5 @@
     <string name="live_pid_wbo2_b1s2">Lambda ta’ medda wiesgħa B1S2</string>
     <string name="live_pid_wbo2_b2s1">Lambda ta’ medda wiesgħa B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda ta’ medda wiesgħa B2S2</string>
-    <string name="cal_uds_transport_hint">Trasport STPX għal adapters OBDLink STN kompatibbli jew pont J2534 fuq PC għal VXDIAG. Daħħal l-ID fiżiċi CAN ikkonfermati; ma tiġi preżunta ebda indirizz GM.</string>
+    <string name="cal_uds_transport_hint">Trasport STPX għal adapters OBDLink STN kompatibbli jew pont J2534 fuq PC għal VXDIAG. Daħħal l\'ID fiżiċi CAN ikkonfermati; ma tiġi preżunta ebda indirizz GM.</string>
 </resources>
