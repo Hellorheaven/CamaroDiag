@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Security;
+using System.Security.Authentication;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,14 +14,16 @@ internal sealed class BridgeServer
     private readonly string _token;
     private readonly int _port;
     private readonly J2534MemoryReadScope? _memoryReadScope;
+    private readonly BridgeTlsIdentity _tlsIdentity;
 
     public BridgeServer(
-        J2534Adapter adapter, string token, int port,
+        J2534Adapter adapter, string token, int port, BridgeTlsIdentity tlsIdentity,
         J2534MemoryReadScope? memoryReadScope = null)
     {
         _adapter = adapter;
         _token = token;
         _port = port;
+        _tlsIdentity = tlsIdentity;
         _memoryReadScope = memoryReadScope;
     }
 
@@ -27,7 +31,7 @@ internal sealed class BridgeServer
     {
         var listener = new TcpListener(IPAddress.Any, _port);
         listener.Start();
-        Console.WriteLine($"Listening on local network interfaces (TCP {_port}); public remote addresses are rejected.");
+        Console.WriteLine($"Listening with mandatory TLS 1.2+ on TCP {_port}; public remote addresses are rejected.");
         Console.WriteLine("Connect the Android device to the same trusted local network.");
         Console.WriteLine("Press Ctrl+C to stop. Do not forward this port to the Internet.");
 
@@ -56,7 +60,30 @@ internal sealed class BridgeServer
 
     private async Task HandleClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
-        using var stream = client.GetStream();
+        using var networkStream = client.GetStream();
+        using var stream = new SslStream(networkStream, leaveInnerStreamOpen: false);
+        try
+        {
+            await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+            {
+                ServerCertificate = _tlsIdentity.Certificate,
+                EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                ClientCertificateRequired = false,
+                AllowRenegotiation = false
+            }, cancellationToken);
+        }
+        catch (AuthenticationException)
+        {
+            // Never parse application JSON or reveal pairing details over a
+            // plaintext/invalid TLS connection.
+            Console.Error.WriteLine("Rejected client without a valid TLS handshake.");
+            return;
+        }
+        catch (IOException)
+        {
+            // A plaintext peer may simply close the socket on TLS failure.
+            return;
+        }
         using var reader = new StreamReader(stream, new UTF8Encoding(false), false, 4096, leaveOpen: true);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false), 4096, leaveOpen: true) { AutoFlush = true };
         using var device = new J2534Device(_adapter, _memoryReadScope);
