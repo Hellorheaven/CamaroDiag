@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 
 namespace CamaroDiag.J2534Bridge;
@@ -23,6 +24,29 @@ internal static class BridgeSelfTests
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("8.8.8.8")), "Public IPv4 denied");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("100.64.0.10")), "Carrier-grade NAT denied");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("2001:4860:4860::8888")), "Public IPv6 denied");
+
+        // Request framing must reject oversized and truncated client data
+        // before JSON parsing or J2534 device access.
+        static string? ReadWire(string input)
+        {
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(input));
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            return BridgeServer.ReadBoundedLineAsync(reader, CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        Assert(ReadWire("{\\"op\\":\\"open\\"}\\r\\n") == "{\\"op\\":\\"open\\"}", "CRLF bridge request");
+        Assert(ReadWire("") is null, "Clean EOF on empty client");
+        Assert(ReadWire(new string('A', 64 * 1024) + "\\n")?.Length == 64 * 1024,
+            "Maximum request accepted");
+        var tooLongRejected = false;
+        try { ReadWire(new string('A', 64 * 1024 + 1) + "\\n"); }
+        catch (InvalidDataException) { tooLongRejected = true; }
+        Assert(tooLongRejected, "Oversized request rejected before JSON parsing");
+        var partialRequestRejected = false;
+        try { ReadWire("{\\"op\\":\\"open\\"}"); }
+        catch (IOException) { partialRequestRejected = true; }
+        Assert(partialRequestRejected, "Unterminated request rejected");
+
 
         using (var valid = JsonDocument.Parse("{\"payloadHex\":\"22 F1 90\",\"requestCanId\":\"0x7e0\"}"))
         {
