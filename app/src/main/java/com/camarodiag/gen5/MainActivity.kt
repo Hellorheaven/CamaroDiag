@@ -19,6 +19,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Recover missed MY_PACKAGE_REPLACED broadcasts after process death:
+        // delete downloaded update APKs only if the installed versionCode advanced.
+        lifecycleScope.launch(Dispatchers.IO) {
+            CamaroDiagUpdateCleanup.cleanupAfterSuccessfulInstall(applicationContext)
+        }
         // Keep Compose content within the system bars on Android 10–16.
         WindowCompat.setDecorFitsSystemWindows(window, true)
         setContent {
