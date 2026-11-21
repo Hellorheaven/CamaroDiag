@@ -447,4 +447,26 @@
     <string name="cal_vin_sync_warning_message">Valitud sõidukiprofiilis olev VIN-kood (%1$s) asendatakse ECU VIN-koodiga (%2$s). Aasta, mootor, käigukast ja turg ei muutu. Tehke seda ainult pärast ühendatud sõiduki õigsuse kinnitamist.</string>
     <string name="cal_vin_sync_confirm">Asenda VIN-kood</string>
     <string name="vin_photo_capture">Pildista VIN-koodi</string>
+    <string name="control_interlock_assessment">Turvatingimuste hindamine: %1$s</string>
+    <string name="control_conditions_confirmed">tingimused kinnitatud</string>
+    <string name="control_windows_explanation">GM-i käsk tuleb tuvastada ja valideerida selle VIN-i BCM-i jaoks. Universaalset kaadrit ei eeldata.</string>
+    <string name="control_sunroof_explanation">Ainult varustuse ja valideeritud BCM-i käsu olemasolul.</string>
+    <string name="control_door_locks_title">Ukselukud</string>
+    <string name="control_door_locks_explanation">Kaitstud keremooduli käsk: adresseerimine, turvalisus ja sõiduki seisund tuleb kontrollida.</string>
+    <string name="control_lights_title">Tuled</string>
+    <string name="control_lights_explanation">Valgustusfunktsioonid sõltuvad BCM-ist, varustusest ja turust.</string>
+    <string name="control_horn_explanation">Helisignaal jääb keelatuks ilma kontrollitud GM-i protseduuri ja kasutaja kinnituseta.</string>
+    <string name="control_mirrors_title">Peeglid</string>
+    <string name="control_mirrors_explanation">Käsk tuleb valideerida varustuse ja BCM-i versiooni jaoks.</string>
+    <string name="control_trunk_explanation">Käsk tuleb valideerida keretüübi, BCM-i ja sõiduki seisundi jaoks.</string>
+    <string name="control_remote_start_title">Kaugkäivitus</string>
+    <string name="control_remote_start_explanation">Üldise OBD-kaadriga ei saa ohutult juhtida. Kasutage ainult tootja heakskiidetud kaugkäivitussüsteemi ja selle turvatingimusi (Park, seisupidur, suletud kapott, kriitiliste rikete puudumine). CamaroDiag ei saada mootori käivituskäsku.</string>
+    <string name="remote_start_blocker_gear">Käigukasti Park-asend pole kinnitatud.</string>
+    <string name="remote_start_blocker_hood">Kapoti sulgemine pole kinnitatud.</string>
+    <string name="remote_start_blocker_locks">Uste lukustus pole kinnitatud.</string>
+    <string name="remote_start_blocker_hazards">Ohutulede väljalülitamine pole kinnitatud.</string>
+    <string name="remote_start_blocker_theft">Vargusvastase süsteemi valmisolek pole kinnitatud.</string>
+    <string name="remote_start_blocker_faults">Kriitiliste rikete puudumine pole kinnitatud.</string>
+    <string name="remote_start_blocker_stationary">Sõiduki paigalseis pole kinnitatud.</string>
+    <string name="remote_start_blocker_equipment">Tootja kaugkäivitusvarustus pole kinnitatud.</string>
 </resources>
