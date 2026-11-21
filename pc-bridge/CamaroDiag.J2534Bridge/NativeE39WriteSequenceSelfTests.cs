@@ -26,6 +26,10 @@ internal static class NativeE39WriteSequenceSelfTests
         internal uint? SupplyMillivolts = 13500;
         internal bool LoseSupplyAfterErase;
         internal int VoltageReads;
+        internal int ByteReads;
+        internal bool WrongOriginalReadback;
+        internal bool WrongWrittenReadback;
+        internal bool TruncatedWrittenReadback;
 
         public Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken token)
         {
@@ -33,6 +37,18 @@ internal static class NativeE39WriteSequenceSelfTests
             VoltageReads++;
             return Task.FromResult(LoseSupplyAfterErase && Erases > 0
                 ? (uint?)null : SupplyMillivolts);
+        }
+        public Task<byte[]> ReadFlashBytesAsync(uint address, int length, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            ByteReads++;
+            var bytes = Memory.AsSpan(checked((int)address - 0x20000), length).ToArray();
+            if ((!wroteAnything && WrongOriginalReadback) ||
+                (wroteAnything && WrongWrittenReadback))
+                bytes[0] ^= 0x80;
+            if (wroteAnything && TruncatedWrittenReadback)
+                bytes = bytes[..^1];
+            return Task.FromResult(bytes);
         }
         private bool wroteAnything;
         internal TestEcu(byte[] initial) => Memory = initial.ToArray();
@@ -115,6 +131,10 @@ internal static class NativeE39WriteSequenceSelfTests
         Assert(journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.WrittenCrcVerified) == 2 &&
                journal.Events[^1].Phase == NativeE39WriteSequence.Phase.Completed,
             "Every sector has a verification event before completed status");
+        Assert(ecu.ByteReads == 4 &&
+               journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.OriginalBytesVerified) == 2 &&
+               journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.WrittenBytesVerified) == 2,
+            "Fresh byte comparisons before and after programming every sector");
         var requests = ecu.Requests;
         var firstErase = requests.FindIndex(x => x[0] == 0x3D && x[1] == 0x05);
         Assert(requests.Take(firstErase).Count(x => x[0] == 0x3D && x[1] == 0x02) == 2 &&
@@ -201,6 +221,34 @@ internal static class NativeE39WriteSequenceSelfTests
                 plan, opts, CancellationToken.None).GetAwaiter().GetResult());
         Assert(verifyJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired,
             "Post-write CRC mismatch requires intervention");
+
+        var wrongBytes = new TestEcu(origin) { WrongOriginalReadback = true };
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteSequence.RunBenchSequenceAsync(wrongBytes, new TestJournal(),
+                plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(wrongBytes.Erases == 0, "Matching original CRC alone cannot authorize erase");
+
+        foreach (bool truncated in new[] { false, true })
+        {
+            var wrongReadback = new TestEcu(origin) {
+                WrongWrittenReadback = !truncated, TruncatedWrittenReadback = truncated
+            };
+            var byteJournal = new TestJournal();
+            Expect<InvalidDataException>(() =>
+                NativeE39WriteSequence.RunBenchSequenceAsync(wrongReadback, byteJournal,
+                    plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+            Assert(wrongReadback.Erases == 1 &&
+                byteJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
+                byteJournal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
+                "Matching CRC but wrong or truncated post-write bytes require recovery");
+        }
+
+        var duplicate = plan with { Sectors = new[] { plan.Sectors[0], plan.Sectors[0] } };
+        var overlapEcu = new TestEcu(origin);
+        Expect<ArgumentException>(() =>
+            NativeE39WriteSequence.RunBenchSequenceAsync(overlapEcu, new TestJournal(),
+                duplicate, opts, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(overlapEcu.Requests.Count == 0, "Duplicate sector never sends ECU requests");
 
         var damagedPlan = NativeEcuSectorPlanner.Preview(layout, origin, updated);
         damagedPlan.Sectors[0].Updated[0] ^= 0x44;

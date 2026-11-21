@@ -10,14 +10,14 @@ namespace CamaroDiag.J2534Bridge;
 /// 
 /// Every changed sector is compared with the expected original using ECU
 /// CRC before erase, preflight-tested without writing, then erased, written
-/// and compared with the expected modified bytes using ECU CRC after write.
+/// and compared with fresh byte readback as well as ECU CRC before and after write.
 /// </summary>
 internal static class NativeE39WriteSequence
 {
     internal enum Phase
     {
-        Prepared, OriginalCrcVerified, TestWriteAccepted, EraseStarted,
-        EraseAcknowledged, WriteStarted, WrittenCrcVerified,
+        Prepared, OriginalCrcVerified, OriginalBytesVerified, TestWriteAccepted, EraseStarted,
+        EraseAcknowledged, WriteStarted, WrittenCrcVerified, WrittenBytesVerified,
         Completed, RecoveryRequired
     }
 
@@ -36,6 +36,10 @@ internal static class NativeE39WriteSequence
     {
         Task<byte[]> ExchangeAsync(byte[] request, CancellationToken cancellationToken);
         Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken cancellationToken);
+        // A qualified hardware implementation must acquire actual flash bytes
+        // from the ECU, never return cached data, the requested image or CRC.
+        Task<byte[]> ReadFlashBytesAsync(uint address, int length,
+            CancellationToken cancellationToken);
     }
 
     internal sealed record Options(
@@ -93,8 +97,18 @@ internal static class NativeE39WriteSequence
             throw new InvalidOperationException("No changed ECU sectors.");
         // Precalculate all outgoing packets before ANY ECU traffic.
         var sectors = new List<(NativeEcuSectorPlanner.Sector Sector, byte[][] Dry, byte[][] Write)>();
-        foreach (var sector in plan.Sectors)
+        // Freeze buffers before computing hashes or awaiting any external code.
+        // Reject overlapping ranges before journal writes or ECU traffic.
+        ulong previousEnd = 0;
+        foreach (var source in plan.Sectors.OrderBy(x => x.Address))
         {
+            var sector = source with {
+                Original = source.Original.ToArray(),
+                Updated = source.Updated.ToArray()
+            };
+            if (sector.Address < previousEnd)
+                throw new ArgumentException("ECU sector ranges overlap.");
+            previousEnd = (ulong)sector.Address + (uint)sector.Length;
             if (sector.Length == 0 || sector.Original.Length != sector.Updated.Length)
                 throw new ArgumentException("Invalid frozen ECU sector data.");
             if (!string.Equals(
@@ -143,6 +157,12 @@ internal static class NativeE39WriteSequence
                         $"Original ECU CRC mismatch at 0x{s.Address:X6}; refusing erase.");
                 await journal.AppendAsync(
                     new(Phase.OriginalCrcVerified, s.Address, expected.ToString("X8")),
+                    cancellationToken);
+
+                await RequireFreshBytesAsync(s.Address, s.Original,
+                    "Original ECU bytes differ from backup; refusing erase.");
+                await journal.AppendAsync(
+                    new(Phase.OriginalBytesVerified, s.Address, s.OriginalSha256),
                     cancellationToken);
 
                 foreach (var frame in item.Dry)
@@ -201,6 +221,11 @@ internal static class NativeE39WriteSequence
                 await journal.AppendAsync(
                     new(Phase.WrittenCrcVerified, s.Address, expected.ToString("X8")),
                     cancellationToken);
+                await RequireFreshBytesAsync(s.Address, s.Updated,
+                    "ECU post-write byte readback mismatch; manual recovery required.");
+                await journal.AppendAsync(
+                    new(Phase.WrittenBytesVerified, s.Address, s.UpdatedSha256),
+                    cancellationToken);
                 writtenBytes += s.Length;
             }
 
@@ -231,6 +256,18 @@ internal static class NativeE39WriteSequence
                 }
             }
             throw;
+        }
+
+        async Task RequireFreshBytesAsync(uint address, byte[] expected, string error)
+        {
+            await RequireSupplyAsync();
+            var observed = await link.ReadFlashBytesAsync(address, expected.Length,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (observed is null || observed.Length != expected.Length ||
+                !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    observed, expected))
+                throw new InvalidDataException(error);
         }
 
         async Task RequireSupplyAsync()

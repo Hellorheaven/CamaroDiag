@@ -61,6 +61,11 @@ internal static class NativeE39FileWriteJournalSelfTests
                 "Verification for the wrong sector cannot complete a transaction");
 
             File.Delete(path);
+            WriteScenario(path, true, false, omitBytes: true);
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "CRC-only journal cannot prove successful byte readback");
+            File.Delete(path);
             var forged = new NativeE39FileWriteJournal(path);
             forged.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,
                 0, "fake success without physical write"), CancellationToken.None)
@@ -106,7 +111,7 @@ internal static class NativeE39FileWriteJournalSelfTests
         return tests;
     }
 
-    private static void WriteScenario(string path, bool writeSecond, bool wrongAddress)
+    private static void WriteScenario(string path, bool writeSecond, bool wrongAddress, bool omitBytes = false)
     {
         var journal = new NativeE39FileWriteJournal(path);
         void Add(NativeE39WriteSequence.Phase phase, uint address) =>
@@ -119,6 +124,7 @@ internal static class NativeE39FileWriteJournalSelfTests
         foreach (var address in addresses)
         {
             Add(NativeE39WriteSequence.Phase.OriginalCrcVerified, address);
+            Add(NativeE39WriteSequence.Phase.OriginalBytesVerified, address);
             Add(NativeE39WriteSequence.Phase.TestWriteAccepted, address);
         }
 
@@ -129,6 +135,7 @@ internal static class NativeE39FileWriteJournalSelfTests
             Add(NativeE39WriteSequence.Phase.WriteStarted, address);
             Add(NativeE39WriteSequence.Phase.WrittenCrcVerified,
                 wrongAddress ? 0x20010u : address);
+            if (!omitBytes) Add(NativeE39WriteSequence.Phase.WrittenBytesVerified, address);
         }
         Add(NativeE39WriteSequence.Phase.Completed, 0);
         journal.DisposeAsync().AsTask().GetAwaiter().GetResult();

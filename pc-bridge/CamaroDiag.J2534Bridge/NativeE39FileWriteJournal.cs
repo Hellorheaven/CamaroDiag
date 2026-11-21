@@ -40,7 +40,7 @@ internal sealed class NativeE39FileWriteJournal :
             ObjectDisposedException.ThrowIf(disposed, this);
             var entry = JsonSerializer.Serialize(new
             {
-                Schema = 1,
+                Schema = 2,
                 UtcTimestamp = DateTimeOffset.UtcNow,
                 Phase = evidence.Phase.ToString(),
                 Address = evidence.Address,
@@ -76,7 +76,7 @@ internal sealed class NativeE39FileWriteJournal :
             {
                 using var json = JsonDocument.Parse(entry);
                 var node = json.RootElement;
-                if (node.GetProperty("Schema").GetInt32() != 1 ||
+                if (node.GetProperty("Schema").GetInt32() != 2 ||
                     !Enum.TryParse<NativeE39WriteSequence.Phase>(
                         node.GetProperty("Phase").GetString(), out var phase) ||
                     !Enum.IsDefined(phase) ||
@@ -100,15 +100,20 @@ internal sealed class NativeE39FileWriteJournal :
                             NativeE39WriteSequence.Phase.Prepared, phase))
                             return CompletionState.Interrupted;
                         break;
-                    case NativeE39WriteSequence.Phase.TestWriteAccepted:
+                    case NativeE39WriteSequence.Phase.OriginalBytesVerified:
                         if (destructiveStarted || !Advance(address,
                             NativeE39WriteSequence.Phase.OriginalCrcVerified, phase))
+                            return CompletionState.Interrupted;
+                        break;
+                    case NativeE39WriteSequence.Phase.TestWriteAccepted:
+                        if (destructiveStarted || !Advance(address,
+                            NativeE39WriteSequence.Phase.OriginalBytesVerified, phase))
                             return CompletionState.Interrupted;
                         break;
                     case NativeE39WriteSequence.Phase.EraseStarted:
                         if (activeSector.HasValue || sectors.Count == 0 ||
                             sectors.Values.Any(p => p != NativeE39WriteSequence.Phase.TestWriteAccepted &&
-                                p != NativeE39WriteSequence.Phase.WrittenCrcVerified) ||
+                                p != NativeE39WriteSequence.Phase.WrittenBytesVerified) ||
                             !Advance(address, NativeE39WriteSequence.Phase.TestWriteAccepted, phase))
                             return CompletionState.Interrupted;
                         destructiveStarted = true;
@@ -128,12 +133,17 @@ internal sealed class NativeE39FileWriteJournal :
                         if (activeSector != address || !Advance(address,
                             NativeE39WriteSequence.Phase.WriteStarted, phase))
                             return CompletionState.Interrupted;
+                        break;
+                    case NativeE39WriteSequence.Phase.WrittenBytesVerified:
+                        if (activeSector != address || !Advance(address,
+                            NativeE39WriteSequence.Phase.WrittenCrcVerified, phase))
+                            return CompletionState.Interrupted;
                         activeSector = null;
                         break;
                     case NativeE39WriteSequence.Phase.Completed:
                         if (address != 0 || !destructiveStarted || activeSector.HasValue ||
                             sectors.Count == 0 || sectors.Values.Any(p =>
-                                p != NativeE39WriteSequence.Phase.WrittenCrcVerified))
+                                p != NativeE39WriteSequence.Phase.WrittenBytesVerified))
                             return CompletionState.Interrupted;
                         completed = true;
                         break;
