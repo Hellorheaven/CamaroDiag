@@ -373,4 +373,19 @@
     <string name="cal_j2534_launch_instructions">Uruchom CamaroDiag.J2534Bridge.exe na komputerze Windows. Wpisz adres IP komputera i pełny kod (token.odcisk TLS) z konsoli. Korzystaj z zaufanej sieci lokalnej.</string>
     <string name="cal_j2534_security_notice">Wymagane są TLS 1.2+ i weryfikacja odcisku certyfikatu. Stare kody zawierające tylko token są odrzucane. Nie udostępniaj portu w internecie.</string>
     <string name="cal_pc_pairing_token">Kod TLS (token.odcisk)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Testy funkcjonalne</string>
+    <string name="functional_tests_title">Testy funkcjonalne — ECU i OBD</string>
+    <string name="functional_tests_readonly">Uruchom wszystkie dostępne kontrole tylko do odczytu przez aktualnie podłączony adapter fizyczny. Pozostałe adaptery i niezweryfikowane ECU zostaną oznaczone jako NIEPRZETESTOWANE. Bez kasowania, sterowania i programowania.</string>
+    <string name="functional_tests_run">Uruchom wszystkie</string>
+    <string name="functional_tests_stop">Zatrzymaj</string>
+    <string name="functional_tests_export">Eksportuj JSON</string>
+    <string name="functional_tests_summary">%1$d zaliczonych · %2$d niezaliczonych · %3$d nieprzetestowanych</string>
+    <string name="functional_tests_passed">ZALICZONO (dowód fizyczny)</string>
+    <string name="functional_tests_failed">NIEZALICZONO</string>
+    <string name="functional_tests_skipped">NIEPRZETESTOWANO</string>
+    <string name="functional_tests_denied">Odmowa dostępu: zaloguj się autoryzowanym kontem Google i połącz ponownie.</string>
+    <string name="functional_tests_not_connected">Nie podłączono fizycznego adaptera OBD. Pozostałych kontroli nie wykonano.</string>
+    <string name="functional_tests_cancelled">Seria testów została anulowana.</string>
 </resources>
