@@ -487,4 +487,6 @@
     <string name="mileage_source_generic">Källa %1$s</string>
     <string name="mileage_details_unavailable">Tekniska detaljer är inte tillgängliga för denna källa.</string>
     <string name="mileage_caveat_unavailable">Ingen ytterligare lokaliserad information finns tillgänglig för denna källa.</string>
+    <string name="obd_physical_can_scope">Fysisk CAN-svarsenhet: 0x%1$s. Avsökningen omfattar endast vald OBD-styrenhet, inte en funktionell avsökning av alla moduler. Inga GM-programmerings- eller ställdonskommandon skickades.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Aktivera radering av emissionsrelaterade DTC i Windows-bryggan, anslut igen, stäng av motorn och bekräfta återställningen. Emissionssystemens beredskapsdata återställs; permanenta koder raderas inte.</string>
 </resources>
