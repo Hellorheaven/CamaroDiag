@@ -47,6 +47,21 @@ internal static class BridgeSelfTests
             Assert(rejected, "Missing CAN identifier rejected");
         }
 
+        var cvns = J2534Device.DecodeIdentityRecords(6, Convert.FromHexString("49060201020304000000A0"));
+        Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
+        Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,
+            "Unavailable optional identity");
+        var vin = J2534Device.DecodeIdentityRecords(2, new byte[] { 0x49, 2, 1 }
+            .Concat(System.Text.Encoding.ASCII.GetBytes("1G1FA1RXXR0123456")).ToArray());
+        Assert(vin.Single() == "1G1FA1RXXR0123456", "Physical VIN");
+        foreach (var malformed in new[] { "49060201020304", "49040101020304", "4906010102030400" })
+        {
+            var rejected = false;
+            try { J2534Device.DecodeIdentityRecords(6, Convert.FromHexString(malformed)); }
+            catch (InvalidDataException) { rejected = true; }
+            Assert(rejected, "Wrong PID, record count or trailing bytes rejected");
+        }
+
         // Physical memory reads require an explicitly scoped map and a matching
         // live VIN. These checks exercise ONLY the policy parser and range gate.
         var map = new J2534MemoryReadScope(

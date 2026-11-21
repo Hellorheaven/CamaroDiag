@@ -114,6 +114,12 @@ internal sealed class BridgeServer
                         }));
                         break;
                     }
+                    case "identify":
+                    {
+                        var identity = device.ReadCalibrationIdentification();
+                        await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = true, identity }));
+                        break;
+                    }
                     case "exchange":
                     {
                         var payload = ParseHexPayload(root);

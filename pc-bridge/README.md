@@ -7,6 +7,7 @@ Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru insta
 ## Fonctionnalités
 
 - Connexion à un fournisseur J2534 Windows enregistré.
+- Dans l’atelier de calibration Android, la lecture d’identification interroge le calculateur sélectionné et affiche le VIN, les CAL ID, les CVN et le nom ECU disponibles. Cette fonction utilise le mode 09 sur tout pilote Pass-Thru compatible avec le profil CAN choisi. Elle nécessite le pont et l’application de la même PR. Les interfaces ELM327 se connectent directement à Android pour cette lecture.
 - ISO15765 HS-CAN, identifiants 11 ou 29 bits, 250/500 kbit/s.
 - SW-ISO15765 GMLAN à 62,5 kbit/s si le fournisseur J2534-2 l'accepte.
 - Transmission de charges UDS ; le fournisseur J2534 gère ISO-TP et le contrôle de flux.

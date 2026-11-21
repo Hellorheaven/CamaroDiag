@@ -545,7 +545,7 @@ class BluetoothObdManager(context: Context) {
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                normalizeElmReply(buffer.toString(), command)
             } else if (sessionTransport == "BLE") {
                 bleTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
@@ -567,7 +567,7 @@ class BluetoothObdManager(context: Context) {
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                normalizeElmReply(buffer.toString(), command)
             } else if (sessionTransport == "WIFI") {
                 wifiTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
@@ -594,7 +594,7 @@ class BluetoothObdManager(context: Context) {
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                normalizeElmReply(buffer.toString(), command)
             } else {
                 check(sessionTransport == "BLUETOOTH") {
                     "An ELM command cannot be sent through the selected transport."
@@ -637,7 +637,7 @@ class BluetoothObdManager(context: Context) {
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                normalizeElmReply(buffer.toString(), command)
             }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -728,6 +728,18 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    suspend fun readCalibrationIdentification(): ObdEcuIdentification {
+        if (!isJ2534BridgeConnected()) return withObdCommandSession { it.readEcuIdentification() }
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            val bridge = checkNotNull(j2534BridgeTransport)
+            val identity = bridge.readCalibrationIdentification()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            identity
+        }
+    }
+
     fun isJ2534MemoryReadAvailable(): Boolean =
         isJ2534BridgeConnected() &&
             j2534BridgeTransport?.isScopedMemoryReadEnabled == true
@@ -805,4 +817,15 @@ class BluetoothObdManager(context: Context) {
         isSimulationActive = false
         activeAdapterCapabilities = null
     }
+}
+
+/** Strip the adapter's echo only when it occupies the first nonempty line. */
+internal fun normalizeElmReply(raw: String, command: String): String {
+    val lines = raw.trim().lineSequence().iterator()
+    if (!lines.hasNext()) return ""
+    val first = lines.next().trim()
+    return buildList {
+        if (!first.equals(command.trim(), ignoreCase = true)) add(first)
+        for (line in lines) if (line.isNotBlank()) add(line.trim())
+    }.joinToString(" ")
 }

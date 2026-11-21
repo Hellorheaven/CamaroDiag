@@ -68,7 +68,7 @@ internal static class Program
         Console.WriteLine($"Selected: {adapters[selectedIndex].Name}");
         Console.WriteLine($"Pairing token: {token}");
         Console.WriteLine($"Port: {port}");
-        Console.WriteLine("The bridge only accepts UDS read services 0x22 / 0x19 and TesterPresent 0x3E.");
+        Console.WriteLine("Available: OBD Mode 09 identity, UDS reads and TesterPresent.");
         Console.WriteLine("ECU writes, security access, actuator controls and flash programming are blocked.");
         if (memoryReadScope != null)
             Console.WriteLine("Memory read profile enabled: every 0x23 read is restricted to the configured " +

@@ -218,6 +218,63 @@ internal sealed class J2534Device : IDisposable
         throw new TimeoutException($"No ISO15765 response from CAN ID 0x{_responseCanId:X} within {timeoutMs} ms.");
     }
 
+    public object ReadCalibrationIdentification()
+    {
+        EnsureOpen();
+        IReadOnlyList<string> Read(byte pid)
+        {
+            try
+            {
+                return DecodeIdentityRecords(pid, Exchange(new byte[] { 0x09, pid }, 1500));
+            }
+            catch (TimeoutException)
+            {
+                // Optional information types may receive no reply.
+                return Array.Empty<string>();
+            }
+        }
+
+        var vin = Read(0x02).SingleOrDefault();
+        var calibrationIds = Read(0x04);
+        var cvns = Read(0x06);
+        var ecuNames = Read(0x0A);
+        if (vin == null && calibrationIds.Count + cvns.Count + ecuNames.Count == 0)
+            throw new IOException("The selected ECU supplied no Mode 09 identity records.");
+        return new { vin, calibrationIds, cvns, ecuNames,
+            responseCanId = _responseCanId.ToString(_can29Bit ? "X8" : "X3") };
+    }
+
+    internal static IReadOnlyList<string> DecodeIdentityRecords(byte pid, byte[] reply)
+    {
+        int width = pid switch { 0x02 => 17, 0x04 => 16, 0x06 => 4, 0x0A => 20,
+            _ => throw new ArgumentOutOfRangeException(nameof(pid)) };
+        if (reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x09)
+            return Array.Empty<string>();
+        if (reply.Length < 3 || reply[0] != 0x49 || reply[1] != pid ||
+            reply.Length != 3 + reply[2] * width || (pid == 2 && reply[2] != 1))
+            throw new InvalidDataException("Malformed Mode 09 identity response.");
+
+        var records = new List<string>();
+        for (int i = 3; i < reply.Length; i += width)
+        {
+            var field = reply.AsSpan(i, width);
+            if (pid == 0x06)
+            {
+                records.Add(Convert.ToHexString(field));
+                continue;
+            }
+
+            // ECU names and CAL IDs can have space or NUL padding at either end.
+            var text = Encoding.Latin1.GetString(field).Trim(' ', '\0');
+            if (text.Any(c => c < ' ' || c > '~') ||
+                (pid == 2 && (text.Length != 17 || text.Any(c =>
+                    !(c is >= '0' and <= '9' or >= 'A' and <= 'Z') || c is 'I' or 'O' or 'Q'))))
+                throw new InvalidDataException("Invalid ECU identity text.");
+            if (text.Length != 0) records.Add(text);
+        }
+        return records;
+    }
+
     public void SendOnly(byte[] payload)
     {
         EnsureOpen();
@@ -232,6 +289,8 @@ internal sealed class J2534Device : IDisposable
     private void ValidateReadOnlyService(byte[] payload, bool allowNoResponse)
     {
         var service = payload[0];
+        if (!allowNoResponse && payload.Length == 2 && service == 0x09 &&
+            payload[1] is 0x02 or 0x04 or 0x06 or 0x0A) return;
         if (service == 0x22 || service == 0x19) return;
         if (service == 0x3E && payload.Length == 2 && payload[1] is 0x00 or 0x80) return;
         if (!allowNoResponse && _memoryReadVinVerified && _memoryReadScope != null)

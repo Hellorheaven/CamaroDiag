@@ -1395,10 +1395,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun readCalibrationIdentification() {
         val startedGeneration = accountSessionGeneration
+        val startedConnection = connectionAttemptGeneration
         viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-            if (!obdManager.isObdCommandChannelAvailable) {
-                val bridgeOnly = obdManager.isJ2534BridgeConnected()
+            if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration) return@launch
+            if (!obdManager.isObdCommandChannelAvailable && !obdManager.isJ2534BridgeConnected()) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
@@ -1409,11 +1409,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     respondingEcuAddresses = emptyList(),
                     calibrationIdResponse = "",
                     cvnResponse = "",
-                    message = if (bridgeOnly) {
-                        getApplication<Application>().getString(R.string.vm_j2534_no_elm_channel)
-                    } else {
-                        getApplication<Application>().getString(R.string.vm_no_obd_data_read)
-                    }
+                    message = getApplication<Application>().getString(R.string.vm_no_obd_data_read)
                 )
                 return@launch
             }
@@ -1431,8 +1427,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             try {
                 val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
-                val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
-                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                val identity = obdManager.readCalibrationIdentification()
+                if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration) return@launch
                 val ecuVin = identity.vin
                 val validCal = identity.calibrationIds.isNotEmpty()
                 val validCvn = identity.calibrationVerificationNumbers.isNotEmpty()
@@ -1456,7 +1452,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration) return@launch
                 reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,

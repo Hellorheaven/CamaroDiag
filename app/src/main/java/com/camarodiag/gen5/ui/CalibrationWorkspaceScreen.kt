@@ -440,7 +440,7 @@ fun CalibrationWorkspaceScreen(
                             color = WarnRed, fontSize = 11.sp)
                         OutlinedButton(
                             onClick = onReadIdentification,
-                            enabled = isConnected && !state.isReading,
+                            enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.cal_read_ecu_ids))
@@ -519,7 +519,7 @@ fun CalibrationWorkspaceScreen(
                     )
                     Button(
                         onClick = onReadIdentification,
-                        enabled = isConnected && !state.isReading,
+                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (state.isReading) CircularProgressIndicator()

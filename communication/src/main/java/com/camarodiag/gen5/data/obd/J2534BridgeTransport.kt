@@ -96,6 +96,25 @@ class J2534BridgeTransport(
         }
     }
 
+    suspend fun readCalibrationIdentification(): ObdEcuIdentification = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureOpen()
+            val data = request(JSONObject().put("op", "identify").put("token", pairingToken), 15_000)
+                .getJSONObject("identity")
+            fun records(name: String): List<String> {
+                val values = data.getJSONArray(name)
+                return List(values.length()) { index -> values.getString(index) }
+            }
+            ObdEcuIdentification(
+                vin = if (data.isNull("vin")) null else data.getString("vin"),
+                calibrationIds = records("calibrationIds"),
+                calibrationVerificationNumbers = records("cvns"),
+                ecuNames = records("ecuNames"),
+                respondingEcuAddresses = listOf(data.getString("responseCanId"))
+            )
+        }
+    }
+
     override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()

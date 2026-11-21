@@ -299,6 +299,11 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     }
 
     private fun payload(response: String, service: Int, pid: Int): List<Int>? {
+        if (service == 0x49 && ':' in response) {
+            val bytes = parseNumberedIdentityReply(response) ?: return null
+            if (bytes.getOrNull(0) != service || bytes.getOrNull(1) != pid) return null
+            return bytes.drop(2)
+        }
         val bytes = parseResponseBytes(response) ?: return null
         val index = bytes.indices.firstOrNull {
             it + 1 < bytes.size && bytes[it] == service && bytes[it + 1] == pid
@@ -327,6 +332,27 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             }
         }
         return bytes.takeIf { it.isNotEmpty() }
+    }
+
+    /** ELM CAN autoformat: total byte count followed by rows 0..F, wrapping at F. */
+    private fun parseNumberedIdentityReply(response: String): List<Int>? {
+        val text = response.trim().removeSuffix(">").trim().uppercase(Locale.ROOT)
+            .removePrefix("SEARCHING...").trim()
+        val markers = Regex("""(?:^|\s)([0-9A-F]):""").findAll(text).toList()
+        if (markers.isEmpty()) return null
+        val header = text.substring(0, markers.first().range.first).trim()
+        if (!header.matches(Regex("[0-9A-F]{3}"))) return null
+        val expected = header.toInt(16)
+        val bytes = mutableListOf<Int>()
+        for ((row, marker) in markers.withIndex()) {
+            if (marker.groupValues[1].toInt(16) != row % 16) return null
+            val end = markers.getOrNull(row + 1)?.range?.first ?: text.length
+            val hex = text.substring(marker.range.last + 1, end).filterNot(Char::isWhitespace)
+            val rowSize = minOf(if (row == 0) 6 else 7, expected - bytes.size)
+            if (rowSize <= 0 || hex.length != 2 * rowSize || hex.any { it !in "0123456789ABCDEF" }) return null
+            bytes += hex.chunked(2).map { it.toInt(16) }
+        }
+        return bytes.takeIf { it.size == expected }
     }
 
     private fun decodeAsciiRecords(
