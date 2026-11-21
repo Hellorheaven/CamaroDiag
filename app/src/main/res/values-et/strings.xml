@@ -574,4 +574,10 @@
     <string name="can_sniffer_capture_failed">CAN-kaadrite salvestamine nurjus või adapter lakkas vastamast.</string>
     <string name="can_sniffer_frame_count">Salvestatud kaadreid: %1$d</string>
     <string name="can_sniffer_filtered_count">Kuvatakse %1$d kaadrit %2$d-st</string>
+    <string name="msg_live_recording_real_started">Alustati tegelike OBD-andmete salvestamist.</string>
+    <string name="msg_live_recording_started">Salvestamine käib. Näitude arv: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Salvestamine peatati. Salvestatud näite: %1$d.</string>
+    <string name="msg_live_csv_exported">CSV-logi eksporditi. Näitude arv: %1$d.</string>
+    <string name="msg_live_csv_export_failed">CSV-logi eksportimine nurjus.</string>
+    <string name="msg_live_recording_max_samples">Saavutati ohutuspiir (%1$d). Salvestamine peatati automaatselt.</string>
 </resources>
