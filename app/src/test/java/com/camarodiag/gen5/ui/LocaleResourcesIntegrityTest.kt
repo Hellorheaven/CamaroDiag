@@ -389,4 +389,21 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    /** CamaroDiag is a trademark/product name, never a translatable word. */
+    @Test fun productNameCamaroDiagRemainsExactlyUnchangedInAllLocales() {
+        val nameVariants = Regex("""(?i)(?:camarodiag|kamarodiag)[a-zà-öø-ÿ]*""")
+        for (locale in locales) {
+            val localized = strings(locale)
+            for ((key, value) in localized) {
+                for (match in nameVariants.findAll(value)) {
+                    assertEquals(
+                        "CamaroDiag product name was translated or declined in $locale/$key",
+                        "CamaroDiag",
+                        match.value
+                    )
+                }
+            }
+        }
+    }
+
 }
