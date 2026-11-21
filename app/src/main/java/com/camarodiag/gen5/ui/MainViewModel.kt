@@ -3387,6 +3387,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (functionalTestJob?.isActive == true) return
         val accountUid = authenticatedAccountUid ?: return
         val sessionGeneration = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val selectedVin = _vehicle.value.vin
+        val adapterName = _adapter.value.deviceName
         val execution = ++functionalTestGeneration
         functionalTestJob = viewModelScope.launch {
             if (!confirmFunctionalTestOwner(accountUid)) {
@@ -3397,7 +3400,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 return@launch
             }
-            if (!isCurrentAccountGeneration(sessionGeneration) || execution != functionalTestGeneration) {
+            if (!isCurrentAccountGeneration(sessionGeneration) || execution != functionalTestGeneration ||
+                connection != connectionAttemptGeneration || selectedVin != _vehicle.value.vin) {
                 return@launch
             }
             val connected = !obdManager.isDemoMode && !obdManager.isSimulationActive &&
@@ -3408,10 +3412,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             _functionalTestState.value = FunctionalTestState(
                 running = true, startedAtMillis = System.currentTimeMillis(),
-                checks = FunctionalTestPlanner.initial(topology, transport, connected)
+                checks = FunctionalTestPlanner.initial(topology, transport, connected),
+                context = FunctionalTestContext(selectedVin, adapterName, transport, connection)
             )
             fun current(): Boolean = execution == functionalTestGeneration &&
-                isCurrentAccountGeneration(sessionGeneration)
+                isCurrentAccountGeneration(sessionGeneration) &&
+                connection == connectionAttemptGeneration && selectedVin == _vehicle.value.vin
             fun mark(
                 key: String, outcome: FunctionalTestOutcome,
                 english: String, french: String
@@ -3555,9 +3561,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } finally {
-                if (current()) _functionalTestState.value = _functionalTestState.value.copy(
-                    running = false, finishedAtMillis = System.currentTimeMillis()
-                )
+                if (execution == functionalTestGeneration && isCurrentAccountGeneration(sessionGeneration)) {
+                    _functionalTestState.value = _functionalTestState.value.copy(
+                        running = false, finishedAtMillis = System.currentTimeMillis(),
+                        error = if (!current()) localizedContext.getString(R.string.functional_tests_cancelled)
+                            else _functionalTestState.value.error
+                    )
+                }
             }
         }
     }
@@ -3583,13 +3593,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 !isCurrentAccountGeneration(sessionGeneration)) return@launch
             val snapshot = _functionalTestState.value
             if (snapshot.running || snapshot.finishedAtMillis == null) return@launch
+            val evidenceContext = snapshot.context ?: return@launch
             val json = JSONObject()
                 .put("schema", "camarodiag-functional-test-v1")
                 .put("startedAtMillis", snapshot.startedAtMillis)
                 .put("finishedAtMillis", snapshot.finishedAtMillis)
-                .put("vin", _vehicle.value.vin)
-                .put("adapter", _adapter.value.deviceName)
-                .put("transport", obdManager.currentTransportKind)
+                .put("vin", evidenceContext.selectedVin)
+                .put("adapter", evidenceContext.adapterName)
+                .put("transport", evidenceContext.transport)
+                .put("connectionGeneration", evidenceContext.connectionGeneration)
+                .put("completedWithoutError", snapshot.error == null)
                 .put("warning", "NOT_TESTED is not a PASS. No write or actuation was tested.")
             val checks = JSONArray()
             snapshot.checks.forEach { check ->

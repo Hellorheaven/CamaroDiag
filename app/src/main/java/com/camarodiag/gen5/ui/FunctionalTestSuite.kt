@@ -15,12 +15,21 @@ data class FunctionalTestCheck(
     val detailFr: String
 )
 
+/** Immutable evidence context captured at the start of a physical run. */
+data class FunctionalTestContext(
+    val selectedVin: String,
+    val adapterName: String,
+    val transport: String,
+    val connectionGeneration: Long
+)
+
 data class FunctionalTestState(
     val running: Boolean = false,
     val startedAtMillis: Long? = null,
     val finishedAtMillis: Long? = null,
     val checks: List<FunctionalTestCheck> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    val context: FunctionalTestContext? = null
 )
 
 /** Enumerates all supported transports and topology candidates without inventing hardware results. */
