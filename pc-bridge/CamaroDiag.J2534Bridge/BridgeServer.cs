@@ -164,6 +164,21 @@ internal sealed class BridgeServer
                         await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = true, identity }));
                         break;
                     }
+                    case "identifyGmlan":
+                    {
+                        // Physical GM CAN VIN/OSID read only. Never grants
+                        // SecurityAccess or programming privileges.
+                        var identity = await Task.Run(
+                            () => device.ReadGmlanIdentification(), cancellationToken);
+                        await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                        {
+                            ok = true,
+                            identity,
+                            readOnly = true,
+                            flashQualified = false
+                        }));
+                        break;
+                    }
                     case "exchange":
                     {
                         var payload = ParseHexPayload(root);
