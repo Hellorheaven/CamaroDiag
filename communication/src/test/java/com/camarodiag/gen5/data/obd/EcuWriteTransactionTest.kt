@@ -163,6 +163,11 @@ class EcuWriteTransactionTest {
         assertEquals(4, records.count { it.stage == EcuWriteTransaction.Stage.BASELINE_CHECKED ||
             it.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE })
         assertEquals(2, records.count { it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE })
+        assertEquals(listOf(0x1000L, 0x1008L),
+            records.filter { it.stage == EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED }
+                .map { it.address })
+        assertEquals(EcuWriteTransaction.Stage.TRANSACTION_COMPLETED, records.last().stage)
+        assertEquals(0x1008L, records.last().address)
     }
 
     @Test fun sameDriverAcceptsBothDocumentedFirmwareVersions() = runBlocking {
@@ -361,6 +366,22 @@ class EcuWriteTransactionTest {
         assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
         assertEquals(1, device.eraseCalls)
         assertEquals(4, device.writeCalls)
+        assertEquals(0, device.resetCalls)
+    }
+
+    @Test fun failedCompletionJournalWriteNeverReportsSuccess() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {
+                if (it.stage == EcuWriteTransaction.Stage.TRANSACTION_COMPLETED) error("disk full")
+                records += it
+            }, EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, outcome.verifiedSectors)
+        assertEquals(EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED, records.last().stage)
+        assertEquals(1, device.eraseCalls)
         assertEquals(0, device.resetCalls)
     }
 }
