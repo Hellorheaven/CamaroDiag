@@ -417,4 +417,13 @@
     <string name="flexfuel_preflight_recovery">Níl an nós imeachta athshlánaithe fíoraithe</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: iniúchadh roimh agus tar éis ríomhchlárú (inléite amháin)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Ní dhearnadh iniúchadh tar éis an ríomhchláraithe. Níor bailíochtaíodh ríomhchlárú an ECU ná tástáil feithicle tar éis scríofa.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Íoslódáil na déantáin Debug is déanaí ó PR #70. Sínigh isteach i GitHub le cuntas údaraithe. Is cartlanna ZIP iad na híoslódálacha agus caithfear iad a dhíphacáil.</string>
+    <string name="debug_builds_android_archive">Cartlann ZIP ina bhfuil APK Android Debug.</string>
+    <string name="debug_builds_windows_archive">Cartlann ZIP ina bhfuil suiteálaithe Windows x64 agus x86.</string>
+    <string name="debug_builds_caution">Rachaidh na déantáin in éag tar éis 30 lá. Ní chruthaíonn a n-infhaighteacht tógáil rathúil ná tástáil ar fheithicil. D\'fhéadfadh síniú APK Debug a bheith éagsúil leis an leagan poiblí.</string>
+    <string name="debug_builds_created">Cruthaithe</string>
+    <string name="debug_builds_expires">In éag</string>
+    <string name="debug_builds_no_browser">Níl brabhsálaí ar fáil chun an íoslódáil a oscailt.</string>
 </resources>
