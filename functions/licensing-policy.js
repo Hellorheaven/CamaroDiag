@@ -36,7 +36,13 @@ function canRevokeThisLicense(license, paymentIntentId) {
         license.status === "active" &&
         license.stripePaymentIntentId === paymentIntentId;
 }
+// Explicit opt-in on the SERVER as well as the Android compile-time switch.
+function billingRolloutEnabled(value = process.env.CAMARODIAG_LICENSES_ENABLED) {
+    return value === "true";
+}
+
 module.exports = {
     normalizeEmail, verifiedFirebaseIdentity,
-    isCurrentActiveLicense, checkoutMatchesIdentity, canRevokeThisLicense
+    isCurrentActiveLicense, checkoutMatchesIdentity, canRevokeThisLicense,
+    billingRolloutEnabled
 };
