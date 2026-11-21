@@ -18,6 +18,19 @@ data class ObdValue(
 
 data class ObdDtc(val code: String, val status: String)
 
+/** Null means the ECU explicitly refused that read; it never means zero DTCs. */
+data class PhysicalObdDtcSnapshot(
+    val confirmed: List<ObdDtc>,
+    val pending: List<ObdDtc>?,
+    val permanent: List<ObdDtc>?
+) {
+    val unavailableModes: Set<Int> get() = buildSet {
+        if (pending == null) add(7)
+        if (permanent == null) add(10)
+    }
+    val records: List<ObdDtc> get() = confirmed + pending.orEmpty() + permanent.orEmpty()
+}
+
 data class ObdEcuIdentification(
     val vin: String?,
     val calibrationIds: List<String>,
@@ -43,7 +56,8 @@ data class ObdScanReport(
     val respondingEcuAddresses: List<String>,
     val rawLog: List<String>,
     val freezeFrameDtc: ObdDtc? = null,
-    val physicalCanResponder: String? = null
+    val physicalCanResponder: String? = null,
+    val unavailableDtcModes: Set<Int> = emptySet()
 )
 
 /**
@@ -289,7 +303,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         log.clear()
         val adapter = initialize()
         val respondingEcus = discoverFunctionalObdResponders()
-        return collectReadOnlyScan(adapter, respondingEcus, readDtcRecords = { readDtcs() })
+        return collectReadOnlyScan(adapter, respondingEcus, readDtcRecords = {
+            val (confirmed,pending,permanent) = readDtcs()
+            PhysicalObdDtcSnapshot(confirmed,pending,permanent)
+        })
     }
 
     /**
@@ -300,13 +317,14 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     suspend fun fullPhysicalCanScan(
         responderCanId: String,
         adapterInfo: Map<String, String>,
-        decodeDtcPayload: (Int, String) -> List<ObdDtc>
+        decodeDtcPayload: (Int, String) -> List<ObdDtc>?
     ): ObdScanReport {
         require(responderCanId.matches(Regex("[0-9A-F]{3}|[0-9A-F]{8}")))
         log.clear()
         return collectReadOnlyScan(adapterInfo, listOf(responderCanId),
             physicalCanResponder = responderCanId, readDtcRecords = {
-                Triple(decodeDtcPayload(3, ask("03")),
+                PhysicalObdDtcSnapshot(
+                    requireNotNull(decodeDtcPayload(3, ask("03"))) { "Confirmed DTC read is unavailable." },
                     decodeDtcPayload(7, ask("07")), decodeDtcPayload(10, ask("0A")))
             })
     }
@@ -315,11 +333,11 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         adapter: Map<String, String>,
         respondingEcus: List<String>,
         physicalCanResponder: String? = null,
-        readDtcRecords: suspend () -> Triple<List<ObdDtc>, List<ObdDtc>, List<ObdDtc>>
+        readDtcRecords: suspend () -> PhysicalObdDtcSnapshot
     ): ObdScanReport {
         val supported = discoverSupportedPids()
         val live = readLiveData(supported)
-        val (confirmed, pending, permanent) = readDtcRecords()
+        val dtcSnapshot = readDtcRecords()
         val freezeFrameDtc = readFreezeFrameDtc()
         val freezeFrameSupported = if (freezeFrameDtc != null) discoverFreezeFrameSupportedPids() else emptySet()
         val freeze = if (freezeFrameDtc != null) readFreezeFrame(freezeFrameSupported) else emptyMap()
@@ -334,9 +352,9 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return ObdScanReport(
             supportedPids = supported,
             liveData = live,
-            confirmedDtcs = confirmed,
-            pendingDtcs = pending,
-            permanentDtcs = permanent,
+            confirmedDtcs = dtcSnapshot.confirmed,
+            pendingDtcs = dtcSnapshot.pending.orEmpty(),
+            permanentDtcs = dtcSnapshot.permanent.orEmpty(),
             vin = vin,
             calibrationIds = calIds,
             calibrationVerificationNumbers = cvns,
@@ -348,7 +366,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             respondingEcuAddresses = respondingEcus,
             rawLog = log.toList(),
             freezeFrameDtc = freezeFrameDtc,
-            physicalCanResponder = physicalCanResponder
+            physicalCanResponder = physicalCanResponder,
+            unavailableDtcModes = dtcSnapshot.unavailableModes
         )
     }
 
