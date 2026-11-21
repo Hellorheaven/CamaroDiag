@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.camarodiag.gen5.R
+import androidx.compose.ui.res.stringResource
 import com.camarodiag.gen5.auth.LicenseLevel
 import com.camarodiag.gen5.auth.LicenseRolloutConfig
 import com.google.firebase.functions.FirebaseFunctions
@@ -35,10 +37,7 @@ import com.google.firebase.functions.FirebaseFunctions
 fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
     val french = LocalConfiguration.current.locales[0].language == "fr"
     if (!LicenseRolloutConfig.ENABLED) {
-        Text(
-            if (french) "Le système de licences n'est pas activé."
-            else "Licensing is not enabled."
-        )
+        Text(stringResource(R.string.license_disabled))
         return
     }
     val context = LocalContext.current
@@ -47,7 +46,7 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Text(
-                if (french) "Licence CamaroDiag" else "CamaroDiag License",
+                stringResource(R.string.license_title),
                 style = MaterialTheme.typography.titleLarge
             )
         }
@@ -58,9 +57,9 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val status = when (level) {
-                        LicenseLevel.FREE -> if (french) "Gratuit" else "Free"
-                        LicenseLevel.PREMIUM -> if (french) "Licence complète active" else "Full license active"
-                        LicenseLevel.OWNER -> if (french) "Propriétaire : tous les droits" else "Owner: all permissions"
+                        LicenseLevel.FREE -> stringResource(R.string.license_free)
+                        LicenseLevel.PREMIUM -> stringResource(R.string.license_premium)
+                        LicenseLevel.OWNER -> stringResource(R.string.license_owner)
                     }
                     Text(status, style = MaterialTheme.typography.titleMedium)
                     Text(
@@ -121,7 +120,7 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                             }
                     }
                 ) {
-                    Text(if (french) "Acheter une licence" else "Buy a license")
+                    Text(stringResource(R.string.license_buy))
                 }
             }
         }
@@ -131,7 +130,7 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy
             ) {
-                Text(if (french) "Actualiser / vérifier l’activation" else "Refresh / check activation")
+                Text(stringResource(R.string.license_refresh))
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
