@@ -621,4 +621,6 @@
     <string name="msg_usb_identifier_unavailable">L-identifikatur tal-apparat USB mhuwiex disponibbli</string>
     <string name="msg_simulation_activation_failed">Il-modalità ta’ simulazzjoni ma setgħetx tiġi attivata.</string>
     <string name="msg_live_simulation_active">Is-simulazzjoni hija attiva. Il-valuri murija ma jiġux mill-vettura.</string>
+    <string name="msg_mileage_audit_failed">Il-qari tad-data għall-verifika tal-kilometraġġ falla.</string>
+    <string name="msg_session_delete_failed">Is-sessjoni ssejvjata ma setgħetx titħassar.</string>
 </resources>
