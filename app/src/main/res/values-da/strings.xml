@@ -185,4 +185,25 @@
     <string name="obd_sensor_ok">OK</string>
     <string name="obd_sensor_not_measured">Ikke målt i denne scanning</string>
     <string name="live_selected_sensors">Viste sensorer (%1$d/%2$d)</string>
+    <string name="obd_scan_description">Skrivebeskyttet kontrol efter SAE J1979: drivlinjedata, fejlkoder, fryserammedata og ECU-identifikation.</string>
+    <string name="obd_responding_can_ids">Svarende CAN-id\'er</string>
+    <string name="obd_can_id_limit_explanation">CAN-id\'er er svar observeret på den funktionelle OBD-anmodning 0100. De er ikke tilstrækkelige til at identificere et modul (BCM, TCM, ABS, IPC, SDM) eller godkende udvidede GM-tjenester.</string>
+    <string name="obd_trigger_dtc">Udløsende DTC</string>
+    <string name="obd_real_scan_scope">Omfang: resultaterne stammer kun fra svar, som faktisk er modtaget fra den ECU, der er tilgængelig via OBD-II. Scanningen forespørger ikke BCM, IPC, ABS, SDM eller andre GM-moduler og udfører ikke aktuator- eller programmeringskommandoer.</string>
+    <string name="connection_busy">Forbindelse eller handling i gang…</string>
+    <string name="swcan_wiring_verified">SW-CAN-ledningsføring kontrolleret (ben 1)</string>
+    <string name="long_response_mode">Tilstand for lange svar (ATAL)</string>
+    <string name="adapter_none_detected">Ingen adapter fundet. Par OBDLink MX+, MX, LX eller andre klassiske Bluetooth-adaptere; CX registreres i nærheden via BLE.</string>
+    <string name="usb_connection_title">USB-forbindelse (OBDLink EX / SX, ELM327 og serielle adaptere)</string>
+    <string name="adapter_connect_label">Forbind: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: transportarkitekturen er klargjort, men J2534-grænseflader kan ikke betragtes som Android-kompatible uden den officielle Android-SDK til den pågældende model. J2534-adgang simuleres ikke.</string>
+    <string name="adapter_vxdiag_profiles">Angivne VXDIAG-grænsefladeprofiler</string>
+    <string name="adapter_vxdiag_profiles_hint">Profilerne skelner mellem hardware- og forbindelsesvarianter. De betyder ikke, at en Android-driver eller køretøjskommunikation er tilgængelig.</string>
+    <string name="adapter_simulation_profiles">Simulerede hardwareprofiler (bænktest)</string>
+    <string name="control_vehicle_title">Køretøjsstyring</string>
+    <string name="control_vehicle_label">Camaro %1$s • %2$s • %3$s</string>
+    <string name="control_gm_body_notice">GM-karrosserikommandoer afhænger af VIN, BCM og kalibrering. De forbliver deaktiverede, indtil DID\'er, sikkerhedssessioner og kommandosekvenser er verificeret på dette køretøj.</string>
+    <string name="status_available">TILGÆNGELIG</string>
+    <string name="status_not_equipped">IKKE MONTERET</string>
+    <string name="control_no_actuation_notice">Der sendes som standard ingen kommandoer til vinduer, oplåsning eller aktuatorer. Det forhindrer forkerte eller usikre kommandoer.</string>
 </resources>
