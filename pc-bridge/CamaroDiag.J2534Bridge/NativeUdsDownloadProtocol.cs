@@ -28,9 +28,9 @@ internal static class NativeUdsDownloadProtocol
             if ((ulong)Address + (uint)Image.Length > 0x1_0000_0000UL)
                 throw new ArgumentOutOfRangeException(nameof(Address),
                     "Download address range wraps the 32-bit space.");
-            if (MaximumApplicationBlockBytes is < 1 or > 4093)
+            if (MaximumApplicationBlockBytes is < 1 or > 4089)
                 throw new ArgumentOutOfRangeException(nameof(MaximumApplicationBlockBytes),
-                    "Payload must fit into a 4095-byte J2534 ISO-TP message.");
+                    "Payload must fit into a 4091-byte J2534 ISO-TP message.");
         }
     }
 
