@@ -592,6 +592,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
+                    canReadEnhancedUds = viewModel.canReadEnhancedUds(),
                     vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${localizedGenerationName(vehicle.generation)}",
                     ecmType = vehicle.engine.ecmType,
                     isConnected = !adapter.deviceName.contains("Demo", ignoreCase = true) &&
