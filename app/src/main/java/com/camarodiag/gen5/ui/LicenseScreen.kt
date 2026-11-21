@@ -2,7 +2,7 @@ package com.camarodiag.gen5.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -94,7 +94,7 @@ fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
                                 ) {
                                     try {
                                         context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                            Intent(Intent.ACTION_VIEW, url.toUri())
                                         )
                                     } catch (_: ActivityNotFoundException) {
                                         error = R.string.license_no_browser
