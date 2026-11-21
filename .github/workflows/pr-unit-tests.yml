@@ -8,6 +8,9 @@ on:
     paths:
       - 'app/**'
       - 'tools/admin/**'
+      - 'functions/**'
+      - 'firebase.json'
+      - 'firestore.rules'
       - 'communication/**'
       - 'core/**'
       - 'diagnostic/**'
@@ -45,6 +48,8 @@ jobs:
         run: gradle wrapper --gradle-version 8.11.1
       - name: Verify private two-account Firebase owner provisioning (offline)
         run: node --test tools/admin/enroll-functional-test-owner.test.mjs
+      - name: Verify staged licensing backend policies without Firebase deployment
+        run: node --test functions/licensing-policy.test.js
       - name: Execute Android unit tests (warnings fail)
         run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
       - name: Collect unit test reports
