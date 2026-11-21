@@ -567,4 +567,11 @@
     <string name="vin_photo_not_found">Kelvollista 17 merkin VIN-tunnusta ei löytynyt. Syötä se käsin tai ota uusi kuva.</string>
     <string name="vin_photo_error">VIN-tunnusta ei voitu lukea kuvasta. Yritä uudelleen paremmassa valossa ja tarkenna kuva.</string>
     <string name="vehicle_vin_placeholder">17 merkkiä</string>
+    <string name="can_sniffer_start">Aloita kaappaus</string>
+    <string name="can_sniffer_stop">Lopeta kaappaus</string>
+    <string name="can_sniffer_empty">CAN-kehyksiä ei ole vielä kaapattu.</string>
+    <string name="can_sniffer_capture_complete">CAN-kaappaus valmis.</string>
+    <string name="can_sniffer_capture_failed">CAN-kaappaus epäonnistui tai sovitin lakkasi vastaamasta.</string>
+    <string name="can_sniffer_frame_count">Kaapattuja kehyksiä: %1$d</string>
+    <string name="can_sniffer_filtered_count">Näytetään %1$d/%2$d kehystä</string>
 </resources>
