@@ -81,6 +81,7 @@ internal sealed partial class BridgeDesktopForm : Form
         tabs.TabPages.Add(BuildMemoryTab());
         tabs.TabPages.Add(BuildDiagnosticsTab());
         tabs.TabPages.Add(BuildFunctionalTestsTab());
+        tabs.TabPages.Add(BuildDebugDownloadsTab());
         tabs.TabPages.Add(BuildUpdatesTab());
         tabs.TabPages.Add(BuildHelpTab());
         Controls.Add(tabs);
