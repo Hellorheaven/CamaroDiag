@@ -709,4 +709,11 @@
     <string name="msg_live_csv_exported">CSV-loggen er eksporteret. Antal målinger: %1$d.</string>
     <string name="msg_live_csv_export_failed">CSV-loggen kunne ikke eksporteres.</string>
     <string name="msg_live_recording_max_samples">Sikkerhedsgrænsen blev nået (%1$d). Optagelsen stoppede automatisk.</string>
+    <string name="msg_cal_file_import_failed">Kalibreringsfilen kunne ikke importeres.</string>
+    <string name="msg_cal_file_export_failed">Kalibreringsfilen kunne ikke eksporteres.</string>
+    <string name="msg_cal_comparison_failed">Kalibreringsfilerne kunne ikke sammenlignes.</string>
+    <string name="msg_cal_template_export_failed">TSV-skabelonen kunne ikke eksporteres.</string>
+    <string name="msg_cal_definitions_import_failed">Tabeldefinitionerne kunne ikke importeres.</string>
+    <string name="msg_cal_map_read_failed">Den valgte tabel kunne ikke læses.</string>
+    <string name="msg_cal_table_edit_failed">Kalibreringstabellen kunne ikke redigeres.</string>
 </resources>
