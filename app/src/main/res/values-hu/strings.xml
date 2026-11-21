@@ -408,4 +408,13 @@
     <string name="flexfuel_preflight_recovery">A helyreállítási eljárás nincs ellenőrizve</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: ellenőrzés programozás előtt és után (csak olvasás)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">A programozás utáni ellenőrzés nem történt meg. Sem az ECU-programozás, sem a jármű írás utáni tesztje nincs validálva.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Töltse le a PR #70 legújabb Debug-állományait. Jelentkezzen be a GitHubra egy engedélyezett fiókkal. A letöltések kicsomagolandó ZIP-archívumok.</string>
+    <string name="debug_builds_android_archive">Az Android Debug APK-t tartalmazó ZIP.</string>
+    <string name="debug_builds_windows_archive">Windows x64 és x86 telepítőket tartalmazó ZIP.</string>
+    <string name="debug_builds_caution">Az állományok 30 nap után lejárnak. Elérhetőségük nem bizonyít sikeres fordítást vagy járműtesztet. A Debug APK aláírása eltérhet a nyilvános verzióétól.</string>
+    <string name="debug_builds_created">Létrehozva</string>
+    <string name="debug_builds_expires">Lejár</string>
+    <string name="debug_builds_no_browser">Nincs böngésző a letöltési hivatkozás megnyitásához.</string>
 </resources>
