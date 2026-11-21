@@ -225,14 +225,21 @@ internal sealed partial class J2534Device : IDisposable
             if (response is null) continue;
             if (response.Length >= 3 && response[0] == 0x7F && response[1] == payload[0] && response[2] == 0x78)
             {
-                if (++pendingResponses > 8) throw new TimeoutException("ECU returned too many UDS ResponsePending (0x78) replies.");
+                if (++pendingResponses > 8) throw new IOException("ECU returned too many UDS ResponsePending (0x78) replies.");
                 continue;
             }
             return response;
         }
 
-        throw new TimeoutException($"No ISO15765 response from CAN ID 0x{_responseCanId:X} within {timeoutMs} ms.");
+        throw ClassifyExchangeDeadline(_responseCanId, timeoutMs, pendingResponses);
     }
+
+    // Silence can mean an optional service is absent. A pending response
+    // proves an unfinished operation and must never be caught as that silence.
+    internal static Exception ClassifyExchangeDeadline(int responseCanId, int timeoutMs, int pendingResponses) =>
+        pendingResponses > 0
+            ? new IOException($"CAN ID 0x{responseCanId:X} returned ResponsePending but no final response within {timeoutMs} ms.")
+            : new TimeoutException($"No ISO15765 response from CAN ID 0x{responseCanId:X} within {timeoutMs} ms.");
 
     // A PassThru indication or stale response must never count as an ECU ACK.
     // This validates the standard J2534-1 receive framing, not ECU flash support.

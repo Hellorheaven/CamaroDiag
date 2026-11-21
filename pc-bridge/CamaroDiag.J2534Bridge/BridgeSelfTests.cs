@@ -144,6 +144,10 @@ internal static class BridgeSelfTests
         Assert(J2534Device.DecodeReceivedPayload(6,0,7,0,[0,0,7,0xE8,0x46,1,0],6,0x7E8,[6,0]) is null,
             "Wrong monitor test identifier rejected");
 
+        Assert(J2534Device.ClassifyExchangeDeadline(0x7E8,1500,0) is TimeoutException,
+            "An optional silent identity service can be unavailable");
+        Assert(J2534Device.ClassifyExchangeDeadline(0x7E8,1500,1) is IOException,
+            "An unfinished ECU operation cannot be classified as silence");
         var cvns = J2534Device.DecodeIdentityRecords(6, Convert.FromHexString("49060201020304000000A0"));
         Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
         Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,
