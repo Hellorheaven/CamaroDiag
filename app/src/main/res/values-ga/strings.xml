@@ -523,4 +523,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • iarratas %2$s / freagra %3$s • eatramh %4$d s</string>
     <string name="cal_axis_values">0x%1$s • líon=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Próifíl crua-earraí amháin; tá SDK/API oifigiúil Android nó droichead doiciméadaithe de dhíth fós.</string>
+    <string name="obd_scan_description">Iniúchadh inléite amháin SAE J1979: sonraí an chórais tiomána, cóid lochtanna, fráma reoite agus sainaithint ECU.</string>
+    <string name="obd_responding_can_ids">Aitheantóirí CAN a thug freagra</string>
+    <string name="obd_can_id_limit_explanation">Is freagraí breathnaithe ar an iarratas feidhmiúil OBD 0100 iad na haitheantóirí CAN. Ní leor iad chun modúl (BCM, TCM, ABS, IPC, SDM) a shainaithint ná ardseirbhísí GM a údarú.</string>
+    <string name="obd_trigger_dtc">DTC a spreag an fráma reoite</string>
+    <string name="obd_real_scan_scope">Raon feidhme: tagann na torthaí ó fhreagraí iarbhír an ECU atá inrochtana trí OBD-II amháin. Ní fhiosraíonn an scanadh BCM, IPC, ABS, SDM ná modúil eile GM agus ní fhorghníomhaíonn sé orduithe achtúire ná ríomhchláraithe.</string>
+    <string name="connection_busy">Ceangal nó oibríocht ar siúl…</string>
+    <string name="swcan_wiring_verified">Sreangú SW-CAN fíoraithe (biorán 1)</string>
+    <string name="long_response_mode">Mód freagraí fada (ATAL)</string>
+    <string name="adapter_none_detected">Níor braitheadh cuibheoir. Péireáil OBDLink MX+, MX, LX agus cuibheoirí Bluetooth Classic eile; braitear CX in aice láimhe trí BLE.</string>
+    <string name="usb_connection_title">Nasc USB (OBDLink EX / SX, ELM327 agus cuibheoirí srathacha)</string>
+    <string name="adapter_connect_label">Ceangail: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: tá an ailtireacht iompair ullmhaithe, ach ní dhearbhaítear comhoiriúnacht Android do chomhéadain J2534 gan SDK oifigiúil Android na samhla. Ní ionsamhlaítear rochtain J2534.</string>
+    <string name="adapter_vxdiag_profiles">Próifílí dearbhaithe chomhéadain VXDIAG</string>
+    <string name="adapter_vxdiag_profiles_hint">Déanann na próifílí idirdhealú idir leaganacha crua-earraí agus naisc. Ní dheimhníonn siad go bhfuil tiománaí Android ná cumarsáid feithicle ar fáil.</string>
+    <string name="adapter_simulation_profiles">Próifílí crua-earraí ionsamhlaithe (tástáil ar bhinse)</string>
 </resources>
