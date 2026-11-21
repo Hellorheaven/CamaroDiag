@@ -27,6 +27,12 @@ internal static class Program
         if (args.Contains("--inspect-e39-image", StringComparer.OrdinalIgnoreCase))
             return InspectE39Image(args);
 
+        // Explicit offline calibration checksum repair. No J2534 adapter,
+        // network listener or external programming software is involved.
+        if (args.Contains(NativeE39CalibrationRepairCli.Command,
+                StringComparer.OrdinalIgnoreCase))
+            return NativeE39CalibrationRepairCli.Run(args);
+
 
         if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
