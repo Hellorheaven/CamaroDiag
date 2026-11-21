@@ -32,6 +32,15 @@ const stripeKey = defineSecret("CAMARODIAG_STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("CAMARODIAG_STRIPE_WEBHOOK_SECRET");
 const db = getFirestore();
 
+/**
+ * Server-side independent kill switch. The repository contains the billing
+ * implementation, but checkout and webhook processing are INACTIVE by default.
+ * Activating this requires a deliberate server deploy and explicit approval.
+ */
+function billingRolloutEnabled() {
+    return process.env.CAMARODIAG_LICENSES_ENABLED === "true";
+}
+
 function priceId() {
     const id = (process.env.CAMARODIAG_STRIPE_PRICE_ID ?? "").trim();
     if (!/^price_[A-Za-z0-9]+$/.test(id)) {
@@ -78,6 +87,12 @@ async function updatePaidClaim(uid, enabled) {
 exports.createLicenseCheckout = onCall(
     { region: REGION, secrets: [stripeKey], maxInstances: 20 },
     async (request) => {
+        if (!billingRolloutEnabled()) {
+            throw new HttpsError(
+                "failed-precondition",
+                "La vente de licences n'est pas activée."
+            );
+        }
         const uid = request.auth?.uid;
         if (!uid) throw new HttpsError("unauthenticated", "Connectez votre compte Firebase.");
         let identity;
@@ -234,6 +249,10 @@ async function revokePayment(stripeClient, paymentIntentId, reason) {
 exports.stripeLicenseWebhook = onRequest(
     { region: REGION, secrets: [stripeKey, stripeWebhookSecret], maxInstances: 20 },
     async (req, res) => {
+        if (!billingRolloutEnabled()) {
+            res.status(503).send("Licensing is disabled.");
+            return;
+        }
         if (req.method !== "POST") {
             res.status(405).send("POST only");
             return;
