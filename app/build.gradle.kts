@@ -75,13 +75,11 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
-            // Keep debuggability while shrinking the PR-distributed APK.
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // AGP disables optimization for debuggable variants even when requested.
+            // Keep PR artifacts truly debuggable and remove misleading shrink flags.
+            // Release remains minified with resource shrinking enabled above.
+            isMinifyEnabled = false
+            isShrinkResources = false
             if (file("release.jks").exists() && !System.getenv("SIGNING_STORE_PASSWORD").isNullOrBlank()) {
                 signingConfig = signingConfigs.getByName("release")
             }
