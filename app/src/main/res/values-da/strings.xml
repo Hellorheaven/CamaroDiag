@@ -643,4 +643,27 @@
     <string name="remote_start_blocker_faults">Fravær af kritiske fejl er ikke bekræftet.</string>
     <string name="remote_start_blocker_stationary">Det er ikke bekræftet, at køretøjet står stille.</string>
     <string name="remote_start_blocker_equipment">Originalt fjernstartudstyr er ikke bekræftet.</string>
+    <string name="mileage_summary_discrepancy">Verificerede uafhængige kilder afviger med %1$.1f km. Kontrollér moduludskiftning, omprogrammering og servicehistorik. Dette er et signal til undersøgelse, ikke bevis på manipulation.</string>
+    <string name="mileage_summary_agreement">Verificerede uafhængige kilder stemmer overens inden for %1$.1f km. Dette garanterer ikke en autentisk kilometerhistorik.</string>
+    <string name="mileage_summary_no_data">Ingen pålidelig samlet kilometertællerværdi blev læst. BCM og IPC er stadig ubekræftede; ingen værdi simuleres.</string>
+    <string name="mileage_summary_insufficient">Brugbare kilometeraflæsninger: %1$d; verificerede uafhængige ECU’er med høj sikkerhed: %2$d. Der er utilstrækkelige data til sammenligning.</string>
+    <string name="mileage_source_j2534">J2534-bro (kun UDS)</string>
+    <string name="mileage_source_ecm_a6">OBD-kilometertæller (PID A6)</string>
+    <string name="mileage_source_ecm_d3">Motorens kilometertæller (PID D3)</string>
+    <string name="mileage_source_ecm_total">ECM samlet kilometertæller</string>
+    <string name="mileage_details_j2534">OBD-II-tilstand 01 er ikke tilgængelig på denne transport</string>
+    <string name="mileage_details_pid">Tilstand 01 PID %1$s • %2$s</string>
+    <string name="mileage_pid_not_advertised">ikke angivet af ECU</string>
+    <string name="mileage_details_module_not_read">Ikke læst: verificeret GM-adresse-/DID-profil kræves</string>
+    <string name="mileage_caveat_j2534">Den tilsluttede PC-bro leverer UDS-payloadtransport, ikke en ELM/SAE J1979-kommandokanal. Ingen OBD-kilometertæller-PID blev forespurgt.</string>
+    <string name="mileage_caveat_demo">Demotilstand viser aldrig køretøjets faktiske kilometerstand.</string>
+    <string name="mileage_caveat_ecm_a6_valid">OBD-kilometertællerværdi rapporteret af ECU. Det er ét ECU-datapunkt, ikke en uafhængig kontrol på tværs af moduler.</string>
+    <string name="mileage_caveat_ecm_a6_missing">PID A6 blev ikke angivet af ECU eller returnerede intet gyldigt svar.</string>
+    <string name="mileage_caveat_ecm_d3_valid">Kun motor-ECU-værdi; ikke en uafhængig BCM/IPC-bekræftelse.</string>
+    <string name="mileage_caveat_ecm_d3_missing">PID D3 blev ikke angivet af ECU eller returnerede intet gyldigt svar.</string>
+    <string name="mileage_caveat_bcm">BCM-kilometertællerdata blev ikke forespurgt: ingen verificeret VIN-specifik adresse-/DID-profil er installeret.</string>
+    <string name="mileage_caveat_ipc">IPC-kilometertællerdata blev ikke forespurgt: ingen verificeret VIN-specifik adresse-/DID-profil er installeret.</string>
+    <string name="mileage_source_generic">Kilde %1$s</string>
+    <string name="mileage_details_unavailable">Tekniske detaljer er ikke tilgængelige for denne kilde.</string>
+    <string name="mileage_caveat_unavailable">Ingen yderligere lokaliserede oplysninger er tilgængelige for denne kilde.</string>
 </resources>
