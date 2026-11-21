@@ -403,4 +403,13 @@
     <string name="license_owner">Vlastník: všetky oprávnenia</string>
     <string name="license_premium">Plná licencia aktívna</string>
     <string name="license_title">Licencia CamaroDiag</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Stiahnite najnovšie Debug artefakty z PR #70. Prihláste sa na GitHub autorizovaným účtom. Stiahnuté súbory sú ZIP archívy, ktoré treba rozbaliť.</string>
+    <string name="debug_builds_android_archive">ZIP archív s Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP archív s inštalátormi Windows x64 a x86.</string>
+    <string name="debug_builds_caution">Platnosť artefaktov vyprší po 30 dňoch. Ich dostupnosť nedokazuje úspešnú kompiláciu ani testovanie na vozidle. Podpisy Debug APK sa môžu líšiť od verejných vydaní.</string>
+    <string name="debug_builds_created">Vytvorené</string>
+    <string name="debug_builds_expires">Platí do</string>
+    <string name="debug_builds_no_browser">Na otvorenie stiahnutia nie je dostupný prehliadač.</string>
 </resources>
