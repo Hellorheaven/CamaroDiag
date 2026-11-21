@@ -5,4 +5,5 @@
     <string name="license_no_browser">Ingen webbläsare tillgänglig.</string>
     <string name="license_checkout_unavailable">Köp är inte tillgängligt. Firebase/Stripe-betalning måste konfigureras.</string>
     <string name="license_activation_help">Licensen aktiveras när servern bekräftar betalningen. Återvänd hit och tryck på Uppdatera. En omdirigering ger inte i sig en licens.</string>
+    <string name="license_required_for_feature">Aktivera en licens för det konto du är inloggad med för att använda den här funktionen.</string>
 </resources>

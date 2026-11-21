@@ -5,4 +5,5 @@
     <string name="license_no_browser">利用できるブラウザがありません。</string>
     <string name="license_checkout_unavailable">購入できません。Firebase/Stripe の決済設定が必要です。</string>
     <string name="license_activation_help">サーバーが支払いを確認するとライセンスが有効になります。ここに戻って更新を押してください。リダイレクトだけではライセンスは付与されません。</string>
+    <string name="license_required_for_feature">この機能を使用するには、ログイン中のアカウントでライセンスを有効にしてください。</string>
 </resources>

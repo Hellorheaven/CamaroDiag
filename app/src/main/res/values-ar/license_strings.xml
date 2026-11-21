@@ -5,4 +5,5 @@
     <string name="license_no_browser">لا يوجد متصفح متاح.</string>
     <string name="license_checkout_unavailable">الشراء غير متاح. يجب إعداد الفوترة عبر Firebase/Stripe.</string>
     <string name="license_activation_help">يتم تفعيل الترخيص بعد تأكيد الدفع من الخادم. عد إلى هنا واضغط على تحديث. إعادة التوجيه وحدها لا تمنح ترخيصًا.</string>
+    <string name="license_required_for_feature">لاستخدام هذه الميزة، فعّل ترخيصًا للحساب الذي سجلت الدخول إليه.</string>
 </resources>

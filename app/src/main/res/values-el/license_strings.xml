@@ -5,4 +5,5 @@
     <string name="license_no_browser">Δεν υπάρχει διαθέσιμο πρόγραμμα περιήγησης.</string>
     <string name="license_checkout_unavailable">Η αγορά δεν είναι διαθέσιμη. Απαιτείται ρύθμιση χρέωσης Firebase/Stripe.</string>
     <string name="license_activation_help">Η άδεια ενεργοποιείται μετά την επιβεβαίωση πληρωμής από τον διακομιστή. Επιστρέψτε εδώ και πατήστε Ανανέωση. Η ανακατεύθυνση από μόνη της δεν χορηγεί άδεια.</string>
+    <string name="license_required_for_feature">Για να χρησιμοποιήσετε αυτή τη λειτουργία, ενεργοποιήστε μια άδεια χρήσης στον λογαριασμό με τον οποίο έχετε συνδεθεί.</string>
 </resources>

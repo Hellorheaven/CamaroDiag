@@ -5,4 +5,5 @@
     <string name="license_no_browser">Brak dostępnej przeglądarki.</string>
     <string name="license_checkout_unavailable">Zakup niedostępny. Należy skonfigurować rozliczenia Firebase/Stripe.</string>
     <string name="license_activation_help">Licencja aktywuje się po potwierdzeniu płatności przez serwer. Wróć i naciśnij Odśwież. Samo przekierowanie nie przyznaje licencji.</string>
+    <string name="license_required_for_feature">Aby użyć tej funkcji, aktywuj licencję na koncie użytym do zalogowania.</string>
 </resources>

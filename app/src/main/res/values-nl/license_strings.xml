@@ -5,4 +5,5 @@
     <string name="license_no_browser">Geen browser beschikbaar.</string>
     <string name="license_checkout_unavailable">Aankoop niet beschikbaar. Firebase/Stripe-facturering moet worden ingesteld.</string>
     <string name="license_activation_help">De licentie wordt actief nadat de server de betaling heeft bevestigd. Keer terug en tik op Vernieuwen. Een doorverwijzing alleen verleent geen licentie.</string>
+    <string name="license_required_for_feature">Activeer een licentie voor het account waarmee je bent aangemeld om deze functie te gebruiken.</string>
 </resources>

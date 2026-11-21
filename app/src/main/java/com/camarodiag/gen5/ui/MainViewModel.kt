@@ -126,8 +126,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun requirePremiumLicense(): Boolean {
         if (hasPremiumLicense()) return true
-        _connectionMessage.value =
-            "Licence requise : activez une licence sur le compte connecté."
+        _connectionMessage.value = localizedContext.getString(R.string.license_required_for_feature)
         return false
     }
 

@@ -5,4 +5,5 @@
     <string name="license_no_browser">Brskalnik ni na voljo.</string>
     <string name="license_checkout_unavailable">Nakup ni na voljo. Nastaviti je treba obračunavanje Firebase/Stripe.</string>
     <string name="license_activation_help">Licenca se aktivira, ko strežnik potrdi plačilo. Vrnite se sem in tapnite Osveži. Sama preusmeritev ne dodeli licence.</string>
+    <string name="license_required_for_feature">Za uporabo te funkcije aktivirajte licenco za račun, s katerim ste prijavljeni.</string>
 </resources>

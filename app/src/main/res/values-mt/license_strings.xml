@@ -5,4 +5,5 @@
     <string name="license_no_browser">Ebda browser disponibbli.</string>
     <string name="license_checkout_unavailable">Ix-xiri mhux disponibbli. Il-ħlasijiet Firebase/Stripe iridu jiġu kkonfigurati.</string>
     <string name="license_activation_help">Il-liċenzja tiġi attivata wara li s-server jikkonferma l-ħlas. Erġa’ lura hawn u agħfas Aġġorna. Ridirezzjoni waħedha ma tagħtix liċenzja.</string>
+    <string name="license_required_for_feature">Biex tuża din il-funzjoni, attiva liċenzja fuq il-kont li dħalt bih.</string>
 </resources>

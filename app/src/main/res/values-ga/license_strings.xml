@@ -5,4 +5,5 @@
     <string name="license_no_browser">Níl brabhsálaí ar fáil.</string>
     <string name="license_checkout_unavailable">Níl ceannach ar fáil. Ní mór billeáil Firebase/Stripe a chumrú.</string>
     <string name="license_activation_help">Gníomhachtaítear an ceadúnas nuair a dheimhníonn an freastalaí an íocaíocht. Fill anseo agus tapáil Athnuaigh. Ní thugann atreorú amháin ceadúnas.</string>
+    <string name="license_required_for_feature">Chun an ghné seo a úsáid, gníomhachtaigh ceadúnas ar an gcuntas a bhfuil tú sínithe isteach ann.</string>
 </resources>

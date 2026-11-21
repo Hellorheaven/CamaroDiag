@@ -5,4 +5,5 @@
     <string name="license_no_browser">Nincs elérhető böngésző.</string>
     <string name="license_checkout_unavailable">A vásárlás nem érhető el. Be kell állítani a Firebase/Stripe számlázást.</string>
     <string name="license_activation_help">A licenc a fizetés szerveroldali visszaigazolása után aktiválódik. Térj vissza ide, és koppints a Frissítés gombra. Az átirányítás önmagában nem ad licencet.</string>
+    <string name="license_required_for_feature">A funkció használatához aktiválj licencet azon a fiókon, amellyel bejelentkeztél.</string>
 </resources>

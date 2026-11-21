@@ -5,4 +5,5 @@
     <string name="license_no_browser">Nie je k dispozícii žiadny prehliadač.</string>
     <string name="license_checkout_unavailable">Nákup nie je dostupný. Je potrebné nastaviť fakturáciu Firebase/Stripe.</string>
     <string name="license_activation_help">Licencia sa aktivuje po potvrdení platby serverom. Vráťte sa sem a ťuknite na Obnoviť. Samotné presmerovanie licenciu neudelí.</string>
+    <string name="license_required_for_feature">Ak chcete používať túto funkciu, aktivujte licenciu pre prihlásený účet.</string>
 </resources>

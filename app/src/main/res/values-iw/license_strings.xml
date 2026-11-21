@@ -5,4 +5,5 @@
     <string name="license_no_browser">אין דפדפן זמין.</string>
     <string name="license_checkout_unavailable">הרכישה אינה זמינה. יש להגדיר חיוב ב-Firebase/Stripe.</string>
     <string name="license_activation_help">הרישיון מופעל לאחר אישור התשלום בשרת. חזור לכאן ולחץ על רענון. הפניה לבדה אינה מעניקה רישיון.</string>
+    <string name="license_required_for_feature">כדי להשתמש בתכונה הזו יש להפעיל רישיון בחשבון שבו התחברת.</string>
 </resources>

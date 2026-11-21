@@ -5,4 +5,5 @@
     <string name="license_no_browser">没有可用的浏览器。</string>
     <string name="license_checkout_unavailable">暂时无法购买。必须配置 Firebase/Stripe 计费服务。</string>
     <string name="license_activation_help">服务器确认付款后许可证才会激活。请返回此处并点击刷新。仅跳转页面不会授予许可证。</string>
+    <string name="license_required_for_feature">要使用此功能，请为当前登录的账号激活许可证。</string>
 </resources>

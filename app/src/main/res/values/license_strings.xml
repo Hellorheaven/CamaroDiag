@@ -5,4 +5,5 @@
     <string name="license_no_browser">No browser available.</string>
     <string name="license_checkout_unavailable">Checkout is unavailable. Firebase/Stripe billing must be configured.</string>
     <string name="license_activation_help">The license activates after server confirmation of payment. Return here and tap Refresh. A redirect alone never grants a license.</string>
+    <string name="license_required_for_feature">Activate a license on the signed-in account to use this feature.</string>
 </resources>

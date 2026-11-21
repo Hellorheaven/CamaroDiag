@@ -5,4 +5,5 @@
     <string name="license_no_browser">Nessun browser disponibile.</string>
     <string name="license_checkout_unavailable">Acquisto non disponibile. Configura la fatturazione Firebase/Stripe.</string>
     <string name="license_activation_help">La licenza si attiva dopo la conferma del pagamento dal server. Torna qui e tocca Aggiorna. Il solo reindirizzamento non concede una licenza.</string>
+    <string name="license_required_for_feature">Per usare questa funzione, attiva una licenza sull’account con cui hai effettuato l’accesso.</string>
 </resources>

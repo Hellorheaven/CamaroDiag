@@ -5,4 +5,5 @@
     <string name="license_no_browser">Nav pieejama pārlūkprogramma.</string>
     <string name="license_checkout_unavailable">Pirkums nav pieejams. Jākonfigurē Firebase/Stripe norēķini.</string>
     <string name="license_activation_help">Licence tiek aktivizēta pēc servera apstiprinājuma par maksājumu. Atgriezieties un pieskarieties Atsvaidzināt. Pāradresācija vien nepiešķir licenci.</string>
+    <string name="license_required_for_feature">Lai izmantotu šo funkciju, aktivizējiet licenci kontā, kurā esat pierakstījies.</string>
 </resources>
