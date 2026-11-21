@@ -382,4 +382,19 @@
     <string name="functional_tests_denied">Juurdepääs keelatud: logi sisse lubatud Google kontoga ja ühenda uuesti.</string>
     <string name="functional_tests_not_connected">Füüsilist OBD-adapterit pole ühendatud. Ülejäänud kontrolle ei tehtud.</string>
     <string name="functional_tests_cancelled">Testimine tühistati.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Silumisversioonid</string>
+    <string name="tab_license">Litsents</string>
+    <string name="debug_builds_title">Privaatsed silumisversioonid</string>
+    <string name="debug_builds_refresh">Värskenda saadaolevaid versioone</string>
+    <string name="debug_builds_download">Laadi alla GitHubist</string>
+    <string name="debug_builds_unavailable">Sobivat silumisarhiivi pole saadaval.</string>
+    <string name="debug_builds_error">Silumisversioone ei õnnestunud GitHubist laadida.</string>
+    <string name="license_disabled">Litsentsisüsteem pole aktiveeritud.</string>
+    <string name="license_buy">Osta litsents</string>
+    <string name="license_refresh">Värskenda litsentsi</string>
+    <string name="license_free">Tasuta</string>
+    <string name="license_owner">Omanik: kõik õigused</string>
+    <string name="license_premium">Täislitsents aktiivne</string>
+    <string name="license_title">CamaroDiagi litsents</string>
 </resources>
