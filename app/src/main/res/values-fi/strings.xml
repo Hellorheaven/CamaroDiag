@@ -609,4 +609,6 @@
     <string name="msg_usb_identifier_unavailable">USB-laitteen tunniste ei ole saatavilla</string>
     <string name="msg_simulation_activation_failed">Simulointitilan käyttöönotto epäonnistui.</string>
     <string name="msg_live_simulation_active">Simulointi on käytössä. Näytetyt arvot eivät ole peräisin ajoneuvosta.</string>
+    <string name="msg_mileage_audit_failed">Matkamittarin tarkastustietojen luku epäonnistui.</string>
+    <string name="msg_session_delete_failed">Tallennetun istunnon poistaminen epäonnistui.</string>
 </resources>
