@@ -602,4 +602,10 @@
     <string name="cal_expert_patch_program_bytes">Méid an aonaid ríomhchláraithe (bearta)</string>
     <string name="cal_expert_patch_preview_button">Réamhamharc ar na hearnálacha a dtéann an comhad BIN athraithe i bhfeidhm orthu</string>
     <string name="cal_expert_patch_summary">Bearta athraithe: %1$d. Earnálacha scriosta lena mbaineann: %2$d. Níor fíoraíodh léarscáil chuimhne na crua-earraí. Níor scríobhadh aon sonraí.</string>
+    <string name="dtc_gm_monitor_title">Monatóir innill GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Critéir chun an cód a shocrú: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Coinníollacha cumasaithe: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Áiritheoir teipeanna / ráta bailíochtaithe: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Aicmiú MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Foinse: GM %1$s, leathanach %2$d</string>
 </resources>
