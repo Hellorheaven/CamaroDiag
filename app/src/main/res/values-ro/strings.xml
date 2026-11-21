@@ -370,4 +370,19 @@
     <string name="cal_j2534_launch_instructions">Pornește CamaroDiag.J2534Bridge.exe pe Windows. Introdu IP-ul PC-ului și codul complet (token.amprentă TLS) afișat în consolă. Folosește o rețea locală de încredere.</string>
     <string name="cal_j2534_security_notice">TLS 1.2+ și verificarea amprentei certificatului sunt obligatorii. Tokenurile vechi fără amprentă sunt respinse. Nu expune portul pe internet.</string>
     <string name="cal_pc_pairing_token">Cod TLS (token.amprentă)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Teste funcționale</string>
+    <string name="functional_tests_title">Teste funcționale — ECU și OBD</string>
+    <string name="functional_tests_readonly">Execută toate verificările disponibile doar pentru citire prin adaptorul fizic conectat. Alte adaptoare și ECU neverificate sunt marcate NETESTAT. Fără ștergere, acționare sau programare.</string>
+    <string name="functional_tests_run">Rulează toate</string>
+    <string name="functional_tests_stop">Oprește</string>
+    <string name="functional_tests_export">Exportă JSON</string>
+    <string name="functional_tests_summary">%1$d reușite · %2$d eșuate · %3$d netestate</string>
+    <string name="functional_tests_passed">REUȘIT (dovadă fizică)</string>
+    <string name="functional_tests_failed">EȘUAT</string>
+    <string name="functional_tests_skipped">NETESTAT</string>
+    <string name="functional_tests_denied">Acces refuzat: conectează-te cu contul Google autorizat și reconectează adaptorul.</string>
+    <string name="functional_tests_not_connected">Nu este conectat niciun adaptor OBD fizic. Restul verificărilor nu au fost efectuate.</string>
+    <string name="functional_tests_cancelled">Sesiunea de teste a fost anulată.</string>
 </resources>
