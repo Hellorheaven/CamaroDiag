@@ -36,11 +36,17 @@ class StnUdsPayloadTransport(
         ensureConfigured(timeoutMs)
         val command = "STPX h:${formatId(requestCanId)}, d:${payload.toHex()}, t:${timeoutMs.coerceIn(1L, 65535L)}, r:1"
         var response = parseResponse(sendCommand(command, timeoutMs), responseCanId)
+        check(isMatchingUdsService(response, payload[0])) {
+            "STN received a response to a different UDS service."
+        }
         var pendingCount = 0
         while (isResponsePending(response, payload[0])) {
             if (++pendingCount > 5) error("UDS ResponsePending limit exceeded.")
             val monitor = sendCommand("STMA 1", maxOf(timeoutMs, 10_000L))
             response = parseResponse(monitor, responseCanId)
+            check(isMatchingUdsService(response, payload[0])) {
+                "STN received a pending response for a different UDS request."
+            }
         }
         response
     }
@@ -94,6 +100,14 @@ class StnUdsPayloadTransport(
 
     private fun requireOk(response: String, operation: String) {
         require(response.contains("OK", true)) { "STN adapter failed to $operation: $response" }
+    }
+
+    private fun isMatchingUdsService(response: ByteArray, requestedService: Byte): Boolean {
+        val requestSid = requestedService.toInt() and 0xFF
+        val positiveSid = (requestSid + 0x40) and 0xFF
+        return (response.isNotEmpty() && (response[0].toInt() and 0xFF) == positiveSid) ||
+            (response.size >= 3 && (response[0].toInt() and 0xFF) == 0x7F &&
+                response[1] == requestedService)
     }
 
     private fun isResponsePending(response: ByteArray, requestedService: Byte): Boolean =
