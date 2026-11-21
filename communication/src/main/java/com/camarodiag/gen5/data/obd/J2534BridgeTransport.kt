@@ -84,7 +84,11 @@ class J2534BridgeTransport(
                 scopedMemoryReadEnabled = response.optBoolean("scopedPhysicalMemoryRead", false)
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
-                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s"
+                val voltage = response.optLong("batteryMillivolts", -1L)
+                val voltageLabel = if (voltage >= 0) {
+                    String.format(Locale.getDefault(), " • %.2f V", voltage / 1000.0)
+                } else ""
+                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s$voltageLabel"
             } catch (error: Exception) {
                 closeInternal()
                 throw error
