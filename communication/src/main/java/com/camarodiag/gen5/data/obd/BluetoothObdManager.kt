@@ -802,9 +802,10 @@ class BluetoothObdManager(context: Context) {
                         val restore = StnUdsAdapterRestoration.restore { command ->
                             sendAtCommandInternal(command, 1_500L, expectedEpoch = requestedEpoch)
                         }
-                        if (!restore.succeeded) {
+                        if (!restore.succeeded && transportSessionEpoch.isCurrent(requestedEpoch)) {
                             // A partially restored adapter cannot safely serve
-                            // normal PID reads. Invalidate this connection.
+                            // normal PID reads. Never disconnect a newer session
+                            // that replaced this adapter while cleanup ran.
                             disconnect()
                             error("STN diagnostic session cleanup failed; reconnect the OBD adapter.")
                         }
