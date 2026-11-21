@@ -84,10 +84,9 @@ internal sealed class J2534MemoryReadScope
             throw new ArgumentException("Memory read profile must be a JSON object.");
         // Deliberately no default region, adapter, session or VIN.
         var vin = root.GetProperty("expectedVin").GetString() ?? "";
-        var request = ParseHex(root.GetProperty("requestCanIdHex").GetString());
-        var response = ParseHex(root.GetProperty("responseCanIdHex").GetString());
-        var start = ParseHex(root.GetProperty("startAddressHex").GetString());
-        if (start < 0) throw new ArgumentException("Memory addresses must be unsigned.");
+        var request = checked((int)ParseHexUnsigned(root.GetProperty("requestCanIdHex").GetString()));
+        var response = checked((int)ParseHexUnsigned(root.GetProperty("responseCanIdHex").GetString()));
+        var start = ParseHexUnsigned(root.GetProperty("startAddressHex").GetString());
         var required = new HashSet<string>(StringComparer.Ordinal)
         {
             "expectedVin", "requestCanIdHex", "responseCanIdHex", "protocolNumber",
@@ -100,16 +99,16 @@ internal sealed class J2534MemoryReadScope
             throw new ArgumentException("Incomplete memory read profile: " + string.Join(",", required));
         return new J2534MemoryReadScope(
             vin, request, response, root.GetProperty("protocolNumber").GetInt32(),
-            checked((uint)start), checked((uint)root.GetProperty("lengthBytes").GetInt64()),
+            start, checked((uint)root.GetProperty("lengthBytes").GetInt64()),
             root.GetProperty("maxReadBytes").GetInt32(), root.GetProperty("session").GetInt32()
         );
     }
 
-    private static int ParseHex(string? value)
+    private static uint ParseHexUnsigned(string? value)
     {
         var raw = value?.Trim();
         if (raw?.StartsWith("0x", StringComparison.OrdinalIgnoreCase) == true) raw = raw[2..];
-        if (string.IsNullOrEmpty(raw) || !int.TryParse(raw, NumberStyles.AllowHexSpecifier,
+        if (string.IsNullOrEmpty(raw) || !uint.TryParse(raw, NumberStyles.AllowHexSpecifier,
             CultureInfo.InvariantCulture, out var parsed))
             throw new ArgumentException("Invalid unsigned hexadecimal value in memory read profile.");
         return parsed;
