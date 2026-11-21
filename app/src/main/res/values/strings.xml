@@ -903,4 +903,13 @@
     <string name="license_owner">Owner: all permissions</string>
     <string name="license_premium">Full license active</string>
     <string name="license_title">CamaroDiag license</string>
+
+    <!-- Owner-only Debug download details -->
+    <string name="debug_builds_intro">Download the latest Debug artifacts from PR #70. Sign in to GitHub with an authorized account. Downloads are ZIP archives to extract.</string>
+    <string name="debug_builds_android_archive">ZIP containing the Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP containing the Windows x64 and x86 installers.</string>
+    <string name="debug_builds_caution">Artifacts expire after 30 days. Availability does not prove a successful build or vehicle tests. Debug APK signatures may differ from public releases.</string>
+    <string name="debug_builds_created">Created</string>
+    <string name="debug_builds_expires">Expires</string>
+    <string name="debug_builds_no_browser">No web browser is available to open this download.</string>
 </resources>
