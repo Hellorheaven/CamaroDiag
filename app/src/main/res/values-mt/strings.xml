@@ -526,4 +526,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • talba %2$s / rispons %3$s • intervall %4$d s</string>
     <string name="cal_axis_values">0x%1$s • għadd=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Profil tal-ħardwer biss; għad hemm bżonn SDK/API uffiċjali Android jew pont dokumentat.</string>
+    <string name="obd_scan_description">Spezzjoni SAE J1979 għall-qari biss: data tas-sistema ta’ propulsjoni, kodiċijiet ta’ ħsara, qafas iffriżat u identifikazzjoni tal-ECU.</string>
+    <string name="obd_responding_can_ids">Identifikaturi CAN li rrispondew</string>
+    <string name="obd_can_id_limit_explanation">L-identifikaturi CAN huma risposti osservati għat-talba funzjonali OBD 0100. Mhumiex biżżejjed biex jidentifikaw modulu (BCM, TCM, ABS, IPC, SDM) jew jawtorizzaw servizzi avvanzati GM.</string>
+    <string name="obd_trigger_dtc">DTC li skattat il-qafas iffriżat</string>
+    <string name="obd_real_scan_scope">Ambitu: ir-riżultati ġejjin biss mir-risposti reali tal-ECU aċċessibbli permezz ta’ OBD-II. L-iskennjar ma jistaqsix lill-BCM, IPC, ABS, SDM jew moduli oħra GM u ma jwettaqx kmandi ta’ attwaturi jew programmar.</string>
+    <string name="connection_busy">Konnessjoni jew operazzjoni għaddejja…</string>
+    <string name="swcan_wiring_verified">Wajers SW-CAN ivverifikati (pin 1)</string>
+    <string name="long_response_mode">Modalità ta’ risposti twal (ATAL)</string>
+    <string name="adapter_none_detected">Ma nstab l-ebda adapter. Agħmel pairing ma’ OBDLink MX+, MX, LX u adapters Bluetooth Classic oħra; CX jinstab fil-qrib permezz ta’ BLE.</string>
+    <string name="usb_connection_title">Konnessjoni USB (OBDLink EX / SX, ELM327 u adapters serjali)</string>
+    <string name="adapter_connect_label">Qabbad: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: l-arkitettura tat-trasport hija ppreparata, iżda l-kompatibbiltà ma’ Android tal-interfaċċi J2534 mhijiex iddikjarata mingħajr l-SDK uffiċjali Android tal-mudell. L-aċċess J2534 mhuwiex simulat.</string>
+    <string name="adapter_vxdiag_profiles">Profili ddikjarati tal-interfaċċi VXDIAG</string>
+    <string name="adapter_vxdiag_profiles_hint">Dawn il-profili jiddistingwu varjanti tal-ħardwer u tal-konnessjoni. Ma jikkonfermawx li hemm driver Android jew komunikazzjoni mal-vettura disponibbli.</string>
+    <string name="adapter_simulation_profiles">Profili simulati tal-ħardwer (test fuq bank)</string>
 </resources>
