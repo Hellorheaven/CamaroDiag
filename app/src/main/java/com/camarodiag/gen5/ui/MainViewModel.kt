@@ -3526,8 +3526,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "ECU VIN received over the selected physical J2534 UDS profile." to
                             "VIN reçu via le profil UDS J2534 physique sélectionné."
                     }
-                    // J2534 does not expose an SAE J1979/ELM channel. Do not
-                    // claim PID, DTC or readiness coverage it has not performed.
+                    // A capable bridge now offers standard OBD payloads without
+                    // an ELM command channel. Test each service independently.
+                    if (obdManager.isJ2534StandardObdAvailable()) {
+                        checkRead("service:pids") {
+                            val pids = obdManager.probeJ2534StandardPids()
+                            require(pids.isNotEmpty()) { "No supported physical PIDs" }
+                            ("Physical J2534 PID bitmap: " + pids.size + " supported PIDs.") to
+                                ("Bitmap physique J2534 : " + pids.size + " PID pris en charge.")
+                        }
+                        checkRead("service:dtcs") {
+                            val snapshot = obdManager.readJ2534StandardDtcs()
+                            require(snapshot.unavailableModes.isEmpty()) {
+                                "Complete standard DTC coverage not confirmed"
+                            }
+                            ("Physical J2534 DTC reads verified: " + snapshot.records.size + " codes, no clearing.") to
+                                ("Lectures physiques J2534 vérifiées : " + snapshot.records.size + " défauts, sans effacement.")
+                        }
+                        checkRead("service:readiness") {
+                            obdManager.probeJ2534StandardReadiness()
+                            "Physical J2534 emissions readiness response verified." to
+                                "Réponse physique J2534 des moniteurs antipollution vérifiée."
+                        }
+                    }
+                    // A physical standard OBD read is not proof of every GM
+                    // module or of programming, actuation or DTC reset.
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
