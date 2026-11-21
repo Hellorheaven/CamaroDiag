@@ -586,4 +586,10 @@
     <string name="can_sniffer_capture_failed">Il-qbid tal-frejms CAN falla jew l-adapter waqaf jirrispondi.</string>
     <string name="can_sniffer_frame_count">Frejms maqbuda: %1$d</string>
     <string name="can_sniffer_filtered_count">Qed jintwerew %1$d minn %2$d frejm</string>
+    <string name="msg_live_recording_real_started">Bdiet ir-reġistrazzjoni tad-data reali tal-OBD.</string>
+    <string name="msg_live_recording_started">Ir-reġistrazzjoni għaddejja. Għadd ta’ kampjuni: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Ir-reġistrazzjoni waqfet. Għadd ta’ kampjuni rreġistrati: %1$d.</string>
+    <string name="msg_live_csv_exported">Ir-reġistru CSV ġie esportat. Għadd ta’ kampjuni: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Ir-reġistru CSV ma setax jiġi esportat.</string>
+    <string name="msg_live_recording_max_samples">Intlaħaq il-limitu tas-sikurezza (%1$d). Ir-reġistrazzjoni waqfet awtomatikament.</string>
 </resources>
