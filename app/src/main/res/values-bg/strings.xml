@@ -581,4 +581,19 @@
     <string name="functional_tests_denied">Достъпът е отказан: влезте с разрешения Google акаунт и се свържете отново.</string>
     <string name="functional_tests_not_connected">Няма свързан физически OBD адаптер. Останалите проверки не са изпълнени.</string>
     <string name="functional_tests_cancelled">Тестовата кампания е отменена.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Версии за отстраняване на грешки</string>
+    <string name="tab_license">Лиценз</string>
+    <string name="debug_builds_title">Частни версии за отстраняване на грешки</string>
+    <string name="debug_builds_refresh">Обновяване на наличните версии</string>
+    <string name="debug_builds_download">Изтегляне от GitHub</string>
+    <string name="debug_builds_unavailable">Няма наличен валиден архив за отстраняване на грешки.</string>
+    <string name="debug_builds_error">Неуспешно зареждане на версиите от GitHub.</string>
+    <string name="license_disabled">Лицензирането не е активирано.</string>
+    <string name="license_buy">Купете лиценз</string>
+    <string name="license_refresh">Обновяване на лиценза</string>
+    <string name="license_free">Безплатно</string>
+    <string name="license_owner">Собственик: всички права</string>
+    <string name="license_premium">Пълният лиценз е активен</string>
+    <string name="license_title">Лиценз за CamaroDiag</string>
 </resources>
