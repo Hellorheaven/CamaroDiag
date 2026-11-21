@@ -350,6 +350,22 @@ fun CalibrationWorkspaceScreen(
                                     color = TextMuted, fontSize = 11.sp)
                             }
                         }
+                        var labelQuery by remember { mutableStateOf("") }
+                        OutlinedTextField(
+                            value = labelQuery,
+                            onValueChange = { labelQuery = it },
+                            label = { Text("Serv# / GM P/N / BCC") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (labelQuery.isNotBlank()) {
+                            val matching = Lfx2012ControllerReferences.findLabels(labelQuery)
+                            if (matching.isEmpty()) Text(unavailable, color = TextMuted, fontSize = 11.sp)
+                            matching.forEach { label ->
+                                Text("Serv# ${label.serviceNumber} · GM P/N ${label.partNumber} · BCC ${label.bcc}",
+                                    color = TextPrimary, fontSize = 12.sp)
+                            }
+                        }
                         Text(stringResource(R.string.flexfuel_lfx2012_parts_warning),
                             color = TextMuted, fontSize = 11.sp)
                         Text(stringResource(R.string.flexfuel_lfx2012_calid_label,

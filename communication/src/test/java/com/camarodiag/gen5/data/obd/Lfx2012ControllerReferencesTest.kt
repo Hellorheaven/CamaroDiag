@@ -18,6 +18,17 @@ class Lfx2012ControllerReferencesTest {
         assertFalse("12653998" in Lfx2012ControllerReferences.describedServiceParts())
     }
 
+    @Test fun lookupHandlesMultipleLabelsOnTheSameServiceNumber() {
+        val expected = Lfx2012ControllerReferences.Label("12643248", "12648906", "AA69")
+        assertEquals(listOf(expected), Lfx2012ControllerReferences.findLabels(" aa69 "))
+        assertEquals(listOf(expected), Lfx2012ControllerReferences.findLabels("12648906"))
+        assertTrue(Lfx2012ControllerReferences.findLabels("12643248").containsAll(listOf(
+            expected, Lfx2012ControllerReferences.Label("12643248", "12648432", "AA6L")
+        )))
+        assertTrue(Lfx2012ControllerReferences.findLabels("12653998").isEmpty())
+        assertTrue(Lfx2012ControllerReferences.findLabels("1264").isEmpty())
+    }
+
     @Test fun fingerprintRequiresEcuNameCalIdAndCvn() {
         val complete = Lfx2012ControllerReferences.ObservedIdentity(
             ecuName = "ECM E39",

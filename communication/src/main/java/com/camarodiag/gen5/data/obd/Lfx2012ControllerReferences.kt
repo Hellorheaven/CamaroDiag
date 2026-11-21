@@ -42,6 +42,49 @@ object Lfx2012ControllerReferences {
         )
     )
 
+    data class Label(val serviceNumber: String, val partNumber: String, val bcc: String)
+
+    // Individual MY2012 3.6L catalog records, searchable by their printed identifiers.
+    // The BCC on a replacement part does not attest to the software currently installed.
+    // https://www.fs1inc.com/2012-chevrolet-camaro-3-6l-ecm-engine-computer-pcm-ecu-programmed-plug-play.html
+    private val catalogLabels = listOf(
+        Label("12616889", "12635821", "AAKG"),
+        Label("12616889", "12636333", "AALW"),
+        Label("12637106", "12636635", "AAL9"),
+        Label("12637106", "12637157", "AAMK"),
+        Label("12637106", "12637489", "AAMU"),
+        Label("12637106", "12639985", "AAUB"),
+        Label("12637106", "12639986", "AAUC"),
+        Label("12637106", "12640385", "AAUL"),
+        Label("12642665", "12641497", "AAWD"),
+        Label("12642665", "12642569", "AAXP"),
+        Label("12642665", "12642612", "AAXS"),
+        Label("12642665", "12642843", "AAXY"),
+        Label("12642665", "12642856", "AAX1"),
+        Label("12642665", "12643469", "AAYY"),
+        Label("12642665", "12643542", "AAZA"),
+        Label("12642665", "12646438", "AA3Y"),
+        Label("12642665", "12646944", "AA4G"),
+        Label("12642665", "12647214", "AA4P"),
+        Label("12643248", "12647402", "AA4U"),
+        Label("12643248", "12648432", "AA6L"),
+        Label("12643248", "12648906", "AA69"),
+        Label("12643248", "12651869", "ABAS"),
+        Label("12651994", "12650248", "AA8R"),
+        Label("12651994", "12652814", "ABDL"),
+        Label("12651994", "12653090", "ABG4"),
+        Label("12651994", "12655480", "ABMY"),
+        Label("12651994", "12663029", "AB3M")
+    )
+
+    fun findLabels(query: String): List<Label> {
+        val value = query.trim()
+        if (value.isEmpty()) return emptyList()
+        return catalogLabels.filter {
+            it.serviceNumber == value || it.partNumber == value || it.bcc.equals(value, ignoreCase = true)
+        }
+    }
+
     data class ObservedIdentity(
         val ecuName: String?,
         val calibrationIds: List<String>,
