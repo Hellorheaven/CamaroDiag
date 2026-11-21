@@ -149,7 +149,7 @@
     <string name="cal_read_uds_did">UDS DIDを読み取る</string>
     <string name="cal_read_uds_dtcs">UDS故障コードを読み取る</string>
     <string name="cal_uds_trouble_codes">UDS故障コード（0x19）</string>
-    <string name="cal_native_catalog_title">CAMARODIAG独自カタログ</string>
+    <string name="cal_native_catalog_title">CamaroDiag独自カタログ</string>
     <string name="cal_native_catalog_explanation">これらの定義はコミュニティカタログとは独立してCamaroDiagが管理します。提案または文書化された定義がECUへ送信されることはありません。</string>
     <string name="cal_native_catalog_loading">独自カタログを読み込み中…</string>
     <string name="cal_native_catalog_empty">現在、使用可能と宣言されたCamaro独自DIDはありません。不明なアドレスやスケーリング値を捏造しません。</string>
