@@ -17,16 +17,42 @@ import java.util.Base64
  * A valid audit is evidence about the transaction log, not proof of a correct
  * ECU flash, OEM checksum, or recoverability.
  */
-class PersistentEcuWriteJournal(
+class PersistentEcuWriteJournal private constructor(
     private val file: File,
     target: EcuProgrammingDriverContract.FirmwareTarget,
-    expectedVin: String
+    expectedVin: String,
+    private val writable: Boolean
 ) : EcuWriteTransaction.Journal {
+    constructor(file: File, target: EcuProgrammingDriverContract.FirmwareTarget, expectedVin: String) :
+        this(file, target, expectedVin, true)
+
+    enum class RecoveryDisposition {
+        INVALID_OR_UNREADABLE,
+        NO_ERASE_RECORDED,
+        ERASE_OR_WRITE_MAY_BE_INCOMPLETE,
+        ADDITIONAL_BASELINES_NOT_WRITTEN,
+        ALL_RECORDED_SECTORS_VERIFIED
+    }
+
     data class Audit(
         val valid: Boolean,
         val records: Int,
-        val lastStage: EcuWriteTransaction.Stage? = null
-    )
+        val lastStage: EcuWriteTransaction.Stage? = null,
+        val baselineSectors: Int = 0,
+        val verifiedSectors: Int = 0,
+        val uncertainAddress: Long? = null,
+        val uncertainRegion: EcuBackupCoverage.Region? = null
+    ) {
+        /** Journal evidence only, never authorization to retry, restore or program. */
+        val recoveryDisposition: RecoveryDisposition
+            get() = when {
+                !valid -> RecoveryDisposition.INVALID_OR_UNREADABLE
+                uncertainAddress != null -> RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE
+                verifiedSectors == 0 -> RecoveryDisposition.NO_ERASE_RECORDED
+                verifiedSectors < baselineSectors -> RecoveryDisposition.ADDITIONAL_BASELINES_NOT_WRITTEN
+                else -> RecoveryDisposition.ALL_RECORDED_SECTORS_VERIFIED
+            }
+    }
 
     private val guard = Any()
     private val shaPattern = Regex("[0-9a-fA-F]{64}")
@@ -48,13 +74,16 @@ class PersistentEcuWriteJournal(
         require(file.parentFile?.isDirectory == true) {
             "The persistent journal directory must already exist."
         }
-        check(file.createNewFile()) {
-            "Refusing to overwrite or append to an earlier ECU write journal."
+        if (writable) {
+            check(file.createNewFile()) {
+                "Refusing to overwrite or append to an earlier ECU write journal."
+            }
+            durableAppend((header + "\n").toByteArray(StandardCharsets.UTF_8))
         }
-        durableAppend((header + "\n").toByteArray(StandardCharsets.UTF_8))
     }
 
     override suspend fun append(record: EcuWriteTransaction.Record) {
+        check(writable) { "An existing recovery journal is read-only." }
         require(record.address >= 0L)
         require(shaPattern.matches(record.originalSha256) &&
             shaPattern.matches(record.updatedSha256)) {
@@ -104,6 +133,16 @@ class PersistentEcuWriteJournal(
         private val completed = mutableSetOf<Sector>()
         private var inFlight: Sector? = null
         private var erasePhase = false
+
+        fun audit(records: Int, lastStage: EcuWriteTransaction.Stage?) = Audit(
+            valid = true,
+            records = records,
+            lastStage = lastStage,
+            baselineSectors = baseline.size,
+            verifiedSectors = completed.size,
+            uncertainAddress = inFlight?.address,
+            uncertainRegion = inFlight?.region
+        )
 
         fun accept(record: EcuWriteTransaction.Record): Boolean {
             val sector = Sector(
@@ -177,7 +216,7 @@ class PersistentEcuWriteJournal(
         if (nextRecord != null && !sequence.accept(nextRecord)) {
             return Audit(false, count, lastStage)
         }
-        return Audit(true, count, lastStage)
+        return sequence.audit(count, lastStage)
     }
 
     private fun durableAppend(bytes: ByteArray) {
@@ -198,7 +237,22 @@ class PersistentEcuWriteJournal(
             .digest(text.toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { "%02x".format(it.toInt() and 0xFF) }
 
-    private companion object {
-        const val MAX_JOURNAL_BYTES = 8L * 1024 * 1024
+    companion object {
+        private const val MAX_JOURNAL_BYTES = 8L * 1024 * 1024
+
+        /**
+         * Inspect a previous transaction after app/process restart without opening a
+         * writer, truncating the file, or contacting any hardware. Identity must
+         * be supplied independently; a different target is not accepted.
+         */
+        fun inspectExisting(
+            file: File,
+            target: EcuProgrammingDriverContract.FirmwareTarget,
+            expectedVin: String
+        ): Audit = try {
+            PersistentEcuWriteJournal(file, target, expectedVin, false).inspect()
+        } catch (_: Exception) {
+            Audit(false, 0)
+        }
     }
 }
