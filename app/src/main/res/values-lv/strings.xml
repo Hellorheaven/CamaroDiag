@@ -612,4 +612,6 @@
     <string name="msg_usb_identifier_unavailable">USB ierīces identifikators nav pieejams</string>
     <string name="msg_simulation_activation_failed">Neizdevās aktivizēt simulācijas režīmu.</string>
     <string name="msg_live_simulation_active">Simulācija ir aktīva. Parādītās vērtības nav iegūtas no transportlīdzekļa.</string>
+    <string name="msg_mileage_audit_failed">Neizdevās nolasīt nobraukuma pārbaudes datus.</string>
+    <string name="msg_session_delete_failed">Neizdevās dzēst saglabāto sesiju.</string>
 </resources>
