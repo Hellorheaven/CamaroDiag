@@ -895,4 +895,6 @@
     <string name="debug_builds_created">作成日時</string>
     <string name="debug_builds_expires">有効期限</string>
     <string name="debug_builds_no_browser">ダウンロードを開くブラウザーがありません。</string>
+    <string name="obd_physical_can_scope">物理 CAN 応答ノード：0x%1$s。このスキャンは選択した OBD ECU のみを対象とし、全モジュールへの機能アドレス指定スキャンではありません。GM プログラミングやアクチュエータのコマンドは送信されていません。</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Windows ブリッジで排出ガス関連 DTC の消去を許可し、再接続してエンジンを停止し、リセットを確認してください。排出ガス監視のレディネス情報はリセットされますが、永久故障コードは消去されません。</string>
 </resources>
