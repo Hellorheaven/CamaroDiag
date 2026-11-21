@@ -18,22 +18,25 @@ internal sealed class BridgeServer
     private readonly int _port;
     private readonly J2534MemoryReadScope? _memoryReadScope;
     private readonly BridgeTlsIdentity _tlsIdentity;
+    private readonly Action? _onListening;
 
     public BridgeServer(
         J2534Adapter adapter, string token, int port, BridgeTlsIdentity tlsIdentity,
-        J2534MemoryReadScope? memoryReadScope = null)
+        J2534MemoryReadScope? memoryReadScope = null, Action? onListening = null)
     {
         _adapter = adapter;
         _token = token;
         _port = port;
         _tlsIdentity = tlsIdentity;
         _memoryReadScope = memoryReadScope;
+        _onListening = onListening;
     }
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
         var listener = new TcpListener(IPAddress.Any, _port);
         listener.Start();
+        _onListening?.Invoke();
         Console.WriteLine($"Listening with mandatory TLS 1.2+ on TCP {_port}; public remote addresses are rejected.");
         Console.WriteLine("Connect the Android device to the same trusted local network.");
         Console.WriteLine("Press Ctrl+C to stop. Do not forward this port to the Internet.");
