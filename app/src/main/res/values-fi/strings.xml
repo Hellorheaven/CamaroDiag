@@ -599,4 +599,10 @@
     <string name="dtc_gm_monitor_failure">Vikalaskuri / vahvistustiheys: %1$s</string>
     <string name="dtc_gm_monitor_mil">MIL-luokitus: %1$s</string>
     <string name="dtc_gm_monitor_source">Lähde: GM %1$s, sivu %2$d</string>
+    <string name="module_bus_hscan">HS-CAN (500 kbit/s)</string>
+    <string name="module_bus_swcan">SW-CAN GMLAN (33,3 kbit/s)</string>
+    <string name="module_bus_unknown">Tunnistettava väylä</string>
+    <string name="units_metric_details">Metrijärjestelmä (km, °C, kPa)</string>
+    <string name="units_imperial_details">Brittiläiset yksiköt (mi, °F, psi)</string>
+    <string name="cal_tcp_port">TCP-portti</string>
 </resources>
