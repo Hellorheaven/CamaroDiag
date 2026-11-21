@@ -3,6 +3,8 @@ package com.camarodiag.gen5.data.obd
 import java.security.cert.CertificateException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -31,6 +33,14 @@ class J2534BridgeTlsTest {
                 J2534BridgeTlsPairing.parse(code)
             }
         }
+    }
+
+    @Test fun pairingCodeSyntaxCheckRejectsLegacyTokensBeforeConnection() {
+        assertTrue(J2534BridgePairingCodeFormat.isValid("$token.$fingerprint"))
+        assertTrue(J2534BridgePairingCodeFormat.isValid("  $token.$fingerprint  "))
+        assertFalse(J2534BridgePairingCodeFormat.isValid(token))
+        assertFalse(J2534BridgePairingCodeFormat.isValid("$token.$fingerprint.extra"))
+        assertFalse(J2534BridgePairingCodeFormat.isValid("$token.${fingerprint.dropLast(1)}"))
     }
 
     @Test fun noCertificateFailsBeforeAnyRequestCanBeSent() {
