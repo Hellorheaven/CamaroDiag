@@ -573,4 +573,11 @@
     <string name="vin_photo_not_found">Nie znaleziono prawidłowego 17-znakowego VIN. Wpisz go ręcznie lub zrób kolejne zdjęcie.</string>
     <string name="vin_photo_error">Nie udało się odczytać VIN ze zdjęcia. Spróbuj ponownie przy lepszym oświetleniu i ustaw ostrość.</string>
     <string name="vehicle_vin_placeholder">17 znaków</string>
+    <string name="can_sniffer_start">Rozpocznij przechwytywanie</string>
+    <string name="can_sniffer_stop">Zatrzymaj przechwytywanie</string>
+    <string name="can_sniffer_empty">Nie przechwycono jeszcze żadnych ramek CAN.</string>
+    <string name="can_sniffer_capture_complete">Zakończono przechwytywanie CAN.</string>
+    <string name="can_sniffer_capture_failed">Przechwytywanie CAN nie powiodło się lub adapter przestał odpowiadać.</string>
+    <string name="can_sniffer_frame_count">Przechwycone ramki: %1$d</string>
+    <string name="can_sniffer_filtered_count">Wyświetlono %1$d z %2$d ramek</string>
 </resources>
