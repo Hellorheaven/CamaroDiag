@@ -901,4 +901,13 @@
     <string name="license_owner">Ιδιοκτήτης: όλα τα δικαιώματα</string>
     <string name="license_premium">Πλήρης άδεια ενεργή</string>
     <string name="license_title">Άδεια CamaroDiag</string>
+
+    <!-- Owner-only Debug download details -->
+    <string name="debug_builds_intro">Κατεβάστε τα τελευταία τεχνικά αρχεία Debug από το PR #70. Συνδεθείτε στο GitHub με εξουσιοδοτημένο λογαριασμό. Οι λήψεις είναι αρχεία ZIP που πρέπει να αποσυμπιεστούν.</string>
+    <string name="debug_builds_android_archive">ZIP που περιέχει το Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP με προγράμματα εγκατάστασης Windows x64 και x86.</string>
+    <string name="debug_builds_caution">Τα αρχεία λήγουν μετά από 30 ημέρες. Η διαθεσιμότητα δεν αποδεικνύει επιτυχημένη μεταγλώττιση ή δοκιμές σε όχημα. Οι υπογραφές των Debug APK ενδέχεται να διαφέρουν από τις δημόσιες εκδόσεις.</string>
+    <string name="debug_builds_created">Δημιουργήθηκε</string>
+    <string name="debug_builds_expires">Λήγει</string>
+    <string name="debug_builds_no_browser">Δεν υπάρχει πρόγραμμα περιήγησης για αυτή τη λήψη.</string>
 </resources>
