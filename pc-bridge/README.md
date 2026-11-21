@@ -98,3 +98,10 @@ Dans PowerShell, avec le boîtier branché en USB et son pilote constructeur ins
 **Limite :** ce test confirme seulement le pilote et son adaptateur, pas la programmation d'un calculateur. Pour activer l'écriture sur un E39/E39A, il faut encore valider sur banc l'identification exacte, les commandes de programmation propres au firmware, les checksums GM, l'alimentation, la sauvegarde restaurable et la récupération en cas de coupure. Un boîtier J2534 compatible avec SPS2 ne fournit pas à lui seul ces algorithmes à CamaroDiag.
 
 
+### Programmation ECU native — état de développement
+
+CamaroDiag contient désormais son **propre moteur de transfert UDS** : RequestDownload, transfert par blocs avec compteur, contrôle des réponses positives/négatives et RequestTransferExit. Il contient également un planificateur de secteurs de flash conservant les octets voisins et interdisant toute modification de plage protégée. Ces fonctions font l'objet d'autotests dans la compilation Windows ; aucun outil externe de flashage ni aucun binaire tiers de programmation n'est requis ou lancé.
+
+**Ce moteur est une brique native de programmation, pas encore un pilote complet E39/E39A.** La procédure de passage en session de programmation, l'authentification spécifique au calculateur, la géométrie flash exacte des variantes, les routines d'effacement, les checksums GM, la lecture de vérification et la récupération boot/bench exigent encore une implémentation par famille et une validation sur calculateur de banc. Le pont réseau Android reste en lecture seule pour ces services destructifs. Le fait que les fonctions de transport J2534 soient disponibles n'implique pas que le calculateur accepte leur utilisation pour programmer la mémoire.
+
+Le contrôle du boîtier et du pilote Windows se fait indépendamment avec `--probe-drivers` ; le fournisseur matériel J2534 doit être installé, mais **aucune application de programmation externe** n'est nécessaire.
