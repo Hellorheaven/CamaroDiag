@@ -14,6 +14,7 @@ import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
 import com.camarodiag.gen5.auth.LicenseLevel
+import com.camarodiag.gen5.auth.LicenseRolloutConfig
 import com.camarodiag.gen5.auth.AccountStorageKeys
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
@@ -104,8 +105,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentLicenseLevel = LicenseLevel.FREE
             return
         }
-        currentLicenseLevel = level
-        if (level == LicenseLevel.FREE) {
+        currentLicenseLevel = if (!LicenseRolloutConfig.ENABLED &&
+            accountUid != null && level != LicenseLevel.OWNER
+        ) LicenseLevel.PREMIUM else level
+        if (LicenseRolloutConfig.ENABLED && level == LicenseLevel.FREE) {
             if (_liveRecordingState.value.isRecording) stopLiveRecording()
             discardCanMonitor()
             detachCanRequest()
@@ -114,8 +117,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun hasPremiumLicense(): Boolean =
         authenticatedAccountUid != null &&
-            currentLicenseLevel != LicenseLevel.FREE &&
-            FirebaseAuth.getInstance().currentUser?.uid == authenticatedAccountUid
+            FirebaseAuth.getInstance().currentUser?.uid == authenticatedAccountUid &&
+            (!LicenseRolloutConfig.ENABLED || currentLicenseLevel != LicenseLevel.FREE)
 
     private fun requirePremiumLicense(): Boolean {
         if (hasPremiumLicense()) return true
