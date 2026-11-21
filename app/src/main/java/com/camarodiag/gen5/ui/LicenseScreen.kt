@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.camarodiag.gen5.auth.LicenseLevel
+import com.camarodiag.gen5.auth.LicenseRolloutConfig
 import com.google.firebase.functions.FirebaseFunctions
 
 /**
@@ -33,6 +34,13 @@ import com.google.firebase.functions.FirebaseFunctions
 @Composable
 fun LicenseScreen(level: LicenseLevel, onRefresh: () -> Unit) {
     val french = LocalConfiguration.current.locales[0].language == "fr"
+    if (!LicenseRolloutConfig.ENABLED) {
+        Text(
+            if (french) "Le système de licences n'est pas activé."
+            else "Licensing is not enabled."
+        )
+        return
+    }
     val context = LocalContext.current
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
