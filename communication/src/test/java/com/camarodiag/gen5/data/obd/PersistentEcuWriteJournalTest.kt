@@ -123,4 +123,69 @@ class PersistentEcuWriteJournalTest {
             )
         }.isFailure)
     }
+
+    @Test fun restartAuditDistinguishesEachProgrammingInterruptionWithoutMutatingJournal() = runBlocking {
+        val (file, journal) = newJournal()
+        val next = record.copy(address = 0x1008)
+        fun reopened(): PersistentEcuWriteJournal.Audit {
+            val before = file.readBytes()
+            val audit = PersistentEcuWriteJournal.inspectExisting(file, target, vin)
+            assertTrue(before.contentEquals(file.readBytes()))
+            return audit
+        }
+
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.NO_ERASE_RECORDED,
+            reopened().recoveryDisposition)
+        journal.append(record)
+        journal.append(next)
+        assertEquals(2, reopened().baselineSectors)
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.NO_ERASE_RECORDED,
+            reopened().recoveryDisposition)
+
+        journal.append(record.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        val interrupted = reopened()
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.ERASE_OR_WRITE_MAY_BE_INCOMPLETE,
+            interrupted.recoveryDisposition)
+        assertEquals(record.address, interrupted.uncertainAddress)
+        assertEquals(record.region, interrupted.uncertainRegion)
+        assertEquals(0, interrupted.verifiedSectors)
+
+        journal.append(record.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.ADDITIONAL_BASELINES_NOT_WRITTEN,
+            reopened().recoveryDisposition)
+        assertEquals(1, reopened().verifiedSectors)
+        assertEquals(null, reopened().uncertainAddress)
+
+        journal.append(next.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        assertEquals(next.address, reopened().uncertainAddress)
+        journal.append(next.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        val recorded = reopened()
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.ALL_RECORDED_SECTORS_VERIFIED,
+            recorded.recoveryDisposition)
+        assertEquals(2, recorded.verifiedSectors)
+    }
+
+    @Test fun recoveryAuditRejectsIncorrectIdentityOrDamagedJournal() = runBlocking {
+        val (file, journal) = newJournal()
+        journal.append(record)
+        fun assertInvalid(audit: PersistentEcuWriteJournal.Audit) {
+            assertFalse(audit.valid)
+            assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.INVALID_OR_UNREADABLE,
+                audit.recoveryDisposition)
+        }
+        assertInvalid(PersistentEcuWriteJournal.inspectExisting(file, target, "2G1FF3D36C9104198"))
+        assertInvalid(PersistentEcuWriteJournal.inspectExisting(file,
+            EcuProgrammingDriverContract.FirmwareTarget("E39", "other-ecu", "test-fw"), vin))
+        file.writeText(file.readText().dropLast(1))
+        assertInvalid(PersistentEcuWriteJournal.inspectExisting(file, target, vin))
+    }
+
+    @Test fun recoveryAuditOfMissingJournalDoesNotCreateAFile() {
+        val file = File(temporaryFolder.root, "missing-journal.txt")
+        val audit = PersistentEcuWriteJournal.inspectExisting(file, target, vin)
+        assertFalse(audit.valid)
+        assertFalse(file.exists())
+        assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.INVALID_OR_UNREADABLE,
+            audit.recoveryDisposition)
+    }
 }
