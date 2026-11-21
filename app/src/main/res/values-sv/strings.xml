@@ -601,4 +601,6 @@
     <string name="msg_usb_identifier_unavailable">USB-enhetens identifierare är inte tillgänglig</string>
     <string name="msg_simulation_activation_failed">Det gick inte att aktivera simuleringsläget.</string>
     <string name="msg_live_simulation_active">Simuleringen är aktiv. De visade värdena kommer inte från fordonet.</string>
+    <string name="msg_mileage_audit_failed">Det gick inte att läsa uppgifterna för kontroll av mätarställningen.</string>
+    <string name="msg_session_delete_failed">Det gick inte att ta bort den sparade sessionen.</string>
 </resources>
