@@ -281,4 +281,17 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    /** Key parity reached by English, French and the twelve established locales. */
+    @Test fun completedLegacyLocalesKeepFullEnglishKeyParity() {
+        val complete = listOf(
+            "en", "fr", "de", "it", "es", "he", "ru", "zh-CN",
+            "ja", "ko-KR", "ar", "pt", "nl", "el"
+        )
+        val english = strings("en").keys
+        for (locale in complete) {
+            val actual = strings(locale).keys
+            assertEquals("Full key coverage regressed in $locale", english, actual)
+        }
+    }
+
 }
