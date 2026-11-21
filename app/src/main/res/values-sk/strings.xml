@@ -524,4 +524,23 @@
     <string name="adapter_vxdiag_profiles">Deklarované profily rozhraní VXDIAG</string>
     <string name="adapter_vxdiag_profiles_hint">Profily rozlišujú varianty hardvéru a spojenia. Nepotvrdzujú dostupnosť ovládača Android ani komunikáciu s vozidlom.</string>
     <string name="adapter_simulation_profiles">Simulované profily hardvéru (test na skúšobnej stolici)</string>
+    <string name="modules_vehicle_title">Riadiace moduly vozidla</string>
+    <string name="module_accessible">Dostupný</string>
+    <string name="module_requires_swcan">Vyžaduje SW-CAN (pin 1)</string>
+    <string name="module_blocked_adapter">Blokované adaptérom</string>
+    <string name="module_not_equipped">Nie je vo výbave</string>
+    <string name="module_discovery_required">Vyžaduje sa detekcia modulov vozidla</string>
+    <string name="live_engine_telemetry">Telemetria motora v reálnom čase</string>
+    <string name="live_resume">Pokračovať</string>
+    <string name="live_stop_recording">Zastaviť záznam</string>
+    <string name="live_record">Zaznamenávať živé údaje</string>
+    <string name="live_export_csv">Exportovať CSV</string>
+    <string name="live_recording_notice">Záznamník ukladá zobrazené hodnoty OBD (metrické) s časovými značkami. Nemení kalibračné tabuľky ECU.</string>
+    <string name="dtc_title">Diagnostické chybové kódy</string>
+    <string name="dtc_clear_warning">Vymazanie v režime 04 odstráni chybové kódy súvisiace s emisiami a resetuje niektoré monitory pripravenosti. Pred pokračovaním uložte správu. Režim 04 nemaže rozšírené DTC uložené v iných moduloch vozidla.</string>
+    <string name="dtc_none_returned">Posledné skenovanie nevrátilo žiadne chybové kódy.</string>
+    <string name="dtc_confirm_clear">Potvrdiť vymazanie DTC?</string>
+    <string name="dtc_clear_description">Odošle sa režim OBD 04 do ECU. Údaje o pripravenosti sa môžu resetovať. Príčina poruchy sa tým neopraví.</string>
+    <string name="dtc_clear_action">Vymazať kódy</string>
+    <string name="common_save">Uložiť</string>
 </resources>
