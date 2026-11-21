@@ -601,4 +601,6 @@
     <string name="msg_usb_identifier_unavailable">Identificatorul dispozitivului USB nu este disponibil</string>
     <string name="msg_simulation_activation_failed">Modul de simulare nu a putut fi activat.</string>
     <string name="msg_live_simulation_active">Simularea este activă. Valorile afișate nu provin de la vehicul.</string>
+    <string name="msg_mileage_audit_failed">Citirea datelor pentru verificarea kilometrajului a eșuat.</string>
+    <string name="msg_session_delete_failed">Sesiunea salvată nu a putut fi ștearsă.</string>
 </resources>
