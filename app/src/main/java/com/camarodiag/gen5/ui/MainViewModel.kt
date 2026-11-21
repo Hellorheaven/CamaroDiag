@@ -20,6 +20,7 @@ import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
+import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
@@ -1087,6 +1088,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isJ2534BridgeConnected = false,
                 j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_pc_bridge_disconnected)
             )
+        }
+    }
+
+    /**
+     * Runs two REAL ECU memory reads through a connected J2534 PC bridge, then
+     * saves the resulting integrity-checked ZIP through Android SAF. The PC
+     * must independently authorize the target VIN, channel and address map.
+     */
+    fun captureJ2534Memory(destinationUri: Uri, request: J2534LiveMemoryBackup.Request) {
+        if (_calibrationWorkspace.value.isJ2534MemoryCapturing) return
+        val accountGeneration = accountSessionGeneration
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isJ2534MemoryCapturing = true,
+            j2534MemoryCaptureMessage = ""
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            val resolver = getApplication<Application>().contentResolver
+            try {
+                check(request.expectedVin == _vehicle.value.vin.uppercase()) {
+                    "Selected vehicle VIN has changed."
+                }
+                check(obdManager.isJ2534BridgeConnected()) {
+                    "A real J2534 adapter must be connected."
+                }
+                val target = resolver.openOutputStream(destinationUri, "w")
+                    ?: error("Unable to open ECU backup destination.")
+                target.use { output ->
+                    obdManager.captureAndExportJ2534Memory(request, output)
+                }
+                check(accountGeneration == accountSessionGeneration &&
+                    request.expectedVin == _vehicle.value.vin.uppercase()) {
+                    "Vehicle or account changed during ECU capture."
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534MemoryCapturing = false,
+                    j2534MemoryCaptureMessage =
+                        getApplication<Application>().getString(R.string.cal_live_memory_saved)
+                )
+            } catch (cancelled: CancellationException) {
+                runCatching { resolver.delete(destinationUri, null, null) }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534MemoryCapturing = false
+                )
+                throw cancelled
+            } catch (error: Exception) {
+                // SAF may create the destination before acquisition starts. Never
+                // leave a partial/empty ZIP presented as a valid ECU backup.
+                runCatching { resolver.delete(destinationUri, null, null) }
+                reportConnectionLoss(error)
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534MemoryCapturing = false,
+                    j2534MemoryCaptureMessage =
+                        getApplication<Application>().getString(R.string.cal_live_memory_failed) +
+                            " " + error.message.orEmpty().take(160)
+                )
+            }
         }
     }
 
