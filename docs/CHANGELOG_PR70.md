@@ -127,3 +127,8 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Le nom propre **CamaroDiag** est conservé caractère pour caractère, y compris la casse, dans toutes les langues : pas de traduction, translittération, majuscules intégrales ni terminaison grammaticale directement accolée.
 - Correction des titres du catalogue natif dans 14 ressources localisées où le nom apparaissait sous forme `CAMARODIAG` ou avec un suffixe ajouté.
 - Test de non-régression `camaroDiagBrandSpellingIsImmutableInEveryLanguage` ajouté à `LocaleResourcesIntegrityTest` : vérifie `app_name` et toutes les occurrences du nom dans les 30 langues. À contrôler dans CI avant toute fusion.
+
+## 21 novembre — sauvegarde Windows et suite des traductions
+- 589 traductions supplémentaires intégrées directement aux ressources ; croate désormais 868/868 clés. 15 langues sur 30 ont toutes les clés, 6 333 traductions manquent encore dans les autres. Noms propres conservés. Contrôle statique : aucune clé inconnue ou dupliquée ni paramètre divergent.
+- Sauvegarde mémoire Windows : vérification réitérée du VIN pendant la double lecture, refus en cas de changement, export annulable sans fichier partiel, contrôle de l'empreinte SHA-256 après écriture sur disque.
+- Gestion d'erreurs et tests de la licence préparée ; activation et facturation toujours désactivées. Aucune écriture ECU réelle validée. CI finale requise.
