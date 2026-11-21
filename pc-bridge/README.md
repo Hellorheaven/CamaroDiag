@@ -10,7 +10,7 @@ Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru insta
 
 | Onglet | Fonctions disponibles |
 |---|---|
-| **Connexion Android** | Choisir et actualiser les pilotes J2534 installés, adresse IP locale du PC, port TLS, profil mémoire facultatif, démarrer/arrêter le pont, copier séparément l'IP, le port et le code d'appairage TLS complet, ou copier les trois valeurs ensemble |
+| **Connexion Android** | Choisir et actualiser les pilotes J2534 installés, adresse IP locale du PC, port TLS, profil mémoire facultatif, autorisation facultative d’effacement des défauts antipollution, démarrer/arrêter le pont, copier séparément l'IP, le port et le code d'appairage TLS complet, ou copier les trois valeurs ensemble |
 | **Outils ECU E39/E39A** | Lire deux fois l'identification GM VIN/OSID (CAN IDs/profil explicites), inspecter une image brute de 3 Mio, recalculer les checksums GM SUM/CVN des calibrations et enregistrer un nouveau fichier sans écraser les originaux |
 | **Console CAN / OBD** | Ouvrir/fermer le canal J2534, envoyer des trames **autorisées en lecture**, afficher distinctement les trames TX et RX, envoyer les trames sans réponse autorisées, identification OBD Mode 09/GM GMLAN, tension du pilote, sauvegarder l'historique |
 | **Lecture mémoire ECU** | Créer/charger un profil de lecture avec VIN, plage mémoire, tailles de blocs, session et CAN IDs ; effectuer une lecture UDS 0x23, relire toute la plage, refuser les divergences, annuler, et exporter un nouveau fichier binaire à couverture déclarée |
@@ -26,7 +26,7 @@ Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru insta
 4. Recopier, avec les boutons Copier, l'**adresse IP**, le **port** et le **code sécurisé complet** (jeton + point + empreinte du certificat SHA-256) dans les champs du connecteur Windows/J2534 de CamaroDiag Android.
 5. La liaison est obligatoirement TLS et le code change à chaque redémarrage. Ne pas ouvrir le port sur Internet.
 
-**La console Windows, les contrôles de pilote et les lectures locales utilisent exclusivement le canal J2534.** Il faut donc arrêter le serveur Android avant de les utiliser, puis le redémarrer. Le pont autorise uniquement les commandes diagnostiques déjà prévues par son allowlist. **Aucune commande de programmation flash, SecurityAccess, effacement ou actionneur n'est rendue accessible par cette interface.** Les composants E39 natifs non qualifiés physiquement restent isolés jusqu'à un essai sur ECU de banc et une récupération démontrée.
+**La console Windows, les contrôles de pilote et les lectures locales utilisent exclusivement le canal J2534.** Il faut donc arrêter le serveur Android avant de les utiliser, puis le redémarrer. Le pont autorise uniquement les commandes diagnostiques déjà prévues par son allowlist. **Aucune commande de programmation flash, SecurityAccess, effacement UDS ou actionneur n'est rendue accessible par cette interface.** L’effacement OBD standard des défauts antipollution est une opération distincte, désactivée par défaut. Les composants E39 natifs non qualifiés physiquement restent isolés jusqu'à un essai sur ECU de banc et une récupération démontrée.
 
 ## Fonctionnalités
 
@@ -34,7 +34,8 @@ Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru insta
 - Dans l’atelier de calibration Android, la lecture d’identification interroge le calculateur sélectionné et affiche le VIN, les CAL ID, les CVN et le nom ECU disponibles. Cette fonction utilise le mode 09 sur tout pilote Pass-Thru compatible avec le profil CAN choisi. Elle nécessite le pont et l’application de la même PR. Les interfaces ELM327 se connectent directement à Android pour cette lecture.
 - ISO15765 HS-CAN, identifiants 11 ou 29 bits, 250/500 kbit/s.
 - SW-ISO15765 GMLAN à 62,5 kbit/s si le fournisseur J2534-2 l'accepte.
-- Transmission de charges UDS ; le fournisseur J2534 gère ISO-TP et le contrôle de flux.
+- Transmission de charges UDS et OBD standard ; le fournisseur J2534 gère ISO-TP et le contrôle de flux.
+- Sur le canal physique OBD primaire compatible, lecture des paramètres temps réel, des DTC, du freeze frame, de l'identification et de l'audit kilométrique selon les données réellement fournies. Ce diagnostic ne couvre que le calculateur sélectionné.
 - Lecture UDS limitée aux services 0x22, 0x19 et 0x3E.
 - Un client Android à la fois, protégé par TLS 1.2/1.3 et un code d'appairage associant un jeton aléatoire à l'empreinte SHA-256 du certificat du pont.
 
@@ -84,6 +85,8 @@ Le pont continue à refuser les adresses distantes publiques et n'accepte que le
 
 | Fonction | État |
 |---|---|
+| Données OBD standard, DTC et lecture freeze frame | Disponibles sur le canal physique primaire compatible |
+| Effacement des défauts antipollution OBD | Facultatif, autorisé sur le PC et confirmé dans Android, moteur arrêté et véhicule immobile |
 | UDS ReadDataByIdentifier (0x22) | Autorisé |
 | UDS ReadDTCInformation (0x19) | Autorisé |
 | TesterPresent (0x3E) | Autorisé |
@@ -95,6 +98,14 @@ Le pont continue à refuser les adresses distantes publiques et n'accepte que le
 | Découverte automatique de tous les calculateurs GM | Non fournie |
 
 Les CAN ID, débits et services doivent provenir d'une documentation fiable pour le VIN et le calculateur. Le pont ne devine aucune adresse ni procédure de programmation.
+
+### Diagnostic OBD et effacement des défauts antipollution
+
+Utilisez la même version du pont et de l’application Android. Sélectionnez le canal OBD physique primaire correspondant au véhicule (par exemple la paire CAN 11 bits 7E0/7E8 à 500 kbit/s lorsque le véhicule l'utilise). Si le calculateur répond aux services OBD standard, les écrans de données temps réel, de lecture des défauts, d’audit kilométrique et de scan OBD peuvent utiliser directement le pont, sans adaptateur ELM supplémentaire. Un service non pris en charge n'est pas assimilé à une absence de défauts.
+
+Pour autoriser l'effacement, arrêtez le pont et cochez **Autoriser l’effacement OBD des défauts antipollution (moteur arrêté)** avant de le redémarrer. Reconnectez Android avec le nouveau code TLS. Immobilisez le véhicule, coupez le moteur en laissant le contact nécessaire au diagnostic, puis confirmez l'effacement dans l'écran DTC. Le calculateur doit confirmer une vitesse et un régime nuls. Relisez les défauts après l'opération. Les données de préparation antipollution et les données de contexte des défauts seront réinitialisées, mais les codes permanents ne sont pas effacés par cette commande. Elle ne répare pas le défaut à l'origine du code. Aucun effacement UDS des autres modules n'est autorisé.
+
+La fonction est en cours de validation sur la PR de développement ; la compatibilité avec votre interface et votre véhicule doit être contrôlée en conditions réelles.
 
 ### Sauvegarde d’une plage mémoire
 
