@@ -388,4 +388,19 @@
     <string name="functional_tests_denied">Prieiga uždrausta: prisijunkite įgaliota Google paskyra ir bandykite dar kartą.</string>
     <string name="functional_tests_not_connected">Neprijungtas fizinis OBD adapteris. Likę patikrinimai neatlikti.</string>
     <string name="functional_tests_cancelled">Bandymų sesija atšaukta.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Derinimo versijos</string>
+    <string name="tab_license">Licencija</string>
+    <string name="debug_builds_title">Privačios derinimo versijos</string>
+    <string name="debug_builds_refresh">Atnaujinti galimas versijas</string>
+    <string name="debug_builds_download">Atsisiųsti iš GitHub</string>
+    <string name="debug_builds_unavailable">Nėra tinkamo derinimo archyvo.</string>
+    <string name="debug_builds_error">Nepavyko įkelti derinimo versijų iš GitHub.</string>
+    <string name="license_disabled">Licencijavimo sistema neįjungta.</string>
+    <string name="license_buy">Pirkti licenciją</string>
+    <string name="license_refresh">Atnaujinti licenciją</string>
+    <string name="license_free">Nemokama</string>
+    <string name="license_owner">Savininkas: visos teisės</string>
+    <string name="license_premium">Visapusiška licencija aktyvi</string>
+    <string name="license_title">CamaroDiag licencija</string>
 </resources>
