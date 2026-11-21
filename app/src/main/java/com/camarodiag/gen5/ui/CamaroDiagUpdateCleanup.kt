@@ -94,10 +94,12 @@ internal object CamaroDiagUpdateCleanup {
      * DownloadManager.remove(id) deletes the file even when it is in the
      * public /storage/emulated/0/Download folder (scoped-storage compatible).
      */
-    fun cleanupAfterSuccessfulInstall(context: Context) {
+    fun cleanupAfterSuccessfulInstall(context: Context, packageWasReplaced: Boolean = false) {
         val prefs = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val original = prefs.getStringSet(PENDING_KEY, emptySet()).orEmpty()
-        if (original.isEmpty()) return
+        // The previous updater did not record IDs. After an actual replacement,
+        // still clean its legacy app-private APKs, even when no new ID exists.
+        if (original.isEmpty() && !packageWasReplaced) return
 
         val installedCode = try {
             val pkg = if (Build.VERSION.SDK_INT >= 33) {
@@ -133,7 +135,7 @@ internal object CamaroDiagUpdateCleanup {
         if (remaining != original && !prefs.edit().putStringSet(PENDING_KEY, remaining).commit()) {
             return
         }
-        if (successfullyRemoved) {
+        if (successfullyRemoved || packageWasReplaced) {
             // Also tidy APKs downloaded by the OLD updater into its private
             // app-specific Downloads folder, but touch no other user files.
             val oldFolder = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
@@ -150,7 +152,9 @@ class CamaroDiagUpdateInstalledReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                CamaroDiagUpdateCleanup.cleanupAfterSuccessfulInstall(context.applicationContext)
+                CamaroDiagUpdateCleanup.cleanupAfterSuccessfulInstall(
+                    context.applicationContext, packageWasReplaced = true
+                )
             } finally {
                 pending.finish()
             }
