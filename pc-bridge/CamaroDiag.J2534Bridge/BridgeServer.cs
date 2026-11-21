@@ -11,12 +11,16 @@ internal sealed class BridgeServer
     private readonly J2534Adapter _adapter;
     private readonly string _token;
     private readonly int _port;
+    private readonly J2534MemoryReadScope? _memoryReadScope;
 
-    public BridgeServer(J2534Adapter adapter, string token, int port)
+    public BridgeServer(
+        J2534Adapter adapter, string token, int port,
+        J2534MemoryReadScope? memoryReadScope = null)
     {
         _adapter = adapter;
         _token = token;
         _port = port;
+        _memoryReadScope = memoryReadScope;
     }
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
@@ -55,7 +59,7 @@ internal sealed class BridgeServer
         using var stream = client.GetStream();
         using var reader = new StreamReader(stream, new UTF8Encoding(false), false, 4096, leaveOpen: true);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false), 4096, leaveOpen: true) { AutoFlush = true };
-        using var device = new J2534Device(_adapter);
+        using var device = new J2534Device(_adapter, _memoryReadScope);
 
         while (!cancellationToken.IsCancellationRequested && client.Connected)
         {
@@ -104,7 +108,8 @@ internal sealed class BridgeServer
                             baudRate,
                             requestCanId = requestId.ToString(can29 ? "X8" : "X3"),
                             responseCanId = responseId.ToString(can29 ? "X8" : "X3"),
-                            readOnly = true
+                            readOnly = true,
+                            scopedPhysicalMemoryRead = device.IsMemoryReadEnabled
                         }));
                         break;
                     }
