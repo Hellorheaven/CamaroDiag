@@ -10,7 +10,14 @@ interface EcuProgrammingDriverContract {
         IDENTIFY, READ_REGION, ERASE_REGION, WRITE_REGION, READBACK_VERIFY, RESET
     }
 
-    /** Identifiers reported by the ECU. Service numbers and broadcast codes are catalog aliases. */
+    /**
+     * An ECU family defines the shared diagnostic/programming protocol.
+     * GM service-part supersessions, printed part numbers and BCC labels
+     * are catalogue aliases, NOT separate protocols or firmware identifiers.
+     *
+     * FirmwareTarget represents one known image/firmware configuration for
+     * authorizing a destructive write, not a dedicated protocol driver.
+     */
     data class FirmwareTarget(val controllerFamily: String, val controllerId: String, val firmwareId: String)
 
     data class Descriptor(
@@ -21,9 +28,20 @@ interface EcuProgrammingDriverContract {
         val physicalHardwareValidated: Boolean,
         val writeTargets: Set<FirmwareTarget> = emptySet()
     ) {
+        /** Shared protocol-family match; neither a firmware nor a service number is required. */
+        fun supportsFamilyProtocol(controllerFamily: String, requestedTransport: Transport): Boolean =
+            transport == requestedTransport && controllerFamily in controllerFamilies &&
+                Capability.IDENTIFY in capabilities
+
+        /**
+         * Destructive operations require a separately validated image/firmware
+         * configuration. Never infer flash approval from a catalogue supersession.
+         * One protocol driver may support many firmware versions on that family.
+         */
         fun supportsWrite(target: FirmwareTarget, requestedTransport: Transport): Boolean =
-            physicalHardwareValidated && transport == requestedTransport &&
-                target.controllerFamily in controllerFamilies && target in writeTargets &&
+            physicalHardwareValidated &&
+                supportsFamilyProtocol(target.controllerFamily, requestedTransport) &&
+                target in writeTargets &&
                 capabilities.containsAll(requiredWriteCapabilities)
     }
 
