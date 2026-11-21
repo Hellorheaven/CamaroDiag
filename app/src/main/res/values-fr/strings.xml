@@ -19,6 +19,9 @@
     <string name="functional_tests_passed">OK (preuve physique)</string>
     <string name="functional_tests_failed">ÉCHEC</string>
     <string name="functional_tests_skipped">NON TESTÉ</string>
+    <string name="functional_tests_denied">Accès refusé : connectez le compte Google autorisé.</string>
+    <string name="functional_tests_not_connected">Aucune interface OBD physique connectée : tests matériels non exécutés.</string>
+    <string name="functional_tests_cancelled">Campagne de tests annulée.</string>
     <string name="tab_modules">Calculateurs</string>
     <string name="tab_mileage">Odomètre</string>
     <string name="tab_calibration">ECU / Cartographie</string>
