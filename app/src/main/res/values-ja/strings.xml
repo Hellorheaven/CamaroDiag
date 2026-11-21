@@ -871,4 +871,19 @@
     <string name="functional_tests_denied">アクセス拒否：許可された Google アカウントでログインしてください。</string>
     <string name="functional_tests_not_connected">実機 OBD アダプターが未接続のため、他のテストは実行されません。</string>
     <string name="functional_tests_cancelled">テストを中止しました。</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">デバッグ版</string>
+    <string name="tab_license">ライセンス</string>
+    <string name="debug_builds_title">非公開デバッグ版</string>
+    <string name="debug_builds_refresh">利用可能な版を更新</string>
+    <string name="debug_builds_download">GitHub からダウンロード</string>
+    <string name="debug_builds_unavailable">有効なデバッグ用アーカイブはありません。</string>
+    <string name="debug_builds_error">GitHub からデバッグ版を取得できません。</string>
+    <string name="license_disabled">ライセンス機能は有効になっていません。</string>
+    <string name="license_buy">ライセンスを購入</string>
+    <string name="license_refresh">ライセンスを更新</string>
+    <string name="license_free">無料</string>
+    <string name="license_owner">所有者：すべての権限</string>
+    <string name="license_premium">フルライセンス有効</string>
+    <string name="license_title">CamaroDiag ライセンス</string>
 </resources>
