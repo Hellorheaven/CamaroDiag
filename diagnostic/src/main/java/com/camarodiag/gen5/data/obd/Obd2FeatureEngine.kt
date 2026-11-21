@@ -164,6 +164,28 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         decodeDtcResponse(ask("0A"), 0x4A, "permanent")
     )
 
+    /**
+     * Verifies that at least one physical Mode 03/07/0A read actually returned
+     * a positive SAE J1979 response. Zero codes alone is not evidence of a
+     * successful ECU request (ELM "NO DATA" also decodes to an empty list).
+     */
+    suspend fun readDtcsWithPositiveResponseProof():
+        Pair<Triple<List<ObdDtc>, List<ObdDtc>, List<ObdDtc>>, Boolean> {
+        val confirmed = ask("03")
+        val pending = ask("07")
+        val permanent = ask("0A")
+        val proved = listOf(
+            confirmed to 0x43, pending to 0x47, permanent to 0x4A
+        ).any { (raw, service) ->
+            parseResponseBytes(raw)?.contains(service) == true
+        }
+        return Triple(
+            decodeDtcResponse(confirmed, 0x43, "confirmed"),
+            decodeDtcResponse(pending, 0x47, "pending"),
+            decodeDtcResponse(permanent, 0x4A, "permanent")
+        ) to proved
+    }
+
     /** Reads the DTC that caused freeze-frame storage (Mode 02, PID 02, frame 00). */
     suspend fun readFreezeFrameDtc(): ObdDtc? {
         val data = payload(ask("020200"), 0x42, 0x02) ?: return null
