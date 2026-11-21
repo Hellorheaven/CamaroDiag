@@ -878,4 +878,19 @@
     <string name="functional_tests_denied">Acesso negado: inicie sessão com a conta Google autorizada.</string>
     <string name="functional_tests_not_connected">Nenhum adaptador OBD físico ligado. Os restantes testes não foram realizados.</string>
     <string name="functional_tests_cancelled">Testes cancelados.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Versões de depuração</string>
+    <string name="tab_license">Licença</string>
+    <string name="debug_builds_title">Versões de depuração privadas</string>
+    <string name="debug_builds_refresh">Atualizar versões disponíveis</string>
+    <string name="debug_builds_download">Transferir do GitHub</string>
+    <string name="debug_builds_unavailable">Não existe arquivo de depuração válido disponível.</string>
+    <string name="debug_builds_error">Não foi possível carregar as versões de depuração do GitHub.</string>
+    <string name="license_disabled">O sistema de licenças não está ativado.</string>
+    <string name="license_buy">Comprar uma licença</string>
+    <string name="license_refresh">Atualizar licença</string>
+    <string name="license_free">Gratuito</string>
+    <string name="license_owner">Proprietário: todas as permissões</string>
+    <string name="license_premium">Licença completa ativa</string>
+    <string name="license_title">Licença CamaroDiag</string>
 </resources>
