@@ -29,6 +29,9 @@ class J2534BridgeTransport(
     @Volatile private var opened = false
     private var connectedResponseCanId: String? = null
     @Volatile private var scopedMemoryReadEnabled = false
+    @Volatile private var standardObdPhysicalReadEnabled = false
+    val isStandardObdPhysicalReadEnabled: Boolean
+        get() = isConnected && standardObdPhysicalReadEnabled
 
     /** True only when the authenticated PC bridge confirmed a VIN-bound memory scope. */
     val isScopedMemoryReadEnabled: Boolean
@@ -90,6 +93,8 @@ class J2534BridgeTransport(
                 ) { "The PC bridge did not confirm the selected read-only CAN channel." }
                 connectedResponseCanId = responseLabel
                 scopedMemoryReadEnabled = response.optBoolean("scopedPhysicalMemoryRead", false)
+                standardObdPhysicalReadEnabled = response.opt("standardObdPhysicalRead") == true &&
+                    J2534StandardObd.supportsChannel(requestCanId, responseCanId, protocolNumber)
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
                 val voltage = response.optLong("batteryMillivolts", -1L)
@@ -152,6 +157,36 @@ class J2534BridgeTransport(
                 flashQualified = response.opt("flashQualified") != false
             )
         }
+    }
+
+    suspend fun discoverStandardObdPids(): Set<Int> {
+        check(isStandardObdPhysicalReadEnabled)
+        val supported = linkedSetOf<Int>()
+        for (base in 0..0xE0 step 32) {
+            val response = exchange(byteArrayOf(1, base.toByte()), 2500)
+            val (pids, next) = J2534StandardObd.supportPage(base, response)
+            supported.addAll(pids)
+            if (!next) break
+        }
+        return supported
+    }
+
+    suspend fun readStandardObdPid(pid: Int): String {
+        check(isStandardObdPhysicalReadEnabled)
+        require(pid in 1..255)
+        val reply = exchange(byteArrayOf(1, pid.toByte()), 1800)
+        // Validate service and PID before delivering the complete payload to
+        // the existing telemetry decoder. No fabricated adapter text.
+        J2534StandardObd.pidData(pid, reply)
+        return reply.toHex()
+    }
+
+    suspend fun readStandardObdDtcs(): Triple<List<ObdDtc>, List<ObdDtc>, List<ObdDtc>> {
+        check(isStandardObdPhysicalReadEnabled)
+        // An absent/refused read is not equivalent to a confirmed empty list.
+        suspend fun read(mode: Int): List<ObdDtc> =
+            J2534StandardObd.dtcs(mode, exchange(byteArrayOf(mode.toByte()), 2500))
+        return Triple(read(3), read(7), read(10))
     }
 
     override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray = withContext(Dispatchers.IO) {
@@ -250,6 +285,7 @@ class J2534BridgeTransport(
         connectedResponseCanId = null
         opened = false
         scopedMemoryReadEnabled = false
+        standardObdPhysicalReadEnabled = false
     }
 
     private fun ByteArray.toHex(): String =
