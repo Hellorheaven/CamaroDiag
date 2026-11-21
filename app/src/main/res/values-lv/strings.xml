@@ -565,4 +565,9 @@
     <string name="update_later">Vēlāk</string>
     <string name="update_ready_to_install">CamaroDiag – gatava instalēšanai</string>
     <string name="update_version_channel">Versija %1$s • %2$s</string>
+    <string name="vin_photo_cancelled">VIN fotografēšana atcelta.</string>
+    <string name="vin_photo_success">VIN atpazīts un iekopēts transportlīdzekļa profilā. Pārbaudiet katru rakstzīmi.</string>
+    <string name="vin_photo_not_found">Derīgs 17 rakstzīmju VIN nav atrasts. Ievadiet to manuāli vai uzņemiet citu fotoattēlu.</string>
+    <string name="vin_photo_error">VIN nevar nolasīt no fotoattēla. Mēģiniet vēlreiz ar labāku apgaismojumu un asāku fokusu.</string>
+    <string name="vehicle_vin_placeholder">17 rakstzīmes</string>
 </resources>
