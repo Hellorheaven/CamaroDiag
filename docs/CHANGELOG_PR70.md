@@ -114,3 +114,11 @@ Branche : `feat/ecu-backup-integrity` — base `main` après fusion de #54.
 - Tests de non-régression ajoutés à `LocaleResourcesIntegrityTest` : 66 libellés CAN/capteurs/sécurité, 20 champs experts, 31 textes de traces et sélection, parité intégrale des 14 langues terminées.
 - La règle `allAdvertisedLocalesCoverEveryStringKey` reste délibérément **bloquante** tant que les 16 autres langues ne sont pas complètes. Aucun build vert ni fusion ne doit être annoncé sur ce seul travail.
 - **Périmètre exclusivement CamaroDiag**. Aucune modification de CamaroDiagConnectors, aucun accès programmation ECU ou validation matérielle ajouté.
+
+## 21 novembre — transaction d'écriture sécurisée (socle logiciel, non matériel)
+- `213d601` : ajout de `EcuWriteTransaction` et du séquenceur interne `EcuWriteExecutionEngine` pour orchestrer, par secteur, les contrôles d'identité firmware/VIN, double contrôle du secteur d'origine, journalisation avant effacement, contrôle de l'alimentation, effacement/écriture et relecture indépendante.
+- `a8d4d37` : dix tests unitaires sur calculateur mémoire simulé : registre physique vide, barrières de sécurité, secteur conservé, différence de l'image ECU, identité incorrecte, coupure d'alimentation après effacement, relecture divergente, journal non disponible, faux pilote non validé, données inchangées / carte invalide.
+- **Barrière matérielle maintenue** : l'API publique n'accepte jamais de pilote arbitraire. Le registre `registeredHardwareDrivers` est vide, donc aucun ECU physique ne peut être écrit. Le séquenceur interne est uniquement testé par injection d'un pilote fictif.
+- Une déclaration de carte mémoire « vérifiée », de checksum OEM ou de sauvegarde ne constitue **pas une preuve matérielle**. Pour activer une écriture réelle, il faudra intégrer des sources de validation spécifiques à l'ECU, un véritable pilote/programmeur compatible, un journal persistant, la surveillance de tension et des tests sur banc.
+- **Pas de remise à zéro automatique, pas de nouvelle tentative d'effacement ou d'écriture après un résultat incertain**. L'état `STOPPED_REQUIRES_ASSESSMENT` nécessite une inspection et ne signifie jamais récupération garantie.
+- Contrôle Android/Windows et tests sur le HEAD final requis avant fusion ; ne pas déduire de la simulation une compatibilité LFX 2012 démontrée.
