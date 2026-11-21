@@ -24,10 +24,9 @@ class J2534BridgeTlsTest {
             token, "", " ", "$token.GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
             "$token.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.$fingerprint",
-            "$token.$fingerprint.extra",
-            "$token.0000000000000000000000000000000000000000000000000000000000000000\n"
+            "$token.$fingerprint.extra"
         )
-        for (code in invalid.dropLast(1)) {
+        for (code in invalid) {
             assertThrows(IllegalArgumentException::class.java) {
                 J2534BridgeTlsPairing.parse(code)
             }
