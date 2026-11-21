@@ -71,6 +71,25 @@ internal static class BridgeSelfTests
             Assert(rejected, "Missing CAN identifier rejected");
         }
 
+        byte[] vinQuery = [0x22, 0xF1, 0x90];
+        byte[] vinFrame = [0, 0, 0x07, 0xE8, 0x62, 0xF1, 0x90, 0x41];
+        byte[]? Decode(uint rx = 0, uint protocol = 6, uint extra = 0,
+            byte[]? frame = null, uint? size = null) =>
+            J2534Device.DecodeReceivedPayload(protocol, rx, size ?? (uint)(frame ?? vinFrame).Length,
+                extra, frame ?? vinFrame, 6, 0x7E8, vinQuery);
+        Assert(Decode()!.SequenceEqual(vinFrame[4..]), "Normal physical J2534 receive payload");
+        Assert(Decode(extra: 8) is not null, "Vendor no-extra-data index is accepted");
+        foreach (var flag in new uint[] { 1, 2, 4, 8, 16, 0x80 })
+            Assert(Decode(rx: flag) is null, "J2534 indication or unsupported address rejected");
+        Assert(Decode(protocol: 5) is null, "Wrong protocol rejected");
+        Assert(Decode(extra: 6) is null, "Unexpected trailing data rejected");
+        Assert(Decode(size: 99) is null, "Truncated native message rejected");
+        Assert(Decode(frame: [0, 0, 7, 0xE9, 0x62, 0xF1, 0x90]) is null, "Wrong response CAN ID rejected");
+        Assert(Decode(frame: [0, 0, 7, 0xE8, 0x62, 0xF1, 0x91]) is null, "Stale DID reply rejected");
+        Assert(Decode(frame: [0, 0, 7, 0xE8, 0x59, 0x02]) is null, "Stale service rejected");
+        Assert(Decode(frame: [0, 0, 7, 0xE8, 0x7F, 0x19, 0x78]) is null, "Foreign pending response rejected");
+        Assert(Decode(frame: [0, 0, 7, 0xE8, 0x7F, 0x22, 0x78]) is not null, "Matching pending response accepted");
+
         var cvns = J2534Device.DecodeIdentityRecords(6, Convert.FromHexString("49060201020304000000A0"));
         Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
         Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,

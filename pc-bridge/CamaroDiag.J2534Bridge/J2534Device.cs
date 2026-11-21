@@ -18,6 +18,8 @@ internal sealed class J2534Device : IDisposable
     private const uint ErrorBufferEmpty = 0x10;
     private const uint Can29BitId = 0x100;
     private const uint Iso15765FramePad = 0x40;
+    private const uint NonPayloadRxStatus = 0x1F; // SAE J2534-1 04.04: echo, start, break, transmit, padding error
+    private const uint Iso15765ExtendedAddress = 0x80;
     private const int MaxData = 4128;
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
@@ -203,10 +205,10 @@ internal sealed class J2534Device : IDisposable
             if (receivedCount == 0) continue;
 
             var message = received[0];
-            if (message.DataSize < 5 || message.DataSize > MaxData) continue;
-            var canId = ReadCanId(message.Data);
-            if (canId != _responseCanId) continue;
-            var response = message.Data.Skip(4).Take((int)message.DataSize - 4).ToArray();
+            var response = DecodeReceivedPayload(message.ProtocolId, message.RxStatus,
+                message.DataSize, message.ExtraDataIndex, message.Data,
+                _protocolId, _responseCanId, payload);
+            if (response is null) continue;
             if (response.Length >= 3 && response[0] == 0x7F && response[1] == payload[0] && response[2] == 0x78)
             {
                 if (++pendingResponses > 8) throw new TimeoutException("ECU returned too many UDS ResponsePending (0x78) replies.");
@@ -216,6 +218,47 @@ internal sealed class J2534Device : IDisposable
         }
 
         throw new TimeoutException($"No ISO15765 response from CAN ID 0x{_responseCanId:X} within {timeoutMs} ms.");
+    }
+
+    // A PassThru indication or stale response must never count as an ECU ACK.
+    // This validates the standard J2534-1 receive framing, not ECU flash support.
+    internal static byte[]? DecodeReceivedPayload(uint protocol, uint rxStatus,
+        uint dataSize, uint extraDataIndex, byte[] data,
+        uint expectedProtocol, int responseId, byte[] request)
+    {
+        if (request.Length == 0 || protocol != expectedProtocol ||
+            (rxStatus & (NonPayloadRxStatus | Iso15765ExtendedAddress)) != 0 ||
+            dataSize < 5 || dataSize > MaxData || dataSize > data.Length ||
+            ReadCanId(data) != responseId)
+            return null;
+        // Some vendor DLLs use zero when no extra bytes are attached.
+        // Reject unexpected trailers rather than hashing or interpreting them.
+        if (extraDataIndex != 0 && extraDataIndex != dataSize)
+            return null;
+        var response = data.AsSpan(4, checked((int)dataSize) - 4);
+        if (response[0] == 0x7F)
+            return response.Length == 3 && response[1] == request[0] ? response.ToArray() : null;
+        if (response[0] != unchecked((byte)(request[0] + 0x40))) return null;
+
+        // Match echoed identifiers on the read services used by the bridge.
+        // A response from the right CAN ID but another DID is stale.
+        var echoLength = request[0] switch
+        {
+            0x09 or 0x1A => 1,
+            0x22 => 2,
+            0x10 or 0x19 or 0x3E => 1,
+            _ => 0
+        };
+        if (echoLength > 0 &&
+            (request.Length <= echoLength || response.Length <= echoLength))
+            return null;
+        for (var i = 1; i <= echoLength; i++)
+        {
+            var expected = request[0] is 0x10 or 0x19 or 0x3E
+                ? (byte)(request[i] & 0x7F) : request[i];
+            if (response[i] != expected) return null;
+        }
+        return response.ToArray();
     }
 
     /// <summary>
