@@ -886,4 +886,19 @@
     <string name="functional_tests_denied">Άρνηση πρόσβασης: συνδεθείτε με τον εγκεκριμένο λογαριασμό Google.</string>
     <string name="functional_tests_not_connected">Δεν έχει συνδεθεί φυσικός προσαρμογέας OBD. Οι άλλοι έλεγχοι δεν έγιναν.</string>
     <string name="functional_tests_cancelled">Οι δοκιμές ακυρώθηκαν.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Εκδόσεις αποσφαλμάτωσης</string>
+    <string name="tab_license">Άδεια χρήσης</string>
+    <string name="debug_builds_title">Ιδιωτικές εκδόσεις αποσφαλμάτωσης</string>
+    <string name="debug_builds_refresh">Ανανέωση διαθέσιμων εκδόσεων</string>
+    <string name="debug_builds_download">Λήψη από το GitHub</string>
+    <string name="debug_builds_unavailable">Δεν υπάρχει διαθέσιμο έγκυρο αρχείο αποσφαλμάτωσης.</string>
+    <string name="debug_builds_error">Αδυναμία φόρτωσης εκδόσεων αποσφαλμάτωσης από το GitHub.</string>
+    <string name="license_disabled">Το σύστημα αδειών δεν έχει ενεργοποιηθεί.</string>
+    <string name="license_buy">Αγορά άδειας</string>
+    <string name="license_refresh">Ανανέωση άδειας</string>
+    <string name="license_free">Δωρεάν</string>
+    <string name="license_owner">Ιδιοκτήτης: όλα τα δικαιώματα</string>
+    <string name="license_premium">Πλήρης άδεια ενεργή</string>
+    <string name="license_title">Άδεια CamaroDiag</string>
 </resources>
