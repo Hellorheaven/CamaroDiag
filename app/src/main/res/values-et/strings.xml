@@ -609,4 +609,6 @@
     <string name="msg_usb_identifier_unavailable">USB-seadme tunnus pole saadaval</string>
     <string name="msg_simulation_activation_failed">Simulatsioonirežiimi aktiveerimine nurjus.</string>
     <string name="msg_live_simulation_active">Simulatsioon on aktiivne. Kuvatavad väärtused ei pärine sõidukist.</string>
+    <string name="msg_mileage_audit_failed">Läbisõidu kontrolliks vajalike andmete lugemine nurjus.</string>
+    <string name="msg_session_delete_failed">Salvestatud seansi kustutamine nurjus.</string>
 </resources>
