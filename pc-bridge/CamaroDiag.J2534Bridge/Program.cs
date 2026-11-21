@@ -6,7 +6,24 @@ namespace CamaroDiag.J2534Bridge;
 
 internal static class Program
 {
-    private static async Task<int> Main(string[] args)
+    // Launching from the Windows Start menu is graphical. Console commands
+    // are kept as an explicitly invoked compatibility and CI interface.
+    [STAThread]
+    private static int Main(string[] args)
+    {
+        if (OperatingSystem.IsWindows() &&
+            (args.Length == 0 ||
+             (args.Length == 1 && args[0].Equals("--ui", StringComparison.OrdinalIgnoreCase))))
+        {
+            BridgeConsoleWindow.HideOnlyStandaloneConsole();
+            ApplicationConfiguration.Initialize();
+            Application.Run(new BridgeDesktopForm());
+            return 0;
+        }
+        return RunCommandLineAsync(args).GetAwaiter().GetResult();
+    }
+
+    private static async Task<int> RunCommandLineAsync(string[] args)
     {
         if (!OperatingSystem.IsWindows())
         {
