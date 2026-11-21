@@ -605,4 +605,10 @@
     <string name="dtc_gm_monitor_failure">Licznik usterek / częstotliwość weryfikacji: %1$s</string>
     <string name="dtc_gm_monitor_mil">Klasyfikacja MIL: %1$s</string>
     <string name="dtc_gm_monitor_source">Źródło: GM %1$s, strona %2$d</string>
+    <string name="module_bus_hscan">HS-CAN (500 kbit/s)</string>
+    <string name="module_bus_swcan">SW-CAN GMLAN (33,3 kbit/s)</string>
+    <string name="module_bus_unknown">Magistrala do identyfikacji</string>
+    <string name="units_metric_details">Jednostki metryczne (km, °C, kPa)</string>
+    <string name="units_imperial_details">Jednostki imperialne (mi, °F, psi)</string>
+    <string name="cal_tcp_port">Port TCP</string>
 </resources>
