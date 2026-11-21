@@ -417,4 +417,34 @@
     <string name="debug_builds_created">Luotu</string>
     <string name="debug_builds_expires">Vanhenee</string>
     <string name="debug_builds_no_browser">Latauslinkin avaamiseen ei ole selainta.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Valittu kieli: %1$s</string>
+    <string name="settings_adapter_not_connected">Sovitinta ei ole yhdistetty</string>
+    <string name="settings_last_connection">Viimeisin yhteysprofiili</string>
+    <string name="settings_no_last_connection">Tallennettua yhteysprofiilia ei vielä ole.</string>
+    <string name="saved_vehicle_profiles_title">Tallennetut ajoneuvoprofiilit</string>
+    <string name="saved_vehicle_name_label">Profiilin nimi</string>
+    <string name="saved_vehicle_name_placeholder">esim. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Tallenna nykyinen ajoneuvo</string>
+    <string name="saved_vehicle_empty">Tallennettuja ajoneuvoprofiileja ei vielä ole.</string>
+    <string name="saved_vehicle_delete">Poista</string>
+    <string name="saved_vehicle_requires_review">Profiili luotiin ECU:n VIN-tunnuksesta. Tarkista mallivuosi, moottori ja vaihteisto ennen diagnostiikkaa.</string>
+    <string name="saved_vehicle_ecu_default_name">Ajoneuvo ECU:sta • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Anna profiilin nimi.</string>
+    <string name="msg_vehicle_profile_saved">Ajoneuvoprofiili tallennettu.</string>
+    <string name="msg_vehicle_profile_review_required">Profiili luotiin ECU:n VIN-tunnuksesta. Tarkista vuosi, moottori ja vaihteisto ennen diagnostiikkaa.</string>
+    <string name="msg_vehicle_profile_loaded">Ladattu ajoneuvoprofiili: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU ei palauttanut kelvollista 17-merkkistä VIN-tunnusta. Profiilia ei luotu.</string>
+    <string name="cal_vin_matches_profile">ECU:n VIN-tunnus vastaa valittua ajoneuvoprofiilia.</string>
+    <string name="cal_vin_mismatch_detected">VIN-TUNNUKSET EIVÄT TÄSMÄÄ — profiili: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Valitussa ajoneuvoprofiilissa ei ole kelvollista VIN-tunnusta.</string>
+    <string name="cal_vin_mismatch_title">VIN-tunnusten ristiriita havaittu</string>
+    <string name="cal_vin_mismatch_confirmation">Valitun profiilin VIN-tunnus on %1$s, mutta ECU palautti tunnuksen %2$s. Kyseessä voivat olla eri ajoneuvot. Luo erillinen profiili säilyttääksesi valitun ajoneuvon tai synkronoi vasta fyysisen ajoneuvon tarkistamisen jälkeen.</string>
+    <string name="cal_vin_create_vehicle">Luo ajoneuvoprofiili</string>
+    <string name="cal_vin_sync_existing">Synkronoi valitun profiilin VIN-tunnus</string>
+    <string name="cal_vin_sync_warning_title">Vahvistetaanko VIN-tunnuksen korvaaminen?</string>
+    <string name="cal_vin_sync_warning_message">Valittuun profiiliin tallennettu VIN-tunnus (%1$s) korvataan ECU:n VIN-tunnuksella (%2$s). Vuosi, moottori, vaihteisto ja markkina-alue eivät muutu. Tee tämä vain, kun olet varmistanut, että yhdistetty auto on oikea.</string>
+    <string name="cal_vin_sync_confirm">Korvaa VIN-tunnus</string>
+    <string name="vin_photo_capture">Kuvaa VIN-tunnus</string>
 </resources>
