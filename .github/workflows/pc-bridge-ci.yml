@@ -187,6 +187,7 @@ jobs:
             if ! git diff --quiet "$count_base" "$HEAD_SHA" -- \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeTlsIdentity.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeTlsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/J2534DriverProbe.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/Program.cs'; then
@@ -206,6 +207,7 @@ jobs:
               # normal adjustable draft checkpoint for unrelated Windows work.
               if ! git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- \
                   'pc-bridge/CamaroDiag.J2534Bridge/J2534Device.cs' \
+                  'pc-bridge/CamaroDiag.J2534Bridge/J2534DriverProbe.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/J2534MemoryReadScope.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
                   'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs'; then
