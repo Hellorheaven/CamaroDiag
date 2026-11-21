@@ -157,7 +157,8 @@ internal sealed class BridgeServer
                             responseCanId = responseId.ToString(can29 ? "X8" : "X3"),
                             batteryMillivolts = device.ReadBatteryMillivolts(),
                             readOnly = true,
-                            scopedPhysicalMemoryRead = device.IsMemoryReadEnabled
+                            scopedPhysicalMemoryRead = device.IsMemoryReadEnabled,
+                            standardObdPhysicalRead = device.IsStandardObdReadEnabled
                         }));
                         break;
                     }

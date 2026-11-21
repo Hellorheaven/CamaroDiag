@@ -110,6 +110,17 @@ internal static class BridgeSelfTests
             nativeBenchReply: true)!.SequenceEqual(new byte[]{0x99}),
             "Isolated native decoder accepts exact response from selected channel");
 
+        Assert(StandardObdPhysicalPolicy.SupportsChannel(0x7E0,0x7E8,33), "Standard primary 11-bit OBD channel");
+        Assert(StandardObdPhysicalPolicy.SupportsChannel(0x18DA10F1,0x18DAF110,34), "Standard primary 29-bit OBD channel");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x7DF,0x7E8,33), "Functional broadcasts not authorized");
+        Assert(!StandardObdPhysicalPolicy.SupportsChannel(0x7E0,0x7E8,63), "SW-CAN not standard ISO 15765-4");
+        foreach (byte[] req in new byte[][] { [1,0], [1,0x52], [3], [7], [0x0A] })
+            Assert(StandardObdPhysicalPolicy.AllowsRead(req), "Standard OBD physical read supported");
+        foreach (byte[] req in new byte[][] { [4], [0x27,1], [1], [1,0,1], [3,0], [0x36,0] })
+            Assert(!StandardObdPhysicalPolicy.AllowsRead(req), "No malformed or mutating service admitted");
+        Assert(J2534Device.DecodeReceivedPayload(6,0,7,0,[0,0,7,0xE8,0x41,0x0C,0],6,0x7E8,[1,0x0D]) is null,
+            "Stale Mode 01 PID rejected");
+
         var cvns = J2534Device.DecodeIdentityRecords(6, Convert.FromHexString("49060201020304000000A0"));
         Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
         Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,

@@ -75,6 +75,7 @@ internal sealed partial class J2534Device : IDisposable
     private int _requestCanId;
     private int _responseCanId;
     private bool _can29Bit;
+    private int _protocolNumber;
     private bool _deviceOpened;
     private bool _channelConnected;
     private bool _opened;
@@ -89,6 +90,8 @@ internal sealed partial class J2534Device : IDisposable
     public string DriverPath => _adapter.FunctionLibrary;
     public bool IsOpen => _opened;
     public string ResponseCanIdLabel => _responseCanId.ToString(_can29Bit ? "X8" : "X3");
+    public bool IsStandardObdReadEnabled => _opened && StandardObdPhysicalPolicy.SupportsChannel(
+        _requestCanId, _responseCanId, _protocolNumber);
     public bool IsMemoryReadEnabled => _memoryReadScope != null && _memoryReadVinVerified;
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -130,6 +133,7 @@ internal sealed partial class J2534Device : IDisposable
         _requestCanId = requestCanId;
         _responseCanId = responseCanId;
         _can29Bit = can29Bit;
+        _protocolNumber = protocolNumber;
 
         try
         {
@@ -256,7 +260,7 @@ internal sealed partial class J2534Device : IDisposable
         // A response from the right CAN ID but another DID is stale.
         var echoLength = request[0] switch
         {
-            0x09 or 0x1A => 1,
+            0x01 or 0x09 or 0x1A => 1,
             0x22 => 2,
             0x10 or 0x19 or 0x3E => 1,
             _ => 0
@@ -377,6 +381,7 @@ internal sealed partial class J2534Device : IDisposable
     private void ValidateReadOnlyService(byte[] payload, bool allowNoResponse)
     {
         var service = payload[0];
+        if (!allowNoResponse && IsStandardObdReadEnabled && StandardObdPhysicalPolicy.AllowsRead(payload)) return;
         if (!allowNoResponse && payload.Length == 2 && service == 0x09 &&
             payload[1] is 0x02 or 0x04 or 0x06 or 0x0A) return;
         if (!allowNoResponse && payload.Length == 2 && service == 0x1A &&
