@@ -20,7 +20,7 @@ internal static class NativeE39SecuritySelfTests
 
         Assert(NativeE39Security.E39AlgorithmIdentifier == 0xDC,
             "E39/A key family explicitly selected");
-        Assert(NativeE39Security.SeedRequest().SequenceEqual([0x27, 0x01]),
+        Assert(NativeE39Security.SeedRequest().SequenceEqual(new byte[] { 0x27, 0x01 }),
             "Physical GMLAN seed request");
         Assert(NativeE39Security.ParseSeedResponse([0x67, 0x01, 0x12, 0x34]) == 0x1234,
             "ECU seed parsed big endian");
@@ -29,7 +29,7 @@ internal static class NativeE39SecuritySelfTests
                NativeE39Security.DeriveKey(0x9D19) == 0xD2E0,
             "Independent GM 0xDC key vectors");
         Assert(NativeE39Security.BuildKeyRequest(0x1234).SequenceEqual(
-            [0x27, 0x02, 0xBD, 0x17]), "Calculated key request uses correct byte order");
+            new byte[] { 0x27, 0x02, 0xBD, 0x17 }), "Calculated key request uses correct byte order");
         Assert(NativeE39Security.IsAlreadyGranted(0) &&
                !NativeE39Security.IsAlreadyGranted(0x1234),
                "Zero seed is granted access, not a new key request");
