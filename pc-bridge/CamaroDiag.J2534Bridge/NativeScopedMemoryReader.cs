@@ -57,6 +57,20 @@ internal static class NativeScopedMemoryReader
         return reply[1..];
     }
 
+    internal static async Task RequireLiveVinAsync(
+        ITransport link, J2534MemoryReadScope scope, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var reply = await link.ExchangeAsync([0x22, 0xF1, 0x90], token);
+        token.ThrowIfCancellationRequested();
+        if (reply.Length != 20 || reply[0] != 0x62 ||
+            reply[1] != 0xF1 || reply[2] != 0x90 ||
+            !string.Equals(System.Text.Encoding.ASCII.GetString(reply, 3, 17),
+                scope.ExpectedVin, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException(
+                "Live ECU VIN no longer matches the approved memory scope.");
+    }
+
     internal static async Task<VerifiedCapture> ReadTwiceAsync(
         ITransport link,
         J2534MemoryReadScope scope,
@@ -76,16 +90,22 @@ internal static class NativeScopedMemoryReader
         var blocksPerPass = 0;
         for (var pass = 1; pass <= 2; pass++)
         {
+            // A connected interface can have been moved to another ECU.
+            // Re-read the identity before each independent acquisition.
+            await RequireLiveVinAsync(link, scope, cancellationToken);
             var output = new byte[size];
             var offset = 0;
             var blocks = 0;
             while (offset < size)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (blocks > 0 && blocks % 32 == 0)
+                    await RequireLiveVinAsync(link, scope, cancellationToken);
                 var length = Math.Min(scope.MaxReadBytes, size - offset);
                 var address = checked(scope.StartAddress + (uint)offset);
                 var request = BuildReadRequest(scope, address, length);
                 var reply = await link.ExchangeAsync(request, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 var data = ParseReadResponse(reply, length);
                 data.CopyTo(output, offset);
                 offset += length;
@@ -102,6 +122,9 @@ internal static class NativeScopedMemoryReader
                     "Two independent physical memory readings differ. No backup may be exported.");
         }
 
+        // A replacement during the final block must invalidate the entire
+        // result even if the replacement happens to have identical bytes.
+        await RequireLiveVinAsync(link, scope, cancellationToken);
         if (first is null) throw new InvalidDataException("No physical bytes received.");
         return new VerifiedCapture(
             first, scope.StartAddress, scope.ExpectedVin,
