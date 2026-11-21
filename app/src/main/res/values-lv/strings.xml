@@ -577,4 +577,10 @@
     <string name="can_sniffer_capture_failed">CAN kadru ierakstīšana neizdevās vai adapteris pārstāja atbildēt.</string>
     <string name="can_sniffer_frame_count">Ierakstītie kadri: %1$d</string>
     <string name="can_sniffer_filtered_count">Redzami %1$d no %2$d kadriem</string>
+    <string name="msg_live_recording_real_started">Sākta reālo OBD datu ierakstīšana.</string>
+    <string name="msg_live_recording_started">Notiek ierakstīšana. Mērījumu skaits: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Ierakstīšana apturēta. Ierakstīto mērījumu skaits: %1$d.</string>
+    <string name="msg_live_csv_exported">CSV žurnāls eksportēts. Mērījumu skaits: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Neizdevās eksportēt CSV žurnālu.</string>
+    <string name="msg_live_recording_max_samples">Sasniegta drošības robeža (%1$d). Ierakstīšana automātiski apturēta.</string>
 </resources>
