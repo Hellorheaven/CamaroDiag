@@ -248,8 +248,17 @@ fun ObdScanScreen(
                 SectionTitle(stringResource(R.string.obd_dtc_title))
             }
             val allCodes = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
+            if (report.unavailableDtcModes.isNotEmpty()) {
+                item {
+                    Text(stringResource(R.string.obd_data_unavailable) + ": OBD " +
+                        report.unavailableDtcModes.sorted().joinToString(" / ") { mode -> "%02X".format(java.util.Locale.ROOT, mode) },
+                        color = CamaroAmber, fontSize = 11.sp)
+                }
+            }
             if (allCodes.isEmpty()) {
-                item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
+                if (report.unavailableDtcModes.isEmpty()) {
+                    item { Text(stringResource(R.string.obd_no_dtcs), color = OkGreen) }
+                }
             } else {
                 val matchesVehicle = ObdDtcGuidancePolicy.hasMatchedEcm(
                     selectedVin = vehicle.vin,

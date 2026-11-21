@@ -3144,15 +3144,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.msg_dtc_j2534_unavailable)
                     else localizedContext.getString(R.string.msg_dtc_adapter_required)
                 } else {
-                    val (confirmed, pending, permanent) = if (obdManager.isJ2534StandardObdAvailable()) {
-                        obdManager.readJ2534StandardDtcs()
-                    } else obdManager.withObdCommandSession { engine ->
-                        engine.readDtcs()
+                    if (obdManager.isJ2534StandardObdAvailable()) {
+                        val snapshot = obdManager.readJ2534StandardDtcs()
+                        if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                        replaceStandardDtcRecords(snapshot.records, snapshot.unavailableModes)
+                        _connectionMessage.value = unavailableDtcNotice(snapshot.unavailableModes)
+                    } else {
+                        val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
+                            engine.readDtcs()
+                        }
+                        if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                        replaceStandardDtcRecords(confirmed + pending + permanent, emptySet())
+                        _connectionMessage.value = null
                     }
-                    if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-                    _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } +
-                        mapObdDtcs(confirmed + pending + permanent)
-                    _connectionMessage.value = null
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -3166,6 +3170,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    /** Keep the prior records for an explicitly unavailable optional read mode. */
+    private fun replaceStandardDtcRecords(records: List<ObdDtc>, unavailableModes: Set<Int>) {
+        _dtcs.value = _dtcs.value.filter { previous ->
+            !previous.module.equals("ECM", ignoreCase = true) ||
+                (7 in unavailableModes && previous.statusEn.equals("Pending", ignoreCase = true)) ||
+                (10 in unavailableModes && previous.statusEn.equals("Permanent", ignoreCase = true))
+        } + mapObdDtcs(records)
+    }
+
+    private fun unavailableDtcNotice(modes: Set<Int>): String? =
+        modes.takeIf { it.isNotEmpty() }?.let {
+            localizedContext.getString(R.string.obd_data_unavailable) + ": OBD " +
+                it.sorted().joinToString(" / ") { mode -> "%02X".format(java.util.Locale.ROOT, mode) }
+        }
 
     /** Converts standard OBD DTC records once for both the quick and full scan screens. */
     private fun mapObdDtcs(records: List<ObdDtc>): List<DiagnosticDtc> =
@@ -3601,15 +3620,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
-                _dtcs.value = if (obdManager.isSimulationActive) {
-                    mapObdDtcs(allDtcs)
+                if (obdManager.isSimulationActive) {
+                    _dtcs.value = mapObdDtcs(allDtcs)
                 } else {
-                    _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } + mapObdDtcs(allDtcs)
+                    replaceStandardDtcRecords(allDtcs, report.unavailableDtcModes)
                 }
                 _obdScanMessage.value = if (obdManager.isSimulationActive) {
                     localizedContext.getString(R.string.msg_full_scan_simulation_complete, report.supportedPids.size, allDtcs.size)
                 } else {
-                    localizedContext.getString(R.string.msg_full_scan_complete, report.supportedPids.size, allDtcs.size)
+                    listOfNotNull(
+                        localizedContext.getString(R.string.msg_full_scan_complete, report.supportedPids.size, allDtcs.size),
+                        unavailableDtcNotice(report.unavailableDtcModes)
+                    ).joinToString("\n")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
