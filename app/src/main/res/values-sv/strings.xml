@@ -397,4 +397,13 @@
     <string name="license_owner">Ägare: alla behörigheter</string>
     <string name="license_premium">Fullständig licens aktiv</string>
     <string name="license_title">CamaroDiag-licens</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Ladda ned de senaste Debug-artefakterna från PR #70. Logga in på GitHub med ett behörigt konto. Nedladdningarna är ZIP-arkiv som måste packas upp.</string>
+    <string name="debug_builds_android_archive">ZIP-arkiv med Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP-arkiv med installationsprogram för Windows x64 och x86.</string>
+    <string name="debug_builds_caution">Artefakter upphör att gälla efter 30 dagar. Att de finns tillgängliga bevisar inte en lyckad byggning eller tester på fordon. Debug APK-signaturer kan skilja sig från offentliga utgåvor.</string>
+    <string name="debug_builds_created">Skapad</string>
+    <string name="debug_builds_expires">Upphör</string>
+    <string name="debug_builds_no_browser">Ingen webbläsare finns för att öppna nedladdningen.</string>
 </resources>
