@@ -256,4 +256,20 @@
     <string name="cal_can_response_id">CAN ID odpovědi (např. 7E8)</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
     <string name="cal_j2534_security_notice">Zabezpečení: token není šifrován pomocí TLS. Používejte důvěryhodnou soukromou síť a nikdy tento port nevystavujte internetu.</string>
+    <string name="cal_native_catalog_title">VLASTNÍ KATALOG CAMARODIAG</string>
+    <string name="cal_native_catalog_explanation">Definice spravuje CamaroDiag nezávisle na komunitních katalozích. Navržené ani zdokumentované definice se nikdy neodesílají do ECU.</string>
+    <string name="cal_native_catalog_loading">Načítání vlastního katalogu…</string>
+    <string name="cal_native_catalog_empty">Žádný proprietární Camaro DID nyní není označen jako použitelný. Neznámé adresy ani měřítka se nevymýšlejí.</string>
+    <string name="cal_native_catalog_read_disabled">Čtení z vozidla je zakázáno, dokud nebude adresování a dekódování ověřeno na totožné konfiguraci.</string>
+    <string name="cal_obdb_catalog_title">SIGNÁLY SPECIFICKÉ PRO CAMARO • OBDb</string>
+    <string name="cal_obdb_catalog_explanation">Komunitní katalog obsahuje DID, CAN adresy, převodní koeficienty a filtry modelových roků. Tyto definice nejsou ověřením od GM; vždy ověřte odpověď ECU.</string>
+    <string name="cal_obdb_catalog_loading">Načítání katalogu signálů Camaro…</string>
+    <string name="cal_search_signal">Hledat signál (název, DID, systém)</string>
+    <string name="cal_no_signal">Žádný signál není dostupný</string>
+    <string name="cal_signal_debug">Signál je ve zdroji OBDb označen jako DEBUG.</string>
+    <string name="cal_signal_flow_control">Zdrojová definice vyžaduje řízení toku.</string>
+    <string name="cal_signal_can_unresolved">CAN adresa není určena: čtení tohoto signálu je zakázáno.</string>
+    <string name="cal_read_signal">Přečíst tento signál ECU</string>
+    <string name="calibration_files">Kalibrační soubory</string>
+    <string name="cal_file_inspection_hint">Importujte BIN, HEX nebo jiný výpis pro kontrolu velikosti a otisku SHA-256. Soubor zůstává místní; zápis do ECU se nespustí.</string>
 </resources>
