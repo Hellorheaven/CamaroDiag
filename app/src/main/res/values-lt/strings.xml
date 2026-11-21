@@ -501,4 +501,6 @@
     <string name="mileage_source_generic">Šaltinis %1$s</string>
     <string name="mileage_details_unavailable">Šio šaltinio techninė informacija nepasiekiama.</string>
     <string name="mileage_caveat_unavailable">Papildoma lokalizuota informacija apie šį šaltinį nepasiekiama.</string>
+    <string name="obd_physical_can_scope">Fizinis CAN atsakiklis: 0x%1$s. Nuskaitymas apima tik pasirinktą OBD ECU, o ne visų modulių funkcinį nuskaitymą. GM programavimo ar vykdiklių komandų nesiųsta.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">Įjunkite su emisijomis susijusių DTC ištrynimą Windows tilte, prisijunkite iš naujo, išjunkite variklį ir patvirtinkite atkūrimą. Emisijų parengties duomenys bus atstatyti; nuolatiniai kodai neištrinami.</string>
 </resources>
