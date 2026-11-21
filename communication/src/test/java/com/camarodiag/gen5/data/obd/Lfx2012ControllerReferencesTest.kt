@@ -9,10 +9,24 @@ class Lfx2012ControllerReferencesTest {
     @Test fun referencesAreListedWithoutImplyingFirmwareCompatibility() {
         assertEquals("E39", Lfx2012ControllerReferences.controllerFamily)
         assertEquals(
-            listOf("12651994", "12643248"),
+            listOf("12651994", "12643248", "12651993", "12637106", "12642665", "12650256", "12616889"),
             Lfx2012ControllerReferences.describedServiceParts()
         )
-        assertEquals("12632286", Lfx2012ControllerReferences.associatedMainBootFile)
+        val groups = Lfx2012ControllerReferences.servicePartGroups.associateBy { it.servicePart }
+        assertEquals("12632286", groups.getValue("12651994").catalogBootFile)
+        assertEquals(null, groups.getValue("12651993").catalogBootFile)
+        assertFalse("12653998" in Lfx2012ControllerReferences.describedServiceParts())
+    }
+
+    @Test fun lookupHandlesMultipleLabelsOnTheSameServiceNumber() {
+        val expected = Lfx2012ControllerReferences.Label("12643248", "12648906", "AA69")
+        assertEquals(listOf(expected), Lfx2012ControllerReferences.findLabels(" aa69 "))
+        assertEquals(listOf(expected), Lfx2012ControllerReferences.findLabels("12648906"))
+        assertTrue(Lfx2012ControllerReferences.findLabels("12643248").containsAll(listOf(
+            expected, Lfx2012ControllerReferences.Label("12643248", "12648432", "AA6L")
+        )))
+        assertTrue(Lfx2012ControllerReferences.findLabels("12653998").isEmpty())
+        assertTrue(Lfx2012ControllerReferences.findLabels("1264").isEmpty())
     }
 
     @Test fun fingerprintRequiresEcuNameCalIdAndCvn() {

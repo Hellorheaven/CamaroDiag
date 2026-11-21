@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Security;
+using System.Security.Authentication;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -8,22 +10,31 @@ namespace CamaroDiag.J2534Bridge;
 
 internal sealed class BridgeServer
 {
+    private const int MaxRequestLineChars = 64 * 1024;
+    private static readonly TimeSpan TlsHandshakeTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan RequestReadTimeout = TimeSpan.FromSeconds(30);
     private readonly J2534Adapter _adapter;
     private readonly string _token;
     private readonly int _port;
+    private readonly J2534MemoryReadScope? _memoryReadScope;
+    private readonly BridgeTlsIdentity _tlsIdentity;
 
-    public BridgeServer(J2534Adapter adapter, string token, int port)
+    public BridgeServer(
+        J2534Adapter adapter, string token, int port, BridgeTlsIdentity tlsIdentity,
+        J2534MemoryReadScope? memoryReadScope = null)
     {
         _adapter = adapter;
         _token = token;
         _port = port;
+        _tlsIdentity = tlsIdentity;
+        _memoryReadScope = memoryReadScope;
     }
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
         var listener = new TcpListener(IPAddress.Any, _port);
         listener.Start();
-        Console.WriteLine($"Listening on local network interfaces (TCP {_port}); public remote addresses are rejected.");
+        Console.WriteLine($"Listening with mandatory TLS 1.2+ on TCP {_port}; public remote addresses are rejected.");
         Console.WriteLine("Connect the Android device to the same trusted local network.");
         Console.WriteLine("Press Ctrl+C to stop. Do not forward this port to the Internet.");
 
@@ -52,22 +63,59 @@ internal sealed class BridgeServer
 
     private async Task HandleClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
-        using var stream = client.GetStream();
+        using var networkStream = client.GetStream();
+        using var stream = new SslStream(networkStream, leaveInnerStreamOpen: false);
+        using var handshakeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        handshakeTimeout.CancelAfter(TlsHandshakeTimeout);
+        try
+        {
+            await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+            {
+                ServerCertificate = _tlsIdentity.Certificate,
+                EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                ClientCertificateRequired = false,
+                AllowRenegotiation = false
+            }, handshakeTimeout.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Console.Error.WriteLine("TLS handshake timed out; closing unauthenticated client.");
+            return;
+        }
+        catch (AuthenticationException)
+        {
+            // Never parse application JSON or reveal pairing details over a
+            // plaintext/invalid TLS connection.
+            Console.Error.WriteLine("Rejected client without a valid TLS handshake.");
+            return;
+        }
+        catch (IOException)
+        {
+            // A plaintext peer may simply close the socket on TLS failure.
+            return;
+        }
         using var reader = new StreamReader(stream, new UTF8Encoding(false), false, 4096, leaveOpen: true);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false), 4096, leaveOpen: true) { AutoFlush = true };
-        using var device = new J2534Device(_adapter);
+        using var device = new J2534Device(_adapter, _memoryReadScope);
 
         while (!cancellationToken.IsCancellationRequested && client.Connected)
         {
             string? line;
-            try { line = await reader.ReadLineAsync(cancellationToken); }
-            catch (IOException) { break; }
-            if (line is null) break;
-            if (line.Length > 65536)
+            using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            readTimeout.CancelAfter(RequestReadTimeout);
+            try { line = await ReadBoundedLineAsync(reader, readTimeout.Token); }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                Console.Error.WriteLine("Timed out waiting for a bridge request; connection closed.");
+                break;
+            }
+            catch (InvalidDataException)
             {
                 await WriteErrorAsync(writer, "Request exceeds the 64 KiB bridge limit.");
                 break;
             }
+            catch (IOException) { break; }
+            if (line is null) break;
 
             try
             {
@@ -104,7 +152,30 @@ internal sealed class BridgeServer
                             baudRate,
                             requestCanId = requestId.ToString(can29 ? "X8" : "X3"),
                             responseCanId = responseId.ToString(can29 ? "X8" : "X3"),
-                            readOnly = true
+                            batteryMillivolts = device.ReadBatteryMillivolts(),
+                            readOnly = true,
+                            scopedPhysicalMemoryRead = device.IsMemoryReadEnabled
+                        }));
+                        break;
+                    }
+                    case "identify":
+                    {
+                        var identity = device.ReadCalibrationIdentification();
+                        await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = true, identity }));
+                        break;
+                    }
+                    case "identifyGmlan":
+                    {
+                        // Physical GM CAN VIN/OSID read only. Never grants
+                        // SecurityAccess or programming privileges.
+                        var identity = await Task.Run(
+                            () => device.ReadGmlanIdentification(), cancellationToken);
+                        await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                        {
+                            ok = true,
+                            identity,
+                            readOnly = true,
+                            flashQualified = false
                         }));
                         break;
                     }
@@ -135,6 +206,29 @@ internal sealed class BridgeServer
             {
                 await WriteErrorAsync(writer, ex.Message);
             }
+        }
+    }
+
+    // Read one bounded request without StreamReader.ReadLineAsync buffering an
+    // attacker-controlled unbounded line before the length check.
+    internal static async Task<string?> ReadBoundedLineAsync(
+        StreamReader reader, CancellationToken cancellationToken)
+    {
+        var line = new StringBuilder();
+        var character = new char[1];
+        var received = 0;
+        while (true)
+        {
+            var count = await reader.ReadAsync(character.AsMemory(), cancellationToken);
+            if (count == 0)
+            {
+                if (received == 0) return null;
+                throw new IOException("Bridge request ended without a newline.");
+            }
+            if (character[0] == '\n') return line.ToString();
+            if (++received > MaxRequestLineChars)
+                throw new InvalidDataException("Bridge request exceeds the 64 KiB limit.");
+            if (character[0] != '\r') line.Append(character[0]);
         }
     }
 

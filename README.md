@@ -95,12 +95,12 @@ Le pont PC permet d'utiliser un fournisseur J2534 sous Windows 10 ou 11, notamme
 1. Installer d'abord le pilote constructeur J2534 correspondant à l'interface (et VX Manager pour les modèles VXDIAG qui le nécessitent).
 2. Télécharger depuis les [versions CamaroDiag](https://github.com/Hellorheaven/CamaroDiag/releases/latest) le programme d'installation Windows x86 ou x64 correspondant au pilote J2534.
 3. Exécuter l'installateur, puis lancer **CamaroDiag J2534 Bridge** depuis le menu Démarrer.
-4. Choisir l'interface et relever l'adresse IP, le port et le jeton d'appairage indiqués.
+4. Choisir l'interface et relever l'adresse IP, le port et **le code d'appairage TLS complet** affiché (`jeton.empreinte_SHA256`). Le code change à chaque redémarrage du pont.
 5. Relier Android et le PC au même réseau privé, puis renseigner ces informations et les identifiants CAN documentés du calculateur dans CamaroDiag.
 
 La connexion J2534 autorise les lectures UDS et le maintien de session lorsqu'ils sont pris en charge. Elle ne rend pas disponibles le flashage, les commandes constructeur non vérifiées ni tous les réseaux GM.
 
-**Sécurité :** utiliser exclusivement un réseau local privé et de confiance. Le pont n'utilise pas de chiffrement TLS : ne jamais exposer son port à Internet ni l'utiliser sur un réseau Wi-Fi public.
+**Sécurité :** la connexion Android–J2534 exige TLS 1.2/1.3 et vérifie l'empreinte SHA-256 du certificat du pont avant toute transmission du jeton ou de trames ECU. Les anciens clients TCP et les jetons seuls sont refusés. Utiliser exclusivement un réseau local privé et de confiance ; ne jamais exposer le port à Internet ni utiliser le pont sur un réseau Wi-Fi public.
 
 Pour les étapes détaillées, consulter le [guide d'installation du pont PC](pc-bridge/README.md).
 
@@ -110,14 +110,15 @@ L'atelier permet l'analyse de fichiers locaux : import BIN/ORI/MOD, Intel HEX, M
 
 Aucun pack de tables Camaro validé n'est fourni. Les définitions doivent correspondre exactement au VIN, au calculateur, au CAL ID/CVN, à l'OS et à l'image concernée. Les formats XDF/A2L/XML ou conteneurs propriétaires non décodés ne sont pas automatiquement convertis.
 
-La lecture mémoire directe de l'ECM, l'écriture, le flashage, le recovery, les checksums GM et les procédures Seed/Key ne sont pas disponibles.
+
+La **lecture physique limitée d'une plage mémoire ECU** est disponible via le pont PC J2534, uniquement avec un profil de plage documenté configuré sur Windows, une correspondance VIN vérifiée et deux acquisitions concordantes. Il ne s'agit **ni d'un dump complet garanti ni d'une sauvegarde restaurable**. La lecture complète universelle de l'ECM, l'écriture physique, le flashage, le recovery, les checksums GM et les procédures Seed/Key ne sont pas disponibles.
 
 ## Fonctions non disponibles
 
 - Scan exhaustif garanti de BCM, TCM, EBCM/ABS, IPC, SDM et de tous les calculateurs GM.
 - Commandes carrosserie non validées pour le VIN, BCM et calibration.
 - Démarrage à distance générique, contournement antidémarrage ou dispositifs antivol.
-- Écriture UDS, actionneurs, codage, programmation, lecture mémoire ou flashage GM.
+- Écriture UDS, actionneurs, codage, programmation, lecture mémoire **hors profil autorisé**, dump complet garanti ou flashage GM.
 
 ## Origine des données et licences intégrées
 

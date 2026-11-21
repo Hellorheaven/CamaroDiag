@@ -26,7 +26,7 @@ import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
-import java.util.Locale
+import androidx.compose.ui.platform.LocalConfiguration
 
 /**
  * Denies access to diagnostic screens until a Firebase session exists.
@@ -135,7 +135,7 @@ fun CamaroAuthGate(
     } else if (readyAccountUid != user.uid || validatedAccountUid != user.uid ||
         validatedUser !== user
     ) {
-        val french = remember { Locale.getDefault().language == "fr" }
+        val french = LocalConfiguration.current.locales[0].language == "fr"
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -173,7 +173,7 @@ fun CamaroAuthGate(
         var accountRevision by remember(user.uid) { mutableIntStateOf(0) }
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
-        val french = remember { Locale.getDefault().language == "fr" }
+        val french = LocalConfiguration.current.locales[0].language == "fr"
         // Account action belongs to the app's TopAppBar; an overlay here would
         // overlap system bars and the title on narrow Android 15/16 devices.
         content { accountOpen = true }
@@ -358,7 +358,7 @@ fun CamaroAuthGate(
 private fun CamaroLoginScreen(auth: FirebaseAuth) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val french = remember { Locale.getDefault().language == "fr" }
+    val french = LocalConfiguration.current.locales[0].language == "fr"
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -499,7 +499,7 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
 @Composable
 private fun EmailVerificationScreen(auth: FirebaseAuth, onVerified: () -> Unit) {
     val signOut = rememberFirebaseSignOut(auth)
-    val french = remember { Locale.getDefault().language == "fr" }
+    val french = LocalConfiguration.current.locales[0].language == "fr"
     var message by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     Column(

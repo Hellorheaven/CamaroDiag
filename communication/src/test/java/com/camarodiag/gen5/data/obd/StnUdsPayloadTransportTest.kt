@@ -98,6 +98,165 @@ class StnUdsPayloadTransportTest {
         assertTrue(commands.contains("STP 63"))
     }
 
+    @Test fun documentedObdLinkModelsUseIsoTpForHsCanDiagnostics() = runBlocking {
+        for (model in listOf("EX", "CX", "LX", "SX", "MX")) {
+            val commands = mutableListOf<String>()
+            val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+                commands += command
+                when {
+                    command == "STI" -> "STN2100 v5.10.3"
+                    command == "STDI" -> "OBDLink $model r3.2.1"
+                    command.startsWith("STPX") -> "7E8 62 12 34"
+                    else -> "OK"
+                }
+            }
+            assertArrayEquals(
+                "HS-CAN UDS must work for OBDLink $model",
+                byteArrayOf(0x62, 0x12, 0x34),
+                transport.exchange(byteArrayOf(0x22, 0x12, 0x34), 1000)
+            )
+            assertTrue("Expected ISO-TP on $model", commands.contains("STP 33"))
+            assertTrue("Expected actual UDS transaction on $model",
+                commands.any { it.startsWith("STPX h:7E0, d:221234") })
+        }
+    }
+
+    @Test fun swCanIsRejectedBeforeProtocolSelectionOnUnsupportedObdLinkModels() = runBlocking {
+        for (model in listOf("EX", "CX", "LX", "SX")) {
+            val commands = mutableListOf<String>()
+            val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 63) { command, _ ->
+                commands += command
+                when (command) {
+                    "STI" -> "STN2100 v5.10.3"
+                    "STDI" -> "OBDLink $model r3.2.1"
+                    else -> "OK"
+                }
+            }
+            val result = runCatching {
+                transport.exchange(byteArrayOf(0x22, 0x12, 0x34), 1000)
+            }
+            assertTrue("GM SW-CAN must fail on $model", result.isFailure)
+            assertFalse("Unsupported SW-CAN must not be selected on $model",
+                commands.any { it.startsWith("STP ") || it.startsWith("STPX") })
+        }
+    }
+
+    @Test fun assemblesLongStpxPayloadFromMatchingResponderAndContinuationOnly() = runBlocking {
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") ->
+                    "STPX h:7E0, d:22F190\n" +
+                        "7E9 62 00 00\n" +
+                        "7E8 62F190 31 47 31\n" +
+                        "32 33 34 35 36\n" +
+                        "7E9 DE AD BE EF\n" +
+                        "7E8 37 38 39\n" +
+                        ">"
+                else -> "OK"
+            }
+        }
+        assertArrayEquals(
+            byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()) +
+                "1G123456789".toByteArray(Charsets.US_ASCII),
+            transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), 1500)
+        )
+    }
+
+    @Test fun rejectsUnattributedStpxTextInsteadOfTreatingItAsEcuBytes() = runBlocking {
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") -> "62 F1 90 01\n7E9 62 F1 90 02\nOK"
+                else -> "OK"
+            }
+        }
+        assertTrue(runCatching {
+            transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), 1000)
+        }.isFailure)
+    }
+
+    @Test fun parsesExtendedCanResponderWithCompactHexPayload() = runBlocking {
+        val transport = StnUdsPayloadTransport(0x18DA10F1, 0x18DAF110, 34) { command, _ ->
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") ->
+                    "18DAF111 62F190AAAA\n18DAF110 621234AB\n>"
+                else -> "OK"
+            }
+        }
+        assertArrayEquals(
+            byteArrayOf(0x62, 0x12, 0x34, 0xAB.toByte()),
+            transport.exchange(byteArrayOf(0x22, 0x12, 0x34), 1000)
+        )
+    }
+
+    @Test fun rejectsAResponseForAnotherUdsServiceOnTheCorrectCanId() = runBlocking {
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") -> "7E8 59 02 FF"
+                else -> "OK"
+            }
+        }
+        assertTrue(runCatching {
+            transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), 1000)
+        }.isFailure)
+    }
+
+    @Test fun rejectsResponsePendingThatBelongsToAnotherService() = runBlocking {
+        val commands = mutableListOf<String>()
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+            commands += command
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") -> "7E8 7F 19 78"
+                else -> "OK"
+            }
+        }
+        assertTrue(runCatching {
+            transport.exchange(byteArrayOf(0x22, 0x12, 0x34), 1000)
+        }.isFailure)
+        assertFalse(commands.contains("STMA 1"))
+    }
+
+    @Test fun ignoresFalseOkSubstringsDuringStnConfiguration() = runBlocking {
+        val commands = mutableListOf<String>()
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+            commands += command
+            when (command) {
+                "STI" -> "STN2255 v5.10.3"
+                "STDI" -> "OBDLink MX+ r3.2.1"
+                "STP 33" -> "NOT OK"
+                else -> "OK"
+            }
+        }
+        assertTrue(runCatching {
+            transport.exchange(byteArrayOf(0x22, 0x12, 0x34), 1000)
+        }.isFailure)
+        assertFalse("Configuration must fail before a UDS transmission",
+            commands.any { it.startsWith("STPX") })
+    }
+
+    @Test fun requiresAdapterAckForSuppressedTesterPresent() = runBlocking {
+        val transport = StnUdsPayloadTransport(0x7E0, 0x7E8, 33) { command, _ ->
+            when {
+                command == "STI" -> "STN2255 v5.10.3"
+                command == "STDI" -> "OBDLink MX+ r3.2.1"
+                command.startsWith("STPX") -> "NO DATA"
+                else -> "OK"
+            }
+        }
+        assertTrue(runCatching {
+            transport.sendOnly(byteArrayOf(0x3E, 0x80.toByte()), 1000)
+        }.isFailure)
+    }
+
     @Test fun rejectsCanIdentifierAndProtocolFormatMismatch() {
         assertTrue(runCatching { StnUdsPayloadTransport(0x7E0, 0x7E8, 34) { _, _ -> "OK" } }.isFailure)
         assertTrue(runCatching { StnUdsPayloadTransport(0x18DA10F1, 0x18DAF110, 34) { _, _ -> "OK" } }.isSuccess)

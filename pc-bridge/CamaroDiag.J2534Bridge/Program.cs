@@ -18,8 +18,35 @@ internal static class Program
         if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
             return BridgeSelfTests.Run();
 
+        // Driver verification is explicitly requested by the operator. Do not
+        // contact an ECU, start the network bridge or run the updater here.
+        if (args.Contains("--probe-drivers", StringComparer.OrdinalIgnoreCase))
+            return J2534DriverProbe.RunAll();
+
+        // Offline image check: native, no ECU, no vendor driver or network.
+        if (args.Contains("--inspect-e39-image", StringComparer.OrdinalIgnoreCase))
+            return InspectE39Image(args);
+
+
         if (await BridgeUpdateManager.CheckAndOfferUpdateAsync()) return 0;
         var port = ReadPort(args);
+        J2534MemoryReadScope? memoryReadScope = null;
+        var mapIndex = Array.FindIndex(args,
+            value => value.Equals("--memory-read-profile", StringComparison.OrdinalIgnoreCase));
+        if (mapIndex >= 0)
+        {
+            if (mapIndex + 1 >= args.Length)
+            {
+                Console.Error.WriteLine("Missing JSON path after --memory-read-profile.");
+                return 6;
+            }
+            try { memoryReadScope = J2534MemoryReadScope.Load(args[mapIndex + 1]); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Invalid ECU memory read profile: " + ex.Message);
+                return 6;
+            }
+        }
         var adapters = J2534Registry.Discover();
         if (adapters.Count == 0)
         {
@@ -45,25 +72,78 @@ internal static class Program
             }
         }
 
+        // New TLS identity and token on each launch: no unencrypted fallback,
+        // no private key persistence, and no reuse of a previously leaked code.
+        using var tlsIdentity = BridgeTlsIdentity.Create();
         var tokenBytes = RandomNumberGenerator.GetBytes(32);
         var token = Convert.ToBase64String(tokenBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         Console.WriteLine();
         Console.WriteLine($"Selected: {adapters[selectedIndex].Name}");
-        Console.WriteLine($"Pairing token: {token}");
+        Console.WriteLine($"Secure pairing code (paste in Android token field): {token}.{tlsIdentity.Fingerprint}");
+        Console.WriteLine("TLS: required (minimum version 1.2); certificate SHA-256 pinned in pairing code.");
+        Console.WriteLine("A new pairing code is required every time the bridge restarts.");
         Console.WriteLine($"Port: {port}");
-        Console.WriteLine("The bridge only accepts UDS read services 0x22 / 0x19 and TesterPresent 0x3E.");
+        Console.WriteLine("Available: OBD Mode 09 identity, UDS reads and TesterPresent.");
         Console.WriteLine("ECU writes, security access, actuator controls and flash programming are blocked.");
+        if (memoryReadScope != null)
+            Console.WriteLine("Memory read profile enabled: every 0x23 read is restricted to the configured " +
+                "range and requires an exact live ECU VIN match. No write privileges are granted.");
         Console.WriteLine();
 
         try
         {
-            await new BridgeServer(adapters[selectedIndex], token, port).RunAsync();
+            await new BridgeServer(
+                adapters[selectedIndex], token, port, tlsIdentity, memoryReadScope).RunAsync();
             return 0;
         }
         catch (SocketException ex)
         {
             Console.Error.WriteLine($"Could not listen on TCP port {port}: {ex.Message}");
             return 5;
+        }
+    }
+
+    private static int InspectE39Image(string[] args)
+    {
+        if (args.Length != 2 || !args[0].Equals("--inspect-e39-image", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine("Usage: CamaroDiag.J2534Bridge.exe --inspect-e39-image <original-3MiB.bin>");
+            return 10;
+        }
+
+        try
+        {
+            var path = Path.GetFullPath(args[1]);
+            var bytes = new FileInfo(path);
+            if (bytes.Length != NativeE39ImageInspector.ImageBytes)
+            {
+                Console.Error.WriteLine("Expected exact E39/E39A raw image length: 0x300000 bytes.");
+                return 10;
+            }
+            var report = NativeE39ImageInspector.Inspect(File.ReadAllBytes(path));
+            Console.WriteLine($"E39/E39A image status: {report.Status}");
+            if (report.OsIdentifier.HasValue)
+                Console.WriteLine($"OS ID: {report.OsIdentifier.Value}");
+            foreach (var segment in report.Segments)
+                Console.WriteLine($"  {segment.Name,-12} 0x{segment.Start:X6}..0x{segment.EndInclusive:X6}");
+            foreach (var check in report.Checks)
+                Console.WriteLine($"  {check.Name,-12} {check.Kind}: stored=0x{check.Stored:X4}, computed=0x{check.Computed:X4} " +
+                    (check.Matches ? "OK" : "MISMATCH"));
+            if (report.Reason is not null)
+                Console.Error.WriteLine("Invalid image: " + report.Reason);
+            if (report.Status == NativeE39ImageInspector.Verdict.CvnMismatch)
+                Console.Error.WriteLine("CVN mismatch: inspect the file's provenance before any programming.");
+            return report.Status switch
+            {
+                NativeE39ImageInspector.Verdict.Valid => 0,
+                NativeE39ImageInspector.Verdict.CvnMismatch => 9,
+                _ => 10
+            };
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Console.Error.WriteLine("Could not inspect image: " + error.Message);
+            return 10;
         }
     }
 

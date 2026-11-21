@@ -24,8 +24,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DropdownMenu
@@ -43,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import com.camarodiag.gen5.R
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
@@ -57,10 +60,13 @@ import com.camarodiag.gen5.ui.theme.TextMuted
 import com.camarodiag.gen5.ui.theme.TextPrimary
 import com.camarodiag.gen5.ui.theme.WarnRed
 import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
+import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
+import com.camarodiag.gen5.data.obd.EcuBackupManifest
+import com.camarodiag.gen5.data.obd.EcuBackupCoverage
 import com.camarodiag.gen5.data.obd.CalibrationAxisDefinition
 import com.camarodiag.gen5.data.obd.CalibrationMapDefinition
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignal
@@ -68,6 +74,12 @@ import com.camarodiag.gen5.data.obd.CamaroSignalDefinition
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.domain.model.VehicleProfile
 import com.camarodiag.gen5.domain.model.VehicleVinComparison
+
+sealed interface ArchiveVerification {
+    data object Reading : ArchiveVerification
+    data object Failed : ArchiveVerification
+    data class Verified(val manifest: EcuBackupManifest.Manifest) : ArchiveVerification
+}
 
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
@@ -87,7 +99,12 @@ data class CalibrationWorkspaceState(
     val udsMessage: String = "",
     val isJ2534BridgeConnecting: Boolean = false,
     val isJ2534BridgeConnected: Boolean = false,
+    val isJ2534MemoryReadAvailable: Boolean = false,
     val j2534BridgeMessage: String = "",
+    val isJ2534MemoryCapturing: Boolean = false,
+    val j2534MemoryCaptureBytesRead: Long = 0L,
+    val j2534MemoryCaptureTotalBytes: Long = 0L,
+    val j2534MemoryCaptureMessage: String = "",
     val nativeSignals: List<CamaroSignalDefinition> = emptyList(),
     val nativeSignalMessage: String = "",
     val obdbSignals: List<ObdbCamaroSignal> = emptyList(),
@@ -97,6 +114,7 @@ data class CalibrationWorkspaceState(
     val isTraceAnalyzing: Boolean = false,
     val traceMessage: String = "",
     val canTraceReport: CanTraceAnalysisReport? = null,
+    val archiveVerification: ArchiveVerification? = null,
     val importedFileName: String? = null,
     val importedFileSize: Long? = null,
     val importedFileSha256: String? = null,
@@ -169,14 +187,14 @@ private fun localizedAxisSummary(
     val details = if (axis == null) {
         stringResource(R.string.cal_axis_undefined)
     } else {
-        stringResource(R.string.cal_axis_values)
-            .replace("%1\u0024s", axis.fileOffset.toString(16).uppercase())
-            .replace("%2\u0024d", axis.count.toString())
-            .replace("%3\u0024s", axis.unit.orEmpty())
+        stringResource(
+            R.string.cal_axis_values,
+            axis.fileOffset.toString(16).uppercase(),
+            axis.count,
+            axis.unit.orEmpty()
+        )
     }
-    return stringResource(R.string.cal_axis_summary)
-        .replace("%1\u0024s", axisLabel)
-        .replace("%2\u0024s", details)
+    return stringResource(R.string.cal_axis_summary, axisLabel, details)
 }
 
 @Composable
@@ -199,6 +217,7 @@ fun CalibrationWorkspaceScreen(
     vehicleLabel: String,
     ecmType: String,
     isConnected: Boolean,
+    canReadEnhancedUds: Boolean,
     onReadIdentification: () -> Unit,
     onExportIdentification: () -> Unit,
     onCreateVehicleFromEcuVin: (String) -> Unit,
@@ -207,9 +226,11 @@ fun CalibrationWorkspaceScreen(
     onReadUdsDtcs: (String, String, String) -> Unit,
     onConnectJ2534Bridge: (String, String, String, String, String, String) -> Unit,
     onDisconnectJ2534Bridge: () -> Unit,
+    onCaptureJ2534Memory: (String, String, Int, EcuBackupCoverage.Region) -> Unit,
     onReadObdbSignal: (String, String) -> Unit,
     vehicle: VehicleProfile,
     onImportFile: () -> Unit,
+    onVerifyEcuBackup: () -> Unit,
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onPreviewPartialWrite: (Long, Int, Int) -> Unit,
@@ -229,6 +250,11 @@ fun CalibrationWorkspaceScreen(
     var j2534Host by remember { mutableStateOf("192.168.1.100") }
     var j2534Port by remember { mutableStateOf("35001") }
     var j2534Token by remember { mutableStateOf("") }
+    var memoryReadAddressHex by remember { mutableStateOf("") }
+    var memoryReadLengthText by remember { mutableStateOf("") }
+    var memoryReadSessionExtended by remember { mutableStateOf(false) }
+    var memoryReadRegion by remember { mutableStateOf(EcuBackupCoverage.Region.CALIBRATION) }
+    var memoryReadRegionMenuExpanded by remember { mutableStateOf(false) }
     var expertExpanded by remember { mutableStateOf(false) }
     var expertControllerFamily by remember { mutableStateOf("") }
     var expertChipMarking by remember { mutableStateOf("") }
@@ -251,9 +277,9 @@ fun CalibrationWorkspaceScreen(
     val selectedObdbSignal = state.obdbSignals.firstOrNull { it.id == selectedObdbSignalId }
         ?: state.obdbSignals.firstOrNull()
     val profileUses29BitIds = udsCanProtocol in setOf("34", "36", "64")
-    val canIdsMatchProfile = udsRequestCanId.length == udsResponseCanId.length &&
-        (udsRequestCanId.length == 8) == profileUses29BitIds &&
-        udsRequestCanId.length in setOf(3, 8)
+    val canIdsMatchProfile = J2534CanProfileValidation.isValid(
+        udsRequestCanId, udsResponseCanId, udsCanProtocol
+    )
     val filteredObdbSignals = state.obdbSignals.filter {
         obdbSignalSearch.isBlank() ||
             it.name.contains(obdbSignalSearch, true) ||
@@ -325,11 +351,33 @@ fun CalibrationWorkspaceScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.flexfuel_lfx2012_title),
                             color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.flexfuel_lfx2012_parts,
-                            Lfx2012ControllerReferences.controllerFamily,
-                            Lfx2012ControllerReferences.currentServicePart,
-                            Lfx2012ControllerReferences.supersededServicePart),
-                            color = TextPrimary, fontSize = 12.sp)
+                        Lfx2012ControllerReferences.servicePartGroups.forEach { group ->
+                            Text(stringResource(R.string.flexfuel_lfx2012_parts,
+                                Lfx2012ControllerReferences.controllerFamily, group.servicePart,
+                                group.replaces.joinToString(", ")),
+                                color = TextPrimary, fontSize = 12.sp)
+                            Text(group.exampleLabel, color = TextMuted, fontSize = 11.sp)
+                            group.catalogBootFile?.let { bootFile ->
+                                Text(stringResource(R.string.flexfuel_lfx2012_boot, bootFile),
+                                    color = TextMuted, fontSize = 11.sp)
+                            }
+                        }
+                        var labelQuery by remember { mutableStateOf("") }
+                        OutlinedTextField(
+                            value = labelQuery,
+                            onValueChange = { labelQuery = it },
+                            label = { Text("Serv# / GM P/N / BCC") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (labelQuery.isNotBlank()) {
+                            val matching = Lfx2012ControllerReferences.findLabels(labelQuery)
+                            if (matching.isEmpty()) Text(unavailable, color = TextMuted, fontSize = 11.sp)
+                            matching.forEach { label ->
+                                Text("Serv# ${label.serviceNumber} · GM P/N ${label.partNumber} · BCC ${label.bcc}",
+                                    color = TextPrimary, fontSize = 12.sp)
+                            }
+                        }
                         Text(stringResource(R.string.flexfuel_lfx2012_parts_warning),
                             color = TextMuted, fontSize = 11.sp)
                         Text(stringResource(R.string.flexfuel_lfx2012_calid_label,
@@ -364,9 +412,6 @@ fun CalibrationWorkspaceScreen(
                                 fontSize = 11.sp
                             )
                         }
-                        Text(stringResource(R.string.flexfuel_lfx2012_boot,
-                            Lfx2012ControllerReferences.associatedMainBootFile),
-                            color = TextMuted, fontSize = 11.sp)
                         Text(stringResource(R.string.flexfuel_lfx2012_checks),
                             color = CamaroAmber, fontWeight = FontWeight.SemiBold)
                         missing.forEach { missingRequirement ->
@@ -426,7 +471,7 @@ fun CalibrationWorkspaceScreen(
                             color = WarnRed, fontSize = 11.sp)
                         OutlinedButton(
                             onClick = onReadIdentification,
-                            enabled = isConnected && !state.isReading,
+                            enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.cal_read_ecu_ids))
@@ -505,7 +550,7 @@ fun CalibrationWorkspaceScreen(
                     )
                     Button(
                         onClick = onReadIdentification,
-                        enabled = isConnected && !state.isReading,
+                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (state.isReading) CircularProgressIndicator()
@@ -588,7 +633,8 @@ fun CalibrationWorkspaceScreen(
                                 label = { Text(stringResource(R.string.cal_pc_pairing_token)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                                visualTransformation = PasswordVisualTransformation()
                             )
                             if (!state.isJ2534BridgeConnected) {
                                 Button(
@@ -600,7 +646,7 @@ fun CalibrationWorkspaceScreen(
                                     },
                                     enabled = !state.isJ2534BridgeConnecting &&
                                         j2534Host.isNotBlank() && j2534Port.isNotBlank() &&
-                                        j2534Token.isNotBlank() && canIdsMatchProfile &&
+                                        J2534BridgePairingCodeFormat.isValid(j2534Token) && canIdsMatchProfile &&
                                         udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -621,11 +667,137 @@ fun CalibrationWorkspaceScreen(
                                 stringResource(R.string.cal_bridge_capabilities),
                                 color = TextMuted, fontSize = 10.sp
                             )
+                            HorizontalDivider(color = TextMuted.copy(alpha = .25f))
+                            Text(stringResource(R.string.cal_live_memory_title),
+                                color = CamaroAmber, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.cal_live_memory_notice),
+                                color = TextMuted, fontSize = 10.sp)
+                            OutlinedTextField(
+                                value = memoryReadAddressHex,
+                                onValueChange = {
+                                    memoryReadAddressHex = it.uppercase()
+                                        .filter { ch -> ch.isDigit() || ch in 'A'..'F' }.take(8)
+                                },
+                                label = { Text(stringResource(R.string.cal_expert_patch_address)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                            )
+                            OutlinedTextField(
+                                value = memoryReadLengthText,
+                                onValueChange = {
+                                    memoryReadLengthText = it.filter(Char::isDigit).take(7)
+                                },
+                                label = { Text(stringResource(R.string.cal_live_memory_length)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            Text(stringResource(R.string.cal_expert_region_title),
+                                color = TextPrimary, fontSize = 12.sp)
+                            Box {
+                                OutlinedButton(onClick = { memoryReadRegionMenuExpanded = true }) {
+                                    Text(when (memoryReadRegion) {
+                                        EcuBackupCoverage.Region.CALIBRATION ->
+                                            stringResource(R.string.cal_live_memory_region_calibration)
+                                        EcuBackupCoverage.Region.PROGRAM_FLASH ->
+                                            stringResource(R.string.cal_expert_region_pflash)
+                                        EcuBackupCoverage.Region.DATA_FLASH ->
+                                            stringResource(R.string.cal_expert_region_dflash)
+                                        EcuBackupCoverage.Region.EXTERNAL_EEPROM ->
+                                            stringResource(R.string.cal_expert_region_eeprom)
+                                        EcuBackupCoverage.Region.OTHER ->
+                                            stringResource(R.string.cal_expert_region_title)
+                                    })
+                                }
+                                DropdownMenu(
+                                    expanded = memoryReadRegionMenuExpanded,
+                                    onDismissRequest = { memoryReadRegionMenuExpanded = false }
+                                ) {
+                                    listOf(
+                                        EcuBackupCoverage.Region.CALIBRATION,
+                                        EcuBackupCoverage.Region.PROGRAM_FLASH,
+                                        EcuBackupCoverage.Region.DATA_FLASH,
+                                        EcuBackupCoverage.Region.EXTERNAL_EEPROM
+                                    ).forEach { region ->
+                                        DropdownMenuItem(
+                                            text = { Text(when (region) {
+                                                EcuBackupCoverage.Region.CALIBRATION ->
+                                                    stringResource(R.string.cal_live_memory_region_calibration)
+                                                EcuBackupCoverage.Region.PROGRAM_FLASH ->
+                                                    stringResource(R.string.cal_expert_region_pflash)
+                                                EcuBackupCoverage.Region.DATA_FLASH ->
+                                                    stringResource(R.string.cal_expert_region_dflash)
+                                                EcuBackupCoverage.Region.EXTERNAL_EEPROM ->
+                                                    stringResource(R.string.cal_expert_region_eeprom)
+                                                EcuBackupCoverage.Region.OTHER ->
+                                                    stringResource(R.string.cal_expert_region_title)
+                                            }) },
+                                            onClick = {
+                                                memoryReadRegion = region
+                                                memoryReadRegionMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = memoryReadSessionExtended,
+                                    onCheckedChange = { memoryReadSessionExtended = it }
+                                )
+                                Text(stringResource(R.string.cal_live_memory_extended),
+                                    color = TextPrimary, fontSize = 12.sp)
+                            }
+                            val memoryAddress = memoryReadAddressHex.toLongOrNull(16)
+                            val memoryBytes = memoryReadLengthText.toIntOrNull()
+                            OutlinedButton(
+                                onClick = {
+                                    onCaptureJ2534Memory(
+                                        memoryReadAddressHex, memoryReadLengthText,
+                                        if (memoryReadSessionExtended) 3 else 1,
+                                        memoryReadRegion
+                                    )
+                                },
+                                enabled = state.isJ2534BridgeConnected &&
+                                    state.isJ2534MemoryReadAvailable &&
+                                    !state.isJ2534MemoryCapturing &&
+                                    vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}")) &&
+                                    memoryAddress != null && memoryBytes != null &&
+                                    memoryBytes in 1..(4 * 1024 * 1024) &&
+                                    memoryAddress + memoryBytes <= 0x1_0000_0000L,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (state.isJ2534MemoryCapturing) CircularProgressIndicator()
+                                else Text(stringResource(R.string.cal_live_memory_save))
+                            }
+                            if (state.isJ2534MemoryCapturing &&
+                                state.j2534MemoryCaptureTotalBytes > 0L
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = {
+                                        (state.j2534MemoryCaptureBytesRead.toFloat() /
+                                            state.j2534MemoryCaptureTotalBytes.toFloat())
+                                            .coerceIn(0f, 1f)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Text(
+                                    "${state.j2534MemoryCaptureBytesRead} / " +
+                                        "${state.j2534MemoryCaptureTotalBytes}",
+                                    color = TextMuted, fontSize = 11.sp
+                                )
+                            }
+                            if (state.j2534MemoryCaptureMessage.isNotBlank()) {
+                                Text(state.j2534MemoryCaptureMessage,
+                                    color = if (state.isJ2534MemoryCapturing) CamaroAmber else TextPrimary,
+                                    fontSize = 11.sp)
+                            }
                         }
                     }
                     Button(
                         onClick = { onReadUdsDid(udsRequestCanId, udsResponseCanId, udsDid, udsCanProtocol) },
-                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
+                        enabled = canReadEnhancedUds && !state.isUdsReading &&
                             canIdsMatchProfile && udsDid.length == 4 &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
@@ -640,7 +812,7 @@ fun CalibrationWorkspaceScreen(
                     }
                     OutlinedButton(
                         onClick = { onReadUdsDtcs(udsRequestCanId, udsResponseCanId, udsCanProtocol) },
-                        enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isUdsReading &&
+                        enabled = canReadEnhancedUds && !state.isUdsReading &&
                             canIdsMatchProfile &&
                             udsCanProtocol in setOf("33", "34", "35", "36", "63", "64"),
                         modifier = Modifier.fillMaxWidth()
@@ -821,7 +993,7 @@ fun CalibrationWorkspaceScreen(
                         }
                         Button(
                             onClick = { onReadObdbSignal(signal.id, udsCanProtocol) },
-                            enabled = (isConnected || state.isJ2534BridgeConnected) &&
+                            enabled = canReadEnhancedUds &&
                                 signal.hasSupportedPhysicalCanAddressing &&
                                 !profileUses29BitIds &&
                                 signal.service == 0x22 &&
@@ -944,10 +1116,40 @@ fun CalibrationWorkspaceScreen(
                         stringResource(R.string.cal_import_supported_formats),
                         color = TextMuted, fontSize = 11.sp
                     )
+                    OutlinedButton(
+                        onClick = onVerifyEcuBackup,
+                        enabled = state.archiveVerification != ArchiveVerification.Reading,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(stringResource(R.string.cal_archive_verify)) }
+                    when (val check = state.archiveVerification) {
+                        ArchiveVerification.Reading -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        ArchiveVerification.Failed -> Text(stringResource(R.string.cal_archive_failed), color = WarnRed)
+                        is ArchiveVerification.Verified -> {
+                            val manifest = check.manifest
+                            Text(stringResource(R.string.cal_archive_verified), color = OkGreen)
+                            if (manifest.coverage.status == EcuBackupCoverage.Status.PARTIAL) {
+                                Text(stringResource(R.string.cal_archive_partial), color = CamaroAmber)
+                            }
+                            manifest.vehicleVin?.let { Text("${stringResource(R.string.obd_vin)} $it", color = TextPrimary) }
+                            Text(stringResource(R.string.cal_payload_size, manifest.coverage.capturedBytes), color = TextPrimary)
+                            for (entry in manifest.entries) {
+                                val end = entry.startAddress + entry.bytesCaptured - 1
+                                Text(stringResource(R.string.cal_address_range,
+                                    entry.startAddress.toString(16).uppercase(), end.toString(16).uppercase(),
+                                    entry.bytesCaptured), color = TextMuted, fontSize = 11.sp)
+                                Text(entry.sha256, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            }
+                        }
+                        null -> Unit
+                    }
                     state.importedFileName?.let { name ->
                         HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                         Text(name, color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text(pluralStringResource(R.plurals.cal_file_size_bytes, (state.importedFileSize ?: 0L).toInt(), state.importedFileSize ?: 0L), color = TextPrimary, fontSize = 12.sp)
+                        Text(pluralStringResource(
+                            R.plurals.cal_file_size_bytes,
+                            (state.importedFileSize ?: 0L).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
+                            state.importedFileSize ?: 0L
+                        ), color = TextPrimary, fontSize = 12.sp)
                         Text(stringResource(R.string.cal_file_hash_label), color = TextMuted, fontSize = 11.sp)
                         Text(state.importedFileSha256.orEmpty(), color = TextPrimary, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                         Text(stringResource(R.string.cal_hex_preview), color = TextMuted, fontSize = 11.sp)
@@ -981,7 +1183,8 @@ fun CalibrationWorkspaceScreen(
                             Text(stringResource(R.string.cal_comparison_name, comparisonName), color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Text(state.comparisonSummary.orEmpty(), color = TextPrimary, fontSize = 12.sp)
                             Text(
-                                stringResource(R.string.cal_comparison_byte_counts),
+                                stringResource(R.string.cal_comparison_byte_counts, state.comparisonChangedBytes ?: 0,
+                                    state.comparisonAppendedBytes ?: 0, state.comparisonMissingBytes ?: 0),
                                 color = TextMuted, fontSize = 11.sp
                             )
                             state.comparisonRanges.forEach { range ->
@@ -1079,10 +1282,15 @@ fun CalibrationWorkspaceScreen(
                                 }
                             }
                             LazyColumn(
-                                modifier = Modifier.fillMaxWidth().height(320.dp),
+                                // Keep a bounded inner viewport (required for nested lazy
+                                // layouts), but adapt it to small and large maps rather
+                                // than forcing a cramped 320.dp editor in every case.
+                                modifier = Modifier.fillMaxWidth().height(
+                                    (state.mapValues.size.coerceIn(3, 7) * 62).dp
+                                ),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                itemsIndexed(state.mapValues) { rowIndex, rowValues ->
+                                itemsIndexed(state.mapValues, key = { rowIndex, _ -> rowIndex }) { rowIndex, rowValues ->
                                     LazyRow(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),

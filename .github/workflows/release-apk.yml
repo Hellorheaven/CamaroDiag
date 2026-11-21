@@ -131,7 +131,23 @@ jobs:
           ./gradlew testDebugUnitTest -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
           ./gradlew lintDebug lintRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
           ./gradlew app:assembleRelease -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
-          ./gradlew app:assembleDebug -PreleasePatch="$RELEASE_PATCH" --stacktrace --warning-mode=fail
+
+      - name: Report release APK size and largest packaged entries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          apks = sorted(Path("app/build/outputs/apk/release").glob("*.apk"))
+          if len(apks) != 1:
+              raise SystemExit(f"Expected exactly one release APK, found {len(apks)}")
+          apk = apks[0]
+          print(f"Release APK: {apk.name} ({apk.stat().st_size / 1048576:.2f} MiB)")
+          with ZipFile(apk) as archive:
+              for item in sorted(archive.infolist(), key=lambda entry: entry.compress_size, reverse=True)[:20]:
+                  print(f"{item.compress_size / 1048576:.2f} MiB  {item.filename}")
+          PY
 
       - name: Reject Android lint errors and warnings in every release variant
         shell: bash
@@ -179,7 +195,6 @@ jobs:
             - GitHub may also show automatic source-code archives (zip/tar.gz); these are not Windows installers. Download the .exe Setup or Android .apk assets only.
           files: |
             app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/CamaroDiag-debug.apk
           draft: false
           prerelease: false
         env:
@@ -265,43 +280,3 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  cleanup-old-releases:
-    needs: [release, bridge-installers]
-    if: always() && needs.release.result == 'success' && needs.bridge-installers.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Keep only the newly published major release and tag
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KEEP_TAG: ${{ needs.release.outputs.release_tag }}
-        run: |
-          set -euo pipefail
-
-          echo "Keeping ${KEEP_TAG}; removing all previous GitHub Releases."
-          mapfile -t release_tags < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[].tag_name')
-          for tag in "${release_tags[@]}"; do
-            if [[ "$tag" != "$KEEP_TAG" ]]; then
-              echo "Deleting release and associated tag: $tag"
-              gh release delete "$tag" --yes
-            fi
-          done
-
-          echo "Removing any remaining Git tags other than ${KEEP_TAG}."
-          mapfile -t tag_refs < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/git/refs/tags" --jq '.[].ref')
-          for ref in "${tag_refs[@]}"; do
-            tag="${ref#refs/tags/}"
-            if [[ "$tag" != "$KEEP_TAG" ]]; then
-              echo "Deleting tag: $tag"
-              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}"
-            fi
-          done
-
-          echo "Cleanup complete. Preserved release/tag: ${KEEP_TAG}"

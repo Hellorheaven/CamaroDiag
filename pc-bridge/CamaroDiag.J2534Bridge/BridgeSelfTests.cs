@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 
 namespace CamaroDiag.J2534Bridge;
@@ -24,6 +25,29 @@ internal static class BridgeSelfTests
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("100.64.0.10")), "Carrier-grade NAT denied");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("2001:4860:4860::8888")), "Public IPv6 denied");
 
+        // Request framing must reject oversized and truncated client data
+        // before JSON parsing or J2534 device access.
+        static string? ReadWire(string input)
+        {
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(input));
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            return BridgeServer.ReadBoundedLineAsync(reader, CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        Assert(ReadWire("{\"op\":\"open\"}\r\n") == "{\"op\":\"open\"}", "CRLF bridge request");
+        Assert(ReadWire("") is null, "Clean EOF on empty client");
+        Assert(ReadWire(new string('A', 64 * 1024) + "\n")?.Length == 64 * 1024,
+            "Maximum request accepted");
+        var tooLongRejected = false;
+        try { ReadWire(new string('A', 64 * 1024 + 1) + "\n"); }
+        catch (InvalidDataException) { tooLongRejected = true; }
+        Assert(tooLongRejected, "Oversized request rejected before JSON parsing");
+        var partialRequestRejected = false;
+        try { ReadWire("{\"op\":\"open\"}"); }
+        catch (IOException) { partialRequestRejected = true; }
+        Assert(partialRequestRejected, "Unterminated request rejected");
+
+
         using (var valid = JsonDocument.Parse("{\"payloadHex\":\"22 F1 90\",\"requestCanId\":\"0x7e0\"}"))
         {
             var root = valid.RootElement;
@@ -47,6 +71,105 @@ internal static class BridgeSelfTests
             Assert(rejected, "Missing CAN identifier rejected");
         }
 
+        var cvns = J2534Device.DecodeIdentityRecords(6, Convert.FromHexString("49060201020304000000A0"));
+        Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
+        Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,
+            "Unavailable optional identity");
+        var vin = J2534Device.DecodeIdentityRecords(2, new byte[] { 0x49, 2, 1 }
+            .Concat(System.Text.Encoding.ASCII.GetBytes("1G1FA1RXXR0123456")).ToArray());
+        Assert(vin.Single() == "1G1FA1RXXR0123456", "Physical VIN");
+        foreach (var malformed in new[] { "49060201020304", "49040101020304", "4906010102030400" })
+        {
+            var rejected = false;
+            try { J2534Device.DecodeIdentityRecords(6, Convert.FromHexString(malformed)); }
+            catch (InvalidDataException) { rejected = true; }
+            Assert(rejected, "Wrong PID, record count or trailing bytes rejected");
+        }
+
+        // Physical memory reads require an explicitly scoped map and a matching
+        // live VIN. These checks exercise ONLY the policy parser and range gate.
+        var map = new J2534MemoryReadScope(
+            "1G1FA1RXXR0123456", 0x7E0, 0x7E8, 33,
+            0x80001000u, 0x100u, 64, 0x03);
+        Assert(map.MatchesChannel(0x7E0, 0x7E8, 33), "Read map CAN channel");
+        Assert(!map.MatchesChannel(0x7E1, 0x7E8, 33), "Wrong CAN ID rejected");
+        Assert(map.AllowsReadMemory(new byte[] {
+            0x23, 0x14, 0x80, 0x00, 0x10, 0x00, 0x20 }), "Scoped physical memory read");
+        Assert(map.AllowsReadMemory(new byte[] {
+            0x23, 0x24, 0x80, 0x00, 0x10, 0x20, 0x00, 0x40 }), "Two-byte size ALFI");
+        Assert(!map.AllowsReadMemory(new byte[] {
+            0x23, 0x14, 0x80, 0x00, 0x0F, 0xFF, 0x01 }), "No read before allowlist");
+        Assert(!map.AllowsReadMemory(new byte[] {
+            0x23, 0x24, 0x80, 0x00, 0x10, 0xF0, 0x00, 0x40 }), "No read past allowlist");
+        Assert(!map.AllowsReadMemory(new byte[] {
+            0x23, 0x14, 0x80, 0x00, 0x10, 0x00, 0x80 }), "Maximum block size enforced");
+        Assert(!map.AllowsReadMemory(new byte[] {
+            0x23, 0x41, 0x80, 0x00, 0x10, 0x00, 0x20 }), "Wrong ALFI rejected");
+        Assert(!map.AllowsReadMemory(new byte[] {
+            0x3D, 0x14, 0x80, 0x00, 0x10, 0x00, 0x20 }), "Writes never authorized");
+        Assert(map.AllowsSessionControl(new byte[] { 0x10, 0x03 }), "Explicit extended read session");
+        Assert(!map.AllowsSessionControl(new byte[] { 0x10, 0x02 }), "Programming session denied");
+
+        var scopedJson = JsonSerializer.Serialize(new {
+            expectedVin = "1G1FA1RXXR0123456",
+            requestCanIdHex = "7E0",
+            responseCanIdHex = "7E8",
+            protocolNumber = 33,
+            startAddressHex = "80001000",
+            lengthBytes = 256,
+            maxReadBytes = 64,
+            session = 3
+        });
+        var scopedFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(scopedFile, scopedJson);
+            var loaded = J2534MemoryReadScope.Load(scopedFile);
+            Assert(loaded.StartAddress == 0x80001000u, "Unsigned 32-bit memory region parsed");
+            Assert(loaded.AllowsReadMemory(new byte[] {
+                0x23, 0x14, 0x80, 0x00, 0x10, 0x00, 0x20 }), "Parsed read profile usable");
+            File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"allowWrite\":true}");
+            var rejected = false;
+            try { J2534MemoryReadScope.Load(scopedFile); }
+            catch (ArgumentException) { rejected = true; }
+            Assert(rejected, "Unknown/dangerous profile permissions rejected");
+        }
+        finally { File.Delete(scopedFile); }
+
+        // Required vendor PassThru ABI: test the same export gate used by the
+        // real --probe-drivers command, without loading an unknown DLL in CI.
+        Assert(J2534DriverProbe.MissingRequiredExports(_ => true).Count == 0,
+            "Complete native J2534 export set accepted");
+        var allMissing = J2534DriverProbe.MissingRequiredExports(_ => false);
+        Assert(allMissing.Count == 11, "Every required J2534 API entry point enforced");
+        Assert(allMissing.Contains("PassThruReadVersion") &&
+               allMissing.Contains("PassThruWriteMsgs") &&
+               allMissing.Contains("PassThruStartMsgFilter"),
+            "Version, transport writes and filter APIs required");
+        var missingVersion = J2534DriverProbe.MissingRequiredExports(
+            name => name != "PassThruReadVersion");
+        Assert(missingVersion.SequenceEqual(new[] { "PassThruReadVersion" }),
+            "Missing version API detected precisely");
+        var transportReady = new J2534DriverProbe.ProbeResult(
+            "mock-driver", true, true, true, "1.0", "1.0", "04.04", "mock");
+        Assert(transportReady.DriverOperational && !transportReady.EcuWriteValidated,
+            "An operational J2534 driver must not be mistaken for certified ECU flash");
+        var noDevice = transportReady with { DeviceOpened = false };
+        Assert(!noDevice.DriverOperational && !noDevice.EcuWriteValidated,
+            "A missing physical adapter cannot pass the driver probe");
+
+        checks += BridgeTlsSelfTests.Run();
+        checks += NativeUdsDownloadSelfTests.Run();
+        checks += NativeEcuSectorSelfTests.Run();
+        checks += NativeE39RamLoaderSelfTests.Run();
+        checks += NativeE39ImageInspectorSelfTests.Run();
+        checks += NativeE39FlashCommandsSelfTests.Run();
+        checks += NativeE39SecuritySelfTests.Run();
+        checks += NativeE39WriteSequenceSelfTests.Run();
+        checks += NativeE39FileWriteJournalSelfTests.Run();
+        checks += NativeE39ImagePreflightSelfTests.Run();
+        checks += NativeGmlanIdentificationSelfTests.Run();
+        checks += NativeE39ProgrammingSessionSelfTests.Run();
         Console.WriteLine($"PASS: {checks} hardware-free J2534 bridge self-tests.");
         return 0;
     }

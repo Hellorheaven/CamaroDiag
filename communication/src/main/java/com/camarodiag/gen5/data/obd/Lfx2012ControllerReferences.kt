@@ -15,6 +15,116 @@ object Lfx2012ControllerReferences {
     const val servicePartsReference =
         "https://www.gmpartsgiant.com/parts-list/2012-chevrolet-camaro-coupe/fuel_system_exhaust_emission_system/e_c_m_module_wiring_harness.html"
 
+    data class ServicePartGroup(
+        val servicePart: String,
+        val replaces: List<String>,
+        val exampleLabel: String,
+        val catalogBootFile: String? = null
+    )
+
+    // Camaro MY2012 V6 catalog supersessions. A predecessor can also appear on
+    // other models. The label on one donor identifies only that physical part.
+    // 12653998 is deliberately excluded: GM bulletin PIC5696A limits it to MY2013.
+    val servicePartGroups = listOf(
+        // GMPartsGiant 2012 Camaro ECM catalog; Ovoko donor EVY6479.
+        ServicePartGroup(
+            servicePart = currentServicePart,
+            replaces = listOf(supersededServicePart),
+            exampleLabel = "Serv# 12643248 · 12648906 · AA69",
+            catalogBootFile = associatedMainBootFile
+        ),
+        // https://www.chevypartsdeal.com/oem/gm~engine-control-module-w-2nd-mpu~12651993
+        // Camaro donor label: https://www.ebay.com/itm/235840055258
+        ServicePartGroup(
+            servicePart = "12651993",
+            replaces = listOf("12637106", "12642665", "12650256", "12616889"),
+            exampleLabel = "Serv# 12637106 · 12637489 · AAMU"
+        )
+    )
+
+    data class Label(val serviceNumber: String, val partNumber: String, val bcc: String)
+
+    // Individual MY2012 3.6L catalog records, searchable by their printed identifiers.
+    // The BCC on a replacement part does not attest to the software currently installed.
+    // https://www.fs1inc.com/2012-chevrolet-camaro-3-6l-ecm-engine-computer-pcm-ecu-programmed-plug-play.html
+    private val catalogLabels = listOf(
+        Label("12616889", "12635821", "AAKG"),
+        Label("12616889", "12636333", "AALW"),
+        Label("12637106", "12636635", "AAL9"),
+        Label("12637106", "12637157", "AAMK"),
+        Label("12637106", "12637489", "AAMU"),
+        Label("12637106", "12639985", "AAUB"),
+        Label("12637106", "12639986", "AAUC"),
+        Label("12637106", "12640385", "AAUL"),
+        Label("12642665", "12641497", "AAWD"),
+        Label("12642665", "12642569", "AAXP"),
+        Label("12642665", "12642612", "AAXS"),
+        Label("12642665", "12642843", "AAXY"),
+        Label("12642665", "12642856", "AAX1"),
+        Label("12642665", "12643469", "AAYY"),
+        Label("12642665", "12643542", "AAZA"),
+        Label("12642665", "12646438", "AA3Y"),
+        Label("12642665", "12646944", "AA4G"),
+        Label("12642665", "12647214", "AA4P"),
+        Label("12643248", "12647402", "AA4U"),
+        Label("12643248", "12648432", "AA6L"),
+        Label("12643248", "12648906", "AA69"),
+        Label("12643248", "12651869", "ABAS"),
+        Label("12651994", "12650248", "AA8R"),
+        Label("12651994", "12652814", "ABDL"),
+        Label("12651994", "12653090", "ABG4"),
+        Label("12651994", "12655480", "ABMY"),
+        Label("12651994", "12663029", "AB3M")
+    )
+
+    fun findLabels(query: String): List<Label> {
+        val value = query.trim()
+        if (value.isEmpty()) return emptyList()
+        return catalogLabels.filter {
+            it.serviceNumber == value || it.partNumber == value || it.bcc.equals(value, ignoreCase = true)
+        }
+    }
+
+    /**
+     * Service numbers can be superseded and printed part numbers/BCC labels may
+     * represent different calibrations on the same ECU protocol family.
+     * Resolve them to the catalogued family without pretending that they are
+     * separate communication drivers or proven identical circuit boards.
+     */
+    enum class CatalogReferenceKind {
+        CURRENT_SERVICE_NUMBER, SUPERSEDED_SERVICE_NUMBER, PRINTED_PART_NUMBER, BROADCAST_CODE
+    }
+
+    data class CatalogReference(
+        val family: String,
+        val serviceGroup: String,
+        val kind: CatalogReferenceKind,
+        val queriedReference: String
+    ) {
+        /** A matching catalogue reference must never grant flash permission. */
+        val authorizesProgramming: Boolean get() = false
+    }
+
+    fun resolveCatalogReference(reference: String): List<CatalogReference> {
+        val query = reference.trim().uppercase()
+        if (query.isEmpty()) return emptyList()
+        return servicePartGroups.mapNotNull { group ->
+            val knownServiceNumbers = (group.replaces + group.servicePart).toSet()
+            val match = when {
+                query == group.servicePart -> CatalogReferenceKind.CURRENT_SERVICE_NUMBER
+                query in group.replaces -> CatalogReferenceKind.SUPERSEDED_SERVICE_NUMBER
+                catalogLabels.any {
+                    it.serviceNumber in knownServiceNumbers && it.partNumber == query
+                } -> CatalogReferenceKind.PRINTED_PART_NUMBER
+                catalogLabels.any {
+                    it.serviceNumber in knownServiceNumbers && it.bcc.equals(query, ignoreCase = true)
+                } -> CatalogReferenceKind.BROADCAST_CODE
+                else -> null
+            }
+            match?.let { CatalogReference(controllerFamily, group.servicePart, it, query) }
+        }
+    }
+
     data class ObservedIdentity(
         val ecuName: String?,
         val calibrationIds: List<String>,
@@ -94,5 +204,5 @@ object Lfx2012ControllerReferences {
     }
 
     fun describedServiceParts(): List<String> =
-        listOf(currentServicePart, supersededServicePart)
+        servicePartGroups.flatMap { listOf(it.servicePart) + it.replaces }
 }

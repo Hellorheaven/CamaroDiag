@@ -36,11 +36,17 @@ class StnUdsPayloadTransport(
         ensureConfigured(timeoutMs)
         val command = "STPX h:${formatId(requestCanId)}, d:${payload.toHex()}, t:${timeoutMs.coerceIn(1L, 65535L)}, r:1"
         var response = parseResponse(sendCommand(command, timeoutMs), responseCanId)
+        check(isMatchingUdsService(response, payload[0])) {
+            "STN received a response to a different UDS service."
+        }
         var pendingCount = 0
         while (isResponsePending(response, payload[0])) {
             if (++pendingCount > 5) error("UDS ResponsePending limit exceeded.")
             val monitor = sendCommand("STMA 1", maxOf(timeoutMs, 10_000L))
             response = parseResponse(monitor, responseCanId)
+            check(isMatchingUdsService(response, payload[0])) {
+                "STN received a pending response for a different UDS request."
+            }
         }
         response
     }
@@ -50,8 +56,8 @@ class StnUdsPayloadTransport(
         ensureConfigured(timeoutMs)
         val command = "STPX h:${formatId(requestCanId)}, d:${payload.toHex()}, t:${timeoutMs.coerceIn(1L, 65535L)}, r:0"
         val result = sendCommand(command, timeoutMs)
-        if (result.contains("?", ignoreCase = true) || result.contains("CAN ERROR", ignoreCase = true)) {
-            error("STN adapter rejected the UDS no-response transmission: $result")
+        check(result.lines().any { it.trim().equals("OK", ignoreCase = true) }) {
+            "STN did not acknowledge the UDS no-response transmission: $result"
         }
     }
 
@@ -59,8 +65,23 @@ class StnUdsPayloadTransport(
         if (configured) return
         val firmware = sendCommand("STI", timeoutMs)
         val hardware = sendCommand("STDI", timeoutMs)
-        require(firmware.contains("STN", true) && hardware.contains("OBDLink MX+", true)) {
-            "This UDS transport requires a documented OBDLink MX+ STN adapter. Detected: $hardware / $firmware"
+        // STPX/ISO-TP is a family feature, not an MX+-only feature.
+        // Detect documented OBDLink models by complete token so e.g. an
+        // "OBDLink MX+ clone" cannot be mistaken for an unrelated model.
+        // These identifiers are sufficient for the diagnostic transport only;
+        // an adapter string can NEVER authorize ECU erasure/programming.
+        val model = Regex("""(?i)\bOBDLink\s+(MX\+|MX|EX|CX|LX|SX)(?=\s|$)""")
+            .find(hardware)?.groupValues?.get(1)?.uppercase(Locale.ROOT)
+        require(firmware.contains("STN", true) && model != null) {
+            "An identified OBDLink STN adapter is required for STPX diagnostics. Detected: $hardware / $firmware"
+        }
+        // Only the MX / MX+ families expose GM single-wire CAN in the
+        // published manufacturer compatibility matrix. EX has Ford MS-CAN,
+        // which is a different bus and must not be confused with GM SW-CAN.
+        if (protocolNumber == 63 || protocolNumber == 64) {
+            require(model == "MX+" || model == "MX") {
+                "GM SW-CAN cannot be selected on OBDLink $model; use supported hardware."
+            }
         }
         requireOk(sendCommand("STP $protocolNumber", timeoutMs), "select CAN protocol")
         requireOk(sendCommand("ATH1", timeoutMs), "enable CAN headers")
@@ -78,7 +99,17 @@ class StnUdsPayloadTransport(
     }
 
     private fun requireOk(response: String, operation: String) {
-        require(response.contains("OK", true)) { "STN adapter failed to $operation: $response" }
+        require(response.replace('\r', '\n').lines().any { it.trim().equals("OK", ignoreCase = true) }) {
+            "STN adapter failed to $operation: $response"
+        }
+    }
+
+    private fun isMatchingUdsService(response: ByteArray, requestedService: Byte): Boolean {
+        val requestSid = requestedService.toInt() and 0xFF
+        val positiveSid = (requestSid + 0x40) and 0xFF
+        return (response.isNotEmpty() && (response[0].toInt() and 0xFF) == positiveSid) ||
+            (response.size >= 3 && (response[0].toInt() and 0xFF) == 0x7F &&
+                response[1] == requestedService)
     }
 
     private fun isResponsePending(response: ByteArray, requestedService: Byte): Boolean =
@@ -87,27 +118,56 @@ class StnUdsPayloadTransport(
             (response[1] == requestedService) &&
             (response[2].toInt() and 0xFF) == 0x78
 
+    /**
+     * Parse an STN ISO-TP payload, not raw CAN frames.
+     * ATH1 is enabled during configuration: accept ONLY matching responder IDs,
+     * including continuations of long STPX responses. Never take two-byte
+     * fragments from command echoes, other ECUs, or adapter status lines.
+     */
     private fun parseResponse(output: String, expectedCanId: Int): ByteArray {
-        require(!output.contains("NO DATA", true)) { "No UDS response from CAN ID ${formatId(expectedCanId)}." }
+        require(!output.contains("NO DATA", true)) { "No UDS response from CAN ID " + formatId(expectedCanId) }
         require(!output.contains("CAN ERROR", true) && !output.contains("BUS ERROR", true)) {
-            "STN adapter reported a CAN bus error: $output"
+            "STN adapter reported a CAN bus error: " + output
         }
-        val lines = output.replace("\r", "\n").lines().map { it.trim() }.filter { it.isNotEmpty() }
-        for (line in lines) {
-            val tokens = line.split(Regex("\\s+"))
+        val buffer = ArrayList<Byte>()
+        var accepting = false
+        var matched = false
+        for (line in output.replace('\r', '\n').lines()) {
+            val tokens = line.trim().split(Regex("\\s+")).filter(String::isNotBlank)
             if (tokens.isEmpty()) continue
-            val header = tokens.first().removePrefix("0X")
-            val hasHeader = (header.length == 3 || header.length == 8) &&
-                header.all { it.digitToIntOrNull(16) != null }
+            val normalizedFirst = tokens.first().removePrefix("0x").removePrefix("0X")
+            val hasHeader = (normalizedFirst.length == 3 || normalizedFirst.length == 8) &&
+                normalizedFirst.all { it.digitToIntOrNull(16) != null }
             if (hasHeader) {
-                val receivedId = header.toLongOrNull(16)?.toInt() ?: continue
-                if (receivedId != expectedCanId) continue
+                val id = normalizedFirst.toLongOrNull(16)?.toInt()
+                accepting = id == expectedCanId
+                if (!accepting) continue
+                matched = true
+            } else if (!accepting) {
+                continue
             }
-            val dataTokens = if (hasHeader) tokens.drop(1) else tokens
-            val bytes = dataTokens.filter { it.length == 2 && it.all { ch -> ch.digitToIntOrNull(16) != null } }
-            if (bytes.isNotEmpty()) return bytes.map { it.toInt(16).toByte() }.toByteArray()
+            val data = if (hasHeader) tokens.drop(1) else tokens
+            if (data.isEmpty()) continue
+            // End a payload on adapter messages; never parse arbitrary hex-like
+            // fragments mixed with a status/error or a new command echo.
+            if (data.any { token ->
+                token.length % 2 != 0 || token.isEmpty() ||
+                    token.any { it.digitToIntOrNull(16) == null }
+            }) {
+                accepting = false
+                continue
+            }
+            for (token in data) {
+                for (offset in token.indices step 2) {
+                    check(buffer.size < 4095) { "Oversize ISO-TP payload from STN adapter." }
+                    buffer.add(token.substring(offset, offset + 2).toInt(16).toByte())
+                }
+            }
         }
-        error("Could not decode a complete UDS response for CAN ID ${formatId(expectedCanId)}: $output")
+        require(matched && buffer.isNotEmpty()) {
+            "No complete UDS payload for CAN ID " + formatId(expectedCanId)
+        }
+        return buffer.toByteArray()
     }
 
     private fun formatId(id: Int): String =

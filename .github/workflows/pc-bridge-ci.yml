@@ -1,14 +1,32 @@
 name: PC J2534 Bridge CI
 
-# Intentionally no push or pull_request trigger.
-# Validation is started manually at the 50-commit checkpoint, not per commit.
+# Validate Windows-relevant PR updates at the configured build checkpoint.
+# Keep manual full validation available even when no Windows files changed.
 on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'pc-bridge/**'
+      - 'global.json'
+      - '.editorconfig'
+      - '.github/actions/**'
+      - 'NuGet.Config'
+      - 'nuget.config'
+      - '**/Directory.Build.props'
+      - '**/Directory.Build.targets'
+      - '**/Directory.Packages.props'
+      - '**/*.sln'
+      - '**/*.slnx'
+      - '**/*.props'
+      - '**/*.targets'
+      - '.github/workflows/pc-bridge-ci.yml'
   workflow_dispatch:
     inputs:
       target_ref:
         description: "Branch or commit to validate"
         required: true
-        default: "feat/live-can-monitor"
+        default: "feat/ecu-backup-integrity"
         type: string
       pr_number:
         description: "Pull request number (optional)"
@@ -22,11 +40,11 @@ permissions:
 
 concurrency:
   group: pc-bridge-debug-${{ inputs.target_ref || github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   evaluate-build-checkpoint:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
     outputs:
       validated_sha: ${{ steps.resolve_revision.outputs.sha }}
@@ -74,7 +92,7 @@ jobs:
             echo "Windows-relevant changes detected:"
             git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
           fi
-          if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- "${paths[@]}"; then
+          if git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- "${paths[@]}"; then
             echo "current_windows_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "current_windows_changed=true" >> "$GITHUB_OUTPUT"
@@ -163,13 +181,83 @@ jobs:
 
           # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
           if [[ "$IS_DRAFT" == "true" ]]; then
+            # Never defer validation of TLS transport changes behind the
+            # routine 50-commit draft interval. Diff against the last actual
+            # successful Windows build, not merely the latest commit.
+            if ! git diff --quiet "$count_base" "$HEAD_SHA" -- \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeTlsIdentity.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeTlsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/J2534DriverProbe.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeUdsDownloadProtocol.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeUdsDownloadSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeEcuSectorPlanner.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeEcuSectorSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39RamLoader.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39RamLoaderSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspector.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspectorSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommands.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommandsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39Security.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39SecuritySelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39WriteSequence.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39WriteSequenceSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FileWriteJournal.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FileWriteJournalSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImagePreflight.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImagePreflightSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanIdentification.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanIdentificationSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ProgrammingSession.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ProgrammingSessionSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/Program.cs'; then
+              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+              echo "build_required=true" >> "$GITHUB_OUTPUT"
+              echo "TLS/security bridge changes require a full .NET build and self-tests."
+              exit 0
+            fi
             if [[ "$CURRENT_WINDOWS_CHANGED" != "true" ]]; then
               echo "validation_applies=false" >> "$GITHUB_OUTPUT"
               echo "build_required=false" >> "$GITHUB_OUTPUT"
               echo "NOT APPLICABLE to this commit: no Windows-relevant files changed."
             else
               echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-              if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- '.github/workflows/pc-bridge-ci.yml'; then
+              # Safety-critical J2534 transport and ECU memory readers require
+              # immediate compile + protocol self-tests, independent of the
+              # normal adjustable draft checkpoint for unrelated Windows work.
+              if ! git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- \
+                  'pc-bridge/CamaroDiag.J2534Bridge/J2534Device.cs' \
+                  'pc-bridge/CamaroDiag.J2534Bridge/J2534DriverProbe.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeUdsDownloadProtocol.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeUdsDownloadSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeEcuSectorPlanner.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeEcuSectorSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39RamLoader.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39RamLoaderSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspector.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspectorSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommands.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommandsSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39Security.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39SecuritySelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39WriteSequence.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39WriteSequenceSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FileWriteJournal.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39FileWriteJournalSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImagePreflight.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImagePreflightSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanIdentification.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanIdentificationSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ProgrammingSession.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ProgrammingSessionSelfTests.cs' \
+                  'pc-bridge/CamaroDiag.J2534Bridge/J2534MemoryReadScope.cs' \
+                  'pc-bridge/CamaroDiag.J2534Bridge/BridgeServer.cs' \
+                  'pc-bridge/CamaroDiag.J2534Bridge/BridgeSelfTests.cs'; then
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "Safety-critical J2534 code changed: full bridge compilation required."
+              elif git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- '.github/workflows/pc-bridge-ci.yml'; then
                 if (( commits_since_build >= interval )); then
                   echo "build_required=true" >> "$GITHUB_OUTPUT"
                   echo "Windows Debug build due: $commits_since_build relevant commits (interval $interval)."
@@ -314,7 +402,8 @@ jobs:
 
   windows-debug-validation:
     needs: [evaluate-build-checkpoint, build-windows-debug]
-    if: always() && github.event_name == 'workflow_dispatch'
+    # Report an explicit result on PRs as well as manual executions.
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Report Windows Debug validation applicability

@@ -75,6 +75,11 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            // AGP disables optimization for debuggable variants even when requested.
+            // Keep PR artifacts truly debuggable and remove misleading shrink flags.
+            // Release remains minified with resource shrinking enabled above.
+            isMinifyEnabled = false
+            isShrinkResources = false
             if (file("release.jks").exists() && !System.getenv("SIGNING_STORE_PASSWORD").isNullOrBlank()) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -105,15 +110,8 @@ android {
         disable += setOf("MissingTranslation", "ExtraTranslation")
     }
 
-    packaging {
-        jniLibs {
-            // These third-party binaries are distributed without strippable debug symbols.
-            keepDebugSymbols += setOf(
-                "**/libandroidx.graphics.path.so",
-                "**/libmlkit_google_ocr_pipeline.so"
-            )
-        }
-    }
+    // Allow Android Gradle Plugin to strip native debug symbols when supported.
+    // Libraries that cannot be stripped are packaged unchanged.
 
     buildFeatures {
         compose = true

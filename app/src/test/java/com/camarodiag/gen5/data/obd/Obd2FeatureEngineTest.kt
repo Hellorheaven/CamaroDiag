@@ -225,6 +225,18 @@ class Obd2FeatureEngineTest {
     }
 
     @Test
+    fun verifiesElmMultilineVinAcrossTransportFraming() = runBlocking {
+        val reply = "014\r0: 490201314731\r1: 46413152585852\r2: 30313233343536"
+        suspend fun vin(raw: String) =
+            Obd2FeatureEngine(ObdCommandChannel { _, _ -> raw }).readVin()
+        assertEquals("1G1FA1RXXR0123456", vin(reply))
+        assertEquals("1G1FA1RXXR0123456", vin(reply.replace('\r', ' ')))
+        assertNull(vin(reply.replace("1:", "2:")))
+        assertNull(vin(reply.dropLast(2)))
+        assertNull(vin(reply.replace("014", "013")))
+    }
+
+    @Test
     fun parsesMode09VinWithCountByte() = runBlocking {
         val vin = "1G1FA1RXXR0123456"
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->

@@ -142,16 +142,16 @@
     <string name="cal_read_ecu_ids">Read ECU VIN / CAL ID / CVN</string>
     <string name="cal_connect_obd_required">Connect an OBD adapter before reading the real ECU.</string>
     <string name="cal_uds_can_title">UDS over CAN</string>
-    <string name="cal_uds_transport_hint">STPX transport for OBDLink MX+ or a PC J2534 bridge for VXDIAG. Enter confirmed physical CAN IDs: no GM address is assumed.</string>
+    <string name="cal_uds_transport_hint">STPX transport for OBDLink STN or a PC J2534 bridge for VXDIAG. Enter confirmed physical CAN IDs: no GM address is assumed.</string>
     <string name="cal_can_request_id">Request CAN ID (e.g. 7E0)</string>
     <string name="cal_can_response_id">Response CAN ID (e.g. 7E8)</string>
     <string name="cal_can_profile">CAN profile: 33/34 HS-CAN 500k • 35/36 HS-CAN 250k • 63/64 SW-CAN</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
     <string name="cal_j2534_bridge_title">J2534 PC BRIDGE • VXDIAG VCX SE / NANO</string>
-    <string name="cal_j2534_launch_instructions">Run CamaroDiag.J2534Bridge.exe on the Windows PC, then enter its IP and the token shown in the console. Both devices must be on the same local network.</string>
-    <string name="cal_j2534_security_notice">Security: the token is not TLS-encrypted. Use a trusted private network and never expose this port to the Internet.</string>
+    <string name="cal_j2534_launch_instructions">Run CamaroDiag.J2534Bridge.exe on the Windows PC. Enter the PC IP address and the complete pairing code (token.TLS-fingerprint) shown in the console. Use a trusted local network.</string>
+    <string name="cal_j2534_security_notice">TLS 1.2+ and certificate fingerprint verification are mandatory. Old token-only bridges are refused. Never expose the bridge port to the Internet.</string>
     <string name="cal_pc_ip_address">PC IP address</string>
-    <string name="cal_pc_pairing_token">PC pairing token</string>
+    <string name="cal_pc_pairing_token">TLS pairing code (token.fingerprint)</string>
     <string name="cal_connect_j2534">Connect J2534 bridge</string>
     <string name="cal_disconnect_pc_bridge">Disconnect PC bridge</string>
     <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Bridge: HS-CAN ISO15765 250/500 kbit/s and J2534-2 SW-ISO15765 when supported by the driver. CAN FD remains disabled.</string>
@@ -566,10 +566,10 @@
     <string name="dtc_possible_causes">Possible causes (not confirmed)</string>
     <string name="dtc_recommended_checks">Recommended checks</string>
     <string name="dtc_vehicle_specific_not_documented">No vehicle-specific procedure is documented for this code and selected configuration. The OEM/SAE description is shown above; verify the exact VIN and control module in GM service information.</string>
-    <string name="dtc_desc_p0016">Crankshaft Position - Intake Camshaft Position Not Plausible (Bank 1)</string>
-    <string name="dtc_desc_p0017">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 1)</string>
-    <string name="dtc_desc_p0018">Crankshaft Position - Intake Camshaft Position Not Plausible (Bank 2)</string>
-    <string name="dtc_desc_p0019">Crankshaft Position - Exhaust Camshaft Position Not Plausible (Bank 2)</string>
+    <string name="dtc_desc_p0016">Crankshaft Position – Intake Camshaft Position Not Plausible (Bank 1)</string>
+    <string name="dtc_desc_p0017">Crankshaft Position – Exhaust Camshaft Position Not Plausible (Bank 1)</string>
+    <string name="dtc_desc_p0018">Crankshaft Position – Intake Camshaft Position Not Plausible (Bank 2)</string>
+    <string name="dtc_desc_p0019">Crankshaft Position – Exhaust Camshaft Position Not Plausible (Bank 2)</string>
     <string name="dtc_gm_calibration_not_validated">The explanations and thresholds below are reference data for the selected engine and model year. ECU identity (VIN, CAL ID, CVN, software ID and hardware part number) has not yet been verified; these data are not validated for the connected ECU.</string>
     <string name="dtc_gm_monitor_title">GM engine monitor – %1$s</string>
     <string name="dtc_gm_monitor_criteria">Setting criteria: %1$s</string>
@@ -837,4 +837,42 @@
     <string name="cal_expert_patch_preview_button">Preview sectors impacted by modified BIN</string>
     <string name="cal_expert_patch_summary">Changed bytes: %1$d. Erase sectors affected: %2$d. Hardware map not verified; no write.</string>
     <string name="cal_expert_patch_invalid">Offline preview unavailable: files, region range or erase/programming geometry invalid. No write attempted.</string>
+    <string name="live_pid_oil">Oil pressure (simulation only)</string>
+    <string name="live_pid_stft_b2">Short-term fuel trim bank 2</string>
+    <string name="live_pid_ltft_b2">Long-term fuel trim bank 2</string>
+    <string name="live_pid_rel_tps">Relative throttle position</string>
+    <string name="live_pid_cmd_tps">Commanded throttle position</string>
+    <string name="live_pid_abs_tps_b">Absolute throttle position B</string>
+    <string name="live_pid_abs_tps_c">Absolute throttle position C</string>
+    <string name="live_pid_app_d">Accelerator pedal position D</string>
+    <string name="live_pid_app_e">Accelerator pedal position E</string>
+    <string name="live_pid_app_f">Accelerator pedal position F</string>
+    <string name="live_pid_abs_load">Absolute engine load</string>
+    <string name="live_pid_ambient">Ambient air temperature</string>
+    <string name="live_pid_fuel_press">Fuel pressure</string>
+    <string name="live_pid_timing">Ignition timing advance</string>
+    <string name="live_pid_eq_ratio">Commanded equivalence ratio</string>
+    <string name="live_pid_o2_b1s1">Oxygen sensor B1S1 voltage</string>
+    <string name="live_pid_o2_b1s2">Oxygen sensor B1S2 voltage</string>
+    <string name="live_pid_o2_b1s3">Oxygen sensor B1S3 voltage</string>
+    <string name="live_pid_o2_b1s4">Oxygen sensor B1S4 voltage</string>
+    <string name="live_pid_wbo2_b1s1">Wideband lambda B1S1</string>
+    <string name="live_pid_wbo2_b1s2">Wideband lambda B1S2</string>
+    <string name="live_pid_wbo2_b2s1">Wideband lambda B2S1</string>
+    <string name="live_pid_wbo2_b2s2">Wideband lambda B2S2</string>
+    <string name="system_language_follow_phone">Follow the phone language</string>
+
+    <!-- Live physical J2534 ECU memory capture -->
+    <string name="cal_live_memory_title">Real ECU memory read (J2534)</string>
+    <string name="cal_live_memory_notice">The Windows bridge needs an approved VIN-bound memory map. Read-only access; ECU writing stays disabled.</string>
+    <string name="cal_live_memory_length">Bytes to read (max 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Calibration</string>
+    <string name="cal_live_memory_extended">Extended diagnostic session (0x03)</string>
+    <string name="cal_live_memory_save">Read twice and save ECU memory ZIP</string>
+    <string name="cal_live_memory_saved">ECU memory saved after two matching reads.</string>
+    <string name="cal_live_memory_failed">ECU memory reading failed. No verified backup was created.</string>
+    <string name="cal_archive_verify">Verify ECU backup ZIP</string>
+    <string name="cal_archive_verified">Both reads match and the SHA-256 hashes are valid for the archived ranges.</string>
+    <string name="cal_archive_partial">The backup covers only part of the requested memory.</string>
+    <string name="cal_archive_failed">Could not verify this ZIP. The limit is 32 MiB uncompressed.</string>
 </resources>
