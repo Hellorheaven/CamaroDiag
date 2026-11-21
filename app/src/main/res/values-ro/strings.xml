@@ -554,4 +554,9 @@
     <string name="update_later">Mai târziu</string>
     <string name="update_ready_to_install">CamaroDiag – gata de instalare</string>
     <string name="update_version_channel">Versiunea %1$s • %2$s</string>
+    <string name="vin_photo_cancelled">Fotografierea VIN a fost anulată.</string>
+    <string name="vin_photo_success">VIN a fost detectat și copiat în profilul vehiculului. Verifică fiecare caracter.</string>
+    <string name="vin_photo_not_found">Nu s-a detectat un VIN valid de 17 caractere. Introdu-l manual sau fă o altă fotografie.</string>
+    <string name="vin_photo_error">VIN nu a putut fi citit din fotografie. Încearcă din nou cu iluminare și focalizare mai bune.</string>
+    <string name="vehicle_vin_placeholder">17 caractere</string>
 </resources>
