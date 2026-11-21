@@ -517,4 +517,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • pieprasījums %2$s / atbilde %3$s • intervāls %4$d s</string>
     <string name="cal_axis_values">0x%1$s • skaits=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Tikai aparatūras profils; joprojām nepieciešams oficiāls Android SDK/API vai dokumentēts tilts.</string>
+    <string name="obd_scan_description">SAE J1979 tikai lasāma pārbaude: spēka piedziņas dati, kļūdu kodi, fiksētais kadrs un ECU identifikācija.</string>
+    <string name="obd_responding_can_ids">Atbildējušo ierīču CAN ID</string>
+    <string name="obd_can_id_limit_explanation">CAN identifikatori ir novērotās atbildes uz funkcionālo OBD pieprasījumu 0100. Ar tiem nepietiek moduļa (BCM, TCM, ABS, IPC, SDM) identificēšanai vai paplašināto GM pakalpojumu atļaušanai.</string>
+    <string name="obd_trigger_dtc">Fiksētā kadra izraisītājs DTC</string>
+    <string name="obd_real_scan_scope">Tvērums: rezultāti iegūti tikai no faktiskajām OBD-II pieejamā ECU atbildēm. Skenēšana neaptaujā BCM, IPC, ABS, SDM vai citus GM moduļus un neizpilda izpildmehānismu vai programmēšanas komandas.</string>
+    <string name="connection_busy">Notiek savienošana vai darbība…</string>
+    <string name="swcan_wiring_verified">SW-CAN vadojums pārbaudīts (1. kontakts)</string>
+    <string name="long_response_mode">Garo atbilžu režīms (ATAL)</string>
+    <string name="adapter_none_detected">Adapteris nav konstatēts. Savienojiet pārī OBDLink MX+, MX, LX un citus klasiskos Bluetooth adapterus; CX tuvumā tiek konstatēts, izmantojot BLE.</string>
+    <string name="usb_connection_title">USB savienojums (OBDLink EX / SX, ELM327 un seriālie adapteri)</string>
+    <string name="adapter_connect_label">Savienot: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: pārraides arhitektūra ir sagatavota, bet J2534 saskarņu saderība ar Android netiek apstiprināta bez modeļa oficiālā Android SDK. J2534 piekļuve netiek simulēta.</string>
+    <string name="adapter_vxdiag_profiles">Deklarētie VXDIAG saskarņu profili</string>
+    <string name="adapter_vxdiag_profiles_hint">Profili atšķir aparatūras un savienojumu variantus. Tie neapstiprina Android draivera vai transportlīdzekļa sakaru pieejamību.</string>
+    <string name="adapter_simulation_profiles">Simulēti aparatūras profili (stenda tests)</string>
 </resources>
