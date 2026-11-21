@@ -545,7 +545,14 @@ object CanTraceAnalyzer {
         val directionIndex = headers.indexOfFirst { it in setOf("direction", "dir", "tx_rx") }
         val dataIndex = headers.indexOfFirst { it in setOf("data", "payload", "bytes", "frame_data") }
         val dlcIndex = headers.indexOfFirst { it == "dlc" }
-        val dataByteIndexes = headers.indices.filter { headers[it].matches(Regex("(data|byte)_?([0-9]|[1-5][0-9]|6[0-3])")) }
+        val byteHeader = Regex("(?:data|byte)_?([0-9]|[1-5][0-9]|6[0-3])")
+        val byteColumns = headers.mapIndexedNotNull { index, header ->
+            byteHeader.matchEntire(header)?.let { it.groupValues[1].toInt() to index }
+        }.sortedBy { it.first }
+        val dataByteIndexes = byteColumns.map { it.second }
+        if (dataIndex < 0 && byteColumns.withIndex().any { (position, column) -> position != column.first }) {
+            return ParsedFrames(emptyList(), listOf("CSV byte columns must be consecutive and unique starting at zero."))
+        }
         if (canIdIndex < 0 || (dataIndex < 0 && dataByteIndexes.isEmpty())) {
             return ParsedFrames(emptyList(), listOf("CSV needs a CAN ID column and a data/payload column (or data0…data63 columns)."))
         }

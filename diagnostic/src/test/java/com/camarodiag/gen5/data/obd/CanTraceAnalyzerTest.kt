@@ -1020,4 +1020,11 @@ class CanTraceAnalyzerTest {
         val report = CanTraceAnalyzer.analyze("0.0 1 18DAF110x Rx d 3 02 41 00")
         assertEquals(0x18DAF110, report.frames.single().canId)
     }
+    @Test
+    fun reordersIndexedBytesAndRejectsMissingOrDuplicateIndices() {
+        fun read(columns: String) = CanTraceAnalyzer.analyze("id,$columns\n7E8,41,02,00", "indexed.csv")
+        assertEquals(listOf(2, 0x41, 0), read("data1,data0,data2").frames.single().data)
+        assertTrue(read("byte1,data1,data2").frames.isEmpty())
+        assertTrue(read("byte0,byte2,byte3").frames.isEmpty())
+    }
 }
