@@ -150,6 +150,7 @@ internal static class NativeE39RamLoader
     internal interface ILink
     {
         Task<byte[]> ExchangeAsync(byte[] request, CancellationToken cancellationToken);
+        Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken cancellationToken);
     }
 
     /// <summary>
@@ -158,12 +159,16 @@ internal static class NativeE39RamLoader
     /// the authenticated programming session must already be established.
     /// </summary>
     internal static async Task StageAsync(
-        ILink link, Plan plan, CancellationToken cancellationToken)
+        ILink link, Plan plan, uint minimumSupplyMillivolts, uint maximumSupplyMillivolts,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(link);
         ArgumentNullException.ThrowIfNull(plan);
         cancellationToken.ThrowIfCancellationRequested();
         plan = ValidateAndSnapshot(plan);
+        if (minimumSupplyMillivolts == 0 || maximumSupplyMillivolts <= minimumSupplyMillivolts)
+            throw new ArgumentException("No qualified RAM staging supply window.");
+        await RequireSupplyAsync();
         var response = await link.ExchangeAsync(plan.RequestDownload, cancellationToken);
         // Stock GM bootloader acknowledges download with 0x74. Its response
         // is not the generic ISO-14229 maxBlockLength structure.
@@ -173,9 +178,20 @@ internal static class NativeE39RamLoader
             throw new InvalidDataException("E39 RequestDownload was not acknowledged.");
         foreach (var frame in plan.Frames)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            await RequireSupplyAsync();
             response = await link.ExchangeAsync(frame.Payload, cancellationToken);
             RequireAcknowledgment(response, frame.Executes);
+        }
+        await RequireSupplyAsync();
+
+        async Task RequireSupplyAsync()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var value = await link.ReadSupplyMillivoltsAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!value.HasValue || value.Value < minimumSupplyMillivolts ||
+                value.Value > maximumSupplyMillivolts)
+                throw new IOException("Supply outside qualified E39 RAM staging window.");
         }
         // Launch acknowledgement is NOT a proof of a valid recovery path or
         // of successful flash erase/program. The kernel must be probed by a

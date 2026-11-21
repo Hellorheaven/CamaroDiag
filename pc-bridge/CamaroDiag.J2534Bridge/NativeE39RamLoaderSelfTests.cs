@@ -5,6 +5,13 @@ internal static class NativeE39RamLoaderSelfTests
     private sealed class FakeLink : NativeE39RamLoader.ILink
     {
         internal readonly List<byte[]> Transmitted = [];
+        internal uint? Supply = 13500;
+        internal int LoseSupplyAfterFrames = int.MaxValue;
+        public Task<uint?> ReadSupplyMillivoltsAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            return Task.FromResult(Transmitted.Count >= LoseSupplyAfterFrames ? (uint?)null : Supply);
+        }
         internal Func<byte[], byte[]> Response = request => request[0] switch
         {
             0x34 => [0x74],
@@ -55,7 +62,7 @@ internal static class NativeE39RamLoaderSelfTests
         Assert(plan.KernelSha256.Length == 64, "Kernel SHA-256 attached to plan");
 
         var accepted = new FakeLink();
-        NativeE39RamLoader.StageAsync(accepted, plan, CancellationToken.None)
+        NativeE39RamLoader.StageAsync(accepted, plan, 12000, 15000, CancellationToken.None)
             .GetAwaiter().GetResult();
         Assert(accepted.Transmitted.Count == 3 &&
                accepted.Transmitted[0].SequenceEqual(plan.RequestDownload) &&
@@ -76,17 +83,31 @@ internal static class NativeE39RamLoaderSelfTests
             change(altered);
             var unused = new FakeLink();
             MustFail<InvalidDataException>(() =>
-                NativeE39RamLoader.StageAsync(unused, altered, CancellationToken.None)
+                NativeE39RamLoader.StageAsync(unused, altered, 12000, 15000, CancellationToken.None)
                     .GetAwaiter().GetResult());
             Assert(unused.Transmitted.Count == 0, "Altered staging plan rejected before I/O");
         }
+
+        var noSupply = new FakeLink { Supply = null };
+        MustFail<IOException>(() =>
+            NativeE39RamLoader.StageAsync(noSupply, plan, 12000, 15000, CancellationToken.None)
+                .GetAwaiter().GetResult());
+        Assert(noSupply.Transmitted.Count == 0, "Missing supply prevents download request.");
+
+        var supplyLost = new FakeLink { LoseSupplyAfterFrames = 2 };
+        MustFail<IOException>(() =>
+            NativeE39RamLoader.StageAsync(supplyLost, plan, 12000, 15000, CancellationToken.None)
+                .GetAwaiter().GetResult());
+        Assert(supplyLost.Transmitted.Count == 2 &&
+            supplyLost.Transmitted.All(x => x[0] != 0x36 || x[1] != 0x80),
+            "Supply loss after first copy prevents execution frame.");
 
         var copyDenied = new FakeLink
         {
             Response = req => req[0] == 0x34 ? [0x74] : [0x7F, 0x36, 0x22]
         };
         MustFail<IOException>(() =>
-            NativeE39RamLoader.StageAsync(copyDenied, plan, CancellationToken.None)
+            NativeE39RamLoader.StageAsync(copyDenied, plan, 12000, 15000, CancellationToken.None)
                 .GetAwaiter().GetResult());
         Assert(copyDenied.Transmitted.Count == 2,
             "Negative copy response halts without executing kernel");
@@ -96,7 +117,7 @@ internal static class NativeE39RamLoaderSelfTests
             Response = req => [0x7F, req[0], 0x22]
         };
         MustFail<IOException>(() =>
-            NativeE39RamLoader.StageAsync(refusedDownload, plan, CancellationToken.None)
+            NativeE39RamLoader.StageAsync(refusedDownload, plan, 12000, 15000, CancellationToken.None)
                 .GetAwaiter().GetResult());
         Assert(refusedDownload.Transmitted.Count == 1,
             "Download rejection prevents copying any bytes to RAM");
@@ -106,7 +127,7 @@ internal static class NativeE39RamLoaderSelfTests
             Response = req => req[0] == 0x34 ? [0x74] : [0x76]
         };
         MustFail<InvalidDataException>(() =>
-            NativeE39RamLoader.StageAsync(badLaunch, plan, CancellationToken.None)
+            NativeE39RamLoader.StageAsync(badLaunch, plan, 12000, 15000, CancellationToken.None)
                 .GetAwaiter().GetResult());
         Assert(badLaunch.Transmitted.Count == 3,
             "Copy acknowledgement is not a valid kernel launch acknowledgement");
@@ -130,7 +151,7 @@ internal static class NativeE39RamLoaderSelfTests
         {
             token.Cancel();
             MustFail<OperationCanceledException>(() =>
-                NativeE39RamLoader.StageAsync(cancelled, plan, token.Token)
+                NativeE39RamLoader.StageAsync(cancelled, plan, 12000, 15000, token.Token)
                     .GetAwaiter().GetResult());
         }
         Assert(cancelled.Transmitted.Count == 0,
