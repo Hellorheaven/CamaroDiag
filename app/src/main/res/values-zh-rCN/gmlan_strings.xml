@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_gmlan_read_identity">读取 GM VIN 和 OSID（J2534）</string>
+    <string name="cal_gmlan_osid">GM 操作系统标识：%1$d</string>
+    <string name="cal_gmlan_vin_can">GM VIN：%1$s • CAN 0x%2$s</string>
+    <string name="cal_gmlan_identity_notice">从选定的物理 CAN 响应节点进行只读识别。这不能验证 ECU 硬件、闪存布局或恢复流程。</string>
+    <string name="cal_gmlan_identity_failed">无法通过此 J2534 通道读取经过验证的 GM VIN 和 OSID。</string>
+</resources>
