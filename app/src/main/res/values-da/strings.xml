@@ -722,4 +722,10 @@
     <string name="cal_expert_patch_program_bytes">Programmeringsenhedens størrelse (byte)</string>
     <string name="cal_expert_patch_preview_button">Vis de sektorer, som den ændrede BIN-fil påvirker</string>
     <string name="cal_expert_patch_summary">Ændrede byte: %1$d. Berørte slettesektorer: %2$d. Hardwarens hukommelseskort er ikke verificeret. Der er ikke skrevet til enheden.</string>
+    <string name="dtc_gm_monitor_title">GM-motorovervågning – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Kriterier for registrering af fejlkoden: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Aktiveringsbetingelser: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Fejltæller / valideringsfrekvens: %1$s</string>
+    <string name="dtc_gm_monitor_mil">MIL-klassifikation: %1$s</string>
+    <string name="dtc_gm_monitor_source">Kilde: GM %1$s, side %2$d</string>
 </resources>
