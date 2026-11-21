@@ -559,4 +559,11 @@
     <string name="vin_photo_not_found">Nu s-a detectat un VIN valid de 17 caractere. Introdu-l manual sau fă o altă fotografie.</string>
     <string name="vin_photo_error">VIN nu a putut fi citit din fotografie. Încearcă din nou cu iluminare și focalizare mai bune.</string>
     <string name="vehicle_vin_placeholder">17 caractere</string>
+    <string name="can_sniffer_start">Începe captura</string>
+    <string name="can_sniffer_stop">Oprește captura</string>
+    <string name="can_sniffer_empty">Nu a fost capturat încă niciun cadru CAN.</string>
+    <string name="can_sniffer_capture_complete">Captura CAN s-a încheiat.</string>
+    <string name="can_sniffer_capture_failed">Captura CAN a eșuat sau adaptorul nu mai răspunde.</string>
+    <string name="can_sniffer_frame_count">Cadre capturate: %1$d</string>
+    <string name="can_sniffer_filtered_count">Se afișează %1$d din %2$d cadre</string>
 </resources>
