@@ -910,4 +910,6 @@
     <string name="debug_builds_created">تاريخ الإنشاء</string>
     <string name="debug_builds_expires">تاريخ الانتهاء</string>
     <string name="debug_builds_no_browser">لا يتوفر متصفح لفتح رابط التنزيل.</string>
+    <string name="obd_physical_can_scope">عقدة CAN المادية المستجيبة: 0x%1$s. يقتصر هذا الفحص على وحدة OBD المحددة، وليس فحصًا وظيفيًا لجميع الوحدات. لم تُرسل أوامر برمجة GM أو أوامر المشغلات.</string>
+    <string name="msg_dtc_j2534_clear_requires_permission">فعّل مسح رموز أعطال الانبعاثات في جسر Windows، ثم أعد الاتصال وأوقف المحرك وأكّد إعادة الضبط. ستُعاد تهيئة بيانات جاهزية أنظمة الانبعاثات؛ ولا تُمسح الرموز الدائمة.</string>
 </resources>
