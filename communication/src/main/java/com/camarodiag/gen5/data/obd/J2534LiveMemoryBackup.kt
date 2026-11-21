@@ -27,6 +27,19 @@ object J2534LiveMemoryBackup {
         val controllerLabel: String? = null
     )
 
+    /** Independent acquisition 1 or 2; byte counts describe actual ECU responses. */
+    data class CaptureProgress(
+        val pass: Int,
+        val completedBytes: Int,
+        val regionBytes: Int
+    ) {
+        init {
+            require(pass in 1..2 && regionBytes > 0 && completedBytes in 0..regionBytes)
+        }
+        val totalBytesRead: Long get() = (pass - 1L) * regionBytes + completedBytes
+        val requiredBytesRead: Long get() = regionBytes.toLong() * 2L
+    }
+
     data class CaptureResult(
         val manifest: EcuBackupManifest.Manifest,
         val capture: EcuBackupManifest.Capture,
@@ -37,17 +50,24 @@ object J2534LiveMemoryBackup {
      * Production entry point: no simulator transport can be supplied.
      * This requires the actual PC bridge to be connected to a physical J2534 device.
      */
-    suspend fun capture(bridge: J2534BridgeTransport, request: Request): CaptureResult {
-        check(bridge.isConnected) { "A real Windows J2534 bridge must be connected." }
-        return acquire(bridge, request, EcuBackupManifest.Origin.REPORTED_HARDWARE_READ)
+    suspend fun capture(
+        bridge: J2534BridgeTransport,
+        request: Request,
+        progress: (CaptureProgress) -> Unit = {}
+    ): CaptureResult {
+        check(bridge.isConnected && bridge.isScopedMemoryReadEnabled) {
+            "A real J2534 bridge with an approved ECU memory read scope must be connected."
+        }
+        return acquire(bridge, request, EcuBackupManifest.Origin.REPORTED_HARDWARE_READ, progress)
     }
 
     suspend fun captureAndExport(
         bridge: J2534BridgeTransport,
         request: Request,
-        output: OutputStream
+        output: OutputStream,
+        progress: (CaptureProgress) -> Unit = {}
     ): CaptureResult {
-        val read = capture(bridge, request)
+        val read = capture(bridge, request, progress)
         EcuBackupArchive.export(
             output = output,
             captures = listOf(read.capture),
@@ -58,13 +78,18 @@ object J2534LiveMemoryBackup {
     }
 
     /** Only fake transport may enter unit tests; fake data is never marked as hardware. */
-    internal suspend fun captureForTest(transport: UdsPayloadTransport, request: Request): CaptureResult =
-        acquire(transport, request, EcuBackupManifest.Origin.SIMULATION)
+    internal suspend fun captureForTest(
+        transport: UdsPayloadTransport,
+        request: Request,
+        progress: (CaptureProgress) -> Unit = {}
+    ): CaptureResult =
+        acquire(transport, request, EcuBackupManifest.Origin.SIMULATION, progress)
 
     private suspend fun acquire(
         transport: UdsPayloadTransport,
         request: Request,
-        origin: EcuBackupManifest.Origin
+        origin: EcuBackupManifest.Origin,
+        progress: (CaptureProgress) -> Unit
     ): CaptureResult {
         require(request.expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) { "Invalid target VIN." }
         require(request.address in 0L..0xFFFFFFFFL &&
@@ -95,9 +120,10 @@ object J2534LiveMemoryBackup {
                     (bytes ushr 8).toByte(), bytes.toByte()
                 )
 
-        suspend fun pass(): ByteArray {
+        suspend fun pass(passNumber: Int): ByteArray {
             val image = ByteArray(request.lengthBytes)
             var offset = 0
+            progress(CaptureProgress(passNumber, 0, image.size))
             var blocks = 0
             while (offset < image.size) {
                 if (blocks > 0 && blocks % 32 == 0) {
@@ -116,6 +142,10 @@ object J2534LiveMemoryBackup {
                 response.copyInto(image, destinationOffset = offset, startIndex = 1)
                 offset += length
                 blocks++
+                // Emit progress periodically rather than on every CAN frame.
+                if (blocks % 16 == 0 || offset == image.size) {
+                    progress(CaptureProgress(passNumber, offset, image.size))
+                }
             }
             return image
         }
@@ -131,9 +161,9 @@ object J2534LiveMemoryBackup {
                 }
                 enteredExtended = true
             }
-            val first = pass()
+            val first = pass(1)
             // A second independent hardware acquisition is compulsory.
-            val second = pass()
+            val second = pass(2)
             // VIN could change after a session replacement or reconnect.
             liveVin()
             require(first.contentEquals(second)) {
