@@ -532,4 +532,23 @@
     <string name="adapter_vxdiag_profiles">Deklarētie VXDIAG saskarņu profili</string>
     <string name="adapter_vxdiag_profiles_hint">Profili atšķir aparatūras un savienojumu variantus. Tie neapstiprina Android draivera vai transportlīdzekļa sakaru pieejamību.</string>
     <string name="adapter_simulation_profiles">Simulēti aparatūras profili (stenda tests)</string>
+    <string name="modules_vehicle_title">Transportlīdzekļa vadības moduļi</string>
+    <string name="module_accessible">Pieejams</string>
+    <string name="module_requires_swcan">Nepieciešams SW-CAN (1. kontakts)</string>
+    <string name="module_blocked_adapter">Adapteris bloķē</string>
+    <string name="module_not_equipped">Nav aprīkots</string>
+    <string name="module_discovery_required">Nepieciešama transportlīdzekļa moduļu noteikšana</string>
+    <string name="live_engine_telemetry">Dzinēja telemetrija reāllaikā</string>
+    <string name="live_resume">Turpināt</string>
+    <string name="live_stop_recording">Apturēt ierakstu</string>
+    <string name="live_record">Ierakstīt reāllaika datus</string>
+    <string name="live_export_csv">Eksportēt CSV</string>
+    <string name="live_recording_notice">Reģistrators saglabā attēlotās OBD vērtības (metriskajās vienībās) ar laika zīmogiem. Tas nemaina ECU kalibrēšanas tabulas.</string>
+    <string name="dtc_title">Diagnostikas kļūdu kodi</string>
+    <string name="dtc_clear_warning">Dzēšana 04 režīmā noņem ar emisijām saistītos kļūdu kodus un atiestata dažus gatavības monitorus. Pirms turpināšanas saglabājiet pārskatu. 04 režīms nedzēš citos transportlīdzekļa moduļos saglabātos paplašinātos DTC.</string>
+    <string name="dtc_none_returned">Pēdējā skenēšanā netika saņemti kļūdu kodi.</string>
+    <string name="dtc_confirm_clear">Apstiprināt DTC dzēšanu?</string>
+    <string name="dtc_clear_description">Šī komanda nosūta OBD 04 režīmu ECU. Gatavības dati var tikt atiestatīti. Tā nenovērš bojājuma cēloni.</string>
+    <string name="dtc_clear_action">Dzēst kodus</string>
+    <string name="common_save">Saglabāt</string>
 </resources>
