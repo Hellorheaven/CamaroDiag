@@ -403,4 +403,15 @@
     <string name="license_owner">Savininkas: visos teisės</string>
     <string name="license_premium">Visapusiška licencija aktyvi</string>
     <string name="license_title">CamaroDiag licencija</string>
+    <!-- LFX 2012 ECU safety and verification guidance -->
+    <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012: ECU identifikavimas (tik skaitymas)</string>
+    <string name="flexfuel_lfx2012_checks">Sąlygos, kurios vis dar neleidžia keisti kalibravimo</string>
+    <string name="flexfuel_preflight_vehicle_missing">Nepasirinktas transporto priemonės profilis</string>
+    <string name="flexfuel_preflight_wrong_vehicle">Transporto priemonė nėra 2012 m. Camaro LFX</string>
+    <string name="flexfuel_preflight_vin">VIN turi būti nuskaitytas iš ECU ir sutapti su išsaugotos transporto priemonės VIN</string>
+    <string name="flexfuel_preflight_ecu">Reikia nustatyti tikrąjį ECU valdiklio numerį</string>
+    <string name="flexfuel_preflight_firmware">Tiksli ECU programinė aparatinė įranga nepatikrinta</string>
+    <string name="flexfuel_preflight_recovery">Atkūrimo procedūra nepatikrinta</string>
+    <string name="flexfuel_lfx2012_audit_title">LFX 2012: patikra prieš programavimą ir po jo (tik skaitymas)</string>
+    <string name="flexfuel_lfx2012_audit_post_not_performed">Patikra po programavimo neatlikta. Nei ECU programavimas, nei transporto priemonės bandymas po įrašymo nepatvirtinti.</string>
 </resources>
