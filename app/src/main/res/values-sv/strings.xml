@@ -506,4 +506,19 @@
     <string name="cal_signal_metadata">DID 0x%1$s • begäran %2$s / svar %3$s • intervall %4$d s</string>
     <string name="cal_axis_values">0x%1$s • antal=%2$d • %3$s</string>
     <string name="adapter_hardware_profile_only">Endast hårdvaruprofil; ett officiellt Android SDK/API eller en dokumenterad brygga krävs fortfarande.</string>
+    <string name="obd_scan_description">Skrivskyddad kontroll enligt SAE J1979: drivlinedata, felkoder, frysta data och ECU-identifiering.</string>
+    <string name="obd_responding_can_ids">Svarande CAN-ID:n</string>
+    <string name="obd_can_id_limit_explanation">CAN-ID:n är observerade svar på den funktionella OBD-begäran 0100. De räcker inte för att identifiera en modul (BCM, TCM, ABS, IPC, SDM) eller tillåta utökade GM-tjänster.</string>
+    <string name="obd_trigger_dtc">DTC som utlöste frysta data</string>
+    <string name="obd_real_scan_scope">Omfattning: resultaten kommer endast från faktiska svar från ECU som nås via OBD-II. Avsökningen frågar inte BCM, IPC, ABS, SDM eller andra GM-moduler och utför inga ställdons- eller programmeringskommandon.</string>
+    <string name="connection_busy">Anslutning eller åtgärd pågår…</string>
+    <string name="swcan_wiring_verified">SW-CAN-kablage verifierat (stift 1)</string>
+    <string name="long_response_mode">Läge för långa svar (ATAL)</string>
+    <string name="adapter_none_detected">Ingen adapter upptäckt. Parkoppla OBDLink MX+, MX, LX och andra klassiska Bluetooth-adaptrar; CX hittas i närheten via BLE.</string>
+    <string name="usb_connection_title">USB-anslutning (OBDLink EX / SX, ELM327 och serieadaptrar)</string>
+    <string name="adapter_connect_label">Anslut: %1$s</string>
+    <string name="adapter_vxdiag_android_limit">VXDIAG: transportarkitekturen är förberedd, men Android-kompatibilitet för J2534-gränssnitt deklareras inte utan modellens officiella Android SDK. J2534-åtkomst simuleras inte.</string>
+    <string name="adapter_vxdiag_profiles">Deklarerade VXDIAG-gränssnittsprofiler</string>
+    <string name="adapter_vxdiag_profiles_hint">Profilerna skiljer på hårdvaru- och anslutningsvarianter. De bekräftar inte tillgång till Android-drivrutin eller fordonskommunikation.</string>
+    <string name="adapter_simulation_profiles">Simulerade hårdvaruprofiler (bänktest)</string>
 </resources>
