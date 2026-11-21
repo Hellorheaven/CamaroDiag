@@ -880,4 +880,19 @@
     <string name="functional_tests_denied">Доступ запрещён: войдите в разрешённую учётную запись Google.</string>
     <string name="functional_tests_not_connected">Физический адаптер OBD не подключён. Остальные проверки не выполнялись.</string>
     <string name="functional_tests_cancelled">Проверки отменены.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Отладочные сборки</string>
+    <string name="tab_license">Лицензия</string>
+    <string name="debug_builds_title">Закрытые отладочные сборки</string>
+    <string name="debug_builds_refresh">Обновить список сборок</string>
+    <string name="debug_builds_download">Скачать с GitHub</string>
+    <string name="debug_builds_unavailable">Нет доступного действительного отладочного архива.</string>
+    <string name="debug_builds_error">Не удалось загрузить отладочные сборки с GitHub.</string>
+    <string name="license_disabled">Система лицензирования отключена.</string>
+    <string name="license_buy">Купить лицензию</string>
+    <string name="license_refresh">Обновить лицензию</string>
+    <string name="license_free">Бесплатно</string>
+    <string name="license_owner">Владелец: все права</string>
+    <string name="license_premium">Полная лицензия активна</string>
+    <string name="license_title">Лицензия CamaroDiag</string>
 </resources>
