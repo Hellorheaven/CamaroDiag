@@ -545,7 +545,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, systemLocale: Locale, onOpenAccount:
                     onConnectMac = { mac -> withBluetoothPermission(mac) },
                     onSelectSim = { viewModel.selectSimulatedAdapter(it) },
                     usbDevices = usbDevices,
-                    onRefreshUsb = { viewModel.refreshPairedDevices() },
+                    onRefreshUsb = { viewModel.refreshUsbDevices() },
                     onConnectUsb = { viewModel.connectUsb(it) },
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
