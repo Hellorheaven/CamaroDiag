@@ -71,6 +71,76 @@ internal static class NativeScopedMemoryReader
                 "Live ECU VIN no longer matches the approved memory scope.");
     }
 
+    /// <summary>
+    /// Own the extended read session for a local capture. A successful capture
+    /// must include confirmed return to default session. Cancellation still
+    /// performs best-effort cleanup on the original, bounded transport.
+    /// </summary>
+    internal static async Task<VerifiedCapture> ReadWithSessionAsync(
+        ITransport link, J2534MemoryReadScope scope,
+        IProgress<(int Pass, int BytesRead, int TotalBytes)>? progress,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        ArgumentNullException.ThrowIfNull(scope);
+        if (scope.Length == 0 || scope.Length > MaximumUiCaptureBytes)
+            throw new ArgumentOutOfRangeException(nameof(scope));
+        if (scope.Session == 1)
+            return await ReadTwiceAsync(link, scope, progress, cancellationToken);
+        if (scope.Session != 3)
+            throw new UnauthorizedAccessException("Only default and extended read sessions are allowed.");
+
+        await RequireLiveVinAsync(link, scope, cancellationToken);
+        var requested = false;
+        var captureCompleted = false;
+        var identityUncertain = false;
+        VerifiedCapture capture;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            requested = true;
+            var reply = await link.ExchangeAsync([0x10, 0x03], cancellationToken);
+            RequireSessionReply(reply, 0x03);
+            capture = await ReadTwiceAsync(link, scope, progress, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            captureCompleted = true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // A VIN or scope failure is not a reason to send another command.
+            identityUncertain = true;
+            throw;
+        }
+        finally
+        {
+            if (requested && !identityUncertain)
+            {
+                try
+                {
+                    // The physical link already bounds each exchange. Do not
+                    // reconnect; re-confirm VIN before changing any session.
+                    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                    await RequireLiveVinAsync(link, scope, cleanup.Token);
+                    var reply = await link.ExchangeAsync([0x10, 0x01], cleanup.Token);
+                    cleanup.Token.ThrowIfCancellationRequested();
+                    RequireSessionReply(reply, 0x01);
+                }
+                catch (Exception) when (!captureCompleted)
+                {
+                    // Preserve the initial capture failure or cancellation.
+                }
+            }
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return capture;
+    }
+
+    private static void RequireSessionReply(byte[] reply, byte expected)
+    {
+        if (reply.Length < 2 || reply[0] != 0x50 || reply[1] != expected)
+            throw new InvalidDataException("ECU did not confirm the requested read session.");
+    }
+
     internal static async Task<VerifiedCapture> ReadTwiceAsync(
         ITransport link,
         J2534MemoryReadScope scope,
