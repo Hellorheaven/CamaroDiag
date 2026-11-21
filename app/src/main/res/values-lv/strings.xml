@@ -370,4 +370,19 @@
     <string name="cal_j2534_launch_instructions">Palaidiet CamaroDiag.J2534Bridge.exe Windows datorā. Ievadiet datora IP un pilno kodu (marķieris.TLS nospiedums) no konsoles. Izmantojiet uzticamu lokālo tīklu.</string>
     <string name="cal_j2534_security_notice">TLS 1.2+ un sertifikāta nospieduma pārbaude ir obligāta. Veci marķieri bez nospieduma tiek noraidīti. Nekad neatveriet portu internetam.</string>
     <string name="cal_pc_pairing_token">TLS kods (marķieris.nospiedums)</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Funkcionālie testi</string>
+    <string name="functional_tests_title">Funkcionālie testi — ECU un OBD</string>
+    <string name="functional_tests_readonly">Veiciet visas pieejamās tikai lasīšanas pārbaudes ar pašlaik pievienoto fizisko adapteri. Citi adapteri un nepārbaudīti ECU tiek atzīmēti kā NAV TESTĒTS. Bez dzēšanas, vadības vai programmēšanas.</string>
+    <string name="functional_tests_run">Palaist visus</string>
+    <string name="functional_tests_stop">Apturēt</string>
+    <string name="functional_tests_export">Eksportēt JSON</string>
+    <string name="functional_tests_summary">%1$d sekmīgi · %2$d nesekmīgi · %3$d nav testēti</string>
+    <string name="functional_tests_passed">SEKMĪGI (fizisks apstiprinājums)</string>
+    <string name="functional_tests_failed">NESEKMĪGI</string>
+    <string name="functional_tests_skipped">NAV TESTĒTS</string>
+    <string name="functional_tests_denied">Piekļuve liegta: pierakstieties ar atļauto Google kontu un pieslēdzieties vēlreiz.</string>
+    <string name="functional_tests_not_connected">Nav pievienots fizisks OBD adapteris. Pārējās pārbaudes nav veiktas.</string>
+    <string name="functional_tests_cancelled">Testēšanas sesija atcelta.</string>
 </resources>
