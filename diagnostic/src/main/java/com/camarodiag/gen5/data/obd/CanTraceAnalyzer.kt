@@ -538,8 +538,9 @@ object CanTraceAnalyzer {
 
         val delimiter = if (lines[headerLineIndex].count { it == ';' } >
             lines[headerLineIndex].count { it == ',' }) ';' else ','
-        val headers = splitCsvLine(lines[headerLineIndex], delimiter)
-            .map { it.trim().trim('"').lowercase(Locale.ROOT).replace(" ", "_") }
+        val headerFields = splitCsvLine(lines[headerLineIndex], delimiter)
+            ?: return ParsedFrames(emptyList(), listOf("CSV header contains an unclosed quote."))
+        val headers = headerFields.map { it.trim().trim('"').lowercase(Locale.ROOT).replace(" ", "_") }
         val timestampIndex = headers.indexOfFirst { it in setOf("timestamp", "time", "seconds", "time_s") }
         val canIdIndex = headers.indexOfFirst { it in setOf("can_id", "canid", "arbitration_id", "id") }
         val directionIndex = headers.indexOfFirst { it in setOf("direction", "dir", "tx_rx") }
@@ -561,6 +562,10 @@ object CanTraceAnalyzer {
             val line = lines[lineIndex]
             if (line.isBlank() || line.trimStart().startsWith("#")) continue
             val fields = splitCsvLine(line, delimiter)
+            if (fields == null) {
+                errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
+                continue
+            }
             fun field(index: Int): String = fields.getOrNull(index).orEmpty().trim().trim('"')
             val canId = parseCanId(field(canIdIndex))
             val dlcText = if (dlcIndex >= 0) field(dlcIndex) else ""
@@ -609,7 +614,7 @@ object CanTraceAnalyzer {
         return ParsedFrames(frames, errors)
     }
 
-    private fun splitCsvLine(line: String, delimiter: Char): List<String> {
+    private fun splitCsvLine(line: String, delimiter: Char): List<String>? {
         val fields = mutableListOf<String>()
         val current = StringBuilder()
         var quoted = false
@@ -630,6 +635,7 @@ object CanTraceAnalyzer {
             }
             index++
         }
+        if (quoted) return null
         fields += current.toString()
         return fields
     }

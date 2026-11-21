@@ -1037,4 +1037,10 @@ class CanTraceAnalyzerTest {
         val report = CanTraceAnalyzer.analyze("id,data0\n7E8,+1\n7E8,000\n7E8,0x0F", "bytes.csv")
         assertEquals(listOf(15), report.frames.single().data)
     }
+    @Test
+    fun ignoresUnterminatedCsvRowAndContinues() {
+        val report = CanTraceAnalyzer.analyze("id,data\n7E8,\"02 41 00\n7E9,02 41 01", "capture.csv")
+        assertEquals(0x7E9, report.frames.single().canId)
+        assertTrue(report.errors.any { it.startsWith("Line 2:") })
+    }
 }
