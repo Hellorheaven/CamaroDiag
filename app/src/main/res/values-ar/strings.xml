@@ -886,4 +886,19 @@
     <string name="functional_tests_denied">تم رفض الوصول: سجّل الدخول بحساب Google المصرح له.</string>
     <string name="functional_tests_not_connected">لا يوجد محول OBD فعلي متصل. لم تنفذ الاختبارات الأخرى.</string>
     <string name="functional_tests_cancelled">تم إلغاء الاختبارات.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">إصدارات التصحيح</string>
+    <string name="tab_license">الترخيص</string>
+    <string name="debug_builds_title">إصدارات التصحيح الخاصة</string>
+    <string name="debug_builds_refresh">تحديث الإصدارات المتاحة</string>
+    <string name="debug_builds_download">تنزيل من GitHub</string>
+    <string name="debug_builds_unavailable">لا يتوفر أرشيف تصحيح صالح.</string>
+    <string name="debug_builds_error">تعذر تحميل إصدارات التصحيح من GitHub.</string>
+    <string name="license_disabled">نظام التراخيص غير مفعل.</string>
+    <string name="license_buy">شراء ترخيص</string>
+    <string name="license_refresh">تحديث الترخيص</string>
+    <string name="license_free">مجاني</string>
+    <string name="license_owner">المالك: جميع الصلاحيات</string>
+    <string name="license_premium">الترخيص الكامل مفعل</string>
+    <string name="license_title">ترخيص CamaroDiag</string>
 </resources>
