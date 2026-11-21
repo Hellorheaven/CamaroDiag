@@ -1400,28 +1400,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (!current()) return@launch
-                require(
-                    !observation.isReading && !observation.isGmlanReading &&
-                        (observation.ecuVinResponse.isNotBlank() ||
-                            observation.calibrationIdResponse.isNotBlank() ||
-                            observation.cvnResponse.isNotBlank() ||
-                            observation.ecuNameResponse.isNotBlank() ||
-                            observation.gmlanIdentity != null)
-                ) { "No observed ECU identity can be exported." }
-                val missing = localizedContext.getString(R.string.obd_not_available)
-                fun reported(value: String): String? = value.trim().takeIf {
-                    it.isNotBlank() && !it.equals(missing, ignoreCase = true)
-                }
-                fun lines(value: String): JSONArray = JSONArray().apply {
-                    value.lines().map(String::trim).filter(String::isNotBlank)
-                        .filterNot { it.equals(missing, ignoreCase = true) }
-                        .forEach { put(it) }
-                }
+                require(observation.canExportIdentification) { "No completed ECU identity can be exported." }
+                fun lines(value: String) = JSONArray(value.lines().map(String::trim).filter(String::isNotEmpty))
                 val report = JSONObject().apply {
                     put("format", "CamaroDiag-ecu-identity-v1")
-                    val hasMode09 = listOf(observation.ecuVinResponse, observation.calibrationIdResponse,
-                        observation.cvnResponse, observation.ecuNameResponse).any { reported(it) != null }
-                    put("source", if (hasMode09) "SAE-J1979-Mode09-read-only" else "J2534-GMLAN-read-only")
+                    put("source", if (observation.hasMode09Identification) "SAE-J1979-Mode09-read-only" else "J2534-GMLAN-read-only")
                     observation.gmlanIdentity?.let { identity ->
                         put("gmlanIdentity", JSONObject().apply {
                             put("source", "GMLAN-1A-physical-J2534")
@@ -1438,7 +1421,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("vehicleYear", profile.modelYear)
                     put("vehicleEngine", profile.engine.rpo)
                     put("selectedVehicleVin", profile.vin)
-                    put("observedEcuVin", reported(observation.ecuVinResponse) ?: JSONObject.NULL)
+                    put("observedEcuVin", observation.ecuVinResponse.trim().takeIf(String::isNotEmpty) ?: JSONObject.NULL)
                     put("ecuNames", lines(observation.ecuNameResponse))
                     put("calibrationIds", lines(observation.calibrationIdResponse))
                     put("calibrationVerificationNumbers", lines(observation.cvnResponse))
@@ -1456,7 +1439,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "observedFingerprintComplete",
                         Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
                             Lfx2012ControllerReferences.ObservedIdentity(
-                                ecuName = reported(observation.ecuNameResponse),
+                                ecuName = observation.ecuNameResponse.trim().takeIf(String::isNotEmpty),
                                 calibrationIds = observation.calibrationIdResponse.lines(),
                                 calibrationVerificationNumbers = observation.cvnResponse.lines(),
                                 simulated = observation.ecuIdentityFromSimulation
@@ -1581,15 +1564,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val vinComparison = VehicleVinMatcher.compare(_vehicle.value.vin, ecuVin)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
-                    ecuVinResponse = ecuVin ?: localizedContext.getString(R.string.obd_not_available),
+                    ecuVinResponse = ecuVin.orEmpty(),
                     ecuIdentityFromSimulation = sourceWasSimulated ||
                         obdManager.isSimulationActive || obdManager.isDemoMode,
                     vinComparison = vinComparison,
                     vinModelYear = VehicleVinMatcher.modelYearFromVin(ecuVin),
                     ecuNameResponse = identity.ecuNames.joinToString("\n"),
                     respondingEcuAddresses = identity.respondingEcuAddresses,
-                    calibrationIdResponse = identity.calibrationIds.joinToString("\n").ifBlank { localizedContext.getString(R.string.obd_not_available) },
-                    cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n").ifBlank { localizedContext.getString(R.string.obd_not_available) },
+                    calibrationIdResponse = identity.calibrationIds.joinToString("\n"),
+                    cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n"),
                     message = localizedContext.getString(
                         if (validCal || validCvn) R.string.msg_cal_identifiers_read
                         else R.string.msg_cal_identifiers_unavailable
@@ -3768,21 +3751,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Read the ECU VIN immediately after a successful OBD connection so that
             // the selected vehicle profile can be checked before the user starts diagnosis.
             // Keep this request ahead of the initial scans to avoid competing for the ELM channel.
+            val account = accountSessionGeneration
+            val connection = connectionAttemptGeneration
+            val request = ++calibrationIdentityGeneration
+            val profile = _vehicle.value
+            fun current() = account == accountSessionGeneration && connection == connectionAttemptGeneration &&
+                request == calibrationIdentityGeneration && profile == _vehicle.value
             viewModelScope.launch {
+                if (!current()) return@launch
                 try {
                     val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
                     val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
-                    val comparison = VehicleVinMatcher.compare(_vehicle.value.vin, identity.vin)
+                    if (!current()) return@launch
+                    val comparison = VehicleVinMatcher.compare(profile.vin, identity.vin)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        ecuVinResponse = identity.vin ?: localizedContext.getString(R.string.obd_not_available),
+                        ecuVinResponse = identity.vin.orEmpty(),
                         ecuIdentityFromSimulation = sourceWasSimulated ||
                         obdManager.isSimulationActive || obdManager.isDemoMode,
                         vinComparison = comparison,
                         vinModelYear = VehicleVinMatcher.modelYearFromVin(identity.vin),
                         ecuNameResponse = identity.ecuNames.joinToString("\n"),
                         respondingEcuAddresses = identity.respondingEcuAddresses,
-                        calibrationIdResponse = identity.calibrationIds.joinToString("\n").ifBlank { localizedContext.getString(R.string.obd_not_available) },
-                        cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n").ifBlank { localizedContext.getString(R.string.obd_not_available) }
+                        calibrationIdResponse = identity.calibrationIds.joinToString("\n"),
+                        cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n")
                     )
                     // Do not automatically interpret or audit data against the wrong saved vehicle.
                     // The user can resolve the mismatch first, then start diagnostics explicitly.
@@ -3793,10 +3784,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
+                    if (!current()) return@launch
                     val connectionLost = ObdTransportFailurePolicy.isConnectionLoss(error)
                     if (connectionLost) reportConnectionLoss(error)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        ecuVinResponse = localizedContext.getString(R.string.obd_not_available),
+                        ecuVinResponse = "",
                         ecuIdentityFromSimulation = false,
                         vinComparison = null,
                         vinModelYear = null,

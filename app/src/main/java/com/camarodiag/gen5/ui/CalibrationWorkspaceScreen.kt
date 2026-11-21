@@ -152,7 +152,14 @@ data class CalibrationWorkspaceState(
     val mapDefinitionsWarnings: List<String> = emptyList(),
     val mapDirty: Boolean = false,
     val mapError: String? = null
-)
+) {
+    val hasMode09Identification: Boolean
+        get() = ecuVinResponse.isNotBlank() || ecuNameResponse.isNotBlank() ||
+            calibrationIdResponse.isNotBlank() || cvnResponse.isNotBlank()
+
+    val canExportIdentification: Boolean
+        get() = !isReading && !isGmlanReading && (hasMode09Identification || gmlanIdentity != null)
+}
 
 
 @Composable
@@ -483,10 +490,7 @@ fun CalibrationWorkspaceScreen(
                         }
                         OutlinedButton(
                             onClick = onExportIdentification,
-                            enabled = !state.isReading &&
-                                (state.ecuVinResponse.isNotBlank() ||
-                                    state.calibrationIdResponse.isNotBlank() ||
-                                    state.cvnResponse.isNotBlank() || state.gmlanIdentity != null),
+                            enabled = state.canExportIdentification,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.flexfuel_lfx2012_export_fingerprint))
@@ -707,7 +711,7 @@ fun CalibrationWorkspaceScreen(
                                         color = CamaroAmber, fontSize = 11.sp)
                                     OutlinedButton(
                                         onClick = onExportIdentification,
-                                        enabled = !state.isReading && !state.isGmlanReading,
+                                        enabled = state.canExportIdentification,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Text(stringResource(R.string.flexfuel_lfx2012_export_fingerprint))
