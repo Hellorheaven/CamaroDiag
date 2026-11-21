@@ -27,6 +27,7 @@ internal static class NativeE39WriteSequenceSelfTests
         internal bool LoseSupplyAfterErase;
         internal int VoltageReads;
         internal int ByteReads;
+        internal bool CorruptEarlierSectorOnSecondErase;
         internal bool WrongOriginalReadback;
         internal bool WrongWrittenReadback;
         internal bool TruncatedWrittenReadback;
@@ -75,6 +76,8 @@ internal static class NativeE39WriteSequenceSelfTests
             {
                 address = (request[2] << 16) | (request[3] << 8) | request[4];
                 Erases++;
+                if (CorruptEarlierSectorOnSecondErase && Erases == 2)
+                    Memory[0] ^= 0x01;
                 Array.Fill(Memory, (byte)0xFF, address - 0x20000, 16);
                 return Task.FromResult(new byte[] { 0x7D, 0x05, 0 });
             }
@@ -131,9 +134,10 @@ internal static class NativeE39WriteSequenceSelfTests
         Assert(journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.WrittenCrcVerified) == 2 &&
                journal.Events[^1].Phase == NativeE39WriteSequence.Phase.Completed,
             "Every sector has a verification event before completed status");
-        Assert(ecu.ByteReads == 4 &&
+        Assert(ecu.ByteReads == 6 &&
                journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.OriginalBytesVerified) == 2 &&
-               journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.WrittenBytesVerified) == 2,
+               journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.WrittenBytesVerified) == 2 &&
+               journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.FinalBytesVerified) == 2,
             "Fresh byte comparisons before and after programming every sector");
         var requests = ecu.Requests;
         var firstErase = requests.FindIndex(x => x[0] == 0x3D && x[1] == 0x05);
@@ -242,6 +246,17 @@ internal static class NativeE39WriteSequenceSelfTests
                 byteJournal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
                 "Matching CRC but wrong or truncated post-write bytes require recovery");
         }
+
+        var disturbedEcu = new TestEcu(origin) { CorruptEarlierSectorOnSecondErase = true };
+        var disturbedJournal = new TestJournal();
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteSequence.RunBenchSequenceAsync(disturbedEcu, disturbedJournal,
+                plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(disturbedEcu.Erases == 2 &&
+               disturbedJournal.Events.Count(e => e.Phase == NativeE39WriteSequence.Phase.WrittenBytesVerified) == 2 &&
+               disturbedJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
+               disturbedJournal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
+            "Final pass catches corruption of a previously verified sector");
 
         var duplicate = plan with { Sectors = new[] { plan.Sectors[0], plan.Sectors[0] } };
         var overlapEcu = new TestEcu(origin);

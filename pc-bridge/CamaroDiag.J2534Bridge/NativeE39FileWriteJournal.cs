@@ -40,7 +40,7 @@ internal sealed class NativeE39FileWriteJournal :
             ObjectDisposedException.ThrowIf(disposed, this);
             var entry = JsonSerializer.Serialize(new
             {
-                Schema = 2,
+                Schema = 3,
                 UtcTimestamp = DateTimeOffset.UtcNow,
                 Phase = evidence.Phase.ToString(),
                 Address = evidence.Address,
@@ -76,7 +76,7 @@ internal sealed class NativeE39FileWriteJournal :
             {
                 using var json = JsonDocument.Parse(entry);
                 var node = json.RootElement;
-                if (node.GetProperty("Schema").GetInt32() != 2 ||
+                if (node.GetProperty("Schema").GetInt32() != 3 ||
                     !Enum.TryParse<NativeE39WriteSequence.Phase>(
                         node.GetProperty("Phase").GetString(), out var phase) ||
                     !Enum.IsDefined(phase) ||
@@ -140,10 +140,17 @@ internal sealed class NativeE39FileWriteJournal :
                             return CompletionState.Interrupted;
                         activeSector = null;
                         break;
+                    case NativeE39WriteSequence.Phase.FinalBytesVerified:
+                        if (!destructiveStarted || activeSector.HasValue ||
+                            sectors.Values.Any(p => p != NativeE39WriteSequence.Phase.WrittenBytesVerified &&
+                                p != NativeE39WriteSequence.Phase.FinalBytesVerified) ||
+                            !Advance(address, NativeE39WriteSequence.Phase.WrittenBytesVerified, phase))
+                            return CompletionState.Interrupted;
+                        break;
                     case NativeE39WriteSequence.Phase.Completed:
                         if (address != 0 || !destructiveStarted || activeSector.HasValue ||
                             sectors.Count == 0 || sectors.Values.Any(p =>
-                                p != NativeE39WriteSequence.Phase.WrittenBytesVerified))
+                                p != NativeE39WriteSequence.Phase.FinalBytesVerified))
                             return CompletionState.Interrupted;
                         completed = true;
                         break;

@@ -66,6 +66,11 @@ internal static class NativeE39FileWriteJournalSelfTests
                 NativeE39FileWriteJournal.CompletionState.Interrupted,
                 "CRC-only journal cannot prove successful byte readback");
             File.Delete(path);
+            WriteScenario(path, true, false, omitFinalPass: true);
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Individual readback cannot substitute for final whole-transaction verification");
+            File.Delete(path);
             var forged = new NativeE39FileWriteJournal(path);
             forged.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,
                 0, "fake success without physical write"), CancellationToken.None)
@@ -111,7 +116,7 @@ internal static class NativeE39FileWriteJournalSelfTests
         return tests;
     }
 
-    private static void WriteScenario(string path, bool writeSecond, bool wrongAddress, bool omitBytes = false)
+    private static void WriteScenario(string path, bool writeSecond, bool wrongAddress, bool omitBytes = false, bool omitFinalPass = false)
     {
         var journal = new NativeE39FileWriteJournal(path);
         void Add(NativeE39WriteSequence.Phase phase, uint address) =>
@@ -137,6 +142,9 @@ internal static class NativeE39FileWriteJournalSelfTests
                 wrongAddress ? 0x20010u : address);
             if (!omitBytes) Add(NativeE39WriteSequence.Phase.WrittenBytesVerified, address);
         }
+        if (writeSecond && !omitBytes && !omitFinalPass)
+            foreach (var address in addresses)
+                Add(NativeE39WriteSequence.Phase.FinalBytesVerified, address);
         Add(NativeE39WriteSequence.Phase.Completed, 0);
         journal.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }

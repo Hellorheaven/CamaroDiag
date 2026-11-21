@@ -18,7 +18,7 @@ internal static class NativeE39WriteSequence
     {
         Prepared, OriginalCrcVerified, OriginalBytesVerified, TestWriteAccepted, EraseStarted,
         EraseAcknowledged, WriteStarted, WrittenCrcVerified, WrittenBytesVerified,
-        Completed, RecoveryRequired
+        FinalBytesVerified, Completed, RecoveryRequired
     }
 
     internal sealed record Event(Phase Phase, uint Address, string Detail);
@@ -227,6 +227,18 @@ internal static class NativeE39WriteSequence
                     new(Phase.WrittenBytesVerified, s.Address, s.UpdatedSha256),
                     cancellationToken);
                 writtenBytes += s.Length;
+            }
+
+            // A later erase or write can disturb an earlier sector. Re-read
+            // every changed sector again after all programming has finished.
+            foreach (var item in sectors)
+            {
+                currentSector = item.Sector;
+                await RequireFreshBytesAsync(currentSector.Address, currentSector.Updated,
+                    "Final ECU readback differs after programming another sector; recovery required.");
+                await journal.AppendAsync(
+                    new(Phase.FinalBytesVerified, currentSector.Address, currentSector.UpdatedSha256),
+                    cancellationToken);
             }
 
             await journal.AppendAsync(
