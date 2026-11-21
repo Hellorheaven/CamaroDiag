@@ -90,6 +90,26 @@ internal static class BridgeSelfTests
         Assert(Decode(frame: [0, 0, 7, 0xE8, 0x7F, 0x19, 0x78]) is null, "Foreign pending response rejected");
         Assert(Decode(frame: [0, 0, 7, 0xE8, 0x7F, 0x22, 0x78]) is not null, "Matching pending response accepted");
 
+        Assert(NativeE39BenchReply.Matches([0x36,0x80,0,0,0,0], [0x99]),
+            "Native RAM execute acknowledgement is 99, not ordinary 76");
+        Assert(!NativeE39BenchReply.Matches([0x36,0x80,0,0,0,0], [0x76]),
+            "Copy acknowledgement cannot confirm RAM execution");
+        Assert(NativeE39BenchReply.Matches([0x28], [0x60]), "Legacy GM communication ack");
+        Assert(!NativeE39BenchReply.Matches([0x3D,0x05,2,0,0], [0x7D,2,0,0,0,0]),
+            "CRC reply cannot confirm erase");
+        Assert(!NativeE39BenchReply.Matches([0x27,1], [0x67,2]), "Stale security subfunction");
+        Assert(NativeE39BenchReply.Matches([0x23,0x14,0,2,0,0,2], [0x63,1,2]),
+            "Native readback exact response length");
+        Assert(!NativeE39BenchReply.Matches([0x23,0x14,0,2,0,0,2], [0x63,1]),
+            "Truncated native readback");
+        byte[] executeRequest = [0x36,0x80,0,0,0,0];
+        byte[] executeFrame = [0,0,7,0xE8,0x99];
+        Assert(J2534Device.DecodeReceivedPayload(6,0,5,0,executeFrame,6,0x7E8,executeRequest) is null,
+            "Regular bridge never interprets a native execute response");
+        Assert(J2534Device.DecodeReceivedPayload(6,0,5,0,executeFrame,6,0x7E8,executeRequest,
+            nativeBenchReply: true)!.SequenceEqual(new byte[]{0x99}),
+            "Isolated native decoder accepts exact response from selected channel");
+
         var cvns = J2534Device.DecodeIdentityRecords(6, Convert.FromHexString("49060201020304000000A0"));
         Assert(cvns.SequenceEqual(new[] { "01020304", "000000A0" }), "Mode 09 multiple CVNs");
         Assert(J2534Device.DecodeIdentityRecords(10, new byte[] { 0x7F, 9, 0x12 }).Count == 0,

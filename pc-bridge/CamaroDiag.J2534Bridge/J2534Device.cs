@@ -186,6 +186,13 @@ internal sealed class J2534Device : IDisposable
         if (payload.Length is < 1 or > 4091) throw new ArgumentOutOfRangeException(nameof(payload));
         ValidateReadOnlyService(payload, allowNoResponse: false);
 
+        return ExchangeCore(payload, timeoutMs, nativeBenchReply: false);
+    }
+
+    // The future isolated bench caller uses a separate reply dialect.
+    // The public network exchange above always remains read-only.
+    private byte[] ExchangeCore(byte[] payload, int timeoutMs, bool nativeBenchReply)
+    {
         var tx = CreatePayloadMessage(_requestCanId, payload);
         var messages = new[] { tx };
         uint count = 1;
@@ -208,7 +215,7 @@ internal sealed class J2534Device : IDisposable
             var message = received[0];
             var response = DecodeReceivedPayload(message.ProtocolId, message.RxStatus,
                 message.DataSize, message.ExtraDataIndex, message.Data,
-                _protocolId, _responseCanId, payload);
+                _protocolId, _responseCanId, payload, nativeBenchReply);
             if (response is null) continue;
             if (response.Length >= 3 && response[0] == 0x7F && response[1] == payload[0] && response[2] == 0x78)
             {
@@ -225,7 +232,7 @@ internal sealed class J2534Device : IDisposable
     // This validates the standard J2534-1 receive framing, not ECU flash support.
     internal static byte[]? DecodeReceivedPayload(uint protocol, uint rxStatus,
         uint dataSize, uint extraDataIndex, byte[] data,
-        uint expectedProtocol, int responseId, byte[] request)
+        uint expectedProtocol, int responseId, byte[] request, bool nativeBenchReply = false)
     {
         if (request.Length == 0 || protocol != expectedProtocol ||
             (rxStatus & (NonPayloadRxStatus | Iso15765ExtendedAddress)) != 0 ||
@@ -239,6 +246,8 @@ internal sealed class J2534Device : IDisposable
         var response = data.AsSpan(4, checked((int)dataSize) - 4);
         if (response[0] == 0x7F)
             return response.Length == 3 && response[1] == request[0] ? response.ToArray() : null;
+        if (nativeBenchReply) return NativeE39BenchReply.Matches(request, response)
+            ? response.ToArray() : null;
         if (response[0] != unchecked((byte)(request[0] + 0x40))) return null;
 
         // Match echoed identifiers on the read services used by the bridge.
