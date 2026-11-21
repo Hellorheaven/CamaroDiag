@@ -95,6 +95,49 @@ internal static class NativeE39CalibrationRepairSelfTests
             NativeE39CalibrationRepair.Repair(original, badLength));
         passed++;
 
+        var folder = Path.Combine(Path.GetTempPath(),
+            "CamaroDiag-E39-Offline-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var baselinePath = Path.Combine(folder, "original.bin");
+            var editedPath = Path.Combine(folder, "edited.bin");
+            var outputPath = Path.Combine(folder, "repaired.bin");
+            File.WriteAllBytes(baselinePath, original);
+            File.WriteAllBytes(editedPath, edited);
+            Assert(NativeE39CalibrationRepairCli.Run([
+                   NativeE39CalibrationRepairCli.Command,
+                   baselinePath, editedPath, outputPath]) == 0,
+                "Offline CLI repairs two calibration segments without opening a J2534 device");
+            Assert(File.ReadAllBytes(outputPath).SequenceEqual(result.RepairedImage),
+                "CLI output is a verified complete 3MiB image");
+            Assert(NativeE39CalibrationRepairCli.Run([
+                   NativeE39CalibrationRepairCli.Command,
+                   baselinePath, editedPath, outputPath]) == 10,
+                "CLI refuses to overwrite an existing result");
+            Assert(File.ReadAllBytes(outputPath).SequenceEqual(result.RepairedImage),
+                "Failed second invocation preserves first output unchanged");
+            Assert(NativeE39CalibrationRepairCli.Run([
+                   NativeE39CalibrationRepairCli.Command,
+                   baselinePath, editedPath, baselinePath]) == 10,
+                "CLI refuses overwriting the sole original backup");
+            Assert(File.ReadAllBytes(baselinePath).SequenceEqual(original),
+                "CLI never mutates the source ECU backup");
+
+            var outside = Path.Combine(folder, "bad-os.bin");
+            File.WriteAllBytes(outside, operatingSystem);
+            var forbiddenOutput = Path.Combine(folder, "should-not-exist.bin");
+            Assert(NativeE39CalibrationRepairCli.Run([
+                   NativeE39CalibrationRepairCli.Command,
+                   baselinePath, outside, forbiddenOutput]) == 10 &&
+                   !File.Exists(forbiddenOutput),
+                "CLI emits no flash image after forbidden OS edits");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+
         Console.WriteLine($"PASS: {passed} E39 native offline calibration repair tests.");
         return passed;
     }
