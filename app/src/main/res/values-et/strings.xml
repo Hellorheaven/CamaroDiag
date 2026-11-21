@@ -417,4 +417,34 @@
     <string name="debug_builds_created">Loodud</string>
     <string name="debug_builds_expires">Aegub</string>
     <string name="debug_builds_no_browser">Allalaadimise avamiseks pole veebibrauserit.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Valitud keel: %1$s</string>
+    <string name="settings_adapter_not_connected">Adapter pole ühendatud</string>
+    <string name="settings_last_connection">Viimane ühendusprofiil</string>
+    <string name="settings_no_last_connection">Salvestatud ühendusprofiili veel pole.</string>
+    <string name="saved_vehicle_profiles_title">Salvestatud sõidukiprofiilid</string>
+    <string name="saved_vehicle_name_label">Profiili nimi</string>
+    <string name="saved_vehicle_name_placeholder">nt Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Salvesta praegune sõiduk</string>
+    <string name="saved_vehicle_empty">Salvestatud sõidukiprofiile veel pole.</string>
+    <string name="saved_vehicle_delete">Kustuta</string>
+    <string name="saved_vehicle_requires_review">Profiil loodi ECU VIN-koodi põhjal. Enne diagnostikat kontrollige mudeliaastat, mootorit ja käigukasti.</string>
+    <string name="saved_vehicle_ecu_default_name">Sõiduk ECU-st • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Sisestage profiili nimi.</string>
+    <string name="msg_vehicle_profile_saved">Sõidukiprofiil salvestati.</string>
+    <string name="msg_vehicle_profile_review_required">Profiil loodi ECU VIN-koodi põhjal. Enne diagnostikat kontrollige aastat, mootorit ja käigukasti.</string>
+    <string name="msg_vehicle_profile_loaded">Laaditud sõidukiprofiil: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU ei tagastanud kehtivat 17 märgiga VIN-koodi. Profiili ei loodud.</string>
+    <string name="cal_vin_matches_profile">ECU VIN-kood vastab valitud sõidukiprofiilile.</string>
+    <string name="cal_vin_mismatch_detected">VIN-KOODID EI ÜHTI — profiil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Valitud sõidukiprofiil ei sisalda kehtivat VIN-koodi.</string>
+    <string name="cal_vin_mismatch_title">Tuvastati VIN-koodide lahknevus</string>
+    <string name="cal_vin_mismatch_confirmation">Valitud profiili VIN-kood on %1$s, kuid ECU tagastas %2$s. Need võivad olla eri sõidukid. Valitud sõiduki säilitamiseks looge eraldi profiil või sünkroonige alles pärast tegeliku sõiduki kontrollimist.</string>
+    <string name="cal_vin_create_vehicle">Loo sõidukiprofiil</string>
+    <string name="cal_vin_sync_existing">Sünkrooni valitud profiili VIN-kood</string>
+    <string name="cal_vin_sync_warning_title">Kas kinnitada VIN-koodi asendamine?</string>
+    <string name="cal_vin_sync_warning_message">Valitud sõidukiprofiilis olev VIN-kood (%1$s) asendatakse ECU VIN-koodiga (%2$s). Aasta, mootor, käigukast ja turg ei muutu. Tehke seda ainult pärast ühendatud sõiduki õigsuse kinnitamist.</string>
+    <string name="cal_vin_sync_confirm">Asenda VIN-kood</string>
+    <string name="vin_photo_capture">Pildista VIN-koodi</string>
 </resources>
