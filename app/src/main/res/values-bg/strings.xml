@@ -472,4 +472,14 @@
     <string name="dtc_desc_p0175">Твърде богата горивна смес (банка 2)</string>
     <string name="dtc_desc_p0420">Ефективност на катализатора под прага (банка 1)</string>
     <string name="dtc_desc_p0430">Ефективност на катализатора под прага (банка 2)</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Четене на реална ECU памет (J2534)</string>
+    <string name="cal_live_memory_notice">Мостът за Windows изисква одобрена карта на паметта, свързана с VIN. Само четене; записът в ECU остава изключен.</string>
+    <string name="cal_live_memory_length">Байтове за четене (до 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">Калибрация</string>
+    <string name="cal_live_memory_extended">Разширена диагностична сесия (0x03)</string>
+    <string name="cal_live_memory_save">Прочети ECU паметта два пъти и запази ZIP</string>
+    <string name="cal_live_memory_saved">ECU паметта е запазена след две еднакви прочитания.</string>
+    <string name="cal_live_memory_failed">Четенето на ECU паметта е неуспешно. Няма проверено копие.</string>
 </resources>

@@ -850,4 +850,14 @@
     <string name="cal_expert_patch_preview_button">הצגת סקטורים שיושפעו מקובץ BIN ששונה</string>
     <string name="cal_expert_patch_summary">בתים ששונו: %1$d. סקטורי מחיקה מושפעים: %2$d. מפת זיכרון החומרה לא אומתה; ללא כתיבה.</string>
     <string name="cal_expert_patch_invalid">תצוגה מקדימה לא זמינה: קבצים, טווח זיכרון או פרמטרי מחיקה/תכנות שגויים. לא בוצע ניסיון כתיבה.</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">קריאת זיכרון ECU אמיתי (J2534)</string>
+    <string name="cal_live_memory_notice">גשר Windows מחייב מפת זיכרון מאושרת המשויכת למספר VIN. קריאה בלבד; כתיבה ל-ECU נשארת חסומה.</string>
+    <string name="cal_live_memory_length">בתים לקריאה (עד 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">כיול</string>
+    <string name="cal_live_memory_extended">מפגש אבחון מורחב (0x03)</string>
+    <string name="cal_live_memory_save">קרא פעמיים ושמור זיכרון ECU בקובץ ZIP</string>
+    <string name="cal_live_memory_saved">זיכרון ECU נשמר לאחר שתי קריאות זהות.</string>
+    <string name="cal_live_memory_failed">קריאת זיכרון ECU נכשלה. לא נוצר גיבוי מאומת.</string>
 </resources>

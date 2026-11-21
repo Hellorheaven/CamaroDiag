@@ -844,4 +844,14 @@
     <string name="cal_expert_patch_preview_button">预览修改后的 BIN 所影响的扇区</string>
     <string name="cal_expert_patch_summary">修改字节数：%1$d。受影响的擦除扇区：%2$d。硬件存储映射未经验证；不执行写入。</string>
     <string name="cal_expert_patch_invalid">无法离线预览：文件、存储区域范围或擦除/编程参数无效。未尝试写入。</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">读取真实 ECU 存储器 (J2534)</string>
+    <string name="cal_live_memory_notice">Windows 桥接程序需要与 VIN 绑定且经批准的存储器映射。仅允许读取，ECU 写入仍被禁用。</string>
+    <string name="cal_live_memory_length">读取字节数（最多 4 MiB）</string>
+    <string name="cal_live_memory_region_calibration">标定</string>
+    <string name="cal_live_memory_extended">扩展诊断会话 (0x03)</string>
+    <string name="cal_live_memory_save">读取两次并将 ECU 存储器保存为 ZIP</string>
+    <string name="cal_live_memory_saved">两次读取结果一致，ECU 存储器已保存。</string>
+    <string name="cal_live_memory_failed">ECU 存储器读取失败，未创建经过验证的备份。</string>
 </resources>

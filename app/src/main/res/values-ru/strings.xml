@@ -853,4 +853,14 @@
     <string name="cal_expert_patch_preview_button">Просмотр секторов, затрагиваемых изменённым BIN</string>
     <string name="cal_expert_patch_summary">Изменено байт: %1$d. Затронуто секторов стирания: %2$d. Карта памяти оборудования не подтверждена; запись отключена.</string>
     <string name="cal_expert_patch_invalid">Автономный просмотр недоступен: неправильные файлы, границы памяти или параметры стирания/программирования. Запись не выполнялась.</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">Чтение реальной памяти ЭБУ (J2534)</string>
+    <string name="cal_live_memory_notice">Мост Windows требует утверждённую карту памяти, привязанную к VIN. Только чтение; запись ЭБУ отключена.</string>
+    <string name="cal_live_memory_length">Объём чтения в байтах (до 4 МиБ)</string>
+    <string name="cal_live_memory_region_calibration">Калибровка</string>
+    <string name="cal_live_memory_extended">Расширенная диагностическая сессия (0x03)</string>
+    <string name="cal_live_memory_save">Дважды прочитать память ЭБУ и сохранить ZIP</string>
+    <string name="cal_live_memory_saved">Память ЭБУ сохранена после двух совпадающих чтений.</string>
+    <string name="cal_live_memory_failed">Ошибка чтения памяти ЭБУ. Проверенная копия не создана.</string>
 </resources>

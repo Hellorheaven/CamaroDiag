@@ -844,4 +844,14 @@
     <string name="cal_expert_patch_preview_button">수정된 BIN이 영향을 미치는 섹터 미리보기</string>
     <string name="cal_expert_patch_summary">변경된 바이트: %1$d. 영향받는 지우기 섹터: %2$d. 하드웨어 메모리 맵 미검증, 쓰기 없음.</string>
     <string name="cal_expert_patch_invalid">오프라인 미리보기를 사용할 수 없습니다. 파일, 메모리 범위 또는 지우기/프로그래밍 설정이 잘못되었습니다. 쓰기를 시도하지 않았습니다.</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">실제 ECU 메모리 읽기 (J2534)</string>
+    <string name="cal_live_memory_notice">Windows 브리지는 VIN에 연결된 승인된 메모리 맵이 필요합니다. 읽기 전용이며 ECU 쓰기는 비활성화됩니다.</string>
+    <string name="cal_live_memory_length">읽을 바이트 수 (최대 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">캘리브레이션</string>
+    <string name="cal_live_memory_extended">확장 진단 세션 (0x03)</string>
+    <string name="cal_live_memory_save">ECU 메모리를 두 번 읽고 ZIP 저장</string>
+    <string name="cal_live_memory_saved">두 번의 읽기 결과가 일치하여 ECU 메모리를 저장했습니다.</string>
+    <string name="cal_live_memory_failed">ECU 메모리 읽기 실패. 검증된 백업이 생성되지 않았습니다.</string>
 </resources>

@@ -859,4 +859,14 @@
     <string name="cal_expert_patch_preview_button">معاينة القطاعات المتأثرة بملف BIN المعدّل</string>
     <string name="cal_expert_patch_summary">البايتات المتغيرة: %1$d. قطاعات المسح المتأثرة: %2$d. خريطة العتاد غير موثّقة؛ لا كتابة.</string>
     <string name="cal_expert_patch_invalid">المعاينة دون اتصال غير متاحة: الملفات أو نطاق الذاكرة أو إعدادات المسح/البرمجة غير صالحة. لم تُجرَ أي محاولة كتابة.</string>
+
+    <!-- Physical J2534 ECU memory backup -->
+    <string name="cal_live_memory_title">قراءة ذاكرة وحدة التحكم ECU الفعلية (J2534)</string>
+    <string name="cal_live_memory_notice">تتطلب وصلة Windows خريطة ذاكرة معتمدة مرتبطة برقم VIN. القراءة فقط؛ تظل الكتابة إلى ECU معطلة.</string>
+    <string name="cal_live_memory_length">عدد البايتات للقراءة (حتى 4 MiB)</string>
+    <string name="cal_live_memory_region_calibration">المعايرة</string>
+    <string name="cal_live_memory_extended">جلسة تشخيص موسعة (0x03)</string>
+    <string name="cal_live_memory_save">قراءة ذاكرة ECU مرتين وحفظها في ZIP</string>
+    <string name="cal_live_memory_saved">تم حفظ ذاكرة ECU بعد قراءتين متطابقتين.</string>
+    <string name="cal_live_memory_failed">فشلت قراءة ذاكرة ECU. لم تُنشأ نسخة احتياطية متحقق منها.</string>
 </resources>
