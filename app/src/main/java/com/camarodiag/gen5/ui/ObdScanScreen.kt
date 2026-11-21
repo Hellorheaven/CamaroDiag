@@ -211,9 +211,10 @@ fun ObdScanScreen(
             }
 
             item {
+                val physical = report.physicalCanResponder
                 Text(
-                    if (report.physicalCanResponder != null) {
-                        stringResource(R.string.obd_physical_can_scope, report.physicalCanResponder)
+                    if (physical != null) {
+                        stringResource(R.string.obd_physical_can_scope, physical)
                     } else stringResource(R.string.obd_can_id_limit_explanation),
                     color = TextMuted,
                     fontSize = 11.sp

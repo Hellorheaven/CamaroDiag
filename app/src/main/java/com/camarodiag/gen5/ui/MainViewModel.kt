@@ -3221,9 +3221,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     _connectionMessage.value = null
                 } else if (!obdManager.isObdCommandChannelAvailable) {
-                    _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
-                        localizedContext.getString(R.string.msg_dtc_clear_j2534_unavailable)
-                    else localizedContext.getString(R.string.msg_dtc_clear_adapter_required)
+                    _connectionMessage.value = when {
+                        obdManager.isJ2534StandardObdAvailable() ->
+                            localizedContext.getString(R.string.msg_dtc_j2534_clear_requires_permission)
+                        obdManager.isJ2534BridgeConnected() ->
+                            localizedContext.getString(R.string.msg_dtc_clear_j2534_unavailable)
+                        else -> localizedContext.getString(R.string.msg_dtc_clear_adapter_required)
+                    }
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
                     if (!current()) return@launch
