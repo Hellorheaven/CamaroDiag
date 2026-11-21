@@ -9,13 +9,11 @@ internal static class NativeE39WritePreviewCli
 
     internal static int Run(string[] args)
     {
-        if (args.Length != 5 ||
-            !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase) ||
-            !int.TryParse(args[3], NumberStyles.None, CultureInfo.InvariantCulture, out var eraseBytes) ||
-            !int.TryParse(args[4], NumberStyles.None, CultureInfo.InvariantCulture, out var unitBytes))
+        if (args.Length is not (3 or 5) ||
+            !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase))
         {
             Console.Error.WriteLine("Usage: CamaroDiag.J2534Bridge.exe " + Command +
-                " <original.bin> <modified.bin> <proposed-erase-sector-bytes> <proposed-program-unit-bytes>");
+                " <original.bin> <modified.bin> [<proposed-erase-sector-bytes> <proposed-program-unit-bytes>]");
             return 10;
         }
 
@@ -25,8 +23,17 @@ internal static class NativeE39WritePreviewCli
             var modified = ReadImage(args[2]);
             var osId = NativeE39ImageInspector.Inspect(original).OsIdentifier ??
                 throw new InvalidDataException("Original firmware identity unavailable.");
-            var layout = new NativeEcuSectorPlanner.Layout(0, original.Length,
-                eraseBytes, unitBytes, [new(0, NativeE39ImageInspector.ProtectedBootBytes)], false);
+            var layout = NativeMpc5566FlashMap.E39PreviewLayout();
+            if (args.Length == 5)
+            {
+                if (!int.TryParse(args[3], NumberStyles.None, CultureInfo.InvariantCulture, out var eraseBytes) ||
+                    !int.TryParse(args[4], NumberStyles.None, CultureInfo.InvariantCulture, out var unitBytes))
+                    throw new ArgumentException("Invalid proposed erase/program unit geometry.");
+                layout = new NativeEcuSectorPlanner.Layout(0, original.Length,
+                    eraseBytes, unitBytes, [new(0, NativeE39ImageInspector.ProtectedBootBytes)], false);
+            }
+            else Console.WriteLine("Reference geometry: MPC5566 silicon, not a qualified ECU.");
+
             var report = NativeE39ImagePreflight.Preview(original, modified, layout,
                 osId, calibrationOnly: true);
             Console.WriteLine("E39/E39A offline calibration sector preview (NOT qualified for flash).");

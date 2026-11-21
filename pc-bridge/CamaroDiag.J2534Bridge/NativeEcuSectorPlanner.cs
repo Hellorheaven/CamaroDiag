@@ -17,7 +17,8 @@ internal static class NativeEcuSectorPlanner
         int EraseSectorBytes,
         int ProgramUnitBytes,
         IReadOnlyList<Range> ProtectedRanges,
-        bool VerifiedForExactFirmware);
+        bool VerifiedForExactFirmware,
+        IReadOnlyList<Range>? PhysicalEraseBlocks = null);
 
     internal sealed record Sector(
         uint Address,
@@ -45,12 +46,17 @@ internal static class NativeEcuSectorPlanner
         if (original.Length == 0 || original.Length != updated.Length ||
             original.Length != layout.RegionSize)
             throw new ArgumentException("ECU original, modified and memory region sizes must match.");
-        if (layout.EraseSectorBytes <= 0 || layout.ProgramUnitBytes <= 0 ||
-            layout.EraseSectorBytes % layout.ProgramUnitBytes != 0 ||
-            layout.RegionSize % layout.EraseSectorBytes != 0 ||
-            layout.RegionStartAddress % layout.EraseSectorBytes != 0)
+        if (layout.ProgramUnitBytes <= 0)
+            throw new ArgumentException("Invalid flash programming unit.");
+        if (layout.PhysicalEraseBlocks is null &&
+            (layout.EraseSectorBytes <= 0 ||
+             layout.EraseSectorBytes % layout.ProgramUnitBytes != 0 ||
+             layout.RegionSize % layout.EraseSectorBytes != 0 ||
+             layout.RegionStartAddress % layout.EraseSectorBytes != 0))
             throw new ArgumentException("ECU erase and write units must match the verified layout.");
-        if ((ulong)layout.RegionStartAddress + (uint)layout.RegionSize > 0x1_0000_0000UL)
+        if (layout.PhysicalEraseBlocks is not null && layout.EraseSectorBytes != 0)
+            throw new ArgumentException("Choose an explicit block map or uniform geometry, not both.");
+        if ((ulong)layout.RegionStartAddress + (uint)layout.RegionSize > uint.MaxValue)
             throw new ArgumentException("ECU flash address range overflows.");
         var lastEnd = 0UL;
         foreach (var protectedRange in layout.ProtectedRanges.OrderBy(range => range.Start))
@@ -63,12 +69,34 @@ internal static class NativeEcuSectorPlanner
             lastEnd = protectedRange.EndExclusive;
         }
 
+        var physicalBlocks = layout.PhysicalEraseBlocks?.ToArray() ??
+            Enumerable.Range(0, layout.RegionSize / layout.EraseSectorBytes)
+                .Select(i => new Range(
+                    checked(layout.RegionStartAddress + (uint)(i * layout.EraseSectorBytes)),
+                    checked(layout.RegionStartAddress + (uint)((i + 1) * layout.EraseSectorBytes))))
+                .ToArray();
+        // Explicit physical blocks must cover the entire input exactly once.
+        ulong next = layout.RegionStartAddress;
+        foreach (var block in physicalBlocks)
+        {
+            if (block.Start != next || block.EndExclusive <= block.Start ||
+                (block.EndExclusive - block.Start) % layout.ProgramUnitBytes != 0 ||
+                block.Start % layout.ProgramUnitBytes != 0 ||
+                block.EndExclusive > (ulong)layout.RegionStartAddress + (uint)layout.RegionSize)
+                throw new ArgumentException("Invalid or noncontiguous physical flash block map.");
+            next = block.EndExclusive;
+        }
+        if (next != (ulong)layout.RegionStartAddress + (uint)layout.RegionSize)
+            throw new ArgumentException("Physical block map does not cover the entire flash region.");
+
         var sectors = new List<Sector>();
         var changed = 0;
-        for (var offset = 0; offset < original.Length; offset += layout.EraseSectorBytes)
+        foreach (var block in physicalBlocks)
         {
+            var offset = checked((int)(block.Start - layout.RegionStartAddress));
+            var blockLength = checked((int)(block.EndExclusive - block.Start));
             var delta = 0;
-            for (var i = offset; i < offset + layout.EraseSectorBytes; i++)
+            for (var i = offset; i < offset + blockLength; i++)
             {
                 if (original[i] == updated[i]) continue;
                 var address = (ulong)layout.RegionStartAddress + (uint)i;
@@ -79,14 +107,14 @@ internal static class NativeEcuSectorPlanner
                 delta++;
             }
             if (delta == 0) continue;
-            var sectorStart = (uint)((ulong)layout.RegionStartAddress + (uint)offset);
-            var sectorEnd = (ulong)sectorStart + (uint)layout.EraseSectorBytes;
+            var sectorStart = block.Start;
+            var sectorEnd = (ulong)block.EndExclusive;
             if (layout.ProtectedRanges.Any(range =>
                 sectorStart < range.EndExclusive && sectorEnd > range.Start))
                 throw new UnauthorizedAccessException(
                     "Erasing this sector would also erase protected ECU memory.");
-            var baseline = original.AsSpan(offset, layout.EraseSectorBytes).ToArray();
-            var patched = updated.AsSpan(offset, layout.EraseSectorBytes).ToArray();
+            var baseline = original.AsSpan(offset, blockLength).ToArray();
+            var patched = updated.AsSpan(offset, blockLength).ToArray();
             sectors.Add(new Sector(
                 sectorStart, baseline, patched,
                 Convert.ToHexString(SHA256.HashData(baseline)),
