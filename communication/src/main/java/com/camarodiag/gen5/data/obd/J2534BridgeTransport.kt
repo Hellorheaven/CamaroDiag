@@ -27,6 +27,11 @@ class J2534BridgeTransport(
     private var reader: BufferedReader? = null
     private var writer: BufferedWriter? = null
     @Volatile private var opened = false
+    @Volatile private var scopedMemoryReadEnabled = false
+
+    /** True only when the authenticated PC bridge confirmed a VIN-bound memory scope. */
+    val isScopedMemoryReadEnabled: Boolean
+        get() = isConnected && scopedMemoryReadEnabled
     /** Close requested by the app, not a spontaneous I/O failure of the bridge. */
     @Volatile private var externallyClosed = false
 
@@ -76,6 +81,7 @@ class J2534BridgeTransport(
                         .put("protocolNumber", protocolNumber),
                     10_000
                 )
+                scopedMemoryReadEnabled = response.optBoolean("scopedPhysicalMemoryRead", false)
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
                 "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s"
@@ -180,6 +186,7 @@ class J2534BridgeTransport(
         writer = null
         socket = null
         opened = false
+        scopedMemoryReadEnabled = false
     }
 
     private fun ByteArray.toHex(): String =
