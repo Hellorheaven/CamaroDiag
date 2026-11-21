@@ -702,4 +702,11 @@
     <string name="vin_photo_not_found">Platný 17znakový VIN nebyl nalezen. Zadejte jej ručně nebo pořiďte nový snímek.</string>
     <string name="vin_photo_error">VIN se ze snímku nepodařilo přečíst. Zkuste lepší osvětlení a zaostření.</string>
     <string name="vehicle_vin_placeholder">17 znaků</string>
+    <string name="can_sniffer_start">Spustit záznam</string>
+    <string name="can_sniffer_stop">Zastavit záznam</string>
+    <string name="can_sniffer_empty">Zatím nebyly zachyceny žádné rámce CAN.</string>
+    <string name="can_sniffer_capture_complete">Záznam CAN byl dokončen.</string>
+    <string name="can_sniffer_capture_failed">Záznam CAN selhal nebo adaptér přestal odpovídat.</string>
+    <string name="can_sniffer_frame_count">Počet zachycených rámců: %1$d</string>
+    <string name="can_sniffer_filtered_count">Zobrazeno %1$d z %2$d rámců</string>
 </resources>
