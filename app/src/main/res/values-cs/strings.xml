@@ -715,4 +715,11 @@
     <string name="msg_live_csv_exported">Protokol CSV byl exportován. Počet vzorků: %1$d.</string>
     <string name="msg_live_csv_export_failed">Protokol CSV se nepodařilo exportovat.</string>
     <string name="msg_live_recording_max_samples">Bylo dosaženo bezpečnostního limitu (%1$d). Záznam se automaticky zastavil.</string>
+    <string name="msg_cal_file_import_failed">Kalibrační soubor se nepodařilo importovat.</string>
+    <string name="msg_cal_file_export_failed">Kalibrační soubor se nepodařilo exportovat.</string>
+    <string name="msg_cal_comparison_failed">Kalibrační soubory se nepodařilo porovnat.</string>
+    <string name="msg_cal_template_export_failed">Šablonu TSV se nepodařilo exportovat.</string>
+    <string name="msg_cal_definitions_import_failed">Definice tabulek se nepodařilo importovat.</string>
+    <string name="msg_cal_map_read_failed">Vybranou tabulku se nepodařilo přečíst.</string>
+    <string name="msg_cal_table_edit_failed">Kalibrační tabulku se nepodařilo upravit.</string>
 </resources>
