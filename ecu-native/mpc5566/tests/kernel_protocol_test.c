@@ -72,6 +72,12 @@ int main(void)
     assert(kernel.remaining == 0x10000 && m.pulses == 1);
     assert(process(&kernel, erase, sizeof(erase), out) == 3 && out[2] == 0x24);
     assert(process(&kernel, handshake, sizeof(handshake), out) == 10 && out[9] == 1);
+    const uint8_t incomplete_read[] = {0x23,0x14,0,2,0,0,8};
+    const uint8_t incomplete_crc[] = {0x3D,2,0,0,8,2,0,0};
+    unsigned before_reads = m.word_reads;
+    assert(process(&kernel, incomplete_read, sizeof(incomplete_read), out) == 3 && out[2] == 0x24);
+    assert(process(&kernel, incomplete_crc, sizeof(incomplete_crc), out) == 3 && out[2] == 0x24);
+    assert(m.word_reads == before_reads && m.pulses == 1);
     n = build_write(0, 0x20008, 8, 0x55);
     assert(process(&kernel, req, n, out) == 3 && out[2] == 0x24);
     n = build_write(0, 0x20000, 8, 0x55);

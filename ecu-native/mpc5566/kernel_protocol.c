@@ -184,6 +184,10 @@ size_t cd_kernel_process(cd_kernel *k, const uint8_t *req, size_t n,
         return 10;
     }
     if (k->flash->recovery_required) return negative(out, cap, sid, NRC_CONDITIONS);
+    /* A partly rewritten sector is not an image that may be verified.
+     * The host must finish its contiguous write before CRC or readback. */
+    if (k->remaining != 0 && !(sid == 0x36 && n >= 2 && req[1] == 0x00))
+        return negative(out, cap, sid, NRC_SEQUENCE);
     if (sid == 0x23) return flash_read(k, req, n, out, cap);
     if (sid == 0x36) return flash_write(k, req, n, out, cap);
     if (sid == 0x3D && n >= 2) {
