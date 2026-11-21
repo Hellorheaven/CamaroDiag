@@ -169,7 +169,20 @@ jobs:
             echo "Manual Android Debug validation explicitly requested."
           # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
           elif [[ "$IS_DRAFT" == "true" ]]; then
-            if [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
+            # The secure bridge must never be called "CI-green" on a
+            # checkpoint-only run. Force a complete Android build/lint/test
+            # whenever its TLS client or network policy changed since the
+            # last actually successful Android build.
+            if ! git diff --quiet "$count_base" "$HEAD_SHA" -- \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/J2534BridgeTransport.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/J2534BridgeTls.kt' \
+                'communication/src/test/java/com/camarodiag/gen5/data/obd/J2534BridgeTlsTest.kt' \
+                'app/src/main/AndroidManifest.xml' \
+                'app/src/main/res/xml/network_security_config.xml'; then
+              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+              echo "build_required=true" >> "$GITHUB_OUTPUT"
+              echo "TLS/security Android changes require a complete build and lint."
+            elif [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
               echo "validation_applies=false" >> "$GITHUB_OUTPUT"
               echo "build_required=false" >> "$GITHUB_OUTPUT"
               echo "NOT APPLICABLE to this commit: no Android-relevant files changed."
