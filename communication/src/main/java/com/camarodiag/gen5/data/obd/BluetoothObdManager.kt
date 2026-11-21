@@ -788,9 +788,29 @@ class BluetoothObdManager(context: Context) {
             ) { command, commandTimeout ->
                 sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
             }
-            val result = block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
-            transportSessionEpoch.requireCurrent(requestedEpoch)
-            result
+            try {
+                val result = block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
+                transportSessionEpoch.requireCurrent(requestedEpoch)
+                result
+            } finally {
+                // STPX changes the adapter's CAN filter, protocol and ISO-TP
+                // segmentation settings. Always restore functional OBD mode
+                // before releasing the mutex to telemetry or other diagnostics.
+                // A replaced connection must NEVER be touched by old cleanup.
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(requestedEpoch)) {
+                        val restore = StnUdsAdapterRestoration.restore { command ->
+                            sendAtCommandInternal(command, 1_500L, expectedEpoch = requestedEpoch)
+                        }
+                        if (!restore.succeeded) {
+                            // A partially restored adapter cannot safely serve
+                            // normal PID reads. Invalidate this connection.
+                            disconnect()
+                            error("STN diagnostic session cleanup failed; reconnect the OBD adapter.")
+                        }
+                    }
+                }
+            }
         }
     }
 
