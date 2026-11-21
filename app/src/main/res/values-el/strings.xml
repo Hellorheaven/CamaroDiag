@@ -873,4 +873,17 @@
     <string name="cal_archive_verified">Οι δύο αναγνώσεις συμφωνούν και οι τιμές SHA-256 είναι έγκυρες για τις αποθηκευμένες περιοχές.</string>
     <string name="cal_archive_partial">Το αντίγραφο καλύπτει μόνο μέρος της μνήμης που ζητήθηκε.</string>
     <string name="cal_archive_failed">Ο έλεγχος του ZIP απέτυχε. Το όριο μετά την αποσυμπίεση είναι 32 MiB.</string>
+    <string name="tab_functional_tests">Λειτουργικές δοκιμές</string>
+    <string name="functional_tests_title">Λειτουργικές δοκιμές — ECU και OBD</string>
+    <string name="functional_tests_readonly">Εκτέλεση διαθέσιμων ελέγχων μόνο ανάγνωσης με τον συνδεδεμένο φυσικό προσαρμογέα. Οι άλλοι προσαρμογείς και οι μη επαληθευμένες ECU παραμένουν ΧΩΡΙΣ ΔΟΚΙΜΗ. Χωρίς διαγραφή ή εγγραφή.</string>
+    <string name="functional_tests_run">Εκτέλεση όλων</string>
+    <string name="functional_tests_stop">Διακοπή</string>
+    <string name="functional_tests_export">Εξαγωγή JSON</string>
+    <string name="functional_tests_summary">%1$d επιτυχίες · %2$d αποτυχίες · %3$d χωρίς δοκιμή</string>
+    <string name="functional_tests_passed">ΕΠΙΤΥΧΙΑ (φυσικός έλεγχος)</string>
+    <string name="functional_tests_failed">ΑΠΟΤΥΧΙΑ</string>
+    <string name="functional_tests_skipped">ΧΩΡΙΣ ΔΟΚΙΜΗ</string>
+    <string name="functional_tests_denied">Άρνηση πρόσβασης: συνδεθείτε με τον εγκεκριμένο λογαριασμό Google.</string>
+    <string name="functional_tests_not_connected">Δεν έχει συνδεθεί φυσικός προσαρμογέας OBD. Οι άλλοι έλεγχοι δεν έγιναν.</string>
+    <string name="functional_tests_cancelled">Οι δοκιμές ακυρώθηκαν.</string>
 </resources>
