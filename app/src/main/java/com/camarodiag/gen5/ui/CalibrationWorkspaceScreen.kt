@@ -1279,10 +1279,15 @@ fun CalibrationWorkspaceScreen(
                                 }
                             }
                             LazyColumn(
-                                modifier = Modifier.fillMaxWidth().height(320.dp),
+                                // Keep a bounded inner viewport (required for nested lazy
+                                // layouts), but adapt it to small and large maps rather
+                                // than forcing a cramped 320.dp editor in every case.
+                                modifier = Modifier.fillMaxWidth().height(
+                                    (state.mapValues.size.coerceIn(3, 7) * 62).dp
+                                ),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                itemsIndexed(state.mapValues) { rowIndex, rowValues ->
+                                itemsIndexed(state.mapValues, key = { rowIndex, _ -> rowIndex }) { rowIndex, rowValues ->
                                     LazyRow(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
