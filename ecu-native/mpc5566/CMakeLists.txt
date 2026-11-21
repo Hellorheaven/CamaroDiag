@@ -16,3 +16,8 @@ foreach(test flash_map flash_controller kernel_protocol isotp kernel_runtime fle
     target_link_libraries(${test}_test PRIVATE cd_flash cd_flash_model)
     add_test(NAME ${test} COMMAND ${test}_test)
 endforeach()
+
+# Host-only integration shim. Never link this model into an ECU RAM image.
+add_library(cd_kernel_model SHARED tests/kernel_model_ffi.c tests/flash_model.c
+    flash_map.c flash_controller.c kernel_protocol.c)
+target_compile_options(cd_kernel_model PRIVATE -Wall -Wextra -Werror -pedantic -UNDEBUG)
