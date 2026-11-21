@@ -414,4 +414,13 @@
     <string name="flexfuel_preflight_recovery">Atkūrimo procedūra nepatikrinta</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: patikra prieš programavimą ir po jo (tik skaitymas)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Patikra po programavimo neatlikta. Nei ECU programavimas, nei transporto priemonės bandymas po įrašymo nepatvirtinti.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Atsisiųskite naujausius PR #70 Debug artefaktus. Prisijunkite prie GitHub įgaliota paskyra. Atsisiuntimai yra ZIP archyvai, kuriuos reikia išskleisti.</string>
+    <string name="debug_builds_android_archive">ZIP archyvas su Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP archyvas su Windows x64 ir x86 diegimo programomis.</string>
+    <string name="debug_builds_caution">Artefaktų galiojimas baigiasi po 30 dienų. Jų prieinamumas neįrodo sėkmingo kompiliavimo ar bandymų automobilyje. Debug APK parašai gali skirtis nuo viešosios versijos.</string>
+    <string name="debug_builds_created">Sukurta</string>
+    <string name="debug_builds_expires">Galioja iki</string>
+    <string name="debug_builds_no_browser">Nėra naršyklės atsisiuntimo nuorodai atverti.</string>
 </resources>
