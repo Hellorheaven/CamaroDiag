@@ -391,4 +391,19 @@
     <string name="functional_tests_denied">Aċċess miċħud: idħol bil-kont Google awtorizzat u erġa qabbad.</string>
     <string name="functional_tests_not_connected">L-ebda adapter OBD fiżiku mhu mqabbad. Il-kontrolli l-oħra ma sarux.</string>
     <string name="functional_tests_cancelled">Is-sessjoni tat-testijiet ġiet ikkanċellata.</string>
+    <!-- Owner-only Debug downloads and staged license labels -->
+    <string name="tab_debug_builds">Verżjonijiet tad-debug</string>
+    <string name="tab_license">Liċenzja</string>
+    <string name="debug_builds_title">Verżjonijiet privati tad-debug</string>
+    <string name="debug_builds_refresh">Aġġorna l-verżjonijiet disponibbli</string>
+    <string name="debug_builds_download">Niżżel minn GitHub</string>
+    <string name="debug_builds_unavailable">M\'hemm l-ebda arkivju tad-debug validu disponibbli.</string>
+    <string name="debug_builds_error">Ma setgħux jitgħabbew il-verżjonijiet tad-debug minn GitHub.</string>
+    <string name="license_disabled">Is-sistema tal-liċenzji mhix attivata.</string>
+    <string name="license_buy">Ixtri liċenzja</string>
+    <string name="license_refresh">Aġġorna l-liċenzja</string>
+    <string name="license_free">B\'xejn</string>
+    <string name="license_owner">Sid: il-permessi kollha</string>
+    <string name="license_premium">Liċenzja sħiħa attiva</string>
+    <string name="license_title">Liċenzja CamaroDiag</string>
 </resources>
