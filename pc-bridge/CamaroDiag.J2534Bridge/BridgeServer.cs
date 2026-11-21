@@ -108,6 +108,7 @@ internal sealed class BridgeServer
                             baudRate,
                             requestCanId = requestId.ToString(can29 ? "X8" : "X3"),
                             responseCanId = responseId.ToString(can29 ? "X8" : "X3"),
+                            batteryMillivolts = device.ReadBatteryMillivolts(),
                             readOnly = true,
                             scopedPhysicalMemoryRead = device.IsMemoryReadEnabled
                         }));
