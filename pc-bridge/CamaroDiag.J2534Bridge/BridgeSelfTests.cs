@@ -160,6 +160,7 @@ internal static class BridgeSelfTests
 
         checks += BridgeTlsSelfTests.Run();
         checks += NativeUdsDownloadSelfTests.Run();
+        checks += NativeEcuSectorSelfTests.Run();
         Console.WriteLine($"PASS: {checks} hardware-free J2534 bridge self-tests.");
         return 0;
     }
