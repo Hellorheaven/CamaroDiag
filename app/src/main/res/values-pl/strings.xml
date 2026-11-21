@@ -423,4 +423,34 @@
     <string name="debug_builds_created">Utworzono</string>
     <string name="debug_builds_expires">Wygasa</string>
     <string name="debug_builds_no_browser">Brak przeglądarki do otwarcia pobierania.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Wybrany język: %1$s</string>
+    <string name="settings_adapter_not_connected">Nie podłączono adaptera</string>
+    <string name="settings_last_connection">Ostatni profil połączenia</string>
+    <string name="settings_no_last_connection">Nie zapisano jeszcze profilu połączenia.</string>
+    <string name="saved_vehicle_profiles_title">Zapisane profile pojazdów</string>
+    <string name="saved_vehicle_name_label">Nazwa profilu</string>
+    <string name="saved_vehicle_name_placeholder">np. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Zapisz bieżący pojazd</string>
+    <string name="saved_vehicle_empty">Nie zapisano jeszcze żadnych profili pojazdów.</string>
+    <string name="saved_vehicle_delete">Usuń</string>
+    <string name="saved_vehicle_requires_review">Profil utworzono na podstawie VIN z ECU. Przed diagnostyką sprawdź rok modelowy, silnik i skrzynię biegów.</string>
+    <string name="saved_vehicle_ecu_default_name">Pojazd z ECU • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Wprowadź nazwę profilu.</string>
+    <string name="msg_vehicle_profile_saved">Profil pojazdu zapisany.</string>
+    <string name="msg_vehicle_profile_review_required">Utworzono profil na podstawie VIN z ECU. Przed diagnostyką sprawdź rok, silnik i skrzynię biegów.</string>
+    <string name="msg_vehicle_profile_loaded">Wczytano profil pojazdu: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">ECU nie zwrócił prawidłowego 17-znakowego VIN. Nie utworzono profilu.</string>
+    <string name="cal_vin_matches_profile">VIN z ECU jest zgodny z wybranym profilem pojazdu.</string>
+    <string name="cal_vin_mismatch_detected">NIEZGODNOŚĆ VIN — profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">Wybrany profil pojazdu nie zawiera prawidłowego VIN.</string>
+    <string name="cal_vin_mismatch_title">Wykryto niezgodność VIN</string>
+    <string name="cal_vin_mismatch_confirmation">VIN wybranego profilu to %1$s, ale ECU zwrócił %2$s. Mogą to być różne pojazdy. Utwórz oddzielny profil, aby zachować wybrany pojazd, lub zsynchronizuj dane dopiero po sprawdzeniu rzeczywistego pojazdu.</string>
+    <string name="cal_vin_create_vehicle">Utwórz profil pojazdu</string>
+    <string name="cal_vin_sync_existing">Zsynchronizuj VIN wybranego profilu</string>
+    <string name="cal_vin_sync_warning_title">Potwierdzić zastąpienie VIN?</string>
+    <string name="cal_vin_sync_warning_message">VIN zapisany w wybranym profilu (%1$s) zostanie zastąpiony VIN z ECU (%2$s). Rok, silnik, skrzynia biegów i rynek nie ulegną zmianie. Zrób to dopiero po upewnieniu się, że podłączony samochód jest właściwym pojazdem.</string>
+    <string name="cal_vin_sync_confirm">Zastąp VIN</string>
+    <string name="vin_photo_capture">Zrób zdjęcie VIN</string>
 </resources>
