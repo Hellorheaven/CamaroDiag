@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="system_language_title">Sovelluksen kieli</string>
-    <string name="system_language_hint">Valitse CamaroDiagin kieli.</string>
-    <string name="about_title">Tietoja CamaroDiagista</string>
+    <string name="system_language_hint">Valitse CamaroDiag-sovelluksen kieli.</string>
+    <string name="about_title">Tietoja CamaroDiag-sovelluksesta</string>
     <string name="about_check_updates">Tarkista päivitykset</string>
     <string name="about_up_to_date">CamaroDiag on ajan tasalla.</string>
     <string name="obd_choose_sensors">Valitse anturit</string>
@@ -396,7 +396,7 @@
     <string name="license_free">Maksuton</string>
     <string name="license_owner">Omistaja: kaikki oikeudet</string>
     <string name="license_premium">Täysi lisenssi käytössä</string>
-    <string name="license_title">CamaroDiag-lisenssi</string>
+    <string name="license_title">CamaroDiag-sovelluksen lisenssi</string>
     <!-- LFX 2012 ECU safety and verification guidance -->
     <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012: ECU:n tunnistus (vain luku)</string>
     <string name="flexfuel_lfx2012_checks">Ehdot, jotka edelleen estävät kalibroinnin muutokset</string>
