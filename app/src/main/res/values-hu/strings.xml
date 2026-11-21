@@ -417,4 +417,34 @@
     <string name="debug_builds_created">Létrehozva</string>
     <string name="debug_builds_expires">Lejár</string>
     <string name="debug_builds_no_browser">Nincs böngésző a letöltési hivatkozás megnyitásához.</string>
+
+    <!-- Vehicle profiles and VIN consistency -->
+    <string name="system_language_current">Kiválasztott nyelv: %1$s</string>
+    <string name="settings_adapter_not_connected">Nincs csatlakoztatott adapter</string>
+    <string name="settings_last_connection">Legutóbbi csatlakozási profil</string>
+    <string name="settings_no_last_connection">Még nincs mentett csatlakozási profil.</string>
+    <string name="saved_vehicle_profiles_title">Mentett járműprofilok</string>
+    <string name="saved_vehicle_name_label">Profil neve</string>
+    <string name="saved_vehicle_name_placeholder">pl. Camaro 2012 LFX</string>
+    <string name="saved_vehicle_save_current">Jelenlegi jármű mentése</string>
+    <string name="saved_vehicle_empty">Még nincs mentett járműprofil.</string>
+    <string name="saved_vehicle_delete">Törlés</string>
+    <string name="saved_vehicle_requires_review">A profil az ECU VIN-je alapján készült. A diagnosztika előtt ellenőrizze a modellévet, a motort és a sebességváltót.</string>
+    <string name="saved_vehicle_ecu_default_name">Jármű az ECU alapján • …%1$s</string>
+    <string name="msg_vehicle_profile_name_required">Adja meg a profil nevét.</string>
+    <string name="msg_vehicle_profile_saved">A járműprofil mentve.</string>
+    <string name="msg_vehicle_profile_review_required">Profil készült az ECU VIN-je alapján. A diagnosztika előtt ellenőrizze az évjáratot, a motort és a sebességváltót.</string>
+    <string name="msg_vehicle_profile_loaded">Betöltött járműprofil: %1$s</string>
+    <string name="msg_vehicle_ecu_vin_invalid">Az ECU nem adott vissza érvényes, 17 karakteres VIN-t. Nem készült profil.</string>
+    <string name="cal_vin_matches_profile">Az ECU VIN-je megegyezik a kiválasztott járműprofiléval.</string>
+    <string name="cal_vin_mismatch_detected">VIN-ELTÉRÉS — profil: %1$s • ECU: %2$s</string>
+    <string name="cal_vin_profile_not_set">A kiválasztott járműprofil nem tartalmaz érvényes VIN-t.</string>
+    <string name="cal_vin_mismatch_title">VIN-eltérés észlelve</string>
+    <string name="cal_vin_mismatch_confirmation">A kiválasztott profil VIN-je %1$s, de az ECU a következőt adta vissza: %2$s. Ezek különböző járművek lehetnek. Hozzon létre külön profilt a kiválasztott jármű megőrzéséhez, vagy csak a tényleges jármű ellenőrzése után szinkronizáljon.</string>
+    <string name="cal_vin_create_vehicle">Járműprofil létrehozása</string>
+    <string name="cal_vin_sync_existing">A kiválasztott profil VIN-jének szinkronizálása</string>
+    <string name="cal_vin_sync_warning_title">Megerősíti a VIN cseréjét?</string>
+    <string name="cal_vin_sync_warning_message">Ez a kiválasztott profilban tárolt VIN-t (%1$s) az ECU VIN-jére (%2$s) cseréli. Az évjárat, a motor, a sebességváltó és a piac nem változik. Csak akkor végezze el, ha meggyőződött arról, hogy a megfelelő autó van csatlakoztatva.</string>
+    <string name="cal_vin_sync_confirm">VIN cseréje</string>
+    <string name="vin_photo_capture">VIN fényképezése</string>
 </resources>
