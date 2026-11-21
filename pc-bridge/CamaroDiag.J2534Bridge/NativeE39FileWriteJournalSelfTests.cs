@@ -44,6 +44,15 @@ internal static class NativeE39FileWriteJournalSelfTests
 
             File.Delete(path);
             var completed = new NativeE39FileWriteJournal(path);
+            completed.AppendAsync(new(NativeE39WriteSequence.Phase.Prepared,
+                0x20000, "offline baseline"), CancellationToken.None)
+                .GetAwaiter().GetResult();
+            completed.AppendAsync(new(NativeE39WriteSequence.Phase.EraseStarted,
+                0x20000, "offline simulated erase"), CancellationToken.None)
+                .GetAwaiter().GetResult();
+            completed.AppendAsync(new(NativeE39WriteSequence.Phase.WrittenCrcVerified,
+                0x20000, "offline simulated CRC"), CancellationToken.None)
+                .GetAwaiter().GetResult();
             completed.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,
                 0, "offline simulated success"), CancellationToken.None)
                 .GetAwaiter().GetResult();
@@ -51,6 +60,34 @@ internal static class NativeE39FileWriteJournalSelfTests
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
                 NativeE39FileWriteJournal.CompletionState.Completed,
                 "Durable last completed entry recognized");
+
+            File.Delete(path);
+            var forged = new NativeE39FileWriteJournal(path);
+            forged.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,
+                0, "fake success without physical write"), CancellationToken.None)
+                .GetAwaiter().GetResult();
+            forged.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            Assert(NativeE39FileWriteJournal.Inspect(path) ==
+                NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Lone completion marker never proves an ECU flash");
+            File.Delete(path);
+            var stale = new NativeE39FileWriteJournal(path);
+            stale.AppendAsync(new(NativeE39WriteSequence.Phase.EraseStarted,
+                0x20000, "offline erase"), CancellationToken.None)
+                .GetAwaiter().GetResult();
+            stale.AppendAsync(new(NativeE39WriteSequence.Phase.RecoveryRequired,
+                0x20000, "failed flash"), CancellationToken.None)
+                .GetAwaiter().GetResult();
+            stale.AppendAsync(new(NativeE39WriteSequence.Phase.WrittenCrcVerified,
+                0x20000, "suspicious after failure"), CancellationToken.None)
+                .GetAwaiter().GetResult();
+            stale.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,
+                0, "forged success after recovery"), CancellationToken.None)
+                .GetAwaiter().GetResult();
+            stale.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            Assert(NativeE39FileWriteJournal.Inspect(path) !=
+                NativeE39FileWriteJournal.CompletionState.Completed,
+                "Recovery-required state cannot be overwritten by later success");
 
             File.Delete(path);
             var failed = new NativeE39FileWriteJournal(path);
