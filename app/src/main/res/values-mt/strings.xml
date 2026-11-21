@@ -509,4 +509,21 @@
     <string name="mileage_caveat_unavailable">Ma hemmx aktar informazzjoni lokalizzata disponibbli għal dan is-sors.</string>
     <string name="obd_physical_can_scope">Rispondent fiżiku CAN: 0x%1$s. Dan l-iskennjar ikopri biss l-ECU OBD magħżul, mhux skennjar funzjonali tal-moduli kollha. Ma ntbagħtu ebda kmandi ta’ programmar GM jew ta’ attwaturi.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Ippermetti t-tħassir tad-DTC tal-emissjonijiet fil-pont Windows, erġa’ qabbad, itfi l-magna u kkonferma r-reset. Id-data dwar il-prontezza tal-emissjonijiet tiġi rrisettjata; il-kodiċijiet permanenti ma jitħassrux.</string>
+    <string name="units_metric">SI / metriċi</string>
+    <string name="units_imperial">Imperjali</string>
+    <string name="live_pause">Pawża</string>
+    <string name="live_recording_status">Kampjuni: %1$d • %2$s</string>
+    <string name="dtc_desc_p0010">Ċirkwit tal-attwatur tal-pożizzjoni tal-camshaft tad-dħul (bank 1)</string>
+    <string name="dtc_desc_p0011">Timing tal-camshaft tad-dħul avvanzat iżżejjed (bank 1)</string>
+    <string name="dtc_desc_p0014">Timing tal-camshaft tal-egżost avvanzat iżżejjed (bank 1)</string>
+    <string name="dtc_desc_p0087">Pressjoni baxxa wisq fir-rail jew fis-sistema tal-fjuwil</string>
+    <string name="dtc_desc_p0089">Prestazzjoni ħażina tar-regolatur tal-pressjoni tal-fjuwil</string>
+    <string name="dtc_desc_p0191">Medda jew prestazzjoni taċ-ċirkwit tas-sensur tal-pressjoni fir-rail tal-fjuwil</string>
+    <string name="dtc_desc_p0299">Pressjoni ta’ sovralimentazzjoni baxxa wisq mit-turbocharger jew mis-supercharger</string>
+    <string name="cal_engine_profile">Profil tal-magna: %1$s • %2$s • %3$d–%4$d</string>
+    <string name="cal_catalogued_engines">Magni fil-katalgu għas-sena %1$d: %2$s</string>
+    <string name="cal_profile_capabilities">CAL ID/CVN: %1$s • Qari binarju: %2$s • Tabelli tal-magna vvalidati: %3$s • Ipprogrammar ECU: %4$s</string>
+    <string name="cal_signal_metadata">DID 0x%1$s • talba %2$s / rispons %3$s • intervall %4$d s</string>
+    <string name="cal_axis_values">0x%1$s • għadd=%2$d • %3$s</string>
+    <string name="adapter_hardware_profile_only">Profil tal-ħardwer biss; għad hemm bżonn SDK/API uffiċjali Android jew pont dokumentat.</string>
 </resources>
