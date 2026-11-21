@@ -43,6 +43,22 @@ class J2534BridgeTlsTest {
         assertFalse(J2534BridgePairingCodeFormat.isValid("$token.${fingerprint.dropLast(1)}"))
     }
 
+    @Test fun certificatePinCannotBeModifiedByCaller() {
+        val pairing = J2534BridgeTlsPairing.parse("$token.$fingerprint")
+        val digest = pairing.certificateSha256
+        digest.fill(0)
+        assertFalse(pairing.certificateSha256.all { it == 0.toByte() })
+    }
+
+    @Test fun actualTrustManagerRejectsUnauthenticatedOrEmptyChains() {
+        val manager = J2534BridgeTlsPairing.parse("$token.$fingerprint").pinnedTrustManager()
+        assertEquals(0, manager.acceptedIssuers.size)
+        assertThrows(CertificateException::class.java) { manager.checkServerTrusted(null, "RSA") }
+        assertThrows(CertificateException::class.java) { manager.checkServerTrusted(emptyArray(), "RSA") }
+        assertThrows(CertificateException::class.java) { manager.checkServerTrusted(emptyArray(), "") }
+        assertThrows(CertificateException::class.java) { manager.checkClientTrusted(emptyArray(), "RSA") }
+    }
+
     @Test fun noCertificateFailsBeforeAnyRequestCanBeSent() {
         val pairing = J2534BridgeTlsPairing.parse("$token.$fingerprint")
         assertThrows(CertificateException::class.java) {

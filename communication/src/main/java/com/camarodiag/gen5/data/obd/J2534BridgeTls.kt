@@ -1,5 +1,6 @@
 package com.camarodiag.gen5.data.obd
 
+import android.annotation.SuppressLint
 import java.net.Socket
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -29,10 +30,12 @@ object J2534BridgePairingCodeFormat {
     fun isValid(code: String): Boolean = pattern.matches(code.trim())
 }
 
-internal data class J2534BridgeTlsPairing(
+internal class J2534BridgeTlsPairing private constructor(
     val token: String,
-    val certificateSha256: ByteArray
+    certificateSha256: ByteArray
 ) {
+    private val pinnedDigest = certificateSha256.copyOf()
+    val certificateSha256: ByteArray get() = pinnedDigest.copyOf()
     companion object {
         fun parse(pairingCode: String): J2534BridgeTlsPairing {
             val normalized = pairingCode.trim()
@@ -52,13 +55,20 @@ internal data class J2534BridgeTlsPairing(
             ?: throw CertificateException("Le pont J2534 n'a fourni aucun certificat TLS.")
         certificate.checkValidity()
         val received = MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
-        if (!MessageDigest.isEqual(certificateSha256, received)) {
+        if (!MessageDigest.isEqual(pinnedDigest, received)) {
             throw CertificateException("Empreinte TLS du pont J2534 incorrecte : connexion refusée.")
         }
     }
 
-    fun openSocket(host: String, port: Int): SSLSocket {
-        val trustManager = object : X509TrustManager {
+    // The bridge deliberately uses a fresh self-signed certificate, not a
+    // public CA. Trust is restricted to an exact SHA-256 leaf fingerprint
+    // supplied out of band by the local pairing code. The TLS handshake also
+    // verifies proof of possession of the associated private key.
+    // Android's general CA trust manager would reject the intended peer;
+    // never fall back to accepting an arbitrary certificate or hostname.
+    @SuppressLint("CustomX509TrustManager")
+    internal fun pinnedTrustManager(): X509TrustManager =
+        object : X509TrustManager {
             override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
 
             override fun checkClientTrusted(
@@ -76,8 +86,9 @@ internal data class J2534BridgeTlsPairing(
                 verifyCertificate(chain)
             }
         }
+    fun openSocket(host: String, port: Int): SSLSocket {
         val context = SSLContext.getInstance("TLS")
-        context.init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
+        context.init(null, arrayOf<TrustManager>(pinnedTrustManager()), SecureRandom())
 
         val plain = Socket()
         try {
