@@ -397,4 +397,15 @@
     <string name="license_owner">Tulajdonos: minden jogosultság</string>
     <string name="license_premium">Teljes licenc aktív</string>
     <string name="license_title">CamaroDiag licenc</string>
+    <!-- LFX 2012 ECU safety and verification guidance -->
+    <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012: ECU-azonosítás (csak olvasás)</string>
+    <string name="flexfuel_lfx2012_checks">A kalibráció módosítását továbbra is akadályozó feltételek</string>
+    <string name="flexfuel_preflight_vehicle_missing">Nincs kiválasztva járműprofil</string>
+    <string name="flexfuel_preflight_wrong_vehicle">A jármű nem 2012-es Camaro LFX</string>
+    <string name="flexfuel_preflight_vin">A VIN-kódot az ECU-ból kell kiolvasni, és egyeznie kell a mentett járműével</string>
+    <string name="flexfuel_preflight_ecu">Az ECU-vezérlő tényleges azonosítóját meg kell állapítani</string>
+    <string name="flexfuel_preflight_firmware">Az ECU pontos firmware-e nincs ellenőrizve</string>
+    <string name="flexfuel_preflight_recovery">A helyreállítási eljárás nincs ellenőrizve</string>
+    <string name="flexfuel_lfx2012_audit_title">LFX 2012: ellenőrzés programozás előtt és után (csak olvasás)</string>
+    <string name="flexfuel_lfx2012_audit_post_not_performed">A programozás utáni ellenőrzés nem történt meg. Sem az ECU-programozás, sem a jármű írás utáni tesztje nincs validálva.</string>
 </resources>
