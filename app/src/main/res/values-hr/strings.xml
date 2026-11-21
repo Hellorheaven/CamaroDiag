@@ -256,4 +256,20 @@
     <string name="cal_can_response_id">CAN ID odgovora (npr. 7E8)</string>
     <string name="cal_uds_did">UDS DID (F190 = VIN)</string>
     <string name="cal_j2534_security_notice">Sigurnost: token nije šifriran TLS-om. Koristite pouzdanu privatnu mrežu i nikada ne izlažite ovaj priključak internetu.</string>
+    <string name="cal_native_catalog_title">VLASTITI KATALOG CAMARODIAG</string>
+    <string name="cal_native_catalog_explanation">Definicije održava CamaroDiag, neovisno o katalozima zajednice. Predložene ili dokumentirane definicije nikada se ne šalju ECU-u.</string>
+    <string name="cal_native_catalog_loading">Učitavanje vlastitog kataloga…</string>
+    <string name="cal_native_catalog_empty">Nijedan vlasnički Camaro DID trenutačno nije označen kao upotrebljiv. Nepoznate adrese i faktori skaliranja ne izmišljaju se.</string>
+    <string name="cal_native_catalog_read_disabled">Očitavanje vozila onemogućeno je dok se adresiranje i dekodiranje ne provjere na istovjetnoj konfiguraciji.</string>
+    <string name="cal_obdb_catalog_title">SIGNALI SPECIFIČNI ZA CAMARO • OBDb</string>
+    <string name="cal_obdb_catalog_explanation">Katalog zajednice uvezen je s DID-ovima, CAN adresama, faktorima skaliranja i filtrima godišta. Te definicije nisu GM-ova potvrda; uvijek provjerite odgovor ECU-a.</string>
+    <string name="cal_obdb_catalog_loading">Učitavanje kataloga signala Camaro…</string>
+    <string name="cal_search_signal">Pretraži signal (naziv, DID, sustav)</string>
+    <string name="cal_no_signal">Nema dostupnih signala</string>
+    <string name="cal_signal_debug">Signal je u izvoru OBDb označen kao DEBUG.</string>
+    <string name="cal_signal_flow_control">Izvorna definicija zahtijeva kontrolu toka.</string>
+    <string name="cal_signal_can_unresolved">CAN adresa nije razriješena: očitavanje ovog signala je onemogućeno.</string>
+    <string name="cal_read_signal">Očitaj ovaj signal ECU-a</string>
+    <string name="calibration_files">Kalibracijske datoteke</string>
+    <string name="cal_file_inspection_hint">Uvezite BIN, HEX ili drugi memorijski zapis za pregled veličine i SHA-256 otiska. Datoteka ostaje lokalna; ne pokreće se upis u ECU.</string>
 </resources>
