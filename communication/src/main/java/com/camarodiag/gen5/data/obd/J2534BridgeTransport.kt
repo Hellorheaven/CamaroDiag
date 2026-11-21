@@ -30,6 +30,9 @@ class J2534BridgeTransport(
     private var connectedResponseCanId: String? = null
     @Volatile private var scopedMemoryReadEnabled = false
     @Volatile private var standardObdPhysicalReadEnabled = false
+    @Volatile private var standardObdClearEnabled = false
+    val isStandardObdClearEnabled: Boolean
+        get() = isStandardObdPhysicalReadEnabled && standardObdClearEnabled
     val isStandardObdPhysicalReadEnabled: Boolean
         get() = isConnected && standardObdPhysicalReadEnabled
 
@@ -95,6 +98,7 @@ class J2534BridgeTransport(
                 scopedMemoryReadEnabled = response.optBoolean("scopedPhysicalMemoryRead", false)
                 standardObdPhysicalReadEnabled = response.opt("standardObdPhysicalRead") == true &&
                     J2534StandardObd.supportsChannel(requestCanId, responseCanId, protocolNumber)
+                standardObdClearEnabled = standardObdPhysicalReadEnabled && response.opt("standardObdClear") == true
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
                 val voltage = response.optLong("batteryMillivolts", -1L)
@@ -187,6 +191,21 @@ class J2534BridgeTransport(
         suspend fun read(mode: Int): List<ObdDtc> =
             J2534StandardObd.dtcs(mode, exchange(byteArrayOf(mode.toByte()), 2500))
         return Triple(read(3), read(7), read(10))
+    }
+
+    suspend fun clearStandardObdDtcs() = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            check(isStandardObdClearEnabled) { "Local Windows operator has not enabled OBD clear." }
+            val response = request(JSONObject()
+                .put("op", "clearStandardObdDtcs")
+                .put("token", tlsPairing.token)
+                .put("confirmed", true), 12_000)
+            check(response.optString("payloadHex") == "44" &&
+                response.optString("responseCanId") == connectedResponseCanId &&
+                response.opt("permanentDtcsCleared") == false) {
+                "Physical emissions reset was not confirmed."
+            }
+        }
     }
 
     override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray = withContext(Dispatchers.IO) {
@@ -286,6 +305,7 @@ class J2534BridgeTransport(
         opened = false
         scopedMemoryReadEnabled = false
         standardObdPhysicalReadEnabled = false
+        standardObdClearEnabled = false
     }
 
     private fun ByteArray.toHex(): String =

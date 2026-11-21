@@ -373,6 +373,20 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    fun isJ2534StandardObdClearAvailable(): Boolean =
+        isJ2534StandardObdAvailable() && j2534BridgeTransport?.isStandardObdClearEnabled == true
+
+    suspend fun clearJ2534StandardDtcs() {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534StandardObdClearAvailable())
+        commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdClearAvailable())
+            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+        }
+    }
+
     /** Invalidates ECU-specific support data after a vehicle identity/profile change. */
     fun invalidateObdPidSupportCache() {
         cachedSupportedMode01Pids = null
