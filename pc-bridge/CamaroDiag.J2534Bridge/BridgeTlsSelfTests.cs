@@ -28,6 +28,8 @@ internal static class BridgeTlsSelfTests
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         var server = Task.Run(async () =>
         {
+            try
+            {
             using var accepted = await listener.AcceptTcpClientAsync();
             using var tls = new SslStream(accepted.GetStream(), leaveInnerStreamOpen: false);
             await tls.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
@@ -42,6 +44,12 @@ internal static class BridgeTlsSelfTests
             if (!incoming.SequenceEqual(Encoding.ASCII.GetBytes("HELLO")))
                 throw new InvalidOperationException("TLS channel corrupted the encrypted request.");
             await tls.WriteAsync(Encoding.ASCII.GetBytes("READY"));
+            }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine("J2534 TLS server self-test handshake failed: " + exception);
+                throw;
+            }
         });
 
         using (var client = new TcpClient())
