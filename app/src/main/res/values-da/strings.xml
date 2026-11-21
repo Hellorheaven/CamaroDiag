@@ -474,4 +474,19 @@
     <string name="live_pid_wbo2_b1s2">Bredbåndslambda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Bredbåndslambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Bredbåndslambda B2S2</string>
+
+    <!-- Functional test laboratory -->
+    <string name="tab_functional_tests">Funktionstests</string>
+    <string name="functional_tests_title">Funktionstests — ECU og OBD</string>
+    <string name="functional_tests_readonly">Kør alle tilgængelige skrivebeskyttede kontroller via den aktuelt tilsluttede fysiske adapter. Andre adaptere og ubekræftede ECU-moduler markeres IKKE TESTET. Ingen sletning, aktivering eller programmering.</string>
+    <string name="functional_tests_run">Kør alle</string>
+    <string name="functional_tests_stop">Stop</string>
+    <string name="functional_tests_export">Eksportér JSON</string>
+    <string name="functional_tests_summary">%1$d bestået · %2$d fejlet · %3$d ikke testet</string>
+    <string name="functional_tests_passed">BESTÅET (fysisk dokumentation)</string>
+    <string name="functional_tests_failed">FEJLET</string>
+    <string name="functional_tests_skipped">IKKE TESTET</string>
+    <string name="functional_tests_denied">Adgang nægtet: log ind med den godkendte Google-konto, og opret forbindelse igen.</string>
+    <string name="functional_tests_not_connected">Ingen fysisk OBD-adapter er tilsluttet. De resterende kontroller blev ikke udført.</string>
+    <string name="functional_tests_cancelled">Testforløbet blev annulleret.</string>
 </resources>
