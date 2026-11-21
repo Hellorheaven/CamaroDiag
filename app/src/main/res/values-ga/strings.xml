@@ -583,4 +583,10 @@
     <string name="can_sniffer_capture_failed">Theip ar an ngabháil CAN nó stop an cuibheoir ag freagairt.</string>
     <string name="can_sniffer_frame_count">Frámaí a gabhadh: %1$d</string>
     <string name="can_sniffer_filtered_count">%1$d fráma as %2$d á dtaispeáint</string>
+    <string name="msg_live_recording_real_started">Tosaíodh ar fhíorshonraí OBD a thaifeadadh.</string>
+    <string name="msg_live_recording_started">Taifeadadh ar siúl. Líon na samplaí: %1$d.</string>
+    <string name="msg_live_recording_stopped_count">Stopadh an taifeadadh. Líon na samplaí a bailíodh: %1$d.</string>
+    <string name="msg_live_csv_exported">Easpórtáladh an loga CSV. Líon na samplaí: %1$d.</string>
+    <string name="msg_live_csv_export_failed">Níorbh fhéidir an loga CSV a easpórtáil.</string>
+    <string name="msg_live_recording_max_samples">Sroicheadh an teorainn sábháilteachta (%1$d). Stopadh an taifeadadh go huathoibríoch.</string>
 </resources>
