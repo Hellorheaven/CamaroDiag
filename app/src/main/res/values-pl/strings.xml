@@ -599,4 +599,10 @@
     <string name="cal_expert_patch_program_bytes">Rozmiar jednostki programowania (bajty)</string>
     <string name="cal_expert_patch_preview_button">Pokaż sektory objęte zmianami w pliku BIN</string>
     <string name="cal_expert_patch_summary">Zmienione bajty: %1$d. Sektory kasowania objęte zmianami: %2$d. Mapa pamięci sprzętu nie została zweryfikowana. Nie wykonano zapisu.</string>
+    <string name="dtc_gm_monitor_title">Monitor silnika GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Kryteria zapisania kodu usterki: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Warunki aktywacji: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Licznik usterek / częstotliwość weryfikacji: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Klasyfikacja MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Źródło: GM %1$s, strona %2$d</string>
 </resources>
