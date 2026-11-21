@@ -62,6 +62,25 @@ internal static class NativeE39RamLoaderSelfTests
                accepted.Transmitted[2].SequenceEqual(plan.Frames[^1].Payload),
             "Native staged transfer sends begin + copies + execute in order");
 
+        // Reject altered plan contents, wire length, entry point and target addresses
+        // before RequestDownload can affect the connected ECU.
+        foreach (var change in new Action<NativeE39RamLoader.Plan>[]
+        {
+            p => p.Frames[0].Payload[2] ^= 1,
+            p => p.Frames[^1].Payload[9] ^= 1,
+            p => p.Frames[0].Payload[^1] ^= 1,
+            p => p.RequestDownload[^1] ^= 1
+        })
+        {
+            var altered = NativeE39RamLoader.Build(image, 2048);
+            change(altered);
+            var unused = new FakeLink();
+            MustFail<InvalidDataException>(() =>
+                NativeE39RamLoader.StageAsync(unused, altered, CancellationToken.None)
+                    .GetAwaiter().GetResult());
+            Assert(unused.Transmitted.Count == 0, "Altered staging plan rejected before I/O");
+        }
+
         var copyDenied = new FakeLink
         {
             Response = req => req[0] == 0x34 ? [0x74] : [0x7F, 0x36, 0x22]

@@ -73,6 +73,59 @@ internal static class NativeE39RamLoader
             Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(ramCode)));
     }
 
+    // Snapshot and validate the entire plan before sending any diagnostic frame.
+    // A modified plan must not redirect a copy/entry address or silently change
+    // the reviewed kernel bytes after the SHA-256 was calculated.
+    private static Plan ValidateAndSnapshot(Plan plan)
+    {
+        if (plan.Frames is null || plan.RequestDownload is null ||
+            plan.Frames.Count is < 1 or > MaximumKernelBytes ||
+            plan.RequestDownload.Length != 5)
+            throw new ArgumentException("Invalid E39 staging plan.");
+        var frames = new List<Frame>(plan.Frames.Count);
+        int codeLength = 0;
+        int wireLength = 0;
+        foreach (var frame in plan.Frames)
+        {
+            if (frame is null || frame.Payload is null ||
+                frame.Payload.Length > MaxJ2534PayloadBytes ||
+                frame.Payload.Length <= (frame.Executes ? 10 : 6))
+                throw new InvalidDataException("Invalid E39 RAM transfer frame.");
+            byte[] payload = frame.Payload.ToArray();
+            codeLength = checked(codeLength + payload.Length - (frame.Executes ? 10 : 6));
+            wireLength = checked(wireLength + payload.Length);
+            if (codeLength > MaximumKernelBytes)
+                throw new InvalidDataException("RAM transfer exceeds the allowed size.");
+            frames.Add(new Frame(payload, frame.Executes));
+        }
+        byte[] begin = plan.RequestDownload.ToArray();
+        if (wireLength != plan.FramedLength ||
+            !begin.SequenceEqual(new byte[] { 0x34, 0, (byte)(wireLength >> 16),
+                (byte)(wireLength >> 8), (byte)wireLength }) ||
+            frames.Take(frames.Count - 1).Any(f => f.Executes) || !frames[^1].Executes)
+            throw new InvalidDataException("Invalid E39 RAM transfer sequence.");
+
+        byte[] reconstructed = new byte[codeLength];
+        int offset = 0;
+        foreach (var frame in frames.AsEnumerable().Reverse())
+        {
+            int header = frame.Executes ? 10 : 6;
+            uint address = frame.Executes ? RamLoadAddress : checked(RamEntryAddress + (uint)offset);
+            var payload = frame.Payload;
+            if (payload[0] != 0x36 || payload[1] != (frame.Executes ? 0x80 : 0x00) ||
+                System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(2, 4)) != address ||
+                (frame.Executes && System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(
+                    payload.AsSpan(6, 4)) != RamEntryAddress))
+                throw new InvalidDataException("Unexpected E39 RAM target or entry address.");
+            Buffer.BlockCopy(payload, header, reconstructed, offset, payload.Length - header);
+            offset += payload.Length - header;
+        }
+        string hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(reconstructed));
+        if (!string.Equals(hash, plan.KernelSha256, StringComparison.Ordinal))
+            throw new InvalidDataException("E39 kernel hash mismatch before staging.");
+        return new Plan(begin, frames.AsReadOnly(), wireLength, hash);
+    }
+
     private static void WriteU32(byte[] into, int offset, uint value)
     {
         into[offset] = (byte)(value >> 24);
@@ -109,12 +162,8 @@ internal static class NativeE39RamLoader
     {
         ArgumentNullException.ThrowIfNull(link);
         ArgumentNullException.ThrowIfNull(plan);
-        if (plan.Frames.Count == 0 ||
-            plan.RequestDownload.Length != 5 ||
-            plan.RequestDownload[0] != 0x34)
-            throw new ArgumentException("Invalid E39 staging plan.");
-
         cancellationToken.ThrowIfCancellationRequested();
+        plan = ValidateAndSnapshot(plan);
         var response = await link.ExchangeAsync(plan.RequestDownload, cancellationToken);
         // Stock GM bootloader acknowledges download with 0x74. Its response
         // is not the generic ISO-14229 maxBlockLength structure.
