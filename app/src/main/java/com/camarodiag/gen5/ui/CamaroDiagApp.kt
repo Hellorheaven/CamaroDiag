@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.ui
 
 import com.camarodiag.gen5.auth.LicenseLevel
+import com.camarodiag.gen5.auth.LicenseRolloutConfig
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -161,7 +162,7 @@ fun CamaroDiagApp(
     onRefreshLicense: () -> Unit
 ) {
     val ownerTestsAllowed = licenseLevel == LicenseLevel.OWNER
-    val premiumAllowed = licenseLevel != LicenseLevel.FREE
+    val premiumAllowed = !LicenseRolloutConfig.ENABLED || licenseLevel != LicenseLevel.FREE
     val premiumTabs = remember {
         setOf(
             DiagTab.MODULES, DiagTab.CAN_SNIFFER, DiagTab.MILEAGE,
@@ -201,6 +202,8 @@ fun CamaroDiagApp(
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(licenseLevel) {
+        if (!LicenseRolloutConfig.ENABLED && currentTab == DiagTab.LICENSE)
+            currentTab = DiagTab.SETUP
         if (!ownerTestsAllowed &&
             currentTab in setOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS)
         ) currentTab = DiagTab.LICENSE
@@ -464,9 +467,9 @@ fun CamaroDiagApp(
                     onDismissRequest = { moreExpanded = false }
                 ) {
                     (listOf(DiagTab.MODULES) +
+                        (if (LicenseRolloutConfig.ENABLED) listOf(DiagTab.LICENSE) else emptyList()) +
                         (if (ownerTestsAllowed) listOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS) else emptyList()) +
                         listOf(
-                        DiagTab.LICENSE,
                         DiagTab.MILEAGE,
                         DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
@@ -593,7 +596,13 @@ fun CamaroDiagApp(
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
-                DiagTab.LICENSE -> LicenseScreen(licenseLevel, onRefreshLicense)
+                DiagTab.LICENSE -> {
+                    if (LicenseRolloutConfig.ENABLED) {
+                        LicenseScreen(licenseLevel, onRefreshLicense)
+                    } else {
+                        HardwareGuideScreen()
+                    }
+                }
                 DiagTab.DEBUG_DOWNLOADS -> {
                     if (ownerTestsAllowed) DebugDownloadsScreen()
                 }
