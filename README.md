@@ -110,6 +110,8 @@ L'atelier permet l'analyse de fichiers locaux : import BIN/ORI/MOD, Intel HEX, M
 
 Aucun pack de tables Camaro validé n'est fourni. Les définitions doivent correspondre exactement au VIN, au calculateur, au CAL ID/CVN, à l'OS et à l'image concernée. Les formats XDF/A2L/XML ou conteneurs propriétaires non décodés ne sont pas automatiquement convertis.
 
+**Programmation expérimentale E39/E39A depuis Windows :** un mode local du pont PC permet désormais de déléguer une écriture à PCM Hammer CLI, à installer séparément, après contrôle du VIN, double sauvegarde et confirmation physique de l'opérateur. Ce mode n'est pas accessible à distance depuis Android et n'a pas encore été qualifié sur le matériel de l'utilisateur. Voir le [guide du pont PC](pc-bridge/README.md). Il ne constitue pas un pilote d'écriture natif de CamaroDiag.
+
 La **lecture physique limitée d'une plage mémoire ECU** est disponible via le pont PC J2534, uniquement avec un profil de plage documenté configuré sur Windows, une correspondance VIN vérifiée et deux acquisitions concordantes. Il ne s'agit **ni d'un dump complet garanti ni d'une sauvegarde restaurable**. La lecture complète universelle de l'ECM, l'écriture physique, le flashage, le recovery, les checksums GM et les procédures Seed/Key ne sont pas disponibles.
 
 ## Fonctions non disponibles
