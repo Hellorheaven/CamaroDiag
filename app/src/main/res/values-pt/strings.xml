@@ -149,7 +149,7 @@
     <string name="cal_read_uds_did">Ler DID UDS</string>
     <string name="cal_read_uds_dtcs">Ler DTC UDS</string>
     <string name="cal_uds_trouble_codes">Códigos de avaria UDS (0x19)</string>
-    <string name="cal_native_catalog_title">CATÁLOGO PRÓPRIO CAMARODIAG</string>
+    <string name="cal_native_catalog_title">CATÁLOGO PRÓPRIO CamaroDiag</string>
     <string name="cal_native_catalog_explanation">Definições mantidas pelo CamaroDiag, independentes dos catálogos comunitários. As definições propostas ou documentadas nunca são enviadas para uma ECU.</string>
     <string name="cal_native_catalog_loading">A carregar catálogo próprio…</string>
     <string name="cal_native_catalog_empty">Atualmente, nenhum DID Camaro proprietário está declarado como utilizável. Não são inventados endereços nem fatores de escala.</string>
