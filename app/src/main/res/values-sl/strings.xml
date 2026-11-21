@@ -588,4 +588,10 @@
     <string name="cal_expert_patch_program_bytes">Velikost programske enote za zapis (bajti)</string>
     <string name="cal_expert_patch_preview_button">Predogled sektorjev, na katere vpliva spremenjena datoteka BIN</string>
     <string name="cal_expert_patch_summary">Spremenjeni bajti: %1$d. Prizadeti sektorji za brisanje: %2$d. Pomnilniška mapa strojne opreme ni preverjena. Zapis ni bil izveden.</string>
+    <string name="dtc_gm_monitor_title">Nadzor motorja GM – %1$s</string>
+    <string name="dtc_gm_monitor_criteria">Merila za zapis kode napake: %1$s</string>
+    <string name="dtc_gm_monitor_enable">Pogoji za aktivacijo: %1$s</string>
+    <string name="dtc_gm_monitor_failure">Števec napak / pogostost potrjevanja: %1$s</string>
+    <string name="dtc_gm_monitor_mil">Razvrstitev MIL: %1$s</string>
+    <string name="dtc_gm_monitor_source">Vir: GM %1$s, stran %2$d</string>
 </resources>
