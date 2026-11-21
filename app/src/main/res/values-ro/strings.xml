@@ -400,4 +400,13 @@
     <string name="license_owner">Proprietar: toate permisiunile</string>
     <string name="license_premium">Licență completă activă</string>
     <string name="license_title">Licență CamaroDiag</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Descărcați cele mai recente artefacte Debug din PR #70. Autentificați-vă pe GitHub cu un cont autorizat. Descărcările sunt arhive ZIP care trebuie extrase.</string>
+    <string name="debug_builds_android_archive">Arhivă ZIP cu APK-ul Android Debug.</string>
+    <string name="debug_builds_windows_archive">Arhivă ZIP cu instalatoarele Windows x64 și x86.</string>
+    <string name="debug_builds_caution">Artefactele expiră după 30 de zile. Disponibilitatea lor nu demonstrează o compilare reușită sau teste pe vehicul. Semnăturile APK Debug pot diferi de versiunile publice.</string>
+    <string name="debug_builds_created">Creat</string>
+    <string name="debug_builds_expires">Expiră</string>
+    <string name="debug_builds_no_browser">Niciun browser disponibil pentru deschiderea descărcării.</string>
 </resources>
