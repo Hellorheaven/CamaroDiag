@@ -515,4 +515,13 @@
     <string name="flexfuel_preflight_recovery">Gendannelsesproceduren er ikke verificeret</string>
     <string name="flexfuel_lfx2012_audit_title">LFX 2012: kontrol før og efter programmering (kun læsning)</string>
     <string name="flexfuel_lfx2012_audit_post_not_performed">Kontrol efter programmering er ikke udført. Hverken ECU-programmering eller køretøjstest efter skrivning er valideret.</string>
+
+    <!-- Private Debug archive details -->
+    <string name="debug_builds_intro">Download de nyeste Debug-artefakter fra PR #70. Log ind på GitHub med en godkendt konto. Downloadene er ZIP-arkiver, som skal udpakkes.</string>
+    <string name="debug_builds_android_archive">ZIP med Android Debug APK.</string>
+    <string name="debug_builds_windows_archive">ZIP med Windows-installationsprogrammer til x64 og x86.</string>
+    <string name="debug_builds_caution">Artefakter udløber efter 30 dage. Tilgængelighed beviser hverken en vellykket build eller test på et køretøj. Debug-APK-signaturer kan afvige fra offentlige versioner.</string>
+    <string name="debug_builds_created">Oprettet</string>
+    <string name="debug_builds_expires">Udløber</string>
+    <string name="debug_builds_no_browser">Der findes ingen browser til at åbne downloadlinket.</string>
 </resources>
