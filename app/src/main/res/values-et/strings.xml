@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="system_language_title">Rakenduse keel</string>
-    <string name="system_language_hint">Valige CamaroDiagi keel.</string>
-    <string name="about_title">Teave CamaroDiagi kohta</string>
+    <string name="system_language_hint">Valige rakenduse CamaroDiag keel.</string>
+    <string name="about_title">Teave rakenduse CamaroDiag kohta</string>
     <string name="about_check_updates">Kontrolli uuendusi</string>
     <string name="about_up_to_date">CamaroDiag on ajakohane.</string>
     <string name="obd_choose_sensors">Vali andurid</string>
@@ -396,7 +396,7 @@
     <string name="license_free">Tasuta</string>
     <string name="license_owner">Omanik: kõik õigused</string>
     <string name="license_premium">Täislitsents aktiivne</string>
-    <string name="license_title">CamaroDiagi litsents</string>
+    <string name="license_title">Rakenduse CamaroDiag litsents</string>
     <!-- LFX 2012 ECU safety and verification guidance -->
     <string name="flexfuel_lfx2012_title">FlexFuel LFX 2012: ECU tuvastamine (ainult lugemine)</string>
     <string name="flexfuel_lfx2012_checks">Tingimused, mis endiselt takistavad kalibreeringu muutmist</string>
