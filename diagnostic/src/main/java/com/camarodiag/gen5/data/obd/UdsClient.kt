@@ -290,9 +290,11 @@ class UdsClient private constructor(
         require(size in 1..4092 && size <= policy.maxTransferBytes) {
             "Memory read length exceeds the verified profile limit."
         }
-        val format = addressLength shl 4 or sizeLength
+        // ISO 14229 ALFI: upper nibble = memory size width, lower nibble = address width.
+        val format = sizeLength shl 4 or addressLength
         val requestData = byteArrayOf(format.toByte()) + encodeUnsigned(address, addressLength) + encodeUnsigned(size.toLong(), sizeLength)
         val response = request(0x23, requestData)
+        require(response.size == size + 1) { "ECU memory read is incomplete or longer than requested." }
         return response.copyOfRange(1, response.size)
     }
 
@@ -302,7 +304,8 @@ class UdsClient private constructor(
             data.size + 2 + addressLength + sizeLength <= 4095)
         requireProgrammingSession()
         requireSecurityIfConfigured()
-        val format = addressLength shl 4 or sizeLength
+        // ISO 14229 ALFI: upper nibble = memory size width, lower nibble = address width.
+        val format = sizeLength shl 4 or addressLength
         val requestData = byteArrayOf(format.toByte()) + encodeUnsigned(address, addressLength) +
             encodeUnsigned(data.size.toLong(), sizeLength) + data
         request(0x3D, requestData)
@@ -315,7 +318,8 @@ class UdsClient private constructor(
         requireProgrammingSession()
         requireSecurityIfConfigured()
         require(dataFormatIdentifier in 0..0xFF)
-        val format = addressLength shl 4 or sizeLength
+        // ISO 14229 ALFI: upper nibble = memory size width, lower nibble = address width.
+        val format = sizeLength shl 4 or addressLength
         val response = request(
             0x34,
             byteArrayOf(dataFormatIdentifier.toByte(), format.toByte()) +
@@ -323,9 +327,13 @@ class UdsClient private constructor(
         )
         require(response.size >= 3) { "Incomplete RequestDownload response." }
         val lengthFormat = response[1].toInt() and 0xFF
-        val lengthBytes = lengthFormat and 0x0F
+        // ISO 14229 lengthFormatIdentifier: upper nibble declares block-length bytes.
+        val lengthBytes = lengthFormat ushr 4
+        require(lengthFormat and 0x0F == 0) { "Reserved LFI bits must be zero." }
         require(lengthBytes in 1..4 && response.size >= 2 + lengthBytes)
-        downloadMaxBlockLength = readUnsigned(response, 2, lengthBytes).toInt()
+        val maxBlockLength = readUnsigned(response, 2, lengthBytes)
+        require(maxBlockLength in 3L..4095L) { "ECU block length exceeds supported UDS framing." }
+        downloadMaxBlockLength = maxBlockLength.toInt()
         require(downloadMaxBlockLength > 2) { "ECU returned an invalid maximum block length." }
         transferSequence = 1
         transferredBytes = 0
@@ -353,13 +361,18 @@ class UdsClient private constructor(
         requireProgrammingSession()
         requireSecurityIfConfigured()
         require(dataFormatIdentifier in 0..0xFF)
-        val format = addressLength shl 4 or sizeLength
+        // ISO 14229 ALFI: upper nibble = memory size width, lower nibble = address width.
+        val format = sizeLength shl 4 or addressLength
         val response = request(0x35, byteArrayOf(dataFormatIdentifier.toByte(), format.toByte()) +
             encodeUnsigned(address, addressLength) + encodeUnsigned(size, sizeLength))
         require(response.size >= 3) { "Incomplete RequestUpload response." }
-        val lengthBytes = response[1].toInt() and 0x0F
+        val lengthFormat = response[1].toInt() and 0xFF
+        val lengthBytes = lengthFormat ushr 4
+        require(lengthFormat and 0x0F == 0) { "Reserved LFI bits must be zero." }
         require(lengthBytes in 1..4 && response.size >= 2 + lengthBytes)
-        downloadMaxBlockLength = readUnsigned(response, 2, lengthBytes).toInt()
+        val maxBlockLength = readUnsigned(response, 2, lengthBytes)
+        require(maxBlockLength in 3L..4095L) { "ECU block length exceeds supported UDS framing." }
+        downloadMaxBlockLength = maxBlockLength.toInt()
         require(downloadMaxBlockLength > 2) { "ECU returned an invalid maximum upload block length." }
         transferSequence = 1
         transferredBytes = 0
