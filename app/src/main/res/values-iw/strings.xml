@@ -864,4 +864,17 @@
     <string name="cal_archive_verified">שתי הקריאות תואמות וערכי SHA-256 תקינים עבור טווחי הזיכרון שבארכיון.</string>
     <string name="cal_archive_partial">הגיבוי מכסה רק חלק מטווח הזיכרון המבוקש.</string>
     <string name="cal_archive_failed">בדיקת קובץ ה-ZIP נכשלה. הגודל המרבי לאחר חילוץ הוא 32 MiB.</string>
+    <string name="tab_functional_tests">בדיקות תפקוד</string>
+    <string name="functional_tests_title">בדיקות תפקוד — מחשבי רכב ו-OBD</string>
+    <string name="functional_tests_readonly">הפעלת בדיקות קריאה בלבד דרך המתאם הפיזי המחובר. מתאמים אחרים ומחשבים שלא נבדקו יסומנו כלא נבדקו. ללא מחיקה או צריבה.</string>
+    <string name="functional_tests_run">הפעל הכול</string>
+    <string name="functional_tests_stop">עצור</string>
+    <string name="functional_tests_export">ייצוא JSON</string>
+    <string name="functional_tests_summary">%1$d הצליחו · %2$d נכשלו · %3$d לא נבדקו</string>
+    <string name="functional_tests_passed">עבר (אימות פיזי)</string>
+    <string name="functional_tests_failed">נכשל</string>
+    <string name="functional_tests_skipped">לא נבדק</string>
+    <string name="functional_tests_denied">הגישה נדחתה: יש להתחבר באמצעות חשבון Google המורשה.</string>
+    <string name="functional_tests_not_connected">לא מחובר מתאם OBD פיזי. שאר הבדיקות לא בוצעו.</string>
+    <string name="functional_tests_cancelled">הבדיקות בוטלו.</string>
 </resources>
