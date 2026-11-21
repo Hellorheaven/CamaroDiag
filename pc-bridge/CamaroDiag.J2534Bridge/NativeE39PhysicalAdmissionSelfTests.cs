@@ -23,10 +23,25 @@ internal static class NativeE39PhysicalAdmissionSelfTests
                 0,NativeE39ImageInspector.ImageBytes,64,3);
             var channel = new NativeE39PhysicalAdmission.QualifiedChannel(
                 Convert.ToHexString(SHA256.HashData(sample)),"Registry64",0x7E0,0x7E8,33,64,3);
-            void Match(J2534Adapter a, NativeE39PhysicalAdmission.QualifiedChannel c) =>
-                NativeE39PhysicalAdmission.RequireMatch(a,scope,c);
+            void Match(J2534Adapter a, NativeE39PhysicalAdmission.QualifiedChannel c)
+            {
+                using var lease = NativeE39PhysicalAdmission.OpenVerifiedDriverLease(a,scope,c);
+            }
             Match(adapter,channel);
             Check(true,"Exact test driver/channel admitted");
+            using (var lease = NativeE39PhysicalAdmission.OpenVerifiedDriverLease(adapter,scope,channel))
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    bool denied = false;
+                    try
+                    {
+                        using var replacement = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read);
+                    }
+                    catch (IOException) { denied = true; }
+                    Check(denied, "Verified Windows driver cannot be opened for modification during operation");
+                }
+            }
             Check(Rejected(() => Match(adapter,channel with { ResponseCanId = 0x7E9 })),
                 "Wrong responder rejected");
             Check(Rejected(() => Match(adapter,channel with { MaximumStockReadBytes = 32 })),

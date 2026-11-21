@@ -13,7 +13,10 @@ internal static class NativeE39PhysicalAdmission
         int RequestCanId, int ResponseCanId, int ProtocolNumber,
         int MaximumStockReadBytes, int StockReadSession);
 
-    internal static void RequireMatch(J2534Adapter adapter, J2534MemoryReadScope scope,
+    // Keep the verified file open without write/delete sharing during the
+    // dedicated Windows programming operation, instead of checking a path
+    // and immediately releasing it before loading the vendor DLL.
+    internal static FileStream OpenVerifiedDriverLease(J2534Adapter adapter, J2534MemoryReadScope scope,
         QualifiedChannel channel)
     {
         ArgumentNullException.ThrowIfNull(adapter);
@@ -29,10 +32,19 @@ internal static class NativeE39PhysicalAdmission
 
         if (!Path.IsPathFullyQualified(adapter.FunctionLibrary))
             throw new UnauthorizedAccessException("Only an explicitly identified installed J2534 DLL is allowed.");
-        using var stream = new FileStream(adapter.FunctionLibrary, FileMode.Open,
+        var stream = new FileStream(adapter.FunctionLibrary, FileMode.Open,
             FileAccess.Read, FileShare.Read);
-        var digest = Convert.ToHexString(SHA256.HashData(stream));
-        if (!string.Equals(digest, channel.DriverSha256, StringComparison.Ordinal))
-            throw new UnauthorizedAccessException("Installed J2534 DLL differs from the independently qualified driver version.");
+        try
+        {
+            var digest = Convert.ToHexString(SHA256.HashData(stream));
+            if (!string.Equals(digest, channel.DriverSha256, StringComparison.Ordinal))
+                throw new UnauthorizedAccessException("Installed J2534 DLL differs from the independently qualified driver version.");
+            return stream;
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
     }
 }
