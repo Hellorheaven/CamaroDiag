@@ -3272,6 +3272,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         error = localizedContext.getString(R.string.functional_tests_not_connected)
                     )
                 } else if (obdManager.isObdCommandChannelAvailable) {
+                    // Only a physically observed 7E8 reply to SAE 0100 permits
+                    // confirmation of the standard 11-bit powertrain OBD responder.
+                    // It does not certify GM enhanced addressing or ECU programming.
+                    if (current()) {
+                        try {
+                            val responders = obdManager.withObdCommandSession {
+                                it.discoverFunctionalObdResponders()
+                            }
+                            if ("7E8" in responders) {
+                                mark(
+                                    "module:ECM", FunctionalTestOutcome.PASSED,
+                                    "Physical 7E8 reply to standard 0100 observed; standard OBD only.",
+                                    "Réponse physique 7E8 à 0100 observée ; OBD standard uniquement."
+                                )
+                            } else {
+                                mark(
+                                    "module:ECM", FunctionalTestOutcome.NOT_TESTED,
+                                    "No verified 7E8 response; enhanced ECM access not tested.",
+                                    "Aucune réponse 7E8 confirmée ; accès ECM étendu non testé."
+                                )
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            mark(
+                                "module:ECM", FunctionalTestOutcome.FAILED,
+                                "Physical OBD responder discovery failed.",
+                                "Échec de la découverte des réponses OBD physiques."
+                            )
+                        }
+                    }
                     checkRead("service:vin") {
                         val vin = obdManager.withObdCommandSession { it.readVin() }
                             ?.trim()?.uppercase(java.util.Locale.ROOT)
