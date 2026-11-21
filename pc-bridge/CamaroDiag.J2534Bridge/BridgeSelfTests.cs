@@ -182,6 +182,7 @@ internal static class BridgeSelfTests
         checks += NativeEcuSectorSelfTests.Run();
         checks += NativeMpc5566FlashMapSelfTests.Run();
         checks += NativeE39RamLoaderSelfTests.Run();
+        checks += NativeE39KernelLinkSelfTests.Run();
         checks += NativeE39ImageInspectorSelfTests.Run();
         checks += NativeE39FlashCommandsSelfTests.Run();
         checks += NativeE39SecuritySelfTests.Run();
