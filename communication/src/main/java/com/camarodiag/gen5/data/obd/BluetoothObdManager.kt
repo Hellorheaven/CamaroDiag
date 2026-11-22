@@ -618,18 +618,23 @@ class BluetoothObdManager(context: Context) {
                 // ELM/STN monitor mode has no normal prompt; ESC returns the adapter
                 // to command mode even when the caller cancels the capture.
                 withContext(NonCancellable) {
-                    runCatching { boundCommand("\u001B", 1_000L) }
-                    if (isStnAdapter) {
-                        runCatching { boundCommand("ATAR", 1_000L) }
+                    // ESC may return only a prompt. A failed ESC still requires a
+                    // fail-closed session even if later configuration commands respond.
+                    var restored = runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
+                    val commands = buildList {
+                        if (isStnAdapter) add("ATAR")
+                        addAll(listOf("ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"))
                     }
-                    // Restore the command-channel formatting established during adapter probing.
-                    // A bare "AT" is not an ELM reset command; ATD would reset protocol and
-                    // other settings that the app relies on, so restore each changed setting.
-                    runCatching { boundCommand("ATE0", 1_000L) }
-                    runCatching { boundCommand("ATL0", 1_000L) }
-                    runCatching { boundCommand("ATH1", 1_000L) }
-                    runCatching { boundCommand("ATS0", 1_000L) }
-                    runCatching { boundCommand("ATCAF1", 1_000L) }
+                    // Restore the command-channel formatting established at probe time.
+                    for (command in commands) {
+                        val answer = runCatching { boundCommand(command, 1_000L) }.getOrNull()
+                        if (answer == null || !CanConsoleAdapterRestorationPolicy.accepted(answer))
+                            restored = false
+                    }
+                    if (!restored) {
+                        disconnect()
+                        throw CanAdapterRestorationException()
+                    }
                 }
             }
             captured.snapshot()
