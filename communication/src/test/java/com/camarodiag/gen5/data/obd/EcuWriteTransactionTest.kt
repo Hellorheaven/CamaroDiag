@@ -613,4 +613,21 @@ class EcuWriteTransactionTest {
         assertEquals(1, device.eraseCalls)
         assertEquals(0, device.resetCalls)
     }
+    @Test fun placeholderEcuAndFirmwareCannotSatisfyWritePreparation() {
+        val invalid = listOf("unknown", "demo", "simulation", "mock", "pending",
+            "00000000", "FFFFFFFF", "0x000000", "N/A")
+        for (value in invalid) {
+            for (target in listOf(
+                request().copy(controllerFamily = value),
+                request().copy(expectedIdentity = expectedIdentity.copy(controllerId = value)),
+                request().copy(expectedIdentity = expectedIdentity.copy(firmwareId = value))
+            )) {
+                val result = EcuWriteTransaction.prepare(target)
+                assertTrue("Unsafe identity must be refused: $value",
+                    EcuWriteTransaction.Blocker.UNKNOWN_TARGET in result.blockers)
+                assertFalse(result.canAttemptWithValidatedHardware)
+            }
+        }
+    }
+
 }
