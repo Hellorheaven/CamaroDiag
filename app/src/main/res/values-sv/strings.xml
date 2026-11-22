@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Appens språk</string>
     <string name="system_language_hint">Välj språk för CamaroDiag.</string>
     <string name="about_title">Om CamaroDiag</string>
@@ -631,7 +631,7 @@
     <string name="cal_pc_ip_address">Datorns IP-adress</string>
     <string name="cal_connect_j2534">Anslut J2534-bryggan</string>
     <string name="cal_disconnect_pc_bridge">Koppla från PC-bryggan</string>
-    <string name="cal_bridge_capabilities">Brygga: HS-CAN ISO15765 250/500 kbit/s och J2534-2 SW-ISO15765 när drivrutinen stöder det. CAN FD förblir inaktiverat.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Brygga: HS-CAN ISO15765 250/500 kbit/s och J2534-2 SW-ISO15765 när drivrutinen stöder det. CAN FD förblir inaktiverat.</string>
     <string name="cal_read_uds_did">Läs UDS DID</string>
     <string name="cal_read_uds_dtcs">Läs UDS-felkoder</string>
     <string name="cal_uds_trouble_codes">UDS-felkoder (0x19)</string>
