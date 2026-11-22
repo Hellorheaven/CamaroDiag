@@ -91,6 +91,27 @@ internal static class NativeScopedBackupArchiveSelfTests
             Reject<IOException>(() => NativeScopedBackupArchive.SaveNew(zipPath, scope, capture, CancellationToken.None));
             Check(File.ReadAllBytes(zipPath).SequenceEqual(originalZip), "Prior backup never overwritten");
 
+            // The public offline command must work without a J2534 driver.
+            var profilePath = Path.Combine(directory, "read-profile.json");
+            File.WriteAllText(profilePath, System.Text.Json.JsonSerializer.Serialize(new
+            {
+                expectedVin = scope.ExpectedVin,
+                requestCanIdHex = scope.RequestCanId.ToString("X"),
+                responseCanIdHex = scope.ResponseCanId.ToString("X"),
+                protocolNumber = scope.ProtocolNumber,
+                startAddressHex = scope.StartAddress.ToString("X"),
+                lengthBytes = scope.Length,
+                maxReadBytes = scope.MaxReadBytes,
+                session = scope.Session
+            }));
+            Check(NativeScopedBackupImportCli.Run([
+                NativeScopedBackupImportCli.Command, zipPath, profilePath
+            ]) == 0, "Offline ZIP verification CLI accepts a valid archive");
+            Check(NativeScopedBackupImportCli.Run([
+                NativeScopedBackupImportCli.Command, zipPath
+            ]) == 6, "Offline verification CLI rejects incomplete arguments");
+            File.Delete(profilePath);
+
             var raw = Path.Combine(directory, "original.bin");
             NativeScopedBackupArchive.SaveNew(raw, scope, capture, CancellationToken.None);
             Check(File.ReadAllBytes(raw).SequenceEqual(bytes), "Raw option preserves exact primary bytes");
