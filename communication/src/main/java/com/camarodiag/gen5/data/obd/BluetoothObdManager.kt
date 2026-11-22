@@ -642,6 +642,9 @@ class BluetoothObdManager(context: Context) {
                             restored = false
                     }
                     if (!restored) {
+                        // An old operation cannot tear down a replacement adapter.
+                        if (!transportSessionEpoch.isCurrent(requestedEpoch))
+                            throw ObdSupersededSessionException(CanAdapterRestorationException())
                         disconnect()
                         throw CanAdapterRestorationException()
                     }
@@ -737,6 +740,9 @@ class BluetoothObdManager(context: Context) {
                             restored = false
                     }
                     if (!restored) {
+                        // An old operation cannot tear down a replacement adapter.
+                        if (!transportSessionEpoch.isCurrent(requestedEpoch))
+                            throw ObdSupersededSessionException(CanAdapterRestorationException())
                         disconnect()
                         throw CanAdapterRestorationException()
                     }
