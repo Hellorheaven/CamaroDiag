@@ -243,6 +243,36 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun flowControlWaitFramesConsumeOneTotalTimeoutRatherThanRestartingIt() = runBlocking {
+        val wait = CanFrame(0x7E8, byteArrayOf(0x31, 0x00, 0x00))
+        val continueSending = CanFrame(0x7E8, byteArrayOf(0x30, 0x00, 0x00))
+        val transport = FakeCanTransport(List(5) { wait } + continueSending)
+        var elapsedNanos = -40_000_000L
+        val channel = IsoTpChannel(transport, 0x7E0, 0x7E8,
+            clock = { elapsedNanos += 40_000_000L; elapsedNanos })
+        val failure = runCatching {
+            channel.sendOnly(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 100L)
+        }.exceptionOrNull()
+        assertTrue(failure is IsoTpException)
+        assertTrue(failure?.message?.contains("flow-control deadline") == true)
+        assertEquals(1, transport.sent.size)
+    }
+
+    @Test
+    fun invalidProfileTimeoutIsRejectedBeforeIdentityCanTraffic() = runBlocking {
+        val profile = syntheticReadProfile()
+        val vehicle = VehicleProfile(modelYear = 2013,
+            engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456")
+        for (timeout in listOf(-1L, 0L, 30_001L, Long.MAX_VALUE)) {
+            val transport = FakeCanTransport()
+            assertTrue(runCatching {
+                ProfiledUdsReadSession.open(transport, vehicle, profile, timeout)
+            }.isFailure)
+            assertTrue("Invalid deadline must not send a CAN frame", transport.sent.isEmpty())
+        }
+    }
+
+    @Test
     fun acceptsExactlyFiveIsoTpFlowControlWaitFramesBeforeContinueToSend() = runBlocking {
         val flowControlWait = CanFrame(0x7E8, byteArrayOf(0x31, 0x00, 0x00))
         val flowControlContinue = CanFrame(0x7E8, byteArrayOf(0x30, 0x00, 0x00))
