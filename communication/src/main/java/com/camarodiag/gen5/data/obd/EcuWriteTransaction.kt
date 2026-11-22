@@ -322,7 +322,12 @@ internal class EcuWriteExecutionEngine(
                 for (offset in sector.patchedBytes.indices step unitBytes) {
                     val unitAddress = sector.absoluteAddress + offset
                     currentAddress = unitAddress
-                    if (!powerMonitor.isStable()) {
+                    // An adapter can reconnect or switch controller between
+                    // programming units. Re-identify before every write, not
+                    // merely before erasing the sector.
+                    if (!powerMonitor.isStable() ||
+                        driver.identify() != request.expectedIdentity
+                    ) {
                         return EcuWriteTransaction.Outcome(
                             EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                             verifiedSectors = verified, failedAddress = unitAddress
