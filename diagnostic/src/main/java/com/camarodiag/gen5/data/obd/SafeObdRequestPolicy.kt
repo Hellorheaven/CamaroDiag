@@ -133,11 +133,30 @@ object SafeObdRequestPolicy {
                         ?: continue
                     if (bytes.length != expected.length + 2 * expectedBytes) continue
                 }
-                if (request.service == 0x09 && request.parameter == 0x02) {
-                    if (bytes.length != 40 || bytes.substring(4, 6) != "01") continue
-                    val vin = bytes.substring(6).chunked(2)
-                        .mapNotNull { it.toIntOrNull(16)?.toChar() }.joinToString("")
-                    if (!Regex("[A-HJ-NPR-Z0-9]{17}").matches(vin)) continue
+                if (request.service == 0x09) {
+                    val pid = requireNotNull(request.parameter)
+                    val width = when (pid) {
+                        0x02 -> 17 // VIN, exactly one record
+                        0x04 -> 16 // Calibration identifier
+                        0x06 -> 4  // Calibration verification number
+                        0x0A -> 20 // ECU name
+                        else -> continue
+                    }
+                    val count = bytes.substring(4, 6).toIntOrNull(16) ?: continue
+                    if (count !in 1..16 || (pid == 0x02 && count != 1) ||
+                        bytes.length != 6 + 2 * count * width) continue
+                    if (pid != 0x06) {
+                        val values = (0 until count).map { index ->
+                            bytes.substring(6 + index * width * 2, 6 + (index + 1) * width * 2)
+                                .chunked(2).mapNotNull { it.toIntOrNull(16)?.toChar() }
+                                .joinToString("").trim(' ', '\\u0000')
+                        }
+                        if (pid == 0x02) {
+                            if (!Regex("[A-HJ-NPR-Z0-9]{17}").matches(values.single())) continue
+                        } else if (values.any { value ->
+                                value.isBlank() || value.any { it !in ' '..'~' }
+                            }) continue
+                    }
                 }
                 if (request.service in setOf(0x03, 0x07, 0x0A)) {
                     val count = bytes.substring(2, 4).toIntOrNull(16) ?: continue
