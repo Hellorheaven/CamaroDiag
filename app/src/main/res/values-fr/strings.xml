@@ -933,4 +933,5 @@
     <string name="can_console_filter_all_ecus">Tous les identifiants CAN observés (surveillance globale)</string>
     <string name="can_console_filter_observed_id">Identifiant CAN observé 0x%1$s</string>
     <string name="can_console_filter_observed_note">Seuls les identifiants CAN réellement observés sur le bus connecté sont proposés. Un identifiant ne suffit pas à identifier un calculateur. Ce filtre agit uniquement sur l’affichage.</string>
+    <string name="can_console_filter_verified_ecu">Calculateur identifié : %1$s (CAN 0x%2$s)</string>
 </resources>
