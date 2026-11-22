@@ -600,8 +600,8 @@ class BluetoothObdManager(context: Context) {
                     captured.append(chunk)
                     onChunk(chunk)
                 }
-                check(monitorResponse.trim() != "?") {
-                    "The connected adapter does not support the selected CAN monitor command."
+                check(CanMonitorCompletionPolicy.accepted(monitorResponse)) {
+                    "The connected adapter failed or rejected the CAN monitor command."
                 }
             } finally {
                 // ELM/STN monitor mode has no normal prompt; ESC returns the adapter
