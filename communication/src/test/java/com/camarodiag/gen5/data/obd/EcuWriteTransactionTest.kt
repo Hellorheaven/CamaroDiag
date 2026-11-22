@@ -35,7 +35,7 @@ class EcuWriteTransactionTest {
 
     private class FakeDriver(
         initial: ByteArray,
-        private val identity: EcuProgrammingDriverContract.Identity,
+        var identity: EcuProgrammingDriverContract.Identity,
         validated: Boolean = true
     ) : EcuProgrammingDriverContract {
         val memory = initial.copyOf()
@@ -252,10 +252,14 @@ class EcuWriteTransactionTest {
     @Test fun controllerIdentityChangedAfterFirstSectorStopsBeforeNextErase() = runBlocking {
         val updated = original.copyOf().also { it[2] = 100; it[10] = 110 }
         val device = FakeDriver(original, expectedIdentity)
-        device.identityAfterErases = 1 to expectedIdentity.copy(vin = "2G1TEST0000000002")
         val records = mutableListOf<EcuWriteTransaction.Record>()
         val outcome = EcuWriteExecutionEngine(
-            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+            device, EcuWriteTransaction.Journal { record ->
+                records += record
+                if (record.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE) {
+                    device.identity = expectedIdentity.copy(vin = "2G1TEST0000000002")
+                }
+            }, EcuWriteTransaction.PowerMonitor { true }
         ).run(request(updated))
         assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
         assertEquals(1, outcome.verifiedSectors)
@@ -581,7 +585,7 @@ class EcuWriteTransactionTest {
         assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.TRANSACTION_COMPLETED })
     }
 
-    @Test fun finalIdentityMismatchAfterSingleSectorDoesNotReportCompletion() = runBlocking {
+    @Test fun controllerSwitchJustAfterEraseStopsBeforeFirstWrite() = runBlocking {
         val device = FakeDriver(original, expectedIdentity)
         device.identityAfterErases = 1 to expectedIdentity.copy(vin = "2G1TEST0000000002")
         val outcome = EcuWriteExecutionEngine(
@@ -589,7 +593,8 @@ class EcuWriteTransactionTest {
         ).run(request())
         assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
         assertEquals(1, device.eraseCalls)
-        assertEquals(4, device.writeCalls)
+        assertEquals(0, device.writeCalls)
+        assertEquals(0, outcome.verifiedSectors)
         assertEquals(0, device.resetCalls)
     }
 

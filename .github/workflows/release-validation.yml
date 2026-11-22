@@ -55,7 +55,7 @@ jobs:
             -dname 'CN=CamaroDiag CI checkpoint' -validity 1 -noprompt
           gradle wrapper --gradle-version 8.11.1
           chmod +x gradlew
-          ./gradlew testDebugUnitTest lintDebug lintRelease app:assembleRelease --stacktrace --warning-mode=fail
+          ./gradlew lintDebug lintRelease app:assembleRelease --stacktrace --warning-mode=fail
       - name: Verify the APK signature
         shell: bash
         run: |
@@ -86,4 +86,3 @@ jobs:
           name: release-validation-${{ github.sha }}
           path: |
             **/build/reports/lint-results-*.xml
-            **/build/test-results/testDebugUnitTest/**

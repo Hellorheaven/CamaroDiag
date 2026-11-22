@@ -12,7 +12,7 @@ class EcuExternalDumpPairTest {
             val region = EcuBenchExpertPlan.MemoryRegion.values().first(method::permitsRegion)
             val output = ByteArrayOutputStream()
             EcuExternalDumpPair.export(output, bytes.inputStream(), bytes.copyOf().inputStream(),
-                method, region, 0, bytes.size, "test-board", "2G1TEST0000000001", 0)
+                method, region, 0, bytes.size, "test-board", "2G1TEST0000000001", 1)
             val archive = EcuBackupArchive.import(output.toByteArray().inputStream())
             assertTrue(archive.verification.consistent)
             assertEquals(EcuBackupCoverage.Status.PARTIAL, archive.manifest.coverage.status)

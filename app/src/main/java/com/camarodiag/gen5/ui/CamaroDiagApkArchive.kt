@@ -47,12 +47,12 @@ internal object CamaroDiagApkRetention {
     }
 
     // Prefer the newest installed-version candidates, then the newest download.
-    // This selects candidates. The bytes must still match before deletion.
-    fun excess(owned: Set<String>, present: Set<String>): List<String> =
+    // Ranking is separate from proof of continued ownership.
+    fun newestFirst(owned: Set<String>, present: Set<String>): List<String> =
         owned.intersect(present).mapNotNull { name -> parse(name)?.let { name to it } }
             .sortedWith(compareByDescending<Pair<String, Entry>> { it.second.versionCode }
                 .thenByDescending { it.second.downloadId })
-            .drop(5).map { it.first }
+            .map { it.first }
 }
 
 internal object CamaroDiagApkArchive {
@@ -132,7 +132,14 @@ internal object CamaroDiagApkArchive {
         val present = files(context, tree)
         val recorded = owned(context)
         val remaining = recorded.filterKeys { it in present }.toMutableMap()
-        for (name in CamaroDiagApkRetention.excess(recorded.keys, present.keys)) {
+        if (remaining.size <= 5) {
+            if (remaining != recorded) {
+                check(persist(context, remaining.values)) { "Unable to persist APK archive cleanup." }
+            }
+            return
+        }
+        var retained = 0
+        for (name in CamaroDiagApkRetention.newestFirst(recorded.keys, present.keys)) {
             val expected = recorded.getValue(name).fingerprint
             val uri = present.getValue(name)
             val actual = try {
@@ -147,6 +154,10 @@ internal object CamaroDiagApkArchive {
             if (actual == null) continue
             if (actual != expected) {
                 remaining.remove(name)
+                continue
+            }
+            if (retained < 5) {
+                retained++
                 continue
             }
             currentCoroutineContext().ensureActive()

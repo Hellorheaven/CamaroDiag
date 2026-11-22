@@ -17,27 +17,29 @@ class CamaroDiagApkRetentionTest {
         })
     }
 
-    @Test fun onlyManagedCompletedApksBeyondFiveAreRemoved() {
+    @Test fun onlyManagedPresentApksAreRanked() {
         val names = (1L..7L).map { CamaroDiagApkRetention.name(it, 100 + it) }
         val unrelated = setOf("manual.apk", "backup.zip", ".camarodiag-update.partial",
             "CamaroDiag-Update-99-999.apk")
-        assertEquals(listOf(names[1], names[0]),
-            CamaroDiagApkRetention.excess(names.toSet(), names.toSet() + unrelated))
-        assertTrue(CamaroDiagApkRetention.excess(names.take(5).toSet(), names.toSet()).isEmpty())
+        assertEquals(names.reversed(),
+            CamaroDiagApkRetention.newestFirst(names.toSet(), names.toSet() + unrelated))
+        assertEquals(names.take(5).reversed(),
+            CamaroDiagApkRetention.newestFirst(names.take(5).toSet(), names.toSet()))
     }
 
     @Test fun latestVersionsThenNewestDownloadAreKept() {
         val names = (1L..6L).map { CamaroDiagApkRetention.name(it, 200L) }
         val oldLaterDownload = CamaroDiagApkRetention.name(99, 100)
-        assertEquals(listOf(names[0], oldLaterDownload),
-            CamaroDiagApkRetention.excess((names + oldLaterDownload).toSet(), (names + oldLaterDownload).toSet()))
+        val present = (names + oldLaterDownload).toSet()
+        assertEquals(names.reversed() + oldLaterDownload,
+            CamaroDiagApkRetention.newestFirst(present, present))
     }
 
     @Test fun malformedNamesAndMissingFilesCannotAuthorizeDeletion() {
         for (name in listOf("../CamaroDiag-Update-1-2.apk", "CamaroDiag-Update-0-2.apk",
                 "CamaroDiag-Update-1-2.apk.partial", "CamaroDiag-Update-99999999999999999999-2.apk"))
             assertNull(CamaroDiagApkRetention.parse(name))
-        assertTrue(CamaroDiagApkRetention.excess(setOf(CamaroDiagApkRetention.name(1, 2)), emptySet()).isEmpty())
+        assertTrue(CamaroDiagApkRetention.newestFirst(setOf(CamaroDiagApkRetention.name(1, 2)), emptySet()).isEmpty())
     }
 
     @Test fun legacyNamesAndConflictingFingerprintsProvideNoOwnership() {
