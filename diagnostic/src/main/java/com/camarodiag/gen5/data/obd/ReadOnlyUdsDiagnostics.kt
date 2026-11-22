@@ -55,6 +55,7 @@ internal class IsoTpChannel(
     private val clock: () -> Long = System::nanoTime
 ) {
     suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+        require(timeoutMs in 1..30_000L) { "ISO-TP timeout must be bounded." }
         require(payload.isNotEmpty()) { "ISO-TP payload cannot be empty." }
         require(payload.size <= MAX_PAYLOAD_BYTES) { "ISO-TP payload exceeds the supported 12-bit length." }
         sendPayload(payload, timeoutMs)
@@ -79,6 +80,7 @@ internal class IsoTpChannel(
     }
 
     suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) {
+        require(timeoutMs in 1..30_000L) { "ISO-TP timeout must be bounded." }
         require(payload.isNotEmpty()) { "ISO-TP payload cannot be empty." }
         require(payload.size <= MAX_PAYLOAD_BYTES) { "ISO-TP payload exceeds the supported 12-bit length." }
         sendPayload(payload, timeoutMs)
