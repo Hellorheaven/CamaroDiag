@@ -116,7 +116,7 @@ class CanConsoleRecordParserTest {
     }
 
 
-    @Test fun elevenBitPhysicalRequestAcceptsOnlyItsResponder() {
+    @Test fun elevenBitMonitorKeepsOtherEcUsVisibleWhileRoutingPhysicalResponder() {
         val request = requireNotNull(RawCanFrameParser.parse("7E0 02 01 0C"))
         assertEquals(0x7E8L, CanConsoleEcuRouting.expectedResponder(request))
         val records = CanConsoleRecordParser.parse(
@@ -129,7 +129,7 @@ class CanConsoleRecordParserTest {
             request, requireNotNull(RawCanFrameParser.parse("7E9 03 41 0C 1A"))))
     }
 
-    @Test fun twentyNineBitPhysicalRequestRejectsOtherEcUsAndWrongAddressWidth() {
+    @Test fun twentyNineBitMonitorKeepsAllEcUsVisibleWithFullCanIdentifiers() {
         val request = requireNotNull(RawCanFrameParser.parse("18DA10F1 03 22 F1 90"))
         assertEquals(0x18DAF110L, CanConsoleEcuRouting.expectedResponder(request))
         val records = CanConsoleRecordParser.parse(
@@ -141,7 +141,7 @@ class CanConsoleRecordParserTest {
         assertEquals("CAN ID=18DAF110 DLC=3 DATA=62 F1 90", records[2].content)
     }
 
-    @Test fun functionalAndUnmappedRequestsCannotClaimAnUnknownEcu() {
+    @Test fun functionalAndUnknownRequestContextsNeverFilterCanPresentation() {
         for (input in listOf("7DF 02 01 0C", "123 02 01 0C", "18DAF110 03 22 F1 90")) {
             val request = requireNotNull(RawCanFrameParser.parse(input))
             assertEquals(null, CanConsoleEcuRouting.expectedResponder(request))
