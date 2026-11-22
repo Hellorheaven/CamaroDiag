@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.data.obd
 
 import java.util.concurrent.CancellationException
+import com.camarodiag.gen5.domain.model.VehicleProfile
+import com.camarodiag.gen5.domain.model.TransmissionType
 
 /**
  * Multi-controller diagnostic inventory for 2012 Camaro. Controller addresses and DIDs are
@@ -49,6 +51,55 @@ sealed interface ModuleDiagnosticResult {
 class CamaroModuleDtcScanner(
     private val transportFactory: (VerifiedModuleReadAddress) -> RawCanFrameTransport
 ) {
+    /**
+     * Identity-bound multi-module DTC scan. Unlike raw address-only captures,
+     * the ECU controller/hardware/OS/CAL/CVN/VIN are independently read and
+     * matched before requesting even the read-only DTC service. No identities,
+     * no bus traffic. The caller owns the transport lifetime.
+     */
+    suspend fun scanProfiled(
+        vehicle: VehicleProfile,
+        documentedProfiles: Collection<DocumentedUdsReadProfile>,
+        openTransport: suspend (DocumentedUdsReadProfile) -> RawCanFrameTransport,
+        timeoutMs: Long = 3000L
+    ): List<ModuleDiagnosticResult> {
+        require(timeoutMs in 1..30_000L) { "DTC scan timeout out of range." }
+        val snapshot = documentedProfiles.map { profile ->
+            profile.copy(readableDids = profile.readableDids.toSet(),
+                identityDids = profile.identityDids.toList())
+        }
+        return CamaroControlModule.entries.map { module ->
+            if (module == CamaroControlModule.TCM &&
+                vehicle.transmission == TransmissionType.MANUAL) {
+                ModuleDiagnosticResult.NotConfigured(module, "Manual transmission: no TCM assumed.")
+            } else {
+                val matching = snapshot.filter {
+                    it.moduleId.equals(module.name, ignoreCase = true)
+                }
+                val profile = matching.singleOrNull()
+                when {
+                    profile == null -> ModuleDiagnosticResult.NotConfigured(
+                        module, "No unique vehicle-specific and ECU-verified profile.")
+                    profile.compatibilityDefinitionIssues(vehicle).isNotEmpty() ->
+                        ModuleDiagnosticResult.NotConfigured(
+                            module, "Module profile is incompatible with the selected vehicle.")
+                    else -> try {
+                        val transport = openTransport(profile)
+                        val session = ProfiledUdsReadSession.open(
+                            transport, vehicle, profile, timeoutMs)
+                        ModuleDiagnosticResult.DtcRead(module, session.readDtcReport())
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        ModuleDiagnosticResult.ReadFailure(
+                            module, "ECU identity or DTC read failed: " +
+                                (error.message ?: error.javaClass.simpleName))
+                    }
+                }
+            }
+        }
+    }
+
     suspend fun scan(
         transmission: CamaroTransmission,
         verifiedAddresses: Collection<VerifiedModuleReadAddress>,
