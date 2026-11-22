@@ -130,7 +130,11 @@ internal class EcuZipCompletionGuard(
             centralNames.add(name)
             pos = next
         }
-        require(pos == eocd && centralNames == localEntryNames) {
+        // ZIP does not require central records to share the order of local
+        // entries. Verify the complete unique name set, not their ordering.
+        require(pos == eocd && centralNames.size == localEntryNames.size &&
+            centralNames.toSet().size == centralNames.size &&
+            centralNames.toSet() == localEntryNames.toSet()) {
             "ECU ZIP central directory does not match its verified local entries."
         }
     }
