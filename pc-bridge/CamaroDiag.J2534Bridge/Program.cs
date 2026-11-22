@@ -158,10 +158,18 @@ internal static class Program
 
         try
         {
-            var state = NativeE39FileWriteJournal.Inspect(args[1]);
-            Console.WriteLine("ECU journal: " + state);
+            var report = NativeE39FileWriteJournal.InspectDetailed(args[1]);
+            Console.WriteLine("ECU journal: " + report.State);
+            if (report.SequenceValid)
+            {
+                Console.WriteLine($"Prepared sectors: {report.PreparedSectors}; written and verified: {report.WrittenSectors}; final reread: {report.FinalReadbackSectors}");
+                Console.WriteLine("Last phase: " + (report.LastPhase ?? "none"));
+            }
+            else Console.WriteLine("Journal sequence is incomplete, invalid, or contains an explicit recovery marker.");
+            if (report.PossiblyIncompleteAddress is uint address)
+                Console.WriteLine($"Potentially incomplete sector: 0x{address:X8}");
             Console.WriteLine("Offline evidence only; this command does not contact, reset or program an ECU.");
-            if (state == NativeE39FileWriteJournal.CompletionState.Completed) return 0;
+            if (!report.RequiresAssessment) return 0;
             Console.Error.WriteLine("No completed transaction recorded. Preserve the original backup and journal.");
             return 8;
         }
