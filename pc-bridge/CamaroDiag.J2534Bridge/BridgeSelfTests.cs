@@ -50,6 +50,25 @@ internal static class BridgeSelfTests
         Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
             [0x14, 0xFF, 0xFF, 0xFF]), "J2534 UDS clear DTC not a read-only query");
 
+        const string memoryVin = "1G1FA1RXXR0123456";
+        var memoryVinReply = new byte[] { 0x62, 0xF1, 0x90 }
+            .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray();
+        Assert(J2534Device.MatchesScopedMemoryVin(memoryVinReply, memoryVin),
+            "J2534 scoped memory read requires exact physical F190 VIN");
+        Assert(!J2534Device.MatchesScopedMemoryVin(
+            memoryVinReply.Concat(new byte[] { 0x00 }).ToArray(), memoryVin),
+            "J2534 rejects physical VIN responses with trailing bytes");
+        Assert(!J2534Device.MatchesScopedMemoryVin(
+            memoryVinReply[..^1], memoryVin),
+            "J2534 rejects truncated physical VIN replies");
+        Assert(!J2534Device.MatchesScopedMemoryVin(
+            memoryVinReply, "1G1FA1RXXR0123457"),
+            "J2534 rejects a different ECU VIN before any scoped memory reads");
+        Assert(!J2534Device.MatchesScopedMemoryVin(
+            new byte[] { 0x62, 0xF1, 0x91 }
+                .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray(), memoryVin),
+            "J2534 rejects a VIN from a different DID");
+
         Assert(BridgeConsoleDirection.Normalize("TX") == "TX", "CAN console TX direction");
         Assert(BridgeConsoleDirection.Normalize("RX") == "RX", "CAN console RX direction");
         Assert(BridgeConsoleDirection.Normalize("SYSTEM") == "SYSTEM", "CAN console SYSTEM direction");

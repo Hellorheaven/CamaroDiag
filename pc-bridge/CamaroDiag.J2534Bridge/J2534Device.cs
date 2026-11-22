@@ -168,12 +168,9 @@ internal sealed partial class J2534Device : IDisposable
                 // Read live VIN via an already allowed, non-destructive DID before
                 // exposing any memory command. No identity -> no 0x23 permission.
                 var vinResponse = Exchange(new byte[] { 0x22, 0xF1, 0x90 }, 6000);
-                if (vinResponse.Length < 20 || vinResponse[0] != 0x62 ||
-                    vinResponse[1] != 0xF1 || vinResponse[2] != 0x90 ||
-                    !string.Equals(Encoding.ASCII.GetString(vinResponse, 3, 17),
-                        _memoryReadScope.ExpectedVin, StringComparison.OrdinalIgnoreCase))
+                if (!MatchesScopedMemoryVin(vinResponse, _memoryReadScope.ExpectedVin))
                     throw new UnauthorizedAccessException(
-                        "The live ECU VIN does not match the approved memory read profile.");
+                        "The live ECU did not return the exact VIN from the approved memory read profile.");
                 _memoryReadVinVerified = true;
             }
         }
@@ -183,6 +180,16 @@ internal sealed partial class J2534Device : IDisposable
             throw;
         }
     }
+
+    /// <summary>
+    /// An ECU must return exactly one 17-character VIN in DID F190.
+    /// Extra bytes, truncated responses or case-changed bytes are not proof
+    /// of the exact ECU identity in the operator's memory read scope.
+    /// </summary>
+    internal static bool MatchesScopedMemoryVin(byte[] response, string expectedVin) =>
+        response.Length == 20 && expectedVin.Length == 17 &&
+        response[0] == 0x62 && response[1] == 0xF1 && response[2] == 0x90 &&
+        response.AsSpan(3, 17).SequenceEqual(Encoding.ASCII.GetBytes(expectedVin));
 
     public byte[] Exchange(byte[] payload, int timeoutMs)
     {
