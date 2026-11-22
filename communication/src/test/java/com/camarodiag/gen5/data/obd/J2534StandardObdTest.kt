@@ -102,4 +102,41 @@ class J2534StandardObdTest {
         }
     }
 
+    @Test fun j2534ConsoleReadOnlyResponsesMustMatchRequestedServiceAndPid() {
+        val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(ethanol,
+            bytes(0x41, 0x52, 0x80))
+        for (invalid in listOf(
+            bytes(0x7F, 0x01, 0x11),
+            bytes(0x41, 0x53, 0x80),
+            bytes(0x41, 0x52),
+            bytes(0x41, 0x52, 0x80, 0x00)
+        )) {
+            assertThrows(IllegalArgumentException::class.java) {
+                J2534BridgeTransport.validateReadOnlyConsoleReply(ethanol, invalid)
+            }
+        }
+        val vehicleInfo = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(vehicleInfo,
+            bytes(0x49, 0x02, 0x01, 0x31))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(vehicleInfo,
+                bytes(0x49, 0x04, 0x01, 0x31))
+        }
+        val pending = requireNotNull(SafeObdRequestPolicy.parse("07"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(pending, bytes(0x47, 0))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(pending,
+                bytes(0x7F, 0x07, 0x22))
+        }
+    }
+
+    @Test fun fabricatedReadOnlyCommandObjectCannotAuthorizeBridgeTraffic() {
+        val fake = SafeObdRequest(0x34, 0x00, "0152")
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(fake,
+                bytes(0x41, 0x52, 0x80))
+        }
+    }
+
 }
