@@ -1,5 +1,5 @@
 CamaroDiag PR #95 - explicit full Debug CI checkpoint
 Branch: chore/unified-ci
-Requested after CAN TX confirmation compile import fix: 18c99a556ca50531c0641731a065b20e76626971
+Requested after final C1 raw CAN TX confirmation bypass closure: 1988ac0ff38be2377a513f4e3bc13df004a782eb
 Scope: C1 CAN/OBD unit tests; Android Debug; Windows J2534 Debug; native ECU; connectors
 Safety: no Release build, no ECU write, no merge.
