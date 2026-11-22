@@ -405,7 +405,8 @@ internal sealed partial class BridgeDesktopForm
                         result.Firmware);
                     // The GUI now requires ZIP, not an unverifiable raw BIN.
                     // Inspect the published archive once more offline.
-                    NativeScopedBackupImport.VerifyZip(destination.FileName, scope);
+                    NativeScopedBackupArchive.RequirePublishedCaptureMatch(
+                        destination.FileName, scope, result.Capture, result.Firmware);
                 }, cancellation.Token);
                 progressActive = false;
                 memoryStatus.Text = "Sauvegarde de plage ECU vérifiée par deux lectures : " +

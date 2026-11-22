@@ -43,6 +43,28 @@ internal static class NativeScopedBackupArchive
         return (first, second, hash);
     }
 
+    /// <summary>
+    /// Check the publicly visible ZIP against the exact capture and optional
+    /// physical firmware observation, not merely against its own edited
+    /// manifest. A self-consistent forged archive is not capture evidence.
+    /// </summary>
+    internal static void RequirePublishedCaptureMatch(
+        string archivePath, J2534MemoryReadScope scope,
+        NativeScopedMemoryReader.VerifiedCapture capture, FirmwareIdentity? firmware)
+    {
+        var readback = NativeScopedBackupImport.VerifyZip(archivePath, scope);
+        if (!readback.ChannelBound ||
+            readback.Vin != capture.ExpectedVin ||
+            readback.StartAddress != capture.StartAddress ||
+            readback.ByteCount != capture.Bytes.Length ||
+            readback.DeclaredRegion != scope.Region ||
+            !string.Equals(readback.Sha256, capture.Sha256, StringComparison.OrdinalIgnoreCase) ||
+            readback.Firmware != firmware ||
+            readback.RequiredRegions.Count != 0)
+            throw new InvalidDataException(
+                "Published ZIP no longer matches the independently verified live ECU acquisition.");
+    }
+
     internal static void SaveNew(string destination, J2534MemoryReadScope scope,
         NativeScopedMemoryReader.VerifiedCapture capture, CancellationToken token,
         FirmwareIdentity? firmware = null)

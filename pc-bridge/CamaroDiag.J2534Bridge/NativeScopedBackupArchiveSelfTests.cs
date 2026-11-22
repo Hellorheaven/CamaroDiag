@@ -74,6 +74,11 @@ internal static class NativeScopedBackupArchiveSelfTests
 
             // Import does not imply restored physical data; it verifies the
             // exact archived two acquisitions and declared VIN-bound scope.
+            NativeScopedBackupArchive.RequirePublishedCaptureMatch(zipPath, scope, capture, null);
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupArchive.RequirePublishedCaptureMatch(
+                    zipPath, scope, capture,
+                    new NativeScopedBackupArchive.FirmwareIdentity(0x123456, 0xC1)));
             var imported = NativeScopedBackupImport.VerifyZip(zipPath, scope);
             Check(imported.ByteCount == bytes.Length &&
                 imported.Vin == vin && imported.StartAddress == scope.StartAddress &&
@@ -110,6 +115,11 @@ internal static class NativeScopedBackupArchiveSelfTests
             var observed = NativeScopedBackupImport.VerifyZip(firmwarePath, scope);
             Check(observed.Firmware == observedFirmware && observed.ChannelBound,
                 "Both physical channel and the observed GM OSID are preserved in v3 ZIP");
+            NativeScopedBackupArchive.RequirePublishedCaptureMatch(
+                firmwarePath, scope, capture, observedFirmware);
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupArchive.RequirePublishedCaptureMatch(
+                    firmwarePath, scope, capture, null));
             var incompleteOsidPath = Path.Combine(directory, "missing-osdid.zip");
             File.Copy(firmwarePath, incompleteOsidPath);
             using (var changedZip = ZipFile.Open(incompleteOsidPath, ZipArchiveMode.Update))
