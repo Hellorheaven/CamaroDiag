@@ -72,7 +72,7 @@ internal static class NativeE39QualifiedBenchProfile
         string Digest(string name)
         {
             var value = Value(name);
-            if (!Regex.IsMatch(value, "^[0-9A-F]{64}$"))
+            if (!Regex.IsMatch(value, @"\A[0-9A-F]{64}\z"))
                 throw new InvalidDataException("Invalid digest: " + name);
             return value;
         }
