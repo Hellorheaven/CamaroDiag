@@ -129,6 +129,8 @@ class EcuBackupArchiveTest {
             metadata.replace("ecu.osId=19088743\n", ""),
             metadata.replace("ecu.osDid=193", "ecu.osDid=144"),
             metadata.replace("ecu.osId=19088743", "ecu.osId=0"),
+            metadata.replace("required=\n", "required=OTHER\n"),
+            metadata.replace("capture.0.expected=4", "capture.0.expected=5"),
             metadata.replace("offline archive v3", "offline archive v2")
         )
         for (bad in malformed) {

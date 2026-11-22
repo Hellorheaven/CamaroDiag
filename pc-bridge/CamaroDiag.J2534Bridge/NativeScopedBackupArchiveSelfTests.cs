@@ -164,6 +164,22 @@ internal static class NativeScopedBackupArchiveSelfTests
             Check(!NativeScopedBackupImport.VerifyZip(legacyPath, scope).ChannelBound,
                 "Legacy v2 archive is accepted without falsely claiming a bound CAN channel");
             File.Delete(legacyPath);
+            var overstatedPath = Path.Combine(directory, "forged-complete.zip");
+            File.Copy(zipPath, overstatedPath);
+            using (var forged = ZipFile.Open(overstatedPath, ZipArchiveMode.Update))
+            {
+                var entry = forged.GetEntry("manifest.properties")!;
+                string manifestText;
+                using (var reader = new StreamReader(entry.Open(), Encoding.ASCII))
+                    manifestText = reader.ReadToEnd();
+                entry.Delete();
+                using var writer = new StreamWriter(
+                    forged.CreateEntry("manifest.properties").Open(), Encoding.ASCII);
+                writer.Write(manifestText.Replace("required=\n", "required=OTHER\n"));
+            }
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupImport.VerifyZip(overstatedPath, scope));
+            File.Delete(overstatedPath);
             var originalZip = File.ReadAllBytes(zipPath);
             var alteredPath = Path.Combine(directory, "altered.zip");
             File.WriteAllBytes(alteredPath, originalZip);
@@ -197,7 +213,11 @@ internal static class NativeScopedBackupArchiveSelfTests
             string androidManifest;
             using (var intact = ZipFile.OpenRead(zipPath))
             using (var reader = new StreamReader(intact.GetEntry("manifest.properties")!.Open()))
-                androidManifest = reader.ReadToEnd();
+                androidManifest = string.Join("\n",
+                    reader.ReadToEnd().Split('\n').Where(line =>
+                        !line.StartsWith("channel.", StringComparison.Ordinal)))
+                    .Replace(NativeScopedBackupArchive.Format,
+                        NativeScopedBackupArchive.LegacyFormat);
             using (var converted = ZipFile.Open(androidStylePath, ZipArchiveMode.Update))
             {
                 converted.GetEntry("manifest.properties")!.Delete();

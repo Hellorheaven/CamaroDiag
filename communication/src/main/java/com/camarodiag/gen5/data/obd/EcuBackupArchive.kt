@@ -245,6 +245,14 @@ object EcuBackupArchive {
             "Duplicate or empty required ECU region"
         }
         val required = requiredNames.map { EcuBackupCoverage.Region.valueOf(it) }.toSet()
+        // The v3 J2534 format describes ONE explicitly authorized read span;
+        // its existence can never establish a complete ECU memory map.
+        // Preserve legacy v1/v2 archive semantics for offline imports.
+        if (channel != null) {
+            require(count == 1 && required.isEmpty()) {
+                "A routed ECU archive cannot claim complete firmware coverage."
+            }
+        }
         val captures = (0 until count).map { index ->
             val prefix = "capture.$index."
             fun field(key: String) = properties.getProperty(prefix + key)
@@ -273,6 +281,12 @@ object EcuBackupArchive {
             )
         }
         require(files.isEmpty()) { "Unreferenced archive data" }
+        if (channel != null) {
+            val only = captures.single()
+            require(only.firstRead.size.toLong() == only.expectedBytes) {
+                "A routed ECU backup must contain a complete independent read of its declared span."
+            }
+        }
         val allowedChannelKeys = if (channel != null) setOf(
             "channel.requestCanId", "channel.responseCanId",
             "channel.protocolNumber", "channel.session"

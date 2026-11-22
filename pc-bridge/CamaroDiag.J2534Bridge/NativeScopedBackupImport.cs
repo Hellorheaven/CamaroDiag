@@ -170,6 +170,12 @@ internal static class NativeScopedBackupImport
         if (requiredRegions.Any(region => !KnownRegions.Contains(region)) ||
             requiredRegions.Distinct(StringComparer.Ordinal).Count() != requiredRegions.Length)
             throw new InvalidDataException("Invalid required ECU region metadata.");
+        // A v3 capture records one scoped region, not the ECU's complete map.
+        // An archive claiming every required region was captured is misleading.
+        // Legacy v2 imports may still carry their original required regions.
+        if (channelBound && requiredRegions.Length != 0)
+            throw new InvalidDataException(
+                "Routed ECU archives must never declare complete firmware coverage.");
         var regionBound = channelBound && scope.Region != "OTHER";
         if (values["vin"] != scope.ExpectedVin || values["controller"].Length > 128 ||
             values["count"] != "1" ||
