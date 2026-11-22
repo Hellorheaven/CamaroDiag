@@ -143,7 +143,7 @@ object SafeObdRequestPolicy {
                         else -> continue
                     }
                     val count = bytes.substring(4, 6).toIntOrNull(16) ?: continue
-                    if (count !in 1..16 || (pid == 0x02 && count != 1) ||
+                    if (count <= 0 || (pid == 0x02 && count != 1) ||
                         bytes.length != 6 + 2 * count * width) continue
                     if (pid != 0x06) {
                         val values = (0 until count).map { index ->
