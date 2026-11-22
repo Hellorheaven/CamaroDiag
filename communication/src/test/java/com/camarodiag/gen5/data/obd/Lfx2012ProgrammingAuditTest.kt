@@ -151,4 +151,22 @@ class Lfx2012ProgrammingAuditTest {
         assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, dtcReport.overall)
     }
 
+    @Test fun implausibleVehicleVoltageNeedsReviewWithoutBlockingReadOnlyChecks() {
+        for (voltage in listOf(0.0, 5.9, 20.1, 120.0)) {
+            val report = Lfx2012ProgrammingAudit.review(before,
+                before.copy(voltage = voltage, capturedAtUtcMillis = 2L))
+            assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, report.overall)
+            assertTrue(report.after.any {
+                it.item == Lfx2012ProgrammingAudit.Item.VOLTAGE &&
+                    it.status == Lfx2012ProgrammingAudit.CheckStatus.REQUIRES_REVIEW
+            })
+        }
+        for (voltage in listOf(6.0, 12.6, 14.7, 20.0)) {
+            val report = Lfx2012ProgrammingAudit.review(before,
+                before.copy(voltage = voltage, capturedAtUtcMillis = 2L))
+            assertEquals(Lfx2012ProgrammingAudit.Overall.READY_FOR_MANUAL_REVIEW, report.overall)
+            assertFalse(report.physicalValidationComplete)
+        }
+    }
+
 }
