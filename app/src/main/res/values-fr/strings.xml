@@ -787,6 +787,7 @@
     <string name="flexfuel_lfx2012_parts_warning">Ces références ne prouvent pas quel calculateur équipe ce VIN et ne permettent pas de modifier sa calibration.</string>
     <string name="flexfuel_lfx2012_calid_label">Identifiant de calibration communiqué par le calculateur : %1$s</string>
     <string name="flexfuel_lfx2012_boot">Référence de fichier de démarrage du catalogue : %1$s (non vérifiée sur ce véhicule).</string>
+    <string name="flexfuel_lfx2012_readonly_testing_notice">La lecture et l’identification du calculateur sur véhicule réel restent utilisables pour les essais individuels, indépendamment de la qualification de l’écriture ECU.</string>
     <string name="flexfuel_lfx2012_checks">Conditions empêchant encore toute modification de calibration</string>
     <string name="flexfuel_preflight_vehicle_missing">Aucun profil véhicule sélectionné</string>
     <string name="flexfuel_preflight_wrong_vehicle">Véhicule différent de la Camaro LFX 2012</string>
