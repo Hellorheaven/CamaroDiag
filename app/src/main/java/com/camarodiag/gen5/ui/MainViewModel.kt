@@ -2054,18 +2054,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
                     val diagnosticStatus = transmission.diagnosticStatus
-                    val streamedRecords = transmission.receivedRecords.ifEmpty {
-                        CanConsoleRecordParser.parse(response)
+                    val streamedRecords = transmission.receivedRecords
+                    val receivedEvents = if (streamedRecords.isNotEmpty()) {
+                        streamedRecords.map { timed ->
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = timed.record.direction,
+                                timestampMillis = timed.timestampMillis,
+                                content = timed.record.content,
+                                succeeded = timed.record.succeeded
+                            )
+                        }
+                    } else {
+                        CanConsoleRecordParser.parse(response).map { record ->
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = record.direction,
+                                timestampMillis = System.currentTimeMillis(),
+                                content = record.content,
+                                succeeded = record.succeeded
+                            )
+                        }
                     }
-                    val receivedEvents = streamedRecords.map { record ->
-                        CanConsoleHistoryEntry(
-                            id = System.nanoTime(),
-                            direction = record.direction,
-                            timestampMillis = System.currentTimeMillis(),
-                            content = record.content,
-                            succeeded = record.succeeded
-                        )
-                    }.ifEmpty {
+                    val displayedReceivedEvents = receivedEvents.ifEmpty {
                         listOf(CanConsoleHistoryEntry(
                             id = System.nanoTime(),
                             direction = "SYSTEM",
@@ -2082,9 +2093,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isSendingRequest = false,
                         consoleHistory = (
                             current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
-                                receivedEvents
+                                displayedReceivedEvents
                         ).takeLast(300),
-                        observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, displayedReceivedEvents),
                         message = localizedContext.getString(when (diagnosticStatus) {
                             CanConsoleDiagnosticStatus.POSITIVE -> R.string.can_sniffer_request_complete
                             CanConsoleDiagnosticStatus.NEGATIVE -> R.string.can_console_negative_ecu_response
