@@ -10,7 +10,9 @@ package com.camarodiag.gen5.data.obd
 /** Physical adapter output plus a reply validated within its receive-time session. */
 data class CanConsoleRawTransmissionResult(
     val adapterOutput: String,
-    val diagnosticStatus: CanConsoleDiagnosticStatus
+    val diagnosticStatus: CanConsoleDiagnosticStatus,
+    /** Recent received adapter records; never truncated by the 1 KiB ELM ACK buffer. */
+    val receivedRecords: List<ParsedCanConsoleRecord> = emptyList()
 )
 
 class CanConsoleLiveDiagnosticCorrelation(
@@ -20,12 +22,16 @@ class CanConsoleLiveDiagnosticCorrelation(
     init { require(timeoutMs > 0) }
 
     private val framer = CanConsoleStreamFramer()
+    private val recentRecords = ArrayDeque<ParsedCanConsoleRecord>()
     private val perResponder = mutableMapOf<Long, CanConsoleDiagnosticCorrelation>()
     private var diagnosticStatus = CanConsoleDiagnosticStatus.NONE
 
     fun append(chunk: String, receivedAtMs: Long) {
         evaluate(framer.append(chunk).completeLines, receivedAtMs)
     }
+
+    /** Every received record is decoded, then the UI's bounded history keeps the latest 300. */
+    fun recentReceivedRecords(): List<ParsedCanConsoleRecord> = recentRecords.toList()
 
     /** Called after the adapter command completes to process a final unterminated line. */
     fun complete(receivedAtMs: Long): CanConsoleDiagnosticStatus {
@@ -34,6 +40,10 @@ class CanConsoleLiveDiagnosticCorrelation(
     }
 
     private fun evaluate(lines: String, receivedAtMs: Long) {
+        for (record in CanConsoleRecordParser.parse(lines)) {
+            recentRecords.addLast(record)
+            if (recentRecords.size > 300) recentRecords.removeFirst()
+        }
         for (frame in RawCanFrameParser.parseReceivedFrames(lines)) {
             val matcher = if (!request.isExtended && request.canId == 0x7DFL) {
                 if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) continue
