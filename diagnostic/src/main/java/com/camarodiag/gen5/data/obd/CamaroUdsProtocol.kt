@@ -196,7 +196,9 @@ object CamaroUdsProtocol {
         if (!Regex("[0-9A-F]{2}").matches(pidHex)) return null
         val expectedPid = pidHex.toInt(16)
         val hexPairData = Regex("(?:[0-9A-F]{2}){3,10}")
-        val canHeader = Regex("(?:[0-9A-F]{3}|[0-9A-F]{8})")
+        // A Mode 01 reply must use a documented OBD responder header, not
+        // arbitrary three hex characters that could be adapter chatter.
+        val canHeader = Regex("(?:7E[8-F]|18DAF1[0-9A-F]{2})")
         for (sourceLine in response.lineSequence()) {
             val line = sourceLine.trim().uppercase(Locale.ROOT)
             if (line.isEmpty()) continue
