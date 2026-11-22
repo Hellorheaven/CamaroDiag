@@ -25,7 +25,7 @@ object CanConsoleAdapterReplyPolicy {
             .any { line -> line.equals("OK", ignoreCase = true) ||
                 RawCanFrameParser.parseReceivedFrames(line).any { response ->
                     request == null || CanConsoleEcuRouting.expectedResponder(request) == null ||
-                        CanConsoleEcuRouting.isSelectedResponder(request, response)
+                        CanConsoleEcuRouting.isExpectedResponse(request, response)
                 } }
     }
 }
@@ -45,6 +45,13 @@ object CanConsoleEcuRouting {
         val expected = expectedResponder(request) ?: return false
         return response.isExtended == request.isExtended && response.canId == expected
     }
+
+    /** SAE J1979 functional request is a broadcast, not one selected ECU.
+     * The console retains each responder's CAN ID and never coalesces payloads. */
+    fun isExpectedResponse(request: RawCanFrame, response: RawCanFrame): Boolean =
+        if (!request.isExtended && request.canId == 0x7DFL) {
+            !response.isExtended && response.canId in 0x7E8L..0x7EFL
+        } else isSelectedResponder(request, response)
 }
 
 object CanConsoleRecordParser {
@@ -62,7 +69,7 @@ object CanConsoleRecordParser {
                     content = line.take(4_096),
                     succeeded = !CanConsoleAdapterReplyPolicy.isFailure(line)
                 )
-            } else if (request != null && !CanConsoleEcuRouting.isSelectedResponder(request, frame)) {
+            } else if (request != null && !CanConsoleEcuRouting.isExpectedResponse(request, frame)) {
                 ParsedCanConsoleRecord(
                     direction = "SYSTEM",
                     content = line.take(4_096),
