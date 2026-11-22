@@ -182,4 +182,16 @@ class J2534StandardObdTest {
             forged, bytes(0x7F, 0x34, 0x11)))
     }
 
+    @Test fun j2534NegativeVehicleIdentificationIsReportedWithoutFakeVin() {
+        val readVin = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        assertTrue(J2534BridgeTransport.isMatchingNegativeConsoleReply(
+            readVin, bytes(0x7F, 0x09, 0x12)))
+        assertFalse(J2534BridgeTransport.isMatchingNegativeConsoleReply(
+            readVin, bytes(0x7F, 0x01, 0x12)))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(
+                readVin, bytes(0x7F, 0x09, 0x12))
+        }
+    }
+
 }
