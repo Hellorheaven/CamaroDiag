@@ -56,7 +56,38 @@ internal static class NativeScopedBackupArchiveSelfTests
                     Check(output.ToArray().SequenceEqual(bytes), "Actual acquisition retained: " + name);
                 }
             }
+            // Import does not imply restored physical data; it verifies the
+            // exact archived two acquisitions and declared VIN-bound scope.
+            var imported = NativeScopedBackupImport.VerifyZip(zipPath, scope);
+            Check(imported.Bytes.SequenceEqual(bytes) &&
+                imported.SecondBytes is not null &&
+                imported.SecondBytes.SequenceEqual(bytes) &&
+                imported.Sha256 == sha && imported.BlocksPerPass == 3,
+                "Read-only import preserves both original acquisitions");
+            var wrongScope = new J2534MemoryReadScope("1G1FA1RXXR0123457",
+                scope.RequestCanId, scope.ResponseCanId, scope.ProtocolNumber,
+                scope.StartAddress, scope.Length, scope.MaxReadBytes, scope.Session);
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(zipPath, wrongScope));
+
             var originalZip = File.ReadAllBytes(zipPath);
+            var alteredPath = Path.Combine(directory, "altered.zip");
+            File.WriteAllBytes(alteredPath, originalZip);
+            using (var alteredZip = ZipFile.Open(alteredPath, ZipArchiveMode.Update))
+            {
+                alteredZip.GetEntry("capture/0/first.bin")!.Delete();
+                using var outStream = alteredZip.CreateEntry("capture/0/first.bin").Open();
+                var alteredBytes = bytes.ToArray();
+                alteredBytes[15] ^= 1;
+                outStream.Write(alteredBytes);
+            }
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(alteredPath, scope));
+            File.Delete(alteredPath);
+            var extraPath = Path.Combine(directory, "extra.zip");
+            File.WriteAllBytes(extraPath, originalZip);
+            using (var extraZip = ZipFile.Open(extraPath, ZipArchiveMode.Update))
+                extraZip.CreateEntry("untrusted/extra.bin");
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(extraPath, scope));
+            File.Delete(extraPath);
             Reject<IOException>(() => NativeScopedBackupArchive.SaveNew(zipPath, scope, capture, CancellationToken.None));
             Check(File.ReadAllBytes(zipPath).SequenceEqual(originalZip), "Prior backup never overwritten");
 
