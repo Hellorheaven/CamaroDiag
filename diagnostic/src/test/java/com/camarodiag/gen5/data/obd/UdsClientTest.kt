@@ -146,6 +146,8 @@ class UdsClientTest {
         }
         assertTrue(runCatching { grant("A1B2", "00000000", "OS-1") }.isFailure)
         assertTrue(runCatching { grant("A1B2", "HW-1", "PENDING") }.isFailure)
+        assertTrue(runCatching { grant("A1B2", "HW-É", "OS-1") }.isFailure)
+        assertTrue(runCatching { grant("A1B2", "HW\n1", "OS-1") }.isFailure)
         assertTrue(runCatching { grant("A1B2", "HW-1", "OS-1") }.isSuccess)
     }
 
