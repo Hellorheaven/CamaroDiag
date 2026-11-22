@@ -52,6 +52,8 @@ import com.camarodiag.gen5.control.VehicleSignal
 import com.camarodiag.gen5.control.VehicleControlId
 import com.camarodiag.gen5.data.obd.VxdiagProfiles
 import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
+import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
+import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.data.obd.CanTraceFilter
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
@@ -1690,8 +1692,23 @@ fun CanSnifferScreen(
     var canIdFilter by remember { mutableStateOf("") }
     var dataPrefixFilter by remember { mutableStateOf("") }
     var directionFilter by remember { mutableStateOf("ALL") }
+    var selectedObservedCanId by remember { mutableStateOf<Long?>(null) }
+    var observedEcuMenuExpanded by remember { mutableStateOf(false) }
     var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
     val report = state.report
+    // The menu describes CAN IDs seen in this session, not assumed ECU identities.
+    val observedCanIds = remember(state.consoleHistory, report) {
+        CanConsoleDisplayFilter.observedIds(
+            state.consoleHistory.map { ParsedCanConsoleRecord(it.direction, it.content, it.succeeded) },
+            report?.observedCanIds.orEmpty()
+        )
+    }
+    // If capture/vehicle changes, do not retain a stale selected identifier.
+    LaunchedEffect(observedCanIds) {
+        if (selectedObservedCanId != null && selectedObservedCanId !in observedCanIds) {
+            selectedObservedCanId = null
+        }
+    }
     val rawCanFrameInput = remember(requestInput) { RawCanFrameParser.parse(requestInput) != null }
     val unsafeRawCanInput = remember(requestInput) {
         RawCanFrameParser.parse(requestInput)?.let {
@@ -1719,7 +1736,9 @@ fun CanSnifferScreen(
         )
     }
     val visibleFrames = if (filterInputValid) {
-        report?.frames.orEmpty().filterCanTrace(traceFilter).asReversed()
+        report?.frames.orEmpty().filterCanTrace(traceFilter)
+            .filter { CanConsoleDisplayFilter.visibleId(it.canId.toLong(), selectedObservedCanId) }
+            .asReversed()
     } else emptyList()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -1792,14 +1811,65 @@ fun CanSnifferScreen(
                             Text(stringResource(R.string.can_console_clear), color = CamaroBlue)
                         }
                     }
+                    Box {
+                        OutlinedButton(
+                            onClick = { observedEcuMenuExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                if (selectedObservedCanId == null)
+                                    stringResource(R.string.can_console_filter_all_ecus)
+                                else stringResource(
+                                    R.string.can_console_filter_observed_id,
+                                    CanConsoleDisplayFilter.displayId(selectedObservedCanId!!)
+                                )
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = observedEcuMenuExpanded,
+                            onDismissRequest = { observedEcuMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.can_console_filter_all_ecus)) },
+                                onClick = {
+                                    selectedObservedCanId = null
+                                    observedEcuMenuExpanded = false
+                                }
+                            )
+                            observedCanIds.forEach { id ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(stringResource(
+                                            R.string.can_console_filter_observed_id,
+                                            CanConsoleDisplayFilter.displayId(id)
+                                        ))
+                                    },
+                                    onClick = {
+                                        selectedObservedCanId = id
+                                        observedEcuMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        stringResource(R.string.can_console_filter_observed_note),
+                        color = TextMuted, fontSize = 10.sp
+                    )
+                    val visibleConsoleHistory = state.consoleHistory.filter { entry ->
+                        CanConsoleDisplayFilter.visible(
+                            ParsedCanConsoleRecord(entry.direction, entry.content, entry.succeeded),
+                            selectedObservedCanId
+                        )
+                    }
                     Column(
                         Modifier.fillMaxWidth().height(220.dp).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        if (state.consoleHistory.isEmpty()) {
+                        if (visibleConsoleHistory.isEmpty()) {
                             Text(stringResource(R.string.can_console_empty), color = TextMuted, fontSize = 11.sp)
                         } else {
-                            state.consoleHistory.forEach { entry ->
+                            visibleConsoleHistory.forEach { entry ->
                                 val time = java.text.DateFormat.getTimeInstance(
                                     java.text.DateFormat.MEDIUM,
                                     LocalConfiguration.current.locales[0]
@@ -1933,6 +2003,7 @@ fun CanSnifferScreen(
                         canIdFilter = ""
                         dataPrefixFilter = ""
                         directionFilter = "ALL"
+                        selectedObservedCanId = null
                     },
                     enabled = frameSearch.isNotBlank() || canIdFilter.isNotBlank() ||
                         dataPrefixFilter.isNotBlank() || directionFilter != "ALL",
