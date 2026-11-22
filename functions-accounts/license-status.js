@@ -12,6 +12,9 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 
 const REGION = "europe-west1";
+// Start in monitoring mode: enable enforcement only after debug and release
+// attestations have been tested. Firebase Auth checks remain mandatory.
+const ENFORCE_APP_CHECK = process.env.CAMARODIAG_ENFORCE_APP_CHECK === "true";
 const AUTO_GRANT_ENABLED = () =>
   process.env.CAMARODIAG_AUTO_GRANT_LICENSES !== "false";
 
@@ -77,7 +80,7 @@ async function licenseStatus(uid, { autoGrant = false } = {}) {
 
 exports.licenseStatus = licenseStatus;
 exports.getMyLicenseStatus = onCall(
-  { region: REGION, enforceAppCheck: true },
+  { region: REGION, enforceAppCheck: ENFORCE_APP_CHECK },
   async request => {
     if (!request.auth?.uid)
       throw new HttpsError("unauthenticated", "Connexion requise.");
