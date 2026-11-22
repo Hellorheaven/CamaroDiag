@@ -37,10 +37,14 @@ object Lfx2012FlexFuelPreflight {
     )
 
     /**
-     * Return all missing preconditions. WRITE_NOT_VALIDATED is always present
-     * until a separate, vehicle-verified calibration implementation exists.
+     * Identity warnings for a *read-only* vehicle inspection. These are diagnostic
+     * findings, not permission gates: a user may perform standard non-destructive
+     * identification to collect the missing ECU/VIN evidence in the first place.
+     *
+     * In particular, unqualified ECU flashing must not block physical VIN/firmware
+     * discovery. Never treat this list as authorization for a write operation.
      */
-    fun missingPreconditions(vehicle: Vehicle?, evidence: Evidence): List<Status> {
+    fun readOnlyIdentityWarnings(vehicle: Vehicle?, evidence: Evidence): List<Status> {
         if (vehicle == null) return listOf(Status.VEHICLE_NOT_SELECTED)
         if (vehicle.modelYear != 2012 ||
             vehicle.generation != 5 ||
@@ -48,20 +52,28 @@ object Lfx2012FlexFuelPreflight {
         ) return listOf(Status.WRONG_VEHICLE)
 
         val problems = mutableListOf<Status>()
-        val selectedVin = vehicle.selectedVin?.trim()?.uppercase()
-        val ecuVin = vehicle.ecuVin?.trim()?.uppercase()
-        // The tenth VIN character C denotes the 2012 model year on
-        // Chevrolet Camaro Gen 5. A selected model-year label alone is not
-        // sufficient when the ECU supplies a different VIN year code.
+        val selectedVin = vehicle.selectedVin?.trim()?.uppercase(java.util.Locale.ROOT)
+        val ecuVin = vehicle.ecuVin?.trim()?.uppercase(java.util.Locale.ROOT)
+        // The 10th VIN character C identifies model year 2012.
         if (!isVin(selectedVin) || !isVin(ecuVin) || selectedVin != ecuVin ||
             selectedVin?.getOrNull(9) != 'C'
-        ) {
-            problems += Status.VIN_MISMATCH
-        }
+        ) problems += Status.VIN_MISMATCH
         if (evidence.controllerId.isNullOrBlank() || evidence.firmwareId.isNullOrBlank()) {
             problems += Status.ECU_IDENTITY_MISSING
         }
-        if (isPlaceholderIdentity(evidence.controllerId) || isPlaceholderIdentity(evidence.firmwareId)) problems += Status.ECU_IDENTITY_UNVERIFIED
+        if (isPlaceholderIdentity(evidence.controllerId) || isPlaceholderIdentity(evidence.firmwareId)) {
+            problems += Status.ECU_IDENTITY_UNVERIFIED
+        }
+        return problems
+    }
+
+    /**
+     * Return all missing write preconditions. WRITE_NOT_VALIDATED is always
+     * present until a separate, vehicle-verified implementation exists.
+     * Read-only identity collection must remain independently usable.
+     */
+    fun missingPreconditions(vehicle: Vehicle?, evidence: Evidence): List<Status> {
+        val problems = readOnlyIdentityWarnings(vehicle, evidence).toMutableList()
         if (!evidence.verifiedFirmware) problems += Status.FIRMWARE_NOT_VERIFIED
         if (!evidence.originalBackupVerified) problems += Status.ORIGINAL_BACKUP_MISSING
         if (!evidence.recoveryVerified) problems += Status.RECOVERY_NOT_VERIFIED
