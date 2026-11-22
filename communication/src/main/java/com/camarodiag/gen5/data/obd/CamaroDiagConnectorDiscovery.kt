@@ -18,7 +18,31 @@ object CamaroDiagConnectorDiscovery {
         fun read(buffer: ByteArray, timeoutMs: Int): Int
     }
 
-    data class Report(val firmware: String, val lines: List<String>)
+    /** Public ASCII replies establish neither device identity nor a secured session. */
+    data class Report(val firmware: String, val lines: List<String>) {
+        val authenticated: Boolean get() = false
+        val vehicleAccessAllowed: Boolean get() = false
+
+        /** Never map advertised ASCII fields to a live diagnostic capability. */
+        fun toAdapterCapabilities() = com.camarodiag.gen5.domain.model.AdapterCapabilities(
+            deviceName = "CamaroDiagConnectors",
+            firmwareId = firmware,
+            rawProbeLog = lines.toList()
+        )
+    }
+
+    /**
+     * Routing hint only, not authentication. A named connector must never be
+     * probed as ELM, including when selected through a stale saved profile.
+     */
+    fun isConnectorUsbLabel(label: String): Boolean =
+        label.contains("CamaroDiagConnectors", ignoreCase = true)
+
+    fun requiresDedicatedUsbDiscovery(deviceId: Int, deviceLabels: List<String>): Boolean =
+        deviceLabels.any { label ->
+            isConnectorUsbLabel(label) &&
+                Regex("#(\\d+)").find(label)?.groupValues?.get(1)?.toIntOrNull() == deviceId
+        }
 
     fun inspect(channel: Channel, ensureActive: () -> Unit = {}): Report {
         fun exchange(command: String): String {
