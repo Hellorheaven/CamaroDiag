@@ -42,6 +42,7 @@ import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
 import com.camarodiag.gen5.data.obd.CanConsoleAdapterReplyPolicy
+import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
@@ -436,7 +437,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isJ2534BridgeConnecting = false,
             isJ2534BridgeConnected = false
         )
-        val messageId = when (obdManager.currentTransportKind) {
+        val failureTransport = (error as? CanAdapterRestorationException)
+            ?.originalTransportKind ?: obdManager.currentTransportKind
+        val messageId = when (failureTransport) {
             "BLUETOOTH", "BLE" -> R.string.connection_lost_bluetooth
             "USB" -> R.string.connection_lost_usb
             "WIFI" -> R.string.connection_lost_wifi
