@@ -1454,30 +1454,37 @@ fun CalibrationWorkspaceScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(stringResource(R.string.cal_expert_access_title), color = TextPrimary)
+                        // Protocol names are industry-standard identifiers; existing
+                        // explanatory labels remain localized in all 30 locales.
+                        val accessLabels = mapOf(
+                            EcuBenchExpertPlan.AccessMethod.OBD to stringResource(R.string.cal_expert_access_obd),
+                            EcuBenchExpertPlan.AccessMethod.CAN_DIRECT to "CAN",
+                            EcuBenchExpertPlan.AccessMethod.BENCH to stringResource(R.string.cal_expert_access_bench),
+                            EcuBenchExpertPlan.AccessMethod.BOOT_BAM to stringResource(R.string.cal_expert_access_boot),
+                            EcuBenchExpertPlan.AccessMethod.BDM to "BDM",
+                            EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG to stringResource(R.string.cal_expert_access_nexus),
+                            EcuBenchExpertPlan.AccessMethod.EXTERNAL_EEPROM_ISP to "EEPROM ISP",
+                            EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF to stringResource(R.string.cal_expert_access_chipoff)
+                        )
                         Box {
                             OutlinedButton(onClick = { expertAccessMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                                Text(stringResource(when (expertAccessMethod) {
-                                    EcuBenchExpertPlan.AccessMethod.OBD -> R.string.cal_expert_access_obd
-                                    EcuBenchExpertPlan.AccessMethod.BENCH -> R.string.cal_expert_access_bench
-                                    EcuBenchExpertPlan.AccessMethod.BOOT_BAM -> R.string.cal_expert_access_boot
-                                    EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG -> R.string.cal_expert_access_nexus
-                                    EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF -> R.string.cal_expert_access_chipoff
-                                }))
+                                Text(accessLabels.getValue(expertAccessMethod))
                             }
                             DropdownMenu(
                                 expanded = expertAccessMenuExpanded,
                                 onDismissRequest = { expertAccessMenuExpanded = false }
                             ) {
-                                listOf(
-                                    EcuBenchExpertPlan.AccessMethod.OBD to R.string.cal_expert_access_obd,
-                                    EcuBenchExpertPlan.AccessMethod.BENCH to R.string.cal_expert_access_bench,
-                                    EcuBenchExpertPlan.AccessMethod.BOOT_BAM to R.string.cal_expert_access_boot,
-                                    EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG to R.string.cal_expert_access_nexus,
-                                    EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF to R.string.cal_expert_access_chipoff
-                                ).forEach { (method, label) ->
+                                accessLabels.forEach { (method, label) ->
                                     DropdownMenuItem(
-                                        text = { Text(stringResource(label)) },
-                                        onClick = { expertAccessMethod = method; expertAccessMenuExpanded = false }
+                                        text = { Text(label) },
+                                        onClick = {
+                                            expertAccessMethod = method
+                                            if (!method.permitsRegion(expertMemoryRegion)) {
+                                                expertMemoryRegion = EcuBenchExpertPlan.MemoryRegion.values()
+                                                    .first(method::permitsRegion)
+                                            }
+                                            expertAccessMenuExpanded = false
+                                        }
                                     )
                                 }
                             }
@@ -1499,7 +1506,8 @@ fun CalibrationWorkspaceScreen(
                                     EcuBenchExpertPlan.MemoryRegion.PFLASH to R.string.cal_expert_region_pflash,
                                     EcuBenchExpertPlan.MemoryRegion.DFLASH to R.string.cal_expert_region_dflash,
                                     EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM to R.string.cal_expert_region_eeprom
-                                ).forEach { (region, label) ->
+                                ).filter { (region, _) -> expertAccessMethod.permitsRegion(region) }
+                                    .forEach { (region, label) ->
                                     DropdownMenuItem(
                                         text = { Text(stringResource(label)) },
                                         onClick = { expertMemoryRegion = region; expertRegionMenuExpanded = false }
