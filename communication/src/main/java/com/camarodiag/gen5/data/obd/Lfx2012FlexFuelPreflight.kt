@@ -74,6 +74,11 @@ object Lfx2012FlexFuelPreflight {
      */
     fun missingPreconditions(vehicle: Vehicle?, evidence: Evidence): List<Status> {
         val problems = readOnlyIdentityWarnings(vehicle, evidence).toMutableList()
+        // Preserve the original early return for an absent or incompatible vehicle;
+        // write-specific checks are meaningful only after selecting the correct target.
+        if (Status.VEHICLE_NOT_SELECTED in problems || Status.WRONG_VEHICLE in problems) {
+            return problems
+        }
         if (!evidence.verifiedFirmware) problems += Status.FIRMWARE_NOT_VERIFIED
         if (!evidence.originalBackupVerified) problems += Status.ORIGINAL_BACKUP_MISSING
         if (!evidence.recoveryVerified) problems += Status.RECOVERY_NOT_VERIFIED
