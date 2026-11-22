@@ -1048,13 +1048,18 @@ fun AdapterScreen(
                     }
                     if (usbDevices.isEmpty()) Text(stringResource(R.string.usb_none_detected), color = TextMuted)
                     usbDevices.forEach { label ->
-                        if (!label.contains("CamaroDiagConnectors", ignoreCase = true) || onDiscoverConnector == null) {
+                        val kklOnly = com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel(label)
+                        if (kklOnly) {
+                            Text(label, fontSize = 12.sp)
+                            Text(stringResource(R.string.status_not_verified), fontSize = 11.sp, color = TextMuted)
+                        }
+                        if (!kklOnly && (!label.contains("CamaroDiagConnectors", ignoreCase = true) || onDiscoverConnector == null)) {
                             OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.adapter_connect_label, label))
                             }
                         }
-                        if (onDiscoverConnector != null) {
+                        if (!kklOnly && onDiscoverConnector != null) {
                             OutlinedButton(onClick = { onDiscoverConnector(label) }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Column {
@@ -1064,7 +1069,7 @@ fun AdapterScreen(
                                 }
                             }
                         }
-                        if (onDiscoverBinaryConnector != null) {
+                        if (!kklOnly && onDiscoverBinaryConnector != null) {
                             OutlinedButton(onClick = { onDiscoverBinaryConnector(label) }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Column {

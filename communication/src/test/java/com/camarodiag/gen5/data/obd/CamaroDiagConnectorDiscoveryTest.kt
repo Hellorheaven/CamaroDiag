@@ -58,6 +58,18 @@ class CamaroDiagConnectorDiscoveryTest {
         assertFalse(capabilities.supportsSwCan)
     }
 
+    @Test fun explicitKklLabelsNeverEnterElmOrNativeDiscoveryByMistake() {
+        val labels = listOf("FTDI KKL (#12)", "CamaroDiagConnectors K-Line (#123)",
+            "FTDI ELM327 (#5)", "FT232R USB UART (#7)", "KKLegacy (#9)")
+        assertTrue(CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(12, labels))
+        assertTrue(CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(123, labels))
+        for (id in listOf(1, 5, 7, 9, 23)) {
+            assertFalse(CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(id, labels))
+        }
+        assertTrue(CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel("KLINE"))
+        assertTrue(CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel("K Line"))
+    }
+
     @Test fun namedConnectorCannotBeRoutedThroughLegacyUsbProbe() {
         val labels = listOf("ELM327 #12", "camarodiagconnectors #123", "CamaroDiagConnectors #5")
         assertTrue(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(123, labels))

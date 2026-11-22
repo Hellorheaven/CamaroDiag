@@ -3078,6 +3078,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectUsb(deviceLabel: String) {
+        if (com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel(deviceLabel)) {
+            _connectionMessage.value = localizedContext.getString(R.string.status_not_verified)
+            return
+        }
         if (deviceLabel.contains("CamaroDiagConnectors", ignoreCase = true)) {
             discoverCamaroDiagConnector(deviceLabel)
             return

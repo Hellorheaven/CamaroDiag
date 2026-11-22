@@ -192,6 +192,9 @@ class BluetoothObdManager(context: Context) {
                 // A stale probe can close only its own handle, never a new OBD session.
                 val probe = ElmUsbTransport(connectorUsbContext)
                 try {
+                    if (CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, probe.availableDevices())) {
+                        return@withLock Result.failure(IllegalStateException("KKL requires its own qualified transport"))
+                    }
                     probe.connect(
                         deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE,
                         discoveryOnly = true, requireCdc = binary
@@ -233,7 +236,11 @@ class BluetoothObdManager(context: Context) {
         try {
             // Re-check the currently enumerated USB device at the manager boundary.
             // Neither a legacy UI entry nor a saved ELM profile may bypass discovery.
-            if (CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(deviceId, usbTransport.availableDevices())) {
+            val labels = usbTransport.availableDevices()
+            if (CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, labels)) {
+                return@withContext Result.failure(IllegalStateException("KKL requires its own qualified transport"))
+            }
+            if (CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(deviceId, labels)) {
                 return@withContext Result.failure(IllegalStateException("CamaroDiagConnectors requires dedicated USB discovery"))
             }
             val connected = usbTransport.connect(deviceId, baudRate)
