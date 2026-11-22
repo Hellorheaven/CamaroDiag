@@ -583,7 +583,10 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             0x4C -> "Commanded throttle actuator" to (percent(a) to "%")
             0x4D -> "Time with MIL on" to ((word() ?: return emptyList()).toDouble() to "min")
             0x4E -> "Time since DTC clear" to ((word() ?: return emptyList()).toDouble() to "min")
-            0x52 -> "Ethanol fuel percentage" to (percent(a) to "%")
+            0x52 -> {
+                if (data.size != 1) return emptyList()
+                "Ethanol fuel percentage" to (percent(a) to "%")
+            }
             0x59 -> "Fuel rail absolute pressure" to ((word() ?: return emptyList()) * 10.0 to "kPa")
             0x5A -> "Relative accelerator pedal position" to (percent(a) to "%")
             0x5B -> "Hybrid battery pack remaining life" to (percent(a) to "%")
