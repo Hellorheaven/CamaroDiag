@@ -77,12 +77,34 @@ class UdsMemoryWireFormatTest {
     @Test fun memoryWriteUsesSameAlfiEncoding() = runBlocking {
         val transport = ScriptedPayloadTransport(
             bytes(0x50, 0x02), bytes(0x67, 0x01, 0x12, 0x34),
-            bytes(0x67, 0x02), bytes(0x7D))
+            bytes(0x67, 0x02), bytes(0x7D, 0x24, 0, 0, 0x10, 0, 0, 2))
         val uds = UdsClient(transport, policy(allowWrite = true))
         uds.diagnosticSessionControl(0x02)
         unlockForSyntheticWrite(uds)
         uds.writeMemoryByAddressAndLength(0x1000, bytes(0xA5, 0x5A), addressLength = 4, sizeLength = 2)
         assertArrayEquals(bytes(0x3D, 0x24, 0, 0, 0x10, 0, 0, 2, 0xA5, 0x5A), transport.sent[3])
+    }
+
+    @Test fun writeMemoryRejectsUncorrelatedOrIncompletePositiveAcknowledgements() = runBlocking {
+        for (badAck in listOf(
+                bytes(0x7D),
+                bytes(0x7D, 0x24, 0, 0, 0x10, 0, 0),
+                bytes(0x7D, 0x24, 0, 0, 0x10, 0, 0, 3),
+                bytes(0x7D, 0x24, 0, 0, 0x10, 0, 0, 2, 0xFF),
+                bytes(0x7D, 0x24, 0, 0, 0x11, 0, 0, 2)
+            )) {
+            val transport = ScriptedPayloadTransport(
+                bytes(0x50, 0x02), bytes(0x67, 0x01, 0x12, 0x34),
+                bytes(0x67, 0x02), badAck
+            )
+            val client = UdsClient(transport, policy(allowWrite = true))
+            client.diagnosticSessionControl(0x02)
+            unlockForSyntheticWrite(client)
+            assertTrue(runCatching {
+                client.writeMemoryByAddressAndLength(0x1000, bytes(0xA5, 0x5A))
+            }.isFailure)
+            assertEquals(4, transport.sent.size)
+        }
     }
 
     @Test fun requestDownloadAndTransferDecodeHighNibbleBlockLength() = runBlocking {
