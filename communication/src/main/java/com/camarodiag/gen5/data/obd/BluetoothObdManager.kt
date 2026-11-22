@@ -404,6 +404,33 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /**
+     * Console operator read, using the active real transport without silently
+     * falling back from J2534 to an ELM adapter or to simulation.
+     */
+    suspend fun sendReadOnlyConsoleCommand(request: SafeObdRequest): String {
+        require(SafeObdRequestPolicy.parse(request.elmCommand) == request) {
+            "Invalid operator OBD read command."
+        }
+        if (!isJ2534BridgeConnected()) {
+            check(isObdCommandChannelAvailable) { "No connected OBD read channel." }
+            val epoch = transportSessionEpoch.capture()
+            return commandSessionMutex.withLock {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                check(isObdCommandChannelAvailable) { "OBD channel disconnected." }
+                sendAtCommandInternal(request.elmCommand, 4_000L, expectedEpoch = epoch)
+            }
+        }
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable()) { "Physical J2534 OBD reading unavailable." }
+            val result = checkNotNull(j2534BridgeTransport).readOnlyConsoleRequest(request)
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            result
+        }
+    }
+
     /** The standard OBD capability is not an ELM/AT command channel. */
     fun isJ2534StandardObdAvailable(): Boolean =
         isJ2534BridgeConnected() && j2534BridgeTransport?.isStandardObdPhysicalReadEnabled == true
