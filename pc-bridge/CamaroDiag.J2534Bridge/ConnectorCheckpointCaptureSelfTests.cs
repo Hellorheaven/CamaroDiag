@@ -49,6 +49,14 @@ internal static class ConnectorCheckpointCaptureSelfTests
             string file = Path.Combine(directory, "checkpoint.cdj");
             Check(ConnectorCheckpointCapture.Save(file, bytes!).Status == ConnectorCheckpoint.Disposition.RecoveryRequired);
             Check(File.ReadAllBytes(file).SequenceEqual(bytes!));
+            var corrupt = bytes!.ToArray();
+            corrupt[30] ^= 1;
+            var invalidPath = Path.Combine(directory, "corrupt.cdj");
+            bool corruptRejected = false;
+            try { ConnectorCheckpointCapture.Save(invalidPath, corrupt); }
+            catch (InvalidDataException) { corruptRejected = true; }
+            Check(corruptRejected && !File.Exists(invalidPath));
+
             bool refused=false;
             try { ConnectorCheckpointCapture.Save(file, bytes!); }
             catch (IOException) { refused=true; }
