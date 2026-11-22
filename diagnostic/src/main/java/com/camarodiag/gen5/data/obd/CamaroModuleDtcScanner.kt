@@ -41,7 +41,14 @@ sealed interface ModuleDiagnosticResult {
 
     data class NotConfigured(override val module: CamaroControlModule, val reason: String) : ModuleDiagnosticResult
     data class ReadFailure(override val module: CamaroControlModule, val reason: String) : ModuleDiagnosticResult
-    data class DtcRead(override val module: CamaroControlModule, val report: UdsDtcReport) : ModuleDiagnosticResult
+    data class DtcRead(
+        override val module: CamaroControlModule,
+        val report: UdsDtcReport,
+        /** Null for the legacy address-only path; no ECU identity was checked. */
+        val verifiedIdentity: UdsEcuIdentity? = null
+    ) : ModuleDiagnosticResult {
+        val identityVerified: Boolean get() = verifiedIdentity != null
+    }
 }
 
 /**
@@ -87,7 +94,9 @@ class CamaroModuleDtcScanner(
                         val transport = openTransport(profile)
                         val session = ProfiledUdsReadSession.open(
                             transport, vehicle, profile, timeoutMs)
-                        ModuleDiagnosticResult.DtcRead(module, session.readDtcReport())
+                        ModuleDiagnosticResult.DtcRead(
+                            module, session.readDtcReport(), session.identity
+                        )
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {
