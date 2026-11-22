@@ -697,7 +697,7 @@ fun CamaroDiagApp(
                     canReadObdAvailable = viewModel.canConsoleReadObd(),
                     canTransmitAvailable = adapter.supportsCanTransmit,
                     knownModules = modules,
-                    onStart = { viewModel.startCanMonitor() },
+                    onStart = { can29Bit -> viewModel.startCanMonitor(can29Bit = can29Bit) },
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
@@ -1683,13 +1683,15 @@ fun CanSnifferScreen(
     canReadObdAvailable: Boolean,
     canTransmitAvailable: Boolean,
     knownModules: List<EcuModule>,
-    onStart: () -> Unit,
+    onStart: (Boolean) -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
     onClearHistory: () -> Unit,
     onExport: () -> Unit
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
+    var monitorCan29Bit by remember { mutableStateOf(false) }
+    var monitorFormatMenuExpanded by remember { mutableStateOf(false) }
     var pendingRawFrameInput by remember { mutableStateOf<String?>(null) }
     var frameSearch by remember { mutableStateOf("") }
     var canIdFilter by remember { mutableStateOf("") }
@@ -1764,9 +1766,42 @@ fun CanSnifferScreen(
                     Text(stringResource(R.string.can_sniffer_safety), color = CamaroAmber, fontSize = 11.sp)
                     Text(stringResource(R.string.can_sniffer_bus_limit), color = TextMuted, fontSize = 10.sp)
                     Text(stringResource(R.string.can_sniffer_stn_filter_notice), color = TextMuted, fontSize = 10.sp)
+                    Box {
+                        OutlinedButton(
+                            onClick = { monitorFormatMenuExpanded = true },
+                            enabled = !state.isCapturing && !state.isSendingRequest,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(
+                                if (monitorCan29Bit) R.string.can_monitor_format_29
+                                else R.string.can_monitor_format_11
+                            ))
+                        }
+                        DropdownMenu(
+                            expanded = monitorFormatMenuExpanded,
+                            onDismissRequest = { monitorFormatMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.can_monitor_format_11)) },
+                                onClick = {
+                                    monitorCan29Bit = false
+                                    monitorFormatMenuExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.can_monitor_format_29)) },
+                                onClick = {
+                                    monitorCan29Bit = true
+                                    monitorFormatMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                    Text(stringResource(R.string.can_monitor_format_notice),
+                        color = TextMuted, fontSize = 10.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = onStart,
+                            onClick = { onStart(monitorCan29Bit) },
                             enabled = isAvailable && !state.isCapturing && !state.isSendingRequest,
                             modifier = Modifier.weight(1f)
                         ) {
