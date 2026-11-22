@@ -185,16 +185,40 @@ internal sealed class BridgeServer
                     {
                         // Physical GM CAN VIN/OSID read only. Never grants
                         // SecurityAccess or programming privileges.
-                        var identity = await Task.Run(
-                            () => device.ReadGmlanIdentification(), cancellationToken);
-                        await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                        try
                         {
-                            ok = true,
-                            identity,
-                            responseCanId = device.ResponseCanIdLabel,
-                            readOnly = true,
-                            flashQualified = false
-                        }));
+                            var identity = await Task.Run(
+                                () => device.ReadGmlanIdentification(), cancellationToken);
+                            await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                            {
+                                ok = true,
+                                identityAvailable = true,
+                                identity,
+                                responseCanId = device.ResponseCanIdLabel,
+                                readOnly = true,
+                                flashQualified = false
+                            }));
+                        }
+                        catch (NativeGmlanIdentification.IdentityUnavailableException)
+                        {
+                            await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                            {
+                                ok = true, identityAvailable = false,
+                                responseCanId = device.ResponseCanIdLabel,
+                                readOnly = true, flashQualified = false
+                            }));
+                        }
+                        catch (TimeoutException)
+                        {
+                            // Mandatory legacy VIN read was silent. The approved
+                            // UDS F190 scope is still independently enforced.
+                            await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                            {
+                                ok = true, identityAvailable = false,
+                                responseCanId = device.ResponseCanIdLabel,
+                                readOnly = true, flashQualified = false
+                            }));
+                        }
                         break;
                     }
                     case "clearStandardObdDtcs":

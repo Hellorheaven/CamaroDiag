@@ -12,6 +12,10 @@ import java.io.OutputStreamWriter
 import java.net.Socket
 import java.util.Locale
 
+/** Explicitly unsupported legacy GM 0x1A identity, never a malformed/denied response. */
+internal class GmlanIdentityUnavailableException :
+    IllegalStateException("The ECU does not expose a supported legacy GM VIN/OSID.")
+
 /**
  * Certificate-pinned TLS (JSON lines) client for the Windows J2534 bridge.
  * J2534 performs ISO-TP framing on the PC; this class exchanges complete UDS payloads.
@@ -198,6 +202,14 @@ class J2534BridgeTransport(
                 JSONObject().put("op", "identifyGmlan").put("token", tlsPairing.token),
                 15_000
             )
+            if (response.opt("identityAvailable") == false) {
+                check(response.opt("readOnly") == true &&
+                    response.opt("flashQualified") == false &&
+                    response.optString("responseCanId") == expected) {
+                    "The PC bridge returned an untrusted optional GMLAN identity response."
+                }
+                throw GmlanIdentityUnavailableException()
+            }
             val data = response.getJSONObject("identity")
             fun integer(name: String): Long {
                 val value = data.opt(name)

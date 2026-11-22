@@ -1089,10 +1089,13 @@ class BluetoothObdManager(context: Context) {
                 bridge.readGmlanIdentification()
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
-            } catch (unavailable: Exception) {
+            } catch (unavailable: GmlanIdentityUnavailableException) {
+                // A genuinely unsupported legacy identity is optional, but
+                // malformed, denied or mismatched evidence is never optional.
                 transportSessionEpoch.requireQueuedCurrent(epoch)
-                if (!bridge.isConnected || !bridge.isScopedMemoryReadEnabled)
-                    throw unavailable
+                check(bridge.isConnected && bridge.isScopedMemoryReadEnabled) {
+                    "Physical J2534 bridge disconnected during GM identity discovery."
+                }
                 null
             }
             if (identityBefore != null) {

@@ -395,8 +395,8 @@ internal sealed partial class BridgeDesktopForm
                     // legacy GM 0x1A. Never invent a firmware version from VIN.
                     NativeGmlanIdentification.Identity? before = null;
                     try { before = device.ReadGmlanIdentification(); }
-                    catch (Exception error) when (error is IOException or
-                        InvalidDataException or TimeoutException)
+                    catch (Exception error) when (error is
+                        NativeGmlanIdentification.IdentityUnavailableException or TimeoutException)
                     {
                         cancellation.Token.ThrowIfCancellationRequested();
                         if (!device.IsOpen) throw;
