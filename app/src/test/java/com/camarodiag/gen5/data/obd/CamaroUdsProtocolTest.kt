@@ -109,7 +109,8 @@ class CamaroUdsProtocolTest {
 
     @Test
     fun negativeAtRepliesDoNotGrantCanOrSwCanCapabilities() {
-        for (failure in listOf("NOT OK", "NOK", "OK?", "ERROR", "UNABLE TO CONNECT")) {
+        for (failure in listOf("NOT OK", "NOK", "OK?", "ERROR", "UNABLE TO CONNECT",
+                "OK\\r\\nERROR", "OK\\r\\nNO DATA", "OK\\r\\n?")) {
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "OBDLink MX+",
                 macAddress = "00:00:00:00:00:01",
