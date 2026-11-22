@@ -2145,11 +2145,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 succeeded = timed.record.succeeded
                             )
                         }
+                    val errorMessage = localizedContext.getString(
+                        if ((error as? CanConsolePhysicalExchangeException)?.isResponseTimeout() == true ||
+                            error is java.net.SocketTimeoutException
+                        ) R.string.can_console_response_timeout
+                        else R.string.can_sniffer_request_failed
+                    )
                     val errorEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = localizedContext.getString(R.string.can_sniffer_request_failed),
+                        content = errorMessage,
                         succeeded = false
                     )
                     _liveCanMonitorState.value = current.copy(
@@ -2160,7 +2166,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             } + receivedEvents + errorEvent
                         ).takeLast(300),
                         observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents),
-                        message = localizedContext.getString(R.string.can_sniffer_request_failed)
+                        message = errorMessage
                     )
                 }
             } finally {
