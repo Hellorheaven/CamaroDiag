@@ -67,10 +67,16 @@ object CanConsoleDisplayFilter {
             })
             .distinct().sortedWith(compareBy({ it.value }, { it.extended })).toList()
 
-    fun visibleTrace(frame: CanTraceFrame, selectedId: ObservedCanId?): Boolean =
-        selectedId == null ||
-            (frame.extendedId != null && frame.canId.toLong() == selectedId.value &&
-                frame.extendedId == selectedId.extended)
+    fun visibleTrace(frame: CanTraceFrame, selectedId: ObservedCanId?): Boolean {
+        if (selectedId == null) return true
+        if (frame.extendedId != selectedId.extended) return false
+        if (frame.canId.toLong() == selectedId.value) return true
+        // TX frames to a physically addressed ECU remain visible when its
+        // response ID is selected; functional broadcasts never belong to one ECU.
+        if (frame.direction != CanTraceDirection.TX) return false
+        val request = RawCanFrame(frame.canId.toLong(), selectedId.extended, byteArrayOf())
+        return CanConsoleEcuRouting.expectedResponder(request) == selectedId.value
+    }
 
     fun visible(entry: ParsedCanConsoleRecord, selectedId: ObservedCanId?): Boolean {
         if (selectedId == null || entry.direction == "SYSTEM") return true
