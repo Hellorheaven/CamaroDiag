@@ -53,6 +53,7 @@ import com.camarodiag.gen5.control.VehicleControlId
 import com.camarodiag.gen5.data.obd.VxdiagProfiles
 import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
+import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.data.obd.CanTraceFilter
@@ -1848,8 +1849,12 @@ fun CanSnifferScreen(
                         Text(stringResource(R.string.can_console_history), color = CamaroAmber, fontWeight = FontWeight.Bold)
                         TextButton(
                             onClick = onExport,
-                            enabled = !state.isCapturing &&
-                                (state.consoleHistory.isNotEmpty() || state.rawText.isNotBlank())
+                            enabled = CanConsoleExportPolicy.canExport(
+                                isCapturing = state.isCapturing,
+                                archiveFailed = state.rawArchiveFailed,
+                                hasHistory = state.consoleHistory.isNotEmpty(),
+                                hasRawData = state.rawText.isNotBlank()
+                            )
                         ) {
                             Text(stringResource(R.string.can_sniffer_export_raw), color = CamaroBlue)
                         }
