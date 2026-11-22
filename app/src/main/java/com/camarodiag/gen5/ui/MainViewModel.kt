@@ -2015,15 +2015,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Standard OBD read availability is distinct from raw CAN monitor/transmit support. */
     fun canConsoleReadObd(): Boolean = obdManager.isStandardObdReadAvailable()
 
-    /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
+    /**
+     * Public console input accepts read-only OBD directly. A raw CAN frame is
+     * never transmitted here: it must pass through the session-bound explicit
+     * confirmation entry point, even if another UI caller invokes this method.
+     */
     fun sendCanConsoleInput(input: String) {
         if (!requirePremiumLicense()) return
-        val frame = RawCanFrameParser.parse(input)
-        if (frame == null) {
-            sendSafeObdRequest(input)
+        if (RawCanFrameParser.parse(input) != null) {
+            val message = localizedContext.getString(R.string.can_console_raw_tx_confirm_title)
+            appendCanConsoleSystemEvent(message, succeeded = false)
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
         }
-        sendRawCanConsoleFrame(input, frame)
+        sendSafeObdRequest(input)
     }
 
     /**
