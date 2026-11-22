@@ -45,7 +45,7 @@ class Lfx2012ProgrammingAuditTest {
     }
 
     @Test fun malformedVinAndNonpositiveVoltageCannotPassManualReviewGate() {
-        for (badVin in listOf("INVALID", "2G1I0000000000001")) {
+        for (badVin in listOf("INVALID", "2G1I0000000000001", "2G1TEST00B0000001")) {
             val report = Lfx2012ProgrammingAudit.review(
                 before, before.copy(vin = badVin, capturedAtUtcMillis = 2L)
             )
