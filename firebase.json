@@ -1,14 +1,8 @@
 {
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "billing"
-    },
-    {
-      "source": "functions-accounts",
-      "codebase": "accounts"
-    }
-  ],
+  "functions": {
+    "source": "functions",
+    "codebase": "accounts"
+  },
   "firestore": {
     "rules": "firestore.rules"
   }

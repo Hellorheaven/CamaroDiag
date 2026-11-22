@@ -1,105 +1,42 @@
-# CamaroDiag — Identité et licence seulement dans Firebase
+# Compte et licences — CamaroDiag
 
-## Règle de minimisation des données (#104)
+CamaroDiag utilise un compte personnel pour retrouver vos droits d'accès.
 
-CamaroDiag n'envoie **aucune donnée diagnostic ou véhicule** vers Firebase/Firestore :
-aucun PID, DTC, VIN, trame CAN, trace, kilométrage, rapport de scan, sauvegarde ECU,
-calibration, cartographie, export utilisateur ni contenu de console.
+## Accès aux fonctionnalités
 
-- **Firebase Authentication** : comptes, UID, e-mail, vérification, état actif/désactivé, fournisseurs d'identité. Les droits `owner_functional_tests` et `admin_accounts` sont des Custom Claims signés.
-- **Firestore** : la seule collection du parcours d'accès est `licenses/{uid}`. Elle contient les champs nécessaires au droit de licence : UID, adresse e-mail normalisée pour l'association, état, origine (promotion, achat, attribution administrative), dates et éventuel choix manuel. Ce ne sont pas des données OBD.
-- **Local** : toutes les données de diagnostic, véhicules, scans, journaux CAN et exports restent sur le téléphone ou PC / le répertoire choisi par l'utilisateur.
-- **Sécurité** : Firestore interdit l'accès client direct ; les lectures/attributions/modifications des licences passent par des Cloud Functions Firebase qui vérifient l'identité et les droits.
+La version gratuite donne accès aux données en temps réel, à la lecture
+des codes défaut et à leur effacement lorsque le véhicule et l'interface
+le permettent.
 
-Le projet n'utilise plus les collections `manualLicenseOverrides`, `promotionalLicenses`,
-`licenseSettings` et `accountAdminAudit` dans les nouveaux parcours d'administration/licence.
-Les changements manuels enregistrent uniquement les propriétés `manualOverride`,
-`manualChangedAt`, et `manualChangedBy` **dans** `licenses/{uid}`. Aucun journal d'administration séparé n'est enregistré dans Firestore.
+Une licence donne accès aux fonctionnalités avancées disponibles dans
+la version de l'application utilisée. Les fonctionnalités nécessitant une
+licence sont identifiées dans l'interface.
 
-## Politique de licence demandée
+Pendant la période de lancement, une licence peut être attribuée
+gratuitement lors de la première connexion d'un compte vérifié.
+Cette offre pourra évoluer. L'achat en ligne n'est pas proposé
+pour le moment.
 
-- **Gratuit** : diagnostic temps réel ; lecture et effacement DTC. Configuration
-  technique, connexion, véhicule, compte, aide, mises à jour restent accessibles.
-- **Avec licence** : modules ECU, console CAN, scan complet, analyse kilométrique,
-  sauvegardes et cartographies, commandes/pilotage et exports avancés.
-- **Sans licence** : fonctions avancées visibles, grisées, avec explication au clic.
-- **Propriétaires** : les deux comptes dotés du claim `owner_functional_tests`
-  conservent l'accès total, y compris outils Debug privés.
+## Mon compte
 
-Les utilisateurs vérifiés reçoivent temporairement une licence **promotionnelle gratuite**
-lors du premier contrôle serveur, sans fausse preuve de paiement. Une licence déjà
-révoquée par l'administration ne sera pas réattribuée automatiquement.
-L'attribution automatique est contrôlée par la configuration **serveur**
-`CAMARODIAG_AUTO_GRANT_LICENSES` (valeur `false` pour la désactiver).
-La désactivation n'enlève pas rétroactivement les licences déjà accordées ;
-cela demande une opération de révocation distincte. Aucune configuration globale
-de licence n'est enregistrée dans Firestore.
+La page « Mon compte » indique si une licence est reconnue.
+La licence est liée au compte de connexion, pas au téléphone.
 
-## Préconditions de mise en service
+La gestion des comptes et des licences est réservée aux
+utilisateurs disposant de l'autorisation correspondante.
 
-Le code en PR ne signifie pas déploiement. Au 22 novembre 2026, le projet Firebase
-`camarodiag-e1ed1` est sur Blaze, Firestore `(default)` est créé mais vide et les
-applications Android Debug/Release sont enregistrées dans App Check.
-L'accès aux Cloud Functions exige un
-déploiement explicite, App Check correctement configuré et les tests Android/serveur.
-Le forfait Blaze Firebase peut être nécessaire et entraîner des frais ; demander
-l'accord avant toute activation de facturation ou tout déploiement.
+## Confidentialité
 
-La **vente de licences Stripe reste désactivée**. Le code historique de préparation
-commerciale contient encore des registres de transactions de paiement (sessions,
-paiements et remboursements) séparés : ces écritures ne sont pas utilisées tant
-que la vente reste désactivée. Elles devront être refactorisées ou approuvées
-explicitement avant toute future activation commerciale pour respecter strictement
-la règle « identités et licences seulement ».
+Les comptes et licences sont gérés avec Firebase. Les données
+de diagnostic, trames, rapports et véhicules restent enregistrées
+localement sur l'appareil, sauf export explicite par l'utilisateur.
 
-La vérification des licences s'effectue côté serveur. Les données diagnostic ne
-seront jamais mises en base cloud pour ce contrôle. L'activation définitive des
-restrictions Premium exige une validation des protections d'opérations sensibles
-(y compris Windows/ECU), au-delà du simple grisement d'un menu.
+## En cas de problème
 
+Vérifiez votre connexion Internet et reconnectez-vous à votre compte.
+Si l'accès à une fonction sous licence reste indisponible,
+contactez l'administrateur de CamaroDiag.
 
-## Fréquence des vérifications (#105)
-
-L'application n'interroge pas les licences à intervalles réguliers.
-Au **démarrage**, CamaroDiag valide la session Firebase et effectue **une
-consultation explicite** du statut de licence côté serveur lorsque le
-contrôle commercial est activé. Le résultat, y compris l'origine de la licence,
-est conservé uniquement en mémoire pour cette session. L'ouverture de
-« Mon compte » affiche ce résultat sans nouvel appel réseau.
-
-Les seules exceptions applicatives : changement de compte, actualisation
-explicitement demandée ou action administrative (recherche, modification,
-révocation), qui doit contacter le serveur. Un redémarrage complet de
-l'Activity Android peut recréer la session visuelle. Le SDK Firebase
-Authentication peut lui-même rafraîchir ses jetons pour maintenir
-l'authentification : **cela ne garantit pas une seule requête réseau totale**.
-
-Compromis : la révocation côté serveur d'une licence ou d'un compte en cours
-d'utilisation ne se reflète normalement dans l'interface qu'au démarrage
-suivant, au changement de compte ou lors d'une actualisation explicite. Les
-opérations à risque (écriture ECU, commandes véhicule) doivent conserver
-leurs contrôles de sécurité propres, indépendamment de ce cache de présentation.
-
-### État de déploiement et garde-fous
-
-`LicenseRolloutConfig.ENABLED=true` et `PAYMENTS_ENABLED=false` :
-l'application exige une licence pour Premium mais aucun achat n'est possible.
-**Cette version ne doit pas être diffusée avant déploiement et validation des
-fonctions** : en leur absence, les fonctions Premium restent fermées.
-
-Les fonctions du codebase Firebase `accounts` utilisent
-`CAMARODIAG_ENFORCE_APP_CHECK=false` par défaut, conformément à l'état
-« Non appliqué » de Firestore et Authentication. La présence d'App Check sur
-le client ne prouve pas que ses tokens soient validés. La vérification de
-l'identité Firebase, des claims signés, des droits administratifs et des
-documents Firestore reste imposée sur le serveur.
-
-Une fois les APK Debug et Release qualifiés, l'exploitant pourra renseigner
-`CAMARODIAG_ENFORCE_APP_CHECK=true` puis redéployer les fonctions. Ne pas
-effectuer ce basculement tant que les deux canaux n'ont pas de token App Check
-valide (notamment le token Debug enregistré dans Firebase).
-
-**Déploiement :** suivre `docs/FIREBASE_DEPLOYMENT.md`. Seul le codebase
-`accounts` est à déployer ; le codebase `billing` contient le prototype
-Stripe inactif et ne doit pas être déployé. Le déploiement peut engendrer des
-coûts Google Cloud même si aucun utilisateur ne paie encore de licence.
+Les capacités de diagnostic et d'écriture dépendent du véhicule et
+de l'interface utilisés. Ne lancez jamais une opération de
+programmation sans matériel et procédure adaptés.
