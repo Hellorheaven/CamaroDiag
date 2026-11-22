@@ -591,6 +591,7 @@ fun CamaroDiagApp(
                     usbDevices = usbDevices,
                     onRefreshUsb = { viewModel.refreshUsbDevices() },
                     onConnectUsb = { viewModel.connectUsb(it) },
+                    onDiscoverConnector = { viewModel.discoverCamaroDiagConnector(it) },
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
@@ -971,7 +972,8 @@ fun AdapterScreen(
     usbDevices: List<String>,
     onRefreshUsb: () -> Unit,
     onConnectUsb: (String) -> Unit,
-    onConnectWifi: (String, Int) -> Unit
+    onConnectWifi: (String, Int) -> Unit,
+    onDiscoverConnector: ((String) -> Unit)? = null
 ) {
     var wifiHost by remember { mutableStateOf("192.168.0.10") }
     var wifiPort by remember { mutableStateOf("35000") }
@@ -1043,7 +1045,24 @@ fun AdapterScreen(
                         TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(stringResource(R.string.common_refresh)) }
                     }
                     if (usbDevices.isEmpty()) Text(stringResource(R.string.usb_none_detected), color = TextMuted)
-                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_connect_label, label)) } }
+                    usbDevices.forEach { label ->
+                        if (!label.contains("CamaroDiagConnectors", ignoreCase = true) || onDiscoverConnector == null) {
+                            OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.adapter_connect_label, label))
+                            }
+                        }
+                        if (onDiscoverConnector != null) {
+                            OutlinedButton(onClick = { onDiscoverConnector(label) }, enabled = !isBusy,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    Text("CamaroDiagConnectors • USB")
+                                    Text(label, fontSize = 11.sp)
+                                    Text(stringResource(R.string.adapter_discovery_only), fontSize = 11.sp, color = TextMuted)
+                                }
+                            }
+                        }
+                    }
                     HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                     Text(stringResource(R.string.wifi_connection_title), fontWeight = FontWeight.Bold)
                     OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(stringResource(R.string.adapter_ip_address)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
