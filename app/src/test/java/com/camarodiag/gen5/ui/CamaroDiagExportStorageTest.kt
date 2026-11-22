@@ -22,6 +22,20 @@ class CamaroDiagExportStorageTest {
         assertFalse(CamaroDiagExportStorage.isExpectedDocument("other.provider", "primary:CamaroDiag"))
     }
 
+    @Test fun categoryPathsAreUniqueAndStayBelowAuthorizedRoot() {
+        val categories = CamaroDiagExportStorage.Category.entries
+        assertEquals(categories.size, categories.map { it.folder }.toSet().size)
+        for (category in categories) {
+            assertTrue(category.folder.split('/').all { it.matches(Regex("[A-Za-z]+")) })
+            assertEquals("primary:CamaroDiag/" + category.folder,
+                CamaroDiagExportStorage.categoryDocumentId(category))
+            assertEquals("/storage/emulated/0/CamaroDiag/" + category.folder + "/",
+                CamaroDiagExportStorage.displayPath(category))
+        }
+        assertNotEquals(CamaroDiagExportStorage.Category.ECU_BACKUPS.folder,
+            CamaroDiagExportStorage.Category.RECOVERY.folder)
+    }
+
     @Test fun preservesBackupAndReportExtensionsWhilePreventingCollisions() {
         for (extension in listOf("zip", "json", "csv", "tsv", "txt", "bin", "ori", "mod", "hex")) {
             val original = "CamaroDiag_backup.$extension"

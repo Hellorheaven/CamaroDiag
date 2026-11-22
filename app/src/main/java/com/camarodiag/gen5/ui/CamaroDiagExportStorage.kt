@@ -21,6 +21,16 @@ internal object CamaroDiagExportStorage {
     const val AUTHORITY = "com.android.externalstorage.documents"
     const val DOCUMENT_ID = "primary:CamaroDiag"
     const val DISPLAY_PATH = "/storage/emulated/0/CamaroDiag/"
+    internal enum class Category(val folder: String) {
+        ECU_BACKUPS("Backups/ECU"), DIAGNOSTIC_SESSIONS("Backups/Diagnostics"),
+        REPORTS("Reports"), CONSOLE("Logs/Console"), RECOVERY("Logs/Recovery"),
+        TELEMETRY("Telemetry"), CALIBRATIONS("Calibrations"), TESTS("Tests"),
+        EXPORTS("Exports")
+    }
+
+    internal fun categoryDocumentId(category: Category): String = "$DOCUMENT_ID/${category.folder}"
+    internal fun displayPath(category: Category): String = "$DISPLAY_PATH${category.folder}/"
+
     private const val FLAGS = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 
     internal fun isExpectedDocument(authority: String?, documentId: String?): Boolean =
@@ -159,18 +169,58 @@ internal object CamaroDiagExportStorage {
         return Fingerprint(length, digest.digest().hex())
     }
 
+    // The primary-storage provider uses root-relative document IDs. Only fixed
+    // category segments are used; never accept a path from an exported filename.
+    @Synchronized
+    private fun categoryDirectory(context: Context, tree: Uri, category: Category): Uri {
+        val resolver = context.contentResolver
+        var parentId = DOCUMENT_ID
+        var parent = DocumentsContract.buildDocumentUriUsingTree(tree, parentId)
+        for (segment in category.folder.split('/')) {
+            val expectedId = "$parentId/$segment"
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
+            val existing = storageOperation {
+                resolver.query(children, arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE
+                ), null, null, null)?.use { cursor ->
+                    var found = false
+                    while (cursor.moveToNext()) {
+                        if (cursor.getString(1).equals(segment, ignoreCase = true)) {
+                            if (found || cursor.getString(0) != expectedId ||
+                                cursor.getString(2) != DocumentsContract.Document.MIME_TYPE_DIR)
+                                throw ExportStorageException("Invalid or conflicting export folder: $segment")
+                            found = true
+                        }
+                    }
+                    found
+                } ?: throw ExportStorageException("Could not list export folders.")
+            }
+            parent = if (existing) DocumentsContract.buildDocumentUriUsingTree(tree, expectedId)
+                else storageOperation {
+                    DocumentsContract.createDocument(resolver, parent,
+                        DocumentsContract.Document.MIME_TYPE_DIR, segment)
+                } ?: throw ExportStorageException("Could not create export folder: $segment")
+            if (parent.authority != AUTHORITY || DocumentsContract.getDocumentId(parent) != expectedId)
+                throw ExportStorageException("Unexpected export folder identity.")
+            parentId = expectedId
+        }
+        return parent
+    }
+
     /**
-     * Create a uniquely named temporary document inside the approved folder.
+     * Create a uniquely named temporary document inside the approved category folder.
      * Publish the final name only after successful completion; cancel or failure deletes the temp.
      * A sudden process or device crash may leave a .partial document, never a completed filename.
      */
     suspend fun write(context: Context, requested: String, mimeType: String,
-        beforePublish: () -> Unit = {}, writeBytes: suspend (OutputStream) -> Unit) =
+        category: Category = Category.EXPORTS, beforePublish: () -> Unit = {}, writeBytes: suspend (OutputStream) -> Unit) =
         withContext(Dispatchers.IO) {
             require(mimeType.isNotBlank())
             val resolver = context.contentResolver
             val tree = availableTree(context) ?: throw ExportStorageException("CamaroDiag folder access is required.")
-            val root = DocumentsContract.buildDocumentUriUsingTree(tree, DOCUMENT_ID)
+            val root = categoryDirectory(context, tree, category)
             val finalName = uniqueFileName(requested)
             // Use a generic MIME until publication: Android's file provider
             // otherwise may append the target extension to the partial name.

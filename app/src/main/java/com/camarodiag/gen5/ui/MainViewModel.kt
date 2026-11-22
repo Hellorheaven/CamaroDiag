@@ -1202,7 +1202,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     "A real J2534 adapter must be connected."
                 }
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
-                    beforePublish = {
+                    category = CamaroDiagExportStorage.Category.ECU_BACKUPS, beforePublish = {
                         check(current())
                     }
                 ) { output ->
@@ -1470,7 +1470,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (!current()) return@launch
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
-                    beforePublish = { check(current() && hasPremiumLicense()) }
+                    category = CamaroDiagExportStorage.Category.REPORTS, beforePublish = { check(current() && hasPremiumLicense()) }
                 ) { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (current()) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -2170,7 +2170,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
-                    beforePublish = { check(current()) }
+                    category = CamaroDiagExportStorage.Category.CONSOLE, beforePublish = { check(current()) }
                 ) { sink ->
                     sink.write(outputText.toByteArray(Charsets.UTF_8))
                     if (archive != null) {
@@ -2612,7 +2612,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/tab-separated-values",
-                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                    category = CamaroDiagExportStorage.Category.CALIBRATIONS, beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
                 ) { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = localizedContext.getString(R.string.msg_cal_template_exported)
@@ -2886,7 +2886,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repeated.length() == length)
                 CamaroDiagExportStorage.write(getApplication<Application>(),
                     "CamaroDiag_ECU_import_${method.name}_${System.currentTimeMillis()}.zip",
-                    "application/zip", beforePublish = { check(current()) }
+                    "application/zip", category = CamaroDiagExportStorage.Category.ECU_BACKUPS, beforePublish = { check(current()) }
                 ) { output ->
                     original.inputStream().use { first ->
                         repeated.inputStream().use { second ->
@@ -2925,7 +2925,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val source = File(sourcePath)
                 check(source.isFile && source.exists()) { "Le fichier local de calibration est introuvable." }
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/octet-stream",
-                    beforePublish = { check(current()) }
+                    category = CamaroDiagExportStorage.Category.CALIBRATIONS, beforePublish = { check(current()) }
                 ) { target -> source.inputStream().use { it.copyTo(target) } }
                 if (current()) _calibrationWorkspace.update {
                     it.copy(message = localizedContext.getString(R.string.msg_cal_file_exported))
@@ -3098,7 +3098,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val inspection = com.camarodiag.gen5.data.obd.CamaroDiagConnectorCheckpoint.inspect(bytes)
                     val record = checkNotNull(inspection.record)
                     CamaroDiagExportStorage.write(getApplication<Application>(), "CamaroDiag_checkpoint.cdj",
-                        "application/octet-stream", beforePublish = { check(current()) }
+                        "application/octet-stream", category = CamaroDiagExportStorage.Category.RECOVERY, beforePublish = { check(current()) }
                     ) { it.write(bytes) }
                     check(current())
                     lines += inspection.disposition.name
@@ -3258,7 +3258,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
                 )
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
-                    beforePublish = { check(current()) }
+                    category = CamaroDiagExportStorage.Category.TELEMETRY, beforePublish = { check(current()) }
                 ) { it.write(csv.toByteArray(Charsets.UTF_8)) }
                 if (current()) _liveRecordingState.update {
                     it.copy(message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size))
@@ -3803,7 +3803,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             json.put("checks", checks)
             try {
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
-                    beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
+                    category = CamaroDiagExportStorage.Category.TESTS, beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
                         authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER) }
                 ) { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (isCurrentAccountGeneration(sessionGeneration)) {
@@ -3929,7 +3929,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("maxDeltaKm", entity.maxDeltaKm)
                 CamaroDiagExportStorage.write(getApplication<Application>(),
                     "CamaroDiag_session_${entity.timestamp}.json", "application/json",
-                    beforePublish = { check(authenticatedAccountUid == ownerUid &&
+                    category = CamaroDiagExportStorage.Category.DIAGNOSTIC_SESSIONS, beforePublish = { check(authenticatedAccountUid == ownerUid &&
                         isCurrentAccountGeneration(exportGeneration)) }
                 ) { it.write(backup.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (authenticatedAccountUid != ownerUid ||
@@ -3937,7 +3937,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sessionDao.insertSession(entity)
                 if (isCurrentAccountGeneration(exportGeneration)) {
                     _connectionMessage.value = localizedContext.getString(R.string.msg_session_saved) +
-                        "\n" + CamaroDiagExportStorage.DISPLAY_PATH
+                        "\n" + CamaroDiagExportStorage.displayPath(CamaroDiagExportStorage.Category.DIAGNOSTIC_SESSIONS)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
