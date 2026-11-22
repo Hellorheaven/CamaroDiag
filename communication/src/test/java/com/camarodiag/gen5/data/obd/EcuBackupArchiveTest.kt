@@ -368,4 +368,39 @@ class EcuBackupArchiveTest {
         assertTrue(!EcuBackupArchive.fitsUncompressedLimit(Long.MAX_VALUE, 1L))
     }
 
+    @Test fun refusesAnInterruptedZipMissingItsCentralDirectoryOrFooter() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val bytes = original.toByteArray()
+        val central = bytes.indices.firstOrNull { index ->
+            index + 3 < bytes.size && bytes[index] == 0x50.toByte() &&
+                bytes[index + 1] == 0x4B.toByte() &&
+                bytes[index + 2] == 0x01.toByte() &&
+                bytes[index + 3] == 0x02.toByte()
+        } ?: error("Expected ZIP central directory")
+        // ZipInputStream can decode local files even if this entire section
+        // is missing; a verified ECU backup must reject such a truncated ZIP.
+        for (truncated in listOf(bytes.copyOf(central), bytes.copyOf(bytes.size - 22),
+            bytes.copyOf(bytes.size - 1))) {
+            assertTrue(runCatching {
+                EcuBackupArchive.import(truncated.inputStream())
+            }.isFailure)
+        }
+        assertTrue(EcuBackupArchive.import(bytes.inputStream()).verification.consistent)
+    }
+
+    @Test fun refusesCentralDirectoryNameThatDisagreesWithLocalVerifiedFiles() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val altered = original.toByteArray().copyOf()
+        val signature = byteArrayOf(0x50, 0x4B, 0x01, 0x02)
+        val index = altered.indices.firstOrNull { i ->
+            i + signature.size <= altered.size &&
+                altered.copyOfRange(i, i + signature.size).contentEquals(signature)
+        } ?: error("Missing central file header")
+        // Central name begins 46 bytes after its header.
+        altered[index + 46] = 'X'.code.toByte()
+        assertTrue(runCatching { EcuBackupArchive.import(altered.inputStream()) }.isFailure)
+    }
+
 }
