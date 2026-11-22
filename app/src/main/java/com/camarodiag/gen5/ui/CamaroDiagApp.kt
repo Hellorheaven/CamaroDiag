@@ -753,7 +753,9 @@ fun CamaroDiagApp(
                                 address = address,
                                 lengthBytes = bytes,
                                 diagnosticSession = session,
-                                controllerLabel = vehicle.engine.ecmType
+                                // The selected engine profile is not an observed
+                                // ECU controller / firmware identity.
+                                controllerLabel = null
                             )
                             withExportFolder {
                                 viewModel.captureJ2534Memory("CamaroDiag_ECU_memory_${System.currentTimeMillis()}.zip", request)
