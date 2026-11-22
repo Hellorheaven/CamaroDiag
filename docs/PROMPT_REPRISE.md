@@ -663,3 +663,8 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 ### 22/11/2026 — Extension multimarque et TuneECU
 - Décision : Connectors #11, #12 ; VCI automobile/moto multimarque et logiciels tiers autorisés. Android direct, pont PC facultatif, DLL/API standard et mode natif restent distincts. Ne pas confondre capacités J2534, CDC ou FTDI KKL ; les noms USB ne sont que des indices. Référence Connectors 1d4de23 : politique de séparation des modes et sécurité, schéma candidat FTDI K/L-Line et Bluetooth Classic additionnel (S3 BLE uniquement). Aucun accès moto physique qualifié.
 - PR70 : protéger les ports explicitement nommés KKL/K-Line des sondes ELM/CDC dans le gestionnaire et l'UI, préserver les adaptateurs FTDI non identifiés comme KKL. Test de routage ajouté. Ne pas déduire un type de câble du seul VID FTDI ; un câble générique non identifié reste à sélectionner avec prudence. TuneECU doit pouvoir fonctionner indépendamment de CamaroDiag, sans imitation d'identité ni contournement des restrictions de l'éditeur. Aucun firmware ou mode reprogrammation tiers activé.
+
+
+### 22/11/2026 — Socle commun K-Line passif
+- Connectors ee9927f : analyse hors ligne ISO 14230-2 adressage physique, longueur courte/étendue, checksum, adresses exactes ; tests C++ et CI. Aucun TX, initialisation K-Line, ISO 9141 ou accès ECU.
+- Côté CamaroDiag : KwpFrameInspector et tests Kotlin, mêmes vecteurs synthétiques que le firmware (82 F1 12 61 01 E7 et 80 F1 12 02 61 01 E7). Aucun support TuneECU réel déduit, aucune capacité K-Line active. Maintenir les tests physiques #12 séparés.

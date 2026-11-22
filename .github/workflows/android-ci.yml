@@ -190,6 +190,7 @@ jobs:
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorDiscovery.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorBinaryDiscovery.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorCheckpoint.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/KwpFrameInspector.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorWiringGuide.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/BluetoothObdManager.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/NetworkUsbObdTransport.kt' \
