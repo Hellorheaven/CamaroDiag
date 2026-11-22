@@ -75,6 +75,17 @@ class SecureTransportTests(unittest.TestCase):
                     raise
                 with self.assertRaises((ssl.SSLError,OSError,ValueError)):
                     future.result(timeout=5)
+    def test_tls_handshake_requires_a_finite_five_second_socket_deadline(self):
+        for timeout in (None, 0.0, 10.0):
+            with self.subTest(timeout=timeout), socket.socket() as stream:
+                stream.settimeout(timeout)
+                with self.assertRaisesRegex(ValueError, "Bounded TLS handshake"):
+                    connect(self.client(), stream, "connector",
+                            device_sha256=self.pin("connector"))
+                with self.assertRaisesRegex(ValueError, "Bounded TLS handshake"):
+                    accept(self.server(), stream,
+                           allowed_host_sha256=(self.pin("host"),))
+
     def test_mutual_auth(self):
         self.exchange(self.client(),self.server())
     def test_wrong_device_identity(self):
