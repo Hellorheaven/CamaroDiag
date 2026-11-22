@@ -13,7 +13,7 @@ const maxSessionAge = 5 * 60;
 // Do not require attestation until real debug/release validation succeeds.
 const ENFORCE_APP_CHECK = process.env.CAMARODIAG_ENFORCE_APP_CHECK === "true";
 const { licenseStatus } = require("./license-status");
-const { isSessionRevoked, displayLicenseWithoutLookup } = require("./account-policy");
+const { isSessionRevoked, displayLicenseWithoutLookup, isVerifiedGoogleSession } = require("./account-policy");
 
 function adminIdentity(request) {
     if (!request.auth?.uid || (request.auth.token?.[adminRole] !== true &&
@@ -23,8 +23,8 @@ function adminIdentity(request) {
     if (!Number.isFinite(authenticatedAt) ||
         Math.floor(Date.now() / 1000) - authenticatedAt > maxSessionAge)
         throw new HttpsError("failed-precondition", "Reconnectez-vous avant cette opération.");
-    if (request.auth.token.email_verified !== true)
-        throw new HttpsError("permission-denied", "Adresse e-mail non vérifiée.");
+    if (!isVerifiedGoogleSession(request.auth.token))
+        throw new HttpsError("permission-denied", "Compte Google vérifié requis pour l'administration.");
     return request.auth.uid;
 }
 
@@ -95,6 +95,8 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK
     if (action === "license") {
         if (typeof value !== "boolean")
             throw new HttpsError("invalid-argument", "Valeur booléenne requise.");
+        if (value && (!target.emailVerified || !target.email))
+            throw new HttpsError("failed-precondition", "Un compte avec e-mail vérifié est requis.");
         await getFirestore().collection("licenses").doc(uid).set({
             uid,
             emailLower: (target.email || "").trim().toLowerCase(),

@@ -23,4 +23,9 @@ function isSessionRevoked(tokensValidAfterTime, authTimeSeconds) {
   return !Number.isFinite(authTime) || authTime < validAfterSeconds;
 }
 
-module.exports = { displayLicenseWithoutLookup, isSessionRevoked };
+function isVerifiedGoogleSession(token) {
+  return token?.email_verified === true &&
+    token?.firebase?.sign_in_provider === "google.com";
+}
+
+module.exports = { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession };

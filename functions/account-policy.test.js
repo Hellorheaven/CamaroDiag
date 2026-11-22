@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { displayLicenseWithoutLookup, isSessionRevoked } = require("./account-policy");
+const { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession } = require("./account-policy");
 
 test("administrator can inspect unverified accounts without an entitlement read", () => {
   assert.deepEqual(displayLicenseWithoutLookup({disabled: false, emailVerified: false, email: "u@example.com"}),
@@ -23,4 +23,17 @@ test("rejected token cannot outlive the server revocation cutoff", () => {
   assert.equal(isSessionRevoked(boundary, undefined), true);
   assert.equal(isSessionRevoked("unparseable", seconds + 10), true);
   assert.equal(isSessionRevoked(undefined, seconds - 1), false);
+});
+
+test("administration requires a verified current Google sign-in, not merely a linked Google provider", () => {
+  assert.equal(isVerifiedGoogleSession({
+    email_verified: true, firebase: {sign_in_provider: "google.com"}
+  }), true);
+  assert.equal(isVerifiedGoogleSession({
+    email_verified: true, firebase: {sign_in_provider: "password"}
+  }), false);
+  assert.equal(isVerifiedGoogleSession({
+    email_verified: false, firebase: {sign_in_provider: "google.com"}
+  }), false);
+  assert.equal(isVerifiedGoogleSession({ email_verified: true }), false);
 });
