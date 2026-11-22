@@ -202,6 +202,7 @@ fun CamaroDiagApp(
     val functionalTests by viewModel.functionalTestState.collectAsState()
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
+    var premiumPreviewTab by remember { mutableStateOf<DiagTab?>(null) }
     var moreExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(licenseLevel) {
         if (!LicenseRolloutConfig.ENABLED && currentTab == DiagTab.LICENSE)
@@ -358,6 +359,38 @@ fun CamaroDiagApp(
         uri?.let { viewModel.importCalibrationDefinitions(it) }
     }
 
+    val premiumPreview = premiumPreviewTab
+    if (premiumPreview != null) {
+        val frenchPreview = LocalConfiguration.current.locales[0].language == "fr"
+        val summary = when (premiumPreview) {
+            DiagTab.MODULES -> if (frenchPreview) "Explorer les calculateurs et consulter leurs informations détaillées." else "Explore ECU modules and inspect detailed module information."
+            DiagTab.CAN_SNIFFER -> if (frenchPreview) "Analyser les trames CAN, filtrer les échanges et utiliser les outils de diagnostic bus autorisés." else "Inspect and filter CAN traffic with supported bus diagnostics."
+            DiagTab.MILEAGE -> if (frenchPreview) "Comparer les informations kilométriques disponibles et générer un rapport d'analyse." else "Compare available mileage information and generate an analysis report."
+            DiagTab.CALIBRATION -> if (frenchPreview) "Consulter et gérer les fonctions ECU, sauvegardes et cartographies selon la compatibilité du calculateur." else "Access supported ECU, backup and calibration workflows."
+            DiagTab.OBD_SCAN -> if (frenchPreview) "Effectuer un scan complet des modules et centraliser les résultats." else "Run a full module scan and review combined results."
+            DiagTab.CONTROL -> if (frenchPreview) "Accéder aux commandes véhicule compatibles, avec les protections de sécurité nécessaires." else "Use supported vehicle controls with required safeguards."
+            else -> if (frenchPreview) "Fonctionnalité avancée de diagnostic CamaroDiag." else "Advanced CamaroDiag diagnostic feature."
+        }
+        AlertDialog(
+            onDismissRequest = { premiumPreviewTab = null },
+            title = { Text(stringResource(premiumPreview.labelResourceId)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(summary)
+                    Text(
+                        if (frenchPreview) "Cette fonction nécessite une licence CamaroDiag. Les données temps réel et les codes défauts restent gratuits."
+                        else "This feature requires a CamaroDiag license. Live data and trouble codes remain free."
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { premiumPreviewTab = null }) {
+                    Text(if (frenchPreview) "Compris" else "Got it")
+                }
+            }
+        )
+    }
+
      Scaffold(
         topBar = {
             TopAppBar(
@@ -490,8 +523,11 @@ fun CamaroDiagApp(
                                 )
                             },
                             onClick = {
-                                currentTab = if (!premiumAllowed && tab in premiumTabs)
-                                    DiagTab.LICENSE else tab
+                                if (!premiumAllowed && tab in premiumTabs) {
+                                    premiumPreviewTab = tab
+                                } else {
+                                    currentTab = tab
+                                }
                                 moreExpanded = false
                             }
                         )
