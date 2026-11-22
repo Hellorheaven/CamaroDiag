@@ -161,6 +161,15 @@ internal sealed class BridgeServer
                             batteryMillivolts = device.ReadBatteryMillivolts(),
                             readOnly = true,
                             scopedPhysicalMemoryRead = device.IsMemoryReadEnabled,
+                            // The actual Windows read allowlist is the sole authority for
+                            // region identity, session and memory boundaries. Android
+                            // must verify these before labelling acquired bytes.
+                            memoryReadVin = device.IsMemoryReadEnabled ? _memoryReadScope?.ExpectedVin : null,
+                            memoryReadRegion = device.IsMemoryReadEnabled ? _memoryReadScope?.Region : null,
+                            memoryReadStartAddress = device.IsMemoryReadEnabled ? _memoryReadScope?.StartAddress : null,
+                            memoryReadLengthBytes = device.IsMemoryReadEnabled ? _memoryReadScope?.Length : null,
+                            memoryReadMaxReadBytes = device.IsMemoryReadEnabled ? _memoryReadScope?.MaxReadBytes : null,
+                            memoryReadSession = device.IsMemoryReadEnabled ? _memoryReadScope?.Session : null,
                             standardObdPhysicalRead = device.IsStandardObdReadEnabled,
                             standardObdClear = _allowStandardObdClear && device.IsStandardObdReadEnabled
                         }));

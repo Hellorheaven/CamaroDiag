@@ -30,6 +30,7 @@ class J2534BridgeTransport(
     private var connectedResponseCanId: String? = null
     private var standardObdAdapterInfo: Map<String, String> = emptyMap()
     @Volatile private var scopedMemoryReadEnabled = false
+    @Volatile private var approvedMemoryReadScope: J2534ApprovedMemoryScope? = null
     @Volatile private var standardObdPhysicalReadEnabled = false
     @Volatile private var standardObdClearEnabled = false
     val isStandardObdClearEnabled: Boolean
@@ -96,7 +97,40 @@ class J2534BridgeTransport(
                     response.optInt("protocolNumber", -1) == protocolNumber
                 ) { "The PC bridge did not confirm the selected read-only CAN channel." }
                 connectedResponseCanId = responseLabel
-                scopedMemoryReadEnabled = response.optBoolean("scopedPhysicalMemoryRead", false)
+                val memoryAllowed = response.opt("scopedPhysicalMemoryRead") == true
+                approvedMemoryReadScope = if (memoryAllowed) {
+                    // Older or malformed PC bridges may not supply physical
+                    // profile evidence. Refuse memory privileges rather than
+                    // trusting a boolean and re-labelling an unrelated span.
+                    fun exactNumber(key: String): Long {
+                        val value = response.opt(key)
+                        require(value is Number &&
+                            value.toDouble() == value.toLong().toDouble()) {
+                            "PC bridge supplied an invalid J2534 memory profile: $key."
+                        }
+                        return value.toLong()
+                    }
+                    fun exactSmallNumber(key: String): Int {
+                        val value = exactNumber(key)
+                        require(value in Int.MIN_VALUE..Int.MAX_VALUE) {
+                            "PC bridge supplied an out-of-range memory profile: $key."
+                        }
+                        return value.toInt()
+                    }
+                    val vin = response.opt("memoryReadVin") as? String
+                        ?: error("The PC bridge must advertise its approved VIN-bound memory profile.")
+                    val region = response.opt("memoryReadRegion") as? String
+                        ?: error("The PC bridge did not advertise its approved ECU memory region.")
+                    J2534ApprovedMemoryScope(
+                        vin = vin,
+                        region = EcuBackupCoverage.Region.valueOf(region),
+                        startAddress = exactNumber("memoryReadStartAddress"),
+                        lengthBytes = exactNumber("memoryReadLengthBytes"),
+                        maxReadBytes = exactSmallNumber("memoryReadMaxReadBytes"),
+                        diagnosticSession = exactSmallNumber("memoryReadSession")
+                    )
+                } else null
+                scopedMemoryReadEnabled = approvedMemoryReadScope != null
                 standardObdPhysicalReadEnabled = response.opt("standardObdPhysicalRead") == true &&
                     J2534StandardObd.supportsChannel(requestCanId, responseCanId, protocolNumber)
                 standardObdClearEnabled = standardObdPhysicalReadEnabled && response.opt("standardObdClear") == true
@@ -116,6 +150,17 @@ class J2534BridgeTransport(
                 closeInternal()
                 throw error
             }
+        }
+    }
+
+    /** Refuse an unapproved ECU span before issuing VIN, OSID or memory commands. */
+    internal fun requireApprovedMemoryReadScope(request: J2534LiveMemoryBackup.Request) {
+        val scope = approvedMemoryReadScope
+        check(isScopedMemoryReadEnabled && scope != null) {
+            "A current Windows J2534 bridge with an approved memory read profile is required."
+        }
+        require(scope.permits(request)) {
+            "ECU VIN, memory range, region, block size or session differs from the PC read profile."
         }
     }
 
@@ -422,6 +467,7 @@ class J2534BridgeTransport(
         standardObdAdapterInfo = emptyMap()
         opened = false
         scopedMemoryReadEnabled = false
+        approvedMemoryReadScope = null
         standardObdPhysicalReadEnabled = false
         standardObdClearEnabled = false
     }

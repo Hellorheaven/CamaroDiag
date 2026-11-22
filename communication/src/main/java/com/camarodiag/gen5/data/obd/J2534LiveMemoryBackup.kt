@@ -125,6 +125,7 @@ object J2534LiveMemoryBackup {
         check(bridge.isConnected && bridge.isScopedMemoryReadEnabled) {
             "A real J2534 bridge with an approved ECU memory read scope must be connected."
         }
+        bridge.requireApprovedMemoryReadScope(request)
         return acquire(bridge, request, EcuBackupManifest.Origin.REPORTED_HARDWARE_READ, progress) {
             bridge.isConnected && bridge.isScopedMemoryReadEnabled
         }

@@ -1079,6 +1079,9 @@ class BluetoothObdManager(context: Context) {
             check(isJ2534BridgeConnected() && bridge.isScopedMemoryReadEnabled) {
                 "The J2534 bridge has no approved physical ECU memory read scope."
             }
+            // Never allow the UI to relabel a Windows-approved address span,
+            // session or region when exporting the physical acquisition.
+            bridge.requireApprovedMemoryReadScope(request)
             // GM GMLAN OSID is optional: other ECUs may support scoped 0x23
             // memory reads but not legacy 0x1A identity. Never infer an OSID
             // from the VIN, adapter name, model year or an imported calibration.
