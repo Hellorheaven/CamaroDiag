@@ -262,7 +262,9 @@ internal class EcuWriteExecutionEngine(
                 if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
                     !driver.read(region).contentEquals(sector.originalBytes) ||
                     !powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
-                    !driver.independentReadback(region).contentEquals(sector.originalBytes)
+                    !driver.independentReadback(region).contentEquals(sector.originalBytes) ||
+                    !powerMonitor.isStable() ||
+                    driver.identify() != request.expectedIdentity
                 ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
@@ -295,7 +297,9 @@ internal class EcuWriteExecutionEngine(
                 }
                 // Recheck bytes immediately before erasing the next sector:
                 // previous sector programming may have modified this one.
-                if (!driver.independentReadback(region).contentEquals(sector.originalBytes)) {
+                if (!driver.independentReadback(region).contentEquals(sector.originalBytes) ||
+                    !powerMonitor.isStable() || driver.identify() != request.expectedIdentity
+                ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                         verifiedSectors = verified, failedAddress = currentAddress
@@ -343,7 +347,9 @@ internal class EcuWriteExecutionEngine(
                 // Check power and live identity before starting readback too.
                 if (!powerMonitor.isStable() ||
                     driver.identify() != request.expectedIdentity ||
-                    !driver.independentReadback(region).contentEquals(sector.patchedBytes)
+                    !driver.independentReadback(region).contentEquals(sector.patchedBytes) ||
+                    !powerMonitor.isStable() ||
+                    driver.identify() != request.expectedIdentity
                 ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
@@ -369,7 +375,9 @@ internal class EcuWriteExecutionEngine(
                 )
                 if (!powerMonitor.isStable() ||
                     driver.identify() != request.expectedIdentity ||
-                    !driver.independentReadback(region).contentEquals(sector.patchedBytes)
+                    !driver.independentReadback(region).contentEquals(sector.patchedBytes) ||
+                    !powerMonitor.isStable() ||
+                    driver.identify() != request.expectedIdentity
                 ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
