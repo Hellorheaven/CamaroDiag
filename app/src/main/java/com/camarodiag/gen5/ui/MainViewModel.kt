@@ -2285,6 +2285,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             archiveFailed = state.rawArchiveFailed,
             hasHistory = state.consoleHistory.isNotEmpty(),
             hasRawData = state.rawText.isNotBlank() || (archive?.length() ?: 0L) > 0L,
+            isSendingRequest = state.isSendingRequest,
             requiresRawArchive = state.captureArchiveRequired,
             hasRawArchive = archive != null
         )
@@ -2296,11 +2297,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val owner = authenticatedAccountUid ?: return
         val exportGeneration = accountSessionGeneration
         val profile = _vehicle.value
-        fun current() = canResumeExport(exportGeneration, owner) &&
-            _vehicle.value == profile && hasPremiumLicense()
         val snapshot = _liveCanMonitorState.value
         val history = snapshot.consoleHistory.toList()
         val selectedArchive = activeCanCaptureFile
+        // Do not publish an old snapshot after Clear, a new recording, or a
+        // new physical TX has changed the active console since export started.
+        fun current() = canResumeExport(exportGeneration, owner) &&
+            _vehicle.value == profile && hasPremiumLicense() &&
+            activeCanCaptureFile == selectedArchive &&
+            !_liveCanMonitorState.value.isCapturing &&
+            !_liveCanMonitorState.value.isSendingRequest
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (!current()) return@launch
@@ -2310,6 +2316,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     archiveFailed = snapshot.rawArchiveFailed,
                     hasHistory = history.isNotEmpty(),
                     hasRawData = snapshot.rawText.isNotBlank() || (archive?.length() ?: 0L) > 0L,
+                    isSendingRequest = snapshot.isSendingRequest,
                     requiresRawArchive = snapshot.captureArchiveRequired,
                     hasRawArchive = archive != null
                 )) {
