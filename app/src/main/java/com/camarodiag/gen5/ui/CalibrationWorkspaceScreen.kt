@@ -246,6 +246,7 @@ fun CalibrationWorkspaceScreen(
     onImportTrace: () -> Unit,
     onImportComparisonFile: () -> Unit,
     onPreviewPartialWrite: (Long, Int, Int) -> Unit,
+    onExportExternalDumpPair: (EcuBenchExpertPlan.AccessMethod, EcuBenchExpertPlan.MemoryRegion, Long) -> Unit,
     onImportDefinitions: () -> Unit,
     onExportDefinitionTemplate: () -> Unit,
     onSelectMap: (String) -> Unit,
@@ -1536,8 +1537,6 @@ fun CalibrationWorkspaceScreen(
                             color = TextMuted,
                             fontSize = 11.sp
                         )
-                        Text(stringResource(R.string.cal_expert_patch_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.cal_expert_patch_warning), color = TextMuted, fontSize = 11.sp)
                         OutlinedTextField(
                             value = patchStartHex,
                             onValueChange = { patchStartHex = it.take(16) },
@@ -1545,41 +1544,63 @@ fun CalibrationWorkspaceScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        OutlinedTextField(
-                            value = patchEraseBytes,
-                            onValueChange = { patchEraseBytes = it.take(10) },
-                            label = { Text(stringResource(R.string.cal_expert_patch_erase_bytes)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
-                        OutlinedTextField(
-                            value = patchProgramBytes,
-                            onValueChange = { patchProgramBytes = it.take(10) },
-                            label = { Text(stringResource(R.string.cal_expert_patch_program_bytes)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
-                        OutlinedButton(
-                            onClick = {
-                                onPreviewPartialWrite(
-                                    patchStartHex.trim().removePrefix("0x").removePrefix("0X")
-                                        .toLongOrNull(16) ?: -1L,
-                                    patchEraseBytes.toIntOrNull() ?: 0,
-                                    patchProgramBytes.toIntOrNull() ?: 0
-                                )
-                            },
-                            enabled = state.importedFilePath != null &&
-                                state.comparisonFilePath != null,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(stringResource(R.string.cal_expert_patch_preview_button))
+                        if (state.comparisonIdentical && state.importedFilePath != null &&
+                            state.comparisonFilePath != null && expertAccessMethod.permitsRegion(expertMemoryRegion)) {
+                            Text(stringResource(R.string.cal_comparison_identical), color = TextPrimary, fontSize = 11.sp)
+                            Text(stringResource(R.string.cal_warning_binary_integrity), color = TextMuted, fontSize = 11.sp)
+                            Text(stringResource(R.string.cal_archive_partial), color = TextMuted, fontSize = 11.sp)
+                            OutlinedButton(
+                                onClick = {
+                                    val address = patchStartHex.trim().removePrefix("0x").removePrefix("0X").toLongOrNull(16)
+                                    if (address != null && address >= 0)
+                                        onExportExternalDumpPair(expertAccessMethod, expertMemoryRegion, address)
+                                },
+                                enabled = patchStartHex.trim().removePrefix("0x").removePrefix("0X")
+                                    .toLongOrNull(16)?.let { it >= 0 } == true,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.cal_export_file) + " (ZIP)")
+                            }
                         }
-                        state.partialWriteSummary?.let { summary ->
-                            Text(summary, color = CamaroAmber, fontSize = 11.sp)
-                            state.partialWriteSectorAddresses.forEach { address ->
-                                Text(address, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                        if (expertMemoryRegion != EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM) {
+                            Text(stringResource(R.string.cal_expert_patch_title), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.cal_expert_patch_warning), color = TextMuted, fontSize = 11.sp)
+                            OutlinedTextField(
+                                value = patchEraseBytes,
+                                onValueChange = { patchEraseBytes = it.take(10) },
+                                label = { Text(stringResource(R.string.cal_expert_patch_erase_bytes)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            OutlinedTextField(
+                                value = patchProgramBytes,
+                                onValueChange = { patchProgramBytes = it.take(10) },
+                                label = { Text(stringResource(R.string.cal_expert_patch_program_bytes)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    onPreviewPartialWrite(
+                                        patchStartHex.trim().removePrefix("0x").removePrefix("0X")
+                                            .toLongOrNull(16) ?: -1L,
+                                        patchEraseBytes.toIntOrNull() ?: 0,
+                                        patchProgramBytes.toIntOrNull() ?: 0
+                                    )
+                                },
+                                enabled = state.importedFilePath != null &&
+                                    state.comparisonFilePath != null,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.cal_expert_patch_preview_button))
+                            }
+                            state.partialWriteSummary?.let { summary ->
+                                Text(summary, color = CamaroAmber, fontSize = 11.sp)
+                                state.partialWriteSectorAddresses.forEach { address ->
+                                    Text(address, color = TextMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                                }
                             }
                         }
                         Text(stringResource(R.string.cal_expert_identity_notice), color = CamaroAmber, fontSize = 11.sp)
