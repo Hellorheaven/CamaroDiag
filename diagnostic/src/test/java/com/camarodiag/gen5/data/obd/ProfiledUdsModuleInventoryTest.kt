@@ -84,6 +84,17 @@ class ProfiledUdsModuleInventoryTest {
         assertEquals(0, hardwareProbes)
     }
 
+    @Test fun callerCannotAddModulesWhileAnAsyncInventoryScanIsRunning() = runBlocking {
+        val requested = mutableListOf("BCM")
+        val results = ProfiledUdsModuleInventory.scan(
+            vehicle, listOf(profile()), { requested.add("SDM"); Frames() },
+            moduleIds = requested
+        )
+        assertEquals(listOf("BCM"), results.map { it.moduleId })
+        assertEquals(ProfiledUdsModuleInventory.Status.IDENTITY_UNVERIFIED,
+            results.single().status)
+    }
+
     @Test fun manualCamaroDoesNotProbeAnUnfittedTcm() = runBlocking {
         var opened = 0
         val result = ProfiledUdsModuleInventory.scan(
