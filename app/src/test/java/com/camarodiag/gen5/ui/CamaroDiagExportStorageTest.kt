@@ -73,6 +73,37 @@ class CamaroDiagExportStorageTest {
         assertTrue(error?.cause is IOException)
     }
 
+    @Test fun fingerprintRemainsStableAfterCloseAndRepeatedAccess() {
+        val output = CamaroDiagExportStorage.VerifiedOutput(ByteArrayOutputStream())
+        output.write(byteArrayOf(12, 34))
+        assertTrue(runCatching { output.fingerprint() }.isFailure)
+        output.close()
+        val first = output.fingerprint()
+        output.close()
+        assertEquals(first, output.fingerprint())
+        assertEquals(2L, first.length)
+    }
+
+    @Test fun failedCloseDoesNotProduceSuccessfulFingerprint() {
+        val broken = object : OutputStream() {
+            override fun write(value: Int) = Unit
+            override fun close() { throw IOException("close failed") }
+        }
+        val output = CamaroDiagExportStorage.VerifiedOutput(broken)
+        output.write(1)
+        assertTrue(runCatching { output.close() }.exceptionOrNull() is
+            CamaroDiagExportStorage.ExportStorageException)
+        assertTrue(runCatching { output.fingerprint() }.isFailure)
+    }
+
+    @Test fun readbackRejectsAdditionalBytesWithoutConsumingAnUnboundedStream() = runBlocking {
+        val bytes = byteArrayOf(1, 2, 3, 4)
+        assertEquals(4L, CamaroDiagExportStorage.fingerprint(bytes.inputStream(), 4L).length)
+        assertTrue(runCatching {
+            CamaroDiagExportStorage.fingerprint(bytes.inputStream(), 3L)
+        }.exceptionOrNull() is CamaroDiagExportStorage.ExportStorageException)
+    }
+
     @Test fun randomlyGeneratedNamesAreDifferent() {
         val first = CamaroDiagExportStorage.uniqueFileName("report.json")
         val second = CamaroDiagExportStorage.uniqueFileName("report.json")
