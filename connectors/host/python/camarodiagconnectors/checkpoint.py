@@ -19,9 +19,6 @@ def validate(record: bytes) -> bytes:
 
 def retrieve_checkpoint(port, *, clock=monotonic):
     """Dedicated service firmware only. Caller owns port, with bounded I/O."""
-    # Refuse unsolicited input before issuing this one-shot recovery request.
-    if getattr(port, "in_waiting", 0):
-        raise IOError("Stale checkpoint input before request")
     deadline = clock()+3
     command = b"CDJ/1 READ\n"
     # pyserial's default timeout=None can block a stalled USB read indefinitely.
