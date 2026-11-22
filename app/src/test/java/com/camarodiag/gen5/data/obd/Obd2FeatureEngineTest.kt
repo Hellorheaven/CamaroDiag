@@ -613,4 +613,48 @@ class Obd2FeatureEngineTest {
         assertEquals("%", values.single().unit)
     }
 
+    @Test
+    fun physicalDtcRepliesAreDecodedSeparatelyForMultipleCanResponders() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "03" -> "7E8 04 43 01 03 00\r7E9 04 43 01 71 00"
+                "07" -> "18DAF110 04 47 01 01 33\r18DAF111 02 47 00"
+                "0A" -> "NO DATA"
+                else -> "NO DATA"
+            }
+        })
+        val (codes, proved) = engine.readDtcsWithPositiveResponseProof()
+        assertTrue(proved)
+        assertEquals(setOf("P0300", "P0171"), codes.first.map { it.code }.toSet())
+        assertEquals(listOf("P0133"), codes.second.map { it.code })
+        assertTrue(codes.third.isEmpty())
+        assertEquals(listOf("03", "07", "0A"), commands)
+    }
+
+    @Test
+    fun malformedInterleavedDtcFramesCannotInventAdditionalCodes() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "03") {
+                "7E8 04 43 01 03 00\n7E9 03 43 02 01\nSEARCHING..."
+            } else "NO DATA"
+        })
+        val (codes, proved) = engine.readDtcsWithPositiveResponseProof()
+        assertTrue(proved)
+        assertEquals(listOf("P0300"), codes.first.map { it.code })
+    }
+
+    @Test
+    fun compactCanResponderHeadersCannotBeDecodedAsFaultData() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "03" -> "7E80443010300\r18DAF1100443017100"
+                else -> "NO DATA"
+            }
+        })
+        val (confirmed, _, _) = engine.readDtcs()
+        assertEquals(setOf("P0300", "P0171"), confirmed.map { it.code }.toSet())
+    }
+
 }
