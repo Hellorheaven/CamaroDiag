@@ -150,7 +150,11 @@ object SafeObdRequestPolicy {
                 (bytes.length - 8) % 2 == 0 && bytes.drop(8).all { it == '0' }) {
                 bytes = bytes.substring(2, 8)
             }
-            if (bytes.length == 6 && bytes.startsWith(expectedPrefix)) return true
+            if (bytes.length == 6 && bytes.startsWith(expectedPrefix)) {
+                val nrc = bytes.substring(4, 6).toIntOrNull(16) ?: continue
+                // NRC 0 is invalid and ResponsePending is not a final reply.
+                if (nrc !in setOf(0x00, 0x78)) return true
+            }
         }
         return false
     }
