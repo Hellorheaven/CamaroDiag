@@ -1844,10 +1844,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
-                    // Every chunk is already appended to rawText in the receive callback.
-                    // pendingChunks is only a line-framing buffer; appending it again duplicates
-                    // the final unterminated record when capture is stopped or fails.
+                    // Raw chunks were archived before parsing. Drain only the
+                    // unframed final line; do not append it to rawText a second time.
                     val raw = current.rawText.takeLast(131_072)
+                    val trailingEvents = framedEvents(framer.drainTrailing())
                     val stoppedEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
@@ -1865,7 +1865,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         rawText = raw,
                         report = report,
                         message = stoppedEvent.content,
-                        consoleHistory = (current.consoleHistory + stoppedEvent).takeLast(300)
+                        consoleHistory = (current.consoleHistory + trailingEvents + stoppedEvent).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, trailingEvents)
                     )
                 }
                 throw cancelled
@@ -1873,10 +1874,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 reportConnectionLoss(error)
                 if (canMonitorJob === monitorJob) {
                     val current = _liveCanMonitorState.value
-                    // Every chunk is already appended to rawText in the receive callback.
-                    // pendingChunks is only a line-framing buffer; appending it again duplicates
-                    // the final unterminated record when capture is stopped or fails.
+                    // Raw chunks were archived before parsing. Drain only the
+                    // unframed final line; do not append it to rawText a second time.
                     val raw = current.rawText.takeLast(131_072)
+                    val trailingEvents = framedEvents(framer.drainTrailing())
                     val failureMessage = localizedContext.getString(R.string.can_sniffer_capture_failed)
                     val failureEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
@@ -1889,7 +1890,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isCapturing = false,
                         rawText = raw,
                         message = failureMessage,
-                        consoleHistory = (current.consoleHistory + failureEvent).takeLast(300)
+                        consoleHistory = (current.consoleHistory + trailingEvents + failureEvent).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, trailingEvents)
                     )
                 }
             } finally {
