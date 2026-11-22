@@ -24,6 +24,11 @@ internal static class NativeScopedBackupImportCli
             Console.WriteLine("SHA-256: " + checkedCapture.Sha256);
             Console.WriteLine("Declared region: " + checkedCapture.DeclaredRegion);
             Console.WriteLine("Declared origin (not attested): " + checkedCapture.DeclaredOrigin);
+            var missingRegions = checkedCapture.RequiredRegions.Where(
+                region => region != checkedCapture.DeclaredRegion).ToArray();
+            Console.WriteLine("Required regions not in this archive: " +
+                (missingRegions.Length == 0 ? "none declared missing" :
+                    string.Join(", ", missingRegions)));
             Console.WriteLine("Offline integrity only. No physical restoration or full ECU coverage is asserted.");
             return 0;
         }
