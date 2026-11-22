@@ -1,5 +1,5 @@
 CamaroDiag PR #95 - explicit full Debug CI checkpoint
 Branch: chore/unified-ci
-Requested after C1 in-flight TX and export snapshot safety fix: d1344918270a72279fa9fc7988e2846d6dd57078
+Requested after C1 CAN TX confirmation generation guard: 758968c55ec7451170eef1ce1278a31e794f583e
 Scope: C1 CAN/OBD unit tests; Android Debug; Windows J2534 Debug; native ECU; connectors
 Safety: no Release build, no ECU write, no merge.
