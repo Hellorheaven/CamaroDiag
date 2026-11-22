@@ -154,6 +154,10 @@ object SafeObdRequestPolicy {
         return false
     }
 
+    /** Conflicting ECU results are not proof of a successful single read. */
+    fun hasUnambiguousPositiveResponse(request: SafeObdRequest, response: String): Boolean =
+        hasPositiveResponse(request, response) && !hasNegativeResponse(request, response)
+
     private fun normalizeHexToken(token: String, expectedLength: Int): String? {
         val value = if (token.startsWith("0x", ignoreCase = true)) token.substring(2) else token
         return value.takeIf {
