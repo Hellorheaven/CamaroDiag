@@ -24,12 +24,6 @@ object CanConsoleDisplayFilter {
         return runCatching { ObservedCanId(id, token.length == 8) }.getOrNull()
     }
 
-    private fun sentId(entry: ParsedCanConsoleRecord): ObservedCanId? {
-        if (entry.direction != "TX") return null
-        val frame = RawCanFrameParser.parse(entry.content) ?: return null
-        return ObservedCanId(frame.canId, frame.isExtended)
-    }
-
     fun observedIds(
         history: List<ParsedCanConsoleRecord>,
         traceIds: Collection<Int>
@@ -82,7 +76,12 @@ object CanConsoleDisplayFilter {
         if (selectedId == null || entry.direction == "SYSTEM") return true
         return when (entry.direction) {
             "RX" -> receivedId(entry) == selectedId
-            "TX" -> sentId(entry) == selectedId
+            "TX" -> {
+                val request = RawCanFrameParser.parse(entry.content)
+                request != null && request.isExtended == selectedId.extended &&
+                    (request.canId == selectedId.value ||
+                        CanConsoleEcuRouting.expectedResponder(request) == selectedId.value)
+            }
             else -> false
         }
     }
