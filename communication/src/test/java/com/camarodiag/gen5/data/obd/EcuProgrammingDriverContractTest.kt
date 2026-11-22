@@ -14,29 +14,37 @@ class EcuProgrammingDriverContractTest {
         }
     }
 
-    @Test fun qualifiedDriverMustMatchTransportFirmwareAndMemoryRegion() {
+    @Test fun qualifiedDriverMustMatchTransportFirmwareMemoryRegionAndRoute() {
         val target = EcuProgrammingDriverContract.FirmwareTarget("E39", "board-test", "os-test")
+        val otherTarget = target.copy(firmwareId = "other")
         val region = EcuBackupCoverage.Region.PROGRAM_FLASH
+        val route = EcuBenchExpertPlan.AccessMethod.BOOT_BAM
         val driver = EcuProgrammingDriverContract.Descriptor(
             id = "model-only", transport = EcuProgrammingDriverContract.Transport.BOOT_BAM,
             capabilities = EcuProgrammingDriverContract.Capability.values().toSet(),
             controllerFamilies = setOf("E39"), physicalHardwareValidated = true,
-            writeTargets = setOf(target), qualifiedWriteRegions = setOf(region)
+            writeTargets = setOf(target, otherTarget),
+            writeQualifications = setOf(
+                EcuProgrammingDriverContract.WriteQualification(target, region, route),
+                EcuProgrammingDriverContract.WriteQualification(otherTarget, EcuBackupCoverage.Region.DATA_FLASH, route)
+            )
         )
-        assertTrue(driver.supportsWrite(target, driver.transport, region))
-        assertFalse(driver.supportsWrite(target.copy(firmwareId = "other"), driver.transport, region))
-        assertFalse(driver.supportsWrite(target, EcuProgrammingDriverContract.Transport.NEXUS_JTAG, region))
-        assertFalse(driver.supportsWrite(target, driver.transport, EcuBackupCoverage.Region.DATA_FLASH))
-        assertFalse(driver.copy(qualifiedWriteRegions = emptySet()).supportsWrite(target, driver.transport))
+        assertTrue(driver.supportsWrite(target, driver.transport, region, route))
+        assertFalse(driver.supportsWrite(otherTarget, driver.transport, region, route))
+        assertFalse(driver.supportsWrite(target, EcuProgrammingDriverContract.Transport.NEXUS_JTAG, region, route))
+        assertFalse(driver.supportsWrite(target, driver.transport, EcuBackupCoverage.Region.DATA_FLASH, route))
+        assertFalse(driver.copy(writeQualifications = emptySet()).supportsWrite(target, driver.transport))
         val elm = driver.copy(transport = EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS)
-        assertFalse(elm.supportsWrite(target, elm.transport, region))
-        for (transport in listOf(EcuProgrammingDriverContract.Transport.CHIP_OFF,
-            EcuProgrammingDriverContract.Transport.EEPROM_ISP)) {
-            val directChip = driver.copy(transport = transport)
-            assertFalse(directChip.supportsWrite(target, transport, region))
-            val qualifiedChip = directChip.copy(qualifiedWriteRegions = setOf(EcuBackupCoverage.Region.EXTERNAL_EEPROM))
-            assertTrue(qualifiedChip.supportsWrite(target, transport, EcuBackupCoverage.Region.EXTERNAL_EEPROM))
-            assertFalse(qualifiedChip.supportsWrite(target, transport, region))
+        assertFalse(elm.supportsWrite(target, elm.transport, region, EcuBenchExpertPlan.AccessMethod.OBD))
+        for ((transport, method) in listOf(
+            EcuProgrammingDriverContract.Transport.CHIP_OFF to EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF,
+            EcuProgrammingDriverContract.Transport.EEPROM_ISP to EcuBenchExpertPlan.AccessMethod.EXTERNAL_EEPROM_ISP
+        )) {
+            val qualifiedChip = driver.copy(transport = transport,
+                writeQualifications = setOf(EcuProgrammingDriverContract.WriteQualification(
+                    target, EcuBackupCoverage.Region.EXTERNAL_EEPROM, method)))
+            assertTrue(qualifiedChip.supportsWrite(target, transport, EcuBackupCoverage.Region.EXTERNAL_EEPROM, method))
+            assertFalse(qualifiedChip.supportsWrite(target, transport, region, method))
         }
     }
 
