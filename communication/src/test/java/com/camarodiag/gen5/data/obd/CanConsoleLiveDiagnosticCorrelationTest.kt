@@ -484,6 +484,22 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         ))
     }
 
+    @Test fun preStartTimestampCannotPoisonPreinitializedPhysicalSession() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requestStartedAtMs = 1_000L,
+            requestDeadlineMs = 500L
+        )
+        // These bytes are visible but older than the requested physical TX.
+        correlation.append("CAN ERROR\r\n", 999L)
+        assertEquals(false, correlation.hasAdapterError())
+        correlation.append("OK\r\n7E8 04 03 41 0C 1A\r\n", 1_100L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(1_101L))
+        assertEquals(true, correlation.hasExplicitAdapterAck())
+        assertEquals(false, correlation.hasAdapterError())
+        assertEquals(listOf("SYSTEM", "SYSTEM", "RX"),
+            correlation.recentReceivedRecords().map { it.record.direction })
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
