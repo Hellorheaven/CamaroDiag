@@ -270,9 +270,10 @@ object CanTraceAnalyzer {
                 val matchingIndexes = pending.indices.filter { index ->
                     val request = pending[index].request
                     request.direction != message.direction &&
+                        // This correlation helper covers conventional *11-bit* OBD.
+                        // Extended IDs with the same numerical value are not OBD 7E0/7E8.
+                        request.extendedId == false && message.extendedId == false &&
                         isCompatibleObdCanResponseId(request.canId, message.canId) &&
-                        (request.extendedId == null || message.extendedId == null ||
-                            request.extendedId == message.extendedId) &&
                         // A physical ECU may send several NRC 0x78 responses before its final reply.
                         // For functional requests, also allow that same ECU to complete a pending
                         // exchange, but do not count duplicate terminal replies from one responder.
@@ -312,7 +313,8 @@ object CanTraceAnalyzer {
                     // A functional 7DF request can receive one response from
                     // several ECUs. Keep it pending for distinct responder IDs and
                     // aggregate those replies into one exchange until capture end.
-                    val functionalRequest = candidate.request.canId == 0x7DF
+                    val functionalRequest =
+                        candidate.request.extendedId == false && candidate.request.canId == 0x7DF
                     if (!functionalRequest && message.negativeResponseCode != 0x78) {
                         pending.removeAt(matchIndex)
                         exchanges += candidate.toExchange(UdsExchangeStatus.COMPLETED)
