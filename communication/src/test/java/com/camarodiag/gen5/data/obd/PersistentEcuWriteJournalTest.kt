@@ -209,7 +209,7 @@ class PersistentEcuWriteJournalTest {
             assertEquals(PersistentEcuWriteJournal.RecoveryDisposition.INVALID_OR_UNREADABLE,
                 audit.recoveryDisposition)
         }
-        assertInvalid(PersistentEcuWriteJournal.inspectExisting(file, target, "2G1FF3D36C9104198"))
+        assertInvalid(PersistentEcuWriteJournal.inspectExisting(file, target, "2G1TEST00C0000002"))
         assertInvalid(PersistentEcuWriteJournal.inspectExisting(file,
             EcuProgrammingDriverContract.FirmwareTarget("E39", "other-ecu", "test-fw"), vin))
         file.writeText(file.readText().dropLast(1))
