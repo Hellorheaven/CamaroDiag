@@ -890,6 +890,7 @@
     <string name="cal_live_memory_region_calibration">Calibration</string>
     <string name="cal_live_memory_extended">Session de diagnostic étendue (0x03)</string>
     <string name="cal_live_memory_save">Lire deux fois et sauvegarder la mémoire ECU en ZIP</string>
+    <string name="cal_live_memory_partial_notice">Plage mémoire partielle uniquement. Cette archive ne constitue ni une sauvegarde complète de l’ECU ni une image dont la restauration est démontrée.</string>
     <string name="cal_live_memory_saved">Mémoire ECU sauvegardée après deux lectures identiques.</string>
     <string name="cal_live_memory_failed">Échec de lecture mémoire ECU. Aucune sauvegarde vérifiée créée.</string>
     <string name="cal_archive_verify">Vérifier le ZIP de sauvegarde du calculateur</string>
