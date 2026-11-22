@@ -121,6 +121,24 @@ internal static class NativeScopedBackupArchiveSelfTests
             Check(NativeScopedBackupImport.VerifyZip(androidStylePath, scope).Bytes.SequenceEqual(bytes),
                 "Java Properties comment headers remain importable");
             File.Delete(androidStylePath);
+            var alteredDigestPath = Path.Combine(directory, "bad-digest.zip");
+            File.WriteAllBytes(alteredDigestPath, originalZip);
+            using (var digestZip = ZipFile.Open(alteredDigestPath, ZipArchiveMode.Update))
+            {
+                digestZip.GetEntry("manifest.properties")!.Delete();
+                using var writer = new StreamWriter(digestZip.CreateEntry("manifest.properties").Open());
+                writer.Write(androidManifest.Replace("capture.0.sha256=" + sha,
+                    "capture.0.sha256=" + new string('0', 64)));
+            }
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(alteredDigestPath, scope));
+            File.Delete(alteredDigestPath);
+
+            var duplicatePath = Path.Combine(directory, "duplicated.zip");
+            File.WriteAllBytes(duplicatePath, originalZip);
+            using (var duplicateZip = ZipFile.Open(duplicatePath, ZipArchiveMode.Update))
+                duplicateZip.CreateEntry("capture/0/first.bin");
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(duplicatePath, scope));
+            File.Delete(duplicatePath);
             var malformedPath = Path.Combine(directory, "malformed.zip");
             File.WriteAllBytes(malformedPath, originalZip);
             string originalManifest;
