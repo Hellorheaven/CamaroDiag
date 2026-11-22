@@ -61,6 +61,9 @@ class PersistentEcuWriteJournal private constructor(
     }
 
     private val guard = Any()
+    private var appendFailed = false
+    private var expectedLength = 0L
+    private var expectedTailHash = ""
     private val shaPattern = Regex("[0-9a-fA-F]{64}")
     private val header = listOf(
         "CAMARODIAG-ECU-JOURNAL-V1",
@@ -84,7 +87,10 @@ class PersistentEcuWriteJournal private constructor(
             check(file.createNewFile()) {
                 "Refusing to overwrite or append to an earlier ECU write journal."
             }
-            durableAppend((header + "\n").toByteArray(StandardCharsets.UTF_8))
+            val bytes = (header + "\n").toByteArray(StandardCharsets.UTF_8)
+            durableAppend(bytes)
+            expectedLength = bytes.size.toLong()
+            expectedTailHash = sha256(header)
         }
     }
 
@@ -96,10 +102,23 @@ class PersistentEcuWriteJournal private constructor(
             "Only complete SHA-256 image digests may be recorded."
         }
         synchronized(guard) {
-            val audit = inspectLocked(nextRecord = record)
-            check(audit.valid) { "The ECU write journal is missing, damaged, or has been modified." }
-            val lines = file.readLines(StandardCharsets.UTF_8)
-            val lastHash = if (audit.records == 0) sha256(header) else lines.last().substringAfterLast('\t')
+            check(!appendFailed) { "Earlier journal I/O failed; preserve the journal for assessment." }
+            val raw = try {
+                readBoundedSnapshot()
+            } catch (error: Exception) {
+                appendFailed = true
+                throw error
+            }
+            val audit = raw?.let { inspectLocked(raw = it) } ?: Audit(false, 0)
+            val lastHash = if (audit.records == 0) sha256(header)
+                else raw?.toString(StandardCharsets.UTF_8)?.dropLast(1)?.substringAfterLast('\t')
+            if (!audit.valid || raw?.size?.toLong() != expectedLength || lastHash != expectedTailHash) {
+                appendFailed = true
+                error("The active ECU journal differs from the last durable accepted state.")
+            }
+            check(inspectLocked(nextRecord = record, raw = raw).valid) {
+                "Invalid ECU journal stage transition."
+            }
             val payload = listOf(
                 audit.records + 1,
                 System.currentTimeMillis(),
@@ -114,7 +133,16 @@ class PersistentEcuWriteJournal private constructor(
             check(file.length() + bytes.size <= MAX_JOURNAL_BYTES) {
                 "Journal size limit reached; unsafe to continue ECU write."
             }
-            durableAppend(bytes)
+            try {
+                check(file.length() == expectedLength) { "Journal changed before append." }
+                durableAppend(bytes)
+                expectedLength += bytes.size
+                expectedTailHash = checksum
+            } catch (error: Exception) {
+                // A failed flush may still have written bytes. Do not retry.
+                appendFailed = true
+                throw error
+            }
         }
     }
 
@@ -213,9 +241,27 @@ class PersistentEcuWriteJournal private constructor(
         }
     }
 
-    private fun inspectLocked(nextRecord: EcuWriteTransaction.Record? = null): Audit {
-        if (!file.isFile || file.length() !in 1..MAX_JOURNAL_BYTES) return Audit(false, 0)
-        val raw = file.readBytes()
+    private fun readBoundedSnapshot(): ByteArray? {
+        if (!file.isFile) return null
+        val length = file.length()
+        if (length !in 1..MAX_JOURNAL_BYTES) return null
+        return file.inputStream().use { input ->
+            val bytes = ByteArray(length.toInt())
+            var offset = 0
+            while (offset < bytes.size) {
+                val count = input.read(bytes, offset, bytes.size - offset)
+                if (count <= 0) return@use null
+                offset += count
+            }
+            if (input.read() != -1) null else bytes
+        }
+    }
+
+    private fun inspectLocked(
+        nextRecord: EcuWriteTransaction.Record? = null,
+        raw: ByteArray? = readBoundedSnapshot()
+    ): Audit {
+        if (raw == null) return Audit(false, 0)
         if (raw.isEmpty() || raw.last() != '\n'.code.toByte()) return Audit(false, 0)
         val lines = raw.toString(StandardCharsets.UTF_8).dropLast(1).split('\n')
         if (lines.firstOrNull() != header) return Audit(false, 0)
