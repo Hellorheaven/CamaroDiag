@@ -33,6 +33,7 @@ import com.camarodiag.gen5.data.obd.toDiagnosticDtc
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
 import com.camarodiag.gen5.data.obd.ObdTransportFailurePolicy
+import com.camarodiag.gen5.data.obd.ObdTransportDisconnectedException
 import com.camarodiag.gen5.data.obd.ObdSupersededSessionException
 import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
@@ -4049,7 +4050,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.readMode01PidIfSupported(pidValue) ?: return null
                 if (response.equals("NO_SOCKET", ignoreCase = true) ||
                     response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
-                    throw IllegalStateException("La connexion OBD a été interrompue.")
+                    throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
                 }
                 return CamaroUdsProtocol.parsePidBytes(response, pid)
             }
