@@ -39,8 +39,8 @@ object CamaroUdsProtocol {
         val verifiedObdLinkMxHardware = normalizedDeviceName.contains("OBDLINK MX+") ||
             Regex("\\bOBDLINK MX\\b").containsMatchIn(normalizedDeviceName)
         val supportsSwCan = (swCanWiringVerified || verifiedObdLinkMxHardware) && isStn &&
-            stp61Resp.contains("OK", ignoreCase = true)
-        val supportsLong = atalResp.contains("OK", ignoreCase = true)
+            hasStandaloneOk(stp61Resp)
+        val supportsLong = hasStandaloneOk(atalResp)
 
         val tier = when {
             isStn -> AdapterTier.PRO_STN
@@ -55,12 +55,19 @@ object CamaroUdsProtocol {
             firmwareId = if (stiResp.isNotBlank() && !stiResp.contains("?")) stiResp else atzResp,
             supportsLongFrames = supportsLong,
             supportsSwCan = supportsSwCan,
-            supportsCanHeaders = headersResp.contains("OK", ignoreCase = true) &&
-                protocolResp.contains("OK", ignoreCase = true),
+            supportsCanHeaders = hasStandaloneOk(headersResp) &&
+                hasStandaloneOk(protocolResp),
             rawProbeLog = logs,
             supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp)
         )
     }
+
+    /** Accept an adapter's isolated OK acknowledgement, not substrings such
+     * as NOT OK or NOK in its diagnostic chatter. Echoes and prompts are allowed. */
+    private fun hasStandaloneOk(response: String): Boolean =
+        response.lineSequence().any { line ->
+            line.trim().removeSuffix(">").trim().equals("OK", ignoreCase = true)
+        }
 
     /**
      * Accept only a complete positive Mode 01 PID 00 ECU response. A substring
