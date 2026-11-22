@@ -1544,7 +1544,7 @@ fun CalibrationWorkspaceScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        if (state.comparisonIdentical && state.importedFilePath != null &&
+                        if (state.comparisonIdentical == true && state.importedFilePath != null &&
                             state.comparisonFilePath != null && expertAccessMethod.permitsRegion(expertMemoryRegion)) {
                             Text(stringResource(R.string.cal_comparison_identical), color = TextPrimary, fontSize = 11.sp)
                             Text(stringResource(R.string.cal_warning_binary_integrity), color = TextMuted, fontSize = 11.sp)
