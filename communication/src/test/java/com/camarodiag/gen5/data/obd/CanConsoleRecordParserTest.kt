@@ -50,4 +50,44 @@ class CanConsoleRecordParserTest {
         assertEquals("RX", records.single().direction)
         assertEquals("CAN ID=7E8 DLC=2 DATA=41 0C", records.single().content)
     }
+    @Test
+    fun physicalJ2534ObdReadsDoNotRequireCanMonitorOrRawTransmit() {
+        assertTrue(CanConsoleCapabilityPolicy.canSubmit(
+            rawCanFrame = false, monitorAvailable = false, canTransmit = false,
+            readObdAvailable = true, inputPresent = true, busy = false
+        ))
+        assertFalse(CanConsoleCapabilityPolicy.canSubmit(
+            rawCanFrame = true, monitorAvailable = false, canTransmit = false,
+            readObdAvailable = true, inputPresent = true, busy = false
+        ))
+    }
+
+    @Test
+    fun rawCanTransmissionStillNeedsVerifiedMonitorAndTransmitCapability() {
+        assertTrue(CanConsoleCapabilityPolicy.canSubmit(
+            rawCanFrame = true, monitorAvailable = true, canTransmit = true,
+            readObdAvailable = false, inputPresent = true, busy = false
+        ))
+        assertFalse(CanConsoleCapabilityPolicy.canSubmit(
+            rawCanFrame = true, monitorAvailable = true, canTransmit = false,
+            readObdAvailable = true, inputPresent = true, busy = false
+        ))
+        assertFalse(CanConsoleCapabilityPolicy.canSubmit(
+            rawCanFrame = false, monitorAvailable = true, canTransmit = true,
+            readObdAvailable = false, inputPresent = true, busy = false
+        ))
+    }
+
+    @Test
+    fun emptyOrBusyConsoleCannotSubmitOnEitherTransport() {
+        for (raw in listOf(true, false)) {
+            assertFalse(CanConsoleCapabilityPolicy.canSubmit(
+                raw, true, true, true, false, false
+            ))
+            assertFalse(CanConsoleCapabilityPolicy.canSubmit(
+                raw, true, true, true, true, true
+            ))
+        }
+    }
+
 }
