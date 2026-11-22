@@ -651,4 +651,7 @@
     <string name="cal_native_catalog_loading">Tiek ielādēts pašu katalogs…</string>
     <string name="cal_native_catalog_empty">Pašlaik neviens Camaro patentētais DID nav atzīts par lietojamu. Nezināmas adreses un mērogojums netiek izdomāti.</string>
     <string name="cal_native_catalog_read_disabled">Transportlīdzekļa nolasīšana ir atspējota, līdz adresēšana un dekodēšana ir pārbaudīta identiskā konfigurācijā.</string>
+    <string name="export_folder_instruction">Izveidojiet vai izvēlieties mapi CamaroDiag iekšējā krātuvē un atļaujiet piekļuvi. Eksportētie faili ir redzami koplietojamā krātuvē.</string>
+    <string name="export_folder_success">Eksports saglabāts mapē /CamaroDiag/.</string>
+    <string name="export_folder_failed">Neizdevās saglabāt eksportu mapē /CamaroDiag/.</string>
 </resources>
