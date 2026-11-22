@@ -26,6 +26,24 @@ data class CanConsoleRawTransmissionResult(
  * those observations separate from diagnostic completion and preserve the
  * original cause so transport-disconnect handling still works.
  */
+/**
+ * A sent CAN request is confirmed by an explicit clean adapter acknowledgement
+ * or a fully correlated ECU diagnostic reply, never by unrelated bus traffic.
+ * A streamed adapter error overrides any prior OK or valid ECU data.
+ */
+object CanConsolePhysicalTransmissionPolicy {
+    fun confirmed(
+        adapterOutput: String,
+        diagnosticStatus: CanConsoleDiagnosticStatus,
+        hasExplicitAck: Boolean,
+        hasAdapterError: Boolean
+    ): Boolean =
+        !hasAdapterError && !CanConsoleAdapterReplyPolicy.isFailure(adapterOutput) &&
+            (hasExplicitAck ||
+                CanConsoleAdapterRestorationPolicy.accepted(adapterOutput) ||
+                diagnosticStatus != CanConsoleDiagnosticStatus.NONE)
+}
+
 class CanConsolePhysicalExchangeException(
     val receivedRecords: List<CanConsoleTimedRecord>,
     cause: Throwable
