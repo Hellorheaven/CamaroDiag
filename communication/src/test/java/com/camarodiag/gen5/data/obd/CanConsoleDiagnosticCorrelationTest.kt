@@ -179,6 +179,22 @@ class CanConsoleDiagnosticCorrelationTest {
         assertNull(truncated.accept(frame("7E8 21 01 78 9A BC"), 21L))
     }
 
+    @Test fun explicitCorrelationResetClearsCompletedAndPartialIsoTpState() {
+        val request = frame("7E0 03 22 F1 90")
+        val correlation = CanConsoleDiagnosticCorrelation(request)
+        assertArrayEquals(byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()),
+            correlation.accept(frame("7E8 03 62 F1 90"), 1L))
+        assertNull(correlation.accept(frame("7E8 03 62 F1 90"), 2L))
+        correlation.reset()
+        assertArrayEquals(byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()),
+            correlation.accept(frame("7E8 03 62 F1 90"), 3L))
+
+        correlation.reset()
+        assertNull(correlation.accept(frame("7E8 10 0A 62 F1 90 31 32 33"), 4L))
+        correlation.reset()
+        assertNull(correlation.accept(frame("7E8 21 34 35 36 37"), 5L))
+    }
+
     @Test fun readDataByIdentifierStillRequiresExactDidEcho() {
         val correlation = CanConsoleDiagnosticCorrelation(frame("7E0 03 22 F1 90"))
         assertNull(correlation.accept(frame("7E8 04 62 F1 91 01"), 1))
