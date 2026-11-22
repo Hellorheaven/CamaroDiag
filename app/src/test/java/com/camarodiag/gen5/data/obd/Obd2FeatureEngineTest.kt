@@ -601,4 +601,16 @@ class Obd2FeatureEngineTest {
         }
     }
 
+    @Test
+    fun physicalObdScanAndLiveDisplayAgreeOnAbsoluteLoadPid43Scaling() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0143") "414301FE" else "NO DATA"
+        })
+        val values = engine.readLiveData(setOf(0x43))
+        assertEquals("200.00", values.single().value)
+        assertEquals(200.0, requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(
+            intArrayOf(1, 254))), 0.001)
+        assertEquals("%", values.single().unit)
+    }
+
 }
