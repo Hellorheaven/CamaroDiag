@@ -39,4 +39,16 @@ class CamaroDiagApkRetentionTest {
             assertNull(CamaroDiagApkRetention.parse(name))
         assertTrue(CamaroDiagApkRetention.excess(setOf(CamaroDiagApkRetention.name(1, 2)), emptySet()).isEmpty())
     }
+
+    @Test fun legacyNamesAndConflictingFingerprintsProvideNoOwnership() {
+        val name = CamaroDiagApkRetention.name(42, 100)
+        val fingerprint = CamaroDiagExportStorage.Fingerprint(100L, "a".repeat(64))
+        val published = CamaroDiagApkRetention.OwnedApk(name, fingerprint)
+        val conflicting = published.copy(fingerprint = fingerprint.copy(sha256 = "b".repeat(64)))
+        assertEquals(mapOf(name to published), CamaroDiagApkRetention.unambiguous(setOf(published.encode())))
+        assertTrue(CamaroDiagApkRetention.unambiguous(setOf(name)).isEmpty())
+        assertTrue(CamaroDiagApkRetention.unambiguous(setOf(published.encode(), conflicting.encode())).isEmpty())
+        assertNull(CamaroDiagApkRetention.decode("$name:0:${fingerprint.sha256}"))
+        assertNull(CamaroDiagApkRetention.decode("$name:100:invalid"))
+    }
 }

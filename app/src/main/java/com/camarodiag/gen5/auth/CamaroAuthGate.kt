@@ -277,7 +277,7 @@ fun CamaroAuthGate(
                         )
                         Spacer(Modifier.height(8.dp))
                         AccountLicenseStatus(french, accessLevel, licenseChecked, licenseSource)
-                        if (accessLevel == LicenseLevel.OWNER || accountAdminAllowed) {
+                        if (accountAdminAllowed) {
                             Spacer(Modifier.height(8.dp))
                             TextButton(onClick = {
                                 accountOpen = false
@@ -375,7 +375,7 @@ fun CamaroAuthGate(
                 }
             )
         }
-        if (administrationOpen && (accessLevel == LicenseLevel.OWNER || accountAdminAllowed)) {
+        if (administrationOpen && accountAdminAllowed) {
             AccountAdministrationDialog(french) { administrationOpen = false }
         }
         if (changePasswordOpen &&
