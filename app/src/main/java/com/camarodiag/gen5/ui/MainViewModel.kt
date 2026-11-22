@@ -1995,13 +1995,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
-                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = hasEcuResponse) else it } +
+                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
                                 receivedEvents
                         ).takeLast(300),
-                        message = localizedContext.getString(
-                            if (hasEcuResponse) R.string.can_sniffer_request_complete
-                            else R.string.can_sniffer_request_failed
-                        )
+                        message = localizedContext.getString(R.string.can_sniffer_request_complete)
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -2081,11 +2078,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
                     val hasEcuResponse = SafeObdRequestPolicy.hasPositiveResponse(request, response)
+                    val hasNegativeEcuResponse = SafeObdRequestPolicy.hasNegativeResponse(request, response)
+                    val isEcuTraffic = hasEcuResponse || hasNegativeEcuResponse
                     val responseEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
-                        direction = if (hasEcuResponse) "RX" else "SYSTEM",
+                        direction = if (isEcuTraffic) "RX" else "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = if (hasEcuResponse) {
+                        content = if (isEcuTraffic) {
                             response
                         } else {
                             localizedContext.getString(
@@ -2098,10 +2097,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
-                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
+                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = hasEcuResponse) else it } +
                                 responseEvent
                         ).takeLast(300),
-                        message = localizedContext.getString(R.string.can_sniffer_request_complete)
+                        message = localizedContext.getString(
+                            if (hasEcuResponse) R.string.can_sniffer_request_complete
+                            else R.string.can_sniffer_request_failed
+                        )
                     )
                 }
             } catch (cancelled: CancellationException) {
