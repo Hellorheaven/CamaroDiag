@@ -83,11 +83,21 @@ object EcuWriteTransaction {
         val failedAddress: Long? = null
     )
 
+    private fun unavailableIdentity(value: String): Boolean {
+        val normalized = value.trim().lowercase(java.util.Locale.ROOT)
+        return normalized.isEmpty() ||
+            normalized in setOf("unknown", "n/a", "none", "null", "demo", "sample",
+                "simulated", "simulation", "mock", "fake", "pending",
+                "not available", "no response", "unavailable") ||
+            normalized.removePrefix("0x").replace(Regex("[\\s:_-]"), "")
+                .let { it.isNotEmpty() && it.all { ch -> ch == '0' || ch == 'f' } }
+    }
+
     fun prepare(request: Request): Preparation {
         val blockers = linkedSetOf<Blocker>()
-        if (request.controllerFamily.isBlank() ||
-            request.expectedIdentity.controllerId.isBlank() ||
-            request.expectedIdentity.firmwareId.isBlank() ||
+        if (unavailableIdentity(request.controllerFamily) ||
+            unavailableIdentity(request.expectedIdentity.controllerId) ||
+            unavailableIdentity(request.expectedIdentity.firmwareId) ||
             request.expectedIdentity.vin?.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) != true
         ) blockers += Blocker.UNKNOWN_TARGET
         if (request.transport == EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS) {
