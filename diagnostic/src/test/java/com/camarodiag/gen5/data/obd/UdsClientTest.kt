@@ -98,6 +98,7 @@ class UdsClientTest {
             readDids = emptySet(), writeDids = emptySet(),
             allowedSessions = setOf(0x01, 0x02),
             routineControlPermissions = routines, ioControlPermissions = ioControls,
+            allowedSecurityLevels = setOf(0x01),
             readableMemoryRegions = emptyList(), writableMemoryRegions = emptyList(),
             maxTransferBytes = 0, requireSecurityAccess = true,
             evidenceReference = "Synthetic identity-bound policy test"
@@ -129,6 +130,7 @@ class UdsClientTest {
                 readDids = emptySet(), writeDids = setOf(0x1234),
                 allowedSessions = setOf(0x01, 0x02),
                 routineControlPermissions = emptyMap(),
+                allowedSecurityLevels = setOf(0x01),
                 readableMemoryRegions = emptyList(), writableMemoryRegions = emptyList(),
                 maxTransferBytes = 0, requireSecurityAccess = true,
                 evidenceReference = "Synthetic ECU identity fail-closed regression"
