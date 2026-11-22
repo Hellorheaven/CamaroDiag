@@ -930,4 +930,5 @@
     <string name="can_console_filter_all_ecus">All observed CAN IDs (global monitor)</string>
     <string name="can_console_filter_observed_id">Observed CAN ID 0x%1$s</string>
     <string name="can_console_filter_observed_note">Only CAN IDs actually observed on the connected bus are listed. An ID alone does not confirm an ECU identity. This filter changes display only.</string>
+    <string name="can_console_filter_verified_ecu">Verified ECU: %1$s (CAN 0x%2$s)</string>
 </resources>
