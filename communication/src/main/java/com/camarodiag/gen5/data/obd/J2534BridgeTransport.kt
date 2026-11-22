@@ -201,14 +201,7 @@ class J2534BridgeTransport(
         check(isStandardObdPhysicalReadEnabled) {
             "J2534 physical standard OBD reading is not enabled."
         }
-        require(SafeObdRequestPolicy.parse(command.elmCommand) == command) {
-            "Unrecognized or modified read-only console command."
-        }
-        val payload = if (command.parameter == null) {
-            byteArrayOf(command.service.toByte())
-        } else {
-            byteArrayOf(command.service.toByte(), command.parameter.toByte())
-        }
+        val payload = readOnlyConsolePayload(command)
         val reply = exchange(payload, 4_000L)
         // An exact negative ECU acknowledgement belongs in RX history as a
         // failed request. All unrelated, corrupted, and truncated replies fail.
@@ -222,6 +215,17 @@ class J2534BridgeTransport(
     }
 
     internal companion object {
+        fun readOnlyConsolePayload(command: SafeObdRequest): ByteArray {
+            require(SafeObdRequestPolicy.parse(command.elmCommand) == command) {
+                "Unrecognized or modified read-only console command."
+            }
+            return if (command.parameter == null) {
+                byteArrayOf(command.service.toByte())
+            } else {
+                byteArrayOf(command.service.toByte(), command.parameter.toByte())
+            }
+        }
+
         fun isMatchingNegativeConsoleReply(command: SafeObdRequest, reply: ByteArray): Boolean =
             SafeObdRequestPolicy.parse(command.elmCommand) == command &&
                 reply.size == 3 &&
