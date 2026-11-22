@@ -228,10 +228,14 @@ internal sealed partial class BridgeDesktopForm
                 var scope = J2534MemoryReadScope.Load(profilePath);
                 return NativeScopedBackupImport.VerifyZip(archivePath, scope);
             });
+            var missing = result.RequiredRegions
+                .Where(region => region != result.DeclaredRegion).ToArray();
             memoryStatus.Text = "Archive vérifiée sans contacter l'ECU : " +
                 result.ByteCount + " octets, SHA-256 " + result.Sha256 +
                 ". Deux copies identiques, VIN lié au profil. Région déclarée : " +
                 result.DeclaredRegion + ", origine déclarée : " + result.DeclaredOrigin + ". " +
+                (missing.Length == 0 ? "" :
+                    "Régions requises absentes de ce ZIP : " + string.Join(", ", missing) + ". ") +
                 "Cette vérification ne prouve ni la couverture ECU complète ni la restaurabilité.";
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or
