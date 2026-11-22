@@ -10,6 +10,15 @@ data class ParsedCanConsoleRecord(
     val succeeded: Boolean = true
 )
 
+/** Terminal errors and silent replies never establish successful adapter transmission. */
+object CanConsoleAdapterReplyPolicy {
+    private val failures = Regex(
+        "(?i)\\b(CAN ERROR|BUS ERROR|BUFFER FULL|NO DATA|UNABLE TO CONNECT|STOPPED|ERROR)\\b"
+    )
+    fun isFailure(text: String): Boolean = text.isBlank() || text.contains("?") ||
+        failures.containsMatchIn(text)
+}
+
 object CanConsoleRecordParser {
     fun parse(output: String): List<ParsedCanConsoleRecord> =
         output.lineSequence().mapNotNull { rawLine ->
@@ -21,8 +30,7 @@ object CanConsoleRecordParser {
                 ParsedCanConsoleRecord(
                     direction = "SYSTEM",
                     content = line.take(4_096),
-                    succeeded = !Regex("(?i)\\b(ERROR|CAN ERROR|BUS ERROR|UNABLE|BUFFER FULL|NO DATA)\\b")
-                        .containsMatchIn(line)
+                    succeeded = !CanConsoleAdapterReplyPolicy.isFailure(line)
                 )
             } else {
                 val identifier = frame.canId.toString(16).uppercase().padStart(
