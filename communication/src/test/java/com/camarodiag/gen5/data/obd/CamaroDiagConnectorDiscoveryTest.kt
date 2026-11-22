@@ -58,6 +58,28 @@ class CamaroDiagConnectorDiscoveryTest {
         assertEquals(listOf("PING\n"), c.sent)
     }
 
+    @Test fun slowUsbWriteConsumesTheSameThreeSecondDeadline() {
+        var nanos = 0L
+        var reads = 0
+        var writes = 0
+        val c = object : CamaroDiagConnectorDiscovery.Channel {
+            override fun write(bytes: ByteArray) {
+                writes++
+                nanos = 3_000_000_000L
+            }
+            override fun read(buffer: ByteArray, timeoutMs: Int): Int {
+                reads++
+                return 0
+            }
+        }
+        val error = runCatching {
+            CamaroDiagConnectorDiscovery.inspectWithClock(c, clock = { nanos })
+        }.exceptionOrNull()
+        assertTrue(error is IOException)
+        assertEquals(1, writes)
+        assertEquals(0, reads)
+    }
+
     @Test fun replyArrivingExactlyAtDeadlineIsNotAccepted() {
         val c = FakeChannel(listOf("$ping\n"), chunkSize = 512)
         val times = listOf(0L, 0L, 3_000_000_000L).iterator()
