@@ -139,4 +139,28 @@ class J2534StandardObdTest {
         }
     }
 
+    @Test fun j2534ConsoleValidatesEveryReadOnlyDtcModeIndependently() {
+        for ((command, positive, negative) in listOf(
+            Triple("03", bytes(0x43, 0), bytes(0x43, 1, 3)),
+            Triple("07", bytes(0x47, 0), bytes(0x7F, 7, 0x11)),
+            Triple("0A", bytes(0x4A, 0), bytes(0x7F, 0x0A, 0x22))
+        )) {
+            val request = requireNotNull(SafeObdRequestPolicy.parse(command))
+            J2534BridgeTransport.validateReadOnlyConsoleReply(request, positive)
+            assertThrows(IllegalArgumentException::class.java) {
+                J2534BridgeTransport.validateReadOnlyConsoleReply(request, negative)
+            }
+        }
+    }
+
+    @Test fun j2534ConsoleSupportBitmapCannotBeAcceptedWhenTruncated() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0100"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+            bytes(0x41, 0x00, 0, 0, 0, 0))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+                bytes(0x41, 0x00, 0, 0, 0))
+        }
+    }
+
 }
