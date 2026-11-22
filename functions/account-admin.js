@@ -43,16 +43,8 @@ function publicUser(user) {
         disabled: user.disabled === true,
         providers: user.providerData.map(p => p.providerId),
         administrator: user.customClaims?.[adminRole] === true,
-        functionalTests: user.customClaims?.owner_functional_tests === true,
-        licensed: user.customClaims?.license_active === true
+        functionalTests: user.customClaims?.owner_functional_tests === true
     };
-}
-
-async function audit(actor, target, operation) {
-    await getFirestore().collection("accountAdminAudit").add({
-        actorUid: actor, targetUid: target, operation,
-        createdAt: FieldValue.serverTimestamp()
-    });
 }
 
 exports.adminGetAccount = onCall({ region, enforceAppCheck: true }, async request => {
@@ -91,10 +83,13 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: true }, async req
     if (action === "license") {
         if (typeof value !== "boolean")
             throw new HttpsError("invalid-argument", "Valeur booléenne requise.");
-        await getFirestore().collection("manualLicenseOverrides").doc(uid).set({
-            licensed: value, actorUid: actor,
-            updatedAt: FieldValue.serverTimestamp()
-        });
+        await getFirestore().collection("licenses").doc(uid).set({
+            uid,
+            emailLower: (target.email || "").trim().toLowerCase(),
+            manualOverride: value,
+            manualChangedBy: actor,
+            manualChangedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
     } else if (action === "disable") {
         if (typeof value !== "boolean")
             throw new HttpsError("invalid-argument", "Valeur booléenne requise.");
@@ -116,6 +111,5 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: true }, async req
         await auth.setCustomUserClaims(uid, claims);
         await auth.revokeRefreshTokens(uid);
     }
-    await audit(actor, uid, action);
     return { account: { ...publicUser(await auth.getUser(uid)), license: await licenseStatus(uid) } };
 });
