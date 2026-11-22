@@ -18,6 +18,7 @@ class SafeObdRequestPolicyTest {
         assertEquals("0902", SafeObdRequestPolicy.parse("0x09 0x02")?.elmCommand)
         assertEquals("0904", SafeObdRequestPolicy.parse("0904")?.elmCommand)
         assertEquals("0906", SafeObdRequestPolicy.parse("09 06")?.elmCommand)
+        assertEquals("090A", SafeObdRequestPolicy.parse("09 0A")?.elmCommand)
     }
 
     @Test
