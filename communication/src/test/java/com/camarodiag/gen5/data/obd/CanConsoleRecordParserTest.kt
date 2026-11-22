@@ -90,4 +90,13 @@ class CanConsoleRecordParserTest {
         }
     }
 
+    @Test fun rawCanAdapterErrorsCannotBeReportedAsSuccessfulTransmissions() {
+        for (response in listOf("", "?", "NO DATA", "CAN ERROR",
+            "BUS ERROR", "UNABLE TO CONNECT", "BUFFER FULL", "STOPPED", "ERROR")) {
+            assertTrue(response, CanConsoleAdapterReplyPolicy.isFailure(response))
+        }
+        assertFalse(CanConsoleAdapterReplyPolicy.isFailure("OK"))
+        assertFalse(CanConsoleAdapterReplyPolicy.isFailure("7E8 03 41 52 80"))
+    }
+
 }
