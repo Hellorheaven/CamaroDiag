@@ -887,6 +887,7 @@
     <string name="cal_live_memory_region_calibration">Calibration</string>
     <string name="cal_live_memory_extended">Extended diagnostic session (0x03)</string>
     <string name="cal_live_memory_save">Read twice and save ECU memory ZIP</string>
+    <string name="cal_live_memory_partial_notice">Partial memory region only. This archive is not a verified full ECU backup or a proven restorable image.</string>
     <string name="cal_live_memory_saved">ECU memory saved after two matching reads.</string>
     <string name="cal_live_memory_failed">ECU memory reading failed. No verified backup was created.</string>
     <string name="cal_archive_verify">Verify ECU backup ZIP</string>
