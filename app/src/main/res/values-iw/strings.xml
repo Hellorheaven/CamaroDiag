@@ -903,4 +903,7 @@
     <string name="debug_builds_no_browser">אין דפדפן זמין לפתיחת ההורדה.</string>
     <string name="obd_physical_can_scope">משיב CAN פיזי: 0x%1$s. סריקה זו כוללת רק את יחידת ה-OBD שנבחרה, ולא סריקה פונקציונלית של כל המודולים. לא נשלחו פקודות תכנות של GM או פקודות למפעילים.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">יש להפעיל מחיקת קודי תקלות פליטות בגשר Windows, להתחבר מחדש, לכבות את המנוע ולאשר את האיפוס. נתוני המוכנות של מערכות הפליטה יאופסו; קודים קבועים לא יימחקו.</string>
+    <string name="export_folder_instruction">יש ליצור או לבחור את התיקייה CamaroDiag באחסון הפנימי ולאשר גישה. קובצי הייצוא גלויים באחסון המשותף.</string>
+    <string name="export_folder_success">הייצוא נשמר בתיקייה /CamaroDiag/.</string>
+    <string name="export_folder_failed">לא ניתן לשמור את הייצוא בתיקייה /CamaroDiag/.</string>
 </resources>
