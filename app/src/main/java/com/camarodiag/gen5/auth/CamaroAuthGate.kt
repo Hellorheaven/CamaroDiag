@@ -112,8 +112,7 @@ fun CamaroAuthGate(
                         latestOnAccountChanged(null)
                         return@addOnCompleteListener
                     }
-                    accountAdminAllowed = verifiedClaims["admin_accounts"] == true && verifiedEmail &&
-                        providerIds.contains("google.com")
+                    accountAdminAllowed = AccountAdminAccessPolicy.isAllowed(verifiedClaims)
                     // Owner claim is signed by Firebase Admin. Paying users
                     // require a SECOND proof from Firestore's SERVER, never cache.
                     accessLevel = if (!LicenseRolloutConfig.ENABLED) {
