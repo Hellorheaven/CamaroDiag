@@ -1,6 +1,9 @@
 package com.camarodiag.gen5.data.obd
 
 import kotlinx.coroutines.runBlocking
+import com.camarodiag.gen5.domain.model.CamaroGeneration
+import com.camarodiag.gen5.domain.model.CamaroEngine
+import com.camarodiag.gen5.domain.model.VehicleProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -71,6 +74,64 @@ class CamaroModuleDtcScannerTest {
             }.isFailure)
         }
         assertEquals(0, opened)
+    }
+
+    private fun documentedBcmProfile(): DocumentedUdsReadProfile =
+        DocumentedUdsReadProfile(
+            profileId = "synthetic-bcm", moduleId = "BCM",
+            generation = CamaroGeneration.GEN5, modelYears = 2012..2015,
+            engineRpo = "LFX", controllerFamily = "BCM",
+            requestCanId = 0x7A0, responseCanId = 0x7A8, extendedCanId = false,
+            hardwarePartNumber = "HW1", operatingSystemId = "OS1",
+            calibrationId = "CAL1", calibrationVerificationNumber = "A1B2",
+            readableDids = (0x0101..0x0106).toSet(),
+            identityDids = listOf(
+                UdsIdentityDidDefinition(UdsIdentityField.CONTROLLER_FAMILY, 0x0101, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.HARDWARE_PART_NUMBER, 0x0102, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.OPERATING_SYSTEM_ID, 0x0103, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_ID, 0x0104, UdsIdentityEncoding.ASCII),
+                UdsIdentityDidDefinition(UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER, 0x0105, UdsIdentityEncoding.HEX),
+                UdsIdentityDidDefinition(UdsIdentityField.VIN, 0x0106, UdsIdentityEncoding.ASCII)
+            ),
+            verifiedVin = "2G1TEST00C0000001",
+            evidenceReference = "Synthetic test profile; not vehicle validated"
+        )
+
+    @Test
+    fun profiledDtcScannerNeverOpensBusForMissingOrMismatchedEcuProfiles() = runBlocking {
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX,
+            vin = "2G1TEST00C0000001")
+        val scanner = CamaroModuleDtcScanner { error("Legacy raw address route unused.") }
+        var opened = 0
+        val open: suspend (DocumentedUdsReadProfile) -> RawCanFrameTransport = {
+            opened++
+            error("No transport for missing ECU evidence.")
+        }
+        val missing = scanner.scanProfiled(vehicle, emptyList(), open)
+        assertTrue(missing.all { it is ModuleDiagnosticResult.NotConfigured })
+        val mismatched = scanner.scanProfiled(vehicle,
+            listOf(documentedBcmProfile().copy(verifiedVin = "1G1TEST00C0000001")), open)
+        assertTrue(mismatched.all { it is ModuleDiagnosticResult.NotConfigured })
+        val duplicates = scanner.scanProfiled(vehicle,
+            listOf(documentedBcmProfile(), documentedBcmProfile()), open)
+        assertTrue(duplicates.all { it is ModuleDiagnosticResult.NotConfigured })
+        assertEquals(0, opened)
+    }
+
+    @Test
+    fun profiledDtcScannerPropagatesCancellationBeforeProbingOtherModules() = runBlocking {
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX,
+            vin = "2G1TEST00C0000001")
+        val scanner = CamaroModuleDtcScanner { error("Legacy path unused") }
+        var opened = 0
+        val outcome = runCatching {
+            scanner.scanProfiled(vehicle, listOf(documentedBcmProfile()), {
+                opened++
+                throw CancellationException("Operator cancelled verified DTC scan")
+            })
+        }
+        assertTrue(outcome.exceptionOrNull() is CancellationException)
+        assertEquals(1, opened)
     }
 
     @Test
