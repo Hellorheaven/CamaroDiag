@@ -36,3 +36,5 @@ uint32_t cd_sim_pulses(void) { return memory.pulses; }
 uint32_t cd_sim_remaining(void) { return kernel.remaining; }
 int cd_sim_recovery(void) { return flash.recovery_required ? 1 : 0; }
 void cd_sim_fail_next_pulse(void) { memory.bad_peg = true; }
+
+void cd_sim_disturb_adjacent_unit(void) { memory.disturb_next_unit = true; }
