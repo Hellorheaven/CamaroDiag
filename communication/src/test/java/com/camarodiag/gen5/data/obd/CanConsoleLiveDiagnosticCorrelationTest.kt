@@ -212,6 +212,26 @@ class CanConsoleLiveDiagnosticCorrelationTest {
             error.receivedRecords.last().record.content)
     }
 
+    @Test fun wrappedCanTimeoutIsDistinctFromPhysicalAdapterLoss() {
+        val direct = CanConsolePhysicalExchangeException(
+            emptyList(), java.net.SocketTimeoutException("adapter prompt timeout")
+        )
+        val nested = CanConsolePhysicalExchangeException(
+            emptyList(),
+            IllegalStateException("ELM command failed",
+                java.net.SocketTimeoutException("response timed out"))
+        )
+        val disconnected = CanConsolePhysicalExchangeException(
+            emptyList(), java.io.EOFException("adapter disconnected")
+        )
+        assertEquals(true, direct.isResponseTimeout())
+        assertEquals(true, nested.isResponseTimeout())
+        assertEquals(false, disconnected.isResponseTimeout())
+        assertEquals(false, ObdTransportFailurePolicy.isConnectionLoss(direct))
+        assertEquals(false, ObdTransportFailurePolicy.isConnectionLoss(nested))
+        assertEquals(true, ObdTransportFailurePolicy.isConnectionLoss(disconnected))
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
