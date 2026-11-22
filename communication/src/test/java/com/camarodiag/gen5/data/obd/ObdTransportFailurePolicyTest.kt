@@ -61,4 +61,21 @@ class ObdTransportFailurePolicyTest {
     fun genericIoFailureIsTreatedAsTransportLoss() {
         assertTrue(ObdTransportFailurePolicy.isConnectionLoss(IOException("socket closed")))
     }
+    @Test
+    fun canAdapterRestorationFailureMustCloseTheVisibleSession() {
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(CanAdapterRestorationException()))
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(
+            IllegalStateException("wrapped recovery failure", CanAdapterRestorationException())
+        ))
+    }
+
+    @Test
+    fun supersededSessionStillCannotCloseReplacementAdapter() {
+        val stale = ObdSupersededSessionException(CanAdapterRestorationException())
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(stale))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(
+            IllegalStateException("old session", stale)
+        ))
+    }
+
 }
