@@ -430,7 +430,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
             isCapturing = false,
             isSendingRequest = false,
-            rawArchiveFailed = _liveCanMonitorState.value.rawArchiveFailed || interruptedCapture
+            rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+                    _liveCanMonitorState.value.rawArchiveFailed, interruptedCapture
+                )
         )
         _isStreamingLive.value = false
         _livePids.value = emptyList()
@@ -867,7 +869,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _liveCanMonitorState.value.copy(
                 isCapturing = false,
                 isSendingRequest = false,
-                rawArchiveFailed = _liveCanMonitorState.value.rawArchiveFailed || interruptedCapture
+                rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+                    _liveCanMonitorState.value.rawArchiveFailed, interruptedCapture
+                )
             )
         } else LiveCanMonitorState()
         obdManager.invalidateObdPidSupportCache()
