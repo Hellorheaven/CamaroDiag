@@ -18,10 +18,12 @@ internal static class NativeScopedBackupImportCli
             var scope = J2534MemoryReadScope.Load(args[2]);
             var checkedCapture = NativeScopedBackupImport.VerifyZip(args[1], scope);
             Console.WriteLine("ECU archive: integrity verified (two independent stored acquisitions).");
-            Console.WriteLine("VIN: " + checkedCapture.ExpectedVin);
+            Console.WriteLine("VIN: " + checkedCapture.Vin);
             Console.WriteLine("Start: 0x" + checkedCapture.StartAddress.ToString("X8"));
-            Console.WriteLine("Bytes: " + checkedCapture.Bytes.Length);
+            Console.WriteLine("Bytes: " + checkedCapture.ByteCount);
             Console.WriteLine("SHA-256: " + checkedCapture.Sha256);
+            Console.WriteLine("Declared region: " + checkedCapture.DeclaredRegion);
+            Console.WriteLine("Declared origin (not attested): " + checkedCapture.DeclaredOrigin);
             Console.WriteLine("Offline integrity only. No physical restoration or full ECU coverage is asserted.");
             return 0;
         }
