@@ -654,4 +654,7 @@
     <string name="cal_native_catalog_loading">Įkeliamas nuosavas katalogas…</string>
     <string name="cal_native_catalog_empty">Šiuo metu joks nuosavybinis Camaro DID nėra paskelbtas tinkamu naudoti. Nežinomi adresai ir mastelio koeficientai neišgalvojami.</string>
     <string name="cal_native_catalog_read_disabled">Automobilio skaitymas išjungtas, kol adresavimas ir dekodavimas nepatikrinti identiškoje konfigūracijoje.</string>
+    <string name="export_folder_instruction">Sukurkite arba pasirinkite aplanką CamaroDiag vidinėje saugykloje ir suteikite prieigą. Eksportuoti failai matomi bendroje saugykloje.</string>
+    <string name="export_folder_success">Eksportas išsaugotas aplanke /CamaroDiag/.</string>
+    <string name="export_folder_failed">Nepavyko išsaugoti eksporto aplanke /CamaroDiag/.</string>
 </resources>
