@@ -904,4 +904,7 @@
     <string name="cal_expert_patch_title">Cílené změny ECU — offline dopad na sektory</string>
     <string name="cal_expert_patch_warning">Pouze náhled. Zadejte geometrii mapy paměti cílové ECU. Rozložení sektorů ani kompatibilita ECU nejsou ověřeny a programování není povoleno.</string>
     <string name="cal_expert_patch_invalid">Offline náhled není dostupný: neplatné soubory, rozsah oblasti nebo geometrie mazání/programování. Nebyl proveden žádný pokus o zápis.</string>
+    <string name="export_folder_instruction">Vytvořte nebo vyberte složku CamaroDiag v interním úložišti a povolte přístup. Exporty jsou viditelné ve sdíleném úložišti.</string>
+    <string name="export_folder_success">Export uložen do /CamaroDiag/.</string>
+    <string name="export_folder_failed">Export nelze uložit do /CamaroDiag/.</string>
 </resources>
