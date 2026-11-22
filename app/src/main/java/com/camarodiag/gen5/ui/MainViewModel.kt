@@ -45,6 +45,7 @@ import com.camarodiag.gen5.data.obd.CanConsoleAdapterReplyPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
 import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
+import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
@@ -1770,7 +1771,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // or overwrite the state of a newer capture started immediately afterward.
         lateinit var monitorJob: Job
         monitorJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
-            val pendingChunks = StringBuilder()
+            val framer = CanConsoleStreamFramer()
+            fun framedEvents(batch: CanConsoleStreamFramer.Batch): List<CanConsoleHistoryEntry> {
+                val frames = parseCanConsoleReceiveEvents(batch.completeLines)
+                if (batch.discardedLines == 0) return frames
+                return frames + CanConsoleHistoryEntry(
+                    id = System.nanoTime(),
+                    direction = "SYSTEM",
+                    timestampMillis = System.currentTimeMillis(),
+                    content = localizedContext.getString(
+                        R.string.can_console_oversized_line, batch.discardedLines
+                    ),
+                    succeeded = false
+                )
+            }
             try {
                 // A quickly cancelled or superseded session must not create or claim a new archive.
                 if (canMonitorJob !== monitorJob || !currentCoroutineContext().isActive) return@launch
@@ -1784,19 +1798,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         writer.write(chunk)
                         // Keep the raw stream unchanged, but decode only complete lines:
                         // Bluetooth/USB reads may split a CAN record at any character.
-                        pendingChunks.append(chunk)
-                        // Protect long-running sessions from a malformed stream without line breaks.
-                        if (pendingChunks.length > 4096) pendingChunks.delete(0, pendingChunks.length - 4096)
                         val current = _liveCanMonitorState.value
                         val raw = (current.rawText + chunk).takeLast(131_072)
-                        val pendingText = pendingChunks.toString()
-                        val lineEnd = maxOf(pendingText.lastIndexOf('\n'), pendingText.lastIndexOf('\r'))
-                        val completeBatch = if (lineEnd >= 0) {
-                            pendingText.substring(0, lineEnd + 1).also {
-                                pendingChunks.delete(0, lineEnd + 1)
-                            }
-                        } else ""
-                        val receiveEvents = parseCanConsoleReceiveEvents(completeBatch)
+                        // Parse complete lines before enforcing the incomplete-line limit.
+                        // The raw archive always receives the original unmodified chunk.
+                        val receiveEvents = framedEvents(framer.append(chunk))
                         val history = (current.consoleHistory + receiveEvents).takeLast(300)
                         _liveCanMonitorState.value = current.copy(
                             rawText = raw, consoleHistory = history,
@@ -1807,12 +1813,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (canMonitorJob === monitorJob) {
                     val raw = captured.takeLast(131_072)
-                    val trailing = pendingChunks.toString()
                     val currentBeforeReport = _liveCanMonitorState.value
-                    val trailingEvents = parseCanConsoleReceiveEvents(trailing)
+                    val trailingEvents = framedEvents(framer.drainTrailing())
                     val historyWithTrailing =
                         (currentBeforeReport.consoleHistory + trailingEvents).takeLast(300)
-                    pendingChunks.clear()
                     val report = CanTraceAnalyzer.analyze(
                         raw.replace("\r\n", "\n").replace('\r', '\n'),
                         "live-can-monitor.txt"
