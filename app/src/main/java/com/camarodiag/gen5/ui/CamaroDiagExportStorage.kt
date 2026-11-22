@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -79,6 +80,28 @@ internal object CamaroDiagExportStorage {
             context.contentResolver.takePersistableUriPermission(uri, FLAGS)
             authorizedTree(context) != null
         }.getOrDefault(false)
+    }
+
+    /**
+     * ZIP reinspection occurs against the storage provider, not the J2534
+     * transport. Malformed or unreadable staged data is a storage/export
+     * failure and must never disconnect a healthy ECU communication session.
+     */
+    internal suspend fun verifyStagedArchive(
+        input: InputStream,
+        verify: suspend (InputStream) -> Unit
+    ) {
+        try {
+            input.use { verify(it) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (storage: ExportStorageException) {
+            throw storage
+        } catch (error: Exception) {
+            throw ExportStorageException(
+                "Staged ECU backup ZIP failed offline verification.", error
+            )
+        }
     }
 
     // Preserve the extension and never overwrite an existing export, even on repeated actions.
@@ -280,7 +303,7 @@ internal object CamaroDiagExportStorage {
                     val reopened = storageOperation {
                         resolver.openInputStream(temporary)
                     } ?: throw ExportStorageException("Could not reopen staged ECU backup.")
-                    reopened.use { verify(it) }
+                    verifyStagedArchive(reopened, verify)
                 }
                 currentCoroutineContext().ensureActive()
                 beforePublish()
