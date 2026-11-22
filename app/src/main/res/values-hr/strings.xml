@@ -901,4 +901,7 @@
     <string name="cal_expert_patch_invalid">Izvanmrežni pregled nije dostupan: nevaljane datoteke, raspon područja ili geometrija brisanja/programiranja. Pisanje nije pokušano.</string>
     <string name="obd_physical_can_scope">Fizički CAN čvor koji odgovara: 0x%1$s. Skeniranje obuhvaća samo odabranu OBD upravljačku jedinicu, a ne funkcionalno skeniranje svih modula. Nisu poslane naredbe za programiranje GM-a ni aktivaciju aktuatora.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Omogućite brisanje DTC-ova emisija u Windows mostu, ponovno se povežite, ugasite motor i potvrdite resetiranje. Podaci o spremnosti sustava emisija bit će resetirani; trajni kodovi ne brišu se.</string>
+    <string name="export_folder_instruction">Izradite ili odaberite mapu CamaroDiag u unutarnjoj pohrani i dopustite pristup. Izvezene datoteke vidljive su u zajedničkoj pohrani.</string>
+    <string name="export_folder_success">Izvoz je spremljen u /CamaroDiag/.</string>
+    <string name="export_folder_failed">Izvoz nije moguće spremiti u /CamaroDiag/.</string>
 </resources>
