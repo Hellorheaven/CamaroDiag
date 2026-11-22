@@ -251,6 +251,13 @@ class J2534BridgeTransport(
                         (reply[0].toInt() and 0xFF) == 0x49 &&
                         (reply[1].toInt() and 0xFF) == pid
                     ) { "Invalid or negative physical vehicle information response." }
+                    if (pid == 0x02) {
+                        val vin = if (reply.size == 20 && reply[2] == 0x01.toByte())
+                            reply.copyOfRange(3, 20).toString(Charsets.US_ASCII) else ""
+                        require(Regex("[A-HJ-NPR-Z0-9]{17}").matches(vin)) {
+                            "Physical Mode 09 VIN is incomplete or invalid."
+                        }
+                    }
                 }
                 else -> throw IllegalArgumentException("Not a read-only OBD console service.")
             }
