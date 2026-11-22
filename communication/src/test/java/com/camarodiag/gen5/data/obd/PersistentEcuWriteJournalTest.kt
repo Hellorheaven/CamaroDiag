@@ -13,7 +13,7 @@ class PersistentEcuWriteJournalTest {
     @get:Rule val temporaryFolder = TemporaryFolder()
 
     private val target = EcuProgrammingDriverContract.FirmwareTarget("E39", "test-ecu", "test-fw")
-    private val vin = "2G1FF3D36C9104199"
+    private val vin = "2G1TEST00C0000001"
     private val record = EcuWriteTransaction.Record(
         stage = EcuWriteTransaction.Stage.BASELINE_CHECKED,
         region = EcuBackupCoverage.Region.CALIBRATION,
