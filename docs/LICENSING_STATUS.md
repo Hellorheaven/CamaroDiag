@@ -1,46 +1,55 @@
-# Licences CamaroDiag — implémentation en attente, non activée
+# CamaroDiag — Identité et licence seulement dans Firebase
 
-## Situation actuelle
+## Règle de minimisation des données (#104)
 
-La base technique des licences est conservée dans la branche de la PR #70, mais la commercialisation et les restrictions sont **inactives** à la demande du propriétaire.
+CamaroDiag n'envoie **aucune donnée diagnostic ou véhicule** vers Firebase/Firestore :
+aucun PID, DTC, VIN, trame CAN, trace, kilométrage, rapport de scan, sauvegarde ECU,
+calibration, cartographie, export utilisateur ni contenu de console.
 
-- **Application Android :** `LicenseRolloutConfig.ENABLED = false` dans `app/src/main/java/com/camarodiag/gen5/auth/LicenseRolloutConfig.kt`. Aucun onglet « Licence » n'est affiché. Toutes les fonctionnalités ordinaires restent accessibles aux utilisateurs authentifiés, sans paiement ni vérification Firestore.
-- **Fonctions Firebase :** `CAMARODIAG_LICENSES_ENABLED` est absent par défaut ; les endpoints d'achat et de notification Stripe refusent toute utilisation s'il n'est pas exactement égal à `true`. **Aucune fonction, règle ou collection de paiement n'est déployée par ces commits.** Ne pas lancer le déploiement sur Firebase pour activer la vente.
-- **Aucun service payant n'est activé** par le code GitHub ; le compte de facturation, le compte Stripe, les tarifs et les secrets de paiement restent à configurer ultérieurement.
-- **Outils réservés :** les onglets « Tests fonctionnels privés » et « Versions Debug » restent strictement séparés de la future licence et requièrent le droit signé Firebase `owner_functional_tests`. Les deux comptes Google propriétaires sont fournis en privé lors du provisionnement administrateur ; leurs adresses ne figurent pas dans les sources.
+- **Firebase Authentication** : comptes, UID, e-mail, vérification, état actif/désactivé, fournisseurs d'identité. Les droits `owner_functional_tests` et `admin_accounts` sont des Custom Claims signés.
+- **Firestore** : la seule collection du parcours d'accès est `licenses/{uid}`. Elle contient les champs nécessaires au droit de licence : UID, adresse e-mail normalisée pour l'association, état, origine (promotion, achat, attribution administrative), dates et éventuel choix manuel. Ce ne sont pas des données OBD.
+- **Local** : toutes les données de diagnostic, véhicules, scans, journaux CAN et exports restent sur le téléphone ou PC / le répertoire choisi par l'utilisateur.
+- **Sécurité** : Firestore interdit l'accès client direct ; les lectures/attributions/modifications des licences passent par des Cloud Functions Firebase qui vérifient l'identité et les droits.
 
-## Architecture prête pour une activation future
+Le projet n'utilise plus les collections `manualLicenseOverrides`, `promotionalLicenses`,
+`licenseSettings` et `accountAdminAudit` dans les nouveaux parcours d'administration/licence.
+Les changements manuels enregistrent uniquement les propriétés `manualOverride`,
+`manualChangedAt`, et `manualChangedBy` **dans** `licenses/{uid}`. Aucun journal d'administration séparé n'est enregistré dans Firestore.
 
-Le modèle prévoit trois états : **gratuit** (temps réel + lecture/effacement DTC), **premium** (toutes les fonctions ordinaires), **propriétaire** (y compris outils Debug). Une licence sera liée au `uid` Firebase et à son adresse e-mail vérifiée.
+## Politique de licence demandée
 
-L'activation commerciale exigera, **dans une version future et après validation explicite** :
+- **Gratuit** : diagnostic temps réel ; lecture et effacement DTC. Configuration
+  technique, connexion, véhicule, compte, aide, mises à jour restent accessibles.
+- **Avec licence** : modules ECU, console CAN, scan complet, analyse kilométrique,
+  sauvegardes et cartographies, commandes/pilotage et exports avancés.
+- **Sans licence** : fonctions avancées visibles, grisées, avec explication au clic.
+- **Propriétaires** : les deux comptes dotés du claim `owner_functional_tests`
+  conservent l'accès total, y compris outils Debug privés.
 
-1. Décider du prix, des conditions commerciales et de la méthode de distribution Android (Play Store ou distribution directe, avec examen des obligations de facturation de la plateforme).
-2. Configurer Firebase Authentication, Firestore, les règles de sécurité, Firebase Functions, Stripe Checkout, les secrets et le webhook signé ; tester dans un environnement de test isolé.
-3. Valider les scénarios de paiement, double notification, échec, annulation, remboursement, contestation, changement de compte, révocation et fonctionnement hors ligne.
-4. Autoriser délibérément les deux interrupteurs **indépendants** : `LicenseRolloutConfig.ENABLED` côté Android et `CAMARODIAG_LICENSES_ENABLED=true` côté serveur. Ne pas activer l'un sans l'autre.
-5. Publier une version validée après compilation Android, tests et revue des contrôles des opérations premium. Le pont Windows devra également être couvert par une vérification robuste avant qu'une restriction commerciale puisse lui être appliquée.
+Les utilisateurs vérifiés reçoivent temporairement une licence **promotionnelle gratuite**
+lors du premier contrôle serveur, sans fausse preuve de paiement. Une licence déjà
+révoquée par l'administration ne sera pas réattribuée automatiquement.
+L'attribution automatique est contrôlée par la configuration **serveur**
+`CAMARODIAG_AUTO_GRANT_LICENSES` (valeur `false` pour la désactiver).
+La désactivation n'enlève pas rétroactivement les licences déjà accordées ;
+cela demande une opération de révocation distincte. Aucune configuration globale
+de licence n'est enregistrée dans Firestore.
 
-**Attention :** les classes de licence et le code de paiement sont une préparation, pas un service de vente opérationnel. Il ne faut ni annoncer un achat possible, ni créer un lien de paiement actif tant que le déploiement et les tests ne sont pas terminés.
+## Préconditions de mise en service
 
+Le code en PR ne signifie pas déploiement. L'accès aux Cloud Functions exige un
+déploiement explicite, App Check correctement configuré et les tests Android/serveur.
+Le forfait Blaze Firebase peut être nécessaire et entraîner des frais ; demander
+l'accord avant toute activation de facturation ou tout déploiement.
 
-## Statut de licence informatif et administration (PR #95, issue #101)
+La **vente de licences Stripe reste désactivée**. Le code historique de préparation
+commerciale contient encore des registres de transactions de paiement (sessions,
+paiements et remboursements) séparés : ces écritures ne sont pas utilisées tant
+que la vente reste désactivée. Elles devront être refactorisées ou approuvées
+explicitement avant toute future activation commerciale pour respecter strictement
+la règle « identités et licences seulement ».
 
-Le statut **Licence : Oui / Non** est distinct du contrôle d'accès. Pendant le lancement, `LicenseRolloutConfig.ENABLED=false` reste inchangé : tous les utilisateurs authentifiés conservent toutes les fonctions ordinaires même si le statut de licence est **Non**. Les outils privés Debug et tests fonctionnels restent protégés par `owner_functional_tests`.
-
-L'écran « Mon compte » interroge `getMyLicenseStatus` (Callable Firebase, région `europe-west1`). En cas d'indisponibilité du serveur, il affiche « Statut indisponible » et **n'invente pas une licence négative**. La source du statut peut être « achat » (enregistrement valide de `licenses/{uid}`) ou « attribution administrative ».
-
-Les deux comptes propriétaires possédant la revendication signée `owner_functional_tests` accèdent à « Administration des comptes ». Ils peuvent chercher un UID par adresse e-mail et positionner la licence à **Oui** ou **Non** à l'aide de `adminGetAccount` et `adminUpdateAccount` avec `action=license`. Les opérations administratives sont vérifiées côté serveur : connexion Firebase, e-mail vérifié, compte non désactivé, Google lié, revendication signée, et session récemment authentifiée (5 minutes). Le backend interdit toute modification d'un autre compte propriétaire ainsi que l'auto-modification.
-
-Les décisions manuelles sont stockées dans `manualLicenseOverrides/{uid}`, **séparément** du registre d'achat Stripe. La valeur manuelle Oui/Non prévaut pour l'affichage et n'efface jamais l'historique de paiement. Toute modification est tracée dans `accountAdminAudit`. Ces collections ne sont accessibles qu'aux Cloud Functions avec Admin SDK : les règles Firestore refusent les accès directs des clients.
-
-**Préconditions avant utilisation réelle** : déployer explicitement Cloud Functions + Firestore avec approbation de la facturation Blaze si nécessaire, configurer Firebase App Check pour les appels protégés, valider les tests de droits et de compilation Android, puis publier une application actualisée. Les commits seuls n'activent pas le service. **Ne pas activer le paywall** à ce stade : le futur moteur d'autorisation premium devra intégrer les décisions manuelles, l'état des paiements et les remboursements dans une politique unifiée et testée avant activation.
-
-
-## Politique cible d’accès gratuit / Premium (issue #102)
-
-**Nouvelle décision produit** : sans licence, les seules fonctions de diagnostic utilisables sont les **données en temps réel** et **les DTC (lecture et effacement)**. La sélection du véhicule, la connexion à l’interface, le compte, les paramètres, l’aide et les mises à jour restent accessibles, car nécessaires au fonctionnement. L’enregistrement et l’export avancé des données temps réel ne font pas partie de l’offre gratuite.
-
-Toutes les fonctions avancées restent **visibles en grisé** : modules ECU, analyse et console CAN, analyse kilométrique, fonctions ECU/cartographies et sauvegardes, scan OBD complet, commandes véhicule. Au clic, le logiciel n’exécute pas la fonction : il affiche une **modale contextualisée** avec un bref descriptif, les bénéfices et la nécessité d’une licence. Les outils privés Debug / tests fonctionnels ne sont pas proposés comme fonctionnalités Premium achetables.
-
-**Activation différée** : le code de présentation de la modale est intégré, mais le verrou de restriction n’est pas activé en production car `LicenseRolloutConfig.ENABLED=false`. Pour l’activer, il faudra aussi faire correspondre la vérification d’accès Premium à la source de vérité licence (achat Stripe ou attribution manuelle), valider la révocation et les autorisations sur toutes les opérations sensibles, et tester les parcours sans licence, avec licence et propriétaire. Les états achat et attribution manuelle ne doivent pas être confondus.
+La vérification des licences s'effectue côté serveur. Les données diagnostic ne
+seront jamais mises en base cloud pour ce contrôle. L'activation définitive des
+restrictions Premium exige une validation des protections d'opérations sensibles
+(y compris Windows/ECU), au-delà du simple grisement d'un menu.
