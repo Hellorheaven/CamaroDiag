@@ -50,6 +50,12 @@ internal static class NativeE39PhysicalAdmissionSelfTests
                 "Different diagnostic session rejected");
             Check(Rejected(() => Match(adapter with { RegistryView = "Registry32" },channel)),
                 "Driver architecture mismatch rejected");
+            Check(Rejected(() => Match(adapter with {
+                FunctionLibrary = @"\\server\share\vendor.dll"
+            }, channel)), "Network-hosted vendor DLL refused");
+            Check(Rejected(() => Match(adapter with {
+                FunctionLibrary = @"\\?\C:\vendor\driver.dll"
+            }, channel)), "Windows device-path DLL refused");
             File.WriteAllBytes(path,[1,2,3,5]);
             Check(Rejected(() => Match(adapter,channel)),"Driver update requires bench requalification");
         }
