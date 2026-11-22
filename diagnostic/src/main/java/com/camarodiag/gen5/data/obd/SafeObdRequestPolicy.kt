@@ -100,7 +100,7 @@ object SafeObdRequestPolicy {
                 bytes = bytes.drop(3)
             }
             // ELM's optional single-frame PCI may precede the positive service.
-            if (bytes.length >= 4 && bytes.take(2).toIntOrNull(16) in 1..7 &&
+            if (bytes.length >= 4 && (bytes.take(2).toIntOrNull(16)?.let { it in 1..7 } == true) &&
                 bytes.drop(2).startsWith(expected)) {
                 bytes = bytes.drop(2)
             }
