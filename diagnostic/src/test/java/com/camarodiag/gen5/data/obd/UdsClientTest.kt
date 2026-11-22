@@ -148,16 +148,40 @@ class UdsClientTest {
     }
 
     @Test fun sessionControlAndTesterPresentValidatePositiveResponses() = runBlocking {
-        val transport = FakeTransport(listOf(response(0x50, 0x02, 0x00, 0x32), response(0x7E, 0x00)))
+        val transport = FakeTransport(listOf(
+            response(0x50, 0x02, 0x00, 0x32, 0x01, 0xF4),
+            response(0x7E, 0x00)
+        ))
         val client = UdsClient(transport, 0x7E0, 0x7E8, policy = verifiedPolicy())
 
         val timing = client.diagnosticSessionControl(0x02)
         client.testerPresent()
 
-        assertArrayEquals(byteArrayOf(0x00, 0x32), timing)
+        assertArrayEquals(byteArrayOf(0x00, 0x32, 0x01, 0xF4.toByte()), timing)
         assertEquals(0x02, client.activeDiagnosticSession())
         assertEquals(0x10, transport.sent[0].data[1].toInt() and 0xFF)
         assertEquals(0x3E, transport.sent[1].data[1].toInt() and 0xFF)
+    }
+
+    @Test fun invalidSessionAcknowledgementCannotEnterProgrammingState() = runBlocking {
+        for (ack in listOf(
+                response(0x50),
+                response(0x50, 0x02, 0x00),
+                response(0x50, 0x02, 0x00, 0x32),
+                response(0x50, 0x02, 0x00, 0x32, 0x01, 0xF4, 0x00),
+                response(0x50, 0x82)
+            )) {
+            val transport = FakeTransport(listOf(ack))
+            val client = UdsClient(transport, 0x7E0, 0x7E8,
+                policy = verifiedPolicy(writeDids = setOf(0x1234)))
+            assertTrue(runCatching { client.diagnosticSessionControl(0x02) }.isFailure)
+            assertEquals(0x01, client.activeDiagnosticSession())
+            assertFalse(client.isSecurityUnlocked())
+            assertTrue(runCatching {
+                client.writeDataByIdentifier(0x1234, byteArrayOf(0x01))
+            }.isFailure)
+            assertEquals(1, transport.sent.size)
+        }
     }
 
     @Test fun suppressPositiveResponseTesterPresentDoesNotWaitForAResponse() = runBlocking {
