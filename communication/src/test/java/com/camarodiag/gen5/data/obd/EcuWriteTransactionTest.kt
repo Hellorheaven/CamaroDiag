@@ -631,4 +631,16 @@ class EcuWriteTransactionTest {
         }
     }
 
+    @Test fun unchangedImageDoesNotBypassUnsafeTargetPreflight() = runBlocking {
+        val unsafe = request(updated = original.copyOf()).copy(
+            expectedIdentity = expectedIdentity.copy(controllerId = "unknown-ecu"))
+        val result = EcuWriteTransaction.execute(
+            unsafe,
+            EcuWriteTransaction.Journal {},
+            EcuWriteTransaction.PowerMonitor { true }
+        )
+        assertEquals(EcuWriteTransaction.Status.BLOCKED, result.status)
+        assertTrue(EcuWriteTransaction.Blocker.UNKNOWN_TARGET in result.blockers)
+    }
+
 }
