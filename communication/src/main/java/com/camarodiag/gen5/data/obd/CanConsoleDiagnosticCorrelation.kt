@@ -113,8 +113,17 @@ class CanConsoleDiagnosticCorrelation(
             else -> false
         }
         if (supportedDtcEcho) {
-            return response.size >= 2 &&
-                (response[1].toInt() and 0x7F) == (requestPayload[1].toInt() and 0x7F)
+            if (response.size < 3 ||
+                (response[1].toInt() and 0x7F) != (requestPayload[1].toInt() and 0x7F)
+            ) return false
+            return when (dtcSubfunction) {
+                // 59 01 availabilityMask formatIdentifier dtcCountHi dtcCountLo.
+                0x01 -> response.size == 6
+                // 59 02/0A availabilityMask followed by zero or more
+                // complete [DTC-high, DTC-middle, DTC-low, status] records.
+                0x02, 0x0A -> (response.size - 3) % 4 == 0
+                else -> false
+            }
         }
         return response.size >= requestPayload.size &&
             requestPayload.drop(1).indices.all { i ->
