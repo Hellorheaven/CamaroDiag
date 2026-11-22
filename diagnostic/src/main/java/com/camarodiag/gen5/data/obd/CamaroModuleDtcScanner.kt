@@ -1,5 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
+import java.util.concurrent.CancellationException
+
 /**
  * Multi-controller diagnostic inventory for 2012 Camaro. Controller addresses and DIDs are
  * deliberately not bundled: they must be backed by a vehicle-specific verified source.
@@ -52,7 +54,7 @@ class CamaroModuleDtcScanner(
         verifiedAddresses: Collection<VerifiedModuleReadAddress>,
         timeoutMs: Long = 3000L
     ): List<ModuleDiagnosticResult> {
-        require(timeoutMs > 0)
+        require(timeoutMs in 1..30_000L) { "Per-module read deadline out of range." }
         require(verifiedAddresses.map { it.module }.distinct().size == verifiedAddresses.size) {
             "Multiple address profiles for the same module must be resolved by vehicle identity first."
         }
@@ -74,6 +76,10 @@ class CamaroModuleDtcScanner(
                             timeoutMs
                         )
                         ModuleDiagnosticResult.DtcRead(module, client.readDtcReport())
+                    } catch (e: CancellationException) {
+                        // An operator cancellation must interrupt the entire scan,
+                        // not silently continue to query the next ECU.
+                        throw e
                     } catch (e: Exception) {
                         // Never turn a timeout, negative UDS response or bus failure into "no faults".
                         ModuleDiagnosticResult.ReadFailure(module, e.message ?: e.javaClass.simpleName)
