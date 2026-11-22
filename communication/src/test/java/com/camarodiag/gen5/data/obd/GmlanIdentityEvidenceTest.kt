@@ -6,7 +6,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class GmlanIdentityEvidenceTest {
-    private val vin = "2G1FF3D36C9100001"
+    private val vin = "2G1TEST00C0000001"
 
     @Test fun retainsPhysicalVinOsidAndResponderSeparately() {
         val identity = GmlanIdentityEvidence.validate(vin, 12664221, 0xC1,
