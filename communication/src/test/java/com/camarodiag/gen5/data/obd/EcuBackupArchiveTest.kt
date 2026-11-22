@@ -403,4 +403,40 @@ class EcuBackupArchiveTest {
         assertTrue(runCatching { EcuBackupArchive.import(altered.inputStream()) }.isFailure)
     }
 
+    @Test fun acceptsCompleteZipWithAStandardEndOfCentralDirectoryComment() {
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()), setOf(capture().region))
+        val commented = ByteArrayOutputStream()
+        java.util.zip.ZipInputStream(original.toByteArray().inputStream()).use { source ->
+            ZipOutputStream(commented).use { target ->
+                target.setComment("CamaroDiag complete ECU archive")
+                while (true) {
+                    val entry = source.nextEntry ?: break
+                    target.putNextEntry(ZipEntry(entry.name))
+                    target.write(source.readBytes())
+                    target.closeEntry()
+                    source.closeEntry()
+                }
+            }
+        }
+        val read = EcuBackupArchive.import(commented.toByteArray().inputStream())
+        assertTrue(read.verification.consistent)
+        assertEquals(EcuBackupCoverage.Status.COMPLETE, read.manifest.coverage.status)
+    }
+
+    @Test fun refusesCentralDirectoryWithForgedEntryCountOrOffset() {
+        val archive = ByteArrayOutputStream()
+        EcuBackupArchive.export(archive, listOf(capture()), setOf(capture().region))
+        val original = archive.toByteArray()
+        val end = original.size - 22
+        assertTrue(original[end] == 0x50.toByte() && original[end + 1] == 0x4B.toByte())
+        for (offset in listOf(10, 16)) {
+            val altered = original.copyOf()
+            altered[end + offset] = (altered[end + offset].toInt() xor 1).toByte()
+            assertTrue(runCatching {
+                EcuBackupArchive.import(altered.inputStream())
+            }.isFailure)
+        }
+    }
+
 }
