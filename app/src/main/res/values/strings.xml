@@ -665,6 +665,7 @@
     <string name="can_sniffer_request_examples">Examples: 01 0C (RPM), 09 02 (VIN), 03 / 07 / 0A (read DTCs). Clear codes is not allowed.</string>
     <string name="can_sniffer_send">Send</string>
     <string name="can_sniffer_empty">No CAN frames captured yet.</string>
+    <string name="can_console_no_adapter_text">No adapter response text received</string>
     <string name="can_console_obd_unavailable">CAN monitoring is available, but the adapter has no active standard OBD read channel.</string>
     <string name="can_console_read_only_available">Read-only OBD commands remain available with the connected adapter. Passive CAN monitoring is unavailable on this interface.</string>
     <string name="can_sniffer_unavailable">Connect a real adapter with CAN header support. Simulation and unsupported bridges cannot monitor live CAN.</string>
