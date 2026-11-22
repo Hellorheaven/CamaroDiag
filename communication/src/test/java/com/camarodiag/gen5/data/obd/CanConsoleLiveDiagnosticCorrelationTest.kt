@@ -138,6 +138,23 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals(true, cancellation.cause is java.util.concurrent.CancellationException)
     }
 
+    @Test fun adapterErrorDoesNotEraseOtherEcuFramesInFailedExchangeHistory() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
+        correlation.append("7E9 04 03 41 0C 1B\r\nOK\r\nCAN ERROR\r\n", 100L)
+        val failure = CanConsolePhysicalExchangeException(
+            correlation.recentReceivedRecords(),
+            IllegalStateException("adapter reported CAN ERROR")
+        )
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(101L))
+        assertEquals(true, correlation.hasAdapterError())
+        assertEquals(false, correlation.hasExplicitAdapterAck())
+        assertEquals(listOf("RX", "SYSTEM", "SYSTEM"),
+            failure.receivedRecords.map { it.record.direction })
+        assertEquals("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B",
+            failure.receivedRecords.first().record.content)
+        assertEquals(false, failure.receivedRecords.last().record.succeeded)
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
