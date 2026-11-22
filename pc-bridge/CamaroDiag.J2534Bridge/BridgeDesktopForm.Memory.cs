@@ -233,8 +233,8 @@ internal sealed partial class BridgeDesktopForm
                 ". Deux acquisitions identiques et VIN lié au profil. " +
                 "Cette vérification ne prouve ni la couverture ECU complète ni la restaurabilité.";
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or
-            UnauthorizedAccessException or OverflowException or JsonException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or
+            UnauthorizedAccessException or OverflowException or JsonException or NotSupportedException)
         {
             memoryStatus.Text = "Archive refusée : " + ex.Message;
         }
