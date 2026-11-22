@@ -237,4 +237,33 @@ class CanConsoleRecordParserTest {
             "7E9 04 03 41 0C 1B", functional
         ))
     }
+    @Test fun monitorCommandSequencesConfigureAndRestoreOnlySelectedBusFormat() {
+        assertEquals(
+            listOf("ATSP6", "ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0"),
+            CanMonitorProtocolPolicy.setupCommands(can29Bit = false, stn = false)
+        )
+        assertEquals(
+            listOf("ATSP7", "ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0"),
+            CanMonitorProtocolPolicy.setupCommands(can29Bit = true, stn = false)
+        )
+        assertEquals(
+            listOf("ATSP7", "ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0",
+                "ATCF 00000000", "ATCM 00000000", "STFAC"),
+            CanMonitorProtocolPolicy.setupCommands(can29Bit = true, stn = true)
+        )
+        assertEquals(
+            listOf("ATSP6", "ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0",
+                "ATCF 000", "ATCM 000", "STFAC"),
+            CanMonitorProtocolPolicy.setupCommands(can29Bit = false, stn = true)
+        )
+        assertEquals(
+            listOf("ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"),
+            CanMonitorProtocolPolicy.restoreCommands(stn = false)
+        )
+        assertEquals(
+            listOf("ATAR", "ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"),
+            CanMonitorProtocolPolicy.restoreCommands(stn = true)
+        )
+    }
+
 }
