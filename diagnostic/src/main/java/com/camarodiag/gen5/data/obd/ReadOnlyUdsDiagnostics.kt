@@ -131,10 +131,15 @@ internal class IsoTpChannel(
 
     private suspend fun awaitFlowControl(timeoutMs: Long): Pair<Int, Long> {
         var waits = 0
+        var unrelated = 0
         while (true) {
             val frame = awaitFrame(timeoutMs)
             requireFrameLength(frame, 3, "Flow-control frame")
-            if ((frame.data[0].toInt() and 0xF0) != 0x30) continue
+            if ((frame.data[0].toInt() and 0xF0) != 0x30) {
+                if (++unrelated > MAX_UNEXPECTED_FLOW_CONTROL_FRAMES)
+                    throw IsoTpException("Repeated non-flow-control frames from the expected ECU.")
+                continue
+            }
 
             when (frame.data[0].toInt() and 0x0F) {
                 0x00 -> return (frame.data[1].toInt() and 0xFF) to decodeSeparationTime(frame.data[2].toInt() and 0xFF)
@@ -229,6 +234,7 @@ internal class IsoTpChannel(
         const val SINGLE_FRAME_MAX_BYTES = 7
         const val MAX_PAYLOAD_BYTES = 0x0FFF
         const val MAX_FLOW_CONTROL_WAIT_FRAMES = 5
+        const val MAX_UNEXPECTED_FLOW_CONTROL_FRAMES = 8
         const val NANOS_PER_MILLISECOND = 1_000_000L
     }
 }
