@@ -143,7 +143,7 @@ class SafeObdRequestPolicyTest {
     fun aMatchingNegativeEcuReplyRemainsReceivedTrafficButNotSuccess() {
         val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
         for (reply in listOf("7F 01 11", "7F0111", "7E8 7F 01 11",
-            "7E8 03 7F 01 11", "18DAF110 7F0111")) {
+            "7E8 03 7F 01 11", "7E8 03 7F 01 11 00 00", "18DAF110 7F0111")) {
             assertEquals(reply, true, SafeObdRequestPolicy.hasNegativeResponse(request, reply))
             assertEquals(reply, false, SafeObdRequestPolicy.hasPositiveResponse(request, reply))
         }
@@ -153,7 +153,7 @@ class SafeObdRequestPolicyTest {
     fun unrelatedNegativeAndAdapterErrorsAreNotAttributedToEcu() {
         val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
         for (reply in listOf("7F 09 11", "7F 01", "7F 01 11 00",
-            "7E0 7F 01 11", "NO DATA", "OK", "41 52 80")) {
+            "7E0 7F 01 11", "7E8 03 7F 01 11 FF", "NO DATA", "OK", "41 52 80")) {
             assertEquals(reply, false, SafeObdRequestPolicy.hasNegativeResponse(request, reply))
         }
     }
