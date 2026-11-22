@@ -895,4 +895,7 @@
     <string name="cal_expert_patch_title">Riktade ECU-ändringar – offlineanalys av sektorpåverkan</string>
     <string name="cal_expert_patch_warning">Endast förhandsvisning. Ange geometrin för mål-ECU:s minneskarta. Ingen sektorindelning eller ECU-kompatibilitet är verifierad och programmering är inte aktiverad.</string>
     <string name="cal_expert_patch_invalid">Offlineförhandsvisning ej tillgänglig: ogiltiga filer, minnesintervall eller raderings-/programmeringsgeometri. Ingen skrivning försöktes.</string>
+    <string name="export_folder_instruction">Skapa eller välj mappen CamaroDiag i internminnet och tillåt åtkomst. Exporterade filer visas i det delade lagringsutrymmet.</string>
+    <string name="export_folder_success">Export sparad i /CamaroDiag/.</string>
+    <string name="export_folder_failed">Exporten kunde inte sparas i /CamaroDiag/.</string>
 </resources>
