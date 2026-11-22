@@ -3,6 +3,7 @@ import pathlib
 import tempfile
 import unittest
 import zlib
+from unittest.mock import patch
 from camarodiagconnectors.checkpoint import retrieve_checkpoint, save_checkpoint, validate
 
 FIXTURE = bytes.fromhex("43444a0102000000010000000102030405060708090a0b0c0d0e0f10202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3fa75e21b6")
@@ -59,6 +60,25 @@ class CheckpointTest(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 save_checkpoint(path, FIXTURE)
             self.assertEqual(b"keep this unrelated evidence", path.read_bytes())
+
+    def test_checkpoint_export_does_not_publish_partial_file_when_commit_fails(self):
+        with tempfile.TemporaryDirectory() as root:
+            final = pathlib.Path(root) / "checkpoint.cdj"
+            with patch("camarodiagconnectors.checkpoint.os.link",
+                       side_effect=OSError("filesystem error")):
+                with self.assertRaisesRegex(OSError, "filesystem error"):
+                    save_checkpoint(final, FIXTURE)
+            self.assertFalse(final.exists())
+            self.assertEqual([], list(pathlib.Path(root).iterdir()))
+
+    def test_checkpoint_atomic_publish_preserves_unrelated_existing_evidence(self):
+        with tempfile.TemporaryDirectory() as root:
+            final = pathlib.Path(root) / "checkpoint.cdj"
+            final.write_bytes(b"already published")
+            with self.assertRaises(FileExistsError):
+                save_checkpoint(final, FIXTURE)
+            self.assertEqual(b"already published", final.read_bytes())
+            self.assertEqual([final], list(pathlib.Path(root).iterdir()))
 
     def test_checkpoint_stage_sequence_matches_native_firmware_contract(self):
         def record(stage, sequence):
