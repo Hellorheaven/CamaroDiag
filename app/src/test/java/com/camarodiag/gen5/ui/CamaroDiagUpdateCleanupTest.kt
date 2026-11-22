@@ -30,7 +30,8 @@ class CamaroDiagUpdateCleanupTest {
 
     @Test fun invalidAndUntrustedStoredDownloadIdsAreIgnored() {
         listOf("", ":", "1:", ":1", "0:42", "-1:42", "2:0",
-            "3:-2", "NaN:4", "4:NaN", "1:2:3", "3:4.apk", "99999999999999999999:1"
+            "3:-2", "NaN:4", "4:NaN", "1:2:3", "3:4.apk", "99999999999999999999:1",
+            "01:2", "+1:2", "1:02", " 1:2", "1:2 ", "1:+2"
         ).forEach { raw ->
             assertNull("Invalid pending download: $raw", PendingCamaroDiagApk.decode(raw))
         }
