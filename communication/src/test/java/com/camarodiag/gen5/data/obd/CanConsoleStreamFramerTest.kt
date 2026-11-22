@@ -41,6 +41,15 @@ class CanConsoleStreamFramerTest {
         assertEquals("OK\n", framer.append("OK\n").completeLines)
     }
 
+    @Test fun resetPreventsPreviousVehiclePartialRecordFromContaminatingNextCapture() {
+        val framer = CanConsoleStreamFramer()
+        assertEquals("", framer.append("7E8 03 41").completeLines)
+        framer.reset()
+        val batch = framer.append("7E9 03 41 0C 1B\n")
+        assertEquals(1, CanConsoleRecordParser.parse(batch.completeLines).size)
+        assertTrue(batch.completeLines.startsWith("7E9"))
+    }
+
     @Test fun incompleteLastFrameIsOnlyReturnedWhenStreamEnds() {
         val framer = CanConsoleStreamFramer()
         assertEquals("", framer.append("7E8 03 41 0C 1A").completeLines)
