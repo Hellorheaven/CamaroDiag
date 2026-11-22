@@ -79,7 +79,15 @@ private object CamaroDiagUpdateChecker {
         connection.setRequestProperty("Accept", "application/vnd.github+json")
         connection.setRequestProperty("User-Agent", "CamaroDiag-Updater")
         try {
-            val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            val jsonBytes = connection.inputStream.use { input ->
+                java.io.ByteArrayOutputStream().use { output ->
+                    // A GitHub release manifest is small; never parse an unlimited
+                    // network body into memory before verifying its asset metadata.
+                    CamaroDiagReleaseAssetPolicy.copyBounded(input, output, maxBytes = 1024L * 1024L)
+                    output.toByteArray()
+                }
+            }
+            val json = JSONObject(jsonBytes.toString(Charsets.UTF_8))
             if (json.optBoolean("draft") || json.optBoolean("prerelease")) return@withContext CamaroDiagUpdateCheck(null, false)
             val versionCode = Regex(
                 "Android versionCode\\s*:\\s*(\\d+)",
