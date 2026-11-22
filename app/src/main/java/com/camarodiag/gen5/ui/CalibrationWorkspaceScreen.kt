@@ -484,6 +484,11 @@ fun CalibrationWorkspaceScreen(
                         )
                         Text(stringResource(R.string.flexfuel_lfx2012_audit_post_not_performed),
                             color = WarnRed, fontSize = 11.sp)
+                        Text(
+                            stringResource(R.string.flexfuel_lfx2012_readonly_testing_notice),
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
                         OutlinedButton(
                             onClick = onReadIdentification,
                             enabled = (isConnected || state.isJ2534BridgeConnected) && !state.isReading,
