@@ -172,7 +172,7 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals("RX", error.receivedRecords.single().record.direction)
         assertEquals("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B",
             error.receivedRecords.single().record.content)
-        assertEquals(1_800_000_000_101L, error.receivedRecords.single().timestampMillis)
+        assertEquals(1_800_000_000_100L, error.receivedRecords.single().timestampMillis)
     }
 
     @Test fun physicalCanTxConfirmationNeverUsesForeignEcuRxAsSuccess() {
@@ -412,6 +412,36 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         correlation.append("\n", 1_041L)
         assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(1_042L))
         assertEquals(3, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
+    }
+
+    @Test fun trailingRxUsesLastChunkTimestampEvenWhenCommandFinishesAfterDeadline() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requestStartedAtMs = 1_000L,
+            requestDeadlineMs = 500L
+        )
+        correlation.append("7E8 04 03 41", 1_200L, 1_800_000_001_200L)
+        correlation.append(" 0C 1A", 1_300L, 1_800_000_001_300L)
+        // The adapter returns the command later, but all bytes had been
+        // physically received inside the allowed response window.
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(
+            1_700L, 1_800_000_001_700L
+        ))
+        val received = correlation.recentReceivedRecords().single()
+        assertEquals("RX", received.record.direction)
+        assertEquals(1_800_000_001_300L, received.timestampMillis)
+    }
+
+    @Test fun trailingRxActuallyReceivedAfterDeadlineStaysVisibleWithoutConfirmation() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requestStartedAtMs = 1_000L,
+            requestDeadlineMs = 500L
+        )
+        correlation.append("7E8 04 03 41 0C 1A", 1_500L, 1_800_000_001_500L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(
+            1_700L, 1_800_000_001_700L
+        ))
+        assertEquals(1_800_000_001_500L,
+            correlation.recentReceivedRecords().single().timestampMillis)
     }
 
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
