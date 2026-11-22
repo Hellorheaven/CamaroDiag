@@ -33,6 +33,13 @@ interface EcuProgrammingDriverContract {
      */
     data class FirmwareTarget(val controllerFamily: String, val controllerId: String, val firmwareId: String)
 
+    /** An approval applies to one firmware, region and physical route only. */
+    data class WriteQualification(
+        val target: FirmwareTarget,
+        val region: EcuBackupCoverage.Region,
+        val accessMethod: EcuBenchExpertPlan.AccessMethod
+    )
+
     data class Descriptor(
         val id: String,
         val transport: Transport,
@@ -40,7 +47,7 @@ interface EcuProgrammingDriverContract {
         val controllerFamilies: Set<String>,
         val physicalHardwareValidated: Boolean,
         val writeTargets: Set<FirmwareTarget> = emptySet(),
-        val qualifiedWriteRegions: Set<EcuBackupCoverage.Region> = emptySet()
+        val writeQualifications: Set<WriteQualification> = emptySet()
     ) {
         /** Shared protocol-family match; neither a firmware nor a service number is required. */
         fun supportsFamilyProtocol(controllerFamily: String, requestedTransport: Transport): Boolean =
@@ -61,12 +68,21 @@ interface EcuProgrammingDriverContract {
                 supportsFamilyProtocol(target.controllerFamily, requestedTransport) &&
                 target in writeTargets &&
                 capabilities.containsAll(requiredWriteCapabilities) &&
-                qualifiedWriteRegions.any(transport::permitsMemoryProgramming)
+                writeQualifications.any { approval ->
+                    approval.target == target &&
+                        transport.permitsMemoryProgramming(approval.region) &&
+                        transport in approval.accessMethod.candidateTransports
+                }
 
-        fun supportsWrite(target: FirmwareTarget, requestedTransport: Transport,
-                          region: EcuBackupCoverage.Region): Boolean =
-            supportsWrite(target, requestedTransport) && region in qualifiedWriteRegions &&
-                transport.permitsMemoryProgramming(region)
+        fun supportsWrite(
+            target: FirmwareTarget,
+            requestedTransport: Transport,
+            region: EcuBackupCoverage.Region,
+            accessMethod: EcuBenchExpertPlan.AccessMethod
+        ): Boolean = supportsWrite(target, requestedTransport) &&
+            transport.permitsMemoryProgramming(region) &&
+            transport in accessMethod.candidateTransports &&
+            WriteQualification(target, region, accessMethod) in writeQualifications
     }
 
     data class Identity(val controllerId: String, val firmwareId: String, val vin: String?)
