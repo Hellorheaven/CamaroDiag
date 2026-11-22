@@ -410,12 +410,13 @@ internal sealed partial class J2534Device : IDisposable
     }
 
     // Check diagnostic wire shape before an untrusted console payload reaches
-    // the physical J2534 driver. 0x22 contains one or more complete 2-byte
-    // DIDs; 0x19 must include at least the read-DTC subfunction.
+    // the physical J2534 driver. 0x22 is deliberately limited to one DID:
+    // response matching presently validates only that DID. 0x19 must contain
+    // at least its read-DTC subfunction.
     internal static bool IsWellFormedReadOnlyDiagnosticPayload(byte[] payload) =>
         payload.Length >= 2 && (payload[0] switch
         {
-            0x22 => payload.Length >= 3 && (payload.Length - 1) % 2 == 0,
+            0x22 => payload.Length == 3,
             0x19 => true,
             _ => false
         });
