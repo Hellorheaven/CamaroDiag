@@ -57,7 +57,7 @@ jobs:
           node --check functions/account-admin.js
           node --check functions/license-status.js
           node --check functions/entitlement-policy.js
-          node --test functions/entitlement-policy.test.js
+          node --test functions/entitlement-policy.test.js functions/account-policy.test.js
       - name: Execute Android unit tests (warnings fail)
         run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
       - name: Collect unit test reports

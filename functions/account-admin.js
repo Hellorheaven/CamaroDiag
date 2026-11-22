@@ -13,6 +13,7 @@ const maxSessionAge = 5 * 60;
 // Do not require attestation until real debug/release validation succeeds.
 const ENFORCE_APP_CHECK = process.env.CAMARODIAG_ENFORCE_APP_CHECK === "true";
 const { licenseStatus } = require("./license-status");
+const { isSessionRevoked, displayLicenseWithoutLookup } = require("./account-policy");
 
 function adminIdentity(request) {
     if (!request.auth?.uid || (request.auth.token?.[adminRole] !== true &&
@@ -27,9 +28,11 @@ function adminIdentity(request) {
     return request.auth.uid;
 }
 
-async function requireCurrentAdmin(uid) {
+async function requireCurrentAdmin(uid, authTime) {
     // A revoked custom claim in an older token is insufficient to authorize.
     const user = await getAuth().getUser(uid);
+    if (isSessionRevoked(user.tokensValidAfterTime, authTime))
+        throw new HttpsError("unauthenticated", "Session révoquée. Reconnectez-vous.");
     if (user.disabled || user.emailVerified !== true ||
         (user.customClaims?.[adminRole] !== true &&
          user.customClaims?.owner_functional_tests !== true) ||
@@ -40,9 +43,7 @@ async function requireCurrentAdmin(uid) {
 async function visibleAccount(user) {
     // Disabled accounts cannot invoke licenseStatus; admins must still be
     // able to review/reactivate them and inspect their last license choice.
-    const license = user.disabled
-        ? { licensed: false, source: "disabled", verified: true }
-        : await licenseStatus(user.uid);
+    const license = displayLicenseWithoutLookup(user) || await licenseStatus(user.uid);
     return { ...publicUser(user), license };
 }
 
@@ -60,7 +61,7 @@ function publicUser(user) {
 
 exports.adminGetAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK }, async request => {
     const actor = adminIdentity(request);
-    await requireCurrentAdmin(actor);
+    await requireCurrentAdmin(actor, request.auth.token.auth_time);
     const email = request.data?.email;
     if (typeof email !== "string" || email.length > 254 ||
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
@@ -77,7 +78,7 @@ exports.adminGetAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK },
 
 exports.adminUpdateAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK }, async request => {
     const actor = adminIdentity(request);
-    await requireCurrentAdmin(actor);
+    await requireCurrentAdmin(actor, request.auth.token.auth_time);
     const { uid, action, value } = request.data || {};
     if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid))
         throw new HttpsError("invalid-argument", "UID invalide.");
