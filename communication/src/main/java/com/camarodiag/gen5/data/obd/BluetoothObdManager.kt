@@ -723,6 +723,11 @@ class BluetoothObdManager(context: Context) {
                     frameResponse, diagnosticStatus, timedCorrelation.recentReceivedRecords()
                 )
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                // A complete CAN line may be missing only its CR/LF when the
+                // stream was cancelled. Drain it for the history, not for TX success.
+                timedCorrelation.complete(
+                    System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                )
                 throw CanConsolePhysicalExchangeCancelled(
                     timedCorrelation.recentReceivedRecords(), cancelled
                 )
@@ -730,6 +735,9 @@ class BluetoothObdManager(context: Context) {
                 throw superseded
             } catch (error: Exception) {
                 // An adapter error/timeout does not erase already observed RX.
+                timedCorrelation.complete(
+                    System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                )
                 throw CanConsolePhysicalExchangeException(
                     timedCorrelation.recentReceivedRecords(), error
                 )
