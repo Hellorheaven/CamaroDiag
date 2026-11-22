@@ -10,6 +10,8 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const region = "europe-west1";
 const adminRole = "admin_accounts";
 const maxSessionAge = 5 * 60;
+// Do not require attestation until real debug/release validation succeeds.
+const ENFORCE_APP_CHECK = process.env.CAMARODIAG_ENFORCE_APP_CHECK === "true";
 const { licenseStatus } = require("./license-status");
 
 function adminIdentity(request) {
@@ -56,7 +58,7 @@ function publicUser(user) {
     };
 }
 
-exports.adminGetAccount = onCall({ region, enforceAppCheck: true }, async request => {
+exports.adminGetAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK }, async request => {
     const actor = adminIdentity(request);
     await requireCurrentAdmin(actor);
     const email = request.data?.email;
@@ -73,7 +75,7 @@ exports.adminGetAccount = onCall({ region, enforceAppCheck: true }, async reques
     }
 });
 
-exports.adminUpdateAccount = onCall({ region, enforceAppCheck: true }, async request => {
+exports.adminUpdateAccount = onCall({ region, enforceAppCheck: ENFORCE_APP_CHECK }, async request => {
     const actor = adminIdentity(request);
     await requireCurrentAdmin(actor);
     const { uid, action, value } = request.data || {};
