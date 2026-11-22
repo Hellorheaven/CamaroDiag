@@ -1,6 +1,7 @@
 package com.camarodiag.gen5.data.obd
 
 import com.camarodiag.gen5.domain.model.VehicleProfile
+import com.camarodiag.gen5.domain.model.TransmissionType
 import java.util.Locale
 import java.util.concurrent.CancellationException
 
@@ -18,6 +19,7 @@ object ProfiledUdsModuleInventory {
 
     enum class Status {
         IDENTIFIED_READ_ONLY,
+        NOT_EQUIPPED,
         PROFILE_REQUIRED,
         IDENTITY_UNVERIFIED
     }
@@ -55,7 +57,11 @@ object ProfiledUdsModuleInventory {
                 it.moduleId.equals(moduleId, ignoreCase = true)
             }
             val profile = candidates.singleOrNull()
-            if (profile == null) {
+            if (moduleId.equals("TCM", ignoreCase = true) &&
+                vehicle.transmission == TransmissionType.MANUAL) {
+                Result(moduleId, Status.NOT_EQUIPPED,
+                    detail = "Manual transmission: no separate automatic TCM expected.")
+            } else if (profile == null) {
                 Result(moduleId, Status.PROFILE_REQUIRED,
                     detail = "Missing or ambiguous VIN-specific ECU profile.")
             } else {
