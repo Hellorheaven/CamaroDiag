@@ -2025,6 +2025,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sendRawCanConsoleFrame(input, frame)
     }
 
+    /**
+     * A confirmation dialog must not authorize TX on a replacement adapter or
+     * another vehicle. Recheck the live generation when the user confirms.
+     */
+    fun confirmRawCanConsoleFrame(input: String, expectedContextGeneration: Long) {
+        if (!requirePremiumLicense()) return
+        val state = _liveCanMonitorState.value
+        val frame = RawCanFrameParser.parse(input)
+        if (!CanConsoleCapabilityPolicy.canConfirmPhysicalTx(
+                frame = frame,
+                pendingContextGeneration = expectedContextGeneration,
+                currentContextGeneration = state.consoleContextGeneration,
+                monitorAvailable = obdManager.isObdCommandChannelAvailable &&
+                    _adapter.value.supportsCanHeaders,
+                canTransmit = _adapter.value.supportsCanTransmit,
+                busy = state.isCapturing || state.isSendingRequest
+            )) return
+        sendRawCanConsoleFrame(input, requireNotNull(frame))
+    }
+
     private fun sendRawCanConsoleFrame(input: String, frame: com.camarodiag.gen5.data.obd.RawCanFrame) {
         if (!SafeRawCanTransmitPolicy.allows(frame)) {
             val message = localizedContext.getString(R.string.can_console_unsafe_can_payload)
