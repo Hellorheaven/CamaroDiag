@@ -683,20 +683,21 @@ class BluetoothObdManager(context: Context) {
             }
             try {
                 val protocolResponse = boundCommand("ATSP$protocol", 1_500L)
-                check(!protocolResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(protocolResponse)) {
                     "The adapter rejected the selected CAN protocol."
                 }
                 val formattingResponse = boundCommand("ATCAF0", 1_500L)
-                check(!formattingResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(formattingResponse)) {
                     "The adapter cannot enter raw CAN formatting mode."
                 }
                 val headerResponse = boundCommand("ATSH $header", 1_500L)
-                check(!headerResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(headerResponse)) {
                     "The adapter rejected CAN header $header."
                 }
                 val headersResponse = boundCommand("ATH1", 1_000L)
                 val spacesResponse = boundCommand("ATS1", 1_000L)
-                check(!headersResponse.contains("?") && !spacesResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(headersResponse) &&
+                    CanConsoleAdapterRestorationPolicy.accepted(spacesResponse)) {
                     "The adapter cannot expose received CAN identifiers and byte boundaries."
                 }
                 val payload = frame.data.joinToString(" ") {
