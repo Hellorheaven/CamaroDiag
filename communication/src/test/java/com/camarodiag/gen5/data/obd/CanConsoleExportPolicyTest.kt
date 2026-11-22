@@ -58,6 +58,30 @@ class CanConsoleExportPolicyTest {
         ))
     }
 
+    @Test fun exportStaysLockedUntilThePhysicalTxAndItsHistoryAreComplete() {
+        // RX can still arrive after the TX row was appended. A snapshot taken
+        // now would falsely look like a complete chronological console log.
+        assertFalse(CanConsoleExportPolicy.canExport(
+            isCapturing = false, archiveFailed = false,
+            hasHistory = true, hasRawData = true,
+            isSendingRequest = true
+        ))
+        // The same rule applies when a full passive raw archive is present:
+        // the mixed TX/RX history must not be cut at an in-flight operation.
+        assertFalse(CanConsoleExportPolicy.canExport(
+            isCapturing = false, archiveFailed = false,
+            hasHistory = true, hasRawData = true,
+            requiresRawArchive = true, hasRawArchive = true,
+            isSendingRequest = true
+        ))
+        assertTrue(CanConsoleExportPolicy.canExport(
+            isCapturing = false, archiveFailed = false,
+            hasHistory = true, hasRawData = true,
+            requiresRawArchive = true, hasRawArchive = true,
+            isSendingRequest = false
+        ))
+    }
+
     @Test fun inProgressOrEmptyCaptureIsNotExportable() {
         assertFalse(CanConsoleExportPolicy.canExport(
             isCapturing = true, archiveFailed = false,
