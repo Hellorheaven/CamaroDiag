@@ -881,10 +881,10 @@
     <string name="live_pid_wbo2_b1s2">Lambda large bande B1S2</string>
     <string name="live_pid_wbo2_b2s1">Lambda large bande B2S1</string>
     <string name="live_pid_wbo2_b2s2">Lambda large bande B2S2</string>
-    <string name="live_pid_wbo2_current_b1s1">Courant de sonde lambda large bande B1S1</string>
-    <string name="live_pid_wbo2_current_b1s2">Courant de sonde lambda large bande B1S2</string>
-    <string name="live_pid_wbo2_current_b2s1">Courant de sonde lambda large bande B2S1</string>
-    <string name="live_pid_wbo2_current_b2s2">Courant de sonde lambda large bande B2S2</string>
+    <string name="live_pid_wbo2_i_b1s1">Courant de sonde lambda large bande B1S1</string>
+    <string name="live_pid_wbo2_i_b1s2">Courant de sonde lambda large bande B1S2</string>
+    <string name="live_pid_wbo2_i_b2s1">Courant de sonde lambda large bande B2S1</string>
+    <string name="live_pid_wbo2_i_b2s2">Courant de sonde lambda large bande B2S2</string>
     <string name="system_language_follow_phone">Suivre la langue du téléphone</string>
 
     <!-- Live physical J2534 ECU memory capture -->
