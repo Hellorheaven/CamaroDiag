@@ -712,11 +712,12 @@ class BluetoothObdManager(context: Context) {
                 // An explicit adapter OK establishes TX only. A correlated ECU
                 // reply may also establish completion, but unmatched bus traffic
                 // and late ISO-TP continuations never do.
-                check(!timedCorrelation.hasAdapterError() &&
-                    !CanConsoleAdapterReplyPolicy.isFailure(frameResponse) &&
-                    (timedCorrelation.hasExplicitAdapterAck() ||
-                        CanConsoleAdapterRestorationPolicy.accepted(frameResponse) ||
-                        diagnosticStatus != CanConsoleDiagnosticStatus.NONE)) {
+                check(CanConsolePhysicalTransmissionPolicy.confirmed(
+                    adapterOutput = frameResponse,
+                    diagnosticStatus = diagnosticStatus,
+                    hasExplicitAck = timedCorrelation.hasExplicitAdapterAck(),
+                    hasAdapterError = timedCorrelation.hasAdapterError()
+                )) {
                     "The adapter did not confirm the raw CAN transmission."
                 }
                 CanConsoleRawTransmissionResult(
