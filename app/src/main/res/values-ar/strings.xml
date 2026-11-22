@@ -912,4 +912,7 @@
     <string name="debug_builds_no_browser">لا يتوفر متصفح لفتح رابط التنزيل.</string>
     <string name="obd_physical_can_scope">عقدة CAN المادية المستجيبة: 0x%1$s. يقتصر هذا الفحص على وحدة OBD المحددة، وليس فحصًا وظيفيًا لجميع الوحدات. لم تُرسل أوامر برمجة GM أو أوامر المشغلات.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">فعّل مسح رموز أعطال الانبعاثات في جسر Windows، ثم أعد الاتصال وأوقف المحرك وأكّد إعادة الضبط. ستُعاد تهيئة بيانات جاهزية أنظمة الانبعاثات؛ ولا تُمسح الرموز الدائمة.</string>
+    <string name="export_folder_instruction">أنشئ مجلد CamaroDiag أو حدده في وحدة التخزين الداخلية ثم اسمح بالوصول إليه. تظهر الملفات المصدّرة في التخزين المشترك.</string>
+    <string name="export_folder_success">تم حفظ الملف في /CamaroDiag/.</string>
+    <string name="export_folder_failed">تعذر حفظ الملف في /CamaroDiag/.</string>
 </resources>
