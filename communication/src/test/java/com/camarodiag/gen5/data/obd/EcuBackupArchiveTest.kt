@@ -28,6 +28,45 @@ class EcuBackupArchiveTest {
         assertArrayEquals(capture().independentRead, result.captures.single().independentRead)
     }
 
+    @Test fun windowsPortableArchiveCanBeImportedWithoutClaimingCompleteEcuCoverage() {
+        val bytes = byteArrayOf(1, 2, 3, 4)
+        val hash = EcuBenchExpertPlan.sha256Hex(bytes).uppercase()
+        val manifest = """
+            format=CamaroDiag ECU offline archive v2
+            vin=1G1FA1RXXR0123456
+            controller=
+            created=1795320000000
+            count=1
+            required=
+            capture.0.region=OTHER
+            capture.0.start=4096
+            capture.0.expected=4
+            capture.0.origin=REPORTED_HARDWARE_READ
+            capture.0.sha256=$hash
+            capture.0.second=true
+        """.trimIndent().toByteArray(Charsets.US_ASCII)
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            for ((name, data) in listOf(
+                "manifest.properties" to manifest,
+                "capture/0/first.bin" to bytes,
+                "capture/0/second.bin" to bytes.copyOf()
+            )) {
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(data)
+                zip.closeEntry()
+            }
+        }
+        val imported = EcuBackupArchive.import(output.toByteArray().inputStream())
+        assertTrue(imported.verification.consistent)
+        assertEquals("1G1FA1RXXR0123456", imported.manifest.vehicleVin)
+        assertEquals(EcuBackupCoverage.Status.PARTIAL, imported.manifest.coverage.status)
+        assertEquals(false, imported.manifest.hardwareProvenanceVerified)
+        assertEquals(EcuBackupCoverage.Region.OTHER, imported.captures.single().region)
+        assertArrayEquals(bytes, imported.captures.single().firstRead)
+        assertArrayEquals(bytes, imported.captures.single().independentRead)
+    }
+
     @Test fun malformedVinIsRejectedBeforeCreatingArchive() {
         val output = ByteArrayOutputStream()
         val failure = runCatching {
