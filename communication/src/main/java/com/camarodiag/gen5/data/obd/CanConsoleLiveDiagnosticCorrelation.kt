@@ -31,6 +31,8 @@ class CanConsoleLiveDiagnosticCorrelation(
     private val recentRecords = java.util.ArrayDeque<CanConsoleTimedRecord>()
     private val perResponder = mutableMapOf<Long, CanConsoleDiagnosticCorrelation>()
     private var diagnosticStatus = CanConsoleDiagnosticStatus.NONE
+    private var adapterAckSeen = false
+    private var adapterErrorSeen = false
 
     fun append(chunk: String, receivedAtMs: Long, receivedAtWallClockMs: Long = receivedAtMs) {
         evaluate(framer.append(chunk).completeLines, receivedAtMs, receivedAtWallClockMs)
@@ -38,6 +40,8 @@ class CanConsoleLiveDiagnosticCorrelation(
 
     /** Every received record is decoded, then the UI's bounded history keeps the latest 300. */
     fun recentReceivedRecords(): List<CanConsoleTimedRecord> = recentRecords.toList()
+    fun hasAdapterError(): Boolean = adapterErrorSeen
+    fun hasExplicitAdapterAck(): Boolean = adapterAckSeen && !adapterErrorSeen
 
     /** Called after the adapter command completes to process a final unterminated line. */
     fun complete(receivedAtMs: Long, receivedAtWallClockMs: Long = receivedAtMs): CanConsoleDiagnosticStatus {
@@ -46,6 +50,11 @@ class CanConsoleLiveDiagnosticCorrelation(
     }
 
     private fun evaluate(lines: String, receivedAtMs: Long, receivedAtWallClockMs: Long) {
+        for (line in lines.lineSequence().map { it.trim().removeSuffix(">").trim() }) {
+            if (line.isEmpty()) continue
+            if (line.equals("OK", ignoreCase = true)) adapterAckSeen = true
+            if (CanConsoleAdapterReplyPolicy.isFailure(line)) adapterErrorSeen = true
+        }
         for (record in CanConsoleRecordParser.parse(lines)) {
             recentRecords.addLast(CanConsoleTimedRecord(record, receivedAtWallClockMs))
             if (recentRecords.size > 300) recentRecords.removeFirst()
