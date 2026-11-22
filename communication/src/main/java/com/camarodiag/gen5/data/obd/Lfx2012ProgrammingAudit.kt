@@ -75,7 +75,8 @@ object Lfx2012ProgrammingAudit {
         val normalizedVin = snapshot.vin?.trim()?.uppercase()
         val vinStatus = when {
             normalizedVin.isNullOrBlank() -> CheckStatus.UNAVAILABLE
-            !Regex("[A-HJ-NPR-Z0-9]{17}").matches(normalizedVin) -> CheckStatus.REQUIRES_REVIEW
+            !Regex("[A-HJ-NPR-Z0-9]{17}").matches(normalizedVin) ||
+                normalizedVin.getOrNull(9) != 'C' -> CheckStatus.REQUIRES_REVIEW
             else -> CheckStatus.OBSERVED
         }
         return listOf(
