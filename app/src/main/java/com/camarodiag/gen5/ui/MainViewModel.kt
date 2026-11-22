@@ -1173,12 +1173,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * saves the resulting integrity-checked ZIP through Android SAF. The PC
      * must independently authorize the target VIN, channel and address map.
      */
+    @Volatile private var memoryCaptureGeneration = 0L
+
     fun captureJ2534Memory(fileName: String, request: J2534LiveMemoryBackup.Request) {
         if (!requirePremiumLicense()) return
         if (_calibrationWorkspace.value.isJ2534MemoryCapturing) return
+        val captureGeneration = ++memoryCaptureGeneration
         val accountGeneration = accountSessionGeneration
         val connectionGeneration = connectionAttemptGeneration
-        fun current() = isCurrentAccountGeneration(accountGeneration) &&
+        fun current() = captureGeneration == memoryCaptureGeneration &&
+            isCurrentAccountGeneration(accountGeneration) &&
             connectionGeneration == connectionAttemptGeneration &&
             request.expectedVin == _vehicle.value.vin.uppercase() && hasPremiumLicense()
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -1217,9 +1221,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_live_memory_saved)
                 )
             } catch (cancelled: CancellationException) {
-                if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    isJ2534MemoryCapturing = false
-                )
                 throw cancelled
             } catch (error: Exception) {
                 if (!current()) return@launch
@@ -1231,6 +1232,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_live_memory_failed) +
                             " " + error.message.orEmpty().take(160)
                 )
+            } finally {
+                // A disconnected capture must release its busy flag, without
+                // allowing an old operation to clear a new account's capture.
+                if (captureGeneration == memoryCaptureGeneration &&
+                    isCurrentAccountGeneration(accountGeneration)) {
+                    _calibrationWorkspace.update { it.copy(isJ2534MemoryCapturing = false) }
+                }
             }
         }
     }
@@ -2845,7 +2853,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isObdScanning.value = false
     }
 
-    private var connectionAttemptGeneration: Long = 0L
+    @Volatile private var connectionAttemptGeneration: Long = 0L
     private var connectionAttemptJob: Job? = null
 
     private fun connectWithResult(
