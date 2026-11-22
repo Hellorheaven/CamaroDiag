@@ -17,6 +17,14 @@ object CanConsoleAdapterReplyPolicy {
     )
     fun isFailure(text: String): Boolean = text.isBlank() || text.contains("?") ||
         failures.containsMatchIn(text)
+    /** Only a parsed physical CAN reply or an explicit adapter OK confirms an exchange.
+     * SEARCHING, command echo and malformed CAN records are not acknowledgements. */
+    fun hasConfirmedTransmission(text: String): Boolean {
+        if (isFailure(text)) return false
+        return text.lineSequence().map { it.trim().removeSuffix(">").trim() }
+            .any { line -> line.equals("OK", ignoreCase = true) ||
+                RawCanFrameParser.parseReceivedFrames(line).isNotEmpty() }
+    }
 }
 
 object CanConsoleRecordParser {
