@@ -47,6 +47,11 @@ internal static class NativeE39FileWriteJournalSelfTests
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
                 NativeE39FileWriteJournal.CompletionState.Completed,
                 "All sectors individually verified before completion");
+            var detailed = NativeE39FileWriteJournal.InspectDetailed(path);
+            Assert(detailed.SequenceValid && !detailed.RequiresAssessment &&
+                detailed.PreparedSectors == 2 && detailed.WrittenSectors == 2 &&
+                detailed.FinalReadbackSectors == 2 && detailed.PossiblyIncompleteAddress is null &&
+                detailed.LastPhase == "Completed", "Completed offline journal reports validated sector counts");
 
             // A full JSON object without the flushed line terminator is not
             // sufficient to declare the flash complete.
@@ -75,6 +80,16 @@ internal static class NativeE39FileWriteJournalSelfTests
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
                 NativeE39FileWriteJournal.CompletionState.Interrupted,
                 "Oversized journal never authorizes completion");
+
+            File.Delete(path);
+            WriteScenario(path, true, false);
+            var prefix = File.ReadLines(path).Take(9).ToArray(); // 2 prepared, 6 preflight, first erase marker
+            File.WriteAllLines(path, prefix);
+            var inFlight = NativeE39FileWriteJournal.InspectDetailed(path);
+            Assert(inFlight.SequenceValid && inFlight.RequiresAssessment &&
+                inFlight.PreparedSectors == 2 && inFlight.WrittenSectors == 0 &&
+                inFlight.PossiblyIncompleteAddress == 0x20000u && inFlight.LastPhase == "EraseStarted",
+                "Durable erase marker identifies the possibly incomplete sector");
 
             File.Delete(path);
             WriteScenario(path, false, false);
