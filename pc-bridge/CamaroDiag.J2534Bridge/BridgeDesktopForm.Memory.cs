@@ -238,7 +238,7 @@ internal sealed partial class BridgeDesktopForm
                     "Régions requises absentes de ce ZIP : " + string.Join(", ", missing) + ". ") +
                 "Cette vérification ne prouve ni la couverture ECU complète ni la restaurabilité.";
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or
             UnauthorizedAccessException or OverflowException or JsonException or
             NotSupportedException or InvalidOperationException)
         {

@@ -17,7 +17,7 @@ internal static class NativeScopedBackupImportCli
         {
             var scope = J2534MemoryReadScope.Load(args[2]);
             var checkedCapture = NativeScopedBackupImport.VerifyZip(args[1], scope);
-            Console.WriteLine("ECU archive: integrity verified (two independent stored acquisitions).");
+            Console.WriteLine("ECU archive: integrity verified (two matching stored copies).");
             Console.WriteLine("VIN: " + checkedCapture.Vin);
             Console.WriteLine("Start: 0x" + checkedCapture.StartAddress.ToString("X8"));
             Console.WriteLine("Bytes: " + checkedCapture.ByteCount);
@@ -32,7 +32,7 @@ internal static class NativeScopedBackupImportCli
             Console.WriteLine("Offline integrity only. No physical restoration or full ECU coverage is asserted.");
             return 0;
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or UnauthorizedAccessException
             or System.Text.Json.JsonException or OverflowException
             or NotSupportedException or InvalidOperationException)
         {

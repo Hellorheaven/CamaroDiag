@@ -89,10 +89,6 @@ internal sealed class J2534MemoryReadScope
         if (root.ValueKind != JsonValueKind.Object)
             throw new ArgumentException("Memory read profile must be a JSON object.");
         // Deliberately no default region, adapter, session or VIN.
-        var vin = root.GetProperty("expectedVin").GetString() ?? "";
-        var request = checked((int)ParseHexUnsigned(root.GetProperty("requestCanIdHex").GetString()));
-        var response = checked((int)ParseHexUnsigned(root.GetProperty("responseCanIdHex").GetString()));
-        var start = ParseHexUnsigned(root.GetProperty("startAddressHex").GetString());
         var required = new HashSet<string>(StringComparer.Ordinal)
         {
             "expectedVin", "requestCanIdHex", "responseCanIdHex", "protocolNumber",
@@ -103,6 +99,10 @@ internal sealed class J2534MemoryReadScope
                 throw new ArgumentException("Unexpected or duplicate profile field: " + property.Name);
         if (required.Count > 0)
             throw new ArgumentException("Incomplete memory read profile: " + string.Join(",", required));
+        var vin = root.GetProperty("expectedVin").GetString() ?? "";
+        var request = checked((int)ParseHexUnsigned(root.GetProperty("requestCanIdHex").GetString()));
+        var response = checked((int)ParseHexUnsigned(root.GetProperty("responseCanIdHex").GetString()));
+        var start = ParseHexUnsigned(root.GetProperty("startAddressHex").GetString());
         return new J2534MemoryReadScope(
             vin, request, response, root.GetProperty("protocolNumber").GetInt32(),
             start, checked((uint)root.GetProperty("lengthBytes").GetInt64()),

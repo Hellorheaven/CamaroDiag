@@ -217,7 +217,6 @@ internal static class NativeScopedBackupArchiveSelfTests
             using (var incomplete = ZipFile.Open(missingPath, ZipArchiveMode.Update))
                 incomplete.GetEntry("capture/0/second.bin")!.Delete();
             Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(missingPath, scope));
-            File.Delete(missingPath);
             Reject<IOException>(() => NativeScopedBackupArchive.SaveNew(zipPath, scope, capture, CancellationToken.None));
             Check(File.ReadAllBytes(zipPath).SequenceEqual(originalZip), "Prior backup never overwritten");
 
@@ -240,6 +239,13 @@ internal static class NativeScopedBackupArchiveSelfTests
             Check(NativeScopedBackupImportCli.Run([
                 NativeScopedBackupImportCli.Command, zipPath
             ]) == 6, "Offline verification CLI rejects incomplete arguments");
+            Check(NativeScopedBackupImportCli.Run([
+                NativeScopedBackupImportCli.Command, missingPath, profilePath
+            ]) == 8, "Offline verification CLI reports archive rejection");
+            File.WriteAllText(profilePath, "{}");
+            Check(NativeScopedBackupImportCli.Run([
+                NativeScopedBackupImportCli.Command, zipPath, profilePath
+            ]) == 8, "Offline verification CLI rejects an incomplete profile");
             File.Delete(profilePath);
 
             var raw = Path.Combine(directory, "original.bin");

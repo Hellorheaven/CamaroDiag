@@ -100,7 +100,7 @@ internal static class ConnectorCheckpointCapture
             Console.WriteLine("CDJ/1 saved: " + result.Status + "; unauthenticated; no automatic recovery.");
             return result.Status == ConnectorCheckpoint.Disposition.RecoveryRequired ? 8 : 0;
         }
-        catch (Exception error) when (error is IOException or TimeoutException or UnauthorizedAccessException
+        catch (Exception error) when (error is IOException or InvalidDataException or TimeoutException or UnauthorizedAccessException
             or ArgumentException or InvalidOperationException or NotSupportedException)
         {
             Console.Error.WriteLine("Checkpoint capture failed: " + error.Message);
