@@ -206,7 +206,8 @@ class CamaroModuleDtcScannerTest {
         val scanner = CamaroModuleDtcScanner { error("Adapter unavailable") }
         val address = VerifiedModuleReadAddress(CamaroControlModule.BCM, 0x700, 0x708, evidenceReference = "Test fixture")
         val results = scanner.scan(CamaroTransmission.UNKNOWN, listOf(address))
-        assertTrue(results.first() is ModuleDiagnosticResult.ReadFailure)
+        assertTrue(results.single { it.module == CamaroControlModule.BCM }
+            is ModuleDiagnosticResult.ReadFailure)
         assertEquals(5, results.count { it is ModuleDiagnosticResult.NotConfigured })
     }
 }
