@@ -222,6 +222,16 @@ internal static class BridgeSelfTests
             try { J2534MemoryReadScope.Load(scopedFile); }
             catch (ArgumentException) { rejected = true; }
             Assert(rejected, "Unknown/dangerous profile permissions rejected");
+            File.WriteAllText(scopedFile, new string(' ', 16 * 1024 + 1));
+            rejected = false;
+            try { J2534MemoryReadScope.Load(scopedFile); }
+            catch (ArgumentException) { rejected = true; }
+            Assert(rejected, "Oversized memory read profile is rejected before parsing");
+            File.WriteAllText(scopedFile, "");
+            rejected = false;
+            try { J2534MemoryReadScope.Load(scopedFile); }
+            catch (ArgumentException) { rejected = true; }
+            Assert(rejected, "Empty memory read profile is rejected before parsing");
         }
         finally { File.Delete(scopedFile); }
 
