@@ -137,7 +137,9 @@ internal static class NativeScopedMemoryReader
 
     private static void RequireSessionReply(byte[] reply, byte expected)
     {
-        if (reply.Length < 2 || reply[0] != 0x50 || reply[1] != expected)
+        // Accept an echoed session response with either no timing fields or
+        // the complete four-byte ISO 14229 timing pair. Reject trailing data.
+        if (reply.Length is not (2 or 6) || reply[0] != 0x50 || reply[1] != expected)
             throw new InvalidDataException("ECU did not confirm the requested read session.");
     }
 
