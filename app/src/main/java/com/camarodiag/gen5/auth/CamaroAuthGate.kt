@@ -62,6 +62,7 @@ fun CamaroAuthGate(
     var validationError by remember { mutableStateOf<String?>(null) }
     var verificationRequired by remember { mutableStateOf(false) }
     var accessLevel by remember { mutableStateOf(LicenseLevel.FREE) }
+    var accountAdminAllowed by remember { mutableStateOf(false) }
     var licenseChecked by remember { mutableStateOf<Boolean?>(null) }
     var licenseSource by remember { mutableStateOf<String?>(null) }
     var retryValidation by remember { mutableIntStateOf(0) }
@@ -75,6 +76,7 @@ fun CamaroAuthGate(
         val identityChanged = readyAccountUid != user?.uid ||
             (validatedUser != null && validatedUser !== user)
         if (identityChanged) {
+            accountAdminAllowed = false
             licenseChecked = null
             licenseSource = null
             accessLevel = LicenseLevel.FREE
@@ -100,6 +102,7 @@ fun CamaroAuthGate(
                     if (verificationRequired) {
                         // Keep the signed-in Firebase session for verification only. Do not expose
                         // diagnostics, previous account state, owner access or offline grace.
+                        accountAdminAllowed = false
                         licenseChecked = null
                         licenseSource = null
                         accessLevel = LicenseLevel.FREE
@@ -109,6 +112,8 @@ fun CamaroAuthGate(
                         latestOnAccountChanged(null)
                         return@addOnCompleteListener
                     }
+                    accountAdminAllowed = verifiedClaims["admin_accounts"] == true && verifiedEmail &&
+                        providerIds.contains("google.com")
                     // Owner claim is signed by Firebase Admin. Paying users
                     // require a SECOND proof from Firestore's SERVER, never cache.
                     accessLevel = if (!LicenseRolloutConfig.ENABLED) {
@@ -159,6 +164,7 @@ fun CamaroAuthGate(
                     latestOnAccountChanged(targetUid)
                 } else {
                     // Failed validation: never retain a previously granted Premium entitlement.
+                    accountAdminAllowed = false
                     licenseChecked = false
                     licenseSource = null
                     accessLevel = LicenseLevel.FREE
@@ -272,7 +278,7 @@ fun CamaroAuthGate(
                         )
                         Spacer(Modifier.height(8.dp))
                         AccountLicenseStatus(french, accessLevel, licenseChecked, licenseSource)
-                        if (accessLevel == LicenseLevel.OWNER) {
+                        if (accessLevel == LicenseLevel.OWNER || accountAdminAllowed) {
                             Spacer(Modifier.height(8.dp))
                             TextButton(onClick = {
                                 accountOpen = false
@@ -370,7 +376,7 @@ fun CamaroAuthGate(
                 }
             )
         }
-        if (administrationOpen && accessLevel == LicenseLevel.OWNER) {
+        if (administrationOpen && (accessLevel == LicenseLevel.OWNER || accountAdminAllowed)) {
             AccountAdministrationDialog(french) { administrationOpen = false }
         }
         if (changePasswordOpen &&
