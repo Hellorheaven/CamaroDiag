@@ -690,6 +690,14 @@ class BluetoothObdManager(context: Context) {
                 check(CanConsoleAdapterRestorationPolicy.accepted(formattingResponse)) {
                     "The adapter cannot enter raw CAN formatting mode."
                 }
+                // Enable hardware ISO-TP flow control explicitly; CAF0 only
+                // controls framing/formatting and does not guarantee CFC1.
+                val flowControlResponse = boundCommand(
+                    CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC, 1_500L
+                )
+                check(CanConsoleIsotpFlowControlPolicy.adapterConfirmed(flowControlResponse)) {
+                    "The adapter did not confirm ISO-TP automatic flow control."
+                }
                 val headerResponse = boundCommand("ATSH $header", 1_500L)
                 check(CanConsoleAdapterRestorationPolicy.accepted(headerResponse)) {
                     "The adapter rejected CAN header $header."
@@ -756,6 +764,7 @@ class BluetoothObdManager(context: Context) {
                         "ATSP6" to 1_500L,
                         "ATSH 7DF" to 1_500L,
                         "ATCAF1" to 1_500L,
+                        CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC to 1_500L,
                         "ATH1" to 1_000L,
                         "ATS0" to 1_000L
                     )) {
