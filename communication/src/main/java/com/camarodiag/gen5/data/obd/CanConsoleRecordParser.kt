@@ -120,6 +120,12 @@ object CanConsoleRecordParser {
  * The OBD read console is independently usable on a physical J2534 bridge.
  * CAN monitor availability is deliberately not a prerequisite for OBD reads.
  */
+/** Hardware ELM/STN monitoring supports one Classical CAN format per session. */
+object CanMonitorProtocolPolicy {
+    fun protocolCommand(can29Bit: Boolean): String = if (can29Bit) "ATSP7" else "ATSP6"
+    fun clearFilter(can29Bit: Boolean): String = if (can29Bit) "00000000" else "000"
+}
+
 object CanConsoleCapabilityPolicy {
     fun canSubmit(
         rawCanFrame: Boolean,
