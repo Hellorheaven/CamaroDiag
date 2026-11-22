@@ -416,4 +416,24 @@ class CamaroUdsProtocolTest {
             CamaroUdsProtocol.parsePidBytes("41 52 FF", "52"))!!, 0.00001)
     }
 
+    @Test
+    fun standardLiveTelemetryRejectsTruncatedAndPaddedSensorResponses() {
+        val samples = listOf(
+            Triple("0C", "41 0C 1A F8", "41 0C 1A"),
+            Triple("05", "41 05 5B", "41 05 5B 00"),
+            Triple("42", "41 42 36 B0", "41 42 36"),
+            Triple("52", "41 52 80", "41 52 80 00"),
+            Triple("24", "41 24 80 00 40 00", "41 24 80 00"),
+            Triple("01", "41 01 00 00 00 00", "41 01 00 00 00")
+        )
+        for ((pid, valid, invalid) in samples) {
+            assertNotNull("PID $pid complete bytes", CamaroUdsProtocol.parsePidBytes(valid, pid))
+            assertNull("PID $pid malformed bytes", CamaroUdsProtocol.parsePidBytes(invalid, pid))
+        }
+        // GM-specific mileage decoding retains its dedicated four-byte
+        // contract even though it is not part of the standard PID allowlist.
+        assertEquals(123456.7,
+            requireNotNull(CamaroUdsProtocol.parseOdometerPidA6("41 A6 00 12 D6 87")), 0.01)
+    }
+
 }
