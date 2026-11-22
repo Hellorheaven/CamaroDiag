@@ -107,7 +107,7 @@ object SafeObdRequestPolicy {
                 }) continue
             var bytes = trimmed.filterNot(Char::isWhitespace)
             // Only known OBD physical response headers are stripped.
-            if (bytes.startsWith("18DAF1") && bytes.length >= 8) {
+            if (bytes.startsWith("18DAF110") && bytes.length >= 8) {
                 bytes = bytes.drop(8)
             } else if (bytes.length >= 3 && bytes.startsWith("7E") &&
                 bytes[2] in '8'..'F') {
@@ -185,7 +185,7 @@ object SafeObdRequestPolicy {
                     it !in '0'..'9' && it !in 'A'..'F' && !it.isWhitespace()
                 }) continue
             var bytes = trimmed.filterNot(Char::isWhitespace)
-            if (bytes.startsWith("18DAF1") && bytes.length >= 8) bytes = bytes.drop(8)
+            if (bytes.startsWith("18DAF110") && bytes.length >= 8) bytes = bytes.drop(8)
             else if (bytes.length >= 3 && bytes.startsWith("7E") &&
                 bytes[2] in '8'..'F') bytes = bytes.drop(3)
             if (bytes.startsWith("03" + expectedPrefix) && bytes.length >= 8 &&
