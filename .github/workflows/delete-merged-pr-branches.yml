@@ -1,9 +1,8 @@
-name: Delete merged pull request branches
-# Heavy tests are never triggered by pull_request synchronize.
-# Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
+name: Single PR and branch policy
+# Branch deletion occurs only after a successful main Release build (release-apk.yml).
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, closed]
+    types: [opened, reopened, ready_for_review]
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,7 +10,7 @@ permissions:
 jobs:
   single-pr-policy:
     name: Single PR and branch policy
-    if: github.event_name == 'workflow_dispatch' || github.event.action != 'closed'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Verify the complete branch and open PR inventory
@@ -45,69 +44,3 @@ jobs:
               return;
             }
             core.info('Repository policy satisfied: ' + prs.length + ' open PR, ' + names.length + ' branches.');
-  delete-merged-pr-branch:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
-    permissions:
-      contents: write
-      pull-requests: read
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check whether the merged head can be deleted
-        id: candidate
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const pr = context.payload.pull_request;
-            const ref = pr.head?.ref;
-            if (!ref || ref === pr.base.ref || ref === 'main' ||
-                ref === context.payload.repository.default_branch ||
-                pr.head.repo?.full_name !== owner + '/' + repo) return;
-            const open = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open', head: owner + ':' + ref, per_page: 100
-            });
-            if (open.length) {
-              core.notice('Branch belongs to an open PR; not deleting.');
-              return;
-            }
-            core.setOutput('ref', ref);
-      - name: Check out main for authenticated branch deletion
-        if: steps.candidate.outputs.ref != ''
-        uses: actions/checkout@v7
-        with:
-          ref: refs/heads/main
-      - name: Delete only the reviewed head revision
-        id: cleanup
-        if: steps.candidate.outputs.ref != ''
-        shell: bash
-        env:
-          HEAD_BRANCH: ${{ steps.candidate.outputs.ref }}
-          MERGED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          ref="refs/heads/$HEAD_BRANCH"
-          git check-ref-format "$ref"
-          [[ "$MERGED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
-          if ! git push --force-with-lease="$ref:$MERGED_HEAD_SHA" origin ":$ref"; then
-            current="$(git ls-remote --refs origin "$ref" | cut -f 1)"
-            if [[ -n "$current" && "$current" != "$MERGED_HEAD_SHA" ]]; then
-              echo "::notice::Branch advanced since merge; left intact."
-              exit 0
-            fi
-            if [[ -n "$current" ]]; then
-              echo "::error::Failed to delete the merged branch."
-              exit 1
-            fi
-          fi
-          echo "verify_inventory=true" >> "$GITHUB_OUTPUT"
-      - name: Verify the post-merge branch and PR inventory
-        if: steps.cleanup.outputs.verify_inventory == 'true'
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const branches = await github.paginate(github.rest.repos.listBranches, {owner, repo, per_page: 100});
-            const prs = await github.paginate(github.rest.pulls.list, {owner, repo, state: 'open', per_page: 100});
-            if (branches.length !== 1 || branches[0].name !== 'main' || prs.length !== 0) {
-              core.setFailed('After merge, expected only main and no open PR. Inspect remaining work; do not delete blindly.');
-            }
