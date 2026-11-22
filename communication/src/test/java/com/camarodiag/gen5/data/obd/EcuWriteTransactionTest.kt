@@ -615,7 +615,8 @@ class EcuWriteTransactionTest {
     }
     @Test fun placeholderEcuAndFirmwareCannotSatisfyWritePreparation() {
         val invalid = listOf("unknown", "demo", "simulation", "mock", "pending",
-            "00000000", "FFFFFFFF", "0x000000", "N/A")
+            "00000000", "FFFFFFFF", "0x000000", "N/A",
+            "unknown-ecu", "ECU-DEMO", "sample-firmware", "fake-controller")
         for (value in invalid) {
             for (target in listOf(
                 request().copy(controllerFamily = value),
