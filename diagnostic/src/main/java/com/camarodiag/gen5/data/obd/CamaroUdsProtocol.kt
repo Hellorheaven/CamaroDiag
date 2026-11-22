@@ -191,7 +191,11 @@ object CamaroUdsProtocol {
      * Adapter banners, echoed requests and neighbouring ECU replies cannot
      * contribute bytes to a sensor or an odometer calculation.
      */
-    fun parsePidBytes(response: String, pid: String): IntArray? {
+    fun parsePidBytes(
+        response: String,
+        pid: String,
+        primaryPowertrainResponderOnly: Boolean = false
+    ): IntArray? {
         val pidHex = pid.trim().uppercase(Locale.ROOT).padStart(2, '0')
         if (!Regex("[0-9A-F]{2}").matches(pidHex)) return null
         val expectedPid = pidHex.toInt(16)
@@ -203,6 +207,19 @@ object CamaroUdsProtocol {
             val line = sourceLine.trim().uppercase(Locale.ROOT)
             if (line.isEmpty()) continue
             val parts = line.split(Regex("\\s+"))
+            val responder = when {
+                parts.size > 1 && canHeader.matches(parts[0]) -> parts[0]
+                parts.size == 1 && line.length % 2 == 1 &&
+                    canHeader.matches(line.take(3)) -> line.take(3)
+                parts.size == 1 && line.length >= 14 && line.length % 2 == 0 &&
+                    canHeader.matches(line.take(8)) -> line.take(8)
+                else -> null
+            }
+            // When physical CAN headers are available, never attribute another
+            // ECU's response to primary powertrain telemetry. Headerless ELM
+            // output still depends on the adapter's selected OBD channel.
+            if (primaryPowertrainResponderOnly && responder != null &&
+                responder !in setOf("7E8", "18DAF110")) continue
             val data = when {
                 parts.size > 1 && canHeader.matches(parts[0]) ->
                     parts.drop(1).joinToString("")
