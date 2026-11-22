@@ -898,4 +898,7 @@
     <string name="cal_expert_patch_title">Målrettede ECU-ændringer — offline sektorvirkning</string>
     <string name="cal_expert_patch_warning">Kun forhåndsvisning. Indtast geometrien for mål-ECUs hukommelseskort. Sektorlayout og ECU-kompatibilitet er ikke verificeret, og ingen programmering er aktiveret.</string>
     <string name="cal_expert_patch_invalid">Offline-forhåndsvisning er utilgængelig: ugyldige filer, områdegrænser eller slette-/programmeringsgeometri. Intet skriveforsøg foretaget.</string>
+    <string name="export_folder_instruction">Opret eller vælg mappen CamaroDiag på det interne lager, og giv adgang. Eksporter er synlige på det delte lager.</string>
+    <string name="export_folder_success">Eksport gemt i /CamaroDiag/.</string>
+    <string name="export_folder_failed">Eksporten kunne ikke gemmes i /CamaroDiag/.</string>
 </resources>
