@@ -21,6 +21,12 @@ internal static class BridgeSelfTests
             if (!condition) throw new InvalidOperationException("Bridge self-test failed: " + name);
         }
 
+        Assert(BridgeConsoleDirection.Normalize("TX") == "TX", "CAN console TX direction");
+        Assert(BridgeConsoleDirection.Normalize("RX") == "RX", "CAN console RX direction");
+        Assert(BridgeConsoleDirection.Normalize("SYSTEM") == "SYSTEM", "CAN console SYSTEM direction");
+        Assert(BridgeConsoleDirection.Normalize("INFO") == "SYSTEM", "Legacy INFO classified SYSTEM");
+        Assert(BridgeConsoleDirection.Normalize(null) == "SYSTEM", "Unknown CAN console direction fails closed");
+
         Assert(BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("192.168.1.20")), "RFC1918 LAN");
         Assert(BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("10.1.2.3")), "10/8 LAN");
         Assert(BridgeServer.IsPrivateNetworkAddress(IPAddress.Loopback), "Loopback");
