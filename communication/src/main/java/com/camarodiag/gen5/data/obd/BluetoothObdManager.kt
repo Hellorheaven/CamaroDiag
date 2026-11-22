@@ -621,8 +621,9 @@ class BluetoothObdManager(context: Context) {
                         // An old operation cannot tear down a replacement adapter.
                         if (!transportSessionEpoch.isCurrent(requestedEpoch))
                             throw ObdSupersededSessionException(CanAdapterRestorationException())
+                        val transportKind = activeTransport
                         disconnect()
-                        throw CanAdapterRestorationException()
+                        throw CanAdapterRestorationException(transportKind)
                     }
                 }
             }
@@ -719,8 +720,9 @@ class BluetoothObdManager(context: Context) {
                         // An old operation cannot tear down a replacement adapter.
                         if (!transportSessionEpoch.isCurrent(requestedEpoch))
                             throw ObdSupersededSessionException(CanAdapterRestorationException())
+                        val transportKind = activeTransport
                         disconnect()
-                        throw CanAdapterRestorationException()
+                        throw CanAdapterRestorationException(transportKind)
                     }
                 }
             }
