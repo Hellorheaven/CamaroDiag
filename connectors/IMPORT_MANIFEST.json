@@ -1,0 +1,427 @@
+{
+  "sourceRepository": "Hellorheaven/CamaroDiagConnectors",
+  "sourceCommit": "81b578571a56c8d96b46932f24c55f34aacd1a65",
+  "sourceInitialCommit": "c049141be903816b13ff62d1e188c377f7ddebb4",
+  "files": [
+    {
+      "source": ".github/workflows/android-connector-validation.yml",
+      "destination": ".github/workflows/connectors-android-connector-validation.yml",
+      "kind": "workflow-relocated"
+    },
+    {
+      "source": ".github/workflows/firmware-validation.yml",
+      "destination": ".github/workflows/connectors-firmware-validation.yml",
+      "kind": "workflow-relocated"
+    },
+    {
+      "source": ".github/workflows/python-tests.yml",
+      "destination": ".github/workflows/connectors-python-tests.yml",
+      "kind": "workflow-relocated"
+    },
+    {
+      "source": ".github/workflows/windows-discovery-validation.yml",
+      "destination": ".github/workflows/connectors-windows-discovery-validation.yml",
+      "kind": "workflow-relocated"
+    },
+    {
+      "source": ".gitignore",
+      "destination": "connectors/.gitignore",
+      "kind": "source-copy"
+    },
+    {
+      "source": "README.md",
+      "destination": "connectors/README.md",
+      "kind": "governance-updated"
+    },
+    {
+      "source": "ROADMAP.md",
+      "destination": "connectors/ROADMAP.md",
+      "kind": "governance-updated"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "destination": "connectors/docs/ARCHITECTURE.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "docs/COMPATIBILITE_CAMARODIAG.md",
+      "destination": "connectors/docs/COMPATIBILITE_CAMARODIAG.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "docs/HARDWARE_VALIDATION.md",
+      "destination": "connectors/docs/HARDWARE_VALIDATION.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "docs/PROTOCOLE.md",
+      "destination": "connectors/docs/PROTOCOLE.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "docs/SECURITE.md",
+      "destination": "connectors/docs/SECURITE.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "docs/user/tuneecu.md",
+      "destination": "connectors/docs/user/tuneecu.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "docs/user/usb-binary-discovery.md",
+      "destination": "connectors/docs/user/usb-binary-discovery.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "docs/user/wiring/README.md",
+      "destination": "connectors/docs/user/wiring/README.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "docs/user/wiring/ecu/2012-lfx-e39.md",
+      "destination": "connectors/docs/user/wiring/ecu/2012-lfx-e39.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "docs/user/wiring/ecu/2012-ls3-l99-e38.md",
+      "destination": "connectors/docs/user/wiring/ecu/2012-ls3-l99-e38.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "docs/user/wiring/ecu/README.md",
+      "destination": "connectors/docs/user/wiring/ecu/README.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "docs/user/wiring/ecu/e39a.md",
+      "destination": "connectors/docs/user/wiring/ecu/e39a.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/binary_frame_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/binary_frame_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/discovery_parser_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/discovery_parser_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/discovery_session_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/discovery_session_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/frame_receiver_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/frame_receiver_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/host_interface_policy_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/host_interface_policy_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/host_session_arbiter_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/host_session_arbiter_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/journal_record_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/journal_record_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/journal_writer_gate_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/journal_writer_gate_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/native-tests/programming_policy_test.cpp",
+      "destination": "connectors/firmware/esp32s3/native-tests/programming_policy_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/platformio.ini",
+      "destination": "connectors/firmware/esp32s3/platformio.ini",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/binary_frame.h",
+      "destination": "connectors/firmware/esp32s3/src/binary_frame.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/discovery_parser.h",
+      "destination": "connectors/firmware/esp32s3/src/discovery_parser.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/discovery_session.h",
+      "destination": "connectors/firmware/esp32s3/src/discovery_session.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/frame_receiver.h",
+      "destination": "connectors/firmware/esp32s3/src/frame_receiver.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/host_interface_policy.h",
+      "destination": "connectors/firmware/esp32s3/src/host_interface_policy.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/host_session_arbiter.h",
+      "destination": "connectors/firmware/esp32s3/src/host_session_arbiter.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/journal_record.h",
+      "destination": "connectors/firmware/esp32s3/src/journal_record.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/journal_storage.cpp",
+      "destination": "connectors/firmware/esp32s3/src/journal_storage.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/journal_storage.h",
+      "destination": "connectors/firmware/esp32s3/src/journal_storage.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/journal_writer_gate.h",
+      "destination": "connectors/firmware/esp32s3/src/journal_writer_gate.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/main.cpp",
+      "destination": "connectors/firmware/esp32s3/src/main.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/esp32s3/src/programming_policy.h",
+      "destination": "connectors/firmware/esp32s3/src/programming_policy.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/shared/interprocessor_link.h",
+      "destination": "connectors/firmware/shared/interprocessor_link.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/shared/isotp_observer.h",
+      "destination": "connectors/firmware/shared/isotp_observer.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/shared/kline_observer.h",
+      "destination": "connectors/firmware/shared/kline_observer.h",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/shared/native-tests/interprocessor_link_test.cpp",
+      "destination": "connectors/firmware/shared/native-tests/interprocessor_link_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/shared/native-tests/isotp_observer_test.cpp",
+      "destination": "connectors/firmware/shared/native-tests/isotp_observer_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/shared/native-tests/kline_observer_test.cpp",
+      "destination": "connectors/firmware/shared/native-tests/kline_observer_test.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/stm32g4/README.md",
+      "destination": "connectors/firmware/stm32g4/README.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/stm32g4/platformio.ini",
+      "destination": "connectors/firmware/stm32g4/platformio.ini",
+      "kind": "source-copy"
+    },
+    {
+      "source": "firmware/stm32g4/src/main.cpp",
+      "destination": "connectors/firmware/stm32g4/src/main.cpp",
+      "kind": "source-copy"
+    },
+    {
+      "source": "hardware/README.md",
+      "destination": "connectors/hardware/README.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "hardware/rev-a-interconnect.md",
+      "destination": "connectors/hardware/rev-a-interconnect.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "hardware/rev-a0-bench.md",
+      "destination": "connectors/hardware/rev-a0-bench.md",
+      "kind": "hardware-reference"
+    },
+    {
+      "source": "host/android/README.md",
+      "destination": "connectors/host/android/README.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java",
+      "destination": "connectors/host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/android/src/main/java/com/camarodiag/connectors/UsbDiscovery.java",
+      "destination": "connectors/host/android/src/main/java/com/camarodiag/connectors/UsbDiscovery.java",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java",
+      "destination": "connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/__init__.py",
+      "destination": "connectors/host/python/camarodiagconnectors/__init__.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/__main__.py",
+      "destination": "connectors/host/python/camarodiagconnectors/__main__.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/backup.py",
+      "destination": "connectors/host/python/camarodiagconnectors/backup.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/binary_discovery.py",
+      "destination": "connectors/host/python/camarodiagconnectors/binary_discovery.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/framing.py",
+      "destination": "connectors/host/python/camarodiagconnectors/framing.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/memory.py",
+      "destination": "connectors/host/python/camarodiagconnectors/memory.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/offline_cli.py",
+      "destination": "connectors/host/python/camarodiagconnectors/offline_cli.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/programming_journal.py",
+      "destination": "connectors/host/python/camarodiagconnectors/programming_journal.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/protocol.py",
+      "destination": "connectors/host/python/camarodiagconnectors/protocol.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/camarodiagconnectors/secure_transport.py",
+      "destination": "connectors/host/python/camarodiagconnectors/secure_transport.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/pyproject.toml",
+      "destination": "connectors/host/python/pyproject.toml",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/tests/test_backup.py",
+      "destination": "connectors/host/python/tests/test_backup.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/tests/test_binary_discovery.py",
+      "destination": "connectors/host/python/tests/test_binary_discovery.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/tests/test_framing.py",
+      "destination": "connectors/host/python/tests/test_framing.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/tests/test_memory.py",
+      "destination": "connectors/host/python/tests/test_memory.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/tests/test_offline_cli.py",
+      "destination": "connectors/host/python/tests/test_offline_cli.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/tests/test_programming_journal.py",
+      "destination": "connectors/host/python/tests/test_programming_journal.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/tests/test_protocol.py",
+      "destination": "connectors/host/python/tests/test_protocol.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/python/tests/test_secure_transport.py",
+      "destination": "connectors/host/python/tests/test_secure_transport.py",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/windows-discovery/BinaryDiscovery.cs",
+      "destination": "connectors/host/windows-discovery/BinaryDiscovery.cs",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/windows-discovery/ConnectorTlsReference.cs",
+      "destination": "connectors/host/windows-discovery/ConnectorTlsReference.cs",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/windows-discovery/ConnectorTlsReferenceSelfTests.cs",
+      "destination": "connectors/host/windows-discovery/ConnectorTlsReferenceSelfTests.cs",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/windows-discovery/Program.cs",
+      "destination": "connectors/host/windows-discovery/Program.cs",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/windows-discovery/README.md",
+      "destination": "connectors/host/windows-discovery/README.md",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/windows-discovery/SelfTests.cs",
+      "destination": "connectors/host/windows-discovery/SelfTests.cs",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/windows-discovery/WindowsDiscovery.csproj",
+      "destination": "connectors/host/windows-discovery/WindowsDiscovery.csproj",
+      "kind": "source-copy"
+    },
+    {
+      "source": "host/windows-j2534/README.md",
+      "destination": "connectors/host/windows-j2534/README.md",
+      "kind": "source-copy"
+    }
+  ]
+}
