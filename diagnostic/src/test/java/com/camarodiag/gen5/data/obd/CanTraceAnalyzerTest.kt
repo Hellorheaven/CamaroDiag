@@ -1055,4 +1055,36 @@ class CanTraceAnalyzerTest {
         val report = CanTraceAnalyzer.analyze("id,data\n7E8,020x4100\n7E9,0x\n7EA,0x02 0X41 00", "capture.csv")
         assertEquals(0x7EA, report.frames.single().canId)
     }
+
+    @Test
+    fun separatesSameNumericCanIdByElevenAndTwentyNineBitFormatDuringIsoTpReassembly() {
+        val log = listOf(
+            "7E8 08 10 0A 62 F1 90 31 32 33",
+            "000007E8 05 21 34 35 36 37", // Must NOT complete the 11-bit message.
+            "7E8 05 21 34 35 36 37",
+            "000007E8 08 10 0A 62 F1 90 41 42 43",
+            "000007E8 05 21 44 45 46 47"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(log, "mixed-can-width.log")
+        assertEquals(listOf(false, true, false, true, true),
+            report.frames.map { it.extendedId })
+        assertEquals(2, report.messages.size)
+        assertEquals(setOf(false, true), report.messages.map { it.extendedId }.toSet())
+        assertTrue(report.messages.any { !it.extendedId!! &&
+            it.payload.takeLast(4) == listOf(0x34, 0x35, 0x36, 0x37) })
+        assertTrue(report.messages.any { it.extendedId!! &&
+            it.payload.takeLast(4) == listOf(0x44, 0x45, 0x46, 0x47) })
+        assertTrue(report.errors.any { it.contains("no matching first frame") })
+    }
+
+    @Test
+    fun recognizesVectorAscExtendedIdentifierMarkerEvenForThreeHexDigits() {
+        val report = CanTraceAnalyzer.analyze(
+            "0.000000 1 7E8x Rx d 4 03 62 F1 90\n" +
+            "0.000001 1 7E8 Rx d 4 03 62 F1 90", "format.asc"
+        )
+        assertEquals(2, report.frames.size)
+        assertEquals(listOf(true, false), report.frames.map { it.extendedId })
+        assertEquals(listOf(true, false), report.messages.map { it.extendedId })
+    }
 }
