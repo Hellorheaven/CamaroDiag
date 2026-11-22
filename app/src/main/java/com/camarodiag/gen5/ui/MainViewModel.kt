@@ -4194,21 +4194,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = b[0] / 200.0
                                     values += LivePidValue("O2_B1S4", "Oxygen Sensor B1S4 Voltage", "Sonde lambda B1S4 - tension", v, "V", v, "V", 0.0, 1.275, push("O2_B1S4", v))
                                 }
-                                read("24")?.takeIf { it.size >= 4 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
-                                    values += LivePidValue("WBO2_B1S1", "Wideband Lambda B1S1", "Sonde large bande B1S1 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B1S1", v))
+                                // Two-bank SAE J1979 wideband voltage family:
+                                // 24/25 = B1S1/B1S2, 28/29 = B2S1/B2S2.
+                                for ((pid, id) in listOf(
+                                    "24" to "WBO2_B1S1", "25" to "WBO2_B1S2",
+                                    "28" to "WBO2_B2S1", "29" to "WBO2_B2S2"
+                                )) {
+                                    CamaroUdsProtocol.decodeWidebandLambda(read(pid))?.let { v ->
+                                        values += LivePidValue(id, id, id, v, "λ", v, "λ",
+                                            0.0, 2.0, push(id, v))
+                                    }
                                 }
-                                read("25")?.takeIf { it.size >= 4 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
-                                    values += LivePidValue("WBO2_B1S2", "Wideband Lambda B1S2", "Sonde large bande B1S2 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B1S2", v))
-                                }
-                                read("34")?.takeIf { it.size >= 4 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
-                                    values += LivePidValue("WBO2_B2S1", "Wideband Lambda B2S1", "Sonde large bande B2S1 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B2S1", v))
-                                }
-                                read("35")?.takeIf { it.size >= 4 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
-                                    values += LivePidValue("WBO2_B2S2", "Wideband Lambda B2S2", "Sonde large bande B2S2 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B2S2", v))
+                                // The current family is distinct: 34/35 = B1, 38/39 = B2.
+                                // Do not pass these amperage readings off as voltage data.
+                                for ((pid, id) in listOf(
+                                    "34" to "WBO2_I_B1S1", "35" to "WBO2_I_B1S2",
+                                    "38" to "WBO2_I_B2S1", "39" to "WBO2_I_B2S2"
+                                )) {
+                                    CamaroUdsProtocol.decodeWidebandCurrent(read(pid))?.let { v ->
+                                        values += LivePidValue(id, id, id, v, "mA", v, "mA",
+                                            -128.0, 128.0, push(id, v))
+                                    }
                                 }
                                 CamaroUdsProtocol.decodeAbsoluteLoadPercent(read("43"))?.let { v ->
                                     // Graph-scale ceiling is not the SAE encoded maximum (25700%). 
