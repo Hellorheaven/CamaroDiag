@@ -689,6 +689,7 @@ fun CamaroDiagApp(
                 DiagTab.CAN_SNIFFER -> CanSnifferScreen(
                     state = liveCanMonitorState,
                     isAvailable = viewModel.canMonitorAvailable(),
+                    canReadObdAvailable = viewModel.canConsoleReadObd(),
                     canTransmitAvailable = adapter.supportsCanTransmit,
                     onStart = { viewModel.startCanMonitor() },
                     onStop = { viewModel.stopCanMonitor() },
@@ -1667,6 +1668,7 @@ fun LiveDataScreen(
 fun CanSnifferScreen(
     state: LiveCanMonitorState,
     isAvailable: Boolean,
+    canReadObdAvailable: Boolean,
     canTransmitAvailable: Boolean,
     onStart: () -> Unit,
     onStop: () -> Unit,
@@ -1825,8 +1827,10 @@ fun CanSnifferScreen(
                                 onSendRequest(requestInput)
                             }
                         },
-                        enabled = isAvailable && !state.isCapturing && !state.isSendingRequest &&
-                            requestInput.isNotBlank() && (!rawCanFrameInput || canTransmitAvailable),
+                        enabled = !state.isCapturing && !state.isSendingRequest &&
+                            requestInput.isNotBlank() &&
+                            (if (rawCanFrameInput) isAvailable && canTransmitAvailable
+                             else canReadObdAvailable),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.can_sniffer_send))
