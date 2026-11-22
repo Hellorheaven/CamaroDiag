@@ -48,6 +48,25 @@ class EcuProgrammingDriverContractTest {
         }
     }
 
+    @Test fun swdQualificationCannotAuthorizeJtagBdmCanOrExternalChipWrites() {
+        val target = EcuProgrammingDriverContract.FirmwareTarget("example-family", "board", "os")
+        val region = EcuBackupCoverage.Region.PROGRAM_FLASH
+        val route = EcuBenchExpertPlan.AccessMethod.SWD
+        val driver = EcuProgrammingDriverContract.Descriptor(
+            id = "model-swd-only", transport = EcuProgrammingDriverContract.Transport.SWD,
+            capabilities = EcuProgrammingDriverContract.Capability.values().toSet(),
+            controllerFamilies = setOf(target.controllerFamily), physicalHardwareValidated = true,
+            writeTargets = setOf(target),
+            writeQualifications = setOf(EcuProgrammingDriverContract.WriteQualification(target, region, route))
+        )
+        assertTrue(driver.supportsWrite(target, driver.transport, region, route))
+        for (other in EcuBenchExpertPlan.AccessMethod.values().filter { it != route }) {
+            assertFalse(driver.supportsWrite(target, driver.transport, region, other))
+        }
+        assertFalse(driver.supportsWrite(target, driver.transport, EcuBackupCoverage.Region.EXTERNAL_EEPROM, route))
+        assertFalse(driver.supportsWrite(target.copy(firmwareId = "other"), driver.transport, region, route))
+    }
+
     @Test fun diagnosticElmTransportIsDistinctFromProgrammingHardware() {
         assertFalse(
             EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS ==

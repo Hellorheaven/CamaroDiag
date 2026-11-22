@@ -128,8 +128,18 @@ class EcuBenchExpertPlanTest {
             EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF.candidateTransports).isEmpty())
     }
 
+    @Test fun swdIsNotInterchangeableWithOtherDebugOrCanRoutes() {
+        val swd = EcuBenchExpertPlan.AccessMethod.SWD
+        assertEquals(setOf(EcuProgrammingDriverContract.Transport.SWD), swd.candidateTransports)
+        for (other in EcuBenchExpertPlan.AccessMethod.values().filter { it != swd }) {
+            assertTrue(swd.candidateTransports.intersect(other.candidateTransports).isEmpty())
+        }
+        assertFalse(swd.permitsRegion(EcuBenchExpertPlan.MemoryRegion.EXTERNAL_EEPROM))
+        assertFalse(EcuBenchExpertPlan.isProgrammingEnabled(target.copy(accessMethod = swd), image))
+    }
+
     @Test fun accessMethodsAndMemoryRegionsAreDistinct() {
-        assertEquals(8, EcuBenchExpertPlan.AccessMethod.values().size)
+        assertEquals(9, EcuBenchExpertPlan.AccessMethod.values().size)
         assertEquals(3, EcuBenchExpertPlan.MemoryRegion.values().size)
     }
 }

@@ -1463,6 +1463,7 @@ fun CalibrationWorkspaceScreen(
                             EcuBenchExpertPlan.AccessMethod.BENCH to stringResource(R.string.cal_expert_access_bench),
                             EcuBenchExpertPlan.AccessMethod.BOOT_BAM to stringResource(R.string.cal_expert_access_boot),
                             EcuBenchExpertPlan.AccessMethod.BDM to "BDM",
+                            EcuBenchExpertPlan.AccessMethod.SWD to "SWD",
                             EcuBenchExpertPlan.AccessMethod.NEXUS_JTAG to stringResource(R.string.cal_expert_access_nexus),
                             EcuBenchExpertPlan.AccessMethod.EXTERNAL_EEPROM_ISP to "EEPROM ISP",
                             EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF to stringResource(R.string.cal_expert_access_chipoff)

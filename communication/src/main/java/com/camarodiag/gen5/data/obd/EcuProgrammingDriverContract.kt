@@ -7,14 +7,14 @@ package com.camarodiag.gen5.data.obd
 interface EcuProgrammingDriverContract {
     enum class Transport {
         ELM_DIAGNOSTICS, J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CHIP_OFF,
-        CAN_DIRECT, BDM, EEPROM_ISP;
+        CAN_DIRECT, BDM, EEPROM_ISP, SWD;
 
         /** Connection type is not evidence of an implemented hardware protocol. */
         fun permitsMemoryProgramming(region: EcuBackupCoverage.Region): Boolean =
             when (this) {
                 ELM_DIAGNOSTICS -> false
                 CHIP_OFF, EEPROM_ISP -> region == EcuBackupCoverage.Region.EXTERNAL_EEPROM
-                J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CAN_DIRECT, BDM ->
+                J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CAN_DIRECT, BDM, SWD ->
                     region in setOf(EcuBackupCoverage.Region.CALIBRATION,
                         EcuBackupCoverage.Region.PROGRAM_FLASH, EcuBackupCoverage.Region.DATA_FLASH)
             }

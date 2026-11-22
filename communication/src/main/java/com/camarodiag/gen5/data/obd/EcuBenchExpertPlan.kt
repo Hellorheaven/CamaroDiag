@@ -12,12 +12,12 @@ import java.security.MessageDigest
 object EcuBenchExpertPlan {
     enum class AccessMethod {
         OBD, BENCH, BOOT_BAM, NEXUS_JTAG, EXTERNAL_CHIP_OFF,
-        CAN_DIRECT, BDM, EXTERNAL_EEPROM_ISP;
+        CAN_DIRECT, BDM, EXTERNAL_EEPROM_ISP, SWD;
 
         fun permitsRegion(region: MemoryRegion): Boolean =
             when (this) {
                 EXTERNAL_CHIP_OFF, EXTERNAL_EEPROM_ISP -> region == MemoryRegion.EXTERNAL_EEPROM
-                OBD, BENCH, BOOT_BAM, NEXUS_JTAG, CAN_DIRECT, BDM ->
+                OBD, BENCH, BOOT_BAM, NEXUS_JTAG, CAN_DIRECT, BDM, SWD ->
                     region != MemoryRegion.EXTERNAL_EEPROM
             }
 
@@ -34,6 +34,7 @@ object EcuBenchExpertPlan {
                 CAN_DIRECT -> setOf(EcuProgrammingDriverContract.Transport.CAN_DIRECT,
                     EcuProgrammingDriverContract.Transport.J2534)
                 BDM -> setOf(EcuProgrammingDriverContract.Transport.BDM)
+                SWD -> setOf(EcuProgrammingDriverContract.Transport.SWD)
                 EXTERNAL_EEPROM_ISP -> setOf(EcuProgrammingDriverContract.Transport.EEPROM_ISP)
             }
     }
