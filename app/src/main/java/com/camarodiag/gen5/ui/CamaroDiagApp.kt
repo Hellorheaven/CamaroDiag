@@ -228,7 +228,7 @@ fun CamaroDiagApp(
     fun withExportFolder(action: () -> Unit) {
         val owner = viewModel.activeAccountUid.value ?: return
         val vin = viewModel.vehicle.value.vin
-        val guardedAction = {
+        val guardedAction: () -> Unit = {
             if (viewModel.activeAccountUid.value == owner && viewModel.vehicle.value.vin == vin) action()
         }
         if (CamaroDiagExportStorage.authorizedTree(permissionContext) != null) {
@@ -236,7 +236,12 @@ fun CamaroDiagApp(
         } else if (pendingExport == null) {
             pendingExport = guardedAction
             Toast.makeText(permissionContext, R.string.export_folder_instruction, Toast.LENGTH_LONG).show()
-            exportFolderPicker.launch(CamaroDiagExportStorage.initialPickerUri())
+            try {
+                exportFolderPicker.launch(CamaroDiagExportStorage.initialPickerUri())
+            } catch (_: Exception) {
+                pendingExport = null
+                Toast.makeText(permissionContext, R.string.export_folder_failed, Toast.LENGTH_LONG).show()
+            }
         }
     }
     var pendingBluetoothMac by remember { mutableStateOf<String?>(null) }
@@ -637,7 +642,7 @@ fun CamaroDiagApp(
                     onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
-                DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { withExportFolder { viewModel.saveCurrentSession() } })
                 DiagTab.ABOUT -> LazyColumn {
                     item { AboutUpdateCard() }
                 }
