@@ -43,6 +43,30 @@ internal static class NativeE39FileWriteJournalSelfTests
                 "Torn JSON entry cannot masquerade as a completed flash");
 
             File.Delete(path);
+            var cancellable = new NativeE39FileWriteJournal(path);
+            using (var cancellation = new CancellationTokenSource())
+            {
+                cancellation.Cancel();
+                AssertThrows<OperationCanceledException>(() =>
+                    cancellable.AppendAsync(new(NativeE39WriteSequence.Phase.Prepared,
+                        0x20000, "cancelled"), cancellation.Token).GetAwaiter().GetResult());
+                tests++;
+            }
+            Assert(new FileInfo(path).Length == 0, "Cancelled request cannot create a journal event");
+            cancellable.AppendAsync(new(NativeE39WriteSequence.Phase.Prepared,
+                0x20000, "valid after cancellation before append"), CancellationToken.None)
+                .GetAwaiter().GetResult();
+            cancellable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            cancellable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            AssertThrows<ObjectDisposedException>(() =>
+                cancellable.AppendAsync(new(NativeE39WriteSequence.Phase.Completed,
+                    0, "closed journal"), CancellationToken.None).GetAwaiter().GetResult());
+            tests++;
+            Assert(File.ReadLines(path).Count() == 1 &&
+                NativeE39FileWriteJournal.Inspect(path) == NativeE39FileWriteJournal.CompletionState.Interrupted,
+                "Only the accepted event is persisted; disposing twice cannot append completion");
+
+            File.Delete(path);
             WriteScenario(path, true, false);
             Assert(NativeE39FileWriteJournal.Inspect(path) ==
                 NativeE39FileWriteJournal.CompletionState.Completed,
