@@ -657,4 +657,7 @@
     <string name="cal_native_catalog_loading">Wczytywanie własnego katalogu…</string>
     <string name="cal_native_catalog_empty">Obecnie żaden własnościowy DID Camaro nie jest zadeklarowany jako użyteczny. Nieznane adresy i skalowania nie są wymyślane.</string>
     <string name="cal_native_catalog_read_disabled">Odczyt pojazdu jest wyłączony do czasu weryfikacji adresowania i dekodowania w identycznej konfiguracji.</string>
+    <string name="export_folder_instruction">Utwórz lub wybierz folder CamaroDiag w pamięci wewnętrznej i zezwól na dostęp. Wyeksportowane pliki są widoczne w pamięci współdzielonej.</string>
+    <string name="export_folder_success">Eksport zapisano w /CamaroDiag/.</string>
+    <string name="export_folder_failed">Nie można zapisać eksportu w /CamaroDiag/.</string>
 </resources>
