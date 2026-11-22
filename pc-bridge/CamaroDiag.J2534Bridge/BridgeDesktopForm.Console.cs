@@ -76,7 +76,7 @@ internal sealed partial class BridgeDesktopForm
         outer.Controls.Add(fields, 0, 0);
         outer.Controls.Add(consoleHistory, 0, 1);
         tab.Controls.Add(outer);
-        ConsoleLine("INFO", "Console prête. Sélectionnez l'interface dans Connexion Android et ouvrez un canal.", Color.DarkSlateGray);
+        ConsoleLine("SYSTEM", "Console prête. Sélectionnez l'interface dans Connexion Android et ouvrez un canal.", Color.DarkSlateGray);
         return tab;
     }
 
@@ -115,7 +115,7 @@ internal sealed partial class BridgeDesktopForm
                 consoleDevice = device;
                 consoleOpen.Enabled = false;
                 consoleClose.Enabled = true;
-                ConsoleLine("INFO", $"Canal ouvert : {selected.Adapter.DisplayName}, " +
+                ConsoleLine("SYSTEM", $"Canal ouvert : {selected.Adapter.DisplayName}, " +
                     $"TX 0x{chosen.RequestCanId:X}, RX 0x{chosen.ResponseCanId:X}, " +
                     $"profil {chosen.ProtocolNumber}.", Color.DarkSlateGray);
             }
@@ -134,7 +134,7 @@ internal sealed partial class BridgeDesktopForm
             consoleDevice = null;
             consoleOpen.Enabled = true;
             consoleClose.Enabled = false;
-            ConsoleLine("INFO", "Canal J2534 fermé.", Color.DarkSlateGray);
+            ConsoleLine("SYSTEM", "Canal J2534 fermé.", Color.DarkSlateGray);
         });
     }
 
@@ -161,7 +161,7 @@ internal sealed partial class BridgeDesktopForm
             if (noResponse)
             {
                 await Task.Run(() => device.SendOnly(payload));
-                ConsoleLine("INFO", "Trame envoyée ; aucune réponse attendue.", Color.DarkSlateGray);
+                ConsoleLine("SYSTEM", "Trame envoyée ; aucune réponse attendue.", Color.DarkSlateGray);
             }
             else
             {
@@ -202,7 +202,7 @@ internal sealed partial class BridgeDesktopForm
         await RunBusyAsync(async () =>
         {
             var mv = await Task.Run(() => device.ReadBatteryMillivolts());
-            ConsoleLine("INFO", mv.HasValue
+            ConsoleLine("SYSTEM", mv.HasValue
                 ? $"Tension rapportée par le pilote J2534 : {mv.Value / 1000.0:F2} V."
                 : "Le pilote J2534 ne fournit pas la tension.", Color.DarkSlateGray);
         });
@@ -225,7 +225,7 @@ internal sealed partial class BridgeDesktopForm
             var bytes = Encoding.UTF8.GetBytes(consoleHistory.Text);
             stream.Write(bytes);
             stream.Flush(flushToDisk: true);
-            ConsoleLine("INFO", "Historique enregistré : " + picker.FileName, Color.DarkSlateGray);
+            ConsoleLine("SYSTEM", "Historique enregistré : " + picker.FileName, Color.DarkSlateGray);
         }
         catch (IOException ex)
         {
