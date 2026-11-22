@@ -41,6 +41,9 @@ import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
+import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
+import com.camarodiag.gen5.data.obd.ObservedCanId
+import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
 import kotlinx.coroutines.delay
@@ -90,6 +93,7 @@ data class LiveCanMonitorState(
     val report: CanTraceAnalysisReport? = null,
     val isSendingRequest: Boolean = false,
     val consoleHistory: List<CanConsoleHistoryEntry> = emptyList(),
+    val observedCanIds: Set<ObservedCanId> = emptySet(),
     val message: String? = null
 )
 
@@ -1717,6 +1721,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
+    private fun retainObservedCanIds(
+        known: Set<ObservedCanId>,
+        events: List<CanConsoleHistoryEntry>
+    ): Set<ObservedCanId> = CanConsoleDisplayFilter.accumulateObserved(
+        known,
+        events.map { ParsedCanConsoleRecord(it.direction, it.content, it.succeeded) }
+    )
+
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
     fun startCanMonitor(durationMs: Long = Long.MAX_VALUE) {
         if (!requirePremiumLicense()) return
@@ -1781,7 +1793,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         } else ""
                         val receiveEvents = parseCanConsoleReceiveEvents(completeBatch)
                         val history = (current.consoleHistory + receiveEvents).takeLast(300)
-                        _liveCanMonitorState.value = current.copy(rawText = raw, consoleHistory = history)
+                        _liveCanMonitorState.value = current.copy(
+                            rawText = raw, consoleHistory = history,
+                            observedCanIds = retainObservedCanIds(current.observedCanIds, receiveEvents)
+                        )
                     }
                     }
                 }
@@ -1798,7 +1813,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "live-can-monitor.txt"
                     )
                     val current = _liveCanMonitorState.value.copy(
-                        consoleHistory = historyWithTrailing.takeLast(300)
+                        consoleHistory = historyWithTrailing.takeLast(300),
+                        observedCanIds = retainObservedCanIds(
+                            currentBeforeReport.observedCanIds, trailingEvents
+                        )
                     )
                     val completeEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
@@ -1913,7 +1931,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveCanMonitorState.value = current.copy(
             rawText = "",
             report = null,
-            consoleHistory = emptyList()
+            consoleHistory = emptyList(),
+            observedCanIds = emptySet()
         )
     }
 
@@ -2015,6 +2034,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
                                 receivedEvents
                         ).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents),
                         message = localizedContext.getString(R.string.can_sniffer_request_complete)
                     )
                 }
