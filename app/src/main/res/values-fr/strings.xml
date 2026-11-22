@@ -660,7 +660,7 @@
     <string name="can_sniffer_raw_heading">Flux brut reçu de l’interface CAN</string>
     <string name="can_sniffer_export_raw">Exporter le journal brut</string>
     <string name="can_sniffer_title">Moniteur CAN en direct</string>
-    <string name="can_sniffer_description">Capture des trames CAN avec un adaptateur ELM ou STN réel et compatible. Chaque capture s’arrête automatiquement après une courte session.</string>
+    <string name="can_sniffer_description">Lecture des données OBD standard avec une interface ELM ou J2534 connectée, ou capture CAN avec un adaptateur ELM/STN compatible. Les captures CAN s’arrêtent automatiquement.</string>
     <string name="can_sniffer_safety">Seules les requêtes OBD-II en lecture seule sont acceptées. Les trames CAN arbitraires et les écritures UDS sont bloquées.</string>
     <string name="can_sniffer_start">Démarrer la capture</string>
     <string name="can_sniffer_stop">Arrêter la capture</string>
