@@ -2054,7 +2054,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
                     val diagnosticStatus = transmission.diagnosticStatus
-                    val receivedEvents = transmission.receivedRecords.map { record ->
+                    val streamedRecords = transmission.receivedRecords.ifEmpty {
+                        CanConsoleRecordParser.parse(response)
+                    }
+                    val receivedEvents = streamedRecords.map { record ->
                         CanConsoleHistoryEntry(
                             id = System.nanoTime(),
                             direction = record.direction,
@@ -2063,26 +2066,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             succeeded = record.succeeded
                         )
                     }.ifEmpty {
-                        CanConsoleRecordParser.parse(response).map { record ->
-                            CanConsoleHistoryEntry(
-                                id = System.nanoTime(),
-                                direction = record.direction,
-                                timestampMillis = System.currentTimeMillis(),
-                                content = record.content,
-                                succeeded = record.succeeded
+                        listOf(CanConsoleHistoryEntry(
+                            id = System.nanoTime(),
+                            direction = "SYSTEM",
+                            timestampMillis = System.currentTimeMillis(),
+                            content = localizedContext.getString(
+                                R.string.can_console_adapter_ack,
+                                response.ifBlank {
+                                    localizedContext.getString(R.string.can_console_no_adapter_text)
+                                }
                             )
-                        }.ifEmpty { listOf(
-                            CanConsoleHistoryEntry(
-                                id = System.nanoTime(),
-                                direction = "SYSTEM",
-                                timestampMillis = System.currentTimeMillis(),
-                                content = localizedContext.getString(
-                                    R.string.can_console_adapter_ack,
-                                    response.ifBlank { localizedContext.getString(R.string.can_console_no_adapter_text) }
-                                )
-                            )
-                        )
-                        ) }
+                        ))
                     }
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
