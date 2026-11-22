@@ -72,6 +72,20 @@ object SafeObdRequestPolicy {
     }
 
     /**
+     * Exact SAE J1979 Mode 01 lengths for the currently whitelisted commands.
+     * A short RPM/MAF reading is no more reliable than a malformed ethanol value.
+     * This is a check on the returned bytes, not a claim that the ECU supports the PID.
+     */
+    internal fun expectedMode01DataBytes(pid: Int): Int? = when (pid) {
+        0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0x01 -> 4
+        0x0C, 0x10, 0x14, 0x15, 0x16, 0x17, 0x1F, 0x42, 0x43, 0x44 -> 2
+        0x24, 0x25, 0x34, 0x35 -> 4
+        0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0D, 0x0E, 0x0F,
+        0x11, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x52 -> 1
+        else -> null
+    }
+
+    /**
      * A command echo, adapter banner, or UDS negative response is never proof
      * of a successful physical read. Works with spaced and compact ELM/J2534
      * payloads, optionally prefixed by a supported CAN responder header.
@@ -112,10 +126,13 @@ object SafeObdRequestPolicy {
             }
             if (bytes.startsWith(expected) && bytes.length > expected.length &&
                 bytes.length % 2 == 0) {
-                // PID 52 is precisely one measurement byte. A padded or
-                // malformed response cannot claim a valid ethanol reading.
-                if (request.service == 0x01 && request.parameter == 0x52 &&
-                    bytes.length != expected.length + 2) continue
+                // Do not accept plausible prefixes with truncated or padded
+                // payloads, particularly for engine RPM and ethanol PID 0x52.
+                if (request.service == 0x01) {
+                    val expectedBytes = expectedMode01DataBytes(requireNotNull(request.parameter))
+                        ?: continue
+                    if (bytes.length != expected.length + 2 * expectedBytes) continue
+                }
                 if (request.service == 0x09 && request.parameter == 0x02) {
                     if (bytes.length != 40 || bytes.substring(4, 6) != "01") continue
                     val vin = bytes.substring(6).chunked(2)
