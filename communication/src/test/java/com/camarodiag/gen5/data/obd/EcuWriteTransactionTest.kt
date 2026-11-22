@@ -56,6 +56,7 @@ class EcuWriteTransactionTest {
             capabilities = EcuProgrammingDriverContract.Capability.values().toSet(),
             controllerFamilies = setOf("E39"),
             physicalHardwareValidated = validated,
+            qualifiedWriteRegions = setOf(EcuBackupCoverage.Region.CALIBRATION),
             writeTargets = setOf(
                 EcuProgrammingDriverContract.FirmwareTarget("E39", "E39-test", "firmware-test"),
                 EcuProgrammingDriverContract.FirmwareTarget("E39", "E39-test", "firmware-update")
