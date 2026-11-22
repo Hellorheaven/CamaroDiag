@@ -238,6 +238,9 @@ internal sealed partial class BridgeDesktopForm
                     : "Ancien format sans preuve de canal CAN/session.") +
                 " Région déclarée : " +
                 result.DeclaredRegion + ", origine déclarée : " + result.DeclaredOrigin + ". " +
+                (result.Firmware is { } firmware
+                    ? $"OSID GM observé : {firmware.OperatingSystemId} (DID 0x{firmware.OsDid:X2}). "
+                    : "OSID GM non enregistré. ") +
                 (missing.Length == 0 ? "" :
                     "Régions requises absentes de ce ZIP : " + string.Join(", ", missing) + ". ") +
                 "Cette vérification ne prouve ni la couverture ECU complète ni la restaurabilité.";
@@ -334,16 +337,46 @@ internal sealed partial class BridgeDesktopForm
                     var can29 = scope.ProtocolNumber is 34 or 36 or 64;
                     device.Open(scope.RequestCanId, scope.ResponseCanId, can29,
                         scope.ProtocolNumber); // VIN F190 physically checked inside Open()
+                    // OSID is optional: some readable ECUs do not implement
+                    // legacy GM 0x1A. Never invent a firmware version from VIN.
+                    NativeGmlanIdentification.Identity? before = null;
+                    try { before = device.ReadGmlanIdentification(); }
+                    catch (Exception error) when (error is IOException or
+                        InvalidDataException or TimeoutException)
+                    {
+                        cancellation.Token.ThrowIfCancellationRequested();
+                        if (!device.IsOpen) throw;
+                    }
+                    if (before is not null && before.Vin != scope.ExpectedVin)
+                        throw new UnauthorizedAccessException(
+                            "GM OSID identity disagrees with the memory profile VIN.");
                     var link = new ScopedTransport(device);
-                    return await NativeScopedMemoryReader.ReadWithSessionAsync(
+                    var capture = await NativeScopedMemoryReader.ReadWithSessionAsync(
                         link, scope, progress, cancellation.Token);
+                    NativeScopedBackupArchive.FirmwareIdentity? firmware = null;
+                    if (before is not null)
+                    {
+                        cancellation.Token.ThrowIfCancellationRequested();
+                        // The second identity read must agree exactly with the
+                        // first before any OSID is written to the archive.
+                        var after = device.ReadGmlanIdentification();
+                        var stable = NativeGmlanBenchProbe.RequireStableIdentity(before, after);
+                        if (stable.Vin != scope.ExpectedVin)
+                            throw new UnauthorizedAccessException(
+                                "GM identity changed after both ECU memory acquisitions.");
+                        firmware = new NativeScopedBackupArchive.FirmwareIdentity(
+                            stable.OperatingSystemId, stable.OsDid);
+                    }
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    return (Capture: capture, Firmware: firmware);
                 }, cancellation.Token);
                 // Cancellation after the final read must not create a file.
                 cancellation.Token.ThrowIfCancellationRequested();
                 await Task.Run(() =>
                 {
                     NativeScopedBackupArchive.SaveNew(
-                        destination.FileName, scope, result, cancellation.Token);
+                        destination.FileName, scope, result.Capture, cancellation.Token,
+                        result.Firmware);
                     // Import the published ZIP once more through the same
                     // user-facing offline verifier, without any ECU I/O.
                     if (Path.GetExtension(destination.FileName).Equals(".zip",
@@ -351,8 +384,11 @@ internal sealed partial class BridgeDesktopForm
                         NativeScopedBackupImport.VerifyZip(destination.FileName, scope);
                 }, cancellation.Token);
                 memoryStatus.Text = "Sauvegarde physique vérifiée : " +
-                    result.Bytes.Length + " octets, SHA-256 " + result.Sha256 +
+                    result.Capture.Bytes.Length + " octets, SHA-256 " + result.Capture.Sha256 +
                     ". Couverture limitée à la zone demandée, pas à tout le calculateur. " +
+                    (result.Firmware is { } firmware
+                        ? $"OSID GM lu deux fois : {firmware.OperatingSystemId} (DID 0x{firmware.OsDid:X2}). "
+                        : "OSID GM non disponible sur ce chemin de lecture. ") +
                     (Path.GetExtension(destination.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase)
                         ? "Les deux lectures sont conservées dans le ZIP."
                         : "Le BIN brut ne conserve pas la seconde acquisition ni son manifeste.");
