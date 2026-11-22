@@ -184,12 +184,16 @@ jobs:
                 'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagExportStorage.kt' \
                 'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagApp.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuWriteTransaction.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuProgrammingDriverContract.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuBenchExpertPlan.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuExternalDumpPair.kt' \
+                'app/src/main/java/com/camarodiag/gen5/ui/CalibrationWorkspaceScreen.kt' \
                 'communication/src/test/java/com/camarodiag/gen5/data/obd/J2534BridgeTlsTest.kt' \
                 'app/src/main/AndroidManifest.xml' \
                 'app/src/main/res/xml/network_security_config.xml'; then
               echo "validation_applies=true" >> "$GITHUB_OUTPUT"
               echo "build_required=true" >> "$GITHUB_OUTPUT"
-              echo "TLS/security Android changes require a complete build and lint."
+              echo "Security, ECU access or export changes require a complete build and lint."
             elif [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
               echo "validation_applies=false" >> "$GITHUB_OUTPUT"
               echo "build_required=false" >> "$GITHUB_OUTPUT"
