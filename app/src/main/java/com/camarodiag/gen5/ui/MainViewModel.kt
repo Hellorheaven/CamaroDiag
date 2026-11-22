@@ -47,6 +47,7 @@ import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
 import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
+import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
@@ -1797,14 +1798,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val previousArchive = activeCanCaptureFile
                 activeCanCaptureFile = archive
                 previousArchive?.delete()
-                val captured = archive.bufferedWriter(Charsets.US_ASCII).use { writer ->
+                val archiveStream = try {
+                    CanConsoleRawArchiveWriter(archive.bufferedWriter(Charsets.US_ASCII))
+                } catch (error: java.io.IOException) {
+                    throw CanCaptureArchiveWriteException(error)
+                }
+                val captured = archiveStream.use { writer ->
                     obdManager.captureCanMonitor(durationMs, can29Bit) { chunk ->
                     if (canMonitorJob === monitorJob) {
-                        try {
-                            writer.write(chunk)
-                        } catch (error: java.io.IOException) {
-                            throw CanCaptureArchiveWriteException(error)
-                        }
+                        writer.append(chunk)
                         // Keep the raw stream unchanged, but decode only complete lines:
                         // Bluetooth/USB reads may split a CAN record at any character.
                         val current = _liveCanMonitorState.value
