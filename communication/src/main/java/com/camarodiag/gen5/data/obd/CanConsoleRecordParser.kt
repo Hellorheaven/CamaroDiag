@@ -21,12 +21,19 @@ object CanConsoleAdapterReplyPolicy {
      * SEARCHING, command echo and malformed CAN records are not acknowledgements. */
     fun hasConfirmedTransmission(text: String, request: RawCanFrame? = null): Boolean {
         if (isFailure(text)) return false
-        return text.lineSequence().map { it.trim().removeSuffix(">").trim() }
-            .any { line -> line.equals("OK", ignoreCase = true) ||
-                RawCanFrameParser.parseReceivedFrames(line).any { response ->
-                    request == null || CanConsoleEcuRouting.expectedResponder(request) == null ||
-                        CanConsoleEcuRouting.isExpectedResponse(request, response)
-                } }
+        val lines = text.lineSequence().map { it.trim().removeSuffix(">").trim() }.toList()
+        // Explicit adapter ACK proves transmission only; never label it an ECU reply.
+        if (lines.any { it.equals("OK", ignoreCase = true) }) return true
+        val frames = lines.flatMap { RawCanFrameParser.parseReceivedFrames(it) }
+        if (request == null) return frames.isNotEmpty()
+        if (CanConsoleEcuRouting.expectedResponder(request) == null) {
+            // Unknown raw CAN ID has no trusted diagnostic correlation. It needs
+            // an explicit adapter ACK, not a coincidental bus frame.
+            return false
+        }
+        val matcher = runCatching { CanConsoleDiagnosticCorrelation(request) }.getOrNull()
+            ?: return false
+        return frames.any { matcher.accept(it, 0L) != null }
     }
 }
 
