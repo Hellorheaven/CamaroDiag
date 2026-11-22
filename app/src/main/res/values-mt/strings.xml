@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Lingwa tal-app</string>
     <string name="system_language_hint">Agħżel il-lingwa ta’ CamaroDiag.</string>
     <string name="about_title">Dwar CamaroDiag</string>
@@ -651,7 +651,7 @@
     <string name="cal_pc_ip_address">Indirizz IP tal-PC</string>
     <string name="cal_connect_j2534">Qabbad il-pont J2534</string>
     <string name="cal_disconnect_pc_bridge">Skonnettja l-pont PC</string>
-    <string name="cal_bridge_capabilities">Pont: HS-CAN ISO15765 250/500 kbit/s u J2534-2 SW-ISO15765 meta d-driver jappoġġahom. CAN FD jibqa’ diżattivat.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Pont: HS-CAN ISO15765 250/500 kbit/s u J2534-2 SW-ISO15765 meta d-driver jappoġġahom. CAN FD jibqa’ diżattivat.</string>
     <string name="cal_read_uds_did">Aqra UDS DID</string>
     <string name="cal_read_uds_dtcs">Aqra DTCs UDS</string>
     <string name="cal_uds_trouble_codes">Kodiċijiet tal-ħsara UDS (0x19)</string>
