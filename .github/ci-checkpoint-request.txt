@@ -1,0 +1,5 @@
+CamaroDiag PR #95 - explicit full Debug CI checkpoint
+Branch: chore/unified-ci
+Requested after workflow trigger commit: 81197b266a1982279b0bf344fc2797dbcc8217a3
+Scope: C1 CAN/OBD unit tests; Android Debug; Windows J2534 Debug; native ECU; connectors
+Safety: no Release build, no ECU write, no merge.
