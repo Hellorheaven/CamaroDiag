@@ -4,7 +4,9 @@ bool cd_kernel_runtime_init(cd_kernel_runtime *r,
     cd_flash_controller *flash, const cd_isotp_channel *channel,
     uint8_t receive_block_size, uint8_t receive_st_min)
 {
-    if (r == NULL || !cd_kernel_init(&r->kernel, flash) ||
+    if (r == NULL) return false;
+    r->initialized = false;
+    if (!cd_kernel_init(&r->kernel, flash) ||
         !cd_isotp_rx_init(&r->rx, channel, r->request, sizeof(r->request),
             receive_block_size, receive_st_min) ||
         !cd_isotp_tx_init(&r->tx, channel)) return false;
@@ -12,12 +14,13 @@ bool cd_kernel_runtime_init(cd_kernel_runtime *r,
     r->link_failed = false;
     r->write_idle_armed = false;
     r->write_idle_since = 0;
+    r->initialized = true;
     return true;
 }
 
 void cd_kernel_runtime_link_failure(cd_kernel_runtime *r)
 {
-    if (r == NULL) return;
+    if (r == NULL || !r->initialized) return;
     if (r->destructive_response || r->kernel.remaining != 0)
         r->kernel.flash->recovery_required = true;
     r->link_failed = true;
@@ -35,7 +38,7 @@ static bool potential_write(const uint8_t *req, size_t length)
 bool cd_kernel_runtime_step(cd_kernel_runtime *r,
     const cd_can_frame *incoming, uint32_t now_us)
 {
-    if (r == NULL || r->link_failed) return false;
+    if (r == NULL || !r->initialized || r->link_failed) return false;
     if (!r->kernel.flash->bus.service(r->kernel.flash->bus.context)) {
         cd_kernel_runtime_link_failure(r);
         return false;
