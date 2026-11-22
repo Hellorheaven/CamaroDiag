@@ -127,7 +127,7 @@ class SafeObdRequestPolicyTest {
     fun commandEchoAdapterAcknowledgementAndNegativeReplyNeverCountAsSuccess() {
         val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
         for (response in listOf("0152", "OK", "NO DATA", "7F 01 11",
-            "41 53 80", "41 52", "SEARCHING...", "7E0 41 52 80",
+            "41 53 80", "41 52", "41 52 80 00", "SEARCHING...", "7E0 41 52 80",
             "41 52 80 0", "")) {
             assertEquals(response, false, SafeObdRequestPolicy.hasPositiveResponse(request, response))
         }
