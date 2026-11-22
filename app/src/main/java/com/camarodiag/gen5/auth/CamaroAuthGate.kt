@@ -31,7 +31,6 @@ import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalConfiguration
 
 /**
@@ -63,34 +62,21 @@ fun CamaroAuthGate(
     var validationError by remember { mutableStateOf<String?>(null) }
     var verificationRequired by remember { mutableStateOf(false) }
     var accessLevel by remember { mutableStateOf(LicenseLevel.FREE) }
+    var licenseChecked by remember { mutableStateOf<Boolean?>(null) }
+    var licenseSource by remember { mutableStateOf<String?>(null) }
     var retryValidation by remember { mutableIntStateOf(0) }
     var validationGeneration by remember { mutableIntStateOf(0) }
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
-    // Delay diagnostic UI until the old user's active connection and transient
-    // diagnostic results have been cleared by the ViewModel.
-    // Reconfirm authorization periodically, even when the app remains open.
-    // This also enforces the bounded offline grace without needing a restart.
-    LaunchedEffect(user?.uid) {
-        if (user == null) return@LaunchedEffect
-        while (true) {
-            delay(5L * 60L * 1000L)
-            retryValidation++
-        }
-    }
+    // Check Firebase only on app startup, account changes or manual retry.
     LaunchedEffect(user, retryValidation) {
         // A late callback from the previous FirebaseUser instance or retry may
         // never authenticate a different validation attempt with the same UID.
         val attempt = ++validationGeneration
-        // Refreshing the current user's token must not unmount the diagnostic
-        // screen every five minutes. Only an identity change hides old data.
         val identityChanged = readyAccountUid != user?.uid ||
             (validatedUser != null && validatedUser !== user)
-        // Preserve the current account's verified tier during a periodic token
-        // refresh: otherwise owner-only Debug tabs disappear every five minutes
-        // and ongoing diagnostic navigation is interrupted. Account changes
-        // still revoke all privileges immediately. A failed refresh below
-        // separately revokes owner privileges and applies offline-grace rules.
         if (identityChanged) {
+            licenseChecked = null
+            licenseSource = null
             accessLevel = LicenseLevel.FREE
             readyAccountUid = null
             validatedAccountUid = null
@@ -272,7 +258,7 @@ fun CamaroAuthGate(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
-                        AccountLicenseStatus(french)
+                        AccountLicenseStatus(french, accessLevel, licenseChecked, licenseSource)
                         if (accessLevel == LicenseLevel.OWNER) {
                             Spacer(Modifier.height(8.dp))
                             TextButton(onClick = {
