@@ -108,7 +108,20 @@ class CanConsoleDisplayFilterTest {
         )
         // Display filtering never mutates or drops the underlying transmitted frame.
         assertTrue(CanConsoleDisplayFilter.visibleTrace(sent, null))
-        assertFalse(CanConsoleDisplayFilter.visibleTrace(sent, standard))
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(sent, standard))
+    }
+
+    @Test fun filteredTraceKeepsPhysicalTransmitButNeverBroadcastOrAnotherEcu() {
+        val request11 = CanTraceFrame(1, null, 0x7E0, CanTraceDirection.TX, listOf(2, 1, 12), false)
+        val request29 = CanTraceFrame(2, null, 0x18DA10F1, CanTraceDirection.TX, listOf(3, 34, 241, 144), true)
+        val broadcast = CanTraceFrame(3, null, 0x7DF, CanTraceDirection.TX, listOf(2, 1, 12), false)
+        val other = CanTraceFrame(4, null, 0x7E9, CanTraceDirection.RX, listOf(3, 65, 12, 26), false)
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(request11, standard))
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(request29, extended))
+        assertFalse(CanConsoleDisplayFilter.visibleTrace(request29, standard))
+        assertFalse(CanConsoleDisplayFilter.visibleTrace(broadcast, standard))
+        assertFalse(CanConsoleDisplayFilter.visibleTrace(other, standard))
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(broadcast, null))
     }
 
     @Test fun observedEcusRemainSelectableAfterRecentHistoryRollsOver() {
