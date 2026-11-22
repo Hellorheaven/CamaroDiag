@@ -63,8 +63,9 @@ class CamaroUdsProtocolTest {
             "41 D3 00 12 D6 87"
         )) assertNull("Never infer odometer from: $invalid",
             CamaroUdsProtocol.parseOdometerPidA6(invalid))
-        assertEquals(123456.7, CamaroUdsProtocol.parseOdometerPidA6(
-            "SEARCHING...\r\n7E8 06 41 A6 00 12 D6 87"), 0.01)
+        val confirmed = requireNotNull(CamaroUdsProtocol.parseOdometerPidA6(
+            "SEARCHING...\r\n7E8 06 41 A6 00 12 D6 87"))
+        assertEquals(123456.7, confirmed, 0.01)
     }
 
     @Test
