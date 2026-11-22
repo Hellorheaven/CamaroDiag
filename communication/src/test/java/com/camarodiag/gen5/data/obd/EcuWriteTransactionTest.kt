@@ -270,6 +270,43 @@ class EcuWriteTransactionTest {
         assertEquals(0, device.writeCalls)
     }
 
+    @Test fun baselineMismatchInUntouchedSectorPreventsAnyErase() = runBlocking {
+        val device = FakeDriver(original.copyOf().also { it[12] = 99 }, expectedIdentity)
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(0x1008L, outcome.failedAddress)
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
+    }
+
+    @Test fun collateralDamageToUnchangedSectorPreventsCompletion() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity).also { it.disturbNextSector = true }
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(0x1008L, outcome.failedAddress)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(4, device.writeCalls)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.TRANSACTION_COMPLETED })
+        assertEquals(0, device.resetCalls)
+    }
+
+    @Test fun unchangedSectorIsPreservedWithoutBeingErased() = runBlocking {
+        val req = request()
+        val device = FakeDriver(original, expectedIdentity)
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true }
+        ).run(req)
+        assertEquals(EcuWriteTransaction.Status.COMPLETED, outcome.status)
+        assertArrayEquals(req.updatedImage, device.memory)
+        assertEquals(1, device.eraseCalls)
+        assertTrue(device.writes.all { it.address < 0x1008L })
+    }
+
     @Test fun mismatchedVinOrFirmwareStopsBeforeAnyErase() = runBlocking {
         val device = FakeDriver(
             original, expectedIdentity.copy(firmwareId = "different-firmware")
