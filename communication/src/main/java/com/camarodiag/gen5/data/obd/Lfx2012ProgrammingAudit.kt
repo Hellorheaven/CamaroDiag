@@ -72,8 +72,14 @@ object Lfx2012ProgrammingAudit {
     private fun checks(snapshot: Snapshot): List<Check> {
         fun reported(text: String?): CheckStatus =
             if (text.isNullOrBlank()) CheckStatus.UNAVAILABLE else CheckStatus.OBSERVED
+        val normalizedVin = snapshot.vin?.trim()?.uppercase()
+        val vinStatus = when {
+            normalizedVin.isNullOrBlank() -> CheckStatus.UNAVAILABLE
+            !Regex("[A-HJ-NPR-Z0-9]{17}").matches(normalizedVin) -> CheckStatus.REQUIRES_REVIEW
+            else -> CheckStatus.OBSERVED
+        }
         return listOf(
-            Check(Item.VEHICLE_VIN, reported(snapshot.vin)),
+            Check(Item.VEHICLE_VIN, vinStatus),
             Check(Item.ECU_NAME, reported(snapshot.ecuName)),
             Check(Item.CALIBRATION_ID, if (snapshot.calibrationIds.any(String::isNotBlank))
                 CheckStatus.OBSERVED else CheckStatus.UNAVAILABLE),
@@ -83,8 +89,11 @@ object Lfx2012ProgrammingAudit {
             Check(Item.DIAGNOSTIC_TROUBLE_CODES,
                 if (snapshot.dtcs == null) CheckStatus.UNAVAILABLE else CheckStatus.OBSERVED),
             Check(Item.VOLTAGE,
-                if (snapshot.voltage == null || !snapshot.voltage.isFinite())
-                    CheckStatus.UNAVAILABLE else CheckStatus.OBSERVED),
+                when {
+                    snapshot.voltage == null || !snapshot.voltage.isFinite() -> CheckStatus.UNAVAILABLE
+                    snapshot.voltage <= 0.0 -> CheckStatus.REQUIRES_REVIEW
+                    else -> CheckStatus.OBSERVED
+                }),
             Check(Item.COMMUNICATION,
                 if (snapshot.communicationConfirmed) CheckStatus.OBSERVED
                     else CheckStatus.REQUIRES_REVIEW),
