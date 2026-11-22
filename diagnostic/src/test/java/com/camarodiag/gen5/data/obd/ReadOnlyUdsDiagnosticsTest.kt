@@ -163,7 +163,7 @@ class ReadOnlyUdsDiagnosticsTest {
     fun opensProfiledSessionOnlyAfterReadingAndMatchingEveryIdentityDid() = runBlocking {
         val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
         val responses = listOf(
-            singleFrameResponse(0x0101, "BCM".toByteArray(Charsets.US_ASCII)),
+            singleFrameResponse(0x0101, byteArrayOf(0x42, 0x43, 0x4D, 0x00)),
             singleFrameResponse(0x0102, "HW1".toByteArray(Charsets.US_ASCII)),
             singleFrameResponse(0x0103, "OS1".toByteArray(Charsets.US_ASCII)),
             singleFrameResponse(0x0104, "CAL1".toByteArray(Charsets.US_ASCII)),
