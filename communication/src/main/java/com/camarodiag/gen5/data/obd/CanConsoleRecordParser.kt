@@ -11,6 +11,8 @@ data class ParsedCanConsoleRecord(
 )
 
 /** Terminal errors and silent replies never establish successful adapter transmission. */
+enum class CanConsoleDiagnosticStatus { NONE, POSITIVE, NEGATIVE }
+
 object CanConsoleAdapterReplyPolicy {
     private val failures = Regex(
         "(?i)\\b(CAN ERROR|BUS ERROR|BUFFER FULL|NO DATA|UNABLE TO CONNECT|STOPPED|ERROR)\\b"
@@ -29,27 +31,45 @@ object CanConsoleAdapterReplyPolicy {
         return hasMatchedDiagnosticResponse(text, request)
     }
 
-    /** Diagnostic completion is independent of an adapter OK and CAN monitor display. */
-    fun hasMatchedDiagnosticResponse(text: String, request: RawCanFrame): Boolean {
-        if (isFailure(text)) return false
+    /** An ECU refusal is a real diagnostic reply, but never a positive result. */
+    fun diagnosticStatus(text: String, request: RawCanFrame): CanConsoleDiagnosticStatus {
+        if (isFailure(text)) return CanConsoleDiagnosticStatus.NONE
         val frames = RawCanFrameParser.parseReceivedFrames(text)
+        var negativeSeen = false
+        fun record(payload: ByteArray?) {
+            if (payload == null) return
+            if ((payload[0].toInt() and 0xFF) == 0x7F)
+                negativeSeen = true
+        }
         if (!request.isExtended && request.canId == 0x7DFL) {
             val responders = mutableMapOf<Long, CanConsoleDiagnosticCorrelation>()
-            return frames.any { frame ->
-                if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) false
-                else {
-                    val matcher = responders.getOrPut(frame.canId) {
-                        CanConsoleDiagnosticCorrelation(request.copy(canId = frame.canId - 8L))
-                    }
-                    matcher.accept(frame, 0L) != null
+            for (frame in frames) {
+                if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) continue
+                val matcher = responders.getOrPut(frame.canId) {
+                    CanConsoleDiagnosticCorrelation(request.copy(canId = frame.canId - 8L))
                 }
+                val payload = matcher.accept(frame, 0L) ?: continue
+                if ((payload[0].toInt() and 0xFF) != 0x7F)
+                    return CanConsoleDiagnosticStatus.POSITIVE
+                record(payload)
+            }
+        } else {
+            val matcher = runCatching { CanConsoleDiagnosticCorrelation(request) }.getOrNull()
+                ?: return CanConsoleDiagnosticStatus.NONE
+            for (frame in frames) {
+                val payload = matcher.accept(frame, 0L) ?: continue
+                if ((payload[0].toInt() and 0xFF) != 0x7F)
+                    return CanConsoleDiagnosticStatus.POSITIVE
+                record(payload)
             }
         }
-        if (CanConsoleEcuRouting.expectedResponder(request) == null) return false
-        val matcher = runCatching { CanConsoleDiagnosticCorrelation(request) }.getOrNull()
-            ?: return false
-        return frames.any { matcher.accept(it, 0L) != null }
+        return if (negativeSeen) CanConsoleDiagnosticStatus.NEGATIVE
+            else CanConsoleDiagnosticStatus.NONE
     }
+
+    fun hasMatchedDiagnosticResponse(text: String, request: RawCanFrame): Boolean =
+        diagnosticStatus(text, request) != CanConsoleDiagnosticStatus.NONE
+
 }
 
 /** Physical OBD CAN requests have one responder. Never attribute another ECU's
