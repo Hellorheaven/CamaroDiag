@@ -678,6 +678,7 @@ class BluetoothObdManager(context: Context) {
             } else {
                 frame.canId.toString(16).uppercase().padStart(3, '0')
             }
+            val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(frame)
             try {
                 val protocolResponse = boundCommand("ATSP$protocol", 1_500L)
                 check(CanConsoleAdapterRestorationPolicy.accepted(protocolResponse)) {
@@ -700,7 +701,6 @@ class BluetoothObdManager(context: Context) {
                 val payload = frame.data.joinToString(" ") {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
-                val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(frame)
                 val frameResponse = boundCommand(payload, 4_000L) { chunk ->
                     timedCorrelation.append(
                         chunk, System.nanoTime() / 1_000_000L, System.currentTimeMillis()
@@ -721,6 +721,15 @@ class BluetoothObdManager(context: Context) {
                 }
                 CanConsoleRawTransmissionResult(
                     frameResponse, diagnosticStatus, timedCorrelation.recentReceivedRecords()
+                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (superseded: ObdSupersededSessionException) {
+                throw superseded
+            } catch (error: Exception) {
+                // An adapter error/timeout does not erase already observed RX.
+                throw CanConsolePhysicalExchangeException(
+                    timedCorrelation.recentReceivedRecords(), error
                 )
             } finally {
                 // Return to the app's configured 11-bit HS-CAN / automatic-format state.
@@ -746,7 +755,10 @@ class BluetoothObdManager(context: Context) {
                             throw ObdSupersededSessionException(CanAdapterRestorationException())
                         val transportKind = activeTransport
                         disconnect()
-                        throw CanAdapterRestorationException(transportKind)
+                        throw CanConsolePhysicalExchangeException(
+                            timedCorrelation.recentReceivedRecords(),
+                            CanAdapterRestorationException(transportKind)
+                        )
                     }
                 }
             }
