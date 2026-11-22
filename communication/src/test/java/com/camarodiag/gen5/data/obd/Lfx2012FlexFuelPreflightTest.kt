@@ -9,8 +9,8 @@ class Lfx2012FlexFuelPreflightTest {
         modelYear = 2012,
         engineCode = "LFX",
         generation = 5,
-        selectedVin = "2G1FF3D36C9104199",
-        ecuVin = "2G1FF3D36C9104199"
+        selectedVin = "2G1TEST00C0000001",
+        ecuVin = "2G1TEST00C0000001"
     )
     private val evidence = Lfx2012FlexFuelPreflight.Evidence(
         controllerId = "unknown-controller",
