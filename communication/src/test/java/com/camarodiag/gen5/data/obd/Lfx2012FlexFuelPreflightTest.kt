@@ -27,13 +27,24 @@ class Lfx2012FlexFuelPreflightTest {
     }
 
     @Test fun blocksVinMismatchAndUnidentifiedFirmware() {
-        val mismatched = vehicle.copy(ecuVin = "1G1FF3D36C9104199")
+        val mismatched = vehicle.copy(ecuVin = "1G1TEST00C0000001")
         val unknown = evidence.copy(controllerId = null, verifiedFirmware = false)
         val problems = Lfx2012FlexFuelPreflight.missingPreconditions(mismatched, unknown)
         assertTrue(problems.contains(Lfx2012FlexFuelPreflight.Status.VIN_MISMATCH))
         assertTrue(problems.contains(Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_MISSING))
         assertTrue(problems.contains(Lfx2012FlexFuelPreflight.Status.FIRMWARE_NOT_VERIFIED))
         assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(mismatched, unknown))
+    }
+
+    @Test fun matchingVinWithWrongModelYearCodeCannotPassPreflight() {
+        val wrongYear = "2G1TEST00B0000001"
+        val problems = Lfx2012FlexFuelPreflight.missingPreconditions(
+            vehicle.copy(selectedVin = wrongYear, ecuVin = wrongYear), evidence
+        )
+        assertTrue(problems.contains(Lfx2012FlexFuelPreflight.Status.VIN_MISMATCH))
+        assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(
+            vehicle.copy(selectedVin = wrongYear, ecuVin = wrongYear), evidence
+        ))
     }
 
     @Test fun placeholderControllerAndFirmwareNeverCountAsIdentity() {
