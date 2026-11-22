@@ -468,45 +468,51 @@ class ProfiledUdsReadSession private constructor(
             profile: DocumentedUdsReadProfile,
             timeoutMs: Long = 3000L
         ): ProfiledUdsReadSession {
-            val issuesBeforeReading = profile.compatibilityDefinitionIssues(vehicle)
+            // Snapshot caller-owned mutable allowlists before any suspending CAN
+            // exchange. A concurrent UI/profile edit cannot broaden this session.
+            val approved = profile.copy(
+                readableDids = profile.readableDids.toSet(),
+                identityDids = profile.identityDids.toList()
+            )
+            val issuesBeforeReading = approved.compatibilityDefinitionIssues(vehicle)
             require(issuesBeforeReading.isEmpty()) {
                 "UDS read profile rejected: " + issuesBeforeReading.joinToString("; ")
             }
             val client = UdsReadOnlyClient(
                 transport = transport,
-                requestCanId = profile.requestCanId,
-                responseCanId = profile.responseCanId,
-                extendedCanId = profile.extendedCanId,
+                requestCanId = approved.requestCanId,
+                responseCanId = approved.responseCanId,
+                extendedCanId = approved.extendedCanId,
                 timeoutMs = timeoutMs
             )
-            val rawIdentity = profile.identityDids.associate { definition ->
+            val rawIdentity = approved.identityDids.associate { definition ->
                 definition.field to client.readDataByIdentifier(definition.did)
             }
             val identity = UdsEcuIdentity(
                 controllerFamily = rawIdentity[UdsIdentityField.CONTROLLER_FAMILY]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CONTROLLER_FAMILY)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.CONTROLLER_FAMILY)
                 }.orEmpty(),
                 hardwarePartNumber = rawIdentity[UdsIdentityField.HARDWARE_PART_NUMBER]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.HARDWARE_PART_NUMBER)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.HARDWARE_PART_NUMBER)
                 },
                 operatingSystemId = rawIdentity[UdsIdentityField.OPERATING_SYSTEM_ID]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.OPERATING_SYSTEM_ID)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.OPERATING_SYSTEM_ID)
                 },
                 calibrationId = rawIdentity[UdsIdentityField.CALIBRATION_ID]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CALIBRATION_ID)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.CALIBRATION_ID)
                 },
                 calibrationVerificationNumber = rawIdentity[UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.CALIBRATION_VERIFICATION_NUMBER)
                 },
                 vin = rawIdentity[UdsIdentityField.VIN]?.let {
-                    decodeIdentity(it, profile.identityDids, UdsIdentityField.VIN)
+                    decodeIdentity(it, approved.identityDids, UdsIdentityField.VIN)
                 }
             )
-            val issues = profile.compatibilityIssues(vehicle, identity)
+            val issues = approved.compatibilityIssues(vehicle, identity)
             require(issues.isEmpty()) {
                 "UDS module identity rejected: " + issues.joinToString("; ")
             }
-            return ProfiledUdsReadSession(profile, identity, client)
+            return ProfiledUdsReadSession(approved, identity, client)
         }
 
         private fun decodeIdentity(
