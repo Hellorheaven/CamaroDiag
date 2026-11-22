@@ -14,6 +14,7 @@ CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5
 - Audit kilométrique fondé sur les sources réellement identifiées.
 - Atelier ECU hors véhicule : import et inspection BIN/ORI/MOD, Intel HEX, Motorola S-record et ZIP, empreinte SHA-256, comparaison binaire et édition de tables à partir de définitions TSV vérifiées.
 - Pont Windows J2534 facultatif pour certains adaptateurs Pass-Thru, notamment VXDIAG VCX SE et VCX Nano avec pilote compatible.
+- Découverte USB/OTG directe du prototype CamaroDiagConnectors 0.1.0, sans pont PC (identification et capacités uniquement ; aucune communication ECU disponible sur ce prototype).
 - Les commandes carrosserie non validées et les fonctions de programmation restent verrouillées.
 
 ## Compte utilisateur et connexion
@@ -40,10 +41,24 @@ CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5
 | ELM327 Bluetooth SPP | Bluetooth classique | Oui, selon qualité | Non | Non garanti | OBD standard ; clones non garantis |
 | ELM/STN USB série | USB OTG | Oui, selon interface | Non, sauf profil validé | Non garanti | USB Host/OTG requis |
 | ELM/STN Wi-Fi | TCP/IP | Oui, selon interface | Non, sauf profil validé | Non garanti | IP et port adaptateur requis |
+| CamaroDiagConnectors 0.1.0 | USB-C / OTG | Non | Non | Non | Découverte uniquement, sans ordinateur ; à tester sur carte isolée |
 | VXDIAG VCX SE | PC Windows + J2534 | Non via le pont UDS | Oui, lecture UDS via pont | SW-ISO15765 si le pilote J2534-2 l'expose | Pilote Windows exact requis ; pas de pilote Android natif |
 | VXDIAG VCX Nano | PC Windows + J2534 | Non via le pont UDS | Oui, lecture UDS via pont selon variante | Dépend révision, câblage et pilote | SW-CAN non présumé ; compatibilité à confirmer |
 
 La connexion d'un adaptateur ne garantit pas l'accès à tous les réseaux GM. Les fonctions dépendent de la référence, révision, firmware, broches DLC, pilote et réponses du calculateur.
+
+## CamaroDiagConnectors — connexion native Android
+
+Le futur [CamaroDiagConnectors](https://github.com/Hellorheaven/CamaroDiagConnectors) est développé séparément. Il communiquera directement avec Android, sans ordinateur ni pont Windows obligatoire. Les interfaces J2534 tierces existantes continuent à utiliser leur propre chemin de connexion.
+
+Pour la version prototype 0.1.0, la seule fonction disponible est la découverte USB de la carte isolée, **sans raccordement au véhicule ni à une mémoire** :
+
+1. Relier le prototype USB au téléphone compatible USB Host/OTG.
+2. Ouvrir Adaptateurs et actualiser les périphériques USB.
+3. Sélectionner le bouton **CamaroDiagConnectors • USB** associé à la carte. Autoriser l'accès USB dans Android ; si nécessaire, sélectionner de nouveau le bouton.
+4. Consulter la version et les capacités retournées. Le diagnostic doit rester indisponible : la liaison de découverte est refermée à la fin de cette opération.
+
+Les futurs modes CAN, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD et EEPROM ISP/chip-off nécessitent un firmware et du matériel réellement compatibles et qualifiés. Voir les [exigences du connecteur](https://github.com/Hellorheaven/CamaroDiagConnectors/issues/7). Aucun mode de programmation n'est activé à partir d'une réponse de découverte.
 
 ## Matrice des véhicules et fonctions
 
