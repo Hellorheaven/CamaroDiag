@@ -21,6 +21,14 @@ object EcuBackupArchive {
     private const val MAX_ARCHIVE_BYTES = 256L * 1024 * 1024
 
     /**
+     * A Windows J2534 scoped capture may contain two separate 16 MiB reads.
+     * Include room for the manifest; an exact 32 MiB Android import cap
+     * rejected Windows' largest valid two-pass archive.
+     */
+    internal const val MAX_J2534_IMPORT_UNCOMPRESSED_BYTES =
+        2L * 16 * 1024 * 1024 + 64L * 1024
+
+    /**
      * The import limit includes decompressed manifest bytes, not just payloads.
      * Keep the same ceiling at export to guarantee that our own ZIP is readable.
      */

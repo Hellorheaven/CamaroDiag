@@ -16,6 +16,16 @@ class EcuBackupArchiveTest {
         EcuBackupManifest.Origin.IMPORTED_FILE
     )
 
+    @Test fun androidImportLimitIncludesWindowsMaximumDoubleReadAndManifest() {
+        val maximumWindowsReadBytes = 16L * 1024 * 1024
+        val independentPassBytes = 2L * maximumWindowsReadBytes
+        assertTrue(EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES > independentPassBytes)
+        assertTrue(EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES >=
+            independentPassBytes + 64L * 1024)
+        assertTrue(EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES <=
+            256L * 1024 * 1024)
+    }
+
     @Test fun exportAndImportPreserveBytesAndCoverage() {
         val archive = ByteArrayOutputStream()
         EcuBackupArchive.export(archive, listOf(capture()), setOf(capture().region), "LFX offline")

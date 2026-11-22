@@ -2519,7 +2519,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val resolver = getApplication<Application>().contentResolver
                     val stream = requireNotNull(resolver.openInputStream(uri))
                     // The mobile importer keeps both reads in memory. The limit includes the manifest.
-                    val manifest = stream.use { EcuBackupArchive.import(it, 32L * 1024 * 1024).manifest }
+                    val manifest = stream.use {
+                        EcuBackupArchive.import(
+                            it, EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES
+                        ).manifest
+                    }
                     ArchiveVerification.Verified(manifest)
                 }
             } catch (cancelled: CancellationException) {
