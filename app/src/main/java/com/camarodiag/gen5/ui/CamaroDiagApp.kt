@@ -725,6 +725,15 @@ fun CamaroDiagApp(
                     onPreviewPartialWrite = { start, eraseBytes, programBytes ->
                         viewModel.previewPartialCalibrationWrite(start, eraseBytes, programBytes)
                     },
+                    onExportExternalDumpPair = { method, region, address ->
+                        val firstPath = calibrationWorkspace.importedFilePath
+                        val secondPath = calibrationWorkspace.comparisonFilePath
+                        if (firstPath != null && secondPath != null) {
+                            withExportFolder {
+                                viewModel.exportExternalDumpPair(method, region, address, firstPath, secondPath)
+                            }
+                        }
+                    },
                     onImportDefinitions = {
                         calibrationDefinitionsPicker.launch(arrayOf("text/*", "text/csv", "text/tab-separated-values", "*/*"))
                     },
