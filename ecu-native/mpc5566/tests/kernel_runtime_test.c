@@ -23,6 +23,15 @@ int main(void)
     cd_isotp_channel channel = {0x7E0, 0x7E8, false, 0, 1000000, &link, send_frame};
     init_model(&m);
     cd_flash_controller flash = controller_for(&m);
+    /* A zero-initialized runtime and a failed bind must never dispatch I/O. */
+    assert(!cd_kernel_runtime_step(&runtime, NULL, 0));
+    cd_kernel_runtime_link_failure(&runtime);
+    cd_isotp_channel invalid_channel = channel;
+    invalid_channel.send = NULL;
+    assert(!cd_kernel_runtime_init(&runtime, &flash, &invalid_channel, 4, 1));
+    assert(!cd_kernel_runtime_step(&runtime, NULL, 0));
+    cd_kernel_runtime_link_failure(&runtime);
+    assert(link.count == 0 && m.pulses == 0 && !flash.recovery_required);
     assert(cd_kernel_runtime_init(&runtime, &flash, &channel, 4, 1));
 
     cd_can_frame wrong = {0x7E1, false, 8, { 5, 0x3D, 5, 2, 0, 0 }};
