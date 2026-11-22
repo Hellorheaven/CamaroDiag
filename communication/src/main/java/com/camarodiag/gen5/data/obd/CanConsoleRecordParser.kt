@@ -213,6 +213,22 @@ object CanMonitorProtocolPolicy {
 }
 
 object CanConsoleCapabilityPolicy {
+    /**
+     * A CAN TX confirmation authorizes only the session in which it opened.
+     * A newly connected adapter is not authority to replay a stale dialog.
+     */
+    fun canConfirmPhysicalTx(
+        frame: RawCanFrame?,
+        pendingContextGeneration: Long,
+        currentContextGeneration: Long,
+        monitorAvailable: Boolean,
+        canTransmit: Boolean,
+        busy: Boolean
+    ): Boolean = frame != null &&
+        pendingContextGeneration == currentContextGeneration &&
+        monitorAvailable && canTransmit && !busy &&
+        SafeRawCanTransmitPolicy.allows(frame)
+
     fun canSubmit(
         rawCanFrame: Boolean,
         monitorAvailable: Boolean,
