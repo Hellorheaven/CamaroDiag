@@ -13,6 +13,14 @@ class CamaroDiagReleaseAssetPolicyTest {
         }
     }
 
+    @Test fun officialReleaseTagMustMatchTheApkAssetTag() {
+        val name = "CamaroDiag-release.apk"
+        assertTrue(CamaroDiagReleaseAssetPolicy.accepts(base + name, name, "v1.2.3"))
+        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(base + name, name, "v1.2.4"))
+        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(base + name, name, "../v1.2.3"))
+        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(base + name, name, ""))
+    }
+
     @Test fun stagedApkCopyRequiresProgressAndHonorsConfiguredSizeLimit() {
         val source = byteArrayOf(1, 2, 3, 4)
         val copied = java.io.ByteArrayOutputStream()
