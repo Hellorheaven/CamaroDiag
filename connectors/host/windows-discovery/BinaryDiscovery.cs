@@ -101,6 +101,20 @@ internal sealed class BinaryDiscovery(Stream stream, Func<long>? clockMs = null)
     {
         if(used)throw new IOException("Fresh prototype session required");
         used=true; // one attempt only, even on failure
-        return [Exchange(1,0),Exchange(2,1),Exchange(3,2)];
+        int oldReadTimeout = stream.CanTimeout ? stream.ReadTimeout : 0;
+        int oldWriteTimeout = stream.CanTimeout ? stream.WriteTimeout : 0;
+        try
+        {
+            return [Exchange(1,0),Exchange(2,1),Exchange(3,2)];
+        }
+        finally
+        {
+            // Preserve the caller's serial settings after discovery or failure.
+            if(stream.CanTimeout)
+            {
+                stream.ReadTimeout = oldReadTimeout;
+                stream.WriteTimeout = oldWriteTimeout;
+            }
+        }
     }
 }
