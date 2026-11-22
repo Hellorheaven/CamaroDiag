@@ -657,4 +657,7 @@
     <string name="cal_native_catalog_loading">Catalóg dílseánaigh á lódáil…</string>
     <string name="cal_native_catalog_empty">Níl aon DID dílseánaigh Camaro dearbhaithe mar inúsáidte faoi láthair. Ní chumtar seoltaí ná scálú anaithnid.</string>
     <string name="cal_native_catalog_read_disabled">Tá léamh na feithicle díchumasaithe go dtí go bhfíoraítear seoladh agus díchódú ar chumraíocht chomhionann.</string>
+    <string name="export_folder_instruction">Cruthaigh nó roghnaigh an fillteán CamaroDiag sa stóras inmheánach agus ceadaigh rochtain air. Tá na comhaid easpórtáilte le feiceáil sa stóras comhroinnte.</string>
+    <string name="export_folder_success">Sábháladh an t-easpórtáil in /CamaroDiag/.</string>
+    <string name="export_folder_failed">Níorbh fhéidir an t-easpórtáil a shábháil in /CamaroDiag/.</string>
 </resources>
