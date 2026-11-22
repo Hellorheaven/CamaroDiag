@@ -53,11 +53,14 @@ object J2534LiveMemoryBackup {
         internal fun export(output: OutputStream) {
             // Bind the archive to the acquisition's original digest, not a newly
             // computed digest of potentially mutated public capture buffers.
+            check(capture.independentRead != null && capture.firstRead !== capture.independentRead) {
+                "Two distinct acquisition buffers are required."
+            }
             val snapshot = capture.copy(
                 firstRead = capture.firstRead.copyOf(),
                 independentRead = capture.independentRead?.copyOf()
             )
-            val required = setOf(snapshot.region)
+            val required = emptySet<EcuBackupCoverage.Region>()
             check(verification.consistent &&
                 EcuBackupIntegrity.verify(manifest, listOf(snapshot), required).consistent
             ) { "Capture no longer matches the verified acquisition." }
@@ -210,7 +213,8 @@ object J2534LiveMemoryBackup {
                 independentRead = second,
                 origin = origin
             )
-            val required = setOf(request.region)
+            // The requested address span is not an independently qualified full ECU map.
+            val required = emptySet<EcuBackupCoverage.Region>()
             val manifest = EcuBackupManifest.inspect(
                 request.controllerLabel, System.currentTimeMillis(), listOf(capture), required, observedVin
             )
