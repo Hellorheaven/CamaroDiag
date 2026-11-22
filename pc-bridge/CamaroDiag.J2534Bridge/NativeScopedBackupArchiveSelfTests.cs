@@ -110,6 +110,12 @@ internal static class NativeScopedBackupArchiveSelfTests
             }
             Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(malformedPath, scope));
             File.Delete(malformedPath);
+            var missingPath = Path.Combine(directory, "missing.zip");
+            File.WriteAllBytes(missingPath, originalZip);
+            using (var incomplete = ZipFile.Open(missingPath, ZipArchiveMode.Update))
+                incomplete.GetEntry("capture/0/second.bin")!.Delete();
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(missingPath, scope));
+            File.Delete(missingPath);
             Reject<IOException>(() => NativeScopedBackupArchive.SaveNew(zipPath, scope, capture, CancellationToken.None));
             Check(File.ReadAllBytes(zipPath).SequenceEqual(originalZip), "Prior backup never overwritten");
 
