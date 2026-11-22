@@ -118,6 +118,39 @@ class UdsMemoryWireFormatTest {
         assertArrayEquals(bytes(0x36, 1), transport.sent[2])
     }
 
+    @Test fun downloadRejectsAppendedOrTruncatedBlockLengthBeforeTransfer() = runBlocking {
+        for (invalid in listOf(
+                bytes(0x74, 0x20, 0x00),
+                bytes(0x74, 0x20, 0x00, 0x20, 0xAA),
+                bytes(0x74, 0x10, 0x20, 0xAA)
+            )) {
+            val transport = ScriptedPayloadTransport(
+                bytes(0x50, 0x02), bytes(0x67, 0x01, 0x12, 0x34),
+                bytes(0x67, 0x02), invalid
+            )
+            val client = UdsClient(transport, policy(allowWrite = true))
+            client.diagnosticSessionControl(0x02)
+            unlockForSyntheticWrite(client)
+            assertTrue(runCatching { client.requestDownload(0x1000, 4) }.isFailure)
+            assertFalse(client.isDownloadActive())
+            assertEquals(4, transport.sent.size)
+        }
+    }
+
+    @Test fun uploadRejectsUnexpectedBlockLengthFieldsBeforeReadingData() = runBlocking {
+        for (invalid in listOf(
+                bytes(0x75, 0x20, 0x00),
+                bytes(0x75, 0x20, 0x00, 0x20, 0xAA)
+            )) {
+            val transport = ScriptedPayloadTransport(bytes(0x50, 0x02), invalid)
+            val client = UdsClient(transport, policy())
+            client.diagnosticSessionControl(0x02)
+            assertTrue(runCatching { client.requestUpload(0x1000, 4) }.isFailure)
+            assertFalse(client.isUploadActive())
+            assertEquals(2, transport.sent.size)
+        }
+    }
+
     @Test fun requestDownloadRejectsReservedLengthFormatBits() = runBlocking {
         val transport = ScriptedPayloadTransport(
             bytes(0x50, 0x02), bytes(0x67, 0x01, 0x12, 0x34),
