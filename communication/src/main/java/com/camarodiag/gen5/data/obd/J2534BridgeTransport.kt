@@ -210,7 +210,11 @@ class J2534BridgeTransport(
             byteArrayOf(command.service.toByte(), command.parameter.toByte())
         }
         val reply = exchange(payload, 4_000L)
-        validateReadOnlyConsoleReply(command, reply)
+        // An exact negative ECU acknowledgement belongs in RX history as a
+        // failed request. All unrelated, corrupted, and truncated replies fail.
+        if (!isMatchingNegativeConsoleReply(command, reply)) {
+            validateReadOnlyConsoleReply(command, reply)
+        }
         check(isStandardObdPhysicalReadEnabled) {
             "J2534 disconnected before the physical console response was accepted."
         }
@@ -218,6 +222,13 @@ class J2534BridgeTransport(
     }
 
     internal companion object {
+        fun isMatchingNegativeConsoleReply(command: SafeObdRequest, reply: ByteArray): Boolean =
+            SafeObdRequestPolicy.parse(command.elmCommand) == command &&
+                reply.size == 3 &&
+                (reply[0].toInt() and 0xFF) == 0x7F &&
+                (reply[1].toInt() and 0xFF) == command.service &&
+                (reply[2].toInt() and 0xFF) !in setOf(0, 0x78)
+
         /** A negative, mismatched, or truncated reply is never a successful read. */
         fun validateReadOnlyConsoleReply(command: SafeObdRequest, reply: ByteArray) {
             require(SafeObdRequestPolicy.parse(command.elmCommand) == command) {
