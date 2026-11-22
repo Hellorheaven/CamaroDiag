@@ -216,4 +216,15 @@ class J2534StandardObdTest {
         }
     }
 
+    @Test fun j2534ConsoleCanReadEcuNameViaStandardMode09Pid0A() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("090A"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+            bytes(0x49, 0x0A, 0x01, 0x45, 0x43, 0x4D))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+                bytes(0x49, 0x04, 0x01, 0x45))
+        }
+        assertEquals("090A", request.elmCommand)
+    }
+
 }
