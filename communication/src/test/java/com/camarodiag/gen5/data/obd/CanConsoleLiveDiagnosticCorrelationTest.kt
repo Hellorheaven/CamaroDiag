@@ -283,6 +283,40 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         }
     }
 
+    @Test fun untimedAdapterTextCannotBypassExpiredPhysicalSession() {
+        val late = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requestStartedAtMs = 100L, requestDeadlineMs = 300L
+        )
+        late.append("7E9 04 03 41 0C 1B\r\n", 110L)
+        late.append("OK\r\n", 400L)
+        val diagnostic = late.complete(401L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, diagnostic)
+        assertEquals(false, late.hasExplicitAdapterAck())
+        assertEquals(false, CanConsolePhysicalTransmissionPolicy.confirmed(
+            adapterOutput = "OK", diagnosticStatus = diagnostic,
+            hasExplicitAck = late.hasExplicitAdapterAck(), hasAdapterError = late.hasAdapterError()
+        ))
+        assertEquals(listOf("RX", "SYSTEM"),
+            late.recentReceivedRecords().map { it.record.direction })
+    }
+
+    @Test fun timelyAdapterAckStillConfirmsPhysicalTransmissionWithoutEcuReply() {
+        val timely = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requestStartedAtMs = 100L, requestDeadlineMs = 300L
+        )
+        timely.append("OK\r\n", 399L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, timely.complete(400L))
+        assertEquals(true, timely.hasExplicitAdapterAck())
+        assertEquals(true, CanConsolePhysicalTransmissionPolicy.confirmed(
+            adapterOutput = "OK", diagnosticStatus = CanConsoleDiagnosticStatus.NONE,
+            hasExplicitAck = timely.hasExplicitAdapterAck(), hasAdapterError = timely.hasAdapterError()
+        ))
+        assertEquals(false, CanConsolePhysicalTransmissionPolicy.confirmed(
+            adapterOutput = "OK", diagnosticStatus = CanConsoleDiagnosticStatus.NONE,
+            hasExplicitAck = false, hasAdapterError = false
+        ))
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
