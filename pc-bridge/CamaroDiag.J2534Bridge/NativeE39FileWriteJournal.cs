@@ -21,6 +21,14 @@ internal sealed class NativeE39FileWriteJournal :
         NoEvents, Interrupted, RecoveryRequired, Completed
     }
 
+    internal sealed record Inspection(
+        CompletionState State, bool SequenceValid, int PreparedSectors = 0,
+        int WrittenSectors = 0, int FinalReadbackSectors = 0,
+        uint? PossiblyIncompleteAddress = null, string? LastPhase = null)
+    {
+        internal bool RequiresAssessment => State != CompletionState.Completed;
+    }
+
     internal NativeE39FileWriteJournal(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -61,7 +69,9 @@ internal sealed class NativeE39FileWriteJournal :
         }
     }
 
-    internal static CompletionState Inspect(string path)
+    internal static CompletionState Inspect(string path) => InspectDetailed(path).State;
+
+    internal static Inspection InspectDetailed(string path)
     {
         if (!File.Exists(path))
             throw new FileNotFoundException("No ECU programming journal exists.", path);
@@ -73,15 +83,15 @@ internal sealed class NativeE39FileWriteJournal :
             FileShare.ReadWrite))
         {
             var length = source.Length;
-            if (length == 0) return CompletionState.NoEvents;
-            if (length > MaximumJournalBytes) return CompletionState.Interrupted;
+            if (length == 0) return new(CompletionState.NoEvents, true);
+            if (length > MaximumJournalBytes) return new(CompletionState.Interrupted, false);
             snapshot = new byte[(int)length];
             try { source.ReadExactly(snapshot); }
-            catch (EndOfStreamException) { return CompletionState.Interrupted; }
+            catch (EndOfStreamException) { return new(CompletionState.Interrupted, false); }
         }
         string text;
         try { text = new UTF8Encoding(false, true).GetString(snapshot); }
-        catch (DecoderFallbackException) { return CompletionState.Interrupted; }
+        catch (DecoderFallbackException) { return new(CompletionState.Interrupted, false); }
         var terminated = text.EndsWith('\n');
         var entries = terminated ? text[..^1].Split('\n') : text.Split('\n');
         // A durable explicit recovery marker wins over malformed older records.
@@ -99,20 +109,22 @@ internal sealed class NativeE39FileWriteJournal :
                     node.TryGetProperty("Phase", out var phase) && phase.ValueKind == JsonValueKind.String &&
                     phase.GetString() == nameof(NativeE39WriteSequence.Phase.RecoveryRequired) &&
                     node.TryGetProperty("Address", out var address) && address.ValueKind == JsonValueKind.Number &&
-                    address.TryGetUInt32(out _))
-                    return CompletionState.RecoveryRequired;
+                    address.TryGetUInt32(out var reportedAddress))
+                    return new(CompletionState.RecoveryRequired, false,
+                        PossiblyIncompleteAddress: reportedAddress, LastPhase: "RecoveryRequired");
             }
             catch (JsonException) { /* still evaluate subsequent complete records */ }
         }
         // A complete-looking JSON object without its record terminator can
         // represent an interrupted append. It is not evidence of completion.
-        if (!terminated) return CompletionState.Interrupted;
+        if (!terminated) return new(CompletionState.Interrupted, false);
 
         var sectors = new Dictionary<uint, NativeE39WriteSequence.Phase>();
         var preflightStarted = false;
         var destructiveStarted = false;
         uint? activeSector = null;
         var completed = false;
+        NativeE39WriteSequence.Phase? lastPhase = null;
         foreach (var entry in entries)
         {
             try
@@ -128,63 +140,65 @@ internal sealed class NativeE39FileWriteJournal :
                     !Enum.IsDefined(phase) ||
                     node.GetProperty("Phase").GetString() != phase.ToString() ||
                     !node.GetProperty("Address").TryGetUInt32(out var address))
-                    return CompletionState.Interrupted;
+                    return new(CompletionState.Interrupted, false);
 
                 // Recovery is terminal even if subsequent records claim success.
                 if (phase == NativeE39WriteSequence.Phase.RecoveryRequired)
-                    return CompletionState.RecoveryRequired;
-                if (completed) return CompletionState.Interrupted;
+                    return new(CompletionState.RecoveryRequired, false,
+                        PossiblyIncompleteAddress: address, LastPhase: phase.ToString());
+                if (completed) return new(CompletionState.Interrupted, false);
 
+                lastPhase = phase;
                 switch (phase)
                 {
                     case NativeE39WriteSequence.Phase.Prepared:
                         if (preflightStarted || !sectors.TryAdd(address, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         break;
                     case NativeE39WriteSequence.Phase.OriginalCrcVerified:
                         preflightStarted = true;
                         if (destructiveStarted || !Advance(address,
                             NativeE39WriteSequence.Phase.Prepared, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         break;
                     case NativeE39WriteSequence.Phase.OriginalBytesVerified:
                         if (destructiveStarted || !Advance(address,
                             NativeE39WriteSequence.Phase.OriginalCrcVerified, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         break;
                     case NativeE39WriteSequence.Phase.TestWriteAccepted:
                         if (destructiveStarted || !Advance(address,
                             NativeE39WriteSequence.Phase.OriginalBytesVerified, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         break;
                     case NativeE39WriteSequence.Phase.EraseStarted:
                         if (activeSector.HasValue || sectors.Count == 0 ||
                             sectors.Values.Any(p => p != NativeE39WriteSequence.Phase.TestWriteAccepted &&
                                 p != NativeE39WriteSequence.Phase.WrittenBytesVerified) ||
                             !Advance(address, NativeE39WriteSequence.Phase.TestWriteAccepted, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         destructiveStarted = true;
                         activeSector = address;
                         break;
                     case NativeE39WriteSequence.Phase.EraseAcknowledged:
                         if (activeSector != address || !Advance(address,
                             NativeE39WriteSequence.Phase.EraseStarted, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         break;
                     case NativeE39WriteSequence.Phase.WriteStarted:
                         if (activeSector != address || !Advance(address,
                             NativeE39WriteSequence.Phase.EraseAcknowledged, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         break;
                     case NativeE39WriteSequence.Phase.WrittenCrcVerified:
                         if (activeSector != address || !Advance(address,
                             NativeE39WriteSequence.Phase.WriteStarted, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         break;
                     case NativeE39WriteSequence.Phase.WrittenBytesVerified:
                         if (activeSector != address || !Advance(address,
                             NativeE39WriteSequence.Phase.WrittenCrcVerified, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         activeSector = null;
                         break;
                     case NativeE39WriteSequence.Phase.FinalBytesVerified:
@@ -192,27 +206,32 @@ internal sealed class NativeE39FileWriteJournal :
                             sectors.Values.Any(p => p != NativeE39WriteSequence.Phase.WrittenBytesVerified &&
                                 p != NativeE39WriteSequence.Phase.FinalBytesVerified) ||
                             !Advance(address, NativeE39WriteSequence.Phase.WrittenBytesVerified, phase))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         break;
                     case NativeE39WriteSequence.Phase.Completed:
                         if (address != 0 || !destructiveStarted || activeSector.HasValue ||
                             sectors.Count == 0 || sectors.Values.Any(p =>
                                 p != NativeE39WriteSequence.Phase.FinalBytesVerified))
-                            return CompletionState.Interrupted;
+                            return new(CompletionState.Interrupted, false);
                         completed = true;
                         break;
                     default:
-                        return CompletionState.Interrupted;
+                        return new(CompletionState.Interrupted, false);
                 }
             }
             catch (Exception error) when (error is JsonException or
                 KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
             {
-                return CompletionState.Interrupted;
+                return new(CompletionState.Interrupted, false);
             }
         }
 
-        return completed ? CompletionState.Completed : CompletionState.Interrupted;
+        return new(completed ? CompletionState.Completed : CompletionState.Interrupted,
+            true, sectors.Count,
+            sectors.Values.Count(p => p is NativeE39WriteSequence.Phase.WrittenBytesVerified or
+                NativeE39WriteSequence.Phase.FinalBytesVerified),
+            sectors.Values.Count(p => p == NativeE39WriteSequence.Phase.FinalBytesVerified),
+            activeSector, lastPhase?.ToString());
 
         bool Advance(uint address, NativeE39WriteSequence.Phase expected,
             NativeE39WriteSequence.Phase next)
