@@ -785,7 +785,11 @@ class BluetoothObdManager(context: Context) {
                     } else delay(10)
                 }
                 ensureSameSession()
-                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, onChunk != null),
+                    promptReceived = promptReceived
+                )
                 ensureSameSession()
                 normalizeElmReply(buffer.toString(), command)
             } else if (sessionTransport == "BLE") {
@@ -807,7 +811,11 @@ class BluetoothObdManager(context: Context) {
                     } else delay(10)
                 }
                 ensureSameSession()
-                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, onChunk != null),
+                    promptReceived = promptReceived
+                )
                 ensureSameSession()
                 normalizeElmReply(buffer.toString(), command)
             } else if (sessionTransport == "WIFI") {
@@ -834,7 +842,11 @@ class BluetoothObdManager(context: Context) {
                     delay(10)
                 }
                 ensureSameSession()
-                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, onChunk != null),
+                    promptReceived = promptReceived
+                )
                 ensureSameSession()
                 normalizeElmReply(buffer.toString(), command)
             } else {
@@ -877,7 +889,11 @@ class BluetoothObdManager(context: Context) {
                 }
                 if (callbackBuffer.isNotEmpty()) onChunk?.invoke(callbackBuffer.toString())
                 ensureSameSession()
-                ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, onChunk != null),
+                    promptReceived = promptReceived
+                )
                 ensureSameSession()
                 normalizeElmReply(buffer.toString(), command)
             }
