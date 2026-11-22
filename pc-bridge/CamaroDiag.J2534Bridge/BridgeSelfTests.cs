@@ -32,9 +32,21 @@ internal static class BridgeSelfTests
         Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
             [0x22, 0xF1, 0x90, 0xF1]), "J2534 UDS incomplete second DID rejected");
         Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
-            [0x19, 0x0A]), "J2534 UDS read DTC report supported");
+            [0x19, 0x01, 0xFF]), "J2534 UDS report number by status mask");
+        Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x02, 0xFF]), "J2534 UDS report DTC by status mask");
+        Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x0A]), "J2534 UDS report supported DTC");
         Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
             [0x19]), "J2534 UDS missing DTC subfunction rejected");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x01]), "J2534 UDS missing status mask for DTC count");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x02]), "J2534 UDS missing status mask for DTC list");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0x0A, 0xFF]), "J2534 UDS unwanted mask on supported DTC list");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x19, 0xFE, 0xFF]), "J2534 UDS unsupported DTC subfunction");
         Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
             [0x14, 0xFF, 0xFF, 0xFF]), "J2534 UDS clear DTC not a read-only query");
 
