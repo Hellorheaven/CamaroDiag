@@ -107,4 +107,17 @@ class Lfx2012FlexFuelPreflightTest {
         assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(vehicle.copy(modelYear = 2013), evidence))
     }
 
+    @Test fun absentVehiclePreservesOriginalWritePreflightContract() {
+        val problems = Lfx2012FlexFuelPreflight.missingPreconditions(null, evidence)
+        assertTrue(problems == listOf(Lfx2012FlexFuelPreflight.Status.VEHICLE_NOT_SELECTED))
+        assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(null, evidence))
+    }
+
+    @Test fun incompatibleVehiclePreservesOriginalWritePreflightContract() {
+        val problems = Lfx2012FlexFuelPreflight.missingPreconditions(
+            vehicle.copy(engineCode = "LS3"), evidence)
+        assertTrue(problems == listOf(Lfx2012FlexFuelPreflight.Status.WRONG_VEHICLE))
+        assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(vehicle.copy(engineCode = "LS3"), evidence))
+    }
+
 }
