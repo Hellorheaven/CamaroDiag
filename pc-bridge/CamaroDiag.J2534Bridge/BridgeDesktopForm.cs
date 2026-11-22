@@ -81,6 +81,7 @@ internal sealed partial class BridgeDesktopForm : Form
 
         var tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(12, 7) };
         tabs.TabPages.Add(BuildConnectionTab());
+        tabs.TabPages.Add(BuildConnectorTab());
         tabs.TabPages.Add(BuildEcuTab());
         tabs.TabPages.Add(BuildConsoleTab());
         tabs.TabPages.Add(BuildMemoryTab());

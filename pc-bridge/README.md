@@ -249,3 +249,5 @@ Le brouillon d'une géométrie de secteurs flash n'est pas applicable à une EEP
 ## Découverte locale CamaroDiagConnectors (prototype isolé)
 
 Le pont inclut désormais un mode local explicite : `CamaroDiag.J2534Bridge.exe --discover-connector COM5` (remplacer COM5 par le port vérifié de la carte isolée, firmware CD/1). Cette commande vérifie les trois réponses publiques, ferme le port, et n'exécute ni J2534 ni serveur réseau ni mise à jour. Redémarrer la carte isolée entre sessions. Ne pas utiliser avec un câble KKL/ELM ou un ECU raccordé. Le boîtier n'est pas authentifié, aucune capacité véhicule n'est accordée. Le backend natif sécurisé via pont reste à développer et qualifier.
+
+L'onglet **CamaroDiagConnectors** du pont propose aussi cette découverte sans terminal : actualiser les ports COM, sélectionner uniquement la carte CD/1 isolée, confirmer l'absence de cible et lancer le test. Aucun port n'est sélectionné ou interrogé automatiquement. L'opération exige l'arrêt du pont et de la console ; le résultat n'autorise aucun accès véhicule.

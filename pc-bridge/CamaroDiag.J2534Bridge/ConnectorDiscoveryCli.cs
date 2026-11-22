@@ -10,6 +10,18 @@ internal static class ConnectorDiscoveryCli
     internal static bool IsValidPort(string port) =>
         Regex.IsMatch(port, @"\ACOM[1-9][0-9]{0,3}\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    internal static string[] VerifyPort(string port)
+    {
+        if (!IsValidPort(port)) throw new ArgumentException("Invalid COM port.", nameof(port));
+        using var serial = new SerialPort(port, 115200, Parity.None, 8, StopBits.One)
+        {
+            Handshake = Handshake.None, DtrEnable = true, RtsEnable = false,
+            ReadTimeout = 1500, WriteTimeout = 1500
+        };
+        serial.Open();
+        return new ConnectorBinaryDiscovery(serial.BaseStream).Verify();
+    }
+
     internal static int Run(string[] args)
     {
         if (args.Length != 2 || !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase) ||
@@ -20,13 +32,7 @@ internal static class ConnectorDiscoveryCli
         }
         try
         {
-            using var serial = new SerialPort(args[1], 115200, Parity.None, 8, StopBits.One)
-            {
-                Handshake = Handshake.None, DtrEnable = true, RtsEnable = false,
-                ReadTimeout = 1500, WriteTimeout = 1500
-            };
-            serial.Open();
-            foreach (var response in new ConnectorBinaryDiscovery(serial.BaseStream).Verify())
+            foreach (var response in VerifyPort(args[1]))
                 Console.WriteLine(response);
             Console.WriteLine("Public prototype discovery only. Not authenticated; vehicle access disabled.");
             return 0;
