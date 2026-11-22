@@ -184,7 +184,28 @@ class BluetoothObdManager(context: Context) {
 
     /** Discovery only. Close the probe before returning: never expose an ELM channel. */
     suspend fun discoverCamaroDiagConnector(deviceId: Int, binary: Boolean = false): Result<AdapterCapabilities> =
-        withContext(Dispatchers.IO) {
+        isolatedConnectorUsb(deviceId, binary) { channel, ensureCurrent ->
+            val report = if (binary) {
+                CamaroDiagConnectorBinaryDiscovery.inspect(channel, ensureCurrent)
+            } else {
+                CamaroDiagConnectorDiscovery.inspect(channel, ensureCurrent)
+            }
+            report.toAdapterCapabilities()
+        }
+
+    /** Dedicated service firmware only, after explicit local consent. Never auto-probe. */
+    suspend fun captureConnectorCheckpoint(deviceId: Int, isolatedConfirmed: Boolean): Result<ByteArray?> {
+        if (!isolatedConfirmed) return Result.failure(IllegalArgumentException("Isolated board confirmation required"))
+        return isolatedConnectorUsb(deviceId, true) { channel, ensureCurrent ->
+            CamaroDiagConnectorCheckpointUsb.capture(channel, ensureCurrent)
+        }
+    }
+
+    private suspend fun <T> isolatedConnectorUsb(
+        deviceId: Int,
+        requireCdc: Boolean,
+        inspect: (CamaroDiagConnectorDiscovery.Channel, () -> Unit) -> T
+    ): Result<T> = withContext(Dispatchers.IO) {
             connectorDiscoveryMutex.withLock {
                 disconnect()
                 val epoch = transportSessionEpoch.capture()
@@ -197,7 +218,7 @@ class BluetoothObdManager(context: Context) {
                     }
                     probe.connect(
                         deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE,
-                        discoveryOnly = true, requireCdc = binary
+                        discoveryOnly = true, requireCdc = requireCdc
                     ).getOrThrow()
                     val context = currentCoroutineContext()
                     val ensureCurrent = {
@@ -214,13 +235,9 @@ class BluetoothObdManager(context: Context) {
                             return probe.read(buffer, timeoutMs)
                         }
                     }
-                    val report = if (binary) {
-                        CamaroDiagConnectorBinaryDiscovery.inspect(channel, ensureCurrent)
-                    } else {
-                        CamaroDiagConnectorDiscovery.inspect(channel, ensureCurrent)
-                    }
+                    val result = inspect(channel, ensureCurrent)
                     ensureCurrent()
-                    Result.success(report.toAdapterCapabilities())
+                    Result.success(result)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
