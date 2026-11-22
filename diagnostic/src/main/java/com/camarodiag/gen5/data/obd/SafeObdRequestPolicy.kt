@@ -92,6 +92,12 @@ object SafeObdRequestPolicy {
      */
     fun hasPositiveResponse(request: SafeObdRequest, response: String): Boolean {
         if (parse(request.elmCommand) != request) return false
+        if (request.service == 0x09 && ':' in response) {
+            val assembled = ObdNumberedIdentityFrames.parse(response) ?: return false
+            return hasPositiveResponse(request, assembled.joinToString("") {
+                "%02X".format(java.util.Locale.ROOT, it)
+            })
+        }
         val expected = when (request.service) {
             0x01 -> "41%02X".format(java.util.Locale.ROOT, requireNotNull(request.parameter))
             0x03 -> "43"
