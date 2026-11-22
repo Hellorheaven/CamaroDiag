@@ -39,7 +39,14 @@ object SafeRawCanTransmitPolicy {
         // TesterPresent is limited to its ordinary/suppressed-positive forms.
         return when (service) {
             0x22 -> body.size == 3
-            0x19 -> body.size in 2..6
+            // Match the actual ISO-TP response correlator and Windows J2534
+            // read-only subset. Unknown or truncated DTC subfunctions are not
+            // permitted on a physical ECU.
+            0x19 -> when (body.getOrNull(1)) {
+                0x01, 0x02 -> body.size == 3 // request status mask
+                0x0A -> body.size == 2       // all supported DTCs
+                else -> false
+            }
             0x3E -> body.size == 2 && body[1] in setOf(0x00, 0x80)
             else -> false
         }
