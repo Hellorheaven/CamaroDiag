@@ -37,7 +37,10 @@ de licence n'est enregistrée dans Firestore.
 
 ## Préconditions de mise en service
 
-Le code en PR ne signifie pas déploiement. L'accès aux Cloud Functions exige un
+Le code en PR ne signifie pas déploiement. Au 22 novembre 2026, le projet Firebase
+`camarodiag-e1ed1` est sur Blaze, Firestore `(default)` est créé mais vide et les
+applications Android Debug/Release sont enregistrées dans App Check.
+L'accès aux Cloud Functions exige un
 déploiement explicite, App Check correctement configuré et les tests Android/serveur.
 Le forfait Blaze Firebase peut être nécessaire et entraîner des frais ; demander
 l'accord avant toute activation de facturation ou tout déploiement.
@@ -77,6 +80,26 @@ suivant, au changement de compte ou lors d'une actualisation explicite. Les
 opérations à risque (écriture ECU, commandes véhicule) doivent conserver
 leurs contrôles de sécurité propres, indépendamment de ce cache de présentation.
 
-Tant que `LicenseRolloutConfig.ENABLED=false`, les vérifications de licence
-au démarrage restent désactivées : ne pas activer le verrou sans déployer
-et tester le service serveur et la gestion Firebase App Check.
+### État de déploiement et garde-fous
+
+`LicenseRolloutConfig.ENABLED=true` et `PAYMENTS_ENABLED=false` :
+l'application exige une licence pour Premium mais aucun achat n'est possible.
+**Cette version ne doit pas être diffusée avant déploiement et validation des
+fonctions** : en leur absence, les fonctions Premium restent fermées.
+
+Les fonctions du codebase Firebase `accounts` utilisent
+`CAMARODIAG_ENFORCE_APP_CHECK=false` par défaut, conformément à l'état
+« Non appliqué » de Firestore et Authentication. La présence d'App Check sur
+le client ne prouve pas que ses tokens soient validés. La vérification de
+l'identité Firebase, des claims signés, des droits administratifs et des
+documents Firestore reste imposée sur le serveur.
+
+Une fois les APK Debug et Release qualifiés, l'exploitant pourra renseigner
+`CAMARODIAG_ENFORCE_APP_CHECK=true` puis redéployer les fonctions. Ne pas
+effectuer ce basculement tant que les deux canaux n'ont pas de token App Check
+valide (notamment le token Debug enregistré dans Firebase).
+
+**Déploiement :** suivre `docs/FIREBASE_DEPLOYMENT.md`. Seul le codebase
+`accounts` est à déployer ; le codebase `billing` contient le prototype
+Stripe inactif et ne doit pas être déployé. Le déploiement peut engendrer des
+coûts Google Cloud même si aucun utilisateur ne paie encore de licence.
