@@ -260,6 +260,20 @@ class CanConsoleRecordParserTest {
             "7E9 04 03 41 0C 1B", functional
         ))
     }
+    @Test fun passiveCanCaptureMayEndQuietlyButNeverAcceptAdapterFailure() {
+        for (reply in listOf("", "   ", "\r\n", "SEARCHING...",
+            "7E8 03 41 0C 1A", "7E8 03 41 0C 1A\r\n7E9 03 41 0D 1B"
+        )) {
+            assertTrue(reply, CanMonitorCompletionPolicy.accepted(reply))
+        }
+        for (reply in listOf("?", "NO DATA", "CAN ERROR", "BUS ERROR",
+            "BUFFER FULL", "UNABLE TO CONNECT", "STOPPED", "ERROR",
+            "7E8 03 41 0C 1A\r\nCAN ERROR"
+        )) {
+            assertFalse(reply, CanMonitorCompletionPolicy.accepted(reply))
+        }
+    }
+
     @Test fun monitorCommandSequencesConfigureAndRestoreOnlySelectedBusFormat() {
         assertEquals(
             listOf("ATSP6", "ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0"),
