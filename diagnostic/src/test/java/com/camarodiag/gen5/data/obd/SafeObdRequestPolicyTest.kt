@@ -119,6 +119,10 @@ class SafeObdRequestPolicyTest {
         val dtc = requireNotNull(SafeObdRequestPolicy.parse("03"))
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 00"))
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "4300"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 01 03 00"))
+        for (invalid in listOf("43 FF", "43 01 03", "43 01 00 00", "43 00 03 00")) {
+            assertEquals(invalid, false, SafeObdRequestPolicy.hasPositiveResponse(dtc, invalid))
+        }
         val vin = requireNotNull(SafeObdRequestPolicy.parse("0902"))
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(vin, "49 02 01 31"))
     }
