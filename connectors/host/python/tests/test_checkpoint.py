@@ -52,7 +52,7 @@ class CheckpointTest(unittest.TestCase):
                 self.read_timeouts.append(self.timeout)
                 return super().read(count)
 
-        for reply in (b"CDJ/1 NONE\\n", b"CDJ/1 CORRUPT\\n"):
+        for reply in (b"CDJ/1 NONE\n", b"CDJ/1 CORRUPT\n"):
             with self.subTest(reply=reply):
                 port = SerialPort(reply)
                 try:
@@ -71,6 +71,37 @@ class CheckpointTest(unittest.TestCase):
         with self.assertRaisesRegex(OSError, "Short checkpoint"):
             retrieve_checkpoint(port)
         self.assertIsNone(port.timeout)
+
+    def test_short_serial_read_timeout_can_recover_before_deadline(self):
+        class SlowPort(Port):
+            timeout = None
+            write_timeout = None
+            empty_reads = 2
+            def read(self, count):
+                if self.empty_reads:
+                    self.empty_reads -= 1
+                    return b""
+                return super().read(count)
+
+        port = SlowPort(b"CDJ/1 NONE\n")
+        self.assertIsNone(retrieve_checkpoint(port))
+        self.assertEqual([b"CDJ/1 READ\n"], port.writes)
+        self.assertIsNone(port.timeout)
+        self.assertIsNone(port.write_timeout)
+
+    def test_write_timeout_is_restored_after_failure(self):
+        class ShortWritePort(Port):
+            timeout = None
+            write_timeout = None
+            def write(self, data):
+                self.observed_write_timeout = self.write_timeout
+                return 0
+
+        port = ShortWritePort(b"")
+        with self.assertRaisesRegex(OSError, "Short checkpoint"):
+            retrieve_checkpoint(port)
+        self.assertEqual(0.1, port.observed_write_timeout)
+        self.assertIsNone(port.write_timeout)
 
     def test_deadline(self):
         ticks = iter([0.0, 3.0])
