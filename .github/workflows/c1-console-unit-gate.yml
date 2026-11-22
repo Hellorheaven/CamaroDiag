@@ -1,0 +1,70 @@
+name: C1 console unit gate
+
+# Exactly one explicit unit-test campaign after C1 implementation is frozen.
+# Ordinary C1 code commits, PR synchronize and draft updates never start CI.
+# The full multi-component Debug validation remains the separate C8 checkpoint.
+on:
+  push:
+    branches: [chore/unified-ci]
+    paths:
+      - '.github/c1-console-gate-request.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c1-console-unit-gate
+  cancel-in-progress: false
+
+jobs:
+  android-c1:
+    name: C1 Android communication / diagnostic / app unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: 14742923
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Generate wrapper for repository Gradle
+        run: gradle wrapper --gradle-version 8.11.1
+      - name: Run affected C1 Android unit suites (warnings fail)
+        run: ./gradlew :communication:testDebugUnitTest :diagnostic:testDebugUnitTest :app:testDebugUnitTest --warning-mode=fail --stacktrace
+      - name: Preserve C1 unit test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: c1-android-unit-${{ github.sha }}
+          path: |
+            **/build/reports/tests/testDebugUnitTest/**
+            **/build/test-results/testDebugUnitTest/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-c1:
+    name: C1 Windows J2534 Debug compile and hardware-free self-tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build and self-test Windows J2534 console
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build ./pc-bridge/CamaroDiag.J2534Bridge/CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Windows J2534 Debug build failed' }
+          dotnet run --project ./pc-bridge/CamaroDiag.J2534Bridge/CamaroDiag.J2534Bridge.csproj --configuration Debug --no-build -- --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'Windows J2534 self-test failed' }
