@@ -223,6 +223,11 @@ object CamaroUdsProtocol {
                 bytes = bytes.drop(1)
             }
             if (bytes.size < 3 || bytes[0] != 0x41 || bytes[1] != expectedPid) continue
+            // Apply the same exact SAE lengths as the read-only console and
+            // the physical J2534 bridge. An extra byte must never turn a
+            // malformed live sensor frame into an apparently valid reading.
+            val expectedLength = SafeObdRequestPolicy.expectedMode01DataBytes(expectedPid)
+            if (expectedLength != null && bytes.size != expectedLength + 2) continue
             return bytes.drop(2).toIntArray()
         }
         return null
