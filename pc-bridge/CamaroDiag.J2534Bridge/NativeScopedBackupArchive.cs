@@ -58,6 +58,7 @@ internal static class NativeScopedBackupArchive
             readback.StartAddress != capture.StartAddress ||
             readback.ByteCount != capture.Bytes.Length ||
             readback.DeclaredRegion != scope.Region ||
+            readback.DeclaredOrigin != "REPORTED_HARDWARE_READ" ||
             !string.Equals(readback.Sha256, capture.Sha256, StringComparison.OrdinalIgnoreCase) ||
             readback.Firmware != firmware ||
             readback.RequiredRegions.Count != 0)

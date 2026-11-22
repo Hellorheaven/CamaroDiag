@@ -190,6 +190,30 @@ internal static class NativeScopedBackupArchiveSelfTests
             Reject<InvalidDataException>(() =>
                 NativeScopedBackupImport.VerifyZip(overstatedPath, scope));
             File.Delete(overstatedPath);
+            // The generic offline importer may inspect self-consistent data
+            // marked SIMULATION; the physical publication checker must not
+            // accept that changed origin as the captured ECU evidence.
+            var wrongOriginPath = Path.Combine(directory, "forged-origin.zip");
+            File.Copy(zipPath, wrongOriginPath);
+            using (var forged = ZipFile.Open(wrongOriginPath, ZipArchiveMode.Update))
+            {
+                var entry = forged.GetEntry("manifest.properties")!;
+                string metadata;
+                using (var reader = new StreamReader(entry.Open(), Encoding.ASCII))
+                    metadata = reader.ReadToEnd();
+                entry.Delete();
+                using var writer = new StreamWriter(
+                    forged.CreateEntry("manifest.properties").Open(), Encoding.ASCII);
+                writer.Write(metadata.Replace(
+                    "capture.0.origin=REPORTED_HARDWARE_READ",
+                    "capture.0.origin=SIMULATION"));
+            }
+            Check(NativeScopedBackupImport.VerifyZip(wrongOriginPath, scope).DeclaredOrigin ==
+                "SIMULATION", "Offline integrity can inspect explicit simulated origin");
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupArchive.RequirePublishedCaptureMatch(
+                    wrongOriginPath, scope, capture, null));
+            File.Delete(wrongOriginPath);
             var originalZip = File.ReadAllBytes(zipPath);
             var alteredPath = Path.Combine(directory, "altered.zip");
             File.WriteAllBytes(alteredPath, originalZip);
