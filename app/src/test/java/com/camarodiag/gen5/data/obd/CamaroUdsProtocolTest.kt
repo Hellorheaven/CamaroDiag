@@ -37,7 +37,7 @@ class CamaroUdsProtocolTest {
     fun ignoresAdapterBannersAndOtherPidsBeforeValidSingleLineTelemetry() {
         assertArrayEquals(intArrayOf(0x1A, 0xF8),
             CamaroUdsProtocol.parsePidBytes(
-                "SEARCHING...\\r\\n010C\\r\\nNO DATA\\r\\n7E8 04 41 0C 1A F8", "0C"))
+                "SEARCHING...\r\n010C\r\nNO DATA\r\n7E8 04 41 0C 1A F8", "0C"))
         assertArrayEquals(intArrayOf(0x1A, 0xF8),
             CamaroUdsProtocol.parsePidBytes("7E804410C1AF8", "0C"))
         for (invalid in listOf("410C", "41 0C", "7E8 03 41 0C 1A F8",
@@ -56,13 +56,13 @@ class CamaroUdsProtocolTest {
             "41 A6 00 12 D6 87 01",
             "7E8 05 41 A6 00 12 D6 87",
             "7E8 07 41 A6 00 12 D6 87",
-            "SEARCHING...\\nNO DATA",
+            "SEARCHING...\nNO DATA",
             "410A410A410A",
             "41 D3 00 12 D6 87"
         )) assertNull("Never infer odometer from: $invalid",
             CamaroUdsProtocol.parseOdometerPidA6(invalid))
         assertEquals(123456.7, CamaroUdsProtocol.parseOdometerPidA6(
-            "SEARCHING...\\r\\n7E8 06 41 A6 00 12 D6 87"), 0.01)
+            "SEARCHING...\r\n7E8 06 41 A6 00 12 D6 87"), 0.01)
     }
 
     @Test
@@ -110,7 +110,7 @@ class CamaroUdsProtocolTest {
     @Test
     fun negativeAtRepliesDoNotGrantCanOrSwCanCapabilities() {
         for (failure in listOf("NOT OK", "NOK", "OK?", "ERROR", "UNABLE TO CONNECT",
-                "OK\\r\\nERROR", "OK\\r\\nNO DATA", "OK\\r\\n?")) {
+                "OK\r\nERROR", "OK\r\nNO DATA", "OK\r\n?")) {
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "OBDLink MX+",
                 macAddress = "00:00:00:00:00:01",
@@ -134,10 +134,10 @@ class CamaroUdsProtocolTest {
             macAddress = "00:00:00:00:00:01",
             atzResp = "OBDLink",
             stiResp = "STN2120 v5.6.5",
-            atalResp = "ATAL\\r\\nOK\\r\\n>",
-            stp61Resp = "STP 61\\r\\nOK\\r\\n>",
-            headersResp = "ATH1\\r\\nOK\\r\\n>",
-            protocolResp = "ATSP6\\r\\nOK\\r\\n>"
+            atalResp = "ATAL\r\nOK\r\n>",
+            stp61Resp = "STP 61\r\nOK\r\n>",
+            headersResp = "ATH1\r\nOK\r\n>",
+            protocolResp = "ATSP6\r\nOK\r\n>"
         )
         assertTrue(capabilities.supportsLongFrames)
         assertTrue(capabilities.supportsSwCan)
