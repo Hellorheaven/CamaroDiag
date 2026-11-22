@@ -676,3 +676,5 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 - PR70 : snapshot privé unique avant contrôle/planification et protections pendant la double lecture baseline ; tests de coupure et mutation des images. Aucune activation de driver ECU. Attendre les CI complètes, pas de fusion avant build sans avertissements et validation des critères existants.
 
 - Connectors 6c95fac : délais de découverte Android Java et Python, vérification des octets USB encore en tampon, tests de fragmentation lente. PR70 : onglet graphique local de découverte CD/1, sélection COM explicite, confirmation carte isolée, aucun sondage automatique, blocage si pont/console occupés ; même implémentation que CLI. CI du nouveau HEAD à vérifier.
+
+- Pont Windows : inspection hors ligne CDJ/1 et test du vecteur commun avec firmware/Android ; UI récupération et CLI explicite. Toute étape reste bloquante pour les opérations physiques ; pas de commande embarquée d'export. Vérifier CI avant fusion.

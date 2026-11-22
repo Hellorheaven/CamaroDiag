@@ -10,6 +10,7 @@ internal static class BridgeSelfTests
     public static int Run()
     {
         if (ConnectorDiscoverySelfTests.Run() != 0) return 1;
+        ConnectorCheckpointSelfTests.Run();
         var checks = 0;
         void Assert(bool condition, string name)
         {

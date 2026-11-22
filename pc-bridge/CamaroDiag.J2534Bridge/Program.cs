@@ -45,6 +45,9 @@ internal static class Program
         if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
             return BridgeSelfTests.Run();
 
+        if (args.Contains(ConnectorCheckpoint.Command, StringComparer.OrdinalIgnoreCase))
+            return ConnectorCheckpoint.Run(args);
+
         // Offline recovery inspection must never load a J2534 driver or
         // trigger the updater. Invalid or incomplete evidence is not success.
         if (args.Contains("--inspect-write-journal", StringComparer.OrdinalIgnoreCase))

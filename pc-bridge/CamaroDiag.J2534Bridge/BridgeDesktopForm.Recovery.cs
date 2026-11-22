@@ -24,6 +24,7 @@ internal sealed partial class BridgeDesktopForm
                 "Conservez toujours le fichier original et le journal."
         };
         var choose = Button("Ouvrir et analyser un journal");
+        var chooseConnector = Button("Ouvrir un checkpoint CDJ/1");
         var results = new TextBox
         {
             Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
@@ -79,9 +80,48 @@ internal sealed partial class BridgeDesktopForm
             }
             finally { choose.Enabled = true; }
         };
+        chooseConnector.Click += async (_, _) =>
+        {
+            if (busy) return;
+            using var dialog = new OpenFileDialog
+            {
+                Title = "Choisir un checkpoint CDJ/1 exporté (64 octets)",
+                Filter = "Checkpoint binaire (*.bin)|*.bin|Tous les fichiers (*.*)|*.*",
+                CheckFileExists = true, Multiselect = false
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            results.Text = "Analyse CDJ/1 hors ligne…";
+            chooseConnector.Enabled = choose.Enabled = false;
+            try
+            {
+                await RunBusyAsync(async () =>
+                {
+                    var report = await Task.Run(() => ConnectorCheckpoint.InspectFile(dialog.FileName));
+                    var lines = new List<string>
+                    {
+                        "Fichier : " + Path.GetFileName(dialog.FileName),
+                        "État CDJ/1 : " + report.Status,
+                        "Authentification : NON. Aucun accès physique autorisé."
+                    };
+                    if (report.Record is { } record)
+                    {
+                        lines.Add("Étape : " + record.Stage);
+                        lines.Add("Séquence : " + record.Sequence);
+                        lines.Add("Transaction : " + record.TransactionHex);
+                        lines.Add("SHA-256 du manifeste : " + record.ManifestSha256);
+                    }
+                    lines.Add("Reprise automatique et programmation interdites. Vérifier les preuves et l'état réel.");
+                    results.Lines = lines.ToArray();
+                });
+                if (results.Text == "Analyse CDJ/1 hors ligne…")
+                    results.Text = "Checkpoint non analysable. Aucune conclusion sur la cible.";
+            }
+            finally { chooseConnector.Enabled = choose.Enabled = true; }
+        };
         layout.Controls.Add(instructions, 0, 0);
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         actions.Controls.Add(choose);
+        actions.Controls.Add(chooseConnector);
         layout.Controls.Add(actions, 0, 1);
         layout.Controls.Add(results, 0, 2);
         tab.Controls.Add(layout);
