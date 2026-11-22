@@ -105,9 +105,14 @@ class CanConsoleDiagnosticCorrelation(
         // statusAvailabilityMask, NOT an echo of the request's statusMask.
         // 0A similarly answers with a DTC list. Keep the subfunction matched,
         // and retain strict full-parameter matching for other UDS requests.
-        if (service == 0x19 && requestPayload.size >= 2 &&
-            (requestPayload[1].toInt() and 0x7F) in setOf(0x01, 0x02, 0x0A)
-        ) {
+        val dtcSubfunction = if (requestPayload.size > 1)
+            requestPayload[1].toInt() and 0x7F else -1
+        val supportedDtcEcho = service == 0x19 && when (dtcSubfunction) {
+            0x01, 0x02 -> requestPayload.size == 3
+            0x0A -> requestPayload.size == 2
+            else -> false
+        }
+        if (supportedDtcEcho) {
             return response.size >= 2 &&
                 (response[1].toInt() and 0x7F) == (requestPayload[1].toInt() and 0x7F)
         }
