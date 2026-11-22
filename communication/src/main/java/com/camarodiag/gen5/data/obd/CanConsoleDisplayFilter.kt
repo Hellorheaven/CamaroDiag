@@ -6,7 +6,7 @@ package com.camarodiag.gen5.data.obd
  * The diagnostic engine never consumes this filter.
  */
 object CanConsoleDisplayFilter {
-    private val historyCanId = Regex("""^CAN ID=([0-9A-Fa-f]{3}|[0-9A-Fa-f]{8})\\s+DLC=""")
+    private val historyCanId = Regex("""^CAN ID=([0-9A-Fa-f]{3}|[0-9A-Fa-f]{8})\s+DLC=""")
     fun observedIds(history: List<ParsedCanConsoleRecord>, traceIds: Collection<Int>): List<Long> =
         (traceIds.map { it.toLong() } +
             history.mapNotNull { entry ->
