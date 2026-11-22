@@ -20,6 +20,21 @@ class EcuBackupIntegrityTest {
     private fun manifest(captures: List<EcuBackupManifest.Capture>) =
         EcuBackupManifest.inspect("test", 1L, captures, required)
 
+    @Test fun reportedHardwareReadCannotLackVehicleIdentity() {
+        val hardware = listOf(capture().copy(
+            origin = EcuBackupManifest.Origin.REPORTED_HARDWARE_READ
+        ))
+        val missingVin = manifest(hardware)
+        val problems = EcuBackupIntegrity.verify(missingVin, hardware, required).problems
+        assertTrue(EcuBackupIntegrity.Problem.PHYSICAL_ORIGIN_MISSING_VIN in problems)
+
+        val identified = EcuBackupManifest.inspect(
+            "test", 1L, hardware, required, "1G1FA1RXXR0123456"
+        )
+        assertTrue(EcuBackupIntegrity.verify(identified, hardware, required).consistent)
+        assertFalse(identified.hardwareProvenanceVerified)
+    }
+
     @Test fun consistentBytesAndManifestPassOfflineCheck() {
         val captures = listOf(capture())
         assertTrue(EcuBackupIntegrity.verify(manifest(captures), captures, required).consistent)

@@ -26,6 +26,24 @@ class EcuBackupArchiveTest {
             256L * 1024 * 1024)
     }
 
+    @Test fun hardwareReportedArchiveWithoutVinIsNeverExported() {
+        val reported = capture().copy(
+            origin = EcuBackupManifest.Origin.REPORTED_HARDWARE_READ
+        )
+        val output = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(output, listOf(reported), emptySet())
+        }.isFailure)
+        assertEquals(0, output.size())
+        EcuBackupArchive.export(
+            output, listOf(reported), emptySet(), vehicleVin = "1G1FA1RXXR0123456"
+        )
+        val imported = EcuBackupArchive.import(output.toByteArray().inputStream())
+        assertEquals("1G1FA1RXXR0123456", imported.manifest.vehicleVin)
+        assertTrue(imported.verification.consistent)
+        assertTrue(!imported.manifest.hardwareProvenanceVerified)
+    }
+
     @Test fun exportAndImportPreserveBytesAndCoverage() {
         val archive = ByteArrayOutputStream()
         EcuBackupArchive.export(archive, listOf(capture()), setOf(capture().region), "LFX offline")

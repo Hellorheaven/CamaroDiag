@@ -22,6 +22,7 @@ object EcuBackupIntegrity {
         ALIASED_INDEPENDENT_READ,
         EMPTY_CAPTURE,
         INVALID_VIN,
+        PHYSICAL_ORIGIN_MISSING_VIN,
         INVALID_CAPTURE_TIMESTAMP
     }
 
@@ -41,6 +42,13 @@ object EcuBackupIntegrity {
         if (manifest.createdAtUtcMillis <= 0L) problems += Problem.INVALID_CAPTURE_TIMESTAMP
         if (manifest.vehicleVin != null && !manifest.vehicleVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
             problems += Problem.INVALID_VIN
+        }
+        // A reported physical read must at least identify the ECU's vehicle.
+        // This is still a declaration, not independent proof of provenance.
+        if (captures.any { it.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ } &&
+            manifest.vehicleVin == null
+        ) {
+            problems += Problem.PHYSICAL_ORIGIN_MISSING_VIN
         }
         if (manifest.hardwareProvenanceVerified) {
             // No hardware reader currently issues an independently authenticated attestation.
