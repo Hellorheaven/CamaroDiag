@@ -50,7 +50,12 @@ object Lfx2012FlexFuelPreflight {
         val problems = mutableListOf<Status>()
         val selectedVin = vehicle.selectedVin?.trim()?.uppercase()
         val ecuVin = vehicle.ecuVin?.trim()?.uppercase()
-        if (!isVin(selectedVin) || !isVin(ecuVin) || selectedVin != ecuVin) {
+        // The tenth VIN character C denotes the 2012 model year on
+        // Chevrolet Camaro Gen 5. A selected model-year label alone is not
+        // sufficient when the ECU supplies a different VIN year code.
+        if (!isVin(selectedVin) || !isVin(ecuVin) || selectedVin != ecuVin ||
+            selectedVin?.getOrNull(9) != 'C'
+        ) {
             problems += Status.VIN_MISMATCH
         }
         if (evidence.controllerId.isNullOrBlank() || evidence.firmwareId.isNullOrBlank()) {
