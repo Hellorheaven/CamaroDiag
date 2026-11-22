@@ -532,6 +532,7 @@ pas le port du pont sur Internet.",
                 Filter = filter, OverwritePrompt = true, AddExtension = true,
                 DefaultExt = "bin", Title = "Choisir un NOUVEAU fichier de sortie"
             };
+            if (!PrepareExportDialog(dialog, UserExportStorage.Category.Calibrations, "CamaroDiag-calibration.bin")) return;
             if (dialog.ShowDialog(this) == DialogResult.OK)
                 target.Text = dialog.FileName;
         }

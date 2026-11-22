@@ -16,4 +16,6 @@ Android utilise le dossier public `/storage/emulated/0/CamaroDiag/` autorisé pa
 
 Les fichiers existants restent en place. Les nouveaux fichiers ne les écrasent pas. Les écritures temporaires et les vérifications SHA-256 sont conservées dans chaque dossier. En cas d'erreur de création du dossier, l'export échoue sans revenir silencieusement à la racine.
 
-Objectif de parité Windows : adopter la même classification sous le dossier CamaroDiag choisi par l'utilisateur ; les chemins libres existants ne sont pas modifiés par ce lot. Les données internes, les clés et les fichiers de travail sensibles restent dans le stockage privé approprié.
+Windows : les dialogues de sauvegarde de l'interface utilisent par défaut `Documents/CamaroDiag/` et les mêmes catégories, avec `Profiles` pour les profils mémoire. Ils proposent un nom unique ; un emplacement différent peut être choisi explicitement. Les chemins CLI explicites et anciens fichiers restent inchangés ; aucune migration automatique. Un dossier invalide ou redirigé est refusé, sans repli silencieux. Les données internes, les clés et les fichiers de travail sensibles restent dans le stockage privé approprié.
+
+Les APK de mise à jour Android sont gérés séparément par DownloadManager et vérifiés avant installation ; le dossier de téléchargements appartient au mécanisme système. Les clés, journaux internes et fichiers temporaires d'installation privés ne sont pas des exports publics.

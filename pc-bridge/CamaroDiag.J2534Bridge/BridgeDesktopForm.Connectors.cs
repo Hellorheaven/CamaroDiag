@@ -101,6 +101,7 @@ internal sealed partial class BridgeDesktopForm
                 Filter = "Checkpoint CDJ/1 (*.cdj)|*.cdj",
                 FileName = "checkpoint.cdj", OverwritePrompt = true
             };
+            if (!PrepareExportDialog(dialog, UserExportStorage.Category.Recovery, "checkpoint.cdj")) return;
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             string path = dialog.FileName;
             refresh.Enabled = ports.Enabled = confirmed.Enabled = verify.Enabled = capture.Enabled = false;

@@ -216,6 +216,7 @@ internal sealed partial class BridgeDesktopForm
             Filter = "Texte (*.txt)|*.txt", AddExtension = true,
             FileName = "CamaroDiag-Console.txt"
         };
+        if (!PrepareExportDialog(picker, UserExportStorage.Category.Console, "CamaroDiag-Console.txt")) return;
         if (picker.ShowDialog(this) != DialogResult.OK) return;
         try
         {

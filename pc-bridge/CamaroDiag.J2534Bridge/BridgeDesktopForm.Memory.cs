@@ -133,6 +133,7 @@ internal sealed partial class BridgeDesktopForm
                 FileName = "CamaroDiag-Memoire-ECU.json",
                 AddExtension = true
             };
+            if (!PrepareExportDialog(picker, UserExportStorage.Category.Profiles, "CamaroDiag-Memoire-ECU.json")) return;
             if (picker.ShowDialog(this) != DialogResult.OK) return;
             var json = JsonSerializer.Serialize(new
             {
@@ -252,6 +253,7 @@ internal sealed partial class BridgeDesktopForm
             AddExtension = true,
             FileName = "CamaroDiag-Memoire-ECU.zip"
         };
+        if (!PrepareExportDialog(destination, UserExportStorage.Category.EcuBackups, "CamaroDiag-Memoire-ECU.zip")) return;
         if (destination.ShowDialog(this) != DialogResult.OK) return;
         if (File.Exists(destination.FileName))
         {
