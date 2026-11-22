@@ -420,7 +420,12 @@ internal sealed partial class BridgeDesktopForm
                 catch (OperationCanceledException)
                 {
                     progressActive = false;
-                    memoryStatus.Text = "Lecture ECU annulée : aucune nouvelle archive validée.";
+                    // Cancellation may race a successfully completed atomic
+                    // rename. Do not claim "no archive" if a ZIP is visible.
+                    memoryStatus.Text = File.Exists(destination.FileName)
+                        ? "Annulation pendant la finalisation : un ZIP est présent. " +
+                          "Vérifiez son intégrité avec le profil avant utilisation."
+                        : "Lecture ECU annulée : aucune nouvelle archive validée.";
                     throw;
                 }
                 catch (Exception error)
