@@ -236,4 +236,23 @@ class SafeObdRequestPolicyTest {
         }
     }
 
+    @Test
+    fun mode09VinRejectsForbiddenCharactersAndWrongRecordCount() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        fun response(vin: String, count: Int = 1): String =
+            "49 02 %02X ".format(java.util.Locale.ROOT, count) +
+                vin.toByteArray(Charsets.US_ASCII).joinToString(" ") {
+                    "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+                }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            request, response("1G1FA1RXXR0123456")))
+        for (invalid in listOf("1G1IA1RXXR0123456", "1G1OA1RXXR0123456",
+            "1G1QA1RXXR0123456", "1G1FA1RXXR012345", "1G1FA1RXXR01234567")) {
+            assertEquals(invalid, false, SafeObdRequestPolicy.hasPositiveResponse(
+                request, response(invalid)))
+        }
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            request, response("1G1FA1RXXR0123456", count = 2)))
+    }
+
 }
