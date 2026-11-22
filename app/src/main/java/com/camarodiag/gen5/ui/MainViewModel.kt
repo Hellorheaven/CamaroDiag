@@ -855,12 +855,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var calibrationIdentityGeneration = 0L
     private var gmlanIdentityGeneration = 0L
 
-    private fun clearVehicleEvidence() {
+    private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
-        discardCanMonitor()
+        val interruptedCapture = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
+        discardCanMonitor(deleteArchive = !preserveCanConsole)
         detachCanRequest()
-        _liveCanMonitorState.value = LiveCanMonitorState()
+        _liveCanMonitorState.value = if (preserveCanConsole) {
+            _liveCanMonitorState.value.copy(
+                isCapturing = false,
+                isSendingRequest = false,
+                rawArchiveFailed = _liveCanMonitorState.value.rawArchiveFailed || interruptedCapture
+            )
+        } else LiveCanMonitorState()
         obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
             obdManager.disconnect()
@@ -1929,10 +1936,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var detachedCanMonitorJob: Job? = null
     private var detachedCanRequestJob: Job? = null
 
-    private fun discardCanMonitor() {
-        // A changed vehicle must never inherit the previous vehicle's raw archive.
-        activeCanCaptureFile?.delete()
-        activeCanCaptureFile = null
+    private fun discardCanMonitor(deleteArchive: Boolean = true) {
+        // Vehicle/VIN changes delete old evidence; link disconnects retain it.
+        if (deleteArchive) {
+            activeCanCaptureFile?.delete()
+            activeCanCaptureFile = null
+        }
         val activeJob = canMonitorJob ?: return
         canMonitorJob = null
         detachedCanMonitorJob = activeJob
@@ -3041,7 +3050,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isJ2534BridgeConnecting = false,
             isJ2534BridgeConnected = false
         )
-        clearVehicleEvidence()
+        clearVehicleEvidence(preserveCanConsole = true)
         _isObdScanning.value = false
     }
 
