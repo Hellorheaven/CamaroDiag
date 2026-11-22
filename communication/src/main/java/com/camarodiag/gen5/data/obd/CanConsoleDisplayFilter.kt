@@ -1,35 +1,66 @@
 package com.camarodiag.gen5.data.obd
 
 /**
- * Display-only selector populated from CAN identifiers actually observed on
- * the connected bus. An identifier is NOT proof of a named ECU identity.
- * The diagnostic engine never consumes this filter.
+ * A CAN identifier is composed of the numeric arbitration ID AND its format.
+ * 7E8 (11-bit) and 000007E8 (29-bit) are distinct bus addresses.
  */
-object CanConsoleDisplayFilter {
-    private val historyCanId = Regex("""^CAN ID=([0-9A-Fa-f]{3}|[0-9A-Fa-f]{8})\s+DLC=""")
-    fun observedIds(history: List<ParsedCanConsoleRecord>, traceIds: Collection<Int>): List<Long> =
-        (traceIds.map { it.toLong() } +
-            history.mapNotNull { entry ->
-                if (entry.direction != "RX") null
-                else historyCanId.find(entry.content)?.groupValues?.get(1)?.toLongOrNull(16)
-            })
-            .filter { it in 0..0x1FFFFFFFL }
-            .distinct()
-            .sorted()
-
-    fun visible(entry: ParsedCanConsoleRecord, selectedId: Long?): Boolean {
-        if (selectedId == null || entry.direction == "SYSTEM") return true
-        val id = if (entry.direction == "RX") {
-            historyCanId.find(entry.content)?.groupValues?.get(1)?.toLongOrNull(16)
-        } else {
-            RawCanFrameParser.parse(entry.content)?.canId
-        }
-        return id == selectedId
+data class ObservedCanId(val value: Long, val extended: Boolean) {
+    init {
+        require(value >= 0 && value <= if (extended) 0x1FFFFFFFL else 0x7FFL)
     }
 
-    fun visibleId(frameId: Long, selectedId: Long?): Boolean =
-        selectedId == null || frameId == selectedId
+    val hex: String
+        get() = value.toString(16).uppercase().padStart(if (extended) 8 else 3, '0')
+}
 
-    fun displayId(id: Long): String =
-        id.toString(16).uppercase().padStart(if (id <= 0x7FF) 3 else 8, '0')
+/** Presentation only. Never modify stored capture or diagnostic correlation. */
+object CanConsoleDisplayFilter {
+    private val historyCanId = Regex("""^CAN ID=([0-9A-Fa-f]{3}|[0-9A-Fa-f]{8})\s+DLC=""")
+
+    private fun receivedId(entry: ParsedCanConsoleRecord): ObservedCanId? {
+        if (entry.direction != "RX") return null
+        val token = historyCanId.find(entry.content)?.groupValues?.get(1) ?: return null
+        val id = token.toLongOrNull(16) ?: return null
+        return runCatching { ObservedCanId(id, token.length == 8) }.getOrNull()
+    }
+
+    private fun sentId(entry: ParsedCanConsoleRecord): ObservedCanId? {
+        if (entry.direction != "TX") return null
+        val frame = RawCanFrameParser.parse(entry.content) ?: return null
+        return ObservedCanId(frame.canId, frame.isExtended)
+    }
+
+    fun observedIds(
+        history: List<ParsedCanConsoleRecord>,
+        traceIds: Collection<Int>
+    ): List<ObservedCanId> {
+        // The existing offline trace model does not retain the original CAN ID width.
+        // An ID <= 0x7FF in that model is ambiguous and MUST NOT be promoted to
+        // a verified 11-bit address. History RX entries preserve the width.
+        val unambiguousTrace = traceIds.asSequence()
+            .filter { it in 0x800..0x1FFFFFFF }
+            .map { ObservedCanId(it.toLong(), extended = true) }
+        return (history.asSequence().mapNotNull(::receivedId) + unambiguousTrace)
+            .distinct().sortedWith(compareBy({ it.value }, { it.extended })).toList()
+    }
+
+    fun visible(entry: ParsedCanConsoleRecord, selectedId: ObservedCanId?): Boolean {
+        if (selectedId == null || entry.direction == "SYSTEM") return true
+        return when (entry.direction) {
+            "RX" -> receivedId(entry) == selectedId
+            "TX" -> sentId(entry) == selectedId
+            else -> false
+        }
+    }
+
+    /**
+     * Offline trace frames have no 11-/29-bit flag. For IDs <= 0x7FF,
+     * do not assert membership in a specific format; this avoids showing
+     * unrelated standard frames under an extended-ID selection.
+     */
+    fun visibleId(frameId: Long, selectedId: ObservedCanId?): Boolean =
+        selectedId == null || (frameId > 0x7FFL &&
+            selectedId.extended && selectedId.value == frameId)
+
+    fun displayId(id: ObservedCanId): String = id.hex
 }
