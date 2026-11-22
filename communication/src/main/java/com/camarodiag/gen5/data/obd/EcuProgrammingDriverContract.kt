@@ -5,7 +5,20 @@ package com.camarodiag.gen5.data.obd
  * There is currently no registered ECU writer; no transport is interchangeable.
  */
 interface EcuProgrammingDriverContract {
-    enum class Transport { ELM_DIAGNOSTICS, J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CHIP_OFF }
+    enum class Transport {
+        ELM_DIAGNOSTICS, J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CHIP_OFF,
+        CAN_DIRECT, BDM, EEPROM_ISP;
+
+        /** Connection type is not evidence of an implemented hardware protocol. */
+        fun permitsMemoryProgramming(region: EcuBackupCoverage.Region): Boolean =
+            when (this) {
+                ELM_DIAGNOSTICS -> false
+                CHIP_OFF, EEPROM_ISP -> region == EcuBackupCoverage.Region.EXTERNAL_EEPROM
+                J2534, BENCH, BOOT_BAM, NEXUS_JTAG, CAN_DIRECT, BDM ->
+                    region in setOf(EcuBackupCoverage.Region.CALIBRATION,
+                        EcuBackupCoverage.Region.PROGRAM_FLASH, EcuBackupCoverage.Region.DATA_FLASH)
+            }
+    }
     enum class Capability {
         IDENTIFY, READ_REGION, ERASE_REGION, WRITE_REGION, READBACK_VERIFY, RESET
     }
@@ -26,7 +39,8 @@ interface EcuProgrammingDriverContract {
         val capabilities: Set<Capability>,
         val controllerFamilies: Set<String>,
         val physicalHardwareValidated: Boolean,
-        val writeTargets: Set<FirmwareTarget> = emptySet()
+        val writeTargets: Set<FirmwareTarget> = emptySet(),
+        val qualifiedWriteRegions: Set<EcuBackupCoverage.Region> = emptySet()
     ) {
         /** Shared protocol-family match; neither a firmware nor a service number is required. */
         fun supportsFamilyProtocol(controllerFamily: String, requestedTransport: Transport): Boolean =
@@ -43,10 +57,16 @@ interface EcuProgrammingDriverContract {
          * One protocol driver may support many firmware versions on that family.
          */
         fun supportsWrite(target: FirmwareTarget, requestedTransport: Transport): Boolean =
-            physicalHardwareValidated &&
+            physicalHardwareValidated && transport != Transport.ELM_DIAGNOSTICS &&
                 supportsFamilyProtocol(target.controllerFamily, requestedTransport) &&
                 target in writeTargets &&
-                capabilities.containsAll(requiredWriteCapabilities)
+                capabilities.containsAll(requiredWriteCapabilities) &&
+                qualifiedWriteRegions.any(transport::permitsMemoryProgramming)
+
+        fun supportsWrite(target: FirmwareTarget, requestedTransport: Transport,
+                          region: EcuBackupCoverage.Region): Boolean =
+            supportsWrite(target, requestedTransport) && region in qualifiedWriteRegions &&
+                transport.permitsMemoryProgramming(region)
     }
 
     data class Identity(val controllerId: String, val firmwareId: String, val vin: String?)
