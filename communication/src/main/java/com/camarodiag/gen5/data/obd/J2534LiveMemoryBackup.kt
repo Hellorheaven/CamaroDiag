@@ -174,13 +174,20 @@ object J2534LiveMemoryBackup {
             throw failure
         }
 
-        fun memoryRequest(address: Long, bytes: Int): ByteArray =
-            byteArrayOf(0x23, 0x24) +
-                byteArrayOf(
-                    (address ushr 24).toByte(), (address ushr 16).toByte(),
-                    (address ushr 8).toByte(), address.toByte(),
-                    (bytes ushr 8).toByte(), bytes.toByte()
-                )
+        fun memoryRequest(address: Long, bytes: Int): ByteArray {
+            // ISO 14229 ALFI: 4-byte address; use a 1-byte size for 1..255
+            // and a 2-byte size only for 256. Match the Windows native reader.
+            val addressBytes = byteArrayOf(
+                (address ushr 24).toByte(), (address ushr 16).toByte(),
+                (address ushr 8).toByte(), address.toByte()
+            )
+            return if (bytes > 255) {
+                byteArrayOf(0x23, 0x24) + addressBytes +
+                    byteArrayOf((bytes ushr 8).toByte(), bytes.toByte())
+            } else {
+                byteArrayOf(0x23, 0x14) + addressBytes + byteArrayOf(bytes.toByte())
+            }
+        }
 
         suspend fun pass(passNumber: Int): ByteArray {
             val image = ByteArray(request.lengthBytes)

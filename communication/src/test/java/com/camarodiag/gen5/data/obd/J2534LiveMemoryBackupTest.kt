@@ -45,14 +45,19 @@ class J2534LiveMemoryBackupTest {
                 0x10 -> byteArrayOf(0x50, payload[1])
                 0x3E -> byteArrayOf(0x7E, 0x00)
                 0x23 -> {
-                    require(payload.size == 8 && payload[1] == 0x24.toByte())
+                    require((payload.size == 7 && payload[1] == 0x14.toByte()) ||
+                        (payload.size == 8 && payload[1] == 0x24.toByte()))
                     val address = ((payload[2].toLong() and 0xFF) shl 24) or
                         ((payload[3].toLong() and 0xFF) shl 16) or
                         ((payload[4].toLong() and 0xFF) shl 8) or
                         (payload[5].toLong() and 0xFF)
                     val offset = (address - 0x1000L).toInt()
-                    val length = ((payload[6].toInt() and 0xFF) shl 8) or
-                        (payload[7].toInt() and 0xFF)
+                    val length = if (payload.size == 7) {
+                        payload[6].toInt() and 0xFF
+                    } else {
+                        ((payload[6].toInt() and 0xFF) shl 8) or
+                            (payload[7].toInt() and 0xFF)
+                    }
                     require(offset >= 0 && offset + length <= memory.size)
                     val body = memory.copyOfRange(offset, offset + length)
                     if (alterSecondPass && reads >= 3) body[0] = (body[0] + 1).toByte()
@@ -64,6 +69,26 @@ class J2534LiveMemoryBackupTest {
         }
         override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) =
             error("Unexpected sendOnly")
+    }
+
+    @Test fun memoryReadLengthUsesTheShortestDocumentedUdsAlfiEncoding() = runBlocking {
+        for (size in listOf(1, 128, 255, 256)) {
+            val fake = ScriptedEcu(ByteArray(size) { it.toByte() }, vin)
+            val result = J2534LiveMemoryBackup.captureForTest(
+                fake, request(length = size).copy(chunkBytes = size)
+            )
+            assertEquals(size, result.capture.firstRead.size)
+            val payloads = fake.sent.filter { it[0] == 0x23.toByte() }
+            assertEquals(2, payloads.size)
+            for (requestBytes in payloads) {
+                val expected = if (size == 256) {
+                    byteArrayOf(0x23, 0x24, 0, 0, 0x10, 0, 0x01, 0)
+                } else {
+                    byteArrayOf(0x23, 0x14, 0, 0, 0x10, 0, size.toByte())
+                }
+                assertArrayEquals(expected, requestBytes)
+            }
+        }
     }
 
     @Test fun twoIndependentReadPassesBecomeAConsistentOfflineArchive() = runBlocking {
@@ -516,9 +541,9 @@ class J2534LiveMemoryBackupTest {
         assertEquals(2, requests.count { it[0] == 0x23.toByte() })
         val memoryRequests = requests.filter { it[0] == 0x23.toByte() }
         for (payload in memoryRequests) {
-            assertArrayEquals(byteArrayOf(0x23, 0x24,
+            assertArrayEquals(byteArrayOf(0x23, 0x14,
                 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFE.toByte(),
-                0x00, 0x02), payload)
+                0x02), payload)
         }
     }
 
