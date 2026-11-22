@@ -2077,11 +2077,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendReadOnlyConsoleCommand(request)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val hasEcuResponse = SafeObdRequestPolicy.hasUnambiguousPositiveResponse(request, response)
-                    val hasNegativeEcuResponse = SafeObdRequestPolicy.hasNegativeResponse(request, response)
+                    val kind = SafeObdRequestPolicy.classifyResponse(request, response)
+                    val hasEcuResponse = kind == SafeObdRequestPolicy.ReadResponseKind.POSITIVE_ECU
                     // An ECU negative response proves the TX was delivered,
                     // although the requested diagnostic read was refused.
-                    val isEcuTraffic = hasEcuResponse || hasNegativeEcuResponse
+                    val isEcuTraffic = kind != SafeObdRequestPolicy.ReadResponseKind.UNMATCHED_OR_ADAPTER
                     val responseEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = if (isEcuTraffic) "RX" else "SYSTEM",
