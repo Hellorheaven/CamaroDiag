@@ -139,7 +139,7 @@ class Lfx2012ProgrammingAuditTest {
 
     @Test fun syntheticOrDemoEvidenceIsNeverPresentedAsRealObservation() {
         val suspectValues = listOf("SIMULATED", "demo", "SAMPLE", "mock",
-            "fake", "placeholder", "CAL-DEMO-01")
+            "fake", "placeholder", "CAL-DEMO-01", "unknown-controller", "pending-firmware")
         suspectValues.forEach { suspect ->
             val report = Lfx2012ProgrammingAudit.review(before,
                 before.copy(ecuName = suspect, capturedAtUtcMillis = 2L))
