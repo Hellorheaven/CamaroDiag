@@ -733,3 +733,8 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 
 
 - Hotfix #98 (main et PR95, demande explicite) : logo Google 18dp, vérification fondée sur le claim Firebase signé email_verified après renouvellement, relecture au retour du navigateur, feedback erreurs, actualisation après ajout d'un fournisseur, grâce hors ligne seulement sur même adresse précédemment confirmée, sans privilèges propriétaire offline. L'objet des mails nécessite la configuration Firebase Authentication (nom public CamaroDiag et modèle de vérification). Ne pas modifier l'ID projet/OAuth ni annoncer une modification serveur sans confirmation.
+
+
+### UX Auth #99 — compte Google et mots de passe
+- Google devient la connexion par défaut ; aucun champ e-mail/mot de passe n'est affiché tant que l'utilisateur n'a pas explicitement choisi « Connexion avec e-mail et mot de passe ». Lors du changement de mode, nettoyer les saisies.
+- Aucun champ « ajouter/créer mot de passe » sur compte lié Google, même si `password` est présent parmi les fournisseurs ; aucun changement de mot de passe sur compte Google. Seuls les comptes e-mail purs (`password` et non `google.com`) ont dans « Mon compte » une action Changer mon mot de passe, avec ancien mot de passe + double saisie du nouveau. Vérifier ≥8 caractères, égalité, différence de l'ancien ; appeler `reauthenticate` puis `updatePassword` Firebase ; ne pas toucher aux UID, e-mails ou claims. Tests de la politique.
