@@ -201,6 +201,19 @@ object SafeObdRequestPolicy {
         return false
     }
 
+    enum class ReadResponseKind { POSITIVE_ECU, NEGATIVE_ECU, UNMATCHED_OR_ADAPTER }
+
+    /**
+     * One shared classification for the console history and its TX/RX status.
+     * A negative ECU reply proves delivery but is not a successful diagnostic read.
+     */
+    fun classifyResponse(request: SafeObdRequest, response: String): ReadResponseKind =
+        when {
+            hasNegativeResponse(request, response) -> ReadResponseKind.NEGATIVE_ECU
+            hasPositiveResponse(request, response) -> ReadResponseKind.POSITIVE_ECU
+            else -> ReadResponseKind.UNMATCHED_OR_ADAPTER
+        }
+
     /** Conflicting ECU results are not proof of a successful single read. */
     fun hasUnambiguousPositiveResponse(request: SafeObdRequest, response: String): Boolean =
         hasPositiveResponse(request, response) && !hasNegativeResponse(request, response)
