@@ -702,6 +702,9 @@ fun CamaroDiagApp(
                     onStart = { can29Bit -> viewModel.startCanMonitor(can29Bit = can29Bit) },
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
+                    onConfirmRawFrame = { frame, epoch ->
+                        viewModel.confirmRawCanConsoleFrame(frame, epoch)
+                    },
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
                     onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
@@ -1689,13 +1692,14 @@ fun CanSnifferScreen(
     onStart: (Boolean) -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
+    onConfirmRawFrame: (String, Long) -> Unit,
     onClearHistory: () -> Unit,
     onExport: () -> Unit
 ) {
     var requestInput by remember { mutableStateOf("01 0C") }
     var monitorCan29Bit by remember { mutableStateOf(false) }
     var monitorFormatMenuExpanded by remember { mutableStateOf(false) }
-    var pendingRawFrameInput by remember { mutableStateOf<String?>(null) }
+    var pendingRawFrameInput by remember { mutableStateOf<Pair<String, Long>?>(null) }
     var frameSearch by remember { mutableStateOf("") }
     var canIdFilter by remember { mutableStateOf("") }
     var dataPrefixFilter by remember { mutableStateOf("") }
@@ -1704,6 +1708,10 @@ fun CanSnifferScreen(
     var observedEcuMenuExpanded by remember { mutableStateOf(false) }
     var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
     val report = state.report
+    // A vehicle or adapter change invalidates even an already opened TX dialog.
+    LaunchedEffect(state.consoleContextGeneration) {
+        pendingRawFrameInput = null
+    }
     // The menu describes CAN IDs seen in this session, not assumed ECU identities.
     val observedCanIds = remember(state.observedCanIds, report) {
         // Old log entries remain visible in the global monitor, but cannot
@@ -1991,7 +1999,8 @@ fun CanSnifferScreen(
                     Button(
                         onClick = {
                             if (RawCanFrameParser.parse(requestInput) != null) {
-                                pendingRawFrameInput = requestInput.trim()
+                                pendingRawFrameInput =
+                                    requestInput.trim() to state.consoleContextGeneration
                             } else {
                                 onSendRequest(requestInput)
                             }
@@ -2299,7 +2308,15 @@ fun CanSnifferScreen(
             }
         }
     }
-    pendingRawFrameInput?.let { frame ->
+    pendingRawFrameInput?.let { (frame, pendingEpoch) ->
+        val canConfirm = CanConsoleCapabilityPolicy.canConfirmPhysicalTx(
+            frame = RawCanFrameParser.parse(frame),
+            pendingContextGeneration = pendingEpoch,
+            currentContextGeneration = state.consoleContextGeneration,
+            monitorAvailable = isAvailable,
+            canTransmit = canTransmitAvailable,
+            busy = state.isCapturing || state.isSendingRequest
+        )
         AlertDialog(
             onDismissRequest = { pendingRawFrameInput = null },
             title = { Text(stringResource(R.string.can_console_raw_tx_confirm_title)) },
@@ -2310,10 +2327,13 @@ fun CanSnifferScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    onSendRequest(frame)
-                    pendingRawFrameInput = null
-                }) { Text(stringResource(android.R.string.ok)) }
+                TextButton(
+                    enabled = canConfirm,
+                    onClick = {
+                        if (canConfirm) onConfirmRawFrame(frame, pendingEpoch)
+                        pendingRawFrameInput = null
+                    }
+                ) { Text(stringResource(android.R.string.ok)) }
             },
             dismissButton = {
                 TextButton(onClick = { pendingRawFrameInput = null }) {
