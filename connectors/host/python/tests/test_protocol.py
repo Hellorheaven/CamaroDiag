@@ -22,6 +22,41 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(DiscoveryClient(transport).execute("PING"), "PONG CamaroDiagConnectors 0.1.0")
         self.assertEqual(bytes(transport.outgoing), b"PING\n")
 
+    def test_discovery_binds_and_restores_read_write_timeouts(self):
+        class TimedSerial(MockSerial):
+            def __init__(self, reply):
+                super().__init__(reply)
+                self.timeout = None
+                self.write_timeout = None
+            def write(self, data):
+                self.write_deadline = self.write_timeout
+                return super().write(data)
+            def readline(self):
+                self.read_deadline = self.timeout
+                return super().readline()
+
+        port = TimedSerial(b"PONG CamaroDiagConnectors 0.1.0\\n")
+        self.assertEqual(DiscoveryClient(port).execute("PING"),
+                         "PONG CamaroDiagConnectors 0.1.0")
+        self.assertEqual((2, 2), (port.read_deadline, port.write_deadline))
+        self.assertIsNone(port.timeout)
+        self.assertIsNone(port.write_timeout)
+
+    def test_discovery_restores_timeouts_after_short_write(self):
+        class ShortWrite(MockSerial):
+            timeout = None
+            write_timeout = None
+            def write(self, data):
+                self.write_deadline = self.write_timeout
+                return 0
+
+        port = ShortWrite(b"")
+        with self.assertRaisesRegex(IOError, "Short command"):
+            DiscoveryClient(port).execute("PING")
+        self.assertEqual(2, port.write_deadline)
+        self.assertIsNone(port.timeout)
+        self.assertIsNone(port.write_timeout)
+
     def test_ping_rejects_unknown_identity_or_version(self):
         for reply in (
             b"PONG OtherDevice 0.1.0\n",
