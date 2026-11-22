@@ -409,6 +409,17 @@ internal sealed partial class J2534Device : IDisposable
         if (count != 1) throw new IOException("J2534 driver did not queue the UDS message.");
     }
 
+    // Check diagnostic wire shape before an untrusted console payload reaches
+    // the physical J2534 driver. 0x22 contains one or more complete 2-byte
+    // DIDs; 0x19 must include at least the read-DTC subfunction.
+    internal static bool IsWellFormedReadOnlyDiagnosticPayload(byte[] payload) =>
+        payload.Length >= 2 && (payload[0] switch
+        {
+            0x22 => payload.Length >= 3 && (payload.Length - 1) % 2 == 0,
+            0x19 => true,
+            _ => false
+        });
+
     private void ValidateReadOnlyService(byte[] payload, bool allowNoResponse)
     {
         var service = payload[0];
@@ -417,7 +428,7 @@ internal sealed partial class J2534Device : IDisposable
             payload[1] is 0x02 or 0x04 or 0x06 or 0x0A) return;
         if (!allowNoResponse && payload.Length == 2 && service == 0x1A &&
             payload[1] is 0x90 or 0xC1 or 0xC9) return;
-        if (service == 0x22 || service == 0x19) return;
+        if (IsWellFormedReadOnlyDiagnosticPayload(payload)) return;
         if (service == 0x3E && payload.Length == 2 && payload[1] is 0x00 or 0x80) return;
         if (!allowNoResponse && _memoryReadVinVerified && _memoryReadScope != null)
         {
