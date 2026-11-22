@@ -6,12 +6,14 @@ internal object CamaroDiagReleaseAssetPolicy {
     const val MAX_APK_BYTES = 512L * 1024L * 1024L
     private const val prefix = "https://github.com/Hellorheaven/CamaroDiag/releases/download/"
 
-    fun accepts(url: String?, fileName: String): Boolean {
+    fun accepts(url: String?, fileName: String, expectedTag: String? = null): Boolean {
         if (fileName != "CamaroDiag-debug.apk" && fileName != "CamaroDiag-release.apk") return false
         if (url == null || !url.startsWith(prefix)) return false
         val remainder = url.removePrefix(prefix).split('/')
-        return remainder.size == 2 && allowedTag.matches(remainder[0]) &&
-            remainder[0] != "." && remainder[0] != ".." && remainder[1] == fileName
+        val tag = remainder.firstOrNull() ?: return false
+        return remainder.size == 2 && allowedTag.matches(tag) &&
+            tag != "." && tag != ".." && remainder[1] == fileName &&
+            (expectedTag == null || (expectedTag == tag && allowedTag.matches(expectedTag)))
     }
     /** Refuse truncated or excessively large APKs before writing past the limit. */
     fun copyBounded(input: java.io.InputStream, output: java.io.OutputStream,
