@@ -342,6 +342,36 @@ class CanConsoleLiveDiagnosticCorrelationTest {
             correlation.recentReceivedRecords().map { it.record.content })
     }
 
+    @Test fun physicalSessionRejectsPreTxAckAndEcuResponseButKeepsGlobalRx() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.append("OK\r\n7E8 04 03 41 0C 1A\r\n", 900L)
+        assertEquals(false, correlation.hasExplicitAdapterAck())
+        assertEquals(1, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
+        correlation.beginRequest(1_000L)
+        correlation.append("7E9 04 03 41 0C 1B\r\n", 1_001L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(1_002L))
+        assertEquals(3, correlation.recentReceivedRecords().size)
+        assertEquals(false, CanConsolePhysicalTransmissionPolicy.confirmed(
+            adapterOutput = "OK", diagnosticStatus = correlation.complete(1_003L),
+            hasExplicitAck = correlation.hasExplicitAdapterAck(),
+            hasAdapterError = correlation.hasAdapterError()
+        ))
+    }
+
+    @Test fun physicalSessionOnlyAcceptsAckOrResponseAfterBeginRequest() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.append("7E8 04 03 41 0C 1A\r\n", 990L)
+        correlation.beginRequest(1_000L)
+        correlation.append("OK\r\n7E8 04 03 41 0C 1A\r\n", 1_001L)
+        assertEquals(true, correlation.hasExplicitAdapterAck())
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(1_002L))
+        assertEquals(2, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
