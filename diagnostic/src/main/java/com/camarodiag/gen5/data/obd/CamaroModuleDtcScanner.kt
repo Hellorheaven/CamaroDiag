@@ -12,6 +12,7 @@ import com.camarodiag.gen5.domain.model.TransmissionType
  * an automatic-transmission variant does.
  */
 enum class CamaroControlModule(val displayName: String) {
+    ECM("Engine Control Module"),
     BCM("Body Control Module"),
     TCM("Transmission Control Module"),
     EBCM("Electronic Brake Control Module (ABS)"),
