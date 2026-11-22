@@ -1,16 +1,17 @@
 name: Release validation (no publication)
 on:
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
   windows-release:
-    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
@@ -23,12 +24,12 @@ jobs:
           dotnet run --project .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --no-build -- --self-test
           if ($LASTEXITCODE -ne 0) { throw 'Release bridge self-test failed' }
   android-release:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -40,26 +41,26 @@ jobs:
         with:
           cmdline-tools-version: 14742923
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
-      - name: Restore Release signing keystore
+      - name: Build Release APK with a temporary test key
         env:
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: android
+          SIGNING_KEY_ALIAS: checkpoint
+          SIGNING_KEY_PASSWORD: android
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$SIGNING_KEYSTORE_BASE64"
-          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > app/release.jks
-          test -s app/release.jks
-      - name: Lint, unit tests and signed Release APK
-        env:
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          keytool -genkeypair -keystore app/release.jks -storetype JKS \
+            -storepass "$SIGNING_STORE_PASSWORD" -keypass "$SIGNING_KEY_PASSWORD" \
+            -alias "$SIGNING_KEY_ALIAS" -keyalg RSA -keysize 2048 \
+            -dname 'CN=CamaroDiag CI checkpoint' -validity 1 -noprompt
           gradle wrapper --gradle-version 8.11.1
           chmod +x gradlew
           ./gradlew testDebugUnitTest lintDebug lintRelease app:assembleRelease --stacktrace --warning-mode=fail
+      - name: Verify the APK signature
+        shell: bash
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --Werr --verbose \
+            app/build/outputs/apk/release/CamaroDiag-release.apk
       - name: Reject lint warnings in all modules
         shell: bash
         run: |

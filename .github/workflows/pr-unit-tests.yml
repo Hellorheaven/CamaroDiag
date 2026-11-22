@@ -1,10 +1,14 @@
 name: PR unit tests
 # Heavy tests are never triggered by pull_request synchronize.
 # Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
-# Lightweight regression gate on PR changes. Full Android/Windows checkpoint
-# remains explicitly launched through the existing manual CI workflows.
+# Unit tests on ready-for-review. A manual checkpoint also runs Connectors
+# and Android/Windows Release validation on the same revision.
 on:
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "Exact branch head for the full checkpoint (optional)"
+        type: string
   pull_request:
     branches: [main]
     types: [ready_for_review]
@@ -32,10 +36,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify-revision:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the requested immutable revision
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [[ -n "$EXPECTED_SHA" && "$EXPECTED_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::Requested SHA differs from the workflow dispatch revision."
+            exit 1
+          fi
+
   unit-tests:
+    needs: verify-revision
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -70,3 +90,13 @@ jobs:
             **/build/test-results/testDebugUnitTest/**
           if-no-files-found: ignore
           retention-days: 14
+
+  connectors:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify-revision
+    uses: ./.github/workflows/connectors-ci.yml
+
+  release-validation:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify-revision
+    uses: ./.github/workflows/release-validation.yml

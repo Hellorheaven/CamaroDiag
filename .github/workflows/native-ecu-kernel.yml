@@ -3,6 +3,7 @@ name: Native ECU kernel tests
 # Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
 on:
   pull_request:
+    branches: [main]
     types: [ready_for_review]
     paths:
       - 'ecu-native/**'
@@ -16,8 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
       - name: Test native C components and cross-compile PowerPC objects

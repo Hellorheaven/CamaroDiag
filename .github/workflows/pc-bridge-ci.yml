@@ -344,7 +344,7 @@ jobs:
           fi
   build-windows-debug:
     needs: evaluate-build-checkpoint
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.evaluate-build-checkpoint.outputs.build_required == 'true')
+    if: needs.evaluate-build-checkpoint.result == 'success' && needs.evaluate-build-checkpoint.outputs.build_required == 'true'
     runs-on: windows-latest
     steps:
       - name: Checkout pull request commit

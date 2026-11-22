@@ -268,7 +268,7 @@ jobs:
           fi
   test-and-build:
     needs: evaluate-build-checkpoint
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.evaluate-build-checkpoint.outputs.build_required == 'true')
+    if: needs.evaluate-build-checkpoint.result == 'success' && needs.evaluate-build-checkpoint.outputs.build_required == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout requested validation commit
@@ -319,12 +319,11 @@ jobs:
         run: |
           python3 - <<'PY'
           import pathlib
-          import re
+          import xml.etree.ElementTree as ET
           import sys
 
           def keys(path):
-              content = pathlib.Path(path).read_text(encoding="utf-8")
-              return set(re.findall(r'<string\\s+name="([^"]+)"', content))
+              return {entry.attrib["name"] for entry in ET.parse(path).getroot().findall("string")}
 
           english = keys("app/src/main/res/values/strings.xml")
           french = keys("app/src/main/res/values-fr/strings.xml")
@@ -399,7 +398,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -s app/build/outputs/apk/debug/CamaroDiag-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --Werr \
+            app/build/outputs/apk/debug/CamaroDiag-debug.apk
           test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           python3 - <<'PY'
           import pathlib
