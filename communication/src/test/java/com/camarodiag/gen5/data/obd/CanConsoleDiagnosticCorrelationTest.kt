@@ -84,6 +84,25 @@ class CanConsoleDiagnosticCorrelationTest {
         ))
     }
 
+    @Test fun functionalBroadcastAcceptsSeparateRespondersButNeverMixesTheirSegments() {
+        val functional = frame("7DF 03 22 F1 90")
+        val mixed = "7E8 08 10 0A 62 F1 90 31 32 33\\r\\n" +
+            "7E9 05 21 34 35 36 37\\r\\n" +
+            "7E8 05 21 34 35 36 37"
+        assertEquals(3, CanConsoleRecordParser.parse(mixed).count { it.direction == "RX" })
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(mixed, functional))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E8 08 10 0A 62 F1 90 31 32 33\\r\\n7E9 05 21 34 35 36 37",
+            functional
+        ))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E9 04 03 62 F1 90", functional
+        ))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E9 04 03 62 F1 91", functional
+        ))
+    }
+
     @Test fun unknownOrFunctionalPhysicalContextCannotAcquireOtherEcu() {
         for (request in listOf("7DF 02 01 0C", "123 02 01 0C", "18DAF110 03 22 F1 90")) {
             try {
