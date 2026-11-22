@@ -42,8 +42,9 @@ object ProfiledUdsModuleInventory {
         timeoutMs: Long = 3000L
     ): List<Result> {
         require(timeoutMs in 1..30_000L) { "Module identification deadline out of range." }
-        require(moduleIds.size <= 32 && moduleIds.all(String::isNotBlank) &&
-            moduleIds.map { it.uppercase(Locale.ROOT) }.distinct().size == moduleIds.size) {
+        val requestedModules = moduleIds.toList()
+        require(requestedModules.size <= 32 && requestedModules.all(String::isNotBlank) &&
+            requestedModules.map { it.uppercase(Locale.ROOT) }.distinct().size == requestedModules.size) {
             "Module inventory requires unique nonblank module identifiers."
         }
         // Snapshot caller-owned collections; a profile-pack edit during a
@@ -52,7 +53,7 @@ object ProfiledUdsModuleInventory {
             it.copy(readableDids = it.readableDids.toSet(),
                 identityDids = it.identityDids.toList())
         }
-        return moduleIds.map { moduleId ->
+        return requestedModules.map { moduleId ->
             val candidates = approvedProfiles.filter {
                 it.moduleId.equals(moduleId, ignoreCase = true)
             }
