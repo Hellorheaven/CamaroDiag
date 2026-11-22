@@ -2,6 +2,7 @@ package com.camarodiag.gen5.data.obd
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -351,6 +352,57 @@ class J2534LiveMemoryBackupTest {
         assertTrue(job.isCancelled)
         assertEquals(0, ecu.reads)
         assertEquals(listOf(3, 1), ecu.sent.filter { it[0] == 0x10.toByte() }.map { it[1].toInt() })
+    }
+
+    @Test fun cancellationInsideVinCheckSafelyRevalidatesBeforeResettingSession() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        var vinChecks = 0
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                if (payload.contentEquals(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()))) {
+                    vinChecks++
+                    if (vinChecks == 2)
+                        throw CancellationException("Cancelled during VIN polling")
+                }
+                return ecu.exchange(payload, timeoutMs)
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.exceptionOrNull() is CancellationException)
+        assertEquals(3, ecu.reads)
+        assertEquals(3, vinChecks)
+        assertEquals(
+            listOf(3, 1),
+            ecu.sent.filter { it[0] == 0x10.toByte() }.map { it[1].toInt() }
+        )
+    }
+
+    @Test fun cancellationInsideVinCheckNeverResetsAnUnidentifiedReplacement() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        var vinChecks = 0
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                if (payload.contentEquals(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()))) {
+                    vinChecks++
+                    if (vinChecks == 2)
+                        throw CancellationException("Cancelled during VIN polling")
+                    if (vinChecks == 3)
+                        return byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()) +
+                            "1G1FA1RXXR0123457".toByteArray(Charsets.US_ASCII)
+                }
+                return ecu.exchange(payload, timeoutMs)
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.exceptionOrNull() is CancellationException)
+        assertEquals(3, ecu.reads)
+        assertEquals(3, vinChecks)
+        assertEquals(
+            listOf(3),
+            ecu.sent.filter { it[0] == 0x10.toByte() }.map { it[1].toInt() }
+        )
     }
 
     @Test fun extendedSessionIsNeverResetAfterLiveVinMismatch() = runBlocking {

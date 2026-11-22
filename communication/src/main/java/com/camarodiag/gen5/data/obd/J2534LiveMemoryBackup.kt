@@ -2,6 +2,7 @@ package com.camarodiag.gen5.data.obd
 
 import java.io.OutputStream
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -168,8 +169,14 @@ object J2534LiveMemoryBackup {
             val vin = response.copyOfRange(3, 20).toString(Charsets.US_ASCII)
             require(vin == request.expectedVin) { "Live ECU VIN differs from selected vehicle." }
             vin
+        } catch (cancelled: CancellationException) {
+            // Cancellation alone does not prove a different ECU. The
+            // NonCancellable session cleanup independently rechecks the
+            // original link's VIN before it can send a session reset.
+            throw cancelled
         } catch (failure: Exception) {
-            // Never send a session change to a target whose identity is uncertain.
+            // Malformed, missing or mismatched identity is uncertain;
+            // never send a session change to that target.
             identityLost = true
             throw failure
         }
