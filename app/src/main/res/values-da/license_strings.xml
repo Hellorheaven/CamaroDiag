@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Gratis: livedata, læsning og sletning af DTC. En personlig licens låser avancerede funktioner op. Fejlfindingsværktøjer er kun for ejeren.</string>
+    <string name="license_account_link">Licensen er knyttet til din Firebase-konto og bekræftede loginmail.</string>
+    <string name="license_no_browser">Ingen browser tilgængelig.</string>
+    <string name="license_checkout_unavailable">Køb er ikke tilgængeligt. Firebase/Stripe-betaling skal konfigureres.</string>
+    <string name="license_activation_help">Licensen aktiveres, når serveren bekræfter betalingen. Vend tilbage og tryk på Opdater. En omdirigering alene giver ikke en licens.</string>
+    <string name="license_required_for_feature">Aktivér en licens på den konto, du er logget ind med, for at bruge denne funktion.</string>
+</resources>

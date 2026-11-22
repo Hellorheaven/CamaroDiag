@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+build="$(mktemp -d)"
+trap 'rm -rf "$build"' EXIT
+cmake -S "$root" -B "$build/host" -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$build/host" --parallel
+ctest --test-dir "$build/host" --output-on-failure
+
+# Execute production C# protocol and transaction code against the actual C model.
+LD_LIBRARY_PATH="$build/host:${LD_LIBRARY_PATH:-}" dotnet run \
+    --project "$root/tests/managed/NativeKernelIntegration.csproj" --configuration Release
+
+# Cross-compile the actual MMIO component and its freestanding dependencies.
+# These are relocatable PowerPC objects only: no board startup, linker image,
+# upload binary or hardware compatibility is implied by this test.
+for source in flash_map flash_controller kernel_protocol isotp_rx isotp_tx kernel_runtime flexcan kernel_can flexcan_mmio flash_mmio; do
+    clang --target=powerpc-none-eabi -mcpu=powerpc -std=c11 -Os \
+        -ffreestanding -fno-builtin -Wall -Wextra -Werror \
+        -c "$root/$source.c" -o "$build/$source.o"
+    file "$build/$source.o"
+done

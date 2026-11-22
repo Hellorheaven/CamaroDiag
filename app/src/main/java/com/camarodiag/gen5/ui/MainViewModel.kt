@@ -13,17 +13,22 @@ import com.camarodiag.gen5.data.db.SavedSessionEntity
 import com.camarodiag.gen5.data.obd.BluetoothObdManager
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.google.firebase.auth.FirebaseAuth
+import com.camarodiag.gen5.auth.LicenseLevel
+import com.camarodiag.gen5.auth.LicenseRolloutConfig
 import com.camarodiag.gen5.auth.AccountStorageKeys
 import com.camarodiag.gen5.data.obd.CamaroUdsProtocol
 import com.camarodiag.gen5.data.obd.CalibrationFileInspector
 import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
+import com.camarodiag.gen5.data.obd.EcuBackupArchive
+import com.camarodiag.gen5.data.obd.EcuExternalDumpPair
+import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
+import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
 import com.camarodiag.gen5.data.obd.ObdbCamaroSignalSet
 import com.camarodiag.gen5.data.obd.CamaroSignalCatalog
-import com.camarodiag.gen5.data.obd.UdsAccessPolicy
 import com.camarodiag.gen5.data.obd.toDiagnosticDtc
 import com.camarodiag.gen5.data.obd.ObdDtc
 import com.camarodiag.gen5.data.obd.ObdScanReport
@@ -41,6 +46,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -49,6 +55,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 import java.security.MessageDigest
+import kotlin.coroutines.resume
 import java.io.File
 import java.util.UUID
 import org.json.JSONArray
@@ -89,9 +96,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsPreferences = application.getSharedPreferences("camarodiag_settings", Context.MODE_PRIVATE)
     private val obdManager = BluetoothObdManager(application)
     private var authenticatedAccountUid: String? = FirebaseAuth.getInstance().currentUser?.uid
-    private var accountSessionGeneration: Long = 0L
+    @Volatile private var currentLicenseLevel: LicenseLevel = LicenseLevel.FREE
+
+    /**
+     * Only CamaroAuthGate supplies this tier, from a signed Firebase token
+     * and, for paying customers, a freshly fetched SERVER Firestore document.
+     * Device-side checks are defense in depth; the backend enforces billing.
+     */
+    fun setLicenseLevel(level: LicenseLevel, accountUid: String?) {
+        if (accountUid != authenticatedAccountUid) {
+            currentLicenseLevel = LicenseLevel.FREE
+            return
+        }
+        currentLicenseLevel = if (!LicenseRolloutConfig.ENABLED &&
+            accountUid != null && level != LicenseLevel.OWNER
+        ) LicenseLevel.PREMIUM else level
+        if (LicenseRolloutConfig.ENABLED && level == LicenseLevel.FREE) {
+            gmlanIdentityGeneration++
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                isGmlanReading = false, gmlanIdentity = null, gmlanIdentityFailed = false
+            )
+            if (_liveRecordingState.value.isRecording) stopLiveRecording()
+            discardCanMonitor()
+            detachCanRequest()
+        }
+    }
+
+    private fun hasPremiumLicense(): Boolean =
+        authenticatedAccountUid != null &&
+            FirebaseAuth.getInstance().currentUser?.uid == authenticatedAccountUid &&
+            (!LicenseRolloutConfig.ENABLED || currentLicenseLevel != LicenseLevel.FREE)
+
+    private fun requirePremiumLicense(): Boolean {
+        if (hasPremiumLicense()) return true
+        _connectionMessage.value = localizedContext.getString(R.string.license_required_for_feature)
+        return false
+    }
+
+    @Volatile private var accountSessionGeneration: Long = 0L
     private fun isCurrentAccountGeneration(started: Long): Boolean =
         started == accountSessionGeneration && authenticatedAccountUid != null
+
+    /** A pending folder-picker action is valid only in the original login session. */
+    internal fun exportAccountGeneration(): Long = accountSessionGeneration
+    internal fun canResumeExport(started: Long, owner: String): Boolean =
+        isCurrentAccountGeneration(started) && authenticatedAccountUid == owner &&
+            FirebaseAuth.getInstance().currentUser?.uid == owner
 
     private val _activeAccountUid = MutableStateFlow(authenticatedAccountUid)
     val activeAccountUid: StateFlow<String?> = _activeAccountUid.asStateFlow()
@@ -120,7 +170,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onAccountSessionChanged(accountUid: String?) {
         if (authenticatedAccountUid == accountUid) return
         authenticatedAccountUid = accountUid
+        currentLicenseLevel = LicenseLevel.FREE
         accountSessionGeneration++
+        traceAnalysisJob?.cancel()
+        functionalTestGeneration++
+        functionalTestJob?.cancel()
+        functionalTestJob = null
+        _functionalTestState.value = FunctionalTestState()
         // A connection started under another Firebase account must never
         // complete after the garage and session ownership have changed.
         connectionAttemptGeneration++
@@ -193,6 +249,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ?: AppLanguage.fromLocale(application.resources.configuration.locales[0])
     )
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
+    private val localizedContext: Context
+        get() = getApplication<Application>().forAppLanguage(_language.value)
+    // No saved manual override means follow the device language.
+    private val _followSystemLanguage = MutableStateFlow(
+        settingsPreferences.getString("language", null) == null
+    )
+    val followSystemLanguage: StateFlow<Boolean> = _followSystemLanguage.asStateFlow()
 
     private val _unitSystem = MutableStateFlow(
         runCatching { UnitSystem.valueOf(settingsPreferences.getString("unit_system", UnitSystem.METRIC.name)!!) }
@@ -285,7 +348,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         id = UUID.nameUUIDFromBytes(
                             "legacy-current:$uid:${vehicle.modelYear}:${vehicle.engine}:${vehicle.transmission}:${vehicle.market}:${vehicle.vin}".toByteArray(Charsets.UTF_8)
                         ).toString(),
-                        name = getApplication<Application>().getString(R.string.saved_vehicle_legacy_default_name),
+                        name = localizedContext.getString(R.string.saved_vehicle_legacy_default_name),
                         vehicle = vehicle,
                         requiresReview = true
                     )
@@ -310,7 +373,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (_: Exception) {
                 _connectionMessage.value =
-                    getApplication<Application>().getString(R.string.msg_session_save_failed)
+                    localizedContext.getString(R.string.msg_session_save_failed)
             } finally {
                 legacyImportInProgress = false
                 if (authenticatedAccountUid == uid &&
@@ -357,7 +420,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (_liveRecordingState.value.isRecording) {
             stopLiveRecording()
         }
-        _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_recording_channel_lost)
+        _liveTelemetryMessage.value = localizedContext.getString(R.string.msg_live_recording_channel_lost)
         _isObdScanning.value = false
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isReading = false,
@@ -373,7 +436,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "J2534_BRIDGE" -> R.string.connection_lost_pc_bridge
             else -> R.string.connection_lost_vehicle
         }
-        _connectionLossMessage.value = getApplication<Application>().getString(messageId)
+        _connectionLossMessage.value = localizedContext.getString(messageId)
         // Reset the physical transport too; USB/Wi-Fi availability otherwise remains optimistic.
         obdManager.disconnect()
         markAdapterDisconnected()
@@ -392,6 +455,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         activeBusyOperations = (activeBusyOperations - 1).coerceAtLeast(0)
         _isBusy.value = activeBusyOperations > 0
     }
+
+    private val _functionalTestState = MutableStateFlow(FunctionalTestState())
+    val functionalTestState: StateFlow<FunctionalTestState> = _functionalTestState.asStateFlow()
+    private var functionalTestJob: Job? = null
+    private var functionalTestGeneration: Long = 0L
 
     private val _modules = MutableStateFlow<List<EcuModule>>(emptyList())
     val modules: StateFlow<List<EcuModule>> = _modules.asStateFlow()
@@ -551,7 +619,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun saveCurrentVehicle(name: String) {
         val cleanName = name.trim().take(60)
         if (cleanName.isBlank()) {
-            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_profile_name_required)
+            _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_profile_name_required)
             return
         }
         val current = _vehicle.value
@@ -575,7 +643,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         persistSavedVehicleProfiles(updated)
         _selectedSavedVehicleId.value = profile.id
         accountVehiclePreferences().edit { putString("selected_vehicle_id", profile.id) }
-        _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_profile_saved)
+        _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_profile_saved)
     }
 
     fun selectSavedVehicle(id: String) {
@@ -590,9 +658,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedSavedVehicleId.value = saved.id
         accountVehiclePreferences().edit { putString("selected_vehicle_id", saved.id) }
         _connectionMessage.value = if (saved.requiresReview) {
-            getApplication<Application>().getString(R.string.msg_vehicle_profile_review_required)
+            localizedContext.getString(R.string.msg_vehicle_profile_review_required)
         } else {
-            getApplication<Application>().getString(R.string.msg_vehicle_profile_loaded, saved.name)
+            localizedContext.getString(R.string.msg_vehicle_profile_loaded, saved.name)
         }
     }
 
@@ -610,7 +678,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun syncVehicleVinFromEcu(ecuVin: String) {
         val normalizedVin = VehicleVinMatcher.normalize(ecuVin)
         if (normalizedVin == null) {
-            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_ecu_vin_invalid)
+            _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_ecu_vin_invalid)
             return
         }
         val selectedId = _selectedSavedVehicleId.value
@@ -629,14 +697,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun createVehicleFromEcuVin(ecuVin: String) {
         val normalizedVin = VehicleVinMatcher.normalize(ecuVin)
         if (normalizedVin == null) {
-            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_ecu_vin_invalid)
+            _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_ecu_vin_invalid)
             return
         }
         val vehicleFromEcu = _vehicle.value.copy(vin = normalizedVin)
         val suffix = normalizedVin.takeLast(6)
         val saved = SavedVehicleProfile(
             id = UUID.randomUUID().toString(),
-            name = getApplication<Application>().getString(R.string.saved_vehicle_ecu_default_name, suffix),
+            name = localizedContext.getString(R.string.saved_vehicle_ecu_default_name, suffix),
             vehicle = vehicleFromEcu,
             requiresReview = true
         )
@@ -646,7 +714,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateVin(normalizedVin)
         _selectedSavedVehicleId.value = saved.id
         accountVehiclePreferences().edit { putString("selected_vehicle_id", saved.id) }
-        _connectionMessage.value = getApplication<Application>().getString(R.string.msg_vehicle_profile_review_required)
+        _connectionMessage.value = localizedContext.getString(R.string.msg_vehicle_profile_review_required)
     }
 
     private fun rememberConnectionProfile(transport: String, capabilities: AdapterCapabilities, endpoint: String) {
@@ -660,8 +728,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setLanguage(lang: AppLanguage) {
+        _followSystemLanguage.value = false
         _language.value = lang
         settingsPreferences.edit { putString("language", lang.code) }
+    }
+
+    /** Restore automatic language choice and remove any saved manual override. */
+    fun setFollowSystemLanguage(systemLocale: java.util.Locale) {
+        settingsPreferences.edit { remove("language") }
+        _followSystemLanguage.value = true
+        _language.value = AppLanguage.fromLocale(systemLocale)
+    }
+
+    /** Update automatic language after Android reports a device configuration change. */
+    fun refreshSystemLanguage(systemLocale: java.util.Locale) {
+        if (_followSystemLanguage.value) {
+            _language.value = AppLanguage.fromLocale(systemLocale)
+        }
     }
 
     private fun localizedMileageSummaryForStorage(report: com.camarodiag.gen5.domain.model.MileageAuditReport): String {
@@ -675,7 +758,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }.distinctBy { it.moduleId.uppercase() }
         val values = independent.mapNotNull { it.kmValue }
         val delta = if (values.size >= 2) values.maxOrNull()!! - values.minOrNull()!! else 0.0
-        val context = getApplication<Application>()
+        val context = localizedContext
         return when {
             report.hasDiscrepancy -> context.getString(R.string.mileage_summary_discrepancy, delta)
             values.size >= 2 -> context.getString(R.string.mileage_summary_agreement, delta)
@@ -741,7 +824,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isRecording = false,
                 sampleCount = 0,
                 stoppedAtMillis = System.currentTimeMillis(),
-                message = getApplication<Application>().getString(
+                message = localizedContext.getString(
                     R.string.msg_live_recording_stopped_count,
                     previousSampleCount
                 )
@@ -751,7 +834,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var traceAnalysisJob: Job? = null
+    private var calibrationIdentityGeneration = 0L
+    private var gmlanIdentityGeneration = 0L
+
     private fun clearVehicleEvidence() {
+        calibrationIdentityGeneration++
+        gmlanIdentityGeneration++
         discardCanMonitor()
         detachCanRequest()
         _liveCanMonitorState.value = LiveCanMonitorState()
@@ -761,7 +850,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = false,
                 isJ2534BridgeConnected = false,
-                j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_bridge_disconnected_vehicle_changed)
+                j2534BridgeMessage = localizedContext.getString(R.string.vm_bridge_disconnected_vehicle_changed)
             )
         }
         _dtcs.value = emptyList()
@@ -771,6 +860,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _obdScanMessage.value = null
         _liveTelemetryMessage.value = null
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isReading = false,
+            isGmlanReading = false,
+            gmlanIdentity = null,
+            gmlanIdentityFailed = false,
             ecuVinResponse = "",
             ecuIdentityFromSimulation = false,
             vinComparison = null,
@@ -806,13 +899,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 withContext(Dispatchers.Main) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         nativeSignals = signals,
-                        nativeSignalMessage = getApplication<Application>().resources.getQuantityString(R.plurals.vm_native_catalog_loaded, signals.size, signals.size, _vehicle.value.modelYear)
+                        nativeSignalMessage = localizedContext.resources.getQuantityString(R.plurals.vm_native_catalog_loaded, signals.size, signals.size, _vehicle.value.modelYear)
                     )
                 }
             }.onFailure { error ->
                 withContext(Dispatchers.Main) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        nativeSignalMessage = getApplication<Application>().getString(R.string.msg_native_catalog_load_failed)
+                        nativeSignalMessage = localizedContext.getString(R.string.msg_native_catalog_load_failed)
                     )
                 }
             }
@@ -828,14 +921,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     withContext(Dispatchers.Main) {
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                             obdbSignals = signals,
-                            obdbSignalMessage = getApplication<Application>().resources.getQuantityString(R.plurals.vm_community_catalog_loaded, signals.size, signals.size, _vehicle.value.modelYear)
+                            obdbSignalMessage = localizedContext.resources.getQuantityString(R.plurals.vm_community_catalog_loaded, signals.size, signals.size, _vehicle.value.modelYear)
                         )
                     }
                 }
                 .onFailure { error ->
                     withContext(Dispatchers.Main) {
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                            obdbSignalMessage = getApplication<Application>().getString(R.string.msg_obdb_catalog_load_failed)
+                            obdbSignalMessage = localizedContext.getString(R.string.msg_obdb_catalog_load_failed)
                         )
                     }
                 }
@@ -847,7 +940,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val signals = catalog.forYear(_vehicle.value.modelYear)
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             nativeSignals = signals,
-            nativeSignalMessage = getApplication<Application>().resources.getQuantityString(
+            nativeSignalMessage = localizedContext.resources.getQuantityString(
                 R.plurals.vm_native_catalog_loaded,
                 signals.size,
                 signals.size,
@@ -862,7 +955,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             obdbSignals = signals,
             obdbSignalValue = "",
-            obdbSignalMessage = getApplication<Application>().resources.getQuantityString(
+            obdbSignalMessage = localizedContext.resources.getQuantityString(
                 R.plurals.vm_community_catalog_loaded,
                 signals.size,
                 signals.size,
@@ -873,6 +966,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Reads and decodes one read-only Camaro signal from the imported OBDb signalset. */
     fun readObdbSignal(signalId: String, protocolNumberText: String) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isObdbSignalReading = true,
@@ -894,31 +988,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val requestId = signal.requestCanId!!
                 val responseId = signal.responseCanId!!
                 val did = signal.identifierHex.toInt(16)
-                val policy = UdsAccessPolicy.readOnly(setOf(did))
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val client = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(
+                val raw = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.withJ2534BridgeUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
-                        policy = policy,
-                        timeoutMs = 5000L
-                    )
+                        timeoutMs = 5000L,
+                        readDids = setOf(did)
+                    ) { client -> client.readDataByIdentifier(did) }
                 } else {
-                    obdManager.createStnUdsClient(
+                    obdManager.withStnUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
-                        policy = policy,
-                        timeoutMs = 5000L
-                    )
+                        timeoutMs = 5000L,
+                        readDids = setOf(did)
+                    ) { client -> client.readDataByIdentifier(did) }
                 }
-                val raw = client.readDataByIdentifier(did)
                 val decoded = signal.decode(raw)
                 val rendered = when {
-                    decoded.unavailable -> getApplication<Application>().getString(R.string.vm_sentinel_unavailable)
+                    decoded.unavailable -> localizedContext.getString(R.string.vm_sentinel_unavailable)
                     decoded.mappedLabel != null -> decoded.mappedLabel
                     decoded.value != null -> {
                         val number = java.text.DecimalFormat("0.###", java.text.DecimalFormatSymbols.getInstance(java.util.Locale.ROOT))
@@ -930,7 +1022,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isObdbSignalReading = false,
                     obdbSignalValue = "$rendered\nRAW_DEC=${decoded.raw} • DID=0x${signal.identifierHex}",
-                    obdbSignalMessage = getApplication<Application>().getString(R.string.vm_obdb_signal_read)
+                    obdbSignalMessage = localizedContext.getString(
+                        R.string.vm_obdb_signal_read, signal.name,
+                        requestId.toString(16).uppercase(), responseId.toString(16).uppercase()
+                    )
                 )
             } catch (cancelled: CancellationException) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isObdbSignalReading = false)
@@ -940,7 +1035,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isObdbSignalReading = false,
                     obdbSignalValue = "",
-                    obdbSignalMessage = getApplication<Application>().getString(R.string.msg_obdb_signal_read_failed)
+                    obdbSignalMessage = localizedContext.getString(R.string.msg_obdb_signal_read_failed)
                 )
             }
         }
@@ -955,6 +1050,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         responseCanIdHex: String,
         protocolNumberText: String
     ) {
+        if (!requirePremiumLicense()) return
         val attempt = ++connectionAttemptGeneration
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
@@ -978,6 +1074,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = true,
                 isJ2534BridgeConnected = false,
+                isJ2534MemoryReadAvailable = false,
                 j2534BridgeMessage = ""
             )
             try {
@@ -1019,7 +1116,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534BridgeConnecting = false,
                     isJ2534BridgeConnected = true,
-                    j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_j2534_connected, result)
+                    isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
+                    j2534BridgeMessage = localizedContext.getString(R.string.vm_j2534_connected, result)
                 )
             } catch (cancelled: CancellationException) {
                 if (attempt == connectionAttemptGeneration) {
@@ -1031,7 +1129,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         isJ2534BridgeConnecting = false,
                         isJ2534BridgeConnected = false,
-                        j2534BridgeMessage = getApplication<Application>().getString(R.string.msg_j2534_bridge_connect_failed)
+                        isJ2534MemoryReadAvailable = false,
+                        j2534BridgeMessage = localizedContext.getString(R.string.msg_j2534_bridge_connect_failed)
                     )
                 }
             } finally {
@@ -1065,13 +1164,90 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = false,
                 isJ2534BridgeConnected = false,
-                j2534BridgeMessage = getApplication<Application>().getString(R.string.vm_pc_bridge_disconnected)
+                isJ2534MemoryReadAvailable = false,
+                j2534BridgeMessage = localizedContext.getString(R.string.vm_pc_bridge_disconnected)
             )
+        }
+    }
+
+    /**
+     * Runs two REAL ECU memory reads through a connected J2534 PC bridge, then
+     * saves the resulting integrity-checked ZIP through Android SAF. The PC
+     * must independently authorize the target VIN, channel and address map.
+     */
+    @Volatile private var memoryCaptureGeneration = 0L
+
+    fun captureJ2534Memory(fileName: String, request: J2534LiveMemoryBackup.Request) {
+        if (!requirePremiumLicense()) return
+        if (_calibrationWorkspace.value.isJ2534MemoryCapturing) return
+        val captureGeneration = ++memoryCaptureGeneration
+        val accountGeneration = accountSessionGeneration
+        val connectionGeneration = connectionAttemptGeneration
+        fun current() = captureGeneration == memoryCaptureGeneration &&
+            isCurrentAccountGeneration(accountGeneration) &&
+            connectionGeneration == connectionAttemptGeneration &&
+            request.expectedVin == _vehicle.value.vin.uppercase() && hasPremiumLicense()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isJ2534MemoryCapturing = true,
+            j2534MemoryCaptureBytesRead = 0L,
+            j2534MemoryCaptureTotalBytes = request.lengthBytes.toLong() * 2,
+            j2534MemoryCaptureMessage = ""
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                check(current()) {
+                    "Selected vehicle VIN has changed."
+                }
+                check(obdManager.isJ2534BridgeConnected()) {
+                    "A real J2534 adapter must be connected."
+                }
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
+                    beforePublish = {
+                        check(current())
+                    }
+                ) { output ->
+                    obdManager.captureAndExportJ2534Memory(request, output) { progress ->
+                        check(current()) { "Vehicle or account changed while ECU memory was being read." }
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            j2534MemoryCaptureBytesRead = progress.totalBytesRead,
+                            j2534MemoryCaptureTotalBytes = progress.requiredBytesRead
+                        )
+                    }
+                }
+                check(current()) {
+                    "Vehicle or account changed during ECU capture."
+                }
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534MemoryCapturing = false,
+                    j2534MemoryCaptureMessage =
+                        localizedContext.getString(R.string.cal_live_memory_saved)
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (!current()) return@launch
+                // A full folder/revoked grant is not an ECU disconnection.
+                if (error !is CamaroDiagExportStorage.ExportStorageException) reportConnectionLoss(error)
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534MemoryCapturing = false,
+                    j2534MemoryCaptureMessage =
+                        localizedContext.getString(R.string.cal_live_memory_failed) +
+                            " " + error.message.orEmpty().take(160)
+                )
+            } finally {
+                // A disconnected capture must release its busy flag, without
+                // allowing an old operation to clear a new account's capture.
+                if (captureGeneration == memoryCaptureGeneration &&
+                    isCurrentAccountGeneration(accountGeneration)) {
+                    _calibrationWorkspace.update { it.copy(isJ2534MemoryCapturing = false) }
+                }
+            }
         }
     }
 
     /** Reads one UDS DID over the verified STPX CAN transport; CAN IDs must be supplied from service data. */
     fun readUdsDid(requestCanIdHex: String, responseCanIdHex: String, didHex: String, protocolNumberText: String) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
@@ -1092,22 +1268,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val client = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(
+                val data = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.withJ2534BridgeUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
-                        timeoutMs = 5000L
-                    )
+                        timeoutMs = 5000L,
+                        readDids = setOf(did)
+                    ) { client -> client.readDataByIdentifier(did) }
                 } else {
-                    obdManager.createStnUdsClient(
+                    obdManager.withStnUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
-                        timeoutMs = 5000L
-                    )
+                        timeoutMs = 5000L,
+                        readDids = setOf(did)
+                    ) { client -> client.readDataByIdentifier(did) }
                 }
-                val data = client.readDataByIdentifier(did)
                 val hex = data.joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
                 val isVinDid = did == 0xF190
                 val rendered = if (isVinDid) {
@@ -1117,7 +1294,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDidResponse = rendered,
-                    udsMessage = getApplication<Application>().getString(R.string.vm_uds_response_received)
+                    udsMessage = localizedContext.getString(
+                        R.string.vm_uds_response_received, responseId.toString(16).uppercase()
+                    )
                 )
             } catch (cancelled: CancellationException) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
@@ -1127,7 +1306,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDidResponse = "",
-                    udsMessage = getApplication<Application>().getString(R.string.msg_uds_read_failed)
+                    udsMessage = localizedContext.getString(R.string.msg_uds_read_failed)
                 )
             }
         }
@@ -1135,6 +1314,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Reads UDS ReadDTCInformation (0x19/0x02) from the selected physical ECU. */
     fun readUdsDtcs(requestCanIdHex: String, responseCanIdHex: String, protocolNumberText: String) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isUdsReading = true,
@@ -1154,22 +1334,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val protocolNumber = protocolNumberText.toIntOrNull()
                     ?: error("Profil CAN invalide.")
                 require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                val client = if (obdManager.isJ2534BridgeConnected()) {
-                    obdManager.createJ2534BridgeUdsClient(
+                val report = if (obdManager.isJ2534BridgeConnected()) {
+                    obdManager.withJ2534BridgeUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L
-                    )
+                    ) { client -> client.readDtcReport() }
                 } else {
-                    obdManager.createStnUdsClient(
+                    obdManager.withStnUdsSession(
                         requestCanId = requestId,
                         responseCanId = responseId,
                         protocolNumber = protocolNumber,
                         timeoutMs = 5000L
-                    )
+                    ) { client -> client.readDtcReport() }
                 }
-                val report = client.readDtcReport()
                 val moduleId = "ECU ${responseCanIdHex.uppercase()}"
                 val mappedDtcs = report.records.map { record ->
                     val baseCode = record.code.substringBefore('-')
@@ -1191,7 +1370,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _dtcs.value = _dtcs.value.filterNot { it.module == moduleId } + mappedDtcs
                 val rendered = if (report.records.isEmpty()) {
-                    getApplication<Application>().getString(R.string.vm_no_dtcs_returned, responseCanIdHex.uppercase())
+                    localizedContext.getString(R.string.vm_no_dtcs_returned, responseCanIdHex.uppercase())
                 } else {
                     report.records.joinToString("\n") { record ->
                         "${record.code}  status=0x${record.statusByte.toString(16).uppercase().padStart(2, '0')}"
@@ -1200,7 +1379,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = rendered,
-                    udsMessage = getApplication<Application>().getString(R.string.vm_uds_read_complete)
+                    udsMessage = localizedContext.getString(R.string.vm_uds_read_complete)
                 )
             } catch (cancelled: CancellationException) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isUdsReading = false)
@@ -1210,7 +1389,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isUdsReading = false,
                     udsDtcResponse = "",
-                    udsMessage = getApplication<Application>().getString(R.string.msg_uds_dtc_read_failed)
+                    udsMessage = localizedContext.getString(R.string.msg_uds_dtc_read_failed)
                 )
             }
         }
@@ -1221,35 +1400,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Export SAE Mode 09 identification only; this is explicitly NOT an ECU-memory
      * backup and never grants any permission to write calibrations.
      */
-    fun exportEcuIdentification(destinationUri: Uri) {
+    fun exportEcuIdentification(fileName: String) {
+        if (!requirePremiumLicense()) return
         val accountUid = authenticatedAccountUid ?: return
         val profile = _vehicle.value
         val observation = _calibrationWorkspace.value
+        val accountGeneration = accountSessionGeneration
+        val connectionGeneration = connectionAttemptGeneration
+        val mode09Generation = calibrationIdentityGeneration
+        val gmGeneration = gmlanIdentityGeneration
+        fun current() = authenticatedAccountUid == accountUid &&
+            isCurrentAccountGeneration(accountGeneration) &&
+            connectionGeneration == connectionAttemptGeneration &&
+            mode09Generation == calibrationIdentityGeneration &&
+            gmGeneration == gmlanIdentityGeneration &&
+            _vehicle.value == profile && hasPremiumLicense()
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (authenticatedAccountUid != accountUid) return@launch
-                require(
-                    observation.ecuVinResponse.isNotBlank() ||
-                        observation.calibrationIdResponse.isNotBlank() ||
-                        observation.cvnResponse.isNotBlank()
-                ) { "No observed ECU identity can be exported." }
-                val missing = getApplication<Application>().getString(R.string.obd_not_available)
-                fun reported(value: String): String? = value.trim().takeIf {
-                    it.isNotBlank() && !it.equals(missing, ignoreCase = true)
-                }
-                fun lines(value: String): JSONArray = JSONArray().apply {
-                    value.lines().map(String::trim).filter(String::isNotBlank)
-                        .filterNot { it.equals(missing, ignoreCase = true) }
-                        .forEach { put(it) }
-                }
+                if (!current()) return@launch
+                require(observation.canExportIdentification) { "No completed ECU identity can be exported." }
+                fun lines(value: String) = JSONArray(value.lines().map(String::trim).filter(String::isNotEmpty))
                 val report = JSONObject().apply {
                     put("format", "CamaroDiag-ecu-identity-v1")
-                    put("source", "SAE-J1979-Mode09-read-only")
+                    put("source", if (observation.hasMode09Identification) "SAE-J1979-Mode09-read-only" else "J2534-GMLAN-read-only")
+                    observation.gmlanIdentity?.let { identity ->
+                        put("gmlanIdentity", JSONObject().apply {
+                            put("source", "GMLAN-1A-physical-J2534")
+                            put("vin", identity.vin)
+                            put("operatingSystemId", identity.operatingSystemId)
+                            put("osDid", identity.osDid)
+                            put("responseCanId", identity.responseCanId)
+                            put("physicalRead", true)
+                            put("readOnly", true)
+                            put("flashQualified", false)
+                        })
+                    }
                     put("exportedAtUtcMillis", System.currentTimeMillis())
                     put("vehicleYear", profile.modelYear)
                     put("vehicleEngine", profile.engine.rpo)
                     put("selectedVehicleVin", profile.vin)
-                    put("observedEcuVin", reported(observation.ecuVinResponse) ?: JSONObject.NULL)
+                    put("observedEcuVin", observation.ecuVinResponse.trim().takeIf(String::isNotEmpty) ?: JSONObject.NULL)
                     put("ecuNames", lines(observation.ecuNameResponse))
                     put("calibrationIds", lines(observation.calibrationIdResponse))
                     put("calibrationVerificationNumbers", lines(observation.cvnResponse))
@@ -1267,7 +1457,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "observedFingerprintComplete",
                         Lfx2012ControllerReferences.hasCompleteReadOnlyFingerprint(
                             Lfx2012ControllerReferences.ObservedIdentity(
-                                ecuName = reported(observation.ecuNameResponse),
+                                ecuName = observation.ecuNameResponse.trim().takeIf(String::isNotEmpty),
                                 calibrationIds = observation.calibrationIdResponse.lines(),
                                 calibrationVerificationNumbers = observation.cvnResponse.lines(),
                                 simulated = observation.ecuIdentityFromSimulation
@@ -1278,12 +1468,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("firmwareCompatibilityValidated", false)
                     put("calibrationWritingPermitted", false)
                 }
-                if (authenticatedAccountUid != accountUid) return@launch
-                val output = getApplication<Application>().contentResolver
-                    .openOutputStream(destinationUri, "w")
-                    ?: error("Cannot create ECU identity report.")
-                output.use { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
-                if (authenticatedAccountUid == accountUid) {
+                if (!current()) return@launch
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                    beforePublish = { check(current() && hasPremiumLicense()) }
+                ) { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
+                if (current()) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         message = getApplication<Application>()
                             .getString(R.string.flexfuel_lfx2012_export_success)
@@ -1292,7 +1481,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (authenticatedAccountUid == accountUid) {
+                if (current()) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         message = getApplication<Application>()
                             .getString(R.string.flexfuel_lfx2012_export_failed)
@@ -1302,12 +1491,59 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun readCalibrationIdentification() {
-        val startedGeneration = accountSessionGeneration
+    /** Keep the legacy GM observation separate from generic OBD Mode 09. */
+    fun readGmlanIdentification() {
+        if (!requirePremiumLicense()) return
+        if (_calibrationWorkspace.value.isGmlanReading) return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val vehicle = _vehicle.value
+        val generation = ++gmlanIdentityGeneration
+        fun current(): Boolean =
+            isCurrentAccountGeneration(account) &&
+                generation == gmlanIdentityGeneration &&
+                connection == connectionAttemptGeneration &&
+                _vehicle.value == vehicle &&
+                hasPremiumLicense()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isGmlanReading = true, gmlanIdentity = null, gmlanIdentityFailed = false
+        )
         viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-            if (!obdManager.isObdCommandChannelAvailable) {
-                val bridgeOnly = obdManager.isJ2534BridgeConnected()
+            try {
+                if (!current()) return@launch
+                check(obdManager.isJ2534BridgeConnected())
+                val identity = obdManager.readGmlanIdentification()
+                if (current() && obdManager.isJ2534BridgeConnected()) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        isGmlanReading = false, gmlanIdentity = identity
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (current()) {
+                    reportConnectionLoss(error)
+                    if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        isGmlanReading = false, gmlanIdentity = null, gmlanIdentityFailed = true
+                    )
+                }
+            } finally {
+                if (current() && _calibrationWorkspace.value.isGmlanReading) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isGmlanReading = false)
+                }
+            }
+        }
+    }
+
+    fun readCalibrationIdentification() {
+        if (!requirePremiumLicense()) return
+        val startedGeneration = accountSessionGeneration
+        val requestId = ++calibrationIdentityGeneration
+        val startedConnection = connectionAttemptGeneration
+        viewModelScope.launch {
+            if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration ||
+                requestId != calibrationIdentityGeneration) return@launch
+            if (!obdManager.isObdCommandChannelAvailable && !obdManager.isJ2534BridgeConnected()) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
                     ecuVinResponse = "",
@@ -1318,11 +1554,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     respondingEcuAddresses = emptyList(),
                     calibrationIdResponse = "",
                     cvnResponse = "",
-                    message = if (bridgeOnly) {
-                        getApplication<Application>().getString(R.string.vm_j2534_no_elm_channel)
-                    } else {
-                        getApplication<Application>().getString(R.string.vm_no_obd_data_read)
-                    }
+                    message = localizedContext.getString(R.string.vm_no_obd_data_read)
                 )
                 return@launch
             }
@@ -1340,24 +1572,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             try {
                 val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
-                val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
-                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                val identity = obdManager.readCalibrationIdentification()
+                if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration ||
+                requestId != calibrationIdentityGeneration) return@launch
                 val ecuVin = identity.vin
                 val validCal = identity.calibrationIds.isNotEmpty()
                 val validCvn = identity.calibrationVerificationNumbers.isNotEmpty()
                 val vinComparison = VehicleVinMatcher.compare(_vehicle.value.vin, ecuVin)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
-                    ecuVinResponse = ecuVin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                    ecuVinResponse = ecuVin.orEmpty(),
                     ecuIdentityFromSimulation = sourceWasSimulated ||
                         obdManager.isSimulationActive || obdManager.isDemoMode,
                     vinComparison = vinComparison,
                     vinModelYear = VehicleVinMatcher.modelYearFromVin(ecuVin),
                     ecuNameResponse = identity.ecuNames.joinToString("\n"),
                     respondingEcuAddresses = identity.respondingEcuAddresses,
-                    calibrationIdResponse = identity.calibrationIds.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
-                    cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
-                    message = getApplication<Application>().getString(
+                    calibrationIdResponse = identity.calibrationIds.joinToString("\n"),
+                    cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n"),
+                    message = localizedContext.getString(
                         if (validCal || validCvn) R.string.msg_cal_identifiers_read
                         else R.string.msg_cal_identifiers_unavailable
                     )
@@ -1365,7 +1598,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                if (!isCurrentAccountGeneration(startedGeneration) || startedConnection != connectionAttemptGeneration ||
+                requestId != calibrationIdentityGeneration) return@launch
                 reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isReading = false,
@@ -1377,7 +1611,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     respondingEcuAddresses = emptyList(),
                     calibrationIdResponse = "",
                     cvnResponse = "",
-                    message = getApplication<Application>().getString(R.string.msg_cal_identifiers_failed)
+                    message = localizedContext.getString(R.string.msg_cal_identifiers_failed)
                 )
             }
         }
@@ -1385,42 +1619,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Imports and analyzes a local Vector ASC or CSV CAN trace without connecting to a vehicle. */
     fun analyzeCanTrace(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        if (!requirePremiumLicense()) return
+        traceAnalysisJob?.cancel()
+        traceAnalysisJob = viewModelScope.launch {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isTraceAnalyzing = true,
                 canTraceReport = null,
                 traceMessage = ""
             )
             try {
-                val resolver = getApplication<Application>().contentResolver
-                val displayName = resolver.query(
-                    uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) cursor.getString(0) else null
-                } ?: uri.lastPathSegment ?: "can-trace.asc"
-                val bytes = resolver.openInputStream(uri)?.use { input ->
-                    val output = java.io.ByteArrayOutputStream()
-                    val buffer = ByteArray(8192)
-                    var total = 0
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        require(total <= 32 * 1024 * 1024) {
-                            getApplication<Application>().getString(R.string.msg_trace_too_large)
-                        }
-                        output.write(buffer, 0, count)
-                    }
-                    output.toByteArray()
-                } ?: error(getApplication<Application>().getString(R.string.msg_trace_open_failed))
-                require(bytes.isNotEmpty()) { getApplication<Application>().getString(R.string.msg_trace_empty) }
-                val report = CanTraceAnalyzer.analyze(bytes.toString(Charsets.UTF_8), displayName)
+                val report = withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    val displayName = resolver.query(
+                        uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    } ?: uri.lastPathSegment ?: "can-trace.asc"
+                    val trace = resolver.openInputStream(uri)?.use { it.readCanTraceText(32 * 1024 * 1024) }
+                        ?: throw CanTraceInputException(R.string.msg_trace_open_failed)
+                    CanTraceAnalyzer.analyze(trace, displayName)
+                }
                 val localizedErrors = report.errors.map(::localizedCanTraceError)
                 val localizedReport = report.copy(errors = localizedErrors)
                 val summary = if (report.frames.isEmpty()) {
-                    getApplication<Application>().getString(R.string.vm_trace_no_frames)
+                    localizedContext.getString(R.string.vm_trace_no_frames)
                 } else {
-                    getApplication<Application>().getString(
+                    localizedContext.getString(
                         R.string.vm_trace_summary,
                         report.frames.size,
                         report.messages.size,
@@ -1435,13 +1659,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     traceMessage = summary
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isTraceAnalyzing = false)
                 throw cancelled
             } catch (error: Exception) {
+                currentCoroutineContext().ensureActive()
+                val message = when (error) {
+                    is CanTraceInputException -> error.messageRes
+                    is java.io.IOException, is SecurityException -> R.string.msg_trace_open_failed
+                    else -> R.string.msg_trace_analysis_failed
+                }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isTraceAnalyzing = false,
                     canTraceReport = null,
-                    traceMessage = getApplication<Application>().getString(R.string.msg_trace_analysis_failed)
+                    traceMessage = localizedContext.getString(message)
                 )
             }
         }
@@ -1449,6 +1678,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun canMonitorAvailable(): Boolean =
         obdManager.isObdCommandChannelAvailable && _adapter.value.supportsCanHeaders
+
+    /** Enhanced read-only UDS needs a verified STN adapter or a connected J2534 bridge. */
+    fun canReadEnhancedUds(): Boolean =
+        obdManager.isStnUdsReadAvailable || obdManager.isJ2534BridgeConnected()
 
     private fun appendCanConsoleSystemEvent(message: String, succeeded: Boolean = true) {
         val current = _liveCanMonitorState.value
@@ -1482,11 +1715,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
     fun startCanMonitor(durationMs: Long = Long.MAX_VALUE) {
+        if (!requirePremiumLicense()) return
         if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
             canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
         ) return
         if (!obdManager.isObdCommandChannelAvailable || !_adapter.value.supportsCanHeaders) {
-            val unavailable = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            val unavailable = localizedContext.getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(unavailable, succeeded = false)
             _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = unavailable)
             return
@@ -1501,7 +1735,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             id = System.nanoTime(),
             direction = "SYSTEM",
             timestampMillis = System.currentTimeMillis(),
-            content = getApplication<Application>().getString(R.string.can_sniffer_start)
+            content = localizedContext.getString(R.string.can_sniffer_start)
         )
         _liveCanMonitorState.value = previousState.copy(
             isCapturing = true,
@@ -1566,7 +1800,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
+                        content = localizedContext.getString(R.string.can_sniffer_capture_complete)
                     )
                     _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
@@ -1587,7 +1821,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = getApplication<Application>().getString(R.string.can_sniffer_stop)
+                        content = localizedContext.getString(R.string.can_sniffer_stop)
                     )
                     val report = runCatching {
                         CanTraceAnalyzer.analyze(
@@ -1612,7 +1846,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // pendingChunks is only a line-framing buffer; appending it again duplicates
                     // the final unterminated record when capture is stopped or fails.
                     val raw = current.rawText.takeLast(131_072)
-                    val failureMessage = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
+                    val failureMessage = localizedContext.getString(R.string.can_sniffer_capture_failed)
                     val failureEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
@@ -1698,6 +1932,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
     fun sendCanConsoleInput(input: String) {
+        if (!requirePremiumLicense()) return
         val frame = RawCanFrameParser.parse(input)
         if (frame == null) {
             sendSafeObdRequest(input)
@@ -1717,7 +1952,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentState.isCapturing || canMonitorJob?.isActive == true ||
             detachedCanMonitorJob?.isActive == true
         ) {
-            val message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            val message = localizedContext.getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(message, succeeded = false)
             _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
@@ -1746,7 +1981,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 id = System.nanoTime(),
                                 direction = "SYSTEM",
                                 timestampMillis = System.currentTimeMillis(),
-                                content = getApplication<Application>().getString(
+                                content = localizedContext.getString(
                                     R.string.can_console_adapter_ack,
                                     response.ifBlank { "No adapter text returned" }
                                 )
@@ -1759,7 +1994,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
                                 receivedEvents
                         ).takeLast(300),
-                        message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
+                        message = localizedContext.getString(R.string.can_sniffer_request_complete)
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -1775,13 +2010,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = error.message ?: getApplication<Application>().getString(R.string.can_sniffer_request_failed),
+                        content = error.message ?: localizedContext.getString(R.string.can_sniffer_request_failed),
                         succeeded = false
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = false) else it } + errorEvent).takeLast(300),
-                        message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
+                        message = localizedContext.getString(R.string.can_sniffer_request_failed)
                     )
                 }
             } finally {
@@ -1796,7 +2031,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun sendSafeObdRequest(input: String) {
         val request = SafeObdRequestPolicy.parse(input)
         if (request == null) {
-            val message = getApplication<Application>().getString(R.string.can_sniffer_invalid_request)
+            val message = localizedContext.getString(R.string.can_sniffer_invalid_request)
             // Invalid input is still part of the operator's console session: retain it
             // as a failed SYSTEM event rather than silently dropping it from the history.
             appendCanConsoleSystemEvent("$message — ${input.trim().take(120)}", succeeded = false)
@@ -1812,7 +2047,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             canMonitorJob?.isActive == true ||
             detachedCanMonitorJob?.isActive == true
         ) {
-            val message = getApplication<Application>().getString(R.string.can_sniffer_unavailable)
+            val message = localizedContext.getString(R.string.can_sniffer_unavailable)
             appendCanConsoleSystemEvent(message, succeeded = false)
             _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
@@ -1849,7 +2084,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         content = if (hasEcuResponse) {
                             response
                         } else {
-                            getApplication<Application>().getString(
+                            localizedContext.getString(
                                 R.string.can_console_adapter_ack,
                                 response.ifBlank { "No adapter text returned" }
                             )
@@ -1862,7 +2097,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
                                 responseEvent
                         ).takeLast(300),
-                        message = getApplication<Application>().getString(R.string.can_sniffer_request_complete)
+                        message = localizedContext.getString(R.string.can_sniffer_request_complete)
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -1878,13 +2113,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = getApplication<Application>().getString(R.string.can_sniffer_request_failed),
+                        content = localizedContext.getString(R.string.can_sniffer_request_failed),
                         succeeded = false
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = false) else it } + errorEvent).takeLast(300),
-                        message = getApplication<Application>().getString(R.string.can_sniffer_request_failed)
+                        message = localizedContext.getString(R.string.can_sniffer_request_failed)
                     )
                 }
             } finally {
@@ -1896,12 +2131,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Export the latest raw CAN capture without transforming adapter output. */
-    fun exportCanCapture(destinationUri: Uri) {
+    fun exportCanCapture(fileName: String) {
+        if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val exportGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        fun current() = canResumeExport(exportGeneration, owner) &&
+            _vehicle.value == profile && hasPremiumLicense()
+        val snapshot = _liveCanMonitorState.value
+        val history = snapshot.consoleHistory.toList()
+        val selectedArchive = activeCanCaptureFile
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val snapshot = _liveCanMonitorState.value
-                val history = snapshot.consoleHistory
-                val archive = activeCanCaptureFile?.takeIf { it.isFile }
+                if (!current()) return@launch
+                val archive = selectedArchive?.takeIf { it.isFile }
                 require(history.isNotEmpty() || snapshot.rawText.isNotBlank() ||
                     (archive?.length() ?: 0L) > 0L) {
                     "No CAN console history is available to export."
@@ -1926,9 +2169,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         appendLine("# RX RAW — received adapter stream (unmodified)")
                     }
                 }
-                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                    ?: error("Could not create the CAN console history file.")
-                output.use { sink ->
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
+                    beforePublish = { check(current()) }
+                ) { sink ->
                     sink.write(outputText.toByteArray(Charsets.UTF_8))
                     if (archive != null) {
                         archive.inputStream().use { source -> source.copyTo(sink) }
@@ -1936,21 +2179,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         sink.write(snapshot.rawText.toByteArray(Charsets.UTF_8))
                     }
                 }
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
-                    message = getApplication<Application>().getString(R.string.can_sniffer_capture_complete)
-                )
+                if (current()) _liveCanMonitorState.update {
+                    it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_complete))
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
-                    message = getApplication<Application>().getString(R.string.can_sniffer_capture_failed)
-                )
+                if (current()) _liveCanMonitorState.update {
+                    it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_failed))
+                }
             }
         }
     }
 
     private fun localizedCanTraceError(message: String): String {
-        val app = getApplication<Application>()
+        val app = localizedContext
         val lineMatch = Regex("^Line (\\d+): (.*)$").matchEntire(message)
         val line = lineMatch?.groupValues?.get(1)?.toIntOrNull()
         val detail = lineMatch?.groupValues?.get(2)
@@ -1989,11 +2232,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             CalibrationFileFormat.EXTERNAL_TUNE_PROJECT -> R.string.cal_format_external_tune_project
             CalibrationFileFormat.UNKNOWN -> R.string.cal_format_unknown
         }
-        return getApplication<Application>().getString(resource)
+        return localizedContext.getString(resource)
     }
 
     private fun localizedInspectionSummary(inspection: CalibrationFileInspection, fileName: String): String {
-        val context = getApplication<Application>()
+        val context = localizedContext
         val extension = fileName.substringAfterLast('.', "").lowercase()
         if (!inspection.valid && inspection.format !in setOf(
                 CalibrationFileFormat.EXTERNAL_TUNE_PROJECT,
@@ -2020,11 +2263,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             inspection.format == CalibrationFileFormat.ZIP_ARCHIVE -> R.string.cal_checksum_interrupted
             else -> R.string.cal_checksum_not_verified
         }
-        return getApplication<Application>().getString(resource)
+        return localizedContext.getString(resource)
     }
 
     private fun localizedInspectionWarnings(inspection: CalibrationFileInspection): List<String> {
-        val context = getApplication<Application>()
+        val context = localizedContext
         if (!inspection.valid && inspection.format in setOf(CalibrationFileFormat.INTEL_HEX, CalibrationFileFormat.MOTOROLA_S_RECORD)) {
             return listOf(context.getString(R.string.cal_warning_invalid_file))
         }
@@ -2054,9 +2297,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun verifyEcuBackup(uri: Uri) {
+        if (!requirePremiumLicense()) return
+        if (_calibrationWorkspace.value.archiveVerification == ArchiveVerification.Reading) return
+        val generation = accountSessionGeneration
+        _calibrationWorkspace.update { it.copy(archiveVerification = ArchiveVerification.Reading) }
+        viewModelScope.launch {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    val resolver = getApplication<Application>().contentResolver
+                    val stream = requireNotNull(resolver.openInputStream(uri))
+                    // The mobile importer keeps both reads in memory. The limit includes the manifest.
+                    val manifest = stream.use { EcuBackupArchive.import(it, 32L * 1024 * 1024).manifest }
+                    ArchiveVerification.Verified(manifest)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                ArchiveVerification.Failed
+            }
+            if (generation == accountSessionGeneration) {
+                _calibrationWorkspace.update { it.copy(archiveVerification = result) }
+            }
+        }
+    }
+
+    @Volatile private var calibrationFileImportGeneration = 0L
+
     fun importCalibrationFile(uri: Uri) {
+        if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val accountGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        val importGeneration = ++calibrationFileImportGeneration
+        fun current() = canResumeExport(accountGeneration, owner) &&
+            _vehicle.value == profile && importGeneration == calibrationFileImportGeneration &&
+            hasPremiumLicense()
         viewModelScope.launch(Dispatchers.IO) {
+            var staged: File? = null
             try {
+                if (!current()) return@launch
                 val resolver = getApplication<Application>().contentResolver
                 val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                     ?.use { cursor ->
@@ -2067,6 +2347,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val buffer = ByteArray(8192)
                     var total = 0
                     while (true) {
+                        currentCoroutineContext().ensureActive()
+                        check(current())
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
@@ -2082,10 +2364,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val storageDir = File(getApplication<Application>().filesDir, "calibrations")
                 check(storageDir.exists() || storageDir.mkdirs()) { "Impossible de créer le dossier local des cartographies." }
                 val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifBlank { "calibration.bin" }
-                val storedFile = File(storageDir, "${System.currentTimeMillis()}_${safeName}")
+                val storedFile = File.createTempFile("original_", "_$safeName", storageDir)
+                staged = storedFile
                 storedFile.writeBytes(bytes)
                 val preview = bytes.take(64).joinToString(" ") { "%02X".format(it) }
-                val previousState = _calibrationWorkspace.value
+                withContext(Dispatchers.Main) {
+                    if (!current()) return@withContext
+                    val previousState = _calibrationWorkspace.value
                 previousState.importedFilePath?.let { previousPath ->
                     if (previousPath != storedFile.absolutePath) runCatching { File(previousPath).delete() }
                 }
@@ -2115,7 +2400,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     inspectionPayloadBytes = inspection.payloadBytes,
                     inspectionRecordCount = inspection.recordCount,
                     inspectionChecksumStatus = localizedInspectionChecksum(inspection),
-                    inspectionAddressRanges = inspection.addressRanges.map { getApplication<Application>().getString(R.string.cal_address_range, it.start.toString(16).uppercase(), it.endInclusive.toString(16).uppercase(), it.length) },
+                    inspectionAddressRanges = inspection.addressRanges.map { localizedContext.getString(R.string.cal_address_range, it.start.toString(16).uppercase(), it.endInclusive.toString(16).uppercase(), it.length) },
                     inspectionWarnings = localizedInspectionWarnings(inspection),
                     comparisonFileName = null,
                     comparisonFilePath = null,
@@ -2129,25 +2414,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     partialWriteSummary = null,
                     partialWriteChangedBytes = null,
                     partialWriteSectorAddresses = emptyList(),
-                    message = getApplication<Application>().getString(R.string.msg_cal_file_imported)
+                    message = localizedContext.getString(R.string.msg_cal_file_imported)
                 )
+                    staged = null
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = getApplication<Application>().getString(R.string.msg_cal_file_import_failed)
-                )
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_import_failed))
+                }
+            } finally {
+                staged?.let { runCatching { it.delete() } }
             }
         }
     }
 
     /** Imports a second raw BIN image and compares it byte-for-byte with the loaded reference. */
     fun importComparisonCalibrationFile(uri: Uri) {
+        if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val accountGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        val snapshot = _calibrationWorkspace.value
+        val importGeneration = ++calibrationFileImportGeneration
+        fun current() = canResumeExport(accountGeneration, owner) &&
+            _vehicle.value == profile && importGeneration == calibrationFileImportGeneration &&
+            hasPremiumLicense() && _calibrationWorkspace.value.importedFilePath == snapshot.importedFilePath &&
+            _calibrationWorkspace.value.activeFilePath == snapshot.activeFilePath
         viewModelScope.launch(Dispatchers.IO) {
-            var storedFile: File? = null
+            var staged: File? = null
             try {
-                val current = _calibrationWorkspace.value
-                require(current.importedFilePath != null && current.inspectionFormat == "RAW_BINARY") {
+                if (!current()) return@launch
+                require(snapshot.importedFilePath != null && snapshot.inspectionFormat == "RAW_BINARY") {
                     "Charge d'abord une image de référence BIN brute."
                 }
                 val resolver = getApplication<Application>().contentResolver
@@ -2159,6 +2458,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val buffer = ByteArray(8192)
                     var total = 0
                     while (true) {
+                        currentCoroutineContext().ensureActive()
+                        check(current())
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
@@ -2172,39 +2473,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 require(inspection.format.name == "RAW_BINARY") {
                     "La comparaison octet par octet nécessite un second fichier BIN brut."
                 }
-                val reference = File(current.activeFilePath ?: current.importedFilePath!!)
+                val reference = File(snapshot.activeFilePath ?: snapshot.importedFilePath)
                 check(reference.isFile && reference.exists()) { "Le fichier BIN de référence est introuvable." }
                 val referenceBytes = reference.readBytes()
                 val comparison = CalibrationBinaryComparer.compare(referenceBytes, bytes)
                 val storageDir = File(getApplication<Application>().filesDir, "calibrations")
                 check(storageDir.exists() || storageDir.mkdirs()) { "Impossible de créer le dossier local des cartographies." }
                 val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifBlank { "modified.bin" }
-                storedFile = File(storageDir, "comparison_${System.currentTimeMillis()}_${safeName}")
-                storedFile!!.writeBytes(bytes)
+                val storedFile = File.createTempFile("comparison_", "_$safeName", storageDir)
+                staged = storedFile
+                storedFile.writeBytes(bytes)
                 val summary = when {
-                    comparison.identical -> getApplication<Application>().getString(R.string.cal_comparison_identical)
-                    comparison.referenceSize != comparison.modifiedSize -> getApplication<Application>().getString(
+                    comparison.identical -> localizedContext.getString(R.string.cal_comparison_identical)
+                    comparison.referenceSize != comparison.modifiedSize -> localizedContext.getString(
                         R.string.cal_comparison_size_diff, comparison.comparedBytes
                     )
-                    else -> getApplication<Application>().getString(
+                    else -> localizedContext.getString(
                         R.string.cal_comparison_different_ranges,
                         comparison.changedBytes,
                         comparison.changedRanges.size + comparison.omittedRangeCount
                     )
                 }
                 val ranges = comparison.changedRanges.take(25).map {
-                    getApplication<Application>().getString(
+                    localizedContext.getString(
                         R.string.cal_comparison_range,
                         it.startOffset.toString(16).uppercase().padStart(8, '0'),
                         it.endOffsetInclusive.toString(16).uppercase().padStart(8, '0'),
                         it.changedBytes
                     )
                 } + if (comparison.omittedRangeCount > 0) listOf(
-                    getApplication<Application>().getString(R.string.cal_comparison_more_ranges, comparison.omittedRangeCount)
+                    localizedContext.getString(R.string.cal_comparison_more_ranges, comparison.omittedRangeCount)
                 ) else emptyList()
-                _calibrationWorkspace.value = current.copy(
+                withContext(Dispatchers.Main) {
+                    if (!current()) return@withContext
+                    val previous = _calibrationWorkspace.value
+                    _calibrationWorkspace.value = previous.copy(
                     comparisonFileName = displayName,
-                    comparisonFilePath = storedFile!!.absolutePath,
+                    comparisonFilePath = storedFile.absolutePath,
                     comparisonFileSize = bytes.size.toLong(),
                     comparisonSummary = summary,
                     comparisonChangedBytes = comparison.changedBytes,
@@ -2215,18 +2520,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     partialWriteSummary = null,
                     partialWriteChangedBytes = null,
                     partialWriteSectorAddresses = emptyList(),
-                    message = getApplication<Application>().getString(R.string.msg_cal_comparison_complete)
+                    message = localizedContext.getString(R.string.msg_cal_comparison_complete)
                 )
-                current.comparisonFilePath?.let { previousPath ->
-                    if (previousPath != storedFile!!.absolutePath) runCatching { File(previousPath).delete() }
+                    staged = null
+                    previous.comparisonFilePath?.let { previousPath ->
+                        if (previousPath != storedFile.absolutePath) runCatching { File(previousPath).delete() }
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                storedFile?.let { runCatching { it.delete() } }
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = getApplication<Application>().getString(R.string.msg_cal_comparison_failed)
-                )
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_comparison_failed))
+                }
+            } finally {
+                staged?.let { runCatching { it.delete() } }
             }
         }
     }
@@ -2240,6 +2548,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         eraseBlockBytes: Int,
         programBlockBytes: Int
     ) {
+        if (!requirePremiumLicense()) return
         val ownerGeneration = accountSessionGeneration
         viewModelScope.launch(Dispatchers.IO) {
             val snapshot = _calibrationWorkspace.value
@@ -2273,7 +2582,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _calibrationWorkspace.value.importedFilePath != snapshot.importedFilePath
                 ) return@launch
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    partialWriteSummary = getApplication<Application>().getString(
+                    partialWriteSummary = localizedContext.getString(
                         R.string.cal_expert_patch_summary,
                         plan.changedBytes,
                         plan.affectedSectors.size
@@ -2297,20 +2606,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun exportCalibrationDefinitionTemplate(destinationUri: Uri) {
+    fun exportCalibrationDefinitionTemplate(fileName: String) {
+        if (!requirePremiumLicense()) return
+        val exportGeneration = accountSessionGeneration
         viewModelScope.launch {
             try {
-                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                    ?: error("Impossible de créer le fichier modèle.")
-                output.use { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/tab-separated-values",
+                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                ) { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = getApplication<Application>().getString(R.string.msg_cal_template_exported)
+                    message = localizedContext.getString(R.string.msg_cal_template_exported)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = getApplication<Application>().getString(R.string.msg_cal_template_export_failed)
+                    mapError = localizedContext.getString(R.string.msg_cal_template_export_failed)
                 )
             }
         }
@@ -2318,6 +2629,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Imports a semicolon-separated table-definition file supplied for the exact calibration image. */
     fun importCalibrationDefinitions(uri: Uri) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val current = _calibrationWorkspace.value
@@ -2366,30 +2678,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapDefinitionsWarnings = parsed.warnings.map { warning ->
                         when {
                             warning.startsWith("Métadonnées de calibration absentes") ->
-                                getApplication<Application>().getString(R.string.cal_warning_metadata_missing)
+                                localizedContext.getString(R.string.cal_warning_metadata_missing)
                             warning.startsWith("OS et référence matérielle saisis") ->
-                                getApplication<Application>().getString(R.string.cal_warning_os_hardware_metadata)
+                                localizedContext.getString(R.string.cal_warning_os_hardware_metadata)
                             warning.startsWith("Des zones de tables ou d'axes") ->
-                                getApplication<Application>().getString(R.string.cal_warning_overlapping_regions)
-                            else -> getApplication<Application>().getString(R.string.cal_warning_import_review)
+                                localizedContext.getString(R.string.cal_warning_overlapping_regions)
+                            else -> localizedContext.getString(R.string.cal_warning_import_review)
                         }
-                    } + getApplication<Application>().getString(R.string.cal_warning_os_hardware_not_read),
+                    } + localizedContext.getString(R.string.cal_warning_os_hardware_not_read),
                     mapDirty = false,
                     mapError = null,
-                    message = getApplication<Application>().getString(R.string.msg_cal_definitions_loaded, parsed.definitions.size)
+                    message = localizedContext.getString(R.string.msg_cal_definitions_loaded, parsed.definitions.size)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = getApplication<Application>().getString(R.string.msg_cal_definitions_import_failed),
-                    message = getApplication<Application>().getString(R.string.msg_cal_definitions_import_failed)
+                    mapError = localizedContext.getString(R.string.msg_cal_definitions_import_failed),
+                    message = localizedContext.getString(R.string.msg_cal_definitions_import_failed)
                 )
             }
         }
     }
 
     fun selectCalibrationMap(mapId: String) {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             val current = _calibrationWorkspace.value
             try {
@@ -2412,13 +2725,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 _calibrationWorkspace.value = current.copy(
-                    mapError = getApplication<Application>().getString(R.string.msg_cal_map_read_failed)
+                    mapError = localizedContext.getString(R.string.msg_cal_map_read_failed)
                 )
             }
         }
     }
 
     fun updateCalibrationCell(row: Int, column: Int, value: String) {
+        if (!requirePremiumLicense()) return
         val current = _calibrationWorkspace.value
         if (row !in current.mapValues.indices || column !in current.mapValues[row].indices) return
         val updated = current.mapValues.mapIndexed { rowIndex, cells ->
@@ -2435,6 +2749,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Saves edited cells to a new local BIN image. No ECU programming command is sent. */
     fun applyCalibrationTableEdits() {
+        if (!requirePremiumLicense()) return
         viewModelScope.launch(Dispatchers.IO) {
             var createdFile: File? = null
             try {
@@ -2473,7 +2788,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     inspectionRecordCount = inspection.recordCount,
                     inspectionChecksumStatus = localizedInspectionChecksum(inspection),
                     inspectionAddressRanges = inspection.addressRanges.map {
-                        getApplication<Application>().getString(R.string.cal_address_range, it.start.toString(16).uppercase(), it.endInclusive.toString(16).uppercase(), it.length)
+                        localizedContext.getString(R.string.cal_address_range, it.start.toString(16).uppercase(), it.endInclusive.toString(16).uppercase(), it.length)
                     },
                     inspectionWarnings = localizedInspectionWarnings(inspection),
                     mapValues = decoded.values.map { row -> row.map(CalibrationTableCodec::formatEngineeringValue) },
@@ -2481,21 +2796,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     mapYAxisValues = decoded.yAxisValues.map(CalibrationTableCodec::formatEngineeringValue),
                     mapDirty = false,
                     mapError = null,
-                    message = getApplication<Application>().getString(R.string.msg_cal_table_saved)
+                    message = localizedContext.getString(R.string.msg_cal_table_saved)
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 createdFile?.let { runCatching { it.delete() } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    mapError = getApplication<Application>().getString(R.string.msg_cal_table_edit_failed),
-                    message = getApplication<Application>().getString(R.string.msg_cal_table_edit_failed)
+                    mapError = localizedContext.getString(R.string.msg_cal_table_edit_failed),
+                    message = localizedContext.getString(R.string.msg_cal_table_edit_failed)
                 )
             }
         }
     }
 
     fun clearCalibrationFile() {
+        calibrationFileImportGeneration++
         _calibrationWorkspace.value.importedFilePath?.let { path -> runCatching { File(path).delete() } }
         _calibrationWorkspace.value.activeFilePath?.takeIf { it != _calibrationWorkspace.value.importedFilePath }?.let { path ->
             runCatching { File(path).delete() }
@@ -2540,28 +2856,86 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Exports the selected local calibration file through Android's Storage Access Framework. */
-    fun exportCalibrationFile(destinationUri: Uri) {
+    fun exportExternalDumpPair(
+        method: EcuBenchExpertPlan.AccessMethod,
+        region: EcuBenchExpertPlan.MemoryRegion,
+        startAddress: Long,
+        originalPath: String,
+        comparisonPath: String
+    ) {
+        if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val profile = _vehicle.value
+        val snapshot = _calibrationWorkspace.value
+        fun current() = canResumeExport(generation, owner) &&
+            _vehicle.value == profile && hasPremiumLicense() &&
+            _calibrationWorkspace.value.importedFilePath == originalPath &&
+            _calibrationWorkspace.value.activeFilePath == originalPath &&
+            _calibrationWorkspace.value.comparisonFilePath == comparisonPath &&
+            _calibrationWorkspace.value.comparisonIdentical == true
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val sourcePath = _calibrationWorkspace.value.activeFilePath
-                    ?: _calibrationWorkspace.value.importedFilePath
-                    ?: error("Aucun fichier de calibration n'est chargé.")
+                if (!current()) return@launch
+                require(snapshot.inspectionFormat == "RAW_BINARY")
+                val original = File(originalPath)
+                val repeated = File(comparisonPath)
+                require(original.isFile && repeated.isFile && original.canonicalFile != repeated.canonicalFile)
+                val length = original.length()
+                require(length in 1L..EcuExternalDumpPair.MAX_DUMP_BYTES.toLong() &&
+                    repeated.length() == length)
+                CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_ECU_import_${method.name}_${System.currentTimeMillis()}.zip",
+                    "application/zip", beforePublish = { check(current()) }
+                ) { output ->
+                    original.inputStream().use { first ->
+                        repeated.inputStream().use { second ->
+                            EcuExternalDumpPair.export(output, first, second, method, region,
+                                startAddress, length.toInt(),
+                                controllerLabel = profile.engine.ecmType + " / " + method.name)
+                        }
+                    }
+                }
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.export_folder_success))
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.export_folder_failed))
+                }
+            }
+        }
+    }
+
+    fun exportCalibrationFile(fileName: String) {
+        if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val exportGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        fun current() = canResumeExport(exportGeneration, owner) &&
+            _vehicle.value == profile && hasPremiumLicense()
+        val workspace = _calibrationWorkspace.value
+        val selectedPath = workspace.activeFilePath ?: workspace.importedFilePath
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (!current()) return@launch
+                val sourcePath = selectedPath ?: error("Aucun fichier de calibration n'est chargé.")
                 val source = File(sourcePath)
                 check(source.isFile && source.exists()) { "Le fichier local de calibration est introuvable." }
-                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                    ?: error("Impossible de créer le fichier de destination.")
-                source.inputStream().use { input ->
-                    output.use { target -> input.copyTo(target) }
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/octet-stream",
+                    beforePublish = { check(current()) }
+                ) { target -> source.inputStream().use { it.copyTo(target) } }
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_exported))
                 }
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = getApplication<Application>().getString(R.string.msg_cal_file_exported)
-                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = getApplication<Application>().getString(R.string.msg_cal_file_export_failed)
-                )
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_export_failed))
+                }
             }
         }
     }
@@ -2584,14 +2958,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isObdScanning.value = false
     }
 
-    private var connectionAttemptGeneration: Long = 0L
+    @Volatile private var connectionAttemptGeneration: Long = 0L
     private var connectionAttemptJob: Job? = null
 
     private fun connectWithResult(
         connect: suspend () -> Result<AdapterCapabilities>,
         fallbackMessage: String,
         transport: String,
-        endpoint: String
+        endpoint: String,
+        discoveryOnly: Boolean = false
     ) {
         val attempt = ++connectionAttemptGeneration
         val previousAttempt = connectionAttemptJob
@@ -2618,8 +2993,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .onSuccess { capabilities ->
                         if (attempt == connectionAttemptGeneration) {
                             _adapter.value = capabilities
-                            rememberConnectionProfile(transport, capabilities, endpoint)
-                            refreshTopologyAndDefaults(runInitialScans = true)
+                            if (!discoveryOnly) {
+                                rememberConnectionProfile(transport, capabilities, endpoint)
+                                refreshTopologyAndDefaults(runInitialScans = true)
+                            }
                         }
                     }
                     .onFailure {
@@ -2642,6 +3019,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** USB discovery does not require Bluetooth or location permissions. */
+    fun refreshUsbDevices() {
+        viewModelScope.launch {
+            try {
+                _usbDevices.value = obdManager.getUsbDevices()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _connectionMessage.value = localizedContext.getString(R.string.msg_refresh_adapters_failed)
+            }
+        }
+    }
+
     fun refreshPairedDevices() {
         viewModelScope.launch {
             try {
@@ -2658,7 +3048,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_refresh_adapters_failed)
+                _connectionMessage.value = localizedContext.getString(R.string.msg_refresh_adapters_failed)
             }
         }
     }
@@ -2666,22 +3056,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun connectWifi(host: String, port: Int) {
         connectWithResult(
             connect = { obdManager.connectWifi(host.trim(), port) },
-            fallbackMessage = getApplication<Application>().getString(R.string.msg_wifi_connection_failed),
+            fallbackMessage = localizedContext.getString(R.string.msg_wifi_connection_failed),
             transport = "wifi",
             endpoint = "${host.trim()}:$port"
         )
     }
 
-    fun connectUsb(deviceLabel: String) {
+    fun discoverCamaroDiagConnector(deviceLabel: String, binary: Boolean = false) {
         val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
         if (id == null) {
-            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_usb_identifier_unavailable)
+            _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
+            return
+        }
+        connectWithResult(
+            connect = { obdManager.discoverCamaroDiagConnector(id, binary) },
+            fallbackMessage = localizedContext.getString(R.string.msg_usb_connection_failed),
+            transport = "connector_usb",
+            endpoint = deviceLabel,
+            discoveryOnly = true
+        )
+    }
+
+    fun connectUsb(deviceLabel: String) {
+        if (com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel(deviceLabel)) {
+            _connectionMessage.value = localizedContext.getString(R.string.status_not_verified)
+            return
+        }
+        if (deviceLabel.contains("CamaroDiagConnectors", ignoreCase = true)) {
+            discoverCamaroDiagConnector(deviceLabel)
+            return
+        }
+        val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
+        if (id == null) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
             return
         }
         val baudRate = if (deviceLabel.contains("OBDLink", true)) 115200 else 38400
         connectWithResult(
             connect = { obdManager.connectUsb(id, baudRate) },
-            fallbackMessage = getApplication<Application>().getString(R.string.msg_usb_connection_failed),
+            fallbackMessage = localizedContext.getString(R.string.msg_usb_connection_failed),
             transport = "usb",
             endpoint = deviceLabel
         )
@@ -2723,7 +3136,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 throw cancelled
             } catch (error: Exception) {
                 if (attempt == connectionAttemptGeneration) {
-                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_simulation_activation_failed)
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_simulation_activation_failed)
                 }
             } finally {
                 if (attempt == connectionAttemptGeneration) {
@@ -2737,12 +3150,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun connectRealBluetooth(macAddress: String) {
         val selectedName = _pairedDevices.value.firstOrNull { it.second == macAddress }?.first.orEmpty()
         if (selectedName.contains("OBDLink CX", ignoreCase = true)) {
-            _connectionMessage.value = getApplication<Application>().getString(R.string.msg_obdlink_cx_not_gm_compatible)
+            _connectionMessage.value = localizedContext.getString(R.string.msg_obdlink_cx_not_gm_compatible)
             return
         }
         connectWithResult(
             connect = { obdManager.connectAndProbe(macAddress) },
-            fallbackMessage = getApplication<Application>().getString(R.string.msg_bluetooth_connection_failed),
+            fallbackMessage = localizedContext.getString(R.string.msg_bluetooth_connection_failed),
             transport = "bluetooth",
             endpoint = "$selectedName ($macAddress)"
         )
@@ -2754,13 +3167,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Records actual live OBD samples; demo values are deliberately excluded. */
     fun toggleLiveRecording() {
+        if (!requirePremiumLicense()) return
         if (_liveRecordingState.value.isRecording) {
             stopLiveRecording()
             return
         }
-        if (!obdManager.isObdCommandChannelAvailable) {
+        if (!obdManager.isStandardObdReadAvailable()) {
             _liveRecordingState.value = _liveRecordingState.value.copy(
-                message = getApplication<Application>().getString(if (obdManager.isJ2534BridgeConnected()) R.string.msg_live_recording_j2534_block else R.string.msg_live_recording_unavailable)
+                message = localizedContext.getString(if (obdManager.isJ2534BridgeConnected()) R.string.msg_live_recording_j2534_block else R.string.msg_live_recording_unavailable)
             )
             return
         }
@@ -2771,7 +3185,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isRecording = true,
             sampleCount = 0,
             startedAtMillis = now,
-            message = getApplication<Application>().getString(R.string.msg_live_recording_real_started)
+            message = localizedContext.getString(R.string.msg_live_recording_real_started)
         )
     }
 
@@ -2780,46 +3194,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveRecordingState.value = _liveRecordingState.value.copy(
             isRecording = false,
             stoppedAtMillis = System.currentTimeMillis(),
-            message = getApplication<Application>().getString(R.string.msg_live_recording_stopped_count, recordedLiveSamples.size)
+            message = localizedContext.getString(R.string.msg_live_recording_stopped_count, recordedLiveSamples.size)
         )
     }
 
-    fun exportLiveRecording(destinationUri: Uri) {
+    fun exportLiveRecording(fileName: String) {
+        if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val exportGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        fun current() = canResumeExport(exportGeneration, owner) &&
+            _vehicle.value == profile && hasPremiumLicense()
         viewModelScope.launch {
             try {
+                if (!current()) return@launch
                 if (_liveRecordingState.value.isRecording) stopLiveRecording()
                 val snapshot = recordedLiveSamples.toList()
                 check(snapshot.isNotEmpty()) { "Aucune donnée enregistrée à exporter." }
-                val v = _vehicle.value
+                val v = profile
                 val csv = LiveTelemetryCsv.encode(
                     samples = snapshot,
                     vin = v.vin,
                     vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
                 )
-                withContext(Dispatchers.IO) {
-                    val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                        ?: error("Impossible de créer le fichier CSV.")
-                    output.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
+                    beforePublish = { check(current()) }
+                ) { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                if (current()) _liveRecordingState.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size))
                 }
-                _liveRecordingState.value = _liveRecordingState.value.copy(
-                    message = getApplication<Application>().getString(R.string.msg_live_csv_exported, snapshot.size)
-                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _liveRecordingState.value = _liveRecordingState.value.copy(
-                    message = getApplication<Application>().getString(R.string.msg_live_csv_export_failed)
-                )
+                if (current()) _liveRecordingState.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_live_csv_export_failed))
+                }
             }
         }
     }
 
     private fun captureLiveTelemetrySample(values: List<LivePidValue>) {
         if (!_liveRecordingState.value.isRecording) return
-        if (!obdManager.isObdCommandChannelAvailable) {
+        if (!obdManager.isStandardObdReadAvailable()) {
             stopLiveRecording()
             _liveRecordingState.value = _liveRecordingState.value.copy(
-                message = getApplication<Application>().getString(R.string.msg_live_recording_channel_lost)
+                message = localizedContext.getString(R.string.msg_live_recording_channel_lost)
             )
             return
         }
@@ -2829,7 +3248,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isRecording = false,
                 stoppedAtMillis = System.currentTimeMillis(),
                 sampleCount = recordedLiveSamples.size,
-                message = getApplication<Application>().getString(R.string.msg_live_recording_max_samples, maxLiveRecordingSamples)
+                message = localizedContext.getString(R.string.msg_live_recording_max_samples, maxLiveRecordingSamples)
             )
             return
         }
@@ -2844,7 +3263,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         recordedLiveSamples += RecordedLiveSample(System.currentTimeMillis(), snapshot)
         _liveRecordingState.value = _liveRecordingState.value.copy(
             sampleCount = recordedLiveSamples.size,
-            message = getApplication<Application>().getString(R.string.msg_live_recording_started, recordedLiveSamples.size)
+            message = localizedContext.getString(R.string.msg_live_recording_started, recordedLiveSamples.size)
         )
     }
 
@@ -2858,33 +3277,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val (confirmed, pending, permanent) =
                         obdManager.createSimulatedObd2FeatureEngine().readDtcs()
                     _dtcs.value = mapObdDtcs(confirmed + pending + permanent)
-                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_simulated_lfx)
-                } else if (!obdManager.isObdCommandChannelAvailable) {
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_simulated_lfx)
+                } else if (!obdManager.isStandardObdReadAvailable()) {
                     // No SAE OBD channel is available; keep independently read UDS ECU records.
                     _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
                     _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
-                        getApplication<Application>().getString(R.string.msg_dtc_j2534_unavailable)
-                    else getApplication<Application>().getString(R.string.msg_dtc_adapter_required)
+                        localizedContext.getString(R.string.msg_dtc_j2534_unavailable)
+                    else localizedContext.getString(R.string.msg_dtc_adapter_required)
                 } else {
-                    val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
-                        engine.readDtcs()
+                    if (obdManager.isJ2534StandardObdAvailable()) {
+                        val snapshot = obdManager.readJ2534StandardDtcs()
+                        if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                        replaceStandardDtcRecords(snapshot.records, snapshot.unavailableModes)
+                        _connectionMessage.value = unavailableDtcNotice(snapshot.unavailableModes)
+                    } else {
+                        val (confirmed, pending, permanent) = obdManager.withObdCommandSession { engine ->
+                            engine.readDtcs()
+                        }
+                        if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                        replaceStandardDtcRecords(confirmed + pending + permanent, emptySet())
+                        _connectionMessage.value = null
                     }
-                    if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-                    _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } +
-                        mapObdDtcs(confirmed + pending + permanent)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 if (isCurrentAccountGeneration(startedGeneration)) {
                     reportConnectionLoss(error)
-                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_scan_failed)
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_scan_failed)
                 }
             } finally {
                 endBusyOperation()
             }
         }
     }
+
+    /** Keep the prior records for an explicitly unavailable optional read mode. */
+    private fun replaceStandardDtcRecords(records: List<ObdDtc>, unavailableModes: Set<Int>) {
+        _dtcs.value = _dtcs.value.filter { previous ->
+            !previous.module.equals("ECM", ignoreCase = true) ||
+                (7 in unavailableModes && previous.statusEn.equals("Pending", ignoreCase = true)) ||
+                (10 in unavailableModes && previous.statusEn.equals("Permanent", ignoreCase = true))
+        } + mapObdDtcs(records)
+    }
+
+    private fun unavailableDtcNotice(modes: Set<Int>): String? =
+        modes.takeIf { it.isNotEmpty() }?.let {
+            localizedContext.getString(R.string.obd_data_unavailable) + ": OBD " +
+                it.sorted().joinToString(" / ") { mode -> "%02X".format(java.util.Locale.ROOT, mode) }
+        }
 
     /** Converts standard OBD DTC records once for both the quick and full scan screens. */
     private fun mapObdDtcs(records: List<ObdDtc>): List<DiagnosticDtc> =
@@ -2918,33 +3359,57 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return if (isFr) entry.second else entry.first
     }
 
-        fun clearDtcs() {
+    fun clearDtcs() {
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        fun current() = isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration
         viewModelScope.launch {
+            if (!current()) return@launch
             beginBusyOperation()
             try {
                 if (obdManager.isSimulationActive) {
                     _dtcs.value = emptyList()
-                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_demo_cleared)
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_demo_cleared)
+                } else if (obdManager.isJ2534StandardObdClearAvailable()) {
+                    obdManager.clearJ2534StandardDtcs()
+                    if (!current()) return@launch
+                    // Mode 04 does not erase permanent emissions DTCs. Preserve
+                    // all other module records and require a new scan to refresh.
+                    _dtcs.value = _dtcs.value.filterNot {
+                        it.module.equals("ECM", ignoreCase = true) &&
+                            !it.statusEn.equals("Permanent", ignoreCase = true)
+                    }
+                    _connectionMessage.value = null
                 } else if (!obdManager.isObdCommandChannelAvailable) {
-                    _connectionMessage.value = if (obdManager.isJ2534BridgeConnected())
-                        getApplication<Application>().getString(R.string.msg_dtc_clear_j2534_unavailable)
-                    else getApplication<Application>().getString(R.string.msg_dtc_clear_adapter_required)
+                    _connectionMessage.value = when {
+                        obdManager.isJ2534StandardObdAvailable() ->
+                            localizedContext.getString(R.string.msg_dtc_j2534_clear_requires_permission)
+                        obdManager.isJ2534BridgeConnected() ->
+                            localizedContext.getString(R.string.msg_dtc_clear_j2534_unavailable)
+                        else -> localizedContext.getString(R.string.msg_dtc_clear_adapter_required)
+                    }
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L)
-                    if (Regex("\\b44\\b").containsMatchIn(response.uppercase())) {
+                    if (!current()) return@launch
+                    if (com.camarodiag.gen5.data.obd.StandardObdClearEvidence.acknowledged(response)) {
                         // SAE Mode 04 clears standardized emissions DTCs only.
                         // Preserve enhanced UDS records from other ECUs: no GM UDS clear is issued here.
-                        _dtcs.value = _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) }
+                        _dtcs.value = _dtcs.value.filterNot {
+                            it.module.equals("ECM", ignoreCase = true) &&
+                                !it.statusEn.equals("Permanent", ignoreCase = true)
+                        }
                         _connectionMessage.value = null
                     } else {
-                        _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_clear_not_confirmed, response)
+                        _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_not_confirmed, response)
                     }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                reportConnectionLoss(error)
-                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_dtc_clear_failed)
+                if (current()) {
+                    reportConnectionLoss(error)
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_clear_failed)
+                }
             } finally {
                 endBusyOperation()
             }
@@ -2952,14 +3417,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun runMileageAudit() {
+        if (!requirePremiumLicense()) return
         val startedGeneration = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val selectedVin = _vehicle.value.vin
+        fun current() = isCurrentAccountGeneration(startedGeneration) &&
+            connection == connectionAttemptGeneration && selectedVin == _vehicle.value.vin
         viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+            if (!current()) return@launch
             beginBusyOperation()
             _mileageReport.value = null
             val readings = mutableListOf<MileageSourceReading>()
             try {
-                if (!obdManager.isObdCommandChannelAvailable) {
+                if (!obdManager.isStandardObdReadAvailable()) {
                     if (obdManager.isJ2534BridgeConnected()) {
                         readings += MileageSourceReading(
                             "J2534", "J2534 bridge (UDS only)", "Pont J2534 (UDS uniquement)",
@@ -2976,7 +3446,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 } else {
-                    val (a6Response, d3Response) = obdManager.withObdCommandSession { engine ->
+                    val (a6Response, d3Response) = if (obdManager.isJ2534StandardObdAvailable()) {
+                        obdManager.readJ2534OdometerPids()
+                    } else obdManager.withObdCommandSession { engine ->
                         val supportedPids = engine.discoverSupportedPids()
                         engine.readMode01PidIfSupported(0xA6, supportedPids) to
                             engine.readMode01PidIfSupported(0xD3, supportedPids)
@@ -3011,16 +3483,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Donnée IPC non interrogée : aucun profil VIN avec adresse/DID vérifié n'est installé."
                     )
                 }
-                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-                _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
+                if (!current()) return@launch
+                _mileageReport.value = MileageAuditEngine.evaluate(selectedVin, readings)
                 _connectionMessage.value = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentAccountGeneration(startedGeneration)) {
+                if (current()) {
                     reportConnectionLoss(error)
-                    _mileageReport.value = MileageAuditEngine.evaluate(_vehicle.value.vin, readings)
-                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_mileage_audit_failed)
+                    _mileageReport.value = MileageAuditEngine.evaluate(selectedVin, readings)
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_mileage_audit_failed)
                 }
             } finally {
                 endBusyOperation()
@@ -3029,50 +3501,343 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Executes a complete, standards-based read-only OBD-II scan on the connected Camaro. */
-    fun runFullObdScan() {
-        val startedGeneration = accountSessionGeneration
-        viewModelScope.launch {
-            if (!isCurrentAccountGeneration(startedGeneration)) return@launch
-            if (!obdManager.isSimulationActive && !obdManager.isObdCommandChannelAvailable) {
-                _obdScanReport.value = null
-                _obdScanMessage.value = if (obdManager.isJ2534BridgeConnected())
-                    getApplication<Application>().getString(R.string.msg_full_scan_j2534_only)
-                else getApplication<Application>().getString(R.string.msg_full_scan_adapter_required)
+
+    /**
+     * Owner-only read-only hardware verification.
+     * A valid Firebase ID token with a backend-issued custom claim is required
+     * for EACH run. UI visibility alone is never treated as authorization.
+     */
+    private suspend fun confirmFunctionalTestOwner(expectedUid: String): Boolean =
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            val user = FirebaseAuth.getInstance().currentUser
+            if (user == null || user.uid != expectedUid) {
+                continuation.resume(false)
+                return@suspendCancellableCoroutine
+            }
+            user.getIdToken(true).addOnCompleteListener { task ->
+                if (continuation.isActive) {
+                    continuation.resume(
+                        task.isSuccessful &&
+                            FirebaseAuth.getInstance().currentUser?.uid == expectedUid &&
+                            com.camarodiag.gen5.auth.OwnerFunctionalTestPolicy.isAllowed(
+                                user.providerData.map { it.providerId },
+                                task.result?.claims.orEmpty()
+                            )
+                    )
+                }
+            }
+        }
+
+    fun runFunctionalTests() {
+        if (functionalTestJob?.isActive == true) return
+        val accountUid = authenticatedAccountUid ?: return
+        val sessionGeneration = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val selectedVin = _vehicle.value.vin
+        val adapterName = _adapter.value.deviceName
+        val execution = ++functionalTestGeneration
+        functionalTestJob = viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(accountUid)) {
+                if (execution == functionalTestGeneration) {
+                    _functionalTestState.value = FunctionalTestState(
+                        error = localizedContext.getString(R.string.functional_tests_denied)
+                    )
+                }
                 return@launch
             }
+            if (!isCurrentAccountGeneration(sessionGeneration) || execution != functionalTestGeneration ||
+                connection != connectionAttemptGeneration || selectedVin != _vehicle.value.vin) {
+                return@launch
+            }
+            val connected = !obdManager.isDemoMode && !obdManager.isSimulationActive &&
+                (obdManager.isObdCommandChannelAvailable || obdManager.isJ2534BridgeConnected())
+            val transport = obdManager.currentTransportKind
+            val topology = _modules.value.ifEmpty {
+                CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
+            }
+            _functionalTestState.value = FunctionalTestState(
+                running = true, startedAtMillis = System.currentTimeMillis(),
+                checks = FunctionalTestPlanner.initial(topology, transport, connected),
+                context = FunctionalTestContext(selectedVin, adapterName, transport, connection)
+            )
+            fun current(): Boolean = execution == functionalTestGeneration &&
+                isCurrentAccountGeneration(sessionGeneration) &&
+                connection == connectionAttemptGeneration && selectedVin == _vehicle.value.vin
+            fun mark(
+                key: String, outcome: FunctionalTestOutcome,
+                english: String, french: String
+            ) {
+                if (current()) {
+                    _functionalTestState.value = _functionalTestState.value.copy(
+                        checks = FunctionalTestPlanner.updated(
+                            _functionalTestState.value.checks, key, outcome, english, french
+                        )
+                    )
+                }
+            }
+            suspend fun checkRead(
+                key: String, read: suspend () -> Pair<String, String>
+            ) {
+                if (!current()) throw CancellationException("Account or run changed")
+                try {
+                    val (english, french) = read()
+                    if (!current()) throw CancellationException("Account or run changed")
+                    mark(key, FunctionalTestOutcome.PASSED, english, french)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    mark(
+                        key, FunctionalTestOutcome.FAILED,
+                        "Physical read failed (" + failure.javaClass.simpleName + ").",
+                        "Lecture physique échouée (" + failure.javaClass.simpleName + ")."
+                    )
+                }
+            }
+            try {
+                if (!connected) {
+                    if (current()) _functionalTestState.value = _functionalTestState.value.copy(
+                        error = localizedContext.getString(R.string.functional_tests_not_connected)
+                    )
+                } else if (obdManager.isObdCommandChannelAvailable) {
+                    // Only a physically observed 7E8 reply to SAE 0100 permits
+                    // confirmation of the standard 11-bit powertrain OBD responder.
+                    // It does not certify GM enhanced addressing or ECU programming.
+                    if (current()) {
+                        try {
+                            val responders = obdManager.withObdCommandSession {
+                                it.discoverFunctionalObdResponders()
+                            }
+                            if ("7E8" in responders) {
+                                mark(
+                                    "module:ECM", FunctionalTestOutcome.PASSED,
+                                    "Physical 7E8 reply to standard 0100 observed; standard OBD only.",
+                                    "Réponse physique 7E8 à 0100 observée ; OBD standard uniquement."
+                                )
+                            } else {
+                                mark(
+                                    "module:ECM", FunctionalTestOutcome.NOT_TESTED,
+                                    "No verified 7E8 response; enhanced ECM access not tested.",
+                                    "Aucune réponse 7E8 confirmée ; accès ECM étendu non testé."
+                                )
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            mark(
+                                "module:ECM", FunctionalTestOutcome.FAILED,
+                                "Physical OBD responder discovery failed.",
+                                "Échec de la découverte des réponses OBD physiques."
+                            )
+                        }
+                    }
+                    checkRead("service:vin") {
+                        val vin = obdManager.withObdCommandSession { it.readVin() }
+                            ?.trim()?.uppercase(java.util.Locale.ROOT)
+                            ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                            ?: error("VIN missing from physical response")
+                        val chosen = _vehicle.value.vin.trim().uppercase(java.util.Locale.ROOT)
+                        require(chosen.isEmpty() || chosen == vin) {
+                            "VIN mismatch"
+                        }
+                        "Vehicle VIN read and checked against selected profile." to
+                            "VIN physique lu et comparé au véhicule sélectionné."
+                    }
+                    checkRead("service:pids") {
+                        val pids = obdManager.withObdCommandSession { it.discoverSupportedPids() }
+                        require(pids.isNotEmpty()) { "No supported PID response" }
+                        ("ECU responded with " + pids.size + " supported PIDs.") to
+                            ("Réponse OBD physique : " + pids.size + " PID pris en charge.")
+                    }
+                    checkRead("service:dtcs") {
+                        val (dtcResults, positiveResponse) =
+                            obdManager.withObdCommandSession { it.readDtcsWithPositiveResponseProof() }
+                        require(positiveResponse) { "No positive physical DTC service response" }
+                        val (confirmed, pending, permanent) = dtcResults
+                        val count = confirmed.size + pending.size + permanent.size
+                        ("Physical DTC response verified: " + count + " codes, no clearing.") to
+                            ("Réponse physique DTC vérifiée : " + count + " défauts, sans effacement.")
+                    }
+                    checkRead("service:readiness") {
+                        val response = obdManager.withObdCommandSession { it.readReadiness() }
+                        require(!response.isNullOrBlank()) { "Readiness response missing" }
+                        "Physical emissions readiness response received." to
+                            "Réponse physique des moniteurs antipollution reçue."
+                    }
+                    // Functional 7DF/Mode 09 responses cannot prove which individual
+                    // GM controller answered. Keep all per-ECU rows NOT TESTED until
+                    // VIN-specific physical addresses have been independently verified.
+                } else if (obdManager.isJ2534BridgeConnected()) {
+                    checkRead("service:vin") {
+                        val identity = obdManager.readCalibrationIdentification()
+                        val vin = identity.vin?.trim()?.uppercase(java.util.Locale.ROOT)
+                            ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                            ?: error("J2534 ECU VIN missing")
+                        val chosen = _vehicle.value.vin.trim().uppercase(java.util.Locale.ROOT)
+                        require(chosen.isEmpty() || chosen == vin) { "VIN mismatch" }
+                        "ECU VIN received over the selected physical J2534 UDS profile." to
+                            "VIN reçu via le profil UDS J2534 physique sélectionné."
+                    }
+                    // A capable bridge now offers standard OBD payloads without
+                    // an ELM command channel. Test each service independently.
+                    if (obdManager.isJ2534StandardObdAvailable()) {
+                        checkRead("service:pids") {
+                            val pids = obdManager.probeJ2534StandardPids()
+                            require(pids.isNotEmpty()) { "No supported physical PIDs" }
+                            ("Physical J2534 PID bitmap: " + pids.size + " supported PIDs.") to
+                                ("Bitmap physique J2534 : " + pids.size + " PID pris en charge.")
+                        }
+                        checkRead("service:dtcs") {
+                            val snapshot = obdManager.readJ2534StandardDtcs()
+                            require(snapshot.unavailableModes.isEmpty()) {
+                                "Complete standard DTC coverage not confirmed"
+                            }
+                            ("Physical J2534 DTC reads verified: " + snapshot.records.size + " codes, no clearing.") to
+                                ("Lectures physiques J2534 vérifiées : " + snapshot.records.size + " défauts, sans effacement.")
+                        }
+                        checkRead("service:readiness") {
+                            obdManager.probeJ2534StandardReadiness()
+                            "Physical J2534 emissions readiness response verified." to
+                                "Réponse physique J2534 des moniteurs antipollution vérifiée."
+                        }
+                    }
+                    // A physical standard OBD read is not proof of every GM
+                    // module or of programming, actuation or DTC reset.
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                if (execution == functionalTestGeneration && isCurrentAccountGeneration(sessionGeneration)) {
+                    _functionalTestState.value = _functionalTestState.value.copy(
+                        running = false, finishedAtMillis = System.currentTimeMillis(),
+                        error = if (!current()) localizedContext.getString(R.string.functional_tests_cancelled)
+                            else _functionalTestState.value.error
+                    )
+                }
+            }
+        }
+    }
+
+    fun cancelFunctionalTests() {
+        functionalTestGeneration++
+        functionalTestJob?.cancel()
+        functionalTestJob = null
+        if (_functionalTestState.value.running) {
+            _functionalTestState.value = _functionalTestState.value.copy(
+                running = false,
+                finishedAtMillis = System.currentTimeMillis(),
+                error = localizedContext.getString(R.string.functional_tests_cancelled)
+            )
+        }
+    }
+
+    fun exportFunctionalTests(fileName: String) {
+        val accountUid = authenticatedAccountUid ?: return
+        val sessionGeneration = accountSessionGeneration
+        viewModelScope.launch {
+            if (!confirmFunctionalTestOwner(accountUid) ||
+                !isCurrentAccountGeneration(sessionGeneration)) return@launch
+            val snapshot = _functionalTestState.value
+            if (!snapshot.canExport) return@launch
+            val evidenceContext = snapshot.context ?: return@launch
+            val json = JSONObject()
+                .put("schema", "camarodiag-functional-test-v1")
+                .put("startedAtMillis", snapshot.startedAtMillis)
+                .put("finishedAtMillis", snapshot.finishedAtMillis)
+                .put("vin", evidenceContext.selectedVin)
+                .put("adapter", evidenceContext.adapterName)
+                .put("transport", evidenceContext.transport)
+                .put("connectionGeneration", evidenceContext.connectionGeneration)
+                .put("completedWithoutError", snapshot.error == null)
+                .put("warning", "NOT_TESTED is not a PASS. No write or actuation was tested.")
+            val checks = JSONArray()
+            snapshot.checks.forEach { check ->
+                checks.put(
+                    JSONObject()
+                        .put("key", check.key)
+                        .put("group", check.group)
+                        .put("outcome", check.outcome.name)
+                        .put("label", check.labelEn)
+                        .put("detail", check.detailEn)
+                )
+            }
+            json.put("checks", checks)
+            try {
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                    beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
+                        authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER) }
+                ) { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
+                if (isCurrentAccountGeneration(sessionGeneration)) {
+                    _connectionMessage.value = localizedContext.getString(R.string.export_folder_success)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (isCurrentAccountGeneration(sessionGeneration)) {
+                    _connectionMessage.value = localizedContext.getString(R.string.export_folder_failed)
+                }
+            }
+        }
+    }
+
+    fun runFullObdScan() {
+        if (!requirePremiumLicense()) return
+        if (_isObdScanning.value) return
+        val startedGeneration = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val selectedVin = _vehicle.value.vin
+        fun current() = isCurrentAccountGeneration(startedGeneration) &&
+            connection == connectionAttemptGeneration && selectedVin == _vehicle.value.vin
+        viewModelScope.launch {
+            if (!current()) return@launch
+            if (!obdManager.isSimulationActive && !obdManager.isStandardObdReadAvailable()) {
+                _obdScanReport.value = null
+                _obdScanMessage.value = if (obdManager.isJ2534BridgeConnected())
+                    localizedContext.getString(R.string.msg_full_scan_j2534_only)
+                else localizedContext.getString(R.string.msg_full_scan_adapter_required)
+                return@launch
+            }
+            if (_isObdScanning.value) return@launch
             _isObdScanning.value = true
+            _obdScanReport.value = null
             _obdScanMessage.value = null
             try {
                 val report = if (obdManager.isSimulationActive) {
                     obdManager.createSimulatedObd2FeatureEngine().fullReadOnlyScan()
+                } else if (obdManager.isJ2534StandardObdAvailable()) {
+                    obdManager.fullJ2534StandardObdScan()
                 } else {
                     obdManager.withObdCommandSession { engine ->
                         engine.fullReadOnlyScan()
                     }
                 }
-                if (!isCurrentAccountGeneration(startedGeneration)) return@launch
+                if (!current()) return@launch
                 _obdScanReport.value = report
-                _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
-                    topology = _modules.value,
-                    respondingAddresses = report.respondingEcuAddresses
-                )
+                if (report.physicalCanResponder == null) {
+                    _modules.value = CamaroUdsProtocol.applyStandardObdDiscovery(
+                        topology = _modules.value,
+                        respondingAddresses = report.respondingEcuAddresses
+                    )
+                }
                 val allDtcs = report.confirmedDtcs + report.pendingDtcs + report.permanentDtcs
-                _dtcs.value = if (obdManager.isSimulationActive) {
-                    mapObdDtcs(allDtcs)
+                if (obdManager.isSimulationActive) {
+                    _dtcs.value = mapObdDtcs(allDtcs)
                 } else {
-                    _dtcs.value.filterNot { it.module.equals("ECM", ignoreCase = true) } + mapObdDtcs(allDtcs)
+                    replaceStandardDtcRecords(allDtcs, report.unavailableDtcModes)
                 }
                 _obdScanMessage.value = if (obdManager.isSimulationActive) {
-                    getApplication<Application>().getString(R.string.msg_full_scan_simulation_complete, report.supportedPids.size, allDtcs.size)
+                    localizedContext.getString(R.string.msg_full_scan_simulation_complete, report.supportedPids.size, allDtcs.size)
                 } else {
-                    getApplication<Application>().getString(R.string.msg_full_scan_complete, report.supportedPids.size, allDtcs.size)
+                    listOfNotNull(
+                        localizedContext.getString(R.string.msg_full_scan_complete, report.supportedPids.size, allDtcs.size),
+                        unavailableDtcNotice(report.unavailableDtcModes)
+                    ).joinToString("\n")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (isCurrentAccountGeneration(startedGeneration)) {
+                if (current()) {
                     reportConnectionLoss(error)
-                    _obdScanMessage.value = getApplication<Application>().getString(R.string.msg_full_scan_failed)
+                    _obdScanMessage.value = localizedContext.getString(R.string.msg_full_scan_failed)
                 }
             } finally {
                 // An old scan finishing after account switch must not reset
@@ -3088,6 +3853,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Capture the identity and evidence at the user's action, never after
         // a queued coroutine may have crossed a Firebase account switch.
         val ownerUid = authenticatedAccountUid ?: return
+        val exportGeneration = accountSessionGeneration
         val v = _vehicle.value
         val report = _mileageReport.value
         val adapterName = _adapter.value.deviceName
@@ -3104,19 +3870,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     dtcSummary = if (diagnosticCodes.isEmpty()) "0 DTC" else diagnosticCodes.joinToString(", "),
                     mileageSummary = report?.let {
                         localizedMileageSummaryForStorage(it)
-                    } ?: getApplication<Application>().getString(R.string.mileage_audit_not_run),
+                    } ?: localizedContext.getString(R.string.mileage_audit_not_run),
                     hasMileageDiscrepancy = report?.hasDiscrepancy ?: false,
                     maxDeltaKm = report?.maxDeltaKm ?: 0.0
                 )
-                if (authenticatedAccountUid != ownerUid) return@launch
+                if (authenticatedAccountUid != ownerUid ||
+                    !isCurrentAccountGeneration(exportGeneration)) return@launch
+                val backup = JSONObject()
+                    .put("schema", "camarodiag-diagnostic-session-v1")
+                    .put("timestamp", entity.timestamp)
+                    .put("vehicle", entity.vehicleLabel)
+                    .put("vin", entity.vin)
+                    .put("adapter", entity.adapterName)
+                    .put("dtcs", JSONArray(diagnosticCodes))
+                    .put("mileageAuditPerformed", report != null)
+                    .put("mileageSummary", entity.mileageSummary)
+                    .put("hasMileageDiscrepancy", entity.hasMileageDiscrepancy)
+                    .put("maxDeltaKm", entity.maxDeltaKm)
+                CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_session_${entity.timestamp}.json", "application/json",
+                    beforePublish = { check(authenticatedAccountUid == ownerUid &&
+                        isCurrentAccountGeneration(exportGeneration)) }
+                ) { it.write(backup.toString(2).toByteArray(Charsets.UTF_8)) }
+                if (authenticatedAccountUid != ownerUid ||
+                    !isCurrentAccountGeneration(exportGeneration)) return@launch
                 sessionDao.insertSession(entity)
-                if (authenticatedAccountUid == ownerUid) {
-                    _connectionMessage.value = getApplication<Application>().getString(R.string.msg_session_saved)
+                if (isCurrentAccountGeneration(exportGeneration)) {
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_session_saved) +
+                        "\n" + CamaroDiagExportStorage.DISPLAY_PATH
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_session_save_failed)
+                _connectionMessage.value = localizedContext.getString(R.string.msg_session_save_failed)
             }
         }
     }
@@ -3131,7 +3917,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _connectionMessage.value = getApplication<Application>().getString(R.string.msg_session_delete_failed)
+                _connectionMessage.value = localizedContext.getString(R.string.msg_session_delete_failed)
             }
         }
     }
@@ -3142,21 +3928,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Read the ECU VIN immediately after a successful OBD connection so that
             // the selected vehicle profile can be checked before the user starts diagnosis.
             // Keep this request ahead of the initial scans to avoid competing for the ELM channel.
+            val account = accountSessionGeneration
+            val connection = connectionAttemptGeneration
+            val request = ++calibrationIdentityGeneration
+            val profile = _vehicle.value
+            fun current() = account == accountSessionGeneration && connection == connectionAttemptGeneration &&
+                request == calibrationIdentityGeneration && profile == _vehicle.value
             viewModelScope.launch {
+                if (!current()) return@launch
                 try {
                     val sourceWasSimulated = obdManager.isSimulationActive || obdManager.isDemoMode
                     val identity = obdManager.withObdCommandSession { engine -> engine.readEcuIdentification() }
-                    val comparison = VehicleVinMatcher.compare(_vehicle.value.vin, identity.vin)
+                    if (!current()) return@launch
+                    val comparison = VehicleVinMatcher.compare(profile.vin, identity.vin)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        ecuVinResponse = identity.vin ?: getApplication<Application>().getString(R.string.obd_not_available),
+                        ecuVinResponse = identity.vin.orEmpty(),
                         ecuIdentityFromSimulation = sourceWasSimulated ||
                         obdManager.isSimulationActive || obdManager.isDemoMode,
                         vinComparison = comparison,
                         vinModelYear = VehicleVinMatcher.modelYearFromVin(identity.vin),
                         ecuNameResponse = identity.ecuNames.joinToString("\n"),
                         respondingEcuAddresses = identity.respondingEcuAddresses,
-                        calibrationIdResponse = identity.calibrationIds.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) },
-                        cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n").ifBlank { getApplication<Application>().getString(R.string.obd_not_available) }
+                        calibrationIdResponse = identity.calibrationIds.joinToString("\n"),
+                        cvnResponse = identity.calibrationVerificationNumbers.joinToString("\n")
                     )
                     // Do not automatically interpret or audit data against the wrong saved vehicle.
                     // The user can resolve the mismatch first, then start diagnostics explicitly.
@@ -3167,10 +3961,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
+                    if (!current()) return@launch
                     val connectionLost = ObdTransportFailurePolicy.isConnectionLoss(error)
                     if (connectionLost) reportConnectionLoss(error)
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        ecuVinResponse = getApplication<Application>().getString(R.string.obd_not_available),
+                        ecuVinResponse = "",
                         ecuIdentityFromSimulation = false,
                         vinComparison = null,
                         vinModelYear = null,
@@ -3238,15 +4033,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     LivePidValue("BAT", "Control Module Voltage (DEMO)", "Tension calculateur (DÉMO)", voltage, "V", voltage, "V", 11.5, 15.2, push("BAT", voltage))
                                 )
                                 valuesForRecording = _livePids.value
-                                _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_simulation_active)
+                                _liveTelemetryMessage.value = localizedContext.getString(R.string.msg_live_simulation_active)
                             }
                             obdManager.isDemoMode -> {
                                 _livePids.value = emptyList()
-                                _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_no_adapter)
+                                _liveTelemetryMessage.value = localizedContext.getString(R.string.msg_live_no_adapter)
                             }
-                            !obdManager.isObdCommandChannelAvailable -> {
+                            !obdManager.isStandardObdReadAvailable() -> {
                                 _livePids.value = emptyList()
-                                _liveTelemetryMessage.value = getApplication<Application>().getString(R.string.msg_live_j2534_only)
+                                _liveTelemetryMessage.value = localizedContext.getString(R.string.msg_live_j2534_only)
                             }
                             else -> {
                                 val values = mutableListOf<LivePidValue>()
@@ -3410,7 +4205,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                                 valuesForRecording = values
                                 _liveTelemetryMessage.value = if (_livePids.value.isEmpty()) {
-                                    getApplication<Application>().getString(R.string.msg_live_no_pid_response)
+                                    localizedContext.getString(R.string.msg_live_no_pid_response)
                                 } else {
                                     null
                                 }
@@ -3429,11 +4224,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         } else {
                             consecutiveFailures++
                             _liveTelemetryMessage.value =
-                                getApplication<Application>().getString(R.string.msg_live_read_failed)
+                                localizedContext.getString(R.string.msg_live_read_failed)
                             if (_liveRecordingState.value.isRecording) {
                                 stopLiveRecording()
                                 _liveRecordingState.value = _liveRecordingState.value.copy(
-                                    message = getApplication<Application>().getString(R.string.msg_live_recording_stopped)
+                                    message = localizedContext.getString(R.string.msg_live_recording_stopped)
                                 )
                             }
                         }

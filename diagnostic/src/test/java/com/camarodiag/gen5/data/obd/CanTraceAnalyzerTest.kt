@@ -1010,4 +1010,49 @@ class CanTraceAnalyzerTest {
         assertTrue(report.messages.isEmpty())
     }
 
+    @Test
+    fun opensCsvWithBomBeforeCanId() {
+        val report = CanTraceAnalyzer.analyze("\uFEFFcan_id,data\n7E8,02 41 00", "capture.csv")
+        assertEquals(0x7E8, report.frames.single().canId)
+    }
+    @Test
+    fun readsVectorExtendedIdSuffix() {
+        val report = CanTraceAnalyzer.analyze("0.0 1 18DAF110x Rx d 3 02 41 00")
+        assertEquals(0x18DAF110, report.frames.single().canId)
+    }
+    @Test
+    fun reordersIndexedBytesAndRejectsMissingOrDuplicateIndices() {
+        fun read(columns: String) = CanTraceAnalyzer.analyze("id,$columns\n7E8,41,02,00", "indexed.csv")
+        assertEquals(listOf(2, 0x41, 0), read("data1,data0,data2").frames.single().data)
+        assertTrue(read("byte1,data1,data2").frames.isEmpty())
+        assertTrue(read("byte0,byte2,byte3").frames.isEmpty())
+    }
+    @Test
+    fun readsDecimalCommaTimestampsInSemicolonCsv() {
+        val report = CanTraceAnalyzer.analyze("time;id;data\n1,25;7E8;02 41 00", "capture.csv")
+        assertEquals(1.25, report.frames.single().timestampSeconds!!, 0.0)
+    }
+    @Test
+    fun rejectsMalformedIndexedCsvBytes() {
+        val report = CanTraceAnalyzer.analyze("id,data0\n7E8,+1\n7E8,000\n7E8,0x0F", "bytes.csv")
+        assertEquals(listOf(15), report.frames.single().data)
+    }
+    @Test
+    fun ignoresUnterminatedCsvRowAndContinues() {
+        val report = CanTraceAnalyzer.analyze("id,data\n7E8,\"02 41 00\n7E9,02 41 01", "capture.csv")
+        assertEquals(0x7E9, report.frames.single().canId)
+        assertTrue(report.errors.any { it.startsWith("Line 2:") })
+    }
+    @Test
+    fun recognizesTabsAndQuotedDelimiterInCsvHeader() {
+        val tsv = CanTraceAnalyzer.analyze("id\tdata\n7E8\t02 41 00", "capture.tsv")
+        assertEquals(0x7E8, tsv.frames.single().canId)
+        val csv = CanTraceAnalyzer.analyze("id,data,\"note;;;;\"\n7E9,02 41 01,x", "capture.csv")
+        assertEquals(0x7E9, csv.frames.single().canId)
+    }
+    @Test
+    fun rejectsEmbeddedHexPrefixes() {
+        val report = CanTraceAnalyzer.analyze("id,data\n7E8,020x4100\n7E9,0x\n7EA,0x02 0X41 00", "capture.csv")
+        assertEquals(0x7EA, report.frames.single().canId)
+    }
 }

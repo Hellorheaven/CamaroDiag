@@ -1,20 +1,27 @@
 name: Android CI
-# Manual full validation is available on demand; draft validation remains checkpointed.
-
-# Intentionally no push or pull_request trigger.
-# Validation is started manually at the 50-commit checkpoint, not per commit.
+# Full Android validation remains available manually. For draft PRs,
+# evaluate the configurable 50-Android-commit checkpoint automatically.
 on:
-  workflow_dispatch:
-    inputs:
-      target_ref:
-        description: "Branch or commit to validate"
-        required: true
-        default: "feat/live-can-monitor"
-        type: string
-      pr_number:
-        description: "Pull request number (optional)"
-        required: false
-        type: string
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'app/**'
+      - 'communication/**'
+      - 'core/**'
+      - 'diagnostic/**'
+      - 'control/**'
+      - 'mileageaudit/**'
+      - 'storage/**'
+      - 'third_party/**'
+      - '**/*.gradle'
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'version.properties'
+      - '.github/workflows/android-ci.yml'
 
 concurrency:
   group: android-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || inputs.target_ref || 'manual' }}
@@ -27,7 +34,7 @@ permissions:
 
 jobs:
   evaluate-build-checkpoint:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     outputs:
       validated_sha: ${{ steps.resolve_revision.outputs.sha }}
@@ -75,26 +82,31 @@ jobs:
             echo "Android-relevant changes detected:"
             git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "${paths[@]}"
           fi
-          if git diff --quiet "$HEAD_SHA^" "$HEAD_SHA" -- "${paths[@]}"; then
+          if git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- "${paths[@]}"; then
             echo "current_android_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "current_android_changed=true" >> "$GITHUB_OUTPUT"
             echo "Current commit contains Android-relevant changes."
           fi
 
-      - name: Find last completed Android Debug validation attempt
+      - name: Find last successful Android Debug validation attempt
         id: previous_build
         if: steps.android_changes.outputs.android_changed == 'true' && github.event.pull_request.draft
         uses: actions/github-script@v8
         with:
           script: |
             const pr = context.payload.pull_request;
-            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+            // A draft PR can generate hundreds of successful checkpoint-only
+            // runs. Paginating every run and querying every job makes each
+            // subsequent PR update hang for minutes. Bound lookup at 30 runs:
+            // if the last real build is older, prefer a fresh build (safe).
+            const response = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner, repo: context.repo.repo,
               workflow_id: 'android-ci.yml', branch: pr.head.ref,
-              event: 'pull_request', status: 'completed', per_page: 100
+              event: 'pull_request', status: 'completed', per_page: 30,
+              page: 1
             });
-            const candidates = runs
+            const candidates = response.data.workflow_runs
               .filter(run => run.head_sha !== pr.head.sha &&
                 (run.pull_requests || []).some(item => item.number === pr.number))
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -104,15 +116,15 @@ jobs:
                 owner: context.repo.owner, repo: context.repo.repo,
                 run_id: candidate.id, per_page: 100
               });
-              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.status === 'completed')) {
+              if (jobs.data.jobs.some(job => job.name === 'test-and-build' && job.conclusion === 'success')) {
                 previous = candidate;
                 break;
               }
             }
             core.setOutput('sha', previous ? previous.head_sha : '');
             core.info(previous
-              ? 'Last completed Android Debug validation attempt: ' + previous.head_sha
-              : 'No previous completed Android Debug validation attempt; counting relevant commits from the PR base.');
+              ? 'Last successful Android Debug validation attempt: ' + previous.head_sha
+              : 'No previous successful Android Debug validation attempt; counting relevant commits from the PR base.');
 
       - name: Evaluate Android-only periodic build checkpoint
         id: checkpoint
@@ -162,13 +174,54 @@ jobs:
             echo "Manual Android Debug validation explicitly requested."
           # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
           elif [[ "$IS_DRAFT" == "true" ]]; then
-            if [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
+            # The secure bridge must never be called "CI-green" on a
+            # checkpoint-only run. Force a complete Android build/lint/test
+            # whenever its TLS client or network policy changed since the
+            # last actually successful Android build.
+            if ! git diff --quiet "$count_base" "$HEAD_SHA" -- \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/J2534BridgeTransport.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/J2534BridgeTls.kt' \
+                'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagExportStorage.kt' \
+                'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagApp.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuWriteTransaction.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuProgrammingDriverContract.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuBenchExpertPlan.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuExternalDumpPair.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorDiscovery.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorBinaryDiscovery.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorCheckpoint.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorTlsReference.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/KwpFrameInspector.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorWiringGuide.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/BluetoothObdManager.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/NetworkUsbObdTransport.kt' \
+                'app/src/main/java/com/camarodiag/gen5/ui/CalibrationWorkspaceScreen.kt' \
+                'communication/src/test/java/com/camarodiag/gen5/data/obd/J2534BridgeTlsTest.kt' \
+                'app/src/main/AndroidManifest.xml' \
+                'app/src/main/res/xml/network_security_config.xml'; then
+              echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+              echo "build_required=true" >> "$GITHUB_OUTPUT"
+              echo "Security, ECU access or export changes require a complete build and lint."
+            elif [[ "$CURRENT_ANDROID_CHANGED" != "true" ]]; then
               echo "validation_applies=false" >> "$GITHUB_OUTPUT"
               echo "build_required=false" >> "$GITHUB_OUTPUT"
               echo "NOT APPLICABLE to this commit: no Android-relevant files changed."
             else
               echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-              if (( commits_since_build >= interval )); then
+              # An updater change affects public file storage, APK signing
+              # validation and cleanup after package replacement. Always
+              # compile and lint it immediately, irrespective of the normal
+              # draft checkpoint used for ordinary Android edits.
+              if ! git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- \
+                  'app/src/main/java/com/camarodiag/gen5/ui/UpdateManager.kt' \
+                  'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagUpdateCleanup.kt' \
+                  'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagExportStorage.kt' \
+                  'app/src/main/AndroidManifest.xml' \
+                  'app/src/main/res/xml/update_file_paths.xml' \
+                  '.github/workflows/android-ci.yml'; then
+                echo "build_required=true" >> "$GITHUB_OUTPUT"
+                echo "APK updater, public export storage or CI safety-critical change: full Android Debug validation required."
+              elif (( commits_since_build >= interval )); then
                 echo "build_required=true" >> "$GITHUB_OUTPUT"
                 echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
               else
@@ -221,12 +274,16 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: 14742923
-          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
+          packages: "platform-tools platforms;android-35 platforms;android-36 build-tools;36.0.0"
 
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.11.1
 
       - name: Run unit tests
+        id: unit_tests
+        # Continue diagnostics after a failed unit test so lint/build errors are
+        # not hidden. The job still fails at the final verification step.
+        continue-on-error: true
         run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
 
       - name: Upload Android unit-test reports
@@ -287,7 +344,15 @@ jobs:
                   if issue.get("severity", "").lower() in {"warning", "error", "fatal"}:
                       findings.append((module, issue))
           for module, issue in findings:
-              print(f"{module}: {issue.get('severity')}: {issue.get('id')}: {issue.get('message')}")
+              locations = issue.findall("location")
+              rendered = ", ".join(
+                  f"{loc.get('file', '?')}:{loc.get('line', '?')}:{loc.get('column', '?')}"
+                  for loc in locations[:3]
+              ) or "no location"
+              print(
+                  f"{module}: {issue.get('severity')}: {issue.get('id')}: "
+                  f"{issue.get('message')} @ {rendered}"
+              )
           for report in missing:
               print(f"Missing Android lint report: {report}", file=sys.stderr)
           if findings or missing:
@@ -335,6 +400,15 @@ jobs:
           path: app/build/outputs/apk/debug/CamaroDiag-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Enforce successful Android unit tests
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.unit_tests.outcome }}" != "success" ]]; then
+            echo "::error::Android unit tests failed; downstream lint and build were diagnostic only."
+            exit 1
+          fi
   android-instrumented-tests:
     needs: [evaluate-build-checkpoint, test-and-build]
     if: needs.test-and-build.result == 'success'

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Безплатно: данни в реално време, четене и изтриване на DTC. Личният лиценз отключва разширени функции. Инструментите за отстраняване на грешки са само за собственика.</string>
+    <string name="license_account_link">Лицензът е свързан с акаунта във Firebase и потвърдения имейл за вход.</string>
+    <string name="license_no_browser">Няма наличен браузър.</string>
+    <string name="license_checkout_unavailable">Покупката не е достъпна. Настройте плащанията във Firebase/Stripe.</string>
+    <string name="license_activation_help">Лицензът се активира след потвърждение на плащането от сървъра. Върнете се тук и натиснете Обновяване. Само пренасочване не предоставя лиценз.</string>
+    <string name="license_required_for_feature">За да използвате тази функция, активирайте лиценз за профила, с който сте влезли.</string>
+</resources>

@@ -9,6 +9,42 @@ import org.junit.Test
 class Obd2FeatureEngineTest {
 
     @Test
+    fun physicalScanNeverIssuesElmOrFunctionalDiscoveryCommands() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when(command) {
+                "0100" -> "410000100000"
+                "010C" -> "410C1AF8"
+                "03" -> "43010300"
+                "07" -> "4700"
+                "0A" -> "4A00"
+                "020200" -> "4202000000"
+                "0600" -> "7F0611"
+                else -> "NO DATA"
+            }
+        })
+        val decodedModes = mutableListOf<Int>()
+        val report = engine.fullPhysicalCanScan("7E8", mapOf("PROTOCOL" to "J2534 / ISO 15765-4")) { mode, raw ->
+            decodedModes += mode
+            when(mode) {
+                3 -> { assertEquals("43010300",raw); listOf(ObdDtc("P0300","confirmed")) }
+                7 -> { assertEquals("4700",raw); emptyList() }
+                else -> { assertEquals("4A00",raw); emptyList() }
+            }
+        }
+        assertEquals(listOf(3,7,10),decodedModes)
+        assertEquals("7E8",report.physicalCanResponder)
+        assertEquals(listOf("7E8"),report.respondingEcuAddresses)
+        assertEquals("P0300",report.confirmedDtcs.single().code)
+        assertEquals("1726.00",report.liveData.single { it.pid == 0x0C }.value)
+        assertNull(report.monitorTestRaw)
+        assertTrue(commands.none { it.startsWith("AT") || it == "04" })
+        assertEquals(1,commands.count { it == "0100" })
+        assertTrue(report.rawLog.any { it.contains("0600 -> 7F0611") })
+    }
+
+    @Test
     fun doesNotQueryMode01PidThatTheEcuDidNotAdvertise() = runBlocking {
         val commands = mutableListOf<String>()
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
@@ -222,6 +258,18 @@ class Obd2FeatureEngineTest {
         assertEquals("P0171", confirmed.single().code)
         assertEquals("P0133", pending.single().code)
         assertEquals("P0102", permanent.single().code)
+    }
+
+    @Test
+    fun verifiesElmMultilineVinAcrossTransportFraming() = runBlocking {
+        val reply = "014\r0: 490201314731\r1: 46413152585852\r2: 30313233343536"
+        suspend fun vin(raw: String) =
+            Obd2FeatureEngine(ObdCommandChannel { _, _ -> raw }).readVin()
+        assertEquals("1G1FA1RXXR0123456", vin(reply))
+        assertEquals("1G1FA1RXXR0123456", vin(reply.replace('\r', ' ')))
+        assertNull(vin(reply.replace("1:", "2:")))
+        assertNull(vin(reply.dropLast(2)))
+        assertNull(vin(reply.replace("014", "013")))
     }
 
     @Test

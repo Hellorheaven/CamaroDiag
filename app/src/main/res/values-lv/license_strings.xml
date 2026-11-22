@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Bez maksas: reāllaika dati, DTC nolasīšana un dzēšana. Personīgā licence atbloķē papildu funkcijas. Atkļūdošanas rīki ir pieejami tikai īpašniekam.</string>
+    <string name="license_account_link">Licence ir saistīta ar Firebase kontu un verificēto pieteikšanās e-pasta adresi.</string>
+    <string name="license_no_browser">Nav pieejama pārlūkprogramma.</string>
+    <string name="license_checkout_unavailable">Pirkums nav pieejams. Jākonfigurē Firebase/Stripe norēķini.</string>
+    <string name="license_activation_help">Licence tiek aktivizēta pēc servera apstiprinājuma par maksājumu. Atgriezieties un pieskarieties Atsvaidzināt. Pāradresācija vien nepiešķir licenci.</string>
+    <string name="license_required_for_feature">Lai izmantotu šo funkciju, aktivizējiet licenci kontā, kurā esat pierakstījies.</string>
+</resources>

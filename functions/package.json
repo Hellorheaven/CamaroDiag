@@ -1,0 +1,17 @@
+{
+  "name": "camarodiag-license-backend",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test licensing-policy.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.2.0",
+    "firebase-functions": "^6.3.0",
+    "stripe": "^18.0.0"
+  }
+}

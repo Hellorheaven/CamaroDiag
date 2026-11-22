@@ -35,15 +35,21 @@ object EcuBackupManifest {
         val entries: List<Entry>,
         val coverage: EcuBackupCoverage.Report,
         /** Always false until a separately validated hardware reader can attest provenance. */
-        val hardwareProvenanceVerified: Boolean = false
+        val hardwareProvenanceVerified: Boolean = false,
+        /** VIN reported during acquisition, when available. It is not an attestation. */
+        val vehicleVin: String? = null
     )
 
     fun inspect(
         controllerLabel: String?,
         createdAtUtcMillis: Long,
         captures: List<Capture>,
-        expectedRegions: Set<EcuBackupCoverage.Region>
+        expectedRegions: Set<EcuBackupCoverage.Region>,
+        vehicleVin: String? = null
     ): Manifest {
+        require(vehicleVin == null || vehicleVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
+            "Invalid VIN in ECU backup manifest"
+        }
         val entries = captures.map { capture ->
             Entry(
                 region = capture.region,
@@ -52,6 +58,7 @@ object EcuBackupManifest {
                 bytesCaptured = capture.firstRead.size.toLong(),
                 sha256 = EcuBenchExpertPlan.sha256Hex(capture.firstRead),
                 readsIdentical = capture.independentRead != null &&
+                    capture.firstRead !== capture.independentRead &&
                     EcuBenchExpertPlan.verifiedReadback(capture.firstRead, capture.independentRead),
                 origin = capture.origin
             )
@@ -75,7 +82,8 @@ object EcuBackupManifest {
             controllerLabel = controllerLabel?.takeIf(String::isNotBlank),
             createdAtUtcMillis = createdAtUtcMillis,
             entries = entries,
-            coverage = conservativeCoverage
+            coverage = conservativeCoverage,
+            vehicleVin = vehicleVin
         )
     }
 }

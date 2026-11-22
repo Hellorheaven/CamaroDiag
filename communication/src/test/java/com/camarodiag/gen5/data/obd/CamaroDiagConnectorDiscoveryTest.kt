@@ -1,0 +1,125 @@
+package com.camarodiag.gen5.data.obd
+
+import java.io.IOException
+import org.junit.Assert.*
+import org.junit.Test
+
+class CamaroDiagConnectorDiscoveryTest {
+    private val ping = "PONG CamaroDiagConnectors 0.1.0"
+    private val caps = "CAPS hs_can=disabled sw_can=disabled eeprom_read=disabled eeprom_write=disabled ecu_flash=disabled j2534=disabled"
+    private val status = "STATUS mode=prototype write=disabled"
+
+    private class FakeChannel(
+        private val responses: List<String>,
+        private val chunkSize: Int = 3
+    ) : CamaroDiagConnectorDiscovery.Channel {
+        val sent = mutableListOf<String>()
+        private var pending = byteArrayOf()
+        override fun write(bytes: ByteArray) {
+            check(pending.isEmpty())
+            pending = responses[sent.size].toByteArray(Charsets.UTF_8)
+            sent += bytes.toString(Charsets.US_ASCII)
+        }
+        override fun read(buffer: ByteArray, timeoutMs: Int): Int {
+            val count = minOf(buffer.size, pending.size, chunkSize)
+            pending.copyInto(buffer, endIndex = count)
+            pending = pending.copyOfRange(count, pending.size)
+            return count
+        }
+    }
+
+    @Test fun recognizesOnlyExistingReadOnlyPrototypeOverFragmentedUsb() {
+        val c = FakeChannel(listOf("$ping\r\n", "$caps\r\n", "$status\r\n"))
+        val report = CamaroDiagConnectorDiscovery.inspect(c)
+        assertEquals("0.1.0", report.firmware)
+        assertEquals(listOf(ping, caps, status), report.lines)
+        assertEquals(listOf("PING\n", "CAPS\n", "STATUS\n"), c.sent)
+    }
+
+    @Test fun completeCapsPacketIsNotTruncatedToLegacySerialBuffer() {
+        val c = FakeChannel(listOf("$ping\r\n", "$caps\r\n", "$status\r\n"), 512)
+        assertEquals(listOf(ping, caps, status), CamaroDiagConnectorDiscovery.inspect(c).lines)
+        assertEquals(listOf("PING\n", "CAPS\n", "STATUS\n"), c.sent)
+        val trailing = FakeChannel(listOf("$ping\n", "$caps\nEXTRA\n"), 512)
+        assertTrue(runCatching { CamaroDiagConnectorDiscovery.inspect(trailing) }.exceptionOrNull() is IOException)
+        assertEquals(listOf("PING\n", "CAPS\n"), trailing.sent)
+    }
+
+    @Test fun publicDiscoveryNeverAuthenticatesOrEnablesEcuTraffic() {
+        val c = FakeChannel(listOf("$ping\n", "$caps\n", "$status\n"))
+        val report = CamaroDiagConnectorDiscovery.inspect(c)
+        assertFalse(report.authenticated)
+        assertFalse(report.vehicleAccessAllowed)
+        val capabilities = report.toAdapterCapabilities()
+        assertEquals(com.camarodiag.gen5.domain.model.AdapterTier.DISCONNECTED, capabilities.tier)
+        assertFalse(capabilities.supportsCanTransmit)
+        assertFalse(capabilities.supportsCanHeaders)
+        assertFalse(capabilities.supportsLongFrames)
+        assertFalse(capabilities.supportsSwCan)
+    }
+
+    @Test fun explicitKklLabelsNeverEnterElmOrNativeDiscoveryByMistake() {
+        val labels = listOf("FTDI KKL (#12)", "CamaroDiagConnectors K-Line (#123)",
+            "FTDI ELM327 (#5)", "FT232R USB UART (#7)", "KKLegacy (#9)")
+        assertTrue(CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(12, labels))
+        assertTrue(CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(123, labels))
+        for (id in listOf(1, 5, 7, 9, 23)) {
+            assertFalse(CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(id, labels))
+        }
+        assertTrue(CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel("KLINE"))
+        assertTrue(CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel("K Line"))
+    }
+
+    @Test fun namedConnectorCannotBeRoutedThroughLegacyUsbProbe() {
+        val labels = listOf("ELM327 #12", "camarodiagconnectors #123", "CamaroDiagConnectors #5")
+        assertTrue(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(123, labels))
+        assertTrue(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(5, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(12, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(1, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(7, emptyList()))
+    }
+
+    @Test fun unknownIdentityAndFutureVersionsCannotEnterLegacyDiscovery() {
+        for (response in listOf("ELM327 v1.5", "PONG CamaroDiagConnectors 1.0.0", "PONG Other 0.1.0")) {
+            val c = FakeChannel(listOf("$response\n"))
+            assertTrue(runCatching { CamaroDiagConnectorDiscovery.inspect(c) }.exceptionOrNull() is IOException)
+            assertEquals(listOf("PING\n"), c.sent)
+        }
+    }
+
+    @Test fun malformedAndEnabledCapabilitiesAreRejectedRatherThanActivatingHardware() {
+        val replies = listOf(
+            caps.replace("hs_can=disabled", "hs_can=enabled"),
+            caps.replace("ecu_flash=disabled", "ecu_flash=enabled"),
+            caps.replace("j2534=disabled", "hs_can=disabled"),
+            caps.replace(" j2534=disabled", ""),
+            "$caps jtag=disabled",
+            "$caps\rjunk",
+            caps.replace("disabled", "désactivé"),
+            "x".repeat(300)
+        )
+        for (response in replies) {
+            val c = FakeChannel(listOf("$ping\n", "$response\n"))
+            assertTrue(response, runCatching {
+                CamaroDiagConnectorDiscovery.inspect(c)
+            }.exceptionOrNull() is IOException)
+            assertEquals(listOf("PING\n", "CAPS\n"), c.sent)
+        }
+    }
+
+    @Test fun unsafeStatusOrExtraDataDoesNotReturnReport() {
+        val c = FakeChannel(listOf("$ping\n", "$caps\n", "STATUS mode=prototype write=enabled\n"))
+        assertTrue(runCatching { CamaroDiagConnectorDiscovery.inspect(c) }.exceptionOrNull() is IOException)
+        val extra = FakeChannel(listOf("$ping\nEXTRA\n"), 64)
+        assertTrue(runCatching { CamaroDiagConnectorDiscovery.inspect(extra) }.exceptionOrNull() is IOException)
+    }
+
+    @Test fun cancellationStopsBeforeSendingAnyCommand() {
+        val c = FakeChannel(emptyList())
+        val error = runCatching {
+            CamaroDiagConnectorDiscovery.inspect(c) { throw java.util.concurrent.CancellationException() }
+        }.exceptionOrNull()
+        assertTrue(error is java.util.concurrent.CancellationException)
+        assertTrue(c.sent.isEmpty())
+    }
+}

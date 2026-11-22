@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cal_gmlan_read_identity">قراءة VIN وOSID من GM ‏(J2534)</string>
+    <string name="cal_gmlan_osid">معرّف نظام التشغيل GM: %1$d</string>
+    <string name="cal_gmlan_vin_can">VIN الخاص بـ GM: %1$s • CAN 0x%2$s</string>
+    <string name="cal_gmlan_identity_notice">تحديد هوية للقراءة فقط من عقدة CAN المادية المستجيبة المحددة. لا يؤكد ذلك صلاحية عتاد ECU أو تخطيط ذاكرة الفلاش أو إجراء الاسترداد.</string>
+    <string name="cal_gmlan_identity_failed">تعذّرت قراءة VIN وOSID موثّقين من GM عبر قناة J2534 هذه.</string>
+</resources>

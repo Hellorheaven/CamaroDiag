@@ -8,7 +8,7 @@ namespace CamaroDiag.J2534Bridge;
 /// Minimal SAE J2534-1 PassThru provider for ISO 15765-2 CAN.
 /// The installed adapter vendor DLL remains responsible for hardware access and timing.
 /// </summary>
-internal sealed class J2534Device : IDisposable
+internal sealed partial class J2534Device : IDisposable
 {
     private const uint ProtocolIso15765 = 6;
     private const uint ProtocolSwIso15765 = 0x8007;
@@ -18,6 +18,8 @@ internal sealed class J2534Device : IDisposable
     private const uint ErrorBufferEmpty = 0x10;
     private const uint Can29BitId = 0x100;
     private const uint Iso15765FramePad = 0x40;
+    private const uint NonPayloadRxStatus = 0x1F; // SAE J2534-1 04.04: echo, start, break, transmit, padding error
+    private const uint Iso15765ExtendedAddress = 0x80;
     private const int MaxData = 4128;
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
@@ -54,6 +56,8 @@ internal sealed class J2534Device : IDisposable
     private delegate uint PassThruGetLastErrorDelegate(StringBuilder description);
 
     private readonly J2534Adapter _adapter;
+    private readonly J2534MemoryReadScope? _memoryReadScope;
+    private bool _memoryReadVinVerified;
     private IntPtr _library;
     private PassThruOpenDelegate? _open;
     private PassThruCloseDelegate? _close;
@@ -71,19 +75,45 @@ internal sealed class J2534Device : IDisposable
     private int _requestCanId;
     private int _responseCanId;
     private bool _can29Bit;
+    private int _protocolNumber;
     private bool _deviceOpened;
     private bool _channelConnected;
     private bool _opened;
 
-    public J2534Device(J2534Adapter adapter) => _adapter = adapter;
+    public J2534Device(J2534Adapter adapter, J2534MemoryReadScope? memoryReadScope = null)
+    {
+        _adapter = adapter;
+        _memoryReadScope = memoryReadScope;
+    }
 
     public string AdapterName => _adapter.Name;
     public string DriverPath => _adapter.FunctionLibrary;
     public bool IsOpen => _opened;
+    public string ResponseCanIdLabel => _responseCanId.ToString(_can29Bit ? "X8" : "X3");
+    public bool IsStandardObdReadEnabled => _opened && StandardObdPhysicalPolicy.SupportsChannel(
+        _requestCanId, _responseCanId, _protocolNumber);
+    public bool IsMemoryReadEnabled => _memoryReadScope != null && _memoryReadVinVerified;
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate uint ReadVoltageIoctl(uint deviceId, uint ioctlId, IntPtr input, out uint millivolts);
+
+    public uint? ReadBatteryMillivolts()
+    {
+        EnsureOpen();
+        if (!NativeLibrary.TryGetExport(_library, "PassThruIoctl", out var entry)) return null;
+        var ioctl = Marshal.GetDelegateForFunctionPointer<ReadVoltageIoctl>(entry);
+        const uint readVBatt = 0x03;
+        return ioctl(_deviceId, readVBatt, IntPtr.Zero, out var value) == StatusNoError ? value : null;
+    }
 
     public void Open(int requestCanId, int responseCanId, bool can29Bit, int protocolNumber)
     {
         if (_opened) Close();
+        _memoryReadVinVerified = false;
+        if (_memoryReadScope != null &&
+            !_memoryReadScope.MatchesChannel(requestCanId, responseCanId, protocolNumber))
+            throw new UnauthorizedAccessException(
+                "Configured CAN IDs and protocol do not match the VIN-bound memory read profile.");
         var isSwCan = protocolNumber is 63 or 64;
         var maxId = can29Bit ? 0x1FFFFFFF : 0x7FF;
         var baudRate = protocolNumber switch
@@ -103,6 +133,7 @@ internal sealed class J2534Device : IDisposable
         _requestCanId = requestCanId;
         _responseCanId = responseCanId;
         _can29Bit = can29Bit;
+        _protocolNumber = protocolNumber;
 
         try
         {
@@ -132,6 +163,19 @@ internal sealed class J2534Device : IDisposable
                 "PassThruStartMsgFilter(FLOW_CONTROL_FILTER)");
             _filterId = filter;
             _opened = true;
+            if (_memoryReadScope != null)
+            {
+                // Read live VIN via an already allowed, non-destructive DID before
+                // exposing any memory command. No identity -> no 0x23 permission.
+                var vinResponse = Exchange(new byte[] { 0x22, 0xF1, 0x90 }, 6000);
+                if (vinResponse.Length < 20 || vinResponse[0] != 0x62 ||
+                    vinResponse[1] != 0xF1 || vinResponse[2] != 0x90 ||
+                    !string.Equals(Encoding.ASCII.GetString(vinResponse, 3, 17),
+                        _memoryReadScope.ExpectedVin, StringComparison.OrdinalIgnoreCase))
+                    throw new UnauthorizedAccessException(
+                        "The live ECU VIN does not match the approved memory read profile.");
+                _memoryReadVinVerified = true;
+            }
         }
         catch
         {
@@ -146,6 +190,15 @@ internal sealed class J2534Device : IDisposable
         if (payload.Length is < 1 or > 4091) throw new ArgumentOutOfRangeException(nameof(payload));
         ValidateReadOnlyService(payload, allowNoResponse: false);
 
+        return ExchangeCore(payload, timeoutMs, nativeBenchReply: false);
+    }
+
+    // The future isolated bench caller uses a separate reply dialect.
+    // The public network exchange above always remains read-only.
+    private byte[] ExchangeCore(byte[] payload, int timeoutMs, bool nativeBenchReply)
+    {
+        EnsureOpen();
+        if (nativeBenchReply) ClearNativeReceiveQueue();
         var tx = CreatePayloadMessage(_requestCanId, payload);
         var messages = new[] { tx };
         uint count = 1;
@@ -166,19 +219,177 @@ internal sealed class J2534Device : IDisposable
             if (receivedCount == 0) continue;
 
             var message = received[0];
-            if (message.DataSize < 5 || message.DataSize > MaxData) continue;
-            var canId = ReadCanId(message.Data);
-            if (canId != _responseCanId) continue;
-            var response = message.Data.Skip(4).Take((int)message.DataSize - 4).ToArray();
+            var response = DecodeReceivedPayload(message.ProtocolId, message.RxStatus,
+                message.DataSize, message.ExtraDataIndex, message.Data,
+                _protocolId, _responseCanId, payload, nativeBenchReply);
+            if (response is null) continue;
             if (response.Length >= 3 && response[0] == 0x7F && response[1] == payload[0] && response[2] == 0x78)
             {
-                if (++pendingResponses > 8) throw new TimeoutException("ECU returned too many UDS ResponsePending (0x78) replies.");
+                if (++pendingResponses > 8) throw new IOException("ECU returned too many UDS ResponsePending (0x78) replies.");
                 continue;
             }
             return response;
         }
 
-        throw new TimeoutException($"No ISO15765 response from CAN ID 0x{_responseCanId:X} within {timeoutMs} ms.");
+        throw ClassifyExchangeDeadline(_responseCanId, timeoutMs, pendingResponses);
+    }
+
+    // Silence can mean an optional service is absent. A pending response
+    // proves an unfinished operation and must never be caught as that silence.
+    internal static Exception ClassifyExchangeDeadline(int responseCanId, int timeoutMs, int pendingResponses) =>
+        pendingResponses > 0
+            ? new IOException($"CAN ID 0x{responseCanId:X} returned ResponsePending but no final response within {timeoutMs} ms.")
+            : new TimeoutException($"No ISO15765 response from CAN ID 0x{responseCanId:X} within {timeoutMs} ms.");
+
+    // A PassThru indication or stale response must never count as an ECU ACK.
+    // This validates the standard J2534-1 receive framing, not ECU flash support.
+    internal static byte[]? DecodeReceivedPayload(uint protocol, uint rxStatus,
+        uint dataSize, uint extraDataIndex, byte[] data,
+        uint expectedProtocol, int responseId, byte[] request, bool nativeBenchReply = false)
+    {
+        if (request.Length == 0 || protocol != expectedProtocol ||
+            (rxStatus & (NonPayloadRxStatus | Iso15765ExtendedAddress)) != 0 ||
+            dataSize < 5 || dataSize > MaxData || dataSize > data.Length ||
+            ReadCanId(data) != responseId)
+            return null;
+        // Some vendor DLLs use zero when no extra bytes are attached.
+        // Reject unexpected trailers rather than hashing or interpreting them.
+        if (extraDataIndex != 0 && extraDataIndex != dataSize)
+            return null;
+        var response = data.AsSpan(4, checked((int)dataSize) - 4);
+        if (response[0] == 0x7F)
+            return response.Length == 3 && response[1] == request[0] ? response.ToArray() : null;
+        if (nativeBenchReply) return NativeE39BenchReply.Matches(request, response)
+            ? response.ToArray() : null;
+        if (response[0] != unchecked((byte)(request[0] + 0x40))) return null;
+
+        // Match echoed identifiers on the read services used by the bridge.
+        // A response from the right CAN ID but another DID is stale.
+        var echoLength = request[0] switch
+        {
+            0x01 or 0x06 or 0x09 or 0x1A => 1,
+            0x02 => 2,
+            0x22 => 2,
+            0x10 or 0x19 or 0x3E => 1,
+            _ => 0
+        };
+        if (echoLength > 0 &&
+            (request.Length <= echoLength || response.Length <= echoLength))
+            return null;
+        for (var i = 1; i <= echoLength; i++)
+        {
+            var expected = request[0] is 0x10 or 0x19 or 0x3E
+                ? (byte)(request[i] & 0x7F) : request[i];
+            if (response[i] != expected) return null;
+        }
+        return response.ToArray();
+    }
+
+    /// <summary>
+    /// Physical, read-only GM CAN identity: GMLAN service 1A rather than
+    /// standard UDS 22. This does not open any programming privilege.
+    /// </summary>
+    public NativeGmlanIdentification.Identity ReadGmlanIdentification()
+    {
+        EnsureOpen();
+        byte[] Read(byte did, bool required)
+        {
+            try
+            {
+                return Exchange(NativeGmlanIdentification.BuildRequest(did), 1500);
+            }
+            catch (TimeoutException) when (!required)
+            {
+                // Optional OSID candidate was silent; try the next
+                // documented GMLAN software-module identifier.
+                return [0x7F, 0x1A, 0x31];
+            }
+        }
+        return NativeGmlanIdentification.Compose(
+            Read(NativeGmlanIdentification.VinDid, required: true),
+            Read(NativeGmlanIdentification.OsModuleDid, required: false),
+            Read(NativeGmlanIdentification.OsFallbackDid, required: false),
+            physicalRead: true);
+    }
+
+    public object ReadCalibrationIdentification()
+    {
+        EnsureOpen();
+        IReadOnlyList<string> Read(byte pid)
+        {
+            try
+            {
+                return DecodeIdentityRecords(pid, Exchange(new byte[] { 0x09, pid }, 1500));
+            }
+            catch (TimeoutException)
+            {
+                // Optional information types may receive no reply.
+                return Array.Empty<string>();
+            }
+        }
+
+        var vin = Read(0x02).SingleOrDefault();
+        var calibrationIds = Read(0x04);
+        var cvns = Read(0x06);
+        var ecuNames = Read(0x0A);
+        if (vin == null && calibrationIds.Count + cvns.Count + ecuNames.Count == 0)
+            throw new IOException("The selected ECU supplied no Mode 09 identity records.");
+        return new { vin, calibrationIds, cvns, ecuNames,
+            responseCanId = _responseCanId.ToString(_can29Bit ? "X8" : "X3") };
+    }
+
+    internal static IReadOnlyList<string> DecodeIdentityRecords(byte pid, byte[] reply)
+    {
+        int width = pid switch { 0x02 => 17, 0x04 => 16, 0x06 => 4, 0x0A => 20,
+            _ => throw new ArgumentOutOfRangeException(nameof(pid)) };
+        if (reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x09)
+        {
+            if (reply[2] is 0x11 or 0x12 or 0x31) return Array.Empty<string>();
+            throw new IOException($"Mode 09 identity temporarily refused or failed (NRC 0x{reply[2]:X2}).");
+        }
+        if (reply.Length < 3 || reply[0] != 0x49 || reply[1] != pid ||
+            reply.Length != 3 + reply[2] * width || (pid == 2 && reply[2] != 1))
+            throw new InvalidDataException("Malformed Mode 09 identity response.");
+
+        var records = new List<string>();
+        for (int i = 3; i < reply.Length; i += width)
+        {
+            var field = reply.AsSpan(i, width);
+            if (pid == 0x06)
+            {
+                records.Add(Convert.ToHexString(field));
+                continue;
+            }
+
+            // ECU names and CAL IDs can have space or NUL padding at either end.
+            var text = Encoding.Latin1.GetString(field).Trim(' ', '\0');
+            if (text.Any(c => c < ' ' || c > '~') ||
+                (pid == 2 && (text.Length != 17 || text.Any(c =>
+                    !(c is >= '0' and <= '9' or >= 'A' and <= 'Z') || c is 'I' or 'O' or 'Q'))))
+                throw new InvalidDataException("Invalid ECU identity text.");
+            if (text.Length != 0) records.Add(text);
+        }
+        return records;
+    }
+
+    /// <summary>Explicit emissions DTC reset only; no UDS clear or flash.</summary>
+    internal void ClearStandardObdDtcs(bool locallyEnabled)
+    {
+        EnsureOpen();
+        if (!locallyEnabled || !IsStandardObdReadEnabled)
+            throw new UnauthorizedAccessException("Standard OBD clear is not enabled for this physical channel.");
+        // No guessed engine state. Require actual zero-speed and zero-RPM
+        // positive Mode 01 responses just before the irreversible reset.
+        ClearNativeReceiveQueue();
+        byte[] speed = Exchange([0x01,0x0D], 1800);
+        ClearNativeReceiveQueue();
+        byte[] rpm = Exchange([0x01,0x0C], 1800);
+        if (!StandardObdPhysicalPolicy.CanClear(locallyEnabled, IsStandardObdReadEnabled, speed, rpm))
+            throw new InvalidOperationException("Stop the vehicle and engine before an emissions diagnostic reset.");
+        ClearNativeReceiveQueue();
+        var ack = ExchangeCore([0x04], 2500, nativeBenchReply: false);
+        if (!StandardObdPhysicalPolicy.IsClearAcknowledged(ack))
+            throw new IOException("Standard OBD clear not confirmed by exact positive Mode 04 response.");
     }
 
     public void SendOnly(byte[] payload)
@@ -186,20 +397,37 @@ internal sealed class J2534Device : IDisposable
         EnsureOpen();
         if (payload.Length is < 1 or > 4091) throw new ArgumentOutOfRangeException(nameof(payload));
         ValidateReadOnlyService(payload, allowNoResponse: true);
+        SendCore(payload);
+    }
+
+    private void SendCore(byte[] payload)
+    {
+        EnsureOpen();
         var messages = new[] { CreatePayloadMessage(_requestCanId, payload) };
         uint count = 1;
         Check(_write!(_channelId, messages, ref count, 1000), "PassThruWriteMsgs");
         if (count != 1) throw new IOException("J2534 driver did not queue the UDS message.");
     }
 
-    private static void ValidateReadOnlyService(byte[] payload, bool allowNoResponse)
+    private void ValidateReadOnlyService(byte[] payload, bool allowNoResponse)
     {
         var service = payload[0];
+        if (!allowNoResponse && IsStandardObdReadEnabled && StandardObdPhysicalPolicy.AllowsRead(payload)) return;
+        if (!allowNoResponse && payload.Length == 2 && service == 0x09 &&
+            payload[1] is 0x02 or 0x04 or 0x06 or 0x0A) return;
+        if (!allowNoResponse && payload.Length == 2 && service == 0x1A &&
+            payload[1] is 0x90 or 0xC1 or 0xC9) return;
         if (service == 0x22 || service == 0x19) return;
-        if (service == 0x3E && payload.Length >= 2 && payload[1] is 0x00 or 0x80) return;
+        if (service == 0x3E && payload.Length == 2 && payload[1] is 0x00 or 0x80) return;
+        if (!allowNoResponse && _memoryReadVinVerified && _memoryReadScope != null)
+        {
+            if (service == 0x23 && _memoryReadScope.AllowsReadMemory(payload)) return;
+            if (service == 0x10 && _memoryReadScope.AllowsSessionControl(payload)) return;
+        }
         throw new UnauthorizedAccessException(
-            $"PC bridge is read-only. UDS service 0x{service:X2} is not enabled. " +
-            "Only ReadDataByIdentifier (0x22), ReadDTCInformation (0x19) and TesterPresent (0x3E) are accepted.");
+            $"PC bridge denied UDS service 0x{service:X2}: " +
+            "writes and security access are permanently blocked; memory reads require " +
+            "the operator's approved address range, channel and matching live VIN.");
     }
 
     private PassThruMsg CreatePayloadMessage(int canId, byte[] payload)
@@ -273,6 +501,7 @@ internal sealed class J2534Device : IDisposable
         _deviceOpened = false;
         _channelConnected = false;
         _opened = false;
+        _memoryReadVinVerified = false;
         if (_library != IntPtr.Zero)
         {
             try { NativeLibrary.Free(_library); } catch { }

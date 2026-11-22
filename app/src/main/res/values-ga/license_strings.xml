@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Saor in aisce: sonraí beo agus DTCanna a léamh agus a ghlanadh. Díghlasálann ceadúnas pearsanta na hardghnéithe. Is don úinéir amháin na huirlisí dífhabhtaithe.</string>
+    <string name="license_account_link">Tá an ceadúnas nasctha le do chuntas Firebase agus do ríomhphost sínithe isteach fíoraithe.</string>
+    <string name="license_no_browser">Níl brabhsálaí ar fáil.</string>
+    <string name="license_checkout_unavailable">Níl ceannach ar fáil. Ní mór billeáil Firebase/Stripe a chumrú.</string>
+    <string name="license_activation_help">Gníomhachtaítear an ceadúnas nuair a dheimhníonn an freastalaí an íocaíocht. Fill anseo agus tapáil Athnuaigh. Ní thugann atreorú amháin ceadúnas.</string>
+    <string name="license_required_for_feature">Chun an ghné seo a úsáid, gníomhachtaigh ceadúnas ar an gcuntas a bhfuil tú sínithe isteach ann.</string>
+</resources>

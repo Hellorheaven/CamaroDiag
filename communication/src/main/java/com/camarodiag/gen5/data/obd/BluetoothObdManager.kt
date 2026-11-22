@@ -39,6 +39,8 @@ class BluetoothObdManager(context: Context) {
     @Volatile private var cachedSupportedMode01Pids: Set<Int>? = null
     @Volatile private var cachedSupportedMode01PidsAtMillis: Long = 0L
     private val usbTransport = ElmUsbTransport(context)
+    private val connectorUsbContext = context.applicationContext
+    private val connectorDiscoveryMutex = Mutex()
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
     private var j2534BridgeTransport: J2534BridgeTransport? = null
@@ -53,6 +55,12 @@ class BluetoothObdManager(context: Context) {
     /** Capture the active transport before disconnect() resets its identity. */
     val currentTransportKind: String
         get() = activeTransport
+
+    /** Actual read-only UDS availability for the currently connected STN hardware. */
+    val isStnUdsReadAvailable: Boolean
+        get() = StnUdsSessionAdmission.allowsRead(
+            activeAdapterCapabilities, isObdCommandChannelAvailable
+        )
 
     fun getUsbDevices(): List<String> = usbTransport.availableDevices()
 
@@ -174,9 +182,67 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /** Discovery only. Close the probe before returning: never expose an ELM channel. */
+    suspend fun discoverCamaroDiagConnector(deviceId: Int, binary: Boolean = false): Result<AdapterCapabilities> =
+        withContext(Dispatchers.IO) {
+            connectorDiscoveryMutex.withLock {
+                disconnect()
+                val epoch = transportSessionEpoch.capture()
+                // The discovery handle is never the shared ELM transport.
+                // A stale probe can close only its own handle, never a new OBD session.
+                val probe = ElmUsbTransport(connectorUsbContext)
+                try {
+                    if (CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, probe.availableDevices())) {
+                        return@withLock Result.failure(IllegalStateException("KKL requires its own qualified transport"))
+                    }
+                    probe.connect(
+                        deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE,
+                        discoveryOnly = true, requireCdc = binary
+                    ).getOrThrow()
+                    val context = currentCoroutineContext()
+                    val ensureCurrent = {
+                        context.ensureActive()
+                        transportSessionEpoch.requireQueuedCurrent(epoch)
+                    }
+                    val channel = object : CamaroDiagConnectorDiscovery.Channel {
+                        override fun write(bytes: ByteArray) {
+                            ensureCurrent()
+                            probe.write(bytes)
+                        }
+                        override fun read(buffer: ByteArray, timeoutMs: Int): Int {
+                            ensureCurrent()
+                            return probe.read(buffer, timeoutMs)
+                        }
+                    }
+                    val report = if (binary) {
+                        CamaroDiagConnectorBinaryDiscovery.inspect(channel, ensureCurrent)
+                    } else {
+                        CamaroDiagConnectorDiscovery.inspect(channel, ensureCurrent)
+                    }
+                    ensureCurrent()
+                    Result.success(report.toAdapterCapabilities())
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Result.failure(error)
+                } finally {
+                    probe.close()
+                }
+            }
+        }
+
     suspend fun connectUsb(deviceId: Int, baudRate: Int = 38400): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
         disconnect()
         try {
+            // Re-check the currently enumerated USB device at the manager boundary.
+            // Neither a legacy UI entry nor a saved ELM profile may bypass discovery.
+            val labels = usbTransport.availableDevices()
+            if (CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, labels)) {
+                return@withContext Result.failure(IllegalStateException("KKL requires its own qualified transport"))
+            }
+            if (CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(deviceId, labels)) {
+                return@withContext Result.failure(IllegalStateException("CamaroDiagConnectors requires dedicated USB discovery"))
+            }
             val connected = usbTransport.connect(deviceId, baudRate)
             if (connected.isFailure) {
                 disconnect()
@@ -296,6 +362,7 @@ class BluetoothObdManager(context: Context) {
      * The support bitmap is cached for the lifetime of the current adapter connection.
      */
     suspend fun readMode01PidIfSupported(pid: Int): String? {
+        if (isJ2534StandardObdAvailable()) return readJ2534PidIfSupported(pid)
         check(isObdCommandChannelAvailable) {
             "No ELM/OBD-II command channel is available on the active transport."
         }
@@ -317,6 +384,122 @@ class BluetoothObdManager(context: Context) {
         }
         return withObdCommandSession { engine ->
             engine.readMode01PidIfSupported(pid, supported)
+        }
+    }
+
+    /** The standard OBD capability is not an ELM/AT command channel. */
+    fun isJ2534StandardObdAvailable(): Boolean =
+        isJ2534BridgeConnected() && j2534BridgeTransport?.isStandardObdPhysicalReadEnabled == true
+
+    fun isStandardObdReadAvailable(): Boolean =
+        isObdCommandChannelAvailable || isJ2534StandardObdAvailable()
+
+    private suspend fun readJ2534PidIfSupported(pid: Int): String? {
+        require(pid in 1..255)
+        val epoch = transportSessionEpoch.capture()
+        return supportedMode01PidsMutex.withLock {
+            commandSessionMutex.withLock session@{
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                check(isJ2534StandardObdAvailable())
+                val bridge = checkNotNull(j2534BridgeTransport)
+                val age = System.currentTimeMillis() - cachedSupportedMode01PidsAtMillis
+                val cached = cachedSupportedMode01Pids
+                val supported = if (cached != null && (cached.isNotEmpty() || age < 10_000L)) {
+                    cached
+                } else {
+                    bridge.discoverStandardObdPids().also {
+                        transportSessionEpoch.requireQueuedCurrent(epoch)
+                        cachedSupportedMode01Pids = it
+                        cachedSupportedMode01PidsAtMillis = System.currentTimeMillis()
+                    }
+                }
+                if (pid !in supported) return@session null
+                val result = bridge.readStandardObdPid(pid)
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                result
+            }
+        }
+    }
+
+    /** Read both available odometer PIDs from the same physical connection. */
+    suspend fun readJ2534OdometerPids(): Pair<String?, String?> {
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val bridge = checkNotNull(j2534BridgeTransport)
+            val supported = bridge.discoverStandardObdPids()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            suspend fun read(pid: Int): String? {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                val value = if (pid in supported) bridge.readStandardObdPid(pid) else null
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                return value
+            }
+            read(0xA6) to read(0xD3)
+        }
+    }
+
+    suspend fun readJ2534StandardDtcs(): PhysicalObdDtcSnapshot {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534StandardObdAvailable())
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val result = checkNotNull(j2534BridgeTransport).readStandardObdDtcs()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            result
+        }
+    }
+
+    /** Independent, fresh physical capability probe for the owner test suite. */
+    suspend fun probeJ2534StandardPids(): Set<Int> {
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val pids = checkNotNull(j2534BridgeTransport).discoverStandardObdPids()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            pids
+        }
+    }
+
+    suspend fun probeJ2534StandardReadiness(): ByteArray {
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val response = checkNotNull(j2534BridgeTransport).exchange(byteArrayOf(1,1), 1800)
+            val data = J2534StandardObd.pidData(1,response)
+            require(data.size == 4) { "Invalid physical readiness payload." }
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            data
+        }
+    }
+
+    suspend fun fullJ2534StandardObdScan(): ObdScanReport {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534StandardObdAvailable())
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdAvailable())
+            val report = checkNotNull(j2534BridgeTransport).fullStandardObdScan()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            report
+        }
+    }
+
+    fun isJ2534StandardObdClearAvailable(): Boolean =
+        isJ2534StandardObdAvailable() && j2534BridgeTransport?.isStandardObdClearEnabled == true
+
+    suspend fun clearJ2534StandardDtcs() {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534StandardObdClearAvailable())
+        commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534StandardObdClearAvailable())
+            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
         }
     }
 
@@ -545,7 +728,7 @@ class BluetoothObdManager(context: Context) {
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                normalizeElmReply(buffer.toString(), command)
             } else if (sessionTransport == "BLE") {
                 bleTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(512); val start = System.currentTimeMillis()
@@ -567,7 +750,7 @@ class BluetoothObdManager(context: Context) {
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                normalizeElmReply(buffer.toString(), command)
             } else if (sessionTransport == "WIFI") {
                 wifiTransport.write(payload)
                 val buffer = StringBuilder(); val bytes = ByteArray(256); val start = System.currentTimeMillis()
@@ -594,7 +777,7 @@ class BluetoothObdManager(context: Context) {
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                normalizeElmReply(buffer.toString(), command)
             } else {
                 check(sessionTransport == "BLUETOOTH") {
                     "An ELM command cannot be sent through the selected transport."
@@ -637,7 +820,7 @@ class BluetoothObdManager(context: Context) {
                 ensureSameSession()
                 ElmResponseCompletion.requirePrompt(command, streaming = onChunk != null, promptReceived = promptReceived)
                 ensureSameSession()
-                buffer.toString().replace("\r", " ").replace("\n", " ").replace(command, "").trim()
+                normalizeElmReply(buffer.toString(), command)
             }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -705,14 +888,171 @@ class BluetoothObdManager(context: Context) {
         return UdsClient(transport, policy, timeoutMs)
     }
 
+    /**
+     * Runs one real J2534 read-only UDS operation under the same transaction
+     * lock used by ECU memory backups, identification and OBD command sessions.
+     * Prevents DID/DTC reads from interrupting a two-pass physical backup.
+     *
+     * Both the queued session and the completed result are tied to the current
+     * connection epoch, so reconnects cannot reuse an obsolete bridge.
+     */
+    suspend fun <T> withJ2534BridgeUdsSession(
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int,
+        timeoutMs: Long = 5000L,
+        readDids: Set<Int> = emptySet(),
+        block: suspend (UdsClient) -> T
+    ): T {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534BridgeConnected()) { "A real connected J2534 bridge is required." }
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534BridgeConnected()) { "J2534 bridge disconnected while waiting for UDS." }
+            val client = createJ2534BridgeUdsClient(
+                requestCanId, responseCanId, protocolNumber,
+                UdsAccessPolicy.readOnly(readDids), timeoutMs
+            )
+            val result = block(client)
+            transportSessionEpoch.requireCurrent(epoch)
+            result
+        }
+    }
+
+    /**
+     * Physically acquire and archive a documented ECU memory region via the
+     * connected Windows J2534 adapter. The Windows bridge independently
+     * enforces its VIN-bound address allowlist; this API cannot flash an ECU.
+     */
+    suspend fun captureAndExportJ2534Memory(
+        request: J2534LiveMemoryBackup.Request,
+        output: OutputStream,
+        progress: (J2534LiveMemoryBackup.CaptureProgress) -> Unit = {}
+    ): J2534LiveMemoryBackup.CaptureResult {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534MemoryReadAvailable()) {
+            "Connect a real Windows J2534 bridge with an approved VIN-bound memory read profile."
+        }
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            val bridge = j2534BridgeTransport
+                ?: error("The J2534 bridge was disconnected.")
+            check(isJ2534BridgeConnected() && bridge.isScopedMemoryReadEnabled) {
+                "The J2534 bridge has no approved physical ECU memory read scope."
+            }
+            val result = try {
+                J2534LiveMemoryBackup.capture(bridge, request, progress)
+            } finally {
+                // A reconnect can use the same VIN with a different adapter.
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+            }
+            result.export(output)
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            result
+        }
+    }
+
+    suspend fun readCalibrationIdentification(): ObdEcuIdentification {
+        if (!isJ2534BridgeConnected()) return withObdCommandSession { it.readEcuIdentification() }
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            val bridge = checkNotNull(j2534BridgeTransport)
+            val identity = bridge.readCalibrationIdentification()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            identity
+        }
+    }
+
+    /** Read GM legacy VIN/OSID on the exact active physical J2534 channel. */
+    suspend fun readGmlanIdentification(): GmlanIdentityEvidence {
+        val epoch = transportSessionEpoch.capture()
+        check(isJ2534BridgeConnected())
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534BridgeConnected())
+            val bridge = checkNotNull(j2534BridgeTransport)
+            val identity = bridge.readGmlanIdentification()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            identity
+        }
+    }
+
+    fun isJ2534MemoryReadAvailable(): Boolean =
+        isJ2534BridgeConnected() &&
+            j2534BridgeTransport?.isScopedMemoryReadEnabled == true
+
     fun isJ2534BridgeConnected(): Boolean =
         activeTransport == "J2534_BRIDGE" &&
             !isDemoMode && !isSimulationActive &&
             j2534BridgeTransport?.isConnected == true
 
     /**
-     * Creates a UDS client through the adapter's documented STPX ISO-TP implementation.
-     * Only a positively identified OBDLink MX+ is enabled; generic ELM clones are rejected.
+     * Read-only UDS transaction over a physically connected OBDLink STN adapter.
+     * STPX's hardware identification (STI + STDI) is still checked by the transport.
+     *
+     * Keep the adapter configuration and all UDS requests under one exclusive
+     * command session. This prevents telemetry, a CAN console or a queued OBD
+     * command from changing STP/filters between ISO-TP request and response.
+     * Only the documented UDS/ISO-TP transport is used; this is not ECU flashing.
+     */
+    suspend fun <T> withStnUdsSession(
+        requestCanId: Int,
+        responseCanId: Int,
+        protocolNumber: Int = 33,
+        timeoutMs: Long = 3000L,
+        readDids: Set<Int> = emptySet(),
+        block: suspend (UdsClient) -> T
+    ): T {
+        val requestedEpoch = transportSessionEpoch.capture()
+        check(StnUdsSessionAdmission.allowsRead(
+            activeAdapterCapabilities, isObdCommandChannelAvailable
+        )) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
+            check(StnUdsSessionAdmission.allowsRead(
+                activeAdapterCapabilities, isObdCommandChannelAvailable
+            )) { "The physical STN adapter disconnected while waiting for the UDS session." }
+            val transport = StnUdsPayloadTransport(
+                requestCanId = requestCanId,
+                responseCanId = responseCanId,
+                protocolNumber = protocolNumber
+            ) { command, commandTimeout ->
+                sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
+            }
+            val result = try {
+                block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
+            } finally {
+                // STPX changes the adapter's CAN filter, protocol and ISO-TP
+                // segmentation settings. Always restore functional OBD mode
+                // before releasing the mutex to telemetry or other diagnostics.
+                // A replaced connection must NEVER be touched by old cleanup.
+                withContext(NonCancellable) {
+                    if (transportSessionEpoch.isCurrent(requestedEpoch)) {
+                        val restore = StnUdsAdapterRestoration.restore { command ->
+                            sendAtCommandInternal(command, 1_500L, expectedEpoch = requestedEpoch)
+                        }
+                        if (!restore.succeeded && transportSessionEpoch.isCurrent(requestedEpoch)) {
+                            // A partially restored adapter cannot safely serve
+                            // normal PID reads. Never disconnect a newer session
+                            // that replaced this adapter while cleanup ran.
+                            disconnect()
+                            error("STN diagnostic session cleanup failed; reconnect the OBD adapter.")
+                        }
+                    }
+                }
+            }
+            // A connection replaced during cleanup must not have its old
+            // diagnostic bytes shown as a result of the successor session.
+            transportSessionEpoch.requireCurrent(requestedEpoch)
+            result
+        }
+    }
+
+    /**
+     * Legacy single-operation STN client; callers requiring more than one
+     * exchange should use withStnUdsSession to prevent interleaved adapter setup.
+     * Actual STDI validation still occurs before the first UDS command.
      */
     fun createStnUdsClient(
         requestCanId: Int,
@@ -721,14 +1061,9 @@ class BluetoothObdManager(context: Context) {
         policy: UdsAccessPolicy = UdsAccessPolicy.readOnly(),
         timeoutMs: Long = 3000L
     ): UdsClient {
-        val capabilities = activeAdapterCapabilities
-            ?: error("No real adapter has been probed.")
-        check(!isDemoMode && !isSimulationActive) { "UDS CAN is disabled in demo mode." }
-        check(capabilities.tier == AdapterTier.PRO_STN &&
-            capabilities.supportsCanHeaders &&
-            capabilities.deviceName.contains("OBDLink MX+", ignoreCase = true)) {
-            "The STPX UDS provider is currently validated only for a connected OBDLink MX+ STN adapter with CAN headers enabled."
-        }
+        check(StnUdsSessionAdmission.allowsRead(
+            activeAdapterCapabilities, isObdCommandChannelAvailable
+        )) { "A connected physical OBDLink STN adapter with verified CAN transmit is required." }
         val transport = StnUdsPayloadTransport(
             requestCanId = requestCanId,
             responseCanId = responseCanId,
@@ -778,4 +1113,15 @@ class BluetoothObdManager(context: Context) {
         isSimulationActive = false
         activeAdapterCapabilities = null
     }
+}
+
+/** Strip the adapter's echo only when it occupies the first nonempty line. */
+internal fun normalizeElmReply(raw: String, command: String): String {
+    val lines = raw.trim().lineSequence().iterator()
+    if (!lines.hasNext()) return ""
+    val first = lines.next().trim()
+    return buildList {
+        if (!first.equals(command.trim(), ignoreCase = true)) add(first)
+        for (line in lines) if (line.isNotBlank()) add(line.trim())
+    }.joinToString(" ")
 }

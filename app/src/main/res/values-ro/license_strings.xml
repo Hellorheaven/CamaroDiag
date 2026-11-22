@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Gratuit: date în timp real, citirea și ștergerea DTC. O licență personală deblochează funcțiile avansate. Instrumentele de depanare sunt rezervate proprietarului.</string>
+    <string name="license_account_link">Licența este asociată contului Firebase și adresei de e-mail verificate pentru autentificare.</string>
+    <string name="license_no_browser">Niciun browser disponibil.</string>
+    <string name="license_checkout_unavailable">Achiziția nu este disponibilă. Trebuie configurată facturarea Firebase/Stripe.</string>
+    <string name="license_activation_help">Licența se activează după confirmarea plății de către server. Revino aici și apasă Actualizează. Simpla redirecționare nu acordă o licență.</string>
+    <string name="license_required_for_feature">Pentru a folosi această funcție, activează o licență pe contul cu care te-ai conectat.</string>
+</resources>

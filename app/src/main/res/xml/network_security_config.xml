@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The PC J2534 bridge is TLS 1.2+ with a pinned, per-session certificate.
+  No HTTP/cleartext exemption is needed, even on private LANs.
+  This Android network security policy applies to framework-compliant stacks;
+  raw Java sockets have to enforce security in their own transport.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

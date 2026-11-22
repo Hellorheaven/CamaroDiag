@@ -1,0 +1,17 @@
+name: Connectors — Windows discovery validation
+on:
+  pull_request:
+    paths:
+      - 'connectors/host/windows-discovery/**'
+      - '.github/workflows/connectors-windows-discovery-validation.yml'
+  workflow_dispatch:
+jobs:
+  windows-discovery:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build connectors/host/windows-discovery/WindowsDiscovery.csproj -c Release -warnaserror
+      - run: dotnet run --project connectors/host/windows-discovery/WindowsDiscovery.csproj -c Release --no-build -- --self-test

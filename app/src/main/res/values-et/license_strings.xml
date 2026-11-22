@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Tasuta: reaalajaandmed ning DTC-koodide lugemine ja kustutamine. Isiklik litsents avab lisafunktsioonid. Silumistööriistad on ainult omanikule.</string>
+    <string name="license_account_link">Litsents on seotud sinu Firebase’i konto ja kinnitatud sisselogimise e-posti aadressiga.</string>
+    <string name="license_no_browser">Brauser pole saadaval.</string>
+    <string name="license_checkout_unavailable">Ostmine pole saadaval. Firebase’i/Stripe’i arveldus tuleb seadistada.</string>
+    <string name="license_activation_help">Litsents aktiveeritakse pärast serveripoolset maksekinnitust. Naase siia ja vajuta Värskenda. Ümbersuunamine üksi ei anna litsentsi.</string>
+    <string name="license_required_for_feature">Selle funktsiooni kasutamiseks aktiveeri litsents kontol, millega oled sisse logitud.</string>
+</resources>

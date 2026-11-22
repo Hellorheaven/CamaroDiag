@@ -18,10 +18,12 @@ class J2534BridgeProtocolTest {
     }
 
     @Test
-    fun returnsFinalLineWhenPeerClosesWithoutNewline() {
+    fun rejectsFinalLineWhenPeerClosesWithoutNewline() {
         val input = BufferedReader(StringReader("{\"ok\":true}"))
 
-        assertEquals("{\"ok\":true}", J2534BridgeProtocol.readBoundedLine(input))
+        assertThrows(java.io.EOFException::class.java) {
+            J2534BridgeProtocol.readBoundedLine(input)
+        }
         assertNull(J2534BridgeProtocol.readBoundedLine(input))
     }
 

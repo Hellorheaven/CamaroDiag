@@ -22,11 +22,13 @@ import com.camarodiag.gen5.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
-import java.util.Locale
+import androidx.compose.ui.platform.LocalConfiguration
 
 /**
  * Denies access to diagnostic screens until a Firebase session exists.
@@ -36,7 +38,7 @@ import java.util.Locale
 fun CamaroAuthGate(
     onAccountChanged: (String?) -> Unit,
     onAccountDeleted: (String) -> Unit,
-    content: @Composable (onOpenAccount: () -> Unit) -> Unit
+    content: @Composable (onOpenAccount: () -> Unit, accessLevel: LicenseLevel, onRefreshLicense: () -> Unit) -> Unit
 ) {
     val auth = remember { FirebaseAuth.getInstance() }
     val context = LocalContext.current
@@ -57,6 +59,7 @@ fun CamaroAuthGate(
     var validatedAccountUid by remember { mutableStateOf<String?>(null) }
     var validatedUser by remember { mutableStateOf<com.google.firebase.auth.FirebaseUser?>(null) }
     var validationError by remember { mutableStateOf<String?>(null) }
+    var accessLevel by remember { mutableStateOf(LicenseLevel.FREE) }
     var retryValidation by remember { mutableIntStateOf(0) }
     var validationGeneration by remember { mutableIntStateOf(0) }
     val latestOnAccountChanged by rememberUpdatedState(onAccountChanged)
@@ -79,7 +82,13 @@ fun CamaroAuthGate(
         // screen every five minutes. Only an identity change hides old data.
         val identityChanged = readyAccountUid != user?.uid ||
             (validatedUser != null && validatedUser !== user)
+        // Preserve the current account's verified tier during a periodic token
+        // refresh: otherwise owner-only Debug tabs disappear every five minutes
+        // and ongoing diagnostic navigation is interrupted. Account changes
+        // still revoke all privileges immediately. A failed refresh below
+        // separately revokes owner privileges and applies offline-grace rules.
         if (identityChanged) {
+            accessLevel = LicenseLevel.FREE
             readyAccountUid = null
             validatedAccountUid = null
             validatedUser = null
@@ -94,6 +103,58 @@ fun CamaroAuthGate(
                     return@addOnCompleteListener
                 }
                 if (task.isSuccessful) {
+                    val verifiedClaims = task.result?.claims.orEmpty()
+                    val providerIds = user.providerData.map { it.providerId }
+                    // Owner claim is signed by Firebase Admin. Paying users
+                    // require a SECOND proof from Firestore's SERVER, never cache.
+                    accessLevel = if (!LicenseRolloutConfig.ENABLED) {
+                        // Licensing is staged but disconnected: normal functions
+                        // remain available without license lookup or payment.
+                        if (OwnerFunctionalTestPolicy.isAllowed(providerIds, verifiedClaims))
+                            LicenseLevel.OWNER else LicenseLevel.PREMIUM
+                    } else LicenseAccessPolicy.resolve(
+                        uid = targetUid,
+                        email = user.email,
+                        emailVerified = user.isEmailVerified,
+                        providerIds = providerIds,
+                        signedClaims = verifiedClaims,
+                        license = null
+                    )
+                    if (LicenseRolloutConfig.ENABLED && accessLevel != LicenseLevel.OWNER &&
+                        verifiedClaims[LicenseAccessPolicy.PREMIUM_CLAIM] == true
+                    ) {
+                        FirebaseFirestore.getInstance().collection("licenses")
+                            .document(targetUid).get(Source.SERVER)
+                            .addOnCompleteListener { licenseTask ->
+                                if (auth.currentUser?.uid != targetUid ||
+                                    validationGeneration != attempt
+                                ) return@addOnCompleteListener
+                                // Task.result throws if the request failed. A network
+                                // error, permission denial or missing record must
+                                // simply leave the entitlement locked.
+                                val snapshot = if (licenseTask.isSuccessful) {
+                                    licenseTask.result?.takeIf { it.exists() }
+                                } else null
+                                val licenseRecord = snapshot?.let {
+                                    ServerLicenseRecord(
+                                        uid = it.getString("uid").orEmpty(),
+                                        emailLower = it.getString("emailLower").orEmpty(),
+                                        status = it.getString("status").orEmpty(),
+                                        kind = it.getString("kind").orEmpty(),
+                                        expiresAtEpochMillis = it.getTimestamp("expiresAt")?.toDate()?.time,
+                                        verifiedFromServer = !it.metadata.isFromCache
+                                    )
+                                }
+                                accessLevel = LicenseAccessPolicy.resolve(
+                                    uid = targetUid,
+                                    email = user.email,
+                                    emailVerified = user.isEmailVerified,
+                                    providerIds = providerIds,
+                                    signedClaims = verifiedClaims,
+                                    license = licenseRecord
+                                )
+                            }
+                    }
                     validationPrefs.edit {
                         putLong("verified_$targetUid", System.currentTimeMillis())
                     }
@@ -101,12 +162,18 @@ fun CamaroAuthGate(
                     validatedUser = user
                     latestOnAccountChanged(targetUid)
                 } else {
+                    // An offline grace period can allow ordinary diagnostics, never owner tests.
+                    accessLevel = LicenseLevel.FREE
                     val lastValidated = validationPrefs.getLong("verified_$targetUid", 0L)
                     val offlineGrace = task.exception is FirebaseNetworkException &&
                         OfflineSessionPolicy.allowsOfflineAccess(
                             lastValidated, System.currentTimeMillis()
                         )
                     if (offlineGrace) {
+                        // Ordinary diagnostics remain available; private tools
+                        // stay locked until a fresh signed Google token is checked.
+                        accessLevel = if (LicenseRolloutConfig.ENABLED)
+                            LicenseLevel.FREE else LicenseLevel.PREMIUM
                         validatedAccountUid = targetUid
                         validatedUser = user
                         latestOnAccountChanged(targetUid)
@@ -135,7 +202,7 @@ fun CamaroAuthGate(
     } else if (readyAccountUid != user.uid || validatedAccountUid != user.uid ||
         validatedUser !== user
     ) {
-        val french = remember { Locale.getDefault().language == "fr" }
+        val french = LocalConfiguration.current.locales[0].language == "fr"
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -173,10 +240,10 @@ fun CamaroAuthGate(
         var accountRevision by remember(user.uid) { mutableIntStateOf(0) }
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
-        val french = remember { Locale.getDefault().language == "fr" }
+        val french = LocalConfiguration.current.locales[0].language == "fr"
         // Account action belongs to the app's TopAppBar; an overlay here would
         // overlap system bars and the title on narrow Android 15/16 devices.
-        content { accountOpen = true }
+        content({ accountOpen = true }, accessLevel, { retryValidation++ })
         if (accountOpen) {
             val googleLinked = remember(user, accountRevision) {
                 user.providerData.any { it.providerId == "google.com" }
@@ -358,7 +425,7 @@ fun CamaroAuthGate(
 private fun CamaroLoginScreen(auth: FirebaseAuth) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val french = remember { Locale.getDefault().language == "fr" }
+    val french = LocalConfiguration.current.locales[0].language == "fr"
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -499,7 +566,7 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
 @Composable
 private fun EmailVerificationScreen(auth: FirebaseAuth, onVerified: () -> Unit) {
     val signOut = rememberFirebaseSignOut(auth)
-    val french = remember { Locale.getDefault().language == "fr" }
+    val french = LocalConfiguration.current.locales[0].language == "fr"
     var message by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     Column(

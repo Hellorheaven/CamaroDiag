@@ -14,6 +14,7 @@ CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5
 - Audit kilométrique fondé sur les sources réellement identifiées.
 - Atelier ECU hors véhicule : import et inspection BIN/ORI/MOD, Intel HEX, Motorola S-record et ZIP, empreinte SHA-256, comparaison binaire et édition de tables à partir de définitions TSV vérifiées.
 - Pont Windows J2534 facultatif pour certains adaptateurs Pass-Thru, notamment VXDIAG VCX SE et VCX Nano avec pilote compatible.
+- Découverte USB/OTG directe du prototype CamaroDiagConnectors 0.1.0, sans pont PC (identification et capacités uniquement ; aucune communication ECU disponible sur ce prototype).
 - Les commandes carrosserie non validées et les fonctions de programmation restent verrouillées.
 
 ## Compte utilisateur et connexion
@@ -40,10 +41,36 @@ CamaroDiag est une application Android de diagnostic pour Chevrolet Camaro Gen 5
 | ELM327 Bluetooth SPP | Bluetooth classique | Oui, selon qualité | Non | Non garanti | OBD standard ; clones non garantis |
 | ELM/STN USB série | USB OTG | Oui, selon interface | Non, sauf profil validé | Non garanti | USB Host/OTG requis |
 | ELM/STN Wi-Fi | TCP/IP | Oui, selon interface | Non, sauf profil validé | Non garanti | IP et port adaptateur requis |
+| CamaroDiagConnectors 0.1.0 | USB-C / OTG | Non | Non | Non | Découverte uniquement, sans ordinateur ; à tester sur carte isolée |
 | VXDIAG VCX SE | PC Windows + J2534 | Non via le pont UDS | Oui, lecture UDS via pont | SW-ISO15765 si le pilote J2534-2 l'expose | Pilote Windows exact requis ; pas de pilote Android natif |
 | VXDIAG VCX Nano | PC Windows + J2534 | Non via le pont UDS | Oui, lecture UDS via pont selon variante | Dépend révision, câblage et pilote | SW-CAN non présumé ; compatibilité à confirmer |
 
 La connexion d'un adaptateur ne garantit pas l'accès à tous les réseaux GM. Les fonctions dépendent de la référence, révision, firmware, broches DLC, pilote et réponses du calculateur.
+
+## CamaroDiagConnectors — connexion native Android
+
+Le logiciel CamaroDiagConnectors est désormais développé dans ce dépôt sous [`connectors/`](connectors/README.md), avec les CI et issues communes. Le matériel, les schémas, PCB, brochages et documents électriques sont également centralisés dans [`connectors/hardware/`](connectors/hardware/README.md) et [`connectors/docs/`](connectors/docs/). L'ancien dépôt reste une archive historique. Il communiquera directement avec Android, sans ordinateur ni pont Windows obligatoire. Les interfaces J2534 tierces existantes continuent à utiliser leur propre chemin de connexion.
+
+Pour la version prototype 0.1.0, la seule fonction disponible est la découverte USB de la carte isolée, **sans raccordement au véhicule ni à une mémoire** :
+
+1. Relier le prototype USB au téléphone compatible USB Host/OTG.
+2. Ouvrir Adaptateurs et actualiser les périphériques USB.
+3. Sélectionner **CamaroDiagConnectors • USB ASCII** pour le firmware normal, ou **CamaroDiagConnectors • USB CD/1** uniquement pour la variante binaire expérimentale. Autoriser l'accès USB dans Android ; si nécessaire, sélectionner de nouveau le bouton.
+4. Consulter la version et les capacités retournées. En mode CD/1, une erreur de CRC, version ou séquence arrête la découverte sans repli ASCII. Le CRC ne constitue pas une authentification. Le diagnostic doit rester indisponible : la liaison de découverte est refermée à la fin de cette opération.
+
+Le mode CD/1 exige un seul port série CDC ACM compatible, sans sélection arbitraire de port. Redémarrer uniquement le prototype isolé entre découvertes binaires, conformément à sa documentation. Pour Windows, l'outil autonome de découverte est disponible dans `connectors/host/windows-discovery/`, indépendamment du pont J2534 ; il ne s'agit pas d'un pilote de programmation.
+
+Le mode CD/1 est prévu pour les essais sur carte isolée, conformément au [guide USB binaire](connectors/docs/user/usb-binary-discovery.md). Aucun mode ne permet de communiquer avec un ECU via ce prototype.
+
+Les futurs modes CAN, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD et EEPROM ISP/chip-off nécessitent un firmware et du matériel réellement compatibles et qualifiés. Voir les [exigences du connecteur](https://github.com/Hellorheaven/CamaroDiag/issues/86). Aucun mode de programmation n'est activé à partir d'une réponse de découverte.
+
+### Préparation du raccordement sur banc
+
+Dans ECU/Maps → Expert, les neuf modes de connexion sont des choix de préparation, pas des capacités matérielles actives. SWD est distinct de BDM et JTAG/Nexus. Les boutons CamaroDiagConnectors donnent accès au guide générique de câblage et à la fiche correspondant au modèle, à l'année et à la famille ECU saisie si une fiche existe ; sinon le catalogue est proposé. E39A dispose d'une fiche indépendante non qualifiée. Les documents de référence sont figés sur la révision revue, et chaque écran indique que le raccordement n'est pas vérifié.
+
+Le boîtier est prévu pour une alimentation logique USB 5 V protégée. L'alimentation stabilisée externe de banc est dédiée au calculateur, avec protection et limitation adaptées au faisceau. Les opérations critiques devront disposer d'une alimentation logique maintenue indépendamment de la liaison USB ; les puces externes nécessitent leur propre VCC conforme à la référence exacte. Aucun brochage, courant ou tension de programmation universel n'est déduit. Ne raccorder aucune cible au prototype actuel.
+
+Voir [le suivi des fiches](https://github.com/Hellorheaven/CamaroDiag/issues/89). Les fiches documentaires ne valident ni le faisceau, ni le firmware, ni la récupération après interruption.
 
 ## Matrice des véhicules et fonctions
 
@@ -95,12 +122,12 @@ Le pont PC permet d'utiliser un fournisseur J2534 sous Windows 10 ou 11, notamme
 1. Installer d'abord le pilote constructeur J2534 correspondant à l'interface (et VX Manager pour les modèles VXDIAG qui le nécessitent).
 2. Télécharger depuis les [versions CamaroDiag](https://github.com/Hellorheaven/CamaroDiag/releases/latest) le programme d'installation Windows x86 ou x64 correspondant au pilote J2534.
 3. Exécuter l'installateur, puis lancer **CamaroDiag J2534 Bridge** depuis le menu Démarrer.
-4. Choisir l'interface et relever l'adresse IP, le port et le jeton d'appairage indiqués.
+4. Choisir l'interface et relever l'adresse IP, le port et **le code d'appairage TLS complet** affiché (`jeton.empreinte_SHA256`). Le code change à chaque redémarrage du pont.
 5. Relier Android et le PC au même réseau privé, puis renseigner ces informations et les identifiants CAN documentés du calculateur dans CamaroDiag.
 
 La connexion J2534 autorise les lectures UDS et le maintien de session lorsqu'ils sont pris en charge. Elle ne rend pas disponibles le flashage, les commandes constructeur non vérifiées ni tous les réseaux GM.
 
-**Sécurité :** utiliser exclusivement un réseau local privé et de confiance. Le pont n'utilise pas de chiffrement TLS : ne jamais exposer son port à Internet ni l'utiliser sur un réseau Wi-Fi public.
+**Sécurité :** la connexion Android–J2534 exige TLS 1.2/1.3 et vérifie l'empreinte SHA-256 du certificat du pont avant toute transmission du jeton ou de trames ECU. Les anciens clients TCP et les jetons seuls sont refusés. Utiliser exclusivement un réseau local privé et de confiance ; ne jamais exposer le port à Internet ni utiliser le pont sur un réseau Wi-Fi public.
 
 Pour les étapes détaillées, consulter le [guide d'installation du pont PC](pc-bridge/README.md).
 
@@ -110,14 +137,15 @@ L'atelier permet l'analyse de fichiers locaux : import BIN/ORI/MOD, Intel HEX, M
 
 Aucun pack de tables Camaro validé n'est fourni. Les définitions doivent correspondre exactement au VIN, au calculateur, au CAL ID/CVN, à l'OS et à l'image concernée. Les formats XDF/A2L/XML ou conteneurs propriétaires non décodés ne sont pas automatiquement convertis.
 
-La lecture mémoire directe de l'ECM, l'écriture, le flashage, le recovery, les checksums GM et les procédures Seed/Key ne sont pas disponibles.
+
+La **lecture physique limitée d'une plage mémoire ECU** est disponible via le pont PC J2534, uniquement avec un profil de plage documenté configuré sur Windows, une correspondance VIN vérifiée et deux acquisitions concordantes. Il ne s'agit **ni d'un dump complet garanti ni d'une sauvegarde restaurable**. La lecture complète universelle de l'ECM, l'écriture physique, le flashage, le recovery, les checksums GM et les procédures Seed/Key ne sont pas disponibles.
 
 ## Fonctions non disponibles
 
 - Scan exhaustif garanti de BCM, TCM, EBCM/ABS, IPC, SDM et de tous les calculateurs GM.
 - Commandes carrosserie non validées pour le VIN, BCM et calibration.
 - Démarrage à distance générique, contournement antidémarrage ou dispositifs antivol.
-- Écriture UDS, actionneurs, codage, programmation, lecture mémoire ou flashage GM.
+- Écriture UDS, actionneurs, codage, programmation, lecture mémoire **hors profil autorisé**, dump complet garanti ou flashage GM.
 
 ## Origine des données et licences intégrées
 

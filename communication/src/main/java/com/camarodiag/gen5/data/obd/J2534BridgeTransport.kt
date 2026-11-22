@@ -9,12 +9,11 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
-import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.Locale
 
 /**
- * JSON-lines TCP client for the Windows J2534 bridge.
+ * Certificate-pinned TLS (JSON lines) client for the Windows J2534 bridge.
  * J2534 performs ISO-TP framing on the PC; this class exchanges complete UDS payloads.
  */
 class J2534BridgeTransport(
@@ -23,10 +22,24 @@ class J2534BridgeTransport(
     private val pairingToken: String
 ) : UdsPayloadTransport {
     private val mutex = Mutex()
+    private val tlsPairing by lazy { J2534BridgeTlsPairing.parse(pairingToken) }
     @Volatile private var socket: Socket? = null
     private var reader: BufferedReader? = null
     private var writer: BufferedWriter? = null
     @Volatile private var opened = false
+    private var connectedResponseCanId: String? = null
+    private var standardObdAdapterInfo: Map<String, String> = emptyMap()
+    @Volatile private var scopedMemoryReadEnabled = false
+    @Volatile private var standardObdPhysicalReadEnabled = false
+    @Volatile private var standardObdClearEnabled = false
+    val isStandardObdClearEnabled: Boolean
+        get() = isStandardObdPhysicalReadEnabled && standardObdClearEnabled
+    val isStandardObdPhysicalReadEnabled: Boolean
+        get() = isConnected && standardObdPhysicalReadEnabled
+
+    /** True only when the authenticated PC bridge confirmed a VIN-bound memory scope. */
+    val isScopedMemoryReadEnabled: Boolean
+        get() = isConnected && scopedMemoryReadEnabled
     /** Close requested by the app, not a spontaneous I/O failure of the bridge. */
     @Volatile private var externallyClosed = false
 
@@ -47,7 +60,8 @@ class J2534BridgeTransport(
             externallyClosed = false
             require(host.isNotBlank()) { "Adresse IP du PC manquante." }
             require(port in 1024..65535) { "Port du pont PC invalide." }
-            require(pairingToken.isNotBlank()) { "Jeton d'appairage du pont PC manquant." }
+            // Parse before network I/O: legacy token-only pairing must fail closed.
+            val pairing = tlsPairing
             require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN J2534 non pris en charge." }
             val maxId = if (can29Bit) 0x1FFFFFFF else 0x7FF
             require(requestCanId in 0..maxId && responseCanId in 0..maxId && requestCanId != responseCanId) {
@@ -57,28 +71,47 @@ class J2534BridgeTransport(
                 "La largeur des identifiants CAN ne correspond pas au profil sélectionné."
             }
             try {
-                val connected = Socket()
-                // Track the descriptor before connect: the failure path must
-                // close it even when TCP establishment never completes.
+                // TLS handshake (including SHA-256 certificate pin verification)
+                // completes BEFORE the first pairing token or UDS command is sent.
+                val connected = pairing.openSocket(host, port)
                 socket = connected
-                connected.tcpNoDelay = true
-                connected.connect(InetSocketAddress(host, port), 5000)
                 connected.soTimeout = 12_000
                 reader = BufferedReader(InputStreamReader(connected.getInputStream(), Charsets.UTF_8))
                 writer = BufferedWriter(OutputStreamWriter(connected.getOutputStream(), Charsets.UTF_8))
                 val response = request(
                     JSONObject()
                         .put("op", "open")
-                        .put("token", pairingToken)
+                        .put("token", tlsPairing.token)
                         .put("requestCanId", requestCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0'))
                         .put("responseCanId", responseCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0'))
                         .put("can29Bit", can29Bit)
                         .put("protocolNumber", protocolNumber),
                     10_000
                 )
+                val requestLabel = requestCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
+                val responseLabel = responseCanId.toString(16).uppercase().padStart(if (can29Bit) 8 else 3, '0')
+                check(response.opt("readOnly") == true &&
+                    response.optString("requestCanId") == requestLabel &&
+                    response.optString("responseCanId") == responseLabel &&
+                    response.optInt("protocolNumber", -1) == protocolNumber
+                ) { "The PC bridge did not confirm the selected read-only CAN channel." }
+                connectedResponseCanId = responseLabel
+                scopedMemoryReadEnabled = response.optBoolean("scopedPhysicalMemoryRead", false)
+                standardObdPhysicalReadEnabled = response.opt("standardObdPhysicalRead") == true &&
+                    J2534StandardObd.supportsChannel(requestCanId, responseCanId, protocolNumber)
+                standardObdClearEnabled = standardObdPhysicalReadEnabled && response.opt("standardObdClear") == true
                 opened = true
                 val adapter = response.optString("adapter", "J2534")
-                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s"
+                val voltage = response.optLong("batteryMillivolts", -1L)
+                standardObdAdapterInfo = buildMap {
+                    put("IDENTIFICATION", adapter)
+                    put("PROTOCOL", "J2534 / ISO 15765-4 • " + response.optInt("baudRate") + " bit/s")
+                    if (voltage >= 0) put("VOLTAGE", String.format(Locale.ROOT, "%.2f V", voltage / 1000.0))
+                }
+                val voltageLabel = if (voltage >= 0) {
+                    String.format(Locale.getDefault(), " • %.2f V", voltage / 1000.0)
+                } else ""
+                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s$voltageLabel"
             } catch (error: Exception) {
                 closeInternal()
                 throw error
@@ -86,22 +119,157 @@ class J2534BridgeTransport(
         }
     }
 
+    suspend fun readCalibrationIdentification(): ObdEcuIdentification = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureOpen()
+            val data = request(JSONObject().put("op", "identify").put("token", tlsPairing.token), 15_000)
+                .getJSONObject("identity")
+            fun records(name: String): List<String> {
+                val values = data.getJSONArray(name)
+                return List(values.length()) { index -> values.getString(index) }
+            }
+            J2534StandardObd.validateIdentity(
+                vin = if (data.isNull("vin")) null else data.getString("vin"),
+                calibrationIds = records("calibrationIds"),
+                calibrationVerificationNumbers = records("cvns"),
+                ecuNames = records("ecuNames"),
+                responseCanId = data.getString("responseCanId"),
+                expectedResponseCanId = checkNotNull(connectedResponseCanId)
+            )
+        }
+    }
+
+    suspend fun readGmlanIdentification(): GmlanIdentityEvidence = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureOpen()
+            val expected = checkNotNull(connectedResponseCanId)
+            val response = request(
+                JSONObject().put("op", "identifyGmlan").put("token", tlsPairing.token),
+                15_000
+            )
+            val data = response.getJSONObject("identity")
+            fun integer(name: String): Long {
+                val value = data.opt(name)
+                require(value is Number && value.toDouble() == value.toLong().toDouble()) {
+                    "Invalid GM numeric identity field."
+                }
+                return value.toLong()
+            }
+            val did = integer("OsDid")
+            require(did in 0L..255L)
+            GmlanIdentityEvidence.validate(
+                vin = data.getString("Vin"),
+                osId = integer("OperatingSystemId"),
+                osDid = did.toInt(),
+                responseId = response.getString("responseCanId"),
+                expectedResponseId = expected,
+                physicalRead = data.opt("PhysicalRead") == true,
+                readOnly = response.opt("readOnly") == true,
+                flashQualified = response.opt("flashQualified") != false
+            )
+        }
+    }
+
+    suspend fun discoverStandardObdPids(): Set<Int> {
+        check(isStandardObdPhysicalReadEnabled)
+        val supported = linkedSetOf<Int>()
+        for (base in 0..0xE0 step 32) {
+            val response = exchange(byteArrayOf(1, base.toByte()), 2500)
+            val (pids, next) = J2534StandardObd.supportPage(base, response)
+            supported.addAll(pids)
+            if (!next) break
+        }
+        return supported
+    }
+
+    suspend fun readStandardObdPid(pid: Int): String {
+        check(isStandardObdPhysicalReadEnabled)
+        require(pid in 1..255)
+        val reply = exchange(byteArrayOf(1, pid.toByte()), 1800)
+        // Validate service and PID before delivering the complete payload to
+        // the existing telemetry decoder. No fabricated adapter text.
+        J2534StandardObd.pidData(pid, reply)
+        return reply.toHex()
+    }
+
+    suspend fun readStandardObdDtcs(): PhysicalObdDtcSnapshot {
+        check(isStandardObdPhysicalReadEnabled)
+        // An absent/refused read is not equivalent to a confirmed empty list.
+        suspend fun read(mode: Int): List<ObdDtc>? =
+            J2534StandardObd.optionalDtcs(mode, exchange(byteArrayOf(mode.toByte()), 2500))
+        return PhysicalObdDtcSnapshot(requireNotNull(read(3)), read(7), read(10))
+    }
+
+    /** Physical scan uses only exact read payloads, never AT commands. */
+    suspend fun fullStandardObdScan(): ObdScanReport {
+        check(isStandardObdPhysicalReadEnabled)
+        val responder = checkNotNull(connectedResponseCanId)
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, timeout ->
+            require(command.matches(Regex("[0-9A-F]{2,6}")) && command.length % 2 == 0)
+            val payload = command.hexToBytes()
+            val mode = payload[0].toInt() and 0xFF
+            require(when (mode) {
+                1 -> payload.size == 2
+                2 -> payload.size == 3 && payload[2] == 0.toByte()
+                3,7,10 -> payload.size == 1
+                6 -> payload.size == 2 && payload[1] == 0.toByte()
+                9 -> payload.size == 2 && (payload[1].toInt() and 0xFF) in setOf(2,4,6,10)
+                else -> false
+            }) { "Unsupported physical OBD scan command." }
+            val reply = exchange(payload, timeout)
+            if (J2534StandardObd.isExplicitlyUnsupported(mode, reply) &&
+                mode != 3 && !(mode == 1 && payload[1] == 0.toByte())) {
+                // Keep the actual negative response in the scan log; the
+                // read decoder treats the requested service as unavailable.
+                reply.toHex()
+            } else {
+                require(reply.isNotEmpty() && (reply[0].toInt() and 0xFF) == mode + 0x40) {
+                    "Negative or invalid response during physical OBD scan."
+                }
+                if (mode == 1) {
+                    val pid = payload[1].toInt() and 0xFF
+                    if (pid % 32 == 0) J2534StandardObd.supportPage(pid,reply)
+                    else J2534StandardObd.pidData(pid,reply)
+                }
+                reply.toHex()
+            }
+        })
+        return engine.fullPhysicalCanScan(responder, standardObdAdapterInfo) { mode, raw ->
+            J2534StandardObd.optionalDtcs(mode, raw.hexToBytes())
+        }
+    }
+
+    suspend fun clearStandardObdDtcs() = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            check(isStandardObdClearEnabled) { "Local Windows operator has not enabled OBD clear." }
+            val response = request(JSONObject()
+                .put("op", "clearStandardObdDtcs")
+                .put("token", tlsPairing.token)
+                .put("confirmed", true), 12_000)
+            check(response.optString("payloadHex") == "44" &&
+                response.optString("responseCanId") == connectedResponseCanId &&
+                response.opt("permanentDtcsCleared") == false) {
+                "Physical emissions reset was not confirmed."
+            }
+        }
+    }
+
     override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
+            require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES) { "La requête UDS doit contenir entre 1 et 4091 octets." }
             val boundedTimeout = J2534BridgeProtocol.boundedTimeoutMs(timeoutMs)
             socket?.soTimeout = boundedTimeout + 3000
             val response = request(
                 JSONObject()
                     .put("op", "exchange")
-                    .put("token", pairingToken)
+                    .put("token", tlsPairing.token)
                     .put("payloadHex", payload.toHex())
                     .put("timeoutMs", boundedTimeout),
                 boundedTimeout + 3000
             )
             val hex = response.optString("payloadHex")
-            if (hex.isBlank() || hex.length % 2 != 0 || hex.length > 8190 ||
+            if (hex.isBlank() || hex.length % 2 != 0 || hex.length > J2534BridgeProtocol.MAX_PAYLOAD_BYTES * 2 ||
                 !hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }
             ) {
                 closeInternal()
@@ -114,12 +282,12 @@ class J2534BridgeTransport(
     override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
-            require(payload.size in 1..4095) { "La requête UDS doit contenir entre 1 et 4095 octets." }
+            require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES) { "La requête UDS doit contenir entre 1 et 4091 octets." }
             val boundedTimeout = timeoutMs.coerceIn(100L, 10_000L).toInt()
             request(
                 JSONObject()
                     .put("op", "sendOnly")
-                    .put("token", pairingToken)
+                    .put("token", tlsPairing.token)
                     .put("payloadHex", payload.toHex())
                     .put("timeoutMs", boundedTimeout),
                 boundedTimeout + 3000
@@ -179,7 +347,12 @@ class J2534BridgeTransport(
         reader = null
         writer = null
         socket = null
+        connectedResponseCanId = null
+        standardObdAdapterInfo = emptyMap()
         opened = false
+        scopedMemoryReadEnabled = false
+        standardObdPhysicalReadEnabled = false
+        standardObdClearEnabled = false
     }
 
     private fun ByteArray.toHex(): String =
@@ -191,6 +364,7 @@ class J2534BridgeTransport(
 
 /** Bounded framing helpers for the untrusted JSON-lines PC bridge stream. */
 internal object J2534BridgeProtocol {
+    const val MAX_PAYLOAD_BYTES = 4091
     private const val MAX_RESPONSE_LINE_CHARS = 32 * 1024
 
     fun boundedTimeoutMs(timeoutMs: Long): Int = timeoutMs.coerceIn(100L, 10_000L).toInt()
@@ -201,15 +375,18 @@ internal object J2534BridgeProtocol {
             val next = input.read()
             if (next == -1) {
                 if (line.isEmpty()) return null
-                break
+                throw java.io.EOFException("Incomplete J2534 response frame.")
             }
             if (next == '\n'.code) break
-            if (next != '\r'.code) {
-                check(line.length < MAX_RESPONSE_LINE_CHARS) {
-                    "The J2534 bridge response exceeds the maximum allowed line size."
-                }
-                line.append(next.toChar())
+            if (next == '\r'.code) {
+                if (input.read() != '\n'.code)
+                    throw java.io.IOException("Invalid J2534 response frame terminator.")
+                break
             }
+            check(line.length < MAX_RESPONSE_LINE_CHARS) {
+                "The J2534 bridge response exceeds the maximum allowed line size."
+            }
+            line.append(next.toChar())
         }
         return line.toString()
     }

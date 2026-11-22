@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">無料機能：リアルタイムデータ、DTC の読み取りと消去。個人ライセンスで高度な機能が利用できます。デバッグツールは所有者専用です。</string>
+    <string name="license_account_link">ライセンスは Firebase アカウントと確認済みのログイン用メールアドレスに紐付けられます。</string>
+    <string name="license_no_browser">利用できるブラウザがありません。</string>
+    <string name="license_checkout_unavailable">購入できません。Firebase/Stripe の決済設定が必要です。</string>
+    <string name="license_activation_help">サーバーが支払いを確認するとライセンスが有効になります。ここに戻って更新を押してください。リダイレクトだけではライセンスは付与されません。</string>
+    <string name="license_required_for_feature">この機能を使用するには、ログイン中のアカウントでライセンスを有効にしてください。</string>
+</resources>

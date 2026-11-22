@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">免费功能：实时数据、读取和清除 DTC。个人许可证可解锁高级功能。调试工具仅限所有者使用。</string>
+    <string name="license_account_link">许可证与您的 Firebase 账户和已验证的登录邮箱绑定。</string>
+    <string name="license_no_browser">没有可用的浏览器。</string>
+    <string name="license_checkout_unavailable">暂时无法购买。必须配置 Firebase/Stripe 计费服务。</string>
+    <string name="license_activation_help">服务器确认付款后许可证才会激活。请返回此处并点击刷新。仅跳转页面不会授予许可证。</string>
+    <string name="license_required_for_feature">要使用此功能，请为当前登录的账号激活许可证。</string>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Maksuton: reaaliaikaiset tiedot sekä DTC-koodien luku ja poisto. Henkilökohtainen lisenssi avaa lisätoiminnot. Virheenkorjaustyökalut ovat vain omistajalle.</string>
+    <string name="license_account_link">Lisenssi on sidottu Firebase-tiliisi ja vahvistettuun kirjautumissähköpostiisi.</string>
+    <string name="license_no_browser">Selainta ei ole käytettävissä.</string>
+    <string name="license_checkout_unavailable">Osto ei ole käytettävissä. Firebase/Stripe-laskutus on määritettävä.</string>
+    <string name="license_activation_help">Lisenssi aktivoituu, kun palvelin vahvistaa maksun. Palaa tänne ja napauta Päivitä. Pelkkä uudelleenohjaus ei myönnä lisenssiä.</string>
+    <string name="license_required_for_feature">Ota lisenssi käyttöön tilillä, jolla olet kirjautunut sisään, jotta voit käyttää tätä toimintoa.</string>
+</resources>

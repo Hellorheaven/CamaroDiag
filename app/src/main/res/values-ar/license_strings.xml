@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">مجانًا: البيانات المباشرة وقراءة رموز DTC ومسحها. يتيح الترخيص الشخصي الميزات المتقدمة. أدوات تصحيح الأخطاء مخصصة للمالك فقط.</string>
+    <string name="license_account_link">يرتبط الترخيص بحساب Firebase وبريد تسجيل الدخول الإلكتروني الذي تم التحقق منه.</string>
+    <string name="license_no_browser">لا يوجد متصفح متاح.</string>
+    <string name="license_checkout_unavailable">الشراء غير متاح. يجب إعداد الفوترة عبر Firebase/Stripe.</string>
+    <string name="license_activation_help">يتم تفعيل الترخيص بعد تأكيد الدفع من الخادم. عد إلى هنا واضغط على تحديث. إعادة التوجيه وحدها لا تمنح ترخيصًا.</string>
+    <string name="license_required_for_feature">لاستخدام هذه الميزة، فعّل ترخيصًا للحساب الذي سجلت الدخول إليه.</string>
+</resources>

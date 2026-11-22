@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Gratis: realtidsdata samt läsning och radering av DTC. En personlig licens låser upp avancerade funktioner. Felsökningsverktygen är endast för ägaren.</string>
+    <string name="license_account_link">Licensen är kopplad till ditt Firebase-konto och verifierade inloggningsadress.</string>
+    <string name="license_no_browser">Ingen webbläsare tillgänglig.</string>
+    <string name="license_checkout_unavailable">Köp är inte tillgängligt. Firebase/Stripe-betalning måste konfigureras.</string>
+    <string name="license_activation_help">Licensen aktiveras när servern bekräftar betalningen. Återvänd hit och tryck på Uppdatera. En omdirigering ger inte i sig en licens.</string>
+    <string name="license_required_for_feature">Aktivera en licens för det konto du är inloggad med för att använda den här funktionen.</string>
+</resources>

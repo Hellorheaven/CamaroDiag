@@ -1,9 +1,12 @@
 package com.camarodiag.gen5.ui
 
+import com.camarodiag.gen5.auth.LicenseLevel
+import com.camarodiag.gen5.auth.LicenseRolloutConfig
+
 import android.Manifest
-import android.content.res.Configuration
+import android.content.pm.PackageManager
 import android.os.Build
-import android.os.LocaleList
+import androidx.core.content.ContextCompat
 import android.widget.Toast
 import androidx.core.content.edit
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,9 +34,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import com.camarodiag.gen5.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +56,10 @@ import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.CanTraceDirection
 import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.data.obd.UdsNegativeResponse
+import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.ui.theme.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -98,6 +101,9 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
     CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
     OBD_SCAN("Full OBD Scan", "Scan OBD complet", R.string.tab_obd_scan),
+    FUNCTIONAL_TESTS("Functional Tests", "Tests fonctionnels", R.string.tab_functional_tests),
+    DEBUG_DOWNLOADS("Debug Builds", "Versions Debug", R.string.tab_debug_builds),
+    LICENSE("License", "Licence", R.string.tab_license),
     GUIDE("Guide", "Guide", R.string.tab_guide),
     CONTROL("Controls", "Pilotage", R.string.tab_controls),
     ABOUT("About", "À propos", R.string.about_title),
@@ -152,14 +158,21 @@ private fun localizedBusName(bus: CanBusType): String = when (bus) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
-    val lang by viewModel.language.collectAsState()
-    val systemConfiguration = LocalConfiguration.current
-    val localizedConfiguration = remember(systemConfiguration, lang) {
-        Configuration(systemConfiguration).apply {
-            setLocales(LocaleList.forLanguageTags(if (lang == AppLanguage.ZH) "zh-CN" else lang.code))
-        }
+fun CamaroDiagApp(
+    viewModel: MainViewModel, systemLocale: Locale, onOpenAccount: () -> Unit,
+    licenseLevel: LicenseLevel,
+    onRefreshLicense: () -> Unit
+) {
+    val ownerTestsAllowed = licenseLevel == LicenseLevel.OWNER
+    val premiumAllowed = !LicenseRolloutConfig.ENABLED || licenseLevel != LicenseLevel.FREE
+    val premiumTabs = remember {
+        setOf(
+            DiagTab.MODULES, DiagTab.CAN_SNIFFER, DiagTab.MILEAGE,
+            DiagTab.CALIBRATION, DiagTab.OBD_SCAN, DiagTab.CONTROL
+        )
     }
+    val lang by viewModel.language.collectAsState()
+    val followSystemLanguage by viewModel.followSystemLanguage.collectAsState()
     val units by viewModel.unitSystem.collectAsState()
     val vehicle by viewModel.vehicle.collectAsState()
     val savedVehicles by viewModel.savedVehicles.collectAsState()
@@ -186,20 +199,108 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
     val obdScanReport by viewModel.obdScanReport.collectAsState()
     val obdScanMessage by viewModel.obdScanMessage.collectAsState()
     val isObdScanning by viewModel.isObdScanning.collectAsState()
+    val functionalTests by viewModel.functionalTestState.collectAsState()
 
     var currentTab by remember { mutableStateOf(DiagTab.SETUP) }
     var moreExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(licenseLevel) {
+        if (!LicenseRolloutConfig.ENABLED && currentTab == DiagTab.LICENSE)
+            currentTab = DiagTab.SETUP
+        if (!ownerTestsAllowed &&
+            currentTab in setOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS)
+        ) currentTab = if (LicenseRolloutConfig.ENABLED) DiagTab.LICENSE else DiagTab.SETUP
+        if (!premiumAllowed && currentTab in premiumTabs) currentTab = DiagTab.LICENSE
+    }
+    val permissionContext = LocalContext.current
+    val exportScope = rememberCoroutineScope()
+    var pendingExport by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val exportFolderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        val action = pendingExport
+        pendingExport = null
+        if (uri != null) {
+            if (CamaroDiagExportStorage.authorize(permissionContext, uri)) {
+                action?.invoke()
+            } else {
+                Toast.makeText(permissionContext, R.string.export_folder_instruction, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
+    fun withExportFolder(action: () -> Unit) {
+        if (pendingExport != null) return
+        val owner = viewModel.activeAccountUid.value ?: return
+        val generation = viewModel.exportAccountGeneration()
+        val selectedProfile = viewModel.vehicle.value
+        val guardedAction: () -> Unit = {
+            if (viewModel.canResumeExport(generation, owner) &&
+                viewModel.vehicle.value == selectedProfile) action()
+        }
+        pendingExport = guardedAction
+        exportScope.launch {
+            try {
+                if (CamaroDiagExportStorage.availableTree(permissionContext) != null) {
+                    pendingExport = null
+                    guardedAction()
+                } else if (viewModel.canResumeExport(generation, owner) &&
+                    viewModel.vehicle.value == selectedProfile) {
+                    Toast.makeText(permissionContext, R.string.export_folder_instruction, Toast.LENGTH_LONG).show()
+                    exportFolderPicker.launch(CamaroDiagExportStorage.initialPickerUri())
+                } else {
+                    pendingExport = null
+                }
+            } catch (cancelled: CancellationException) {
+                pendingExport = null
+                throw cancelled
+            } catch (_: Exception) {
+                pendingExport = null
+                Toast.makeText(permissionContext, R.string.export_folder_failed, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    var pendingBluetoothMac by remember { mutableStateOf<String?>(null) }
     val btPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        viewModel.refreshPairedDevices()
+    ) { results ->
+        if (results.values.all { it }) {
+            viewModel.refreshPairedDevices()
+            pendingBluetoothMac?.let(viewModel::connectRealBluetooth)
+        }
+        pendingBluetoothMac = null
     }
 
     val bleLocationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) viewModel.refreshPairedDevices()
+        if (granted) {
+            viewModel.refreshPairedDevices()
+            pendingBluetoothMac?.let(viewModel::connectRealBluetooth)
+        }
+        pendingBluetoothMac = null
+    }
+
+    // Bluetooth permissions are requested ONLY after the user explicitly
+    // refreshes paired devices or selects a Bluetooth adapter, never at app launch.
+    fun withBluetoothPermission(mac: String? = null) {
+        val required = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        if (required.all {
+            ContextCompat.checkSelfPermission(permissionContext, it) == PackageManager.PERMISSION_GRANTED
+        }) {
+            viewModel.refreshPairedDevices()
+            mac?.let(viewModel::connectRealBluetooth)
+        } else {
+            pendingBluetoothMac = mac
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                btPermLauncher.launch(required)
+            } else {
+                bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
     }
 
     val vinPhotoLauncher = rememberLauncherForActivityResult(
@@ -235,6 +336,10 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
         uri?.let { viewModel.importCalibrationFile(it) }
     }
 
+    val ecuBackupPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::verifyEcuBackup)
+    }
+
     val canTracePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -253,56 +358,14 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
         uri?.let { viewModel.importCalibrationDefinitions(it) }
     }
 
-    val calibrationDefinitionsTemplateSaver = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/tab-separated-values")
-    ) { uri ->
-        uri?.let { viewModel.exportCalibrationDefinitionTemplate(it) }
-    }
-
-    val liveRecordingExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        uri?.let { viewModel.exportLiveRecording(it) }
-    }
-
-    val canTraceExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/plain")
-    ) { uri ->
-        uri?.let { viewModel.exportCanCapture(it) }
-    }
-
-    val calibrationFileExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        uri?.let { viewModel.exportCalibrationFile(it) }
-    }
-
-    val ecuIdentityExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        uri?.let { viewModel.exportEcuIdentification(it) }
-    }
-
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            btPermLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN))
-        } else {
-            bleLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-    }
-
-    CompositionLocalProvider(
-        LocalConfiguration provides localizedConfiguration,
-        LocalLayoutDirection provides if (lang == AppLanguage.AR || lang == AppLanguage.HE) LayoutDirection.Rtl else LayoutDirection.Ltr
-    ) {
-    Scaffold(
+     Scaffold(
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark),
                 title = {
                     Column {
                         Text(
-                            text = "CAMARODIAG",
+                            text = stringResource(R.string.app_name),
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 19.sp,
                             color = CamaroAmber,
@@ -384,6 +447,9 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                         DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
                         DiagTab.OBD_SCAN,
+                        DiagTab.FUNCTIONAL_TESTS,
+                        DiagTab.DEBUG_DOWNLOADS,
+                        DiagTab.LICENSE,
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.ABOUT,
@@ -404,8 +470,10 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     expanded = moreExpanded,
                     onDismissRequest = { moreExpanded = false }
                 ) {
-                    listOf(
-                        DiagTab.MODULES,
+                    (listOf(DiagTab.MODULES) +
+                        (if (LicenseRolloutConfig.ENABLED) listOf(DiagTab.LICENSE) else emptyList()) +
+                        (if (ownerTestsAllowed) listOf(DiagTab.FUNCTIONAL_TESTS, DiagTab.DEBUG_DOWNLOADS) else emptyList()) +
+                        listOf(
                         DiagTab.MILEAGE,
                         DiagTab.CAN_SNIFFER,
                         DiagTab.CALIBRATION,
@@ -413,13 +481,17 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                         DiagTab.GUIDE,
                         DiagTab.CONTROL,
                         DiagTab.ABOUT
-                    ).forEach { tab ->
+                    )).forEach { tab ->
                         DropdownMenuItem(
                             text = {
-                                Text(stringResource(tab.labelResourceId))
+                                Text(
+                                    (if (!premiumAllowed && tab in premiumTabs) "🔒 " else "") +
+                                        stringResource(tab.labelResourceId)
+                                )
                             },
                             onClick = {
-                                currentTab = tab
+                                currentTab = if (!premiumAllowed && tab in premiumTabs)
+                                    DiagTab.LICENSE else tab
                                 moreExpanded = false
                             }
                         )
@@ -493,7 +565,8 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     }
                 }
             Box(modifier = Modifier.fillMaxSize().weight(1f)) {
-            when (currentTab) {
+            when (if (!premiumAllowed && currentTab in premiumTabs)
+                DiagTab.LICENSE else currentTab) {
                 DiagTab.SETUP -> VehicleSetupScreen(
                     vehicle = vehicle,
                     savedVehicles = savedVehicles,
@@ -512,15 +585,39 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
-                    onRefreshDevices = { viewModel.refreshPairedDevices() },
-                    onConnectMac = { viewModel.connectRealBluetooth(it) },
+                    onRefreshDevices = { withBluetoothPermission() },
+                    onConnectMac = { mac -> withBluetoothPermission(mac) },
                     onSelectSim = { viewModel.selectSimulatedAdapter(it) },
                     usbDevices = usbDevices,
-                    onRefreshUsb = { viewModel.refreshPairedDevices() },
+                    onRefreshUsb = { viewModel.refreshUsbDevices() },
                     onConnectUsb = { viewModel.connectUsb(it) },
+                    onDiscoverConnector = { viewModel.discoverCamaroDiagConnector(it) },
+                    onDiscoverBinaryConnector = { viewModel.discoverCamaroDiagConnector(it, binary = true) },
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
+                DiagTab.LICENSE -> {
+                    if (LicenseRolloutConfig.ENABLED) {
+                        LicenseScreen(licenseLevel, onRefreshLicense)
+                    } else {
+                        HardwareGuideScreen()
+                    }
+                }
+                DiagTab.DEBUG_DOWNLOADS -> {
+                    if (ownerTestsAllowed) DebugDownloadsScreen()
+                }
+                DiagTab.FUNCTIONAL_TESTS -> {
+                    if (ownerTestsAllowed) FunctionalTestsScreen(
+                        state = functionalTests,
+                        onRunAll = { viewModel.runFunctionalTests() },
+                        onStop = { viewModel.cancelFunctionalTests() },
+                        onExport = {
+                            withExportFolder {
+                                viewModel.exportFunctionalTests("CamaroDiag_functional_tests_" + System.currentTimeMillis() + ".json")
+                            }
+                        }
+                    )
+                }
                 DiagTab.LIVE -> LiveDataScreen(
                     pids = livePids,
                     units = units,
@@ -542,9 +639,13 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     onToggleUnits = {
                         viewModel.setUnitSystem(if (units == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC)
                     },
-                    onToggleRecording = { viewModel.toggleLiveRecording() },
+                    onToggleRecording = {
+                        if (premiumAllowed) viewModel.toggleLiveRecording()
+                        else currentTab = DiagTab.LICENSE
+                    },
                     onExportRecording = {
-                        liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
+                        if (!premiumAllowed) currentTab = DiagTab.LICENSE
+                        else withExportFolder { viewModel.exportLiveRecording("CamaroDiag_live_${System.currentTimeMillis()}.csv") }
                     }
                 )
                 DiagTab.CAN_SNIFFER -> CanSnifferScreen(
@@ -555,10 +656,10 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
-                    onExport = { canTraceExporter.launch("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") }
+                    onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
-                DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
+                DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { withExportFolder { viewModel.saveCurrentSession() } })
                 DiagTab.ABOUT -> LazyColumn {
                     item { AboutUpdateCard() }
                 }
@@ -575,6 +676,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                 )
                 DiagTab.CALIBRATION -> CalibrationWorkspaceScreen(
                     state = calibrationWorkspace,
+                    canReadEnhancedUds = viewModel.canReadEnhancedUds(),
                     vehicleLabel = "${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${localizedGenerationName(vehicle.generation)}",
                     ecmType = vehicle.engine.ecmType,
                     isConnected = !adapter.deviceName.contains("Demo", ignoreCase = true) &&
@@ -582,10 +684,11 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                         adapter.tier != AdapterTier.DISCONNECTED,
                     vehicle = vehicle,
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
+                    onReadGmlanIdentification = { viewModel.readGmlanIdentification() },
                     onExportIdentification = {
-                        ecuIdentityExporter.launch(
-                            "CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json"
-                        )
+                        withExportFolder {
+                            viewModel.exportEcuIdentification("CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json")
+                        }
                     },
                     onCreateVehicleFromEcuVin = { viewModel.createVehicleFromEcuVin(it) },
                     onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
@@ -595,18 +698,49 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                         viewModel.connectJ2534Bridge(host, port, token, requestId, responseId, baud)
                     },
                     onDisconnectJ2534Bridge = { viewModel.disconnectJ2534Bridge() },
+                    onCaptureJ2534Memory = { addressText, lengthText, session, region ->
+                        val address = addressText.toLongOrNull(16)
+                        val bytes = lengthText.toIntOrNull()
+                        if (address != null && bytes != null && bytes in 1..(4 * 1024 * 1024) &&
+                            address in 0L..0xFFFFFFFFL &&
+                            address + bytes <= 0x1_0000_0000L &&
+                            vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
+                        ) {
+                            val request = J2534LiveMemoryBackup.Request(
+                                expectedVin = vehicle.vin.uppercase(),
+                                region = region,
+                                address = address,
+                                lengthBytes = bytes,
+                                diagnosticSession = session,
+                                controllerLabel = vehicle.engine.ecmType
+                            )
+                            withExportFolder {
+                                viewModel.captureJ2534Memory("CamaroDiag_ECU_memory_${System.currentTimeMillis()}.zip", request)
+                            }
+                        }
+                    },
                     onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
+                    onVerifyEcuBackup = { ecuBackupPicker.launch(arrayOf("application/zip", "application/octet-stream")) },
                     onImportFile = { calibrationFilePicker.launch(arrayOf("*/*")) },
                     onImportTrace = { canTracePicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel", "*/*")) },
                     onImportComparisonFile = { calibrationComparisonPicker.launch(arrayOf("application/octet-stream", "*/*")) },
                     onPreviewPartialWrite = { start, eraseBytes, programBytes ->
                         viewModel.previewPartialCalibrationWrite(start, eraseBytes, programBytes)
                     },
+                    onExportExternalDumpPair = { method, region, address ->
+                        val firstPath = calibrationWorkspace.importedFilePath
+                        val secondPath = calibrationWorkspace.comparisonFilePath
+                        if (firstPath != null && secondPath != null) {
+                            withExportFolder {
+                                viewModel.exportExternalDumpPair(method, region, address, firstPath, secondPath)
+                            }
+                        }
+                    },
                     onImportDefinitions = {
                         calibrationDefinitionsPicker.launch(arrayOf("text/*", "text/csv", "text/tab-separated-values", "*/*"))
                     },
                     onExportDefinitionTemplate = {
-                        calibrationDefinitionsTemplateSaver.launch("camaro_calibration_tables_template.tsv")
+                        withExportFolder { viewModel.exportCalibrationDefinitionTemplate("CamaroDiag_calibration_tables_template.tsv") }
                     },
                     onSelectMap = { viewModel.selectCalibrationMap(it) },
                     onCellChange = { row, column, value -> viewModel.updateCalibrationCell(row, column, value) },
@@ -614,7 +748,7 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     onDiscardMap = { viewModel.discardCalibrationTableChanges() },
                     onExportFile = {
                         calibrationWorkspace.importedFileName?.let { fileName ->
-                            calibrationFileExporter.launch(fileName)
+                            withExportFolder { viewModel.exportCalibrationFile(fileName) }
                         }
                     },
                     onClearFile = { viewModel.clearCalibrationFile() }
@@ -629,6 +763,8 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
                     lastConnectionProfile = lastConnectionProfile,
                     sessions = savedSessions,
                     onLang = { viewModel.setLanguage(it) },
+                    followSystemLanguage = followSystemLanguage,
+                    onFollowSystemLanguage = { viewModel.setFollowSystemLanguage(systemLocale) },
                     onUnits = { viewModel.setUnitSystem(it) },
                     onDeleteSession = { viewModel.deleteSavedSession(it) },
                     onOpenVehicle = { currentTab = DiagTab.SETUP },
@@ -637,7 +773,6 @@ fun CamaroDiagApp(viewModel: MainViewModel, onOpenAccount: () -> Unit) {
             }
             }
         }
-    }
     }
 }
 
@@ -838,7 +973,9 @@ fun AdapterScreen(
     usbDevices: List<String>,
     onRefreshUsb: () -> Unit,
     onConnectUsb: (String) -> Unit,
-    onConnectWifi: (String, Int) -> Unit
+    onConnectWifi: (String, Int) -> Unit,
+    onDiscoverConnector: ((String) -> Unit)? = null,
+    onDiscoverBinaryConnector: ((String) -> Unit)? = null
 ) {
     var wifiHost by remember { mutableStateOf("192.168.0.10") }
     var wifiPort by remember { mutableStateOf("35000") }
@@ -910,7 +1047,39 @@ fun AdapterScreen(
                         TextButton(onClick = onRefreshUsb, enabled = !isBusy) { Text(stringResource(R.string.common_refresh)) }
                     }
                     if (usbDevices.isEmpty()) Text(stringResource(R.string.usb_none_detected), color = TextMuted)
-                    usbDevices.forEach { label -> OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.adapter_connect_label, label)) } }
+                    usbDevices.forEach { label ->
+                        val kklOnly = com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel(label)
+                        if (kklOnly) {
+                            Text(label, fontSize = 12.sp)
+                            Text(stringResource(R.string.status_not_verified), fontSize = 11.sp, color = TextMuted)
+                        }
+                        if (!kklOnly && (!label.contains("CamaroDiagConnectors", ignoreCase = true) || onDiscoverConnector == null)) {
+                            OutlinedButton(onClick = { onConnectUsb(label) }, enabled = !isBusy,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.adapter_connect_label, label))
+                            }
+                        }
+                        if (!kklOnly && onDiscoverConnector != null) {
+                            OutlinedButton(onClick = { onDiscoverConnector(label) }, enabled = !isBusy,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    Text("CamaroDiagConnectors • USB ASCII")
+                                    Text(label, fontSize = 11.sp)
+                                    Text(stringResource(R.string.adapter_discovery_only), fontSize = 11.sp, color = TextMuted)
+                                }
+                            }
+                        }
+                        if (!kklOnly && onDiscoverBinaryConnector != null) {
+                            OutlinedButton(onClick = { onDiscoverBinaryConnector(label) }, enabled = !isBusy,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    Text("CamaroDiagConnectors • USB CD/1")
+                                    Text(label, fontSize = 11.sp)
+                                    Text(stringResource(R.string.adapter_discovery_only), fontSize = 11.sp, color = TextMuted)
+                                }
+                            }
+                        }
+                    }
                     HorizontalDivider(color = TextMuted.copy(alpha = .25f))
                     Text(stringResource(R.string.wifi_connection_title), fontWeight = FontWeight.Bold)
                     OutlinedTextField(value = wifiHost, onValueChange = { wifiHost = it }, label = { Text(stringResource(R.string.adapter_ip_address)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -1196,6 +1365,50 @@ fun LiveDataScreen(
         )
     }
     val localeFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
+    // Android resources are authoritative for known signals. Legacy bilingual labels
+    // remain a fallback only for signals discovered outside the known catalog.
+    val sensorLabelResources = mapOf(
+        "RPM" to R.string.live_pid_rpm,
+        "ECT" to R.string.live_pid_ect,
+        "STFT" to R.string.live_pid_stft,
+        "LTFT" to R.string.live_pid_ltft,
+        "BAT" to R.string.live_pid_bat,
+        "SPD" to R.string.live_pid_speed,
+        "TPS" to R.string.live_pid_throttle,
+        "LOAD" to R.string.live_pid_load,
+        "MAP" to R.string.live_pid_map,
+        "IAT" to R.string.live_pid_iat,
+        "MAF" to R.string.live_pid_maf,
+        "ETHANOL" to R.string.live_pid_ethanol,
+        "OIL" to R.string.live_pid_oil,
+        "STFT_B2" to R.string.live_pid_stft_b2,
+        "LTFT_B2" to R.string.live_pid_ltft_b2,
+        "REL_TPS" to R.string.live_pid_rel_tps,
+        "CMD_TPS" to R.string.live_pid_cmd_tps,
+        "ABS_TPS_B" to R.string.live_pid_abs_tps_b,
+        "ABS_TPS_C" to R.string.live_pid_abs_tps_c,
+        "APP_D" to R.string.live_pid_app_d,
+        "APP_E" to R.string.live_pid_app_e,
+        "APP_F" to R.string.live_pid_app_f,
+        "ABS_LOAD" to R.string.live_pid_abs_load,
+        "AMBIENT" to R.string.live_pid_ambient,
+        "FUEL_PRESS" to R.string.live_pid_fuel_press,
+        "TIMING" to R.string.live_pid_timing,
+        "EQ_RATIO" to R.string.live_pid_eq_ratio,
+        "O2_B1S1" to R.string.live_pid_o2_b1s1,
+        "O2_B1S2" to R.string.live_pid_o2_b1s2,
+        "O2_B1S3" to R.string.live_pid_o2_b1s3,
+        "O2_B1S4" to R.string.live_pid_o2_b1s4,
+        "WBO2_B1S1" to R.string.live_pid_wbo2_b1s1,
+        "WBO2_B1S2" to R.string.live_pid_wbo2_b1s2,
+        "WBO2_B2S1" to R.string.live_pid_wbo2_b2s1,
+        "WBO2_B2S2" to R.string.live_pid_wbo2_b2s2
+    )
+    val sensorContext = LocalContext.current
+    val sensorLabels = liveCatalog.associate { signal ->
+        signal.id to (sensorLabelResources[signal.id]?.let(sensorContext::getString)
+            ?: if (localeFrench) signal.labelFr else signal.labelEn)
+    }
     val activePidIds = selectedPidIds ?: allPidIds
     val visiblePids = pids.filter { it.id in activePidIds }
 
@@ -1220,8 +1433,7 @@ fun LiveDataScreen(
                         items(
                             liveCatalog.filter { signal ->
                                 sensorQuery.isBlank() || signal.id.contains(sensorQuery, true) ||
-                                    signal.labelEn.contains(sensorQuery, true) ||
-                                    signal.labelFr.contains(sensorQuery, true)
+                                    sensorLabels[signal.id].orEmpty().contains(sensorQuery, true)
                             },
                             key = { it.id }
                         ) { signal ->
@@ -1242,7 +1454,7 @@ fun LiveDataScreen(
                                     }
                                 )
                                 Column {
-                                    Text(if (localeFrench) signal.labelFr else signal.labelEn)
+                                    Text(sensorLabels[signal.id] ?: signal.id)
                                     Text(signal.id, color = TextMuted, fontSize = 11.sp)
                                     if (!measured) {
                                         Text(stringResource(R.string.obd_sensor_not_measured),
@@ -1725,7 +1937,8 @@ fun CanSnifferScreen(
             }
             if (report.messages.isNotEmpty()) {
                 item {
-                    Text(stringResource(R.string.cal_trace_uds_services), color = CamaroAmber, fontWeight = FontWeight.Bold)
+                    val services = report.udsServices.joinToString { "0x" + it.toString(16).uppercase().padStart(2, '0') }
+                    Text(stringResource(R.string.cal_trace_uds_services, services), color = CamaroAmber, fontWeight = FontWeight.Bold)
                 }
                 items(report.messages.takeLast(30).asReversed()) { message ->
                     Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
@@ -2282,6 +2495,8 @@ fun SettingsScreen(
     lastConnectionProfile: SavedObdConnectionProfile?,
     sessions: List<com.camarodiag.gen5.data.db.SavedSessionEntity>,
     onLang: (AppLanguage) -> Unit,
+    followSystemLanguage: Boolean,
+    onFollowSystemLanguage: () -> Unit,
     onUnits: (UnitSystem) -> Unit,
     onDeleteSession: (com.camarodiag.gen5.data.db.SavedSessionEntity) -> Unit,
     onOpenVehicle: () -> Unit,
@@ -2289,6 +2504,34 @@ fun SettingsScreen(
 ) {
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
     var languageExpanded by remember { mutableStateOf(false) }
+    val languageFlags = mapOf(
+        AppLanguage.EN to "🇬🇧", AppLanguage.FR to "🇫🇷", AppLanguage.DE to "🇩🇪",
+        AppLanguage.IT to "🇮🇹", AppLanguage.ES to "🇪🇸", AppLanguage.HE to "🇮🇱",
+        AppLanguage.RU to "🇷🇺", AppLanguage.ZH to "🇨🇳", AppLanguage.JA to "🇯🇵",
+        AppLanguage.KO to "🇰🇷", AppLanguage.AR to "🇸🇦", AppLanguage.PT to "🇵🇹",
+        AppLanguage.NL to "🇳🇱", AppLanguage.EL to "🇬🇷",
+        AppLanguage.BG to "🇧🇬",
+        AppLanguage.HR to "🇭🇷",
+        AppLanguage.CS to "🇨🇿",
+        AppLanguage.DA to "🇩🇰",
+        AppLanguage.ET to "🇪🇪",
+        AppLanguage.FI to "🇫🇮",
+        AppLanguage.HU to "🇭🇺",
+        AppLanguage.GA to "🇮🇪",
+        AppLanguage.LV to "🇱🇻",
+        AppLanguage.LT to "🇱🇹",
+        AppLanguage.MT to "🇲🇹",
+        AppLanguage.PL to "🇵🇱",
+        AppLanguage.RO to "🇷🇴",
+        AppLanguage.SK to "🇸🇰",
+        AppLanguage.SL to "🇸🇮",
+        AppLanguage.SV to "🇸🇪"
+    )
+    val selectedLanguageLabel = if (followSystemLanguage) {
+        "📱 ${stringResource(R.string.system_language_follow_phone)}"
+    } else {
+        "${languageFlags[lang].orEmpty()} ${lang.label}"
+    }
     val currentVehicle = "${localizedGenerationName(vehicle.generation)} • ${vehicle.modelYear} Camaro ${vehicle.engine.rpo} • ${vehicle.transmission.code} • ${vehicle.market.code} • ${vehicle.vin.ifBlank { "VIN —" }}"
     val currentAdapter = if (adapter.tier == AdapterTier.DISCONNECTED) {
         stringResource(R.string.settings_adapter_not_connected)
@@ -2331,18 +2574,25 @@ fun SettingsScreen(
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(stringResource(R.string.system_language_title), fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.system_language_current, lang.label), color = CamaroAmber)
+                    Text(stringResource(R.string.system_language_current, selectedLanguageLabel), color = CamaroAmber)
                     Box {
                         OutlinedButton(onClick = { languageExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(lang.label)
+                            Text(selectedLanguageLabel)
                         }
                         DropdownMenu(
                             expanded = languageExpanded,
                             onDismissRequest = { languageExpanded = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("📱 ${stringResource(R.string.system_language_follow_phone)}") },
+                                onClick = {
+                                    onFollowSystemLanguage()
+                                    languageExpanded = false
+                                }
+                            )
                             AppLanguage.entries.forEach { option ->
                                 DropdownMenuItem(
-                                    text = { Text(option.label) },
+                                    text = { Text("${languageFlags[option].orEmpty()} ${option.label}") },
                                     onClick = {
                                         onLang(option)
                                         languageExpanded = false

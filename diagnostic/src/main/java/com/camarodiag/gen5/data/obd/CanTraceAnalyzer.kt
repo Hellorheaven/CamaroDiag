@@ -177,7 +177,7 @@ object CanTraceAnalyzer {
     private const val MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS = 1.0
 
     private val ascFrameRegex = Regex(
-        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
+        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})(?:x)?\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
         RegexOption.IGNORE_CASE
     )
 
@@ -186,7 +186,7 @@ object CanTraceAnalyzer {
     )
 
     fun analyze(text: String, sourceName: String = "trace.asc"): CanTraceAnalysisReport {
-        val lines = text.lineSequence().toList()
+        val lines = text.removePrefix("\uFEFF").lineSequence().toList()
         val ascLike = sourceName.endsWith(".asc", true) || lines.any { ascFrameRegex.matches(it) }
         val csvLike = sourceName.endsWith(".csv", true)
         val elmLike = lines.any { elmFrameRegex.matches(it) }
@@ -536,16 +536,26 @@ object CanTraceAnalyzer {
         val headerLineIndex = lines.indexOfFirst { it.isNotBlank() && !it.trimStart().startsWith("#") }
         if (headerLineIndex < 0) return ParsedFrames(emptyList(), listOf("CSV trace is empty."))
 
-        val delimiter = if (lines[headerLineIndex].count { it == ';' } >
-            lines[headerLineIndex].count { it == ',' }) ';' else ','
-        val headers = splitCsvLine(lines[headerLineIndex], delimiter)
-            .map { it.trim().trim('"').lowercase(Locale.ROOT).replace(" ", "_") }
+        val header = lines[headerLineIndex]
+        val delimiter = listOf(',', ';', '\t').maxBy { candidate ->
+            splitCsvLine(header, candidate)?.size ?: 0
+        }
+        val headerFields = splitCsvLine(lines[headerLineIndex], delimiter)
+            ?: return ParsedFrames(emptyList(), listOf("CSV header contains an unclosed quote."))
+        val headers = headerFields.map { it.trim().trim('"').lowercase(Locale.ROOT).replace(" ", "_") }
         val timestampIndex = headers.indexOfFirst { it in setOf("timestamp", "time", "seconds", "time_s") }
         val canIdIndex = headers.indexOfFirst { it in setOf("can_id", "canid", "arbitration_id", "id") }
         val directionIndex = headers.indexOfFirst { it in setOf("direction", "dir", "tx_rx") }
         val dataIndex = headers.indexOfFirst { it in setOf("data", "payload", "bytes", "frame_data") }
         val dlcIndex = headers.indexOfFirst { it == "dlc" }
-        val dataByteIndexes = headers.indices.filter { headers[it].matches(Regex("(data|byte)_?([0-9]|[1-5][0-9]|6[0-3])")) }
+        val byteHeader = Regex("(?:data|byte)_?([0-9]|[1-5][0-9]|6[0-3])")
+        val byteColumns = headers.mapIndexedNotNull { index, header ->
+            byteHeader.matchEntire(header)?.let { it.groupValues[1].toInt() to index }
+        }.sortedBy { it.first }
+        val dataByteIndexes = byteColumns.map { it.second }
+        if (dataIndex < 0 && byteColumns.withIndex().any { (position, column) -> position != column.first }) {
+            return ParsedFrames(emptyList(), listOf("CSV byte columns must be consecutive and unique starting at zero."))
+        }
         if (canIdIndex < 0 || (dataIndex < 0 && dataByteIndexes.isEmpty())) {
             return ParsedFrames(emptyList(), listOf("CSV needs a CAN ID column and a data/payload column (or data0…data63 columns)."))
         }
@@ -554,6 +564,10 @@ object CanTraceAnalyzer {
             val line = lines[lineIndex]
             if (line.isBlank() || line.trimStart().startsWith("#")) continue
             val fields = splitCsvLine(line, delimiter)
+            if (fields == null) {
+                errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
+                continue
+            }
             fun field(index: Int): String = fields.getOrNull(index).orEmpty().trim().trim('"')
             val canId = parseCanId(field(canIdIndex))
             val dlcText = if (dlcIndex >= 0) field(dlcIndex) else ""
@@ -565,7 +579,8 @@ object CanTraceAnalyzer {
             val timestampText = if (timestampIndex >= 0) field(timestampIndex) else ""
             val timestamp = when {
                 timestampIndex < 0 || timestampText.isBlank() -> null
-                else -> timestampText.toDoubleOrNull()?.takeIf { it.isFinite() }
+                else -> (if (delimiter == ';') timestampText.replace(',', '.') else timestampText)
+                    .toDoubleOrNull()?.takeIf { it.isFinite() }
             }
             if (timestampIndex >= 0 && timestampText.isNotBlank() && timestamp == null) {
                 errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
@@ -583,8 +598,9 @@ object CanTraceAnalyzer {
                     null
                 } else {
                     val values: List<Int?> = rawValues.take(byteCount).map { value: String ->
-                        if (value.isBlank()) null else value.removePrefix("0x").removePrefix("0X")
-                            .toIntOrNull(16)?.takeIf { byte -> byte in 0..0xFF }
+                        val hex = value.removePrefix("0x").removePrefix("0X")
+                        hex.takeIf { it.length in 1..2 && it.all { c -> c.digitToIntOrNull(16) != null } }
+                            ?.toIntOrNull(16)
                     }
                     if (values.any { byte -> byte == null }) null else values.filterNotNull()
                 }
@@ -600,7 +616,7 @@ object CanTraceAnalyzer {
         return ParsedFrames(frames, errors)
     }
 
-    private fun splitCsvLine(line: String, delimiter: Char): List<String> {
+    private fun splitCsvLine(line: String, delimiter: Char): List<String>? {
         val fields = mutableListOf<String>()
         val current = StringBuilder()
         var quoted = false
@@ -621,19 +637,20 @@ object CanTraceAnalyzer {
             }
             index++
         }
+        if (quoted) return null
         fields += current.toString()
         return fields
     }
 
     private fun parseHexBytes(text: String): List<Int>? {
         val cleaned = text.trim()
-            .replace(Regex("(?i)0x"), "")
             .replace(Regex("[\\[\\]{}():|]"), " ")
         if (cleaned.isBlank()) return emptyList()
         val tokens = cleaned.split(Regex("[\\s,;]+")).filter(String::isNotBlank)
         val bytes = mutableListOf<Int>()
-        for (token in tokens) {
-            if (token.length % 2 != 0 || token.any { it.digitToIntOrNull(16) == null }) return null
+        for (raw in tokens) {
+            val token = raw.removePrefix("0x").removePrefix("0X")
+            if (token.isEmpty() || token.length % 2 != 0 || token.any { it.digitToIntOrNull(16) == null }) return null
             token.chunked(2).forEach { pair -> bytes += pair.toInt(16) }
         }
         return bytes

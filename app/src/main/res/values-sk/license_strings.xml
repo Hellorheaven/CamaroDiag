@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="license_feature_summary">Bezplatne: živé údaje, čítanie a mazanie DTC. Osobná licencia odomyká pokročilé funkcie. Nástroje ladenia sú vyhradené vlastníkovi.</string>
+    <string name="license_account_link">Licencia je prepojená s účtom Firebase a overenou prihlasovacou e-mailovou adresou.</string>
+    <string name="license_no_browser">Nie je k dispozícii žiadny prehliadač.</string>
+    <string name="license_checkout_unavailable">Nákup nie je dostupný. Je potrebné nastaviť fakturáciu Firebase/Stripe.</string>
+    <string name="license_activation_help">Licencia sa aktivuje po potvrdení platby serverom. Vráťte sa sem a ťuknite na Obnoviť. Samotné presmerovanie licenciu neudelí.</string>
+    <string name="license_required_for_feature">Ak chcete používať túto funkciu, aktivujte licenciu pre prihlásený účet.</string>
+</resources>
