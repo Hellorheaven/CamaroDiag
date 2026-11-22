@@ -2306,7 +2306,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _vehicle.value == profile && hasPremiumLicense() &&
             activeCanCaptureFile == selectedArchive &&
             !_liveCanMonitorState.value.isCapturing &&
-            !_liveCanMonitorState.value.isSendingRequest
+            !_liveCanMonitorState.value.isSendingRequest &&
+            _liveCanMonitorState.value.consoleHistory == history &&
+            _liveCanMonitorState.value.rawText == snapshot.rawText
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (!current()) return@launch
