@@ -759,7 +759,7 @@
     <string name="can_console_rx">RX • REÇU</string>
     <string name="can_console_system">SYSTÈME</string>
     <string name="can_console_input_label">Trame ou commande OBD</string>
-    <string name="can_console_input_hint">Trame CAN : 7E0 02 01 0C • Requête OBD : 01 0C</string>
+    <string name="can_console_input_hint">CAN brut : 7E0 02 01 0C • Lecture OBD : 010C, 0152 (si pris en charge), 0902</string>
     <string name="can_console_sending">Envoi en cours…</string>
 
     <string name="can_console_adapter_ack">Réponse de l’interface (pas une trame RX ECU) : %1$s</string>
