@@ -1242,12 +1242,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 check(obdManager.isJ2534BridgeConnected()) {
                     "A real J2534 adapter must be connected."
                 }
+                var acquired: J2534LiveMemoryBackup.CaptureResult? = null
                 val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
-                    category = CamaroDiagExportStorage.Category.ECU_BACKUPS, beforePublish = {
-                        check(current())
+                    category = CamaroDiagExportStorage.Category.ECU_BACKUPS,
+                    beforePublish = { check(current()) },
+                    verifyStaged = { staged ->
+                        check(current()) { "ECU backup context changed before ZIP verification." }
+                        val capture = checkNotNull(acquired) {
+                            "No complete ECU acquisition was returned for this ZIP."
+                        }
+                        val restored = EcuBackupArchive.import(
+                            staged, EcuBackupArchive.MAX_J2534_IMPORT_UNCOMPRESSED_BYTES
+                        )
+                        val original = capture.manifest.entries.single()
+                        val entry = restored.manifest.entries.single()
+                        check(restored.verification.consistent &&
+                            restored.manifest.vehicleVin == request.expectedVin &&
+                            restored.manifest.channel?.diagnosticSession == request.diagnosticSession &&
+                            entry == original &&
+                            entry.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ &&
+                            entry.region == request.region &&
+                            entry.startAddress == request.address &&
+                            entry.expectedBytes == request.lengthBytes.toLong() &&
+                            restored.manifest.coverage.status == EcuBackupCoverage.Status.PARTIAL &&
+                            !restored.manifest.hardwareProvenanceVerified
+                        ) { "Staged ECU backup ZIP differs from the verified physical acquisition." }
                     }
                 ) { output ->
-                    obdManager.captureAndExportJ2534Memory(request, output) { progress ->
+                    acquired = obdManager.captureAndExportJ2534Memory(request, output) { progress ->
                         check(current()) { "Vehicle or account changed while ECU memory was being read." }
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                             j2534MemoryCaptureBytesRead = progress.totalBytesRead,

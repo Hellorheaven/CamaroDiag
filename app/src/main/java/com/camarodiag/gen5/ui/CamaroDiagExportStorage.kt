@@ -222,8 +222,11 @@ internal object CamaroDiagExportStorage {
      * A sudden process or device crash may leave a .partial document, never a completed filename.
      */
     suspend fun write(context: Context, requested: String, mimeType: String,
-        category: Category, beforePublish: () -> Unit = {}, writeBytes: suspend (OutputStream) -> Unit): String =
-        writeNamed(context, uniqueFileName(requested), mimeType, category, beforePublish, writeBytes)
+        category: Category, beforePublish: () -> Unit = {},
+        verifyStaged: (suspend (InputStream) -> Unit)? = null,
+        writeBytes: suspend (OutputStream) -> Unit): String =
+        writeNamed(context, uniqueFileName(requested), mimeType, category,
+            beforePublish, verifyStaged, writeBytes)
 
     // Controlled name for a verified APK; all ordinary exports remain unique.
     internal suspend fun writeArchivedApk(context: Context, name: String, file: java.io.File): String {
@@ -234,7 +237,9 @@ internal object CamaroDiagExportStorage {
     }
 
     private suspend fun writeNamed(context: Context, finalName: String, mimeType: String,
-        category: Category, beforePublish: () -> Unit, writeBytes: suspend (OutputStream) -> Unit): String =
+        category: Category, beforePublish: () -> Unit,
+        verifyStaged: (suspend (InputStream) -> Unit)? = null,
+        writeBytes: suspend (OutputStream) -> Unit): String =
         withContext(Dispatchers.IO) {
             require(mimeType.isNotBlank())
             val resolver = context.contentResolver
@@ -268,6 +273,15 @@ internal object CamaroDiagExportStorage {
                     ?: throw ExportStorageException("Could not read back export document.")
                 if (expected.length == 0L || expected != actual)
                     throw ExportStorageException("Export readback differs from written bytes.")
+                // A byte-identical ZIP can still contain incomplete or
+                // inconsistent ECU backup metadata. Reopen the ACTUAL staged
+                // document and validate its full format before publication.
+                verifyStaged?.let { verify ->
+                    val reopened = storageOperation {
+                        resolver.openInputStream(temporary)
+                    } ?: throw ExportStorageException("Could not reopen staged ECU backup.")
+                    reopened.use { verify(it) }
+                }
                 currentCoroutineContext().ensureActive()
                 beforePublish()
                 val finalDocument = storageOperation { DocumentsContract.renameDocument(resolver, temporary, finalName) }
