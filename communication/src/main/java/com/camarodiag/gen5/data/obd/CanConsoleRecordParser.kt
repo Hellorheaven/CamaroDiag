@@ -26,9 +26,22 @@ object CanConsoleAdapterReplyPolicy {
         if (lines.any { it.equals("OK", ignoreCase = true) }) return true
         val frames = lines.flatMap { RawCanFrameParser.parseReceivedFrames(it) }
         if (request == null) return frames.isNotEmpty()
+        if (!request.isExtended && request.canId == 0x7DFL) {
+            // Functional OBD is broadcast. Assemble each physical responder in
+            // a different context; never mix consecutive frames from different ECUs.
+            val responders = mutableMapOf<Long, CanConsoleDiagnosticCorrelation>()
+            return frames.any { frame ->
+                if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) false
+                else {
+                    val matcher = responders.getOrPut(frame.canId) {
+                        CanConsoleDiagnosticCorrelation(request.copy(canId = frame.canId - 8L))
+                    }
+                    matcher.accept(frame, 0L) != null
+                }
+            }
+        }
         if (CanConsoleEcuRouting.expectedResponder(request) == null) {
-            // Unknown raw CAN ID has no trusted diagnostic correlation. It needs
-            // an explicit adapter ACK, not a coincidental bus frame.
+            // Unknown raw CAN IDs need an explicit adapter ACK, not unrelated traffic.
             return false
         }
         val matcher = runCatching { CanConsoleDiagnosticCorrelation(request) }.getOrNull()
