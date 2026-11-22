@@ -18,7 +18,7 @@ class EcuBackupIntegrityTest {
         )
 
     private fun manifest(captures: List<EcuBackupManifest.Capture>) =
-        EcuBackupManifest.inspect("test", 0L, captures, required)
+        EcuBackupManifest.inspect("test", 1L, captures, required)
 
     @Test fun consistentBytesAndManifestPassOfflineCheck() {
         val captures = listOf(capture())
@@ -147,6 +147,16 @@ class EcuBackupIntegrityTest {
         val result = EcuBackupIntegrity.verify(emptyManifest, captures, required)
         assertFalse(result.consistent)
         assertTrue(EcuBackupIntegrity.Problem.EMPTY_BACKUP in result.problems)
+    }
+
+    @Test fun invalidAcquisitionTimestampCannotPassOfflineIntegrityCheck() {
+        val captures = listOf(capture())
+        for (timestamp in listOf(0L, -1L, Long.MIN_VALUE)) {
+            val invalid = manifest(captures).copy(createdAtUtcMillis = timestamp)
+            val result = EcuBackupIntegrity.verify(invalid, captures, required)
+            assertFalse(result.consistent)
+            assertTrue(EcuBackupIntegrity.Problem.INVALID_CAPTURE_TIMESTAMP in result.problems)
+        }
     }
 
 }
