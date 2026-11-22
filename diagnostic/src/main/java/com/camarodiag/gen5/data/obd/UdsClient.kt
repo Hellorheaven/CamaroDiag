@@ -138,6 +138,17 @@ data class UdsAccessPolicy internal constructor(
             require(safeDtcGroups.all { it in 0..0xFFFFFF })
             require(safeEcuResets.all { it in 1..0x7F })
             require(maxTransferBytes >= 0)
+            val mutatingCapabilitiesGranted = safeWriteDids.isNotEmpty() ||
+                safeWritableRegions.isNotEmpty() || safeRoutineControls.isNotEmpty() ||
+                safeIoControls.isNotEmpty() || safeCommunicationControls.isNotEmpty() ||
+                safeDtcSettings.isNotEmpty() || safeDtcGroups.isNotEmpty() ||
+                safeEcuResets.isNotEmpty()
+            require(!mutatingCapabilitiesGranted || requireSecurityAccess) {
+                "A verified ECU policy cannot grant state-changing operations without SecurityAccess."
+            }
+            require(!mutatingCapabilitiesGranted || safeSecurityLevels.isNotEmpty()) {
+                "State-changing ECU permissions require an explicit SecurityAccess level."
+            }
             return UdsAccessPolicy(
                 safeReadDids, safeWriteDids, safeSessions, safeRoutineControls, safeIoControls,
                 safeSecurityLevels, safeCommunicationControls, safeDtcSettings,
