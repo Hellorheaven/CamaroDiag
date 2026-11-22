@@ -301,6 +301,15 @@ internal static class BridgeSelfTests
             try { J2534MemoryReadScope.Load(scopedFile); }
             catch (ArgumentException) { invalidRegion = true; }
             Assert(invalidRegion, "Invented full-ECU region type cannot be selected");
+            foreach (var badRegion in new[] { "null", "123", "true", "{}" })
+            {
+                File.WriteAllText(scopedFile,
+                    scopedJson[..^1] + ",\"region\":" + badRegion + "}");
+                var rejectedType = false;
+                try { J2534MemoryReadScope.Load(scopedFile); }
+                catch (ArgumentException) { rejectedType = true; }
+                Assert(rejectedType, "Non-string region is rejected as a profile error");
+            }
             Assert(loaded.AllowsReadMemory(new byte[] {
                 0x23, 0x14, 0x80, 0x00, 0x10, 0x00, 0x20 }), "Parsed read profile usable");
             File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"allowWrite\":true}");

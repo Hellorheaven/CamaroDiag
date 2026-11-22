@@ -111,6 +111,8 @@ internal sealed class J2534MemoryReadScope
             {
                 if (seenRegion)
                     throw new ArgumentException("Duplicate profile region.");
+                if (property.Value.ValueKind != JsonValueKind.String)
+                    throw new ArgumentException("ECU memory region must be a declared string.");
                 seenRegion = true;
                 continue;
             }
