@@ -49,7 +49,7 @@ La connexion d'un adaptateur ne garantit pas l'accès à tous les réseaux GM. L
 
 ## CamaroDiagConnectors — connexion native Android
 
-Le logiciel CamaroDiagConnectors est désormais développé dans ce dépôt sous [`connectors/`](connectors/README.md), avec les CI et issues communes. Le matériel, les schémas, PCB, brochages et documents électriques sont également centralisés dans [`connectors/hardware/`](connectors/hardware/README.md) et [`connectors/docs/`](connectors/docs/). L'ancien dépôt reste une archive historique. Il communiquera directement avec Android, sans ordinateur ni pont Windows obligatoire. Les interfaces J2534 tierces existantes continuent à utiliser leur propre chemin de connexion.
+Le logiciel CamaroDiagConnectors est désormais développé dans ce dépôt sous [`connectors/`](connectors/README.md), avec les CI et issues communes. Le matériel, les schémas, PCB, brochages et documents électriques sont également centralisés dans [`connectors/hardware/`](connectors/hardware/README.md) et [`connectors/docs/`](connectors/docs/). Le code et la documentation sont intégralement suivis ici. Il communiquera directement avec Android, sans ordinateur ni pont Windows obligatoire. Les interfaces J2534 tierces existantes continuent à utiliser leur propre chemin de connexion.
 
 Pour la version prototype 0.1.0, la seule fonction disponible est la découverte USB de la carte isolée, **sans raccordement au véhicule ni à une mémoire** :
 

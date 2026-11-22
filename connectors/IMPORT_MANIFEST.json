@@ -1,5 +1,5 @@
 {
-  "sourceRepository": "Hellorheaven/CamaroDiagConnectors",
+  "sourceRepository": "snapshot historique integre a CamaroDiag/connectors",
   "sourceCommit": "81b578571a56c8d96b46932f24c55f34aacd1a65",
   "sourceInitialCommit": "c049141be903816b13ff62d1e188c377f7ddebb4",
   "files": [
@@ -424,5 +424,5 @@
       "kind": "source-copy"
     }
   ],
-  "governance": "Full monorepo: software AND hardware, original repository historical; source snapshot includes original main and PR6."
+  "governance": "Monorepo CamaroDiag: logiciel, materiel, tests et suivi centralises; aucun depot externe necessaire."
 }
