@@ -1992,10 +1992,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
-                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = true) else it } +
+                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = hasEcuResponse) else it } +
                                 receivedEvents
                         ).takeLast(300),
-                        message = localizedContext.getString(R.string.can_sniffer_request_complete)
+                        message = localizedContext.getString(
+                            if (hasEcuResponse) R.string.can_sniffer_request_complete
+                            else R.string.can_sniffer_request_failed
+                        )
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -2074,10 +2077,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendReadOnlyConsoleCommand(request)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val hasEcuResponse =
-                        Regex("(?i)(?:^|\\s)(?:41|43|47|49|4A|7F)(?:\\s|$)")
-                            .containsMatchIn(response) ||
-                            RawCanFrameParser.parseReceivedFrames(response).isNotEmpty()
+                    val hasEcuResponse = SafeObdRequestPolicy.hasPositiveResponse(request, response)
                     val responseEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = if (hasEcuResponse) "RX" else "SYSTEM",
