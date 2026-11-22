@@ -892,6 +892,8 @@
     <string name="cal_live_memory_notice">La passerelle Windows doit disposer d’une carte mémoire approuvée et liée au VIN. Lecture seule, sans écriture ECU.</string>
     <string name="cal_live_memory_length">Octets à lire (4 Mio maximum)</string>
     <string name="cal_live_memory_region_calibration">Calibration</string>
+    <string name="cal_live_memory_region_other">Non qualifiée / inconnue</string>
+    <string name="cal_live_memory_region_profile_match">La région, la plage d’adresses, la taille des blocs et la session doivent correspondre au profil de lecture J2534 Windows. Une région inconnue ne constitue pas une sauvegarde ECU complète.</string>
     <string name="cal_live_memory_extended">Session de diagnostic étendue (0x03)</string>
     <string name="cal_live_memory_save">Lire deux fois et sauvegarder la mémoire ECU en ZIP</string>
     <string name="cal_live_memory_partial_notice">Plage mémoire partielle uniquement. Cette archive ne constitue ni une sauvegarde complète de l’ECU ni une image dont la restauration est démontrée.</string>

@@ -268,7 +268,7 @@ fun CalibrationWorkspaceScreen(
     var memoryReadAddressHex by remember { mutableStateOf("") }
     var memoryReadLengthText by remember { mutableStateOf("") }
     var memoryReadSessionExtended by remember { mutableStateOf(false) }
-    var memoryReadRegion by remember { mutableStateOf(EcuBackupCoverage.Region.CALIBRATION) }
+    var memoryReadRegion by remember { mutableStateOf(EcuBackupCoverage.Region.OTHER) }
     var memoryReadRegionMenuExpanded by remember { mutableStateOf(false) }
     var expertExpanded by remember { mutableStateOf(false) }
     var expertControllerFamily by remember { mutableStateOf("") }
@@ -766,7 +766,7 @@ fun CalibrationWorkspaceScreen(
                                         EcuBackupCoverage.Region.EXTERNAL_EEPROM ->
                                             stringResource(R.string.cal_expert_region_eeprom)
                                         EcuBackupCoverage.Region.OTHER ->
-                                            stringResource(R.string.cal_expert_region_title)
+                                            stringResource(R.string.cal_live_memory_region_other)
                                     })
                                 }
                                 DropdownMenu(
@@ -774,6 +774,7 @@ fun CalibrationWorkspaceScreen(
                                     onDismissRequest = { memoryReadRegionMenuExpanded = false }
                                 ) {
                                     listOf(
+                                        EcuBackupCoverage.Region.OTHER,
                                         EcuBackupCoverage.Region.CALIBRATION,
                                         EcuBackupCoverage.Region.PROGRAM_FLASH,
                                         EcuBackupCoverage.Region.DATA_FLASH,
@@ -790,7 +791,7 @@ fun CalibrationWorkspaceScreen(
                                                 EcuBackupCoverage.Region.EXTERNAL_EEPROM ->
                                                     stringResource(R.string.cal_expert_region_eeprom)
                                                 EcuBackupCoverage.Region.OTHER ->
-                                                    stringResource(R.string.cal_expert_region_title)
+                                                    stringResource(R.string.cal_live_memory_region_other)
                                             }) },
                                             onClick = {
                                                 memoryReadRegion = region
@@ -800,6 +801,10 @@ fun CalibrationWorkspaceScreen(
                                     }
                                 }
                             }
+                            Text(
+                                stringResource(R.string.cal_live_memory_region_profile_match),
+                                color = TextMuted, fontSize = 11.sp
+                            )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(
                                     checked = memoryReadSessionExtended,
