@@ -1222,7 +1222,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534MemoryCapturing = false,
                     j2534MemoryCaptureMessage =
-                        localizedContext.getString(R.string.cal_live_memory_saved) + "\n" + savedPath
+                        localizedContext.getString(R.string.cal_live_memory_saved) + "\n" +
+                            localizedContext.getString(R.string.cal_live_memory_partial_notice) + "\n" +
+                            savedPath
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
