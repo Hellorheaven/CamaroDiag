@@ -930,4 +930,7 @@
     <string name="export_folder_instruction">Créez ou sélectionnez le dossier CamaroDiag dans le stockage interne, puis autorisez son accès. Les exports sont visibles dans le stockage partagé.</string>
     <string name="export_folder_success">Export enregistré dans /CamaroDiag/.</string>
     <string name="export_folder_failed">Impossible d’enregistrer l’export dans /CamaroDiag/.</string>
+    <string name="can_console_filter_all_ecus">Tous les identifiants CAN observés (surveillance globale)</string>
+    <string name="can_console_filter_observed_id">Identifiant CAN observé 0x%1$s</string>
+    <string name="can_console_filter_observed_note">Seuls les identifiants CAN réellement observés sur le bus connecté sont proposés. Un identifiant ne suffit pas à identifier un calculateur. Ce filtre agit uniquement sur l’affichage.</string>
 </resources>
