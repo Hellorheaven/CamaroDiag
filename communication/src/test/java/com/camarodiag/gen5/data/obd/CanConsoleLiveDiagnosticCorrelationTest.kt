@@ -175,6 +175,25 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals(1_800_000_000_101L, error.receivedRecords.single().timestampMillis)
     }
 
+    @Test fun physicalCanTxConfirmationNeverUsesForeignEcuRxAsSuccess() {
+        fun confirmed(
+            output: String, status: CanConsoleDiagnosticStatus,
+            ack: Boolean = false, error: Boolean = false
+        ): Boolean = CanConsolePhysicalTransmissionPolicy.confirmed(output, status, ack, error)
+
+        assertEquals(true, confirmed("OK", CanConsoleDiagnosticStatus.NONE, ack = true))
+        assertEquals(true, confirmed("7E8 04 03 41 0C 1A", CanConsoleDiagnosticStatus.POSITIVE))
+        assertEquals(true, confirmed("7E8 04 03 7F 22 31", CanConsoleDiagnosticStatus.NEGATIVE))
+        assertEquals(false, confirmed("7E9 04 03 41 0C 1B", CanConsoleDiagnosticStatus.NONE))
+        assertEquals(false, confirmed("SEARCHING...", CanConsoleDiagnosticStatus.NONE))
+        assertEquals(false, confirmed("NO DATA", CanConsoleDiagnosticStatus.NONE, ack = true))
+        assertEquals(false, confirmed("OK\r\nCAN ERROR",
+            CanConsoleDiagnosticStatus.POSITIVE, ack = true, error = true))
+        // A late CAN ERROR outside a 1024-char reply prefix is authoritative.
+        assertEquals(false, confirmed("OK",
+            CanConsoleDiagnosticStatus.POSITIVE, ack = true, error = true))
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
