@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Jazyk aplikácie</string>
     <string name="system_language_hint">Vyberte jazyk aplikácie CamaroDiag.</string>
     <string name="about_title">O aplikácii CamaroDiag</string>
@@ -637,7 +637,7 @@
     <string name="cal_pc_ip_address">IP adresa počítača</string>
     <string name="cal_connect_j2534">Pripojiť most J2534</string>
     <string name="cal_disconnect_pc_bridge">Odpojiť most PC</string>
-    <string name="cal_bridge_capabilities">Most: HS-CAN ISO15765 250/500 kbit/s a J2534-2 SW-ISO15765, ak ich ovládač podporuje. CAN FD zostáva vypnuté.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Most: HS-CAN ISO15765 250/500 kbit/s a J2534-2 SW-ISO15765, ak ich ovládač podporuje. CAN FD zostáva vypnuté.</string>
     <string name="cal_read_uds_did">Načítať UDS DID</string>
     <string name="cal_read_uds_dtcs">Načítať UDS DTC</string>
     <string name="cal_uds_trouble_codes">Chybové kódy UDS (0x19)</string>
