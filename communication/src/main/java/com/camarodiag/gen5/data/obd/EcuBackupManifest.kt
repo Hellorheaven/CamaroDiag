@@ -58,6 +58,7 @@ object EcuBackupManifest {
                 bytesCaptured = capture.firstRead.size.toLong(),
                 sha256 = EcuBenchExpertPlan.sha256Hex(capture.firstRead),
                 readsIdentical = capture.independentRead != null &&
+                    capture.firstRead !== capture.independentRead &&
                     EcuBenchExpertPlan.verifiedReadback(capture.firstRead, capture.independentRead),
                 origin = capture.origin
             )
