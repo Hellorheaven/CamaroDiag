@@ -219,12 +219,37 @@ class J2534StandardObdTest {
     @Test fun j2534ConsoleCanReadEcuNameViaStandardMode09Pid0A() {
         val request = requireNotNull(SafeObdRequestPolicy.parse("090A"))
         J2534BridgeTransport.validateReadOnlyConsoleReply(request,
-            bytes(0x49, 0x0A, 0x01, 0x45, 0x43, 0x4D))
+            bytes(0x49, 0x0A, 0x01) +
+                "ECM".padEnd(20, ' ').toByteArray(Charsets.US_ASCII))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(request,
+                bytes(0x49, 0x0A, 0x01, 0x45, 0x43, 0x4D))
+        }
         assertThrows(IllegalArgumentException::class.java) {
             J2534BridgeTransport.validateReadOnlyConsoleReply(request,
                 bytes(0x49, 0x04, 0x01, 0x45))
         }
         assertEquals("090A", request.elmCommand)
+    }
+
+    @Test fun j2534ConsoleCalibrationAndCvnRequireCompleteMode09Records() {
+        val cal = requireNotNull(SafeObdRequestPolicy.parse("0904"))
+        val cvn = requireNotNull(SafeObdRequestPolicy.parse("0906"))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(cal,
+            bytes(0x49, 0x04, 0x01) +
+                "12612345".padEnd(16, ' ').toByteArray(Charsets.US_ASCII))
+        J2534BridgeTransport.validateReadOnlyConsoleReply(cvn,
+            bytes(0x49, 0x06, 0x01, 0x12, 0x34, 0xAB, 0xCD))
+        for ((request, data) in listOf(
+            cal to bytes(0x49, 0x04, 0x01, 0x31),
+            cvn to bytes(0x49, 0x06, 0x01, 0x12, 0x34),
+            cvn to bytes(0x49, 0x06, 0x00),
+            cvn to bytes(0x49, 0x06, 0x02, 0x12, 0x34, 0xAB, 0xCD)
+        )) {
+            assertThrows(IllegalArgumentException::class.java) {
+                J2534BridgeTransport.validateReadOnlyConsoleReply(request, data)
+            }
+        }
     }
 
 }
