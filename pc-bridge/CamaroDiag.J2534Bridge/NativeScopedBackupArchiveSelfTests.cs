@@ -116,7 +116,7 @@ internal static class NativeScopedBackupArchiveSelfTests
                 converted.GetEntry("manifest.properties")!.Delete();
                 using var writer = new StreamWriter(converted.CreateEntry("manifest.properties").Open());
                 writer.Write("#CamaroDiag ECU offline archive v2\n#Sun Nov 22 2026\n");
-                writer.Write(androidManifest.Replace("controller=\n", "controller=E39A\n")
+                writer.Write(androidManifest.Replace("controller=\n", "controller=LFX\\u00E9\\=ECU\n")
                     .Replace("capture.0.region=OTHER\n", "capture.0.region=CALIBRATION\n")
                     .Replace("capture.0.origin=REPORTED_HARDWARE_READ\n",
                         "capture.0.origin=IMPORTED_FILE\n")
@@ -127,6 +127,23 @@ internal static class NativeScopedBackupArchiveSelfTests
             Check(NativeScopedBackupImport.VerifyZip(androidStylePath, scope).Bytes.SequenceEqual(bytes),
                 "Java Properties comment headers remain importable");
             File.Delete(androidStylePath);
+            foreach (var malformedLabel in new[] {
+                @"Bad\uZZZZ", @"Bad\u123", @"Bad\q", @"Bad\", "Bad=ECU"
+            })
+            {
+                var invalidLabelPath = Path.Combine(directory, "bad-controller.zip");
+                File.WriteAllBytes(invalidLabelPath, originalZip);
+                using (var invalidZip = ZipFile.Open(invalidLabelPath, ZipArchiveMode.Update))
+                {
+                    invalidZip.GetEntry("manifest.properties")!.Delete();
+                    using var writer = new StreamWriter(invalidZip.CreateEntry("manifest.properties").Open());
+                    writer.Write(androidManifest.Replace("controller=\n",
+                        "controller=" + malformedLabel + "\n"));
+                }
+                Reject<InvalidDataException>(() =>
+                    NativeScopedBackupImport.VerifyZip(invalidLabelPath, scope));
+                File.Delete(invalidLabelPath);
+            }
             var oversizedLabelPath = Path.Combine(directory, "oversized-label.zip");
             File.WriteAllBytes(oversizedLabelPath, originalZip);
             using (var labelZip = ZipFile.Open(oversizedLabelPath, ZipArchiveMode.Update))
