@@ -80,7 +80,8 @@ object CanConsoleEcuRouting {
  * Diagnostic correlation is a separate operation and must never relabel traffic. */
 /** Transport-level failure: adapter configuration is no longer trusted.
  * The caller must stop the physical session before another diagnostic request. */
-class CanAdapterRestorationException : IllegalStateException()
+class CanAdapterRestorationException(val originalTransportKind: String? = null) :
+    IllegalStateException()
 
 object CanConsoleAdapterRestorationPolicy {
     /** Adapter AT configuration changes require an explicit OK, not ECU traffic. */
