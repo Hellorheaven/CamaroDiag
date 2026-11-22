@@ -934,4 +934,7 @@
     <string name="can_console_filter_observed_id">Identifiant CAN observé 0x%1$s</string>
     <string name="can_console_filter_observed_note">Seuls les identifiants CAN réellement observés sur le bus connecté sont proposés. Un identifiant ne suffit pas à identifier un calculateur. Ce filtre agit uniquement sur l’affichage.</string>
     <string name="can_console_filter_verified_ecu">Calculateur identifié : %1$s (CAN 0x%2$s)</string>
+    <string name="can_monitor_format_11">Capture CAN 11 bits</string>
+    <string name="can_monitor_format_29">Capture CAN 29 bits</string>
+    <string name="can_monitor_format_notice">L’interface physique surveille un seul format CAN à la fois ; les autres bus et formats non pris en charge ne sont pas visibles pendant cette session.</string>
 </resources>
