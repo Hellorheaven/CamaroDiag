@@ -68,6 +68,22 @@ class ProfiledUdsModuleInventoryTest {
         assertEquals(0, opened)
     }
 
+    @Test fun allSixCoreModulesAreListedWithoutGuessingTheirCanAddresses() = runBlocking {
+        var hardwareProbes = 0
+        val results = ProfiledUdsModuleInventory.scan(vehicle, emptyList(), {
+            hardwareProbes++
+            Frames()
+        })
+        assertEquals(listOf("ECM", "TCM", "BCM", "IPC", "EBCM", "SDM"),
+            results.map { it.moduleId })
+        assertEquals(ProfiledUdsModuleInventory.Status.NOT_EQUIPPED,
+            results.single { it.moduleId == "TCM" }.status)
+        assertTrue(results.filter { it.moduleId != "TCM" }.all {
+            it.status == ProfiledUdsModuleInventory.Status.PROFILE_REQUIRED
+        })
+        assertEquals(0, hardwareProbes)
+    }
+
     @Test fun manualCamaroDoesNotProbeAnUnfittedTcm() = runBlocking {
         var opened = 0
         val result = ProfiledUdsModuleInventory.scan(
