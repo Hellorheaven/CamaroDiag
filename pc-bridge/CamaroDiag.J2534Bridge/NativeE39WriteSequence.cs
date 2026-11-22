@@ -3,8 +3,8 @@ namespace CamaroDiag.J2534Bridge;
 /// <summary>
 /// Native, fail-closed E39/E39A flash-sector transaction engine.
 ///
-/// This is a hardware-free, injectable component. It cannot be reached from
-/// Program, BridgeServer or the Android API. A complete, independently
+/// This is an injectable component, tested without hardware. It is not exposed
+/// through BridgeServer or the Android API; the local CLI requires a trusted qualification. A complete, independently
 /// validated E39 flash kernel, ECU identity and bench recovery procedure
 /// must be provided before a real hardware adapter can invoke this engine.
 /// 
