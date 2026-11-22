@@ -98,6 +98,12 @@ internal static class NativeScopedBackupArchive
                 else RequireBytes(input, data.First, token);
             }
             token.ThrowIfCancellationRequested();
+            // Verify the COMPLETE ZIP schema, both independent acquisitions
+            // and VIN-bound scope before exposing a final backup filename.
+            // Entry readback above alone would not catch an invalid manifest.
+            if (zip)
+                NativeScopedBackupImport.VerifyZip(staged, scope, allowInternalStage: true);
+            token.ThrowIfCancellationRequested();
             // Same-directory rename is the publication point. No half-written
             // .zip/.bin exists even after a process crash; no replacement allowed.
             File.Move(staged, full, overwrite: false);

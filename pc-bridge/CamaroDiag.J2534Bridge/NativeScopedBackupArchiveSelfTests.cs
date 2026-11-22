@@ -56,6 +56,18 @@ internal static class NativeScopedBackupArchiveSelfTests
                     Check(output.ToArray().SequenceEqual(bytes), "Actual acquisition retained: " + name);
                 }
             }
+            // The public importer refuses an unfinished .partial suffix.
+            // Only the trusted writer's explicit pre-publication validation
+            // may inspect a hidden staged ZIP with its original bytes.
+            var temporaryStage = Path.Combine(directory, ".camarodiag-manual.partial");
+            File.Copy(zipPath, temporaryStage);
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupImport.VerifyZip(temporaryStage, scope));
+            Check(NativeScopedBackupImport.VerifyZip(
+                temporaryStage, scope, allowInternalStage: true).Sha256 == sha,
+                "Internal staged ZIP is fully verified before publication");
+            File.Delete(temporaryStage);
+
             // Import does not imply restored physical data; it verifies the
             // exact archived two acquisitions and declared VIN-bound scope.
             var imported = NativeScopedBackupImport.VerifyZip(zipPath, scope);

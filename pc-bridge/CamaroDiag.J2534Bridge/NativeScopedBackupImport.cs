@@ -27,11 +27,18 @@ internal static class NativeScopedBackupImport
         string DeclaredRegion, string DeclaredOrigin, IReadOnlyList<string> RequiredRegions);
 
     internal static Inspection VerifyZip(
-        string source, J2534MemoryReadScope scope)
+        string source, J2534MemoryReadScope scope, bool allowInternalStage = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         ArgumentNullException.ThrowIfNull(scope);
-        if (!Path.GetExtension(source).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+        // Only the exporting writer can verify its own hidden temporary ZIP
+        // before publication. User-supplied .partial files are never valid
+        // archives for the ordinary verifier or CLI.
+        bool finalZip = Path.GetExtension(source).Equals(".zip", StringComparison.OrdinalIgnoreCase);
+        bool privateStage = allowInternalStage &&
+            Path.GetFileName(source).StartsWith(".camarodiag-", StringComparison.Ordinal) &&
+            Path.GetExtension(source).Equals(".partial", StringComparison.OrdinalIgnoreCase);
+        if (!finalZip && !privateStage)
             throw new InvalidDataException("An ECU archive import must be a ZIP.");
         if (scope.Length == 0 || scope.Length > NativeScopedMemoryReader.MaximumUiCaptureBytes)
             throw new InvalidDataException("Out-of-bounds backup scope.");
