@@ -31,6 +31,11 @@ internal data class PendingCamaroDiagApk(val downloadId: Long, val targetVersion
         installedVersionCode >= targetVersionCode
 
     companion object {
+        /** Conflicting versions for one ID are ambiguous; never authorize deletion. */
+        fun unambiguous(entries: Set<String>): List<PendingCamaroDiagApk> =
+            entries.mapNotNull(::decode).groupBy { it.downloadId }.values
+                .mapNotNull { records -> records.distinct().singleOrNull() }
+
         fun decode(value: String): PendingCamaroDiagApk? {
             val parts = value.split(':')
             if (parts.size != 2) return null
@@ -72,16 +77,19 @@ internal object CamaroDiagUpdateCleanup {
     fun recordDownload(context: Context, pending: PendingCamaroDiagApk): Boolean {
         val prefs = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val entries = prefs.getStringSet(PENDING_KEY, emptySet()).orEmpty().toMutableSet()
+        val existing = entries.mapNotNull(PendingCamaroDiagApk::decode)
+            .filter { it.downloadId == pending.downloadId }
+        if (existing.any { it != pending }) return false
         entries.add(pending.encode())
         return persistEntries(prefs, entries)
     }
 
     /** All owned downloads, newest first. Never scan or modify unrelated files. */
     fun pendingDownloads(context: Context): List<PendingCamaroDiagApk> =
-        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-            .getStringSet(PENDING_KEY, emptySet())
-            .orEmpty().mapNotNull(PendingCamaroDiagApk::decode)
-            .sortedByDescending { it.downloadId }
+        PendingCamaroDiagApk.unambiguous(
+            context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                .getStringSet(PENDING_KEY, emptySet()).orEmpty()
+        ).sortedByDescending { it.downloadId }
 
     fun targetVersion(context: Context, downloadId: Long): Long? {
         if (downloadId <= 0) return null
@@ -98,7 +106,7 @@ internal object CamaroDiagUpdateCleanup {
         if (downloadId <= 0) return
         val prefs = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val entries = prefs.getStringSet(PENDING_KEY, emptySet()).orEmpty().toMutableSet()
-        val pending = entries.mapNotNull(PendingCamaroDiagApk::decode)
+        val pending = PendingCamaroDiagApk.unambiguous(entries)
             .firstOrNull { it.downloadId == downloadId } ?: return
         val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         try {
@@ -141,8 +149,8 @@ internal object CamaroDiagUpdateCleanup {
         val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val remaining = original.toMutableSet()
         var successfullyRemoved = false
-        for (encoded in original) {
-            val pending = PendingCamaroDiagApk.decode(encoded) ?: continue
+        for (pending in PendingCamaroDiagApk.unambiguous(original)) {
+            val encoded = pending.encode()
             if (!pending.installed(installedCode)) continue
             try {
                 // This removes the DownloadManager entry AND the downloaded APK.
