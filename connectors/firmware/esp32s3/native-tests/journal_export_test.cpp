@@ -21,7 +21,7 @@ int main(){
   for(size_t i=0;i<std::strlen(partial);++i)
     assert(!wrongSuffix.feed(uint8_t(partial[i]),uint32_t(i)));
   assert(!wrongSuffix.feed('X',50)&&wrongSuffix.closed());
-  assert(!wrongSuffix.feed('\\n',51));
+  assert(!wrongSuffix.feed('\n',51));
   ExportRequest repeated;
   for(size_t i=0;i<std::strlen(command);++i)
     assert(repeated.feed(uint8_t(command[i]),uint32_t(i))==(i==std::strlen(command)-1));
