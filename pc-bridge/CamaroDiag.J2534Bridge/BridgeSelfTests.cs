@@ -55,6 +55,22 @@ internal static class BridgeSelfTests
         Assert(BridgeConsoleDirection.Normalize("SYSTEM") == "SYSTEM", "CAN console SYSTEM direction");
         Assert(BridgeConsoleDirection.Normalize("INFO") == "SYSTEM", "Legacy INFO classified SYSTEM");
         Assert(BridgeConsoleDirection.Normalize(null) == "SYSTEM", "Unknown CAN console direction fails closed");
+        // Pending TX and driver queue acceptance are not evidence of bus
+        // delivery; only a correlated ECU reply may be marked as such.
+        foreach (var state in new[] { BridgeConsoleTxState.Requested,
+            BridgeConsoleTxState.DriverAccepted, BridgeConsoleTxState.Unconfirmed })
+        {
+            Assert(!BridgeConsoleTxEvidence.HasVerifiedEcuReply(state),
+                "Unverified Windows console TX must not claim ECU confirmation");
+        }
+        Assert(BridgeConsoleTxEvidence.HasVerifiedEcuReply(BridgeConsoleTxState.EcuReplied),
+            "Correlated J2534 ECU reply confirms a response");
+        Assert(BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Requested).Contains("non confirmée"),
+            "Windows TX request is visibly pending");
+        Assert(BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.DriverAccepted).Contains("non vérifiée"),
+            "Windows no-response transmission does not claim bus delivery");
+        Assert(BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Unconfirmed).Contains("non confirmée"),
+            "Windows J2534 timeout marks TX as unconfirmed");
 
         Assert(BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("192.168.1.20")), "RFC1918 LAN");
         Assert(BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("10.1.2.3")), "10/8 LAN");

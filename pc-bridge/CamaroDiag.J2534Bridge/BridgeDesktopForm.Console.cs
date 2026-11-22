@@ -156,17 +156,40 @@ internal sealed partial class BridgeDesktopForm
 
         await RunBusyAsync(async () =>
         {
-            ConsoleLine("TX", Convert.ToHexString(payload) +
-                (noResponse ? " [sans réponse]" : ""), Color.DarkOrange);
-            if (noResponse)
+            var frameHex = Convert.ToHexString(payload);
+            // A TX row records the operator's attempted send, never an
+            // unconditional claim that the J2534 device queued it on the bus.
+            ConsoleLine("TX", frameHex + " [" +
+                BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Requested) + "]",
+                Color.DarkOrange);
+            try
             {
-                await Task.Run(() => device.SendOnly(payload));
-                ConsoleLine("SYSTEM", "Trame envoyée ; aucune réponse attendue.", Color.DarkSlateGray);
+                if (noResponse)
+                {
+                    await Task.Run(() => device.SendOnly(payload));
+                    // PassThruWriteMsgs only proves acceptance by the driver:
+                    // without an ECU reply, physical bus delivery is unknown.
+                    ConsoleLine("SYSTEM", frameHex + " [" +
+                        BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.DriverAccepted) + "]",
+                        Color.DarkSlateGray);
+                }
+                else
+                {
+                    var reply = await Task.Run(() => device.Exchange(payload, (int)consoleTimeout.Value));
+                    ConsoleLine("SYSTEM", frameHex + " [" +
+                        BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.EcuReplied) + "]",
+                        Color.DarkGreen);
+                    ConsoleLine("RX", Convert.ToHexString(reply), Color.DarkGreen);
+                }
             }
-            else
+            catch (Exception)
             {
-                var reply = await Task.Run(() => device.Exchange(payload, (int)consoleTimeout.Value));
-                ConsoleLine("RX", Convert.ToHexString(reply), Color.DarkGreen);
+                // A timeout does not prove whether a frame was transmitted;
+                // retain the attempted TX and append its explicit final status.
+                ConsoleLine("SYSTEM", frameHex + " [" +
+                    BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.Unconfirmed) + "]",
+                    Color.DarkRed);
+                throw;
             }
         });
     }
