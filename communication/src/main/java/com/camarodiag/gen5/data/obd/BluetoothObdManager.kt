@@ -588,34 +588,13 @@ class BluetoothObdManager(context: Context) {
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = CanCaptureTextBuffer()
             try {
-                // Select the actual frame format explicitly: the adapter's previous
-                // diagnostic protocol cannot be assumed to match the monitor.
-                val protocolAnswer = boundCommand(
-                    CanMonitorProtocolPolicy.protocolCommand(can29Bit), 1_500L
-                )
-                if (!CanConsoleAdapterRestorationPolicy.accepted(protocolAnswer))
-                    throw CanAdapterRestorationException()
-                for (command in listOf("ATE0", "ATL0", "ATS1", "ATH1")) {
-                    val answer = boundCommand(command, 1_000L)
+                // Configure one physical CAN format and clear STN receive filters.
+                // All steps require explicit adapter acknowledgement before streaming.
+                for (command in CanMonitorProtocolPolicy.setupCommands(can29Bit, isStnAdapter)) {
+                    val timeout = if (command.startsWith("ATSP")) 1_500L else 1_000L
+                    val answer = boundCommand(command, timeout)
                     if (!CanConsoleAdapterRestorationPolicy.accepted(answer))
                         throw CanAdapterRestorationException()
-                }
-                val formattingResponse = boundCommand("ATCAF0", 1_000L)
-                check(CanConsoleAdapterRestorationPolicy.accepted(formattingResponse)) {
-                    "The connected adapter cannot switch to raw CAN formatting."
-                }
-                if (isStnAdapter) {
-                    val filter = CanMonitorProtocolPolicy.clearFilter(can29Bit)
-                    val canFilterResponse = boundCommand("ATCF $filter", 1_000L)
-                    val canMaskResponse = boundCommand("ATCM $filter", 1_000L)
-                    val filterResponse = boundCommand("STFAC", 1_000L)
-                    check(
-                        CanConsoleAdapterRestorationPolicy.accepted(canFilterResponse) &&
-                            CanConsoleAdapterRestorationPolicy.accepted(canMaskResponse) &&
-                            CanConsoleAdapterRestorationPolicy.accepted(filterResponse)
-                    ) {
-                        "The STN adapter could not clear its temporary CAN filters."
-                    }
                 }
                 val monitorResponse = boundCommand(monitorCommand, durationMs) { chunk ->
                     captured.append(chunk)
@@ -631,10 +610,7 @@ class BluetoothObdManager(context: Context) {
                     // ESC may return only a prompt. A failed ESC still requires a
                     // fail-closed session even if later configuration commands respond.
                     var restored = runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
-                    val commands = buildList {
-                        if (isStnAdapter) add("ATAR")
-                        addAll(listOf("ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"))
-                    }
+                    val commands = CanMonitorProtocolPolicy.restoreCommands(isStnAdapter)
                     // Restore the command-channel formatting established at probe time.
                     for (command in commands) {
                         val answer = runCatching { boundCommand(command, 1_000L) }.getOrNull()
