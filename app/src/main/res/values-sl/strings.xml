@@ -646,4 +646,7 @@
     <string name="cal_native_catalog_loading">Nalaganje lastnega kataloga…</string>
     <string name="cal_native_catalog_empty">Trenutno noben lastniški DID Camaro ni označen kot uporaben. Neznani naslovi in skaliranja se ne izmišljajo.</string>
     <string name="cal_native_catalog_read_disabled">Branje vozila je onemogočeno, dokler nista naslovljenje in dekodiranje preverjena na enaki konfiguraciji.</string>
+    <string name="export_folder_instruction">Ustvarite ali izberite mapo CamaroDiag v notranjem pomnilniku in dovolite dostop. Izvožene datoteke so vidne v skupni shrambi.</string>
+    <string name="export_folder_success">Izvoz je shranjen v /CamaroDiag/.</string>
+    <string name="export_folder_failed">Izvoza ni bilo mogoče shraniti v /CamaroDiag/.</string>
 </resources>
