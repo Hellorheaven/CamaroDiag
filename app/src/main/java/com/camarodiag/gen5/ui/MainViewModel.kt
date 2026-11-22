@@ -4068,7 +4068,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     response.contains("UNABLE TO CONNECT", ignoreCase = true)) {
                     throw ObdTransportDisconnectedException("Live OBD transport is disconnected")
                 }
-                return CamaroUdsProtocol.parsePidBytes(response, pid)
+                return CamaroUdsProtocol.parsePidBytes(
+                    response, pid, primaryPowertrainResponderOnly = true
+                )
             }
 
             while (currentCoroutineContext().isActive) {
