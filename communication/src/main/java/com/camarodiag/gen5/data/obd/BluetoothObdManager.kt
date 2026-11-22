@@ -587,6 +587,7 @@ class BluetoothObdManager(context: Context) {
             // automatic OBD filtering after the capture.
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = CanCaptureTextBuffer()
+            val monitorErrors = CanMonitorErrorTracker()
             try {
                 // Configure one physical CAN format and clear STN receive filters.
                 // All steps require explicit adapter acknowledgement before streaming.
@@ -598,9 +599,11 @@ class BluetoothObdManager(context: Context) {
                 }
                 val monitorResponse = boundCommand(monitorCommand, durationMs) { chunk ->
                     captured.append(chunk)
+                    monitorErrors.append(chunk)
                     onChunk(chunk)
                 }
-                check(CanMonitorCompletionPolicy.accepted(monitorResponse)) {
+                check(CanMonitorCompletionPolicy.accepted(monitorResponse) &&
+                    !monitorErrors.hasFailureAtEnd()) {
                     "The connected adapter failed or rejected the CAN monitor command."
                 }
             } finally {
