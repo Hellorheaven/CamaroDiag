@@ -36,6 +36,23 @@ class CamaroDiagExportStorageTest {
             CamaroDiagExportStorage.Category.RECOVERY.folder)
     }
 
+    @Test fun publishedFileIdentityAndDisplayedPathMustMatchItsCategory() {
+        val storage = CamaroDiagExportStorage
+        val category = CamaroDiagExportStorage.Category.RECOVERY
+        val file = "checkpoint_safe.cdj"
+        assertEquals("/storage/emulated/0/CamaroDiag/Logs/Recovery/$file",
+            storage.fileDisplayPath(category, file))
+        assertTrue(storage.isCategoryFile(storage.AUTHORITY,
+            "primary:CamaroDiag/Logs/Recovery/$file", category, file))
+        for (id in listOf("primary:CamaroDiag/$file", "primary:CamaroDiag/Backups/ECU/$file",
+            "primary:CamaroDiag/Logs/Recovery/other.cdj")) {
+            assertFalse(storage.isCategoryFile(storage.AUTHORITY, id, category, file))
+        }
+        assertFalse(storage.isCategoryFile("other.provider",
+            "primary:CamaroDiag/Logs/Recovery/$file", category, file))
+        assertTrue(runCatching { storage.fileDisplayPath(category, "../$file") }.isFailure)
+    }
+
     @Test fun preservesBackupAndReportExtensionsWhilePreventingCollisions() {
         for (extension in listOf("zip", "json", "csv", "tsv", "txt", "bin", "ori", "mod", "hex")) {
             val original = "CamaroDiag_backup.$extension"

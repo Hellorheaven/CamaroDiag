@@ -30,6 +30,13 @@ internal object CamaroDiagExportStorage {
 
     internal fun categoryDocumentId(category: Category): String = "$DOCUMENT_ID/${category.folder}"
     internal fun displayPath(category: Category): String = "$DISPLAY_PATH${category.folder}/"
+    internal fun fileDisplayPath(category: Category, finalName: String): String {
+        require(finalName.matches(Regex("[A-Za-z0-9._-]+")) && !finalName.startsWith('.'))
+        return displayPath(category) + finalName
+    }
+    internal fun isCategoryFile(authority: String?, documentId: String?, category: Category, name: String): Boolean =
+        authority == AUTHORITY && name.matches(Regex("[A-Za-z0-9._-]+")) && name !in setOf(".", "..") &&
+            documentId == "${categoryDocumentId(category)}/$name"
 
     private const val FLAGS = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 
@@ -215,7 +222,7 @@ internal object CamaroDiagExportStorage {
      * A sudden process or device crash may leave a .partial document, never a completed filename.
      */
     suspend fun write(context: Context, requested: String, mimeType: String,
-        category: Category = Category.EXPORTS, beforePublish: () -> Unit = {}, writeBytes: suspend (OutputStream) -> Unit) =
+        category: Category, beforePublish: () -> Unit = {}, writeBytes: suspend (OutputStream) -> Unit): String =
         withContext(Dispatchers.IO) {
             require(mimeType.isNotBlank())
             val resolver = context.contentResolver
@@ -228,6 +235,11 @@ internal object CamaroDiagExportStorage {
                 DocumentsContract.createDocument(resolver, root,
                     "application/octet-stream", temporaryFileName(finalName))
             } ?: throw ExportStorageException("Could not create export document.")
+            if (!isCategoryFile(temporary.authority, DocumentsContract.getDocumentId(temporary),
+                    category, temporaryFileName(finalName))) {
+                // Do not write to or delete an unexpected provider document.
+                throw ExportStorageException("Unexpected temporary export identity.")
+            }
             var published = false
             try {
                 val output = VerifiedOutput(storageOperation {
@@ -245,9 +257,13 @@ internal object CamaroDiagExportStorage {
                     throw ExportStorageException("Export readback differs from written bytes.")
                 currentCoroutineContext().ensureActive()
                 beforePublish()
-                storageOperation { DocumentsContract.renameDocument(resolver, temporary, finalName) }
+                val finalDocument = storageOperation { DocumentsContract.renameDocument(resolver, temporary, finalName) }
                     ?: throw ExportStorageException("Could not publish completed export.")
                 published = true
+                if (!isCategoryFile(finalDocument.authority, DocumentsContract.getDocumentId(finalDocument),
+                        category, finalName))
+                    throw ExportStorageException("Unexpected published export identity; inspect the folder.")
+                fileDisplayPath(category, finalName)
             } finally {
                 if (!published) runCatching { DocumentsContract.deleteDocument(resolver, temporary) }
             }

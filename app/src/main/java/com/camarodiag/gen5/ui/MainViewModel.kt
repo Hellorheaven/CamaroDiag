@@ -1201,7 +1201,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 check(obdManager.isJ2534BridgeConnected()) {
                     "A real J2534 adapter must be connected."
                 }
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
                     category = CamaroDiagExportStorage.Category.ECU_BACKUPS, beforePublish = {
                         check(current())
                     }
@@ -1220,7 +1220,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534MemoryCapturing = false,
                     j2534MemoryCaptureMessage =
-                        localizedContext.getString(R.string.cal_live_memory_saved)
+                        localizedContext.getString(R.string.cal_live_memory_saved) + "\n" + savedPath
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -1469,13 +1469,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("calibrationWritingPermitted", false)
                 }
                 if (!current()) return@launch
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
                     category = CamaroDiagExportStorage.Category.REPORTS, beforePublish = { check(current() && hasPremiumLicense()) }
                 ) { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (current()) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         message = getApplication<Application>()
-                            .getString(R.string.flexfuel_lfx2012_export_success)
+                            .getString(R.string.flexfuel_lfx2012_export_success) + "\n" + savedPath
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -2169,7 +2169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         appendLine("# RX RAW — received adapter stream (unmodified)")
                     }
                 }
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
                     category = CamaroDiagExportStorage.Category.CONSOLE, beforePublish = { check(current()) }
                 ) { sink ->
                     sink.write(outputText.toByteArray(Charsets.UTF_8))
@@ -2180,7 +2180,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 if (current()) _liveCanMonitorState.update {
-                    it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_complete))
+                    it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_complete) + "\n" + savedPath)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -2611,11 +2611,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val exportGeneration = accountSessionGeneration
         viewModelScope.launch {
             try {
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/tab-separated-values",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/tab-separated-values",
                     category = CamaroDiagExportStorage.Category.CALIBRATIONS, beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
                 ) { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = localizedContext.getString(R.string.msg_cal_template_exported)
+                    message = localizedContext.getString(R.string.msg_cal_template_exported) + "\n" + savedPath
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -2884,7 +2884,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val length = original.length()
                 require(length in 1L..EcuExternalDumpPair.MAX_DUMP_BYTES.toLong() &&
                     repeated.length() == length)
-                CamaroDiagExportStorage.write(getApplication<Application>(),
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(),
                     "CamaroDiag_ECU_import_${method.name}_${System.currentTimeMillis()}.zip",
                     "application/zip", category = CamaroDiagExportStorage.Category.ECU_BACKUPS, beforePublish = { check(current()) }
                 ) { output ->
@@ -2897,7 +2897,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 if (current()) _calibrationWorkspace.update {
-                    it.copy(message = localizedContext.getString(R.string.export_folder_success))
+                    it.copy(message = localizedContext.getString(R.string.export_folder_success) + "\n" + savedPath)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -2924,11 +2924,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val sourcePath = selectedPath ?: error("Aucun fichier de calibration n'est chargé.")
                 val source = File(sourcePath)
                 check(source.isFile && source.exists()) { "Le fichier local de calibration est introuvable." }
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/octet-stream",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/octet-stream",
                     category = CamaroDiagExportStorage.Category.CALIBRATIONS, beforePublish = { check(current()) }
                 ) { target -> source.inputStream().use { it.copyTo(target) } }
                 if (current()) _calibrationWorkspace.update {
-                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_exported))
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_exported) + "\n" + savedPath)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -3097,13 +3097,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (bytes != null) {
                     val inspection = com.camarodiag.gen5.data.obd.CamaroDiagConnectorCheckpoint.inspect(bytes)
                     val record = checkNotNull(inspection.record)
-                    CamaroDiagExportStorage.write(getApplication<Application>(), "CamaroDiag_checkpoint.cdj",
+                    val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), "CamaroDiag_checkpoint.cdj",
                         "application/octet-stream", category = CamaroDiagExportStorage.Category.RECOVERY, beforePublish = { check(current()) }
                     ) { it.write(bytes) }
                     check(current())
                     lines += inspection.disposition.name
                     lines += record.stage.name + " #" + record.sequence
                     lines += localizedContext.getString(R.string.export_folder_success)
+                    lines += savedPath
                 } else {
                     lines += "CDJ/1 NONE"
                 }
@@ -3257,11 +3258,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     vin = v.vin,
                     vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
                 )
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
                     category = CamaroDiagExportStorage.Category.TELEMETRY, beforePublish = { check(current()) }
                 ) { it.write(csv.toByteArray(Charsets.UTF_8)) }
                 if (current()) _liveRecordingState.update {
-                    it.copy(message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size))
+                    it.copy(message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size) + "\n" + savedPath)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -3802,12 +3803,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             json.put("checks", checks)
             try {
-                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
                     category = CamaroDiagExportStorage.Category.TESTS, beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
                         authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER) }
                 ) { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (isCurrentAccountGeneration(sessionGeneration)) {
-                    _connectionMessage.value = localizedContext.getString(R.string.export_folder_success)
+                    _connectionMessage.value = localizedContext.getString(R.string.export_folder_success) + "\n" + savedPath
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -3927,7 +3928,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .put("mileageSummary", entity.mileageSummary)
                     .put("hasMileageDiscrepancy", entity.hasMileageDiscrepancy)
                     .put("maxDeltaKm", entity.maxDeltaKm)
-                CamaroDiagExportStorage.write(getApplication<Application>(),
+                val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(),
                     "CamaroDiag_session_${entity.timestamp}.json", "application/json",
                     category = CamaroDiagExportStorage.Category.DIAGNOSTIC_SESSIONS, beforePublish = { check(authenticatedAccountUid == ownerUid &&
                         isCurrentAccountGeneration(exportGeneration)) }
@@ -3937,7 +3938,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sessionDao.insertSession(entity)
                 if (isCurrentAccountGeneration(exportGeneration)) {
                     _connectionMessage.value = localizedContext.getString(R.string.msg_session_saved) +
-                        "\n" + CamaroDiagExportStorage.displayPath(CamaroDiagExportStorage.Category.DIAGNOSTIC_SESSIONS)
+                        "\n" + savedPath
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
