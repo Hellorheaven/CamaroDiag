@@ -527,6 +527,26 @@ class EcuWriteTransactionTest {
         assertEquals(0, device.resetCalls)
     }
 
+    @Test fun powerLossDuringFinalIndependentReadbackCannotBeJournaledAsVerified() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        var stable = true
+        // Two reads of untouched baseline, two reads of the changed baseline,
+        // one pre-erase read, one post-write read, then the final readback.
+        device.afterRead = {
+            if (device.reads == 7) stable = false
+        }
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { stable }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(4, device.writeCalls)
+        assertEquals(0x1000L, outcome.failedAddress)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED })
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.TRANSACTION_COMPLETED })
+    }
+
     @Test fun finalIdentityMismatchAfterSingleSectorDoesNotReportCompletion() = runBlocking {
         val device = FakeDriver(original, expectedIdentity)
         device.identityAfterErases = 1 to expectedIdentity.copy(vin = "2G1TEST0000000002")
