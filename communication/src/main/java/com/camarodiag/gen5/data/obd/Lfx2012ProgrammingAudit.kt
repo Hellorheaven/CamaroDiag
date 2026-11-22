@@ -55,6 +55,7 @@ object Lfx2012ProgrammingAudit {
             it.status == CheckStatus.UNAVAILABLE || it.status == CheckStatus.NOT_PERFORMED
         }
         val requiresReview = vinChanged ||
+            before.capturedAtUtcMillis <= 0L || after.capturedAtUtcMillis <= 0L ||
             after.capturedAtUtcMillis <= before.capturedAtUtcMillis ||
             original.any { it.status == CheckStatus.REQUIRES_REVIEW } ||
             current.any { it.status == CheckStatus.REQUIRES_REVIEW }
@@ -70,8 +71,19 @@ object Lfx2012ProgrammingAudit {
     }
 
     private fun checks(snapshot: Snapshot): List<Check> {
-        fun reported(text: String?): CheckStatus =
-            if (text.isNullOrBlank()) CheckStatus.UNAVAILABLE else CheckStatus.OBSERVED
+        fun placeholder(text: String): Boolean = text.trim().lowercase() in
+            setOf("unknown", "pending", "n/a", "no response", "unavailable",
+                "not supported", "no data", "test", "error", "ffffffff", "00000000")
+        fun reported(text: String?): CheckStatus = when {
+            text.isNullOrBlank() -> CheckStatus.UNAVAILABLE
+            placeholder(text) -> CheckStatus.REQUIRES_REVIEW
+            else -> CheckStatus.OBSERVED
+        }
+        fun reportedIds(values: List<String>): CheckStatus = when {
+            values.none(String::isNotBlank) -> CheckStatus.UNAVAILABLE
+            values.any(::placeholder) -> CheckStatus.REQUIRES_REVIEW
+            else -> CheckStatus.OBSERVED
+        }
         val normalizedVin = snapshot.vin?.trim()?.uppercase()
         val vinStatus = when {
             normalizedVin.isNullOrBlank() -> CheckStatus.UNAVAILABLE
@@ -82,13 +94,13 @@ object Lfx2012ProgrammingAudit {
         return listOf(
             Check(Item.VEHICLE_VIN, vinStatus),
             Check(Item.ECU_NAME, reported(snapshot.ecuName)),
-            Check(Item.CALIBRATION_ID, if (snapshot.calibrationIds.any(String::isNotBlank))
-                CheckStatus.OBSERVED else CheckStatus.UNAVAILABLE),
-            Check(Item.CALIBRATION_VERIFICATION_NUMBER,
-                if (snapshot.verificationNumbers.any(String::isNotBlank))
-                    CheckStatus.OBSERVED else CheckStatus.UNAVAILABLE),
-            Check(Item.DIAGNOSTIC_TROUBLE_CODES,
-                if (snapshot.dtcs == null) CheckStatus.UNAVAILABLE else CheckStatus.OBSERVED),
+            Check(Item.CALIBRATION_ID, reportedIds(snapshot.calibrationIds)),
+            Check(Item.CALIBRATION_VERIFICATION_NUMBER, reportedIds(snapshot.verificationNumbers)),
+            Check(Item.DIAGNOSTIC_TROUBLE_CODES, when {
+                snapshot.dtcs == null -> CheckStatus.UNAVAILABLE
+                snapshot.dtcs.any(::placeholder) -> CheckStatus.REQUIRES_REVIEW
+                else -> CheckStatus.OBSERVED
+            }),
             Check(Item.VOLTAGE,
                 when {
                     snapshot.voltage == null || !snapshot.voltage.isFinite() -> CheckStatus.UNAVAILABLE
