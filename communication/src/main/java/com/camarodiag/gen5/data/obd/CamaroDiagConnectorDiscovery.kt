@@ -11,7 +11,7 @@ object CamaroDiagConnectorDiscovery {
     const val BAUD_RATE = 115200
     private const val MAX_REPLY_BYTES = 256
     private const val TIMEOUT_NANOS = 3_000_000_000L
-    private val keys = setOf("hs_can", "sw_can", "eeprom_read", "eeprom_write", "ecu_flash", "j2534")
+    private const val EXPECTED_CAPS = "CAPS hs_can=disabled sw_can=disabled eeprom_read=disabled eeprom_write=disabled ecu_flash=disabled j2534=disabled"
 
     interface Channel {
         fun write(bytes: ByteArray)
@@ -99,15 +99,8 @@ object CamaroDiagConnectorDiscovery {
         val ping = exchange(1)
         if (ping != "PONG CamaroDiagConnectors 0.1.0") throw IOException("Unsupported connector identity/version")
         val caps = exchange(2)
-        val tokens = caps.split(' ')
-        if (tokens.firstOrNull() != "CAPS" || tokens.size != keys.size + 1)
-            throw IOException("Invalid capability response")
-        val seen = mutableSetOf<String>()
-        for (token in tokens.drop(1)) {
-            val pair = token.split('=')
-            if (pair.size != 2 || pair[0] !in keys || !seen.add(pair[0]) || pair[1] != "disabled")
-                throw IOException("Prototype capability not supported or malformed")
-        }
+        if (caps != EXPECTED_CAPS)
+            throw IOException("Prototype capability response differs from the published read-only firmware")
         val status = exchange(3)
         if (status != "STATUS mode=prototype write=disabled")
             throw IOException("Unsupported connector status")
