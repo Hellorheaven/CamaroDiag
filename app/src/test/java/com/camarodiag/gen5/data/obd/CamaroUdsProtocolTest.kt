@@ -404,4 +404,16 @@ class CamaroUdsProtocolTest {
         assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(256)))
     }
 
+    @Test
+    fun ethanolTelemetryDoesNotAcceptWrongOrConcatenatedPidResponses() {
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(
+            CamaroUdsProtocol.parsePidBytes("41 53 FF", "52")))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(
+            CamaroUdsProtocol.parsePidBytes("41 52 FF 00", "52")))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(
+            CamaroUdsProtocol.parsePidBytes("41 52", "52")))
+        assertEquals(100.0, CamaroUdsProtocol.decodeEthanolPercent(
+            CamaroUdsProtocol.parsePidBytes("41 52 FF", "52"))!!, 0.00001)
+    }
+
 }
