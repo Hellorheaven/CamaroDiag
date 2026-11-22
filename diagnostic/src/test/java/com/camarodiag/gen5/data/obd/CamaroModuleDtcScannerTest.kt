@@ -98,6 +98,53 @@ class CamaroModuleDtcScannerTest {
         )
 
     @Test
+    fun physicallyAnsweredProfiledDtcReportCarriesVerifiedEcuIdentity() = runBlocking {
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX,
+            vin = "2G1TEST00C0000001")
+        val vin = vehicle.vin.toByteArray(Charsets.US_ASCII)
+        fun response(did: Int, payload: ByteArray): CanFrame {
+            val data = byteArrayOf(0x62, (did shr 8).toByte(), did.toByte()) + payload
+            return CanFrame(0x7A8, byteArrayOf(data.size.toByte()) + data)
+        }
+        val incoming = java.util.ArrayDeque(listOf(
+            response(0x0101, "BCM".toByteArray()),
+            response(0x0102, "HW1".toByteArray()),
+            response(0x0103, "OS1".toByteArray()),
+            response(0x0104, "CAL1".toByteArray()),
+            response(0x0105, byteArrayOf(0xA1.toByte(), 0xB2.toByte())),
+            CanFrame(0x7A8, byteArrayOf(0x10, 0x14, 0x62, 0x01, 0x06,
+                vin[0], vin[1], vin[2])),
+            CanFrame(0x7A8, byteArrayOf(0x21, vin[3], vin[4], vin[5], vin[6],
+                vin[7], vin[8], vin[9])),
+            CanFrame(0x7A8, byteArrayOf(0x22, vin[10], vin[11], vin[12],
+                vin[13], vin[14], vin[15], vin[16])),
+            CanFrame(0x7A8, byteArrayOf(0x04, 0x59, 0x02, 0xFF.toByte(), 0x00))
+        ))
+        val sent = mutableListOf<CanFrame>()
+        val channel = object : RawCanFrameTransport {
+            override suspend fun send(frame: CanFrame) { sent += frame }
+            override suspend fun receive(timeoutMs: Long): CanFrame? =
+                if (incoming.isEmpty()) null else incoming.removeFirst()
+        }
+        val scanner = CamaroModuleDtcScanner { error("Legacy scan path unused") }
+        val results = scanner.scanProfiled(vehicle,
+            listOf(documentedBcmProfile()), { channel })
+        val bcm = results.single { it.module == CamaroControlModule.BCM }
+            as ModuleDiagnosticResult.DtcRead
+        assertTrue(bcm.identityVerified)
+        assertEquals(vehicle.vin, bcm.verifiedIdentity?.vin)
+        assertTrue(bcm.report.records.isEmpty())
+        assertEquals(0xFF, bcm.report.statusAvailabilityMask)
+        assertTrue(sent.isNotEmpty())
+        assertTrue(sent.all {
+            (it.data[0].toInt() and 0xF0) == 0x30 ||
+                (it.data.size >= 2 && (it.data[1].toInt() and 0xFF) in listOf(0x22, 0x19))
+        })
+        assertTrue(results.filter { it.module != CamaroControlModule.BCM }
+            .all { it is ModuleDiagnosticResult.NotConfigured })
+    }
+
+    @Test
     fun profiledDtcScannerNeverOpensBusForMissingOrMismatchedEcuProfiles() = runBlocking {
         val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX,
             vin = "2G1TEST00C0000001")
