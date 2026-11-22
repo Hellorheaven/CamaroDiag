@@ -13,8 +13,8 @@ const maxSessionAge = 5 * 60;
 const { licenseStatus } = require("./license-status");
 
 function adminIdentity(request) {
-    if (!request.auth?.uid || request.auth.token?.[adminRole] !== true &&
-        request.auth.token?.owner_functional_tests !== true)
+    if (!request.auth?.uid || (request.auth.token?.[adminRole] !== true &&
+        request.auth.token?.owner_functional_tests !== true))
         throw new HttpsError("permission-denied", "Droits administrateur requis.");
     const authenticatedAt = Number(request.auth.token.auth_time);
     if (!Number.isFinite(authenticatedAt) ||
@@ -29,7 +29,8 @@ async function requireCurrentAdmin(uid) {
     // A revoked custom claim in an older token is insufficient to authorize.
     const user = await getAuth().getUser(uid);
     if (user.disabled || user.emailVerified !== true ||
-        user.customClaims?.[adminRole] !== true ||
+        (user.customClaims?.[adminRole] !== true &&
+         user.customClaims?.owner_functional_tests !== true) ||
         !user.providerData.some(p => p.providerId === "google.com"))
         throw new HttpsError("permission-denied", "Compte administrateur non autorisé.");
 }
