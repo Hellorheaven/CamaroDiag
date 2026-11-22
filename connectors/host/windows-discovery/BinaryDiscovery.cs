@@ -55,7 +55,15 @@ internal sealed class BinaryDiscovery(Stream stream, Func<long>? clockMs = null)
             int remaining = Remaining(since);
             if (stream.CanTimeout)
                 stream.ReadTimeout = remaining;
-            int count = stream.Read(buffer);
+            int count;
+            try { count = stream.Read(buffer); }
+            catch (TimeoutException) when (stream.CanTimeout)
+            {
+                // A serial read timeout is not the global exchange deadline.
+                continue;
+            }
+            if (count == 0 && stream.CanTimeout)
+                continue;
             if (count <= 0 || count > buffer.Length)
                 throw new IOException("Incomplete discovery reply");
             Remaining(since);
