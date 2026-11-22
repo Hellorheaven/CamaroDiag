@@ -42,6 +42,7 @@ class EcuWriteTransactionTest {
         var eraseCalls = 0
         var identityAfterErases: Pair<Int, EcuProgrammingDriverContract.Identity>? = null
         var identityAfterWrites: Pair<Int, EcuProgrammingDriverContract.Identity>? = null
+        var identityAfterReads: Pair<Int, EcuProgrammingDriverContract.Identity>? = null
         val writes = mutableListOf<EcuProgrammingDriverContract.RegionRequest>()
         val writeCalls: Int get() = writes.size
         var failWriteAt: Long? = null
@@ -78,7 +79,8 @@ class EcuWriteTransactionTest {
         }
 
         override suspend fun identify(): EcuProgrammingDriverContract.Identity =
-            identityAfterWrites?.takeIf { writeCalls >= it.first }?.second
+            identityAfterReads?.takeIf { reads >= it.first }?.second
+                ?: identityAfterWrites?.takeIf { writeCalls >= it.first }?.second
                 ?: identityAfterErases?.takeIf { eraseCalls >= it.first }?.second ?: identity
         override suspend fun read(request: EcuProgrammingDriverContract.RegionRequest): ByteArray {
             val start = start(request)
@@ -538,6 +540,21 @@ class EcuWriteTransactionTest {
         val records = mutableListOf<EcuWriteTransaction.Record>()
         val outcome = EcuWriteExecutionEngine(
             device, journal(records), EcuWriteTransaction.PowerMonitor { stable }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(4, device.writeCalls)
+        assertEquals(0x1000L, outcome.failedAddress)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.FINAL_READBACK_VERIFIED })
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.TRANSACTION_COMPLETED })
+    }
+
+    @Test fun controllerSwitchDuringFinalIndependentReadbackCannotMarkCompletion() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        device.identityAfterReads = 7 to expectedIdentity.copy(vin = "2G1TEST0000000002")
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
         ).run(request())
         assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
         assertEquals(1, device.eraseCalls)
