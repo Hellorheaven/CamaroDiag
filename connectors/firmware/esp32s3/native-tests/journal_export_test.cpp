@@ -31,6 +31,20 @@ int main(){
   assert(!elapsedBeforeFinish.feed('C',123));
   elapsedBeforeFinish.poll(2123);
   assert(elapsedBeforeFinish.closed());
+  // The one-shot export deadline must also survive the uint32 millis wrap.
+  ExportRequest wrapped;
+  assert(!wrapped.feed('C',0xfffffff0u));
+  assert(!wrapped.feed('D',0x00000300u));
+  wrapped.poll(0x000007d0u);
+  assert(wrapped.closed());
+  assert(!wrapped.feed('J',0x000007d1u));
+  // Returning no record must not leak bytes when the reply buffer is short.
+  char shortReply[11];
+  std::memset(shortReply,'?',sizeof(shortReply));
+  Record unused;
+  assert(exportLine(BootDisposition::NoRecord,unused,shortReply,10)==0);
+  for(size_t i=0;i<sizeof(shortReply);++i)assert(shortReply[i]=='?');
+
   Record rec;rec.transaction[0]=1;rec.manifestDigest[0]=2;
   rec.stage=Stage::EraseIntent;rec.sequence=1;
   char line[140]{};
