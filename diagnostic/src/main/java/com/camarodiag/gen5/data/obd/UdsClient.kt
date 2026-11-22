@@ -43,7 +43,10 @@ data class UdsAccessPolicy internal constructor(
             )
 
         private fun validEcuIdentifier(value: String?): Boolean {
-            val normalized = value?.trim()?.uppercase(Locale.ROOT).orEmpty()
+            // Hardware identification comes from printable ECU bytes, not
+            // Unicode lookalikes or line-control characters in a profile.
+            if (value == null || value.any { it.code !in 0x20..0x7E }) return false
+            val normalized = value.trim().uppercase(Locale.ROOT)
             if (normalized.isBlank() || normalized in setOf(
                     "UNKNOWN", "NONE", "N/A", "NULL", "PENDING", "TBD",
                     "NO DATA", "NO RESPONSE", "INVALID", "ERROR", "TEST",
