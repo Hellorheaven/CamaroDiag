@@ -219,6 +219,46 @@ class EcuBackupArchiveTest {
         }.isFailure)
     }
 
+    @Test fun duplicateRequiredRegionsAndNonpositiveTimestampsAreRejected() {
+        val output = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(output, listOf(capture()),
+                setOf(EcuBackupCoverage.Region.CALIBRATION), createdAtUtcMillis = 0)
+        }.isFailure)
+        assertEquals(0, output.size())
+
+        val original = ByteArrayOutputStream()
+        EcuBackupArchive.export(original, listOf(capture()),
+            setOf(EcuBackupCoverage.Region.CALIBRATION))
+        fun repackage(change: (String) -> String): ByteArray {
+            val modified = ByteArrayOutputStream()
+            java.util.zip.ZipInputStream(original.toByteArray().inputStream()).use { source ->
+                ZipOutputStream(modified).use { target ->
+                    while (true) {
+                        val entry = source.nextEntry ?: break
+                        val data = source.readBytes()
+                        target.putNextEntry(ZipEntry(entry.name))
+                        if (entry.name == "manifest.properties") {
+                            target.write(change(String(data, Charsets.ISO_8859_1))
+                                .toByteArray(Charsets.ISO_8859_1))
+                        } else target.write(data)
+                        target.closeEntry()
+                        source.closeEntry()
+                    }
+                }
+            }
+            return modified.toByteArray()
+        }
+        val duplicated = repackage {
+            it.replace("required=CALIBRATION", "required=CALIBRATION,CALIBRATION")
+        }
+        assertTrue(runCatching { EcuBackupArchive.import(duplicated.inputStream()) }.isFailure)
+        val invalidTime = repackage {
+            it.replace(Regex("(?m)^created=[0-9]+$"), "created=0")
+        }
+        assertTrue(runCatching { EcuBackupArchive.import(invalidTime.inputStream()) }.isFailure)
+    }
+
     @Test fun exportUsesFrozenBytesWhenCallerMutatesBufferDuringZipWrite() {
         val initial = capture()
         val destination = ByteArrayOutputStream()
