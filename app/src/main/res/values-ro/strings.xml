@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Limba aplicației</string>
     <string name="system_language_hint">Alegeți limba pentru CamaroDiag.</string>
     <string name="about_title">Despre CamaroDiag</string>
@@ -634,7 +634,7 @@
     <string name="cal_pc_ip_address">Adresa IP a PC-ului</string>
     <string name="cal_connect_j2534">Conectează puntea J2534</string>
     <string name="cal_disconnect_pc_bridge">Deconectează puntea PC</string>
-    <string name="cal_bridge_capabilities">Punte: HS-CAN ISO15765 250/500 kbit/s și J2534-2 SW-ISO15765 dacă driverul permite. CAN FD rămâne dezactivat.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Punte: HS-CAN ISO15765 250/500 kbit/s și J2534-2 SW-ISO15765 dacă driverul permite. CAN FD rămâne dezactivat.</string>
     <string name="cal_read_uds_did">Citește DID UDS</string>
     <string name="cal_read_uds_dtcs">Citește DTC UDS</string>
     <string name="cal_uds_trouble_codes">Coduri de eroare UDS (0x19)</string>
