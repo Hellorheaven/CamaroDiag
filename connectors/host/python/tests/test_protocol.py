@@ -35,7 +35,7 @@ class DiscoveryTests(unittest.TestCase):
                 self.read_deadline = self.timeout
                 return super().readline()
 
-        port = TimedSerial(b"PONG CamaroDiagConnectors 0.1.0\\n")
+        port = TimedSerial(b"PONG CamaroDiagConnectors 0.1.0\n")
         self.assertEqual(DiscoveryClient(port).execute("PING"),
                          "PONG CamaroDiagConnectors 0.1.0")
         self.assertEqual((2, 2), (port.read_deadline, port.write_deadline))
