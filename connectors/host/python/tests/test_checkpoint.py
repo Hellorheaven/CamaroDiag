@@ -2,6 +2,7 @@ import io
 import pathlib
 import tempfile
 import unittest
+import zlib
 from camarodiagconnectors.checkpoint import retrieve_checkpoint, save_checkpoint, validate
 
 FIXTURE = bytes.fromhex("43444a0102000000010000000102030405060708090a0b0c0d0e0f10202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3fa75e21b6")
@@ -59,6 +60,21 @@ class CheckpointTest(unittest.TestCase):
                 save_checkpoint(path, FIXTURE)
             self.assertEqual(b"keep this unrelated evidence", path.read_bytes())
 
+    def test_checkpoint_stage_sequence_matches_native_firmware_contract(self):
+        def record(stage, sequence):
+            encoded = bytearray(FIXTURE)
+            encoded[4] = stage
+            encoded[8:12] = sequence.to_bytes(4, "little")
+            encoded[60:64] = (zlib.crc32(encoded[:60]) & 0xffffffff).to_bytes(4, "little")
+            return bytes(encoded)
+        for stage, sequence in ((1, 0), (2, 1), (8, 7), (9, 1), (10, 2), (10, 7)):
+            with self.subTest(stage=stage, sequence=sequence):
+                self.assertEqual(record(stage, sequence), validate(record(stage, sequence)))
+        for stage, sequence in ((0, 0), (1, 1), (2, 0), (8, 8), (9, 0),
+                                (10, 1), (10, 8), (11, 10)):
+            with self.subTest(stage=stage, sequence=sequence):
+                with self.assertRaises(ValueError):
+                    validate(record(stage, sequence))
     def test_serial_read_timeout_is_bounded_and_restored(self):
         class SerialPort(Port):
             def __init__(self, response):
