@@ -48,6 +48,7 @@ import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
 import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
 import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeException
+import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeCancelled
 import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
@@ -2110,7 +2111,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (cancelled: CancellationException) {
                 if (canRequestJob === requestJob) {
-                    _liveCanMonitorState.value = _liveCanMonitorState.value.copy(isSendingRequest = false)
+                    val current = _liveCanMonitorState.value
+                    val receivedEvents = (cancelled as? CanConsolePhysicalExchangeCancelled)
+                        ?.receivedRecords.orEmpty().map { timed ->
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = timed.record.direction,
+                                timestampMillis = timed.timestampMillis,
+                                content = timed.record.content,
+                                succeeded = timed.record.succeeded
+                            )
+                        }
+                    // A cancelled TX stays pending/unsuccessful. Old vehicle jobs
+                    // cannot reach this branch after detachCanRequest().
+                    _liveCanMonitorState.value = current.copy(
+                        isSendingRequest = false,
+                        consoleHistory = (current.consoleHistory + receivedEvents).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents)
+                    )
                 }
                 throw cancelled
             } catch (error: Exception) {
