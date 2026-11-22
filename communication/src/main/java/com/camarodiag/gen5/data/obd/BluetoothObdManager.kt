@@ -636,7 +636,11 @@ class BluetoothObdManager(context: Context) {
      * adapter. Receive/header support is checked separately from simulation state; this
      * path never routes through the demo adapter or the ISO-TP-only J2534 bridge.
      */
-    suspend fun sendRawCanFrame(frame: RawCanFrame): String = withContext(Dispatchers.IO) {
+    suspend fun sendRawCanFrame(frame: RawCanFrame): String =
+        sendRawCanFrameWithStatus(frame).adapterOutput
+
+    suspend fun sendRawCanFrameWithStatus(frame: RawCanFrame): CanConsoleRawTransmissionResult =
+        withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
         check(isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive) {
             "Raw CAN transmission requires a connected physical adapter."
@@ -663,8 +667,11 @@ class BluetoothObdManager(context: Context) {
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(isObdCommandChannelAvailable) { "CAN transmission connection changed while waiting." }
-            suspend fun boundCommand(command: String, timeoutMs: Long): String =
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
+            suspend fun boundCommand(
+                command: String, timeoutMs: Long, onChunk: ((String) -> Unit)? = null
+            ): String = sendAtCommandInternal(
+                command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk
+            )
             val protocol = if (frame.isExtended) "7" else "6"
             val header = if (frame.isExtended) {
                 frame.canId.toString(16).uppercase().padStart(8, '0')
@@ -693,11 +700,19 @@ class BluetoothObdManager(context: Context) {
                 val payload = frame.data.joinToString(" ") {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
-                val frameResponse = boundCommand(payload, 4_000L)
-                check(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(frameResponse, frame)) {
+                val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(frame)
+                val frameResponse = boundCommand(payload, 4_000L) { chunk ->
+                    timedCorrelation.append(chunk, System.nanoTime() / 1_000_000L)
+                }
+                val diagnosticStatus = timedCorrelation.complete(System.nanoTime() / 1_000_000L)
+                // An explicit adapter OK establishes TX only. A correlated ECU
+                // reply may also establish completion, but unmatched bus traffic
+                // and late ISO-TP continuations never do.
+                check(CanConsoleAdapterRestorationPolicy.accepted(frameResponse) ||
+                    diagnosticStatus != CanConsoleDiagnosticStatus.NONE) {
                     "The adapter did not confirm the raw CAN transmission."
                 }
-                frameResponse
+                CanConsoleRawTransmissionResult(frameResponse, diagnosticStatus)
             } finally {
                 // Return to the app's configured 11-bit HS-CAN / automatic-format state.
                 withContext(NonCancellable) {
