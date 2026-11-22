@@ -33,7 +33,7 @@ python -m unittest discover -s tests -v
 Voir [découverte USB binaire](docs/user/usb-binary-discovery.md) et [Android](host/android/README.md). Pour tenter la découverte USB sur une carte ESP32-S3 **isolée du véhicule** : flasher `firmware/esp32s3` avec PlatformIO (compilation et qualification physique distinctes), installer `pyserial`, puis `python -m camarodiagconnectors --port COM5 ping`.
 
 ## Gouvernance
-Code, tests et suivi logiciel centralisés dans CamaroDiag (#80, PR #70). [Dépôt matériel](https://github.com/Hellorheaven/CamaroDiagConnectors). Exécuter les commandes depuis `connectors/`.
+Code, tests et suivi logiciel centralisés dans CamaroDiag (#80, PR #70). Matériel, schémas, PCB et documents de validation également centralisés ici. [Ancien dépôt historique](https://github.com/Hellorheaven/CamaroDiagConnectors). Exécuter les commandes depuis `connectors/`.
 
 Aucune licence open source choisie pour le moment. Ne pas publier de dumps, clés ou images firmware GM ni des données véhicules privées.
 

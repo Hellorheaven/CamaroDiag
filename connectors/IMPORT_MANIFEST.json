@@ -51,7 +51,7 @@
     {
       "source": "docs/HARDWARE_VALIDATION.md",
       "destination": "connectors/docs/HARDWARE_VALIDATION.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "docs/PROTOCOLE.md",
@@ -76,27 +76,27 @@
     {
       "source": "docs/user/wiring/README.md",
       "destination": "connectors/docs/user/wiring/README.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "docs/user/wiring/ecu/2012-lfx-e39.md",
       "destination": "connectors/docs/user/wiring/ecu/2012-lfx-e39.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "docs/user/wiring/ecu/2012-ls3-l99-e38.md",
       "destination": "connectors/docs/user/wiring/ecu/2012-ls3-l99-e38.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "docs/user/wiring/ecu/README.md",
       "destination": "connectors/docs/user/wiring/ecu/README.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "docs/user/wiring/ecu/e39a.md",
       "destination": "connectors/docs/user/wiring/ecu/e39a.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "firmware/esp32s3/native-tests/binary_frame_test.cpp",
@@ -256,17 +256,17 @@
     {
       "source": "hardware/README.md",
       "destination": "connectors/hardware/README.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "hardware/rev-a-interconnect.md",
       "destination": "connectors/hardware/rev-a-interconnect.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "hardware/rev-a0-bench.md",
       "destination": "connectors/hardware/rev-a0-bench.md",
-      "kind": "hardware-reference"
+      "kind": "source-copy"
     },
     {
       "source": "host/android/README.md",
@@ -423,5 +423,6 @@
       "destination": "connectors/host/windows-j2534/README.md",
       "kind": "source-copy"
     }
-  ]
+  ],
+  "governance": "Full monorepo: software AND hardware, original repository historical; source snapshot includes original main and PR6."
 }

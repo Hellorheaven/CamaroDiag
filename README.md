@@ -49,7 +49,7 @@ La connexion d'un adaptateur ne garantit pas l'accès à tous les réseaux GM. L
 
 ## CamaroDiagConnectors — connexion native Android
 
-Le logiciel CamaroDiagConnectors est désormais développé dans ce dépôt sous [`connectors/`](connectors/README.md), avec les CI et issues communes. Le [dépôt matériel CamaroDiagConnectors](https://github.com/Hellorheaven/CamaroDiagConnectors) conserve schémas, PCB, brochages et documentation électrique. Il communiquera directement avec Android, sans ordinateur ni pont Windows obligatoire. Les interfaces J2534 tierces existantes continuent à utiliser leur propre chemin de connexion.
+Le logiciel CamaroDiagConnectors est désormais développé dans ce dépôt sous [`connectors/`](connectors/README.md), avec les CI et issues communes. Le matériel, les schémas, PCB, brochages et documents électriques sont également centralisés dans [`connectors/hardware/`](connectors/hardware/README.md) et [`connectors/docs/`](connectors/docs/). L'ancien dépôt reste une archive historique. Il communiquera directement avec Android, sans ordinateur ni pont Windows obligatoire. Les interfaces J2534 tierces existantes continuent à utiliser leur propre chemin de connexion.
 
 Pour la version prototype 0.1.0, la seule fonction disponible est la découverte USB de la carte isolée, **sans raccordement au véhicule ni à une mémoire** :
 
@@ -62,7 +62,7 @@ Le mode CD/1 exige un seul port série CDC ACM compatible, sans sélection arbit
 
 Le mode CD/1 est prévu pour les essais sur carte isolée, conformément au [guide USB binaire](connectors/docs/user/usb-binary-discovery.md). Aucun mode ne permet de communiquer avec un ECU via ce prototype.
 
-Les futurs modes CAN, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD et EEPROM ISP/chip-off nécessitent un firmware et du matériel réellement compatibles et qualifiés. Voir les [exigences du connecteur](https://github.com/Hellorheaven/CamaroDiagConnectors/issues/7). Aucun mode de programmation n'est activé à partir d'une réponse de découverte.
+Les futurs modes CAN, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD et EEPROM ISP/chip-off nécessitent un firmware et du matériel réellement compatibles et qualifiés. Voir les [exigences du connecteur](https://github.com/Hellorheaven/CamaroDiag/issues/86). Aucun mode de programmation n'est activé à partir d'une réponse de découverte.
 
 ### Préparation du raccordement sur banc
 
@@ -70,7 +70,7 @@ Dans ECU/Maps → Expert, les neuf modes de connexion sont des choix de prépara
 
 Le boîtier est prévu pour une alimentation logique USB 5 V protégée. L'alimentation stabilisée externe de banc est dédiée au calculateur, avec protection et limitation adaptées au faisceau. Les opérations critiques devront disposer d'une alimentation logique maintenue indépendamment de la liaison USB ; les puces externes nécessitent leur propre VCC conforme à la référence exacte. Aucun brochage, courant ou tension de programmation universel n'est déduit. Ne raccorder aucune cible au prototype actuel.
 
-Voir [le suivi des fiches](https://github.com/Hellorheaven/CamaroDiagConnectors/issues/10). Les fiches documentaires ne valident ni le faisceau, ni le firmware, ni la récupération après interruption.
+Voir [le suivi des fiches](https://github.com/Hellorheaven/CamaroDiag/issues/89). Les fiches documentaires ne valident ni le faisceau, ni le firmware, ni la récupération après interruption.
 
 ## Matrice des véhicules et fonctions
 
