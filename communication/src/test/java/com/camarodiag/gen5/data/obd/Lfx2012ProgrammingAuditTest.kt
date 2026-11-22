@@ -80,6 +80,33 @@ class Lfx2012ProgrammingAuditTest {
         }
     }
 
+    @Test fun placeholderEcuIdentificationCannotCountAsVerifiedReviewEvidence() {
+        val cases = listOf(
+            before.copy(ecuName = "unknown"),
+            before.copy(calibrationIds = listOf("PENDING")),
+            before.copy(verificationNumbers = listOf("FFFFFFFF")),
+            before.copy(dtcs = listOf("NO RESPONSE"))
+        )
+        for (changed in cases) {
+            val report = Lfx2012ProgrammingAudit.review(
+                before, changed.copy(capturedAtUtcMillis = 2L))
+            assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, report.overall)
+            assertTrue(report.after.any {
+                it.status == Lfx2012ProgrammingAudit.CheckStatus.REQUIRES_REVIEW
+            })
+            assertFalse(report.physicalValidationComplete)
+        }
+    }
+
+    @Test fun zeroOrNegativeCaptureTimestampRequiresHumanReview() {
+        for (timestamp in listOf(0L, -1L)) {
+            val beforeInvalid = before.copy(capturedAtUtcMillis = timestamp)
+            val report = Lfx2012ProgrammingAudit.review(
+                beforeInvalid, before.copy(capturedAtUtcMillis = 2L))
+            assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, report.overall)
+        }
+    }
+
     @Test fun failedCommunicationCannotBeReportedAsPassing() {
         val report = Lfx2012ProgrammingAudit.review(
             before, before.copy(communicationConfirmed = false, capturedAtUtcMillis = 2L))
