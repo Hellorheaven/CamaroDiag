@@ -81,7 +81,7 @@ internal static class NativeE39QualifiedBenchCli
         }
         catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or
             ArgumentException or InvalidOperationException or OperationCanceledException or
-            CryptographicException or JsonException or OverflowException or NotSupportedException)
+            CryptographicException or JsonException or OverflowException or NotSupportedException or AggregateException)
         {
             Console.Error.WriteLine("Bench transaction refused or interrupted: " + error.Message);
             Console.Error.WriteLine("Preserve original and any journal. Do not automatically retry or reset the ECU.");
