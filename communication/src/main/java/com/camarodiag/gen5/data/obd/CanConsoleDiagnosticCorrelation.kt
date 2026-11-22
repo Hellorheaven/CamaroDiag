@@ -136,5 +136,6 @@ class CanConsoleDiagnosticCorrelation(
         nextSequence = 1
         pending = ByteArray(0)
         startedAt = 0L
+        completed = false
     }
 }
