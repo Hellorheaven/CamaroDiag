@@ -468,6 +468,9 @@ class ProfiledUdsReadSession private constructor(
             profile: DocumentedUdsReadProfile,
             timeoutMs: Long = 3000L
         ): ProfiledUdsReadSession {
+            require(timeoutMs in 1..30_000L) {
+                "UDS ECU identification timeout must be between 1 and 30000 ms."
+            }
             // Snapshot caller-owned mutable allowlists before any suspending CAN
             // exchange. A concurrent UI/profile edit cannot broaden this session.
             val approved = profile.copy(
