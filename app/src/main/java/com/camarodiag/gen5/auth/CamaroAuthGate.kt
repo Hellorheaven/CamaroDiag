@@ -1,5 +1,6 @@
 package com.camarodiag.gen5.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,6 +9,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
@@ -46,9 +51,7 @@ fun CamaroAuthGate(
         context.getSharedPreferences("camarodiag_session_validation", Context.MODE_PRIVATE)
     }
     val signOut = rememberFirebaseSignOut(auth)
-    var currentUser by remember { mutableStateOf(auth.currentUser) }
-    // Recompose after an explicit Firebase email verification reload.
-    var verificationRevision by remember { mutableIntStateOf(0) }
+    var currentUser by remember { mutableStateOf(auth.currentUser, referentialEqualityPolicy()) }
     DisposableEffect(auth) {
         val listener = FirebaseAuth.AuthStateListener { currentUser = it.currentUser }
         auth.addAuthStateListener(listener)
@@ -59,6 +62,7 @@ fun CamaroAuthGate(
     var validatedAccountUid by remember { mutableStateOf<String?>(null) }
     var validatedUser by remember { mutableStateOf<com.google.firebase.auth.FirebaseUser?>(null) }
     var validationError by remember { mutableStateOf<String?>(null) }
+    var verificationRequired by remember { mutableStateOf(false) }
     var accessLevel by remember { mutableStateOf(LicenseLevel.FREE) }
     var retryValidation by remember { mutableIntStateOf(0) }
     var validationGeneration by remember { mutableIntStateOf(0) }
@@ -92,7 +96,8 @@ fun CamaroAuthGate(
             readyAccountUid = null
             validatedAccountUid = null
             validatedUser = null
-            latestOnAccountChanged(user?.uid)
+            verificationRequired = false
+            latestOnAccountChanged(null)
             readyAccountUid = user?.uid
         }
         validationError = null
@@ -105,6 +110,18 @@ fun CamaroAuthGate(
                 if (task.isSuccessful) {
                     val verifiedClaims = task.result?.claims.orEmpty()
                     val providerIds = user.providerData.map { it.providerId }
+                    val verifiedEmail = EmailVerificationPolicy.isVerified(verifiedClaims)
+                    verificationRequired = EmailVerificationPolicy.requiresVerification(providerIds, verifiedClaims)
+                    if (verificationRequired) {
+                        // Keep the signed-in Firebase session for verification only. Do not expose
+                        // diagnostics, previous account state, owner access or offline grace.
+                        accessLevel = LicenseLevel.FREE
+                        validationPrefs.edit { remove("verified_$targetUid"); remove("verified_email_$targetUid") }
+                        validatedAccountUid = targetUid
+                        validatedUser = user
+                        latestOnAccountChanged(null)
+                        return@addOnCompleteListener
+                    }
                     // Owner claim is signed by Firebase Admin. Paying users
                     // require a SECOND proof from Firestore's SERVER, never cache.
                     accessLevel = if (!LicenseRolloutConfig.ENABLED) {
@@ -115,7 +132,7 @@ fun CamaroAuthGate(
                     } else LicenseAccessPolicy.resolve(
                         uid = targetUid,
                         email = user.email,
-                        emailVerified = user.isEmailVerified,
+                        emailVerified = verifiedEmail,
                         providerIds = providerIds,
                         signedClaims = verifiedClaims,
                         license = null
@@ -148,7 +165,7 @@ fun CamaroAuthGate(
                                 accessLevel = LicenseAccessPolicy.resolve(
                                     uid = targetUid,
                                     email = user.email,
-                                    emailVerified = user.isEmailVerified,
+                                    emailVerified = verifiedEmail,
                                     providerIds = providerIds,
                                     signedClaims = verifiedClaims,
                                     license = licenseRecord
@@ -157,6 +174,8 @@ fun CamaroAuthGate(
                     }
                     validationPrefs.edit {
                         putLong("verified_$targetUid", System.currentTimeMillis())
+                        if (verifiedEmail) putString("verified_email_$targetUid", user.email.orEmpty())
+                        else remove("verified_email_$targetUid")
                     }
                     validatedAccountUid = targetUid
                     validatedUser = user
@@ -165,8 +184,11 @@ fun CamaroAuthGate(
                     // An offline grace period can allow ordinary diagnostics, never owner tests.
                     accessLevel = LicenseLevel.FREE
                     val lastValidated = validationPrefs.getLong("verified_$targetUid", 0L)
+                    val previousEmail = validationPrefs.getString("verified_email_$targetUid", null)
                     val offlineGrace = task.exception is FirebaseNetworkException &&
-                        OfflineSessionPolicy.allowsOfflineAccess(
+                        !verificationRequired && EmailVerificationPolicy.allowsOfflineEmail(
+                            user.providerData.map { it.providerId }, user.email, user.isEmailVerified, previousEmail
+                        ) && OfflineSessionPolicy.allowsOfflineAccess(
                             lastValidated, System.currentTimeMillis()
                         )
                     if (offlineGrace) {
@@ -195,10 +217,10 @@ fun CamaroAuthGate(
     }
     if (user == null) {
         CamaroLoginScreen(auth)
-    } else if (user.providerData.any { it.providerId == "password" } &&
-        !remember(user, verificationRevision) { user.isEmailVerified }
+    } else if (verificationRequired && readyAccountUid == user.uid &&
+        validatedAccountUid == user.uid && validatedUser === user
     ) {
-        EmailVerificationScreen(auth, onVerified = { verificationRevision++ })
+        key(user.uid) { EmailVerificationScreen(auth, onRefresh = { retryValidation++ }) }
     } else if (readyAccountUid != user.uid || validatedAccountUid != user.uid ||
         validatedUser !== user
     ) {
@@ -299,7 +321,7 @@ fun CamaroAuthGate(
                                                     GoogleAuthProvider.getCredential(google.idToken, null)
                                                 ).addOnCompleteListener { result ->
                                                     linking = false
-                                                    if (result.isSuccessful) accountRevision++
+                                                    if (result.isSuccessful) { accountRevision++; retryValidation++ }
                                                     linkMessage = if (result.isSuccessful) {
                                                         if (french) "Compte Google lié." else "Google account linked."
                                                     } else {
@@ -336,7 +358,7 @@ fun CamaroAuthGate(
                                 user.linkWithCredential(credential).addOnCompleteListener { result ->
                                     linking = false
                                     linkPassword = ""
-                                    if (result.isSuccessful) accountRevision++
+                                    if (result.isSuccessful) { accountRevision++; retryValidation++ }
                                     linkMessage = if (result.isSuccessful) {
                                         if (french) "Connexion e-mail ajoutée." else "Email sign-in added."
                                     } else {
@@ -395,7 +417,7 @@ fun CamaroAuthGate(
                             if (result.isSuccessful) {
                                 // The deleted account must not retain an offline
                                 // authentication grace if it is later recreated.
-                                validationPrefs.edit { remove("verified_$accountToDelete") }
+                                validationPrefs.edit { remove("verified_$accountToDelete"); remove("verified_email_$accountToDelete") }
                                 onAccountDeleted(accountToDelete)
                                 deleteConfirm = false
                                 accountOpen = false
@@ -473,6 +495,7 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
                                 } else {
                                     // Do not claim the verification email was sent before
                                     // Firebase confirms the request actually succeeded.
+                                    auth.setLanguageCode(if (french) "fr" else "en")
                                     registeredUser.sendEmailVerification().addOnCompleteListener { sent ->
                                         if (auth.currentUser?.uid != registeredUser.uid) return@addOnCompleteListener
                                         message = if (sent.isSuccessful) {
@@ -503,6 +526,7 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
         }
         TextButton(enabled = !busy && email.isNotBlank(), onClick = {
             busy = true
+            auth.setLanguageCode(if (french) "fr" else "en")
             auth.sendPasswordResetEmail(email.trim()).addOnCompleteListener { task ->
                 busy = false
                 message = if (task.isSuccessful) {
@@ -555,7 +579,12 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
                 }
             },
             modifier = Modifier.fillMaxWidth()
-        ) { Text(if (french) "Continuer avec Google" else "Continue with Google") }
+        ) {
+            Image(painter = painterResource(R.drawable.ic_google_sign_in), contentDescription = null,
+                modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(if (french) "Continuer avec Google" else "Continue with Google")
+        }
         if (message.isNotBlank()) {
             Spacer(Modifier.height(16.dp))
             Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -564,13 +593,60 @@ private fun CamaroLoginScreen(auth: FirebaseAuth) {
 }
 
 @Composable
-private fun EmailVerificationScreen(auth: FirebaseAuth, onVerified: () -> Unit) {
+private fun EmailVerificationScreen(auth: FirebaseAuth, onRefresh: () -> Unit) {
     val signOut = rememberFirebaseSignOut(auth)
     val french = LocalConfiguration.current.locales[0].language == "fr"
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val latestRefresh by rememberUpdatedState(onRefresh)
     var message by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var sending by remember { mutableStateOf(false) }
+
+    fun refreshVerification() {
+        val pendingUser = auth.currentUser ?: return
+        if (busy) return
+        busy = true
+        message = ""
+        pendingUser.reload().addOnCompleteListener { task ->
+            if (auth.currentUser !== pendingUser) {
+                busy = false
+                return@addOnCompleteListener
+            }
+            if (!task.isSuccessful) {
+                busy = false
+                message = if (french) "Actualisation impossible. Vérifiez votre connexion puis réessayez."
+                    else "Unable to refresh. Check your connection and try again."
+                return@addOnCompleteListener
+            }
+            // reload() updates the mutable user object; get a fresh signed token
+            // too, so linked providers and the email_verified claim agree.
+            pendingUser.getIdToken(true).addOnCompleteListener { refreshed ->
+                busy = false
+                if (auth.currentUser !== pendingUser) return@addOnCompleteListener
+                val confirmed = refreshed.isSuccessful &&
+                    EmailVerificationPolicy.isVerified(refreshed.result?.claims.orEmpty())
+                message = when {
+                    confirmed -> if (french) "Adresse vérifiée." else "Email verified."
+                    !refreshed.isSuccessful -> if (french) "Impossible de confirmer la session. Réessayez."
+                        else "Unable to confirm the session. Try again."
+                    else -> if (french) "Vérification non confirmée. Ouvrez le lien reçu puis réessayez."
+                        else "Verification not confirmed. Open the email link and try again."
+                }
+                if (confirmed) latestRefresh()
+            }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, auth) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshVerification()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -578,28 +654,24 @@ private fun EmailVerificationScreen(auth: FirebaseAuth, onVerified: () -> Unit) 
             style = MaterialTheme.typography.headlineSmall)
         Text(auth.currentUser?.email.orEmpty())
         Spacer(Modifier.height(16.dp))
-        Button(enabled = !busy, onClick = {
-            val pendingUser = auth.currentUser ?: return@Button
-            busy = true
-            pendingUser.reload().addOnCompleteListener { task ->
-                busy = false
-                val verified = task.isSuccessful &&
-                    auth.currentUser?.uid == pendingUser.uid &&
-                    auth.currentUser?.isEmailVerified == true
-                message = if (verified) {
-                    if (french) "Adresse vérifiée." else "Email verified."
-                } else {
-                    if (french) "Vérification non confirmée." else "Verification not confirmed."
-                }
-                if (verified) onVerified()
-            }
-        }) { Text(if (french) "J'ai vérifié mon adresse" else "I've verified my email") }
-        TextButton(enabled = !busy, onClick = {
-            auth.currentUser?.sendEmailVerification()?.addOnCompleteListener { task ->
+        Text(if (french) "Ouvrez le lien dans votre e-mail, puis revenez ici. La vérification sera actualisée automatiquement."
+            else "Open the link in your email, then return here. Verification will refresh automatically.")
+        Spacer(Modifier.height(16.dp))
+        Button(enabled = !busy && !sending, onClick = { refreshVerification() }) {
+            Text(if (french) "J'ai vérifié mon adresse" else "I've verified my email")
+        }
+        if (busy) CircularProgressIndicator(Modifier.size(24.dp))
+        TextButton(enabled = !busy && !sending, onClick = {
+            val pendingUser = auth.currentUser ?: return@TextButton
+            sending = true
+            auth.setLanguageCode(if (french) "fr" else "en")
+            pendingUser.sendEmailVerification().addOnCompleteListener { task ->
+                sending = false
+                if (auth.currentUser !== pendingUser) return@addOnCompleteListener
                 message = if (task.isSuccessful) {
                     if (french) "E-mail de vérification envoyé." else "Verification email sent."
                 } else {
-                    if (french) "Envoi impossible." else "Unable to send email."
+                    if (french) "Envoi impossible. Réessayez plus tard." else "Unable to send email. Try again later."
                 }
             }
         }) { Text(if (french) "Renvoyer l'e-mail" else "Resend email") }
