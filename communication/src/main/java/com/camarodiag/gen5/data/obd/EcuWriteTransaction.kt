@@ -31,6 +31,7 @@ object EcuWriteTransaction {
         val evidence: SafetyEvidence,
         val accessMethod: EcuBenchExpertPlan.AccessMethod = EcuBenchExpertPlan.AccessMethod.OBD
     ) {
+        internal fun frozen() = copy(originalImage = originalImage.copyOf(), updatedImage = updatedImage.copyOf())
         internal val firmwareTarget get() = EcuProgrammingDriverContract.FirmwareTarget(
             controllerFamily, expectedIdentity.controllerId, expectedIdentity.firmwareId
         )
@@ -133,22 +134,23 @@ object EcuWriteTransaction {
         journalFile: java.io.File,
         powerMonitor: PowerMonitor
     ): Outcome {
-        val preparation = prepare(request)
+        val snapshot = request.frozen()
+        val preparation = prepare(snapshot)
         if (!preparation.canAttemptWithValidatedHardware) {
             return Outcome(Status.BLOCKED, preparation.blockers)
         }
         if (preparation.changedBytes == 0L) return Outcome(Status.NO_CHANGE)
         val driver = EcuProgrammingDriverContract.registeredHardwareDrivers.firstOrNull {
-            it.descriptor.supportsWrite(request.firmwareTarget, request.transport, request.region, request.accessMethod)
+            it.descriptor.supportsWrite(snapshot.firmwareTarget, snapshot.transport, snapshot.region, snapshot.accessMethod)
         } ?: return Outcome(Status.BLOCKED, setOf(Blocker.NO_VALIDATED_DRIVER))
         val journal = try {
             PersistentEcuWriteJournal(
-                journalFile, request.firmwareTarget, requireNotNull(request.expectedIdentity.vin)
+                journalFile, snapshot.firmwareTarget, requireNotNull(snapshot.expectedIdentity.vin)
             )
         } catch (_: Exception) {
             return Outcome(Status.STOPPED_REQUIRES_ASSESSMENT)
         }
-        return EcuWriteExecutionEngine(driver, journal, powerMonitor).run(request)
+        return EcuWriteExecutionEngine(driver, journal, powerMonitor).run(snapshot)
     }
 
     /**
@@ -160,15 +162,16 @@ object EcuWriteTransaction {
         journal: Journal,
         powerMonitor: PowerMonitor
     ): Outcome {
-        val preparation = prepare(request)
+        val snapshot = request.frozen()
+        val preparation = prepare(snapshot)
         if (!preparation.canAttemptWithValidatedHardware) {
             return Outcome(Status.BLOCKED, preparation.blockers)
         }
         if (preparation.changedBytes == 0L) return Outcome(Status.NO_CHANGE)
         val driver = EcuProgrammingDriverContract.registeredHardwareDrivers.firstOrNull {
-            it.descriptor.supportsWrite(request.firmwareTarget, request.transport, request.region, request.accessMethod)
+            it.descriptor.supportsWrite(snapshot.firmwareTarget, snapshot.transport, snapshot.region, snapshot.accessMethod)
         } ?: return Outcome(Status.BLOCKED, setOf(Blocker.NO_VALIDATED_DRIVER))
-        return EcuWriteExecutionEngine(driver, journal, powerMonitor).run(request)
+        return EcuWriteExecutionEngine(driver, journal, powerMonitor).run(snapshot)
     }
 }
 
@@ -181,7 +184,8 @@ internal class EcuWriteExecutionEngine(
     private val journal: EcuWriteTransaction.Journal,
     private val powerMonitor: EcuWriteTransaction.PowerMonitor
 ) {
-    suspend fun run(request: EcuWriteTransaction.Request): EcuWriteTransaction.Outcome {
+    suspend fun run(input: EcuWriteTransaction.Request): EcuWriteTransaction.Outcome {
+        val request = input.frozen()
         val plan = EcuWriteTransaction.prepare(request)
         if (!plan.canAttemptWithValidatedHardware) {
             return EcuWriteTransaction.Outcome(
@@ -191,9 +195,9 @@ internal class EcuWriteExecutionEngine(
         if (plan.changedBytes == 0L) {
             return EcuWriteTransaction.Outcome(EcuWriteTransaction.Status.NO_CHANGE)
         }
-        // Freeze caller-owned mutable arrays before any suspension/driver I/O.
-        val original = request.originalImage.copyOf()
-        val updated = request.updatedImage.copyOf()
+        // Use the same private snapshot for preparation and execution.
+        val original = request.originalImage
+        val updated = request.updatedImage
         val preview = EcuPartialWritePlanner.preview(request.layout, original, updated)
         if (!driver.descriptor.supportsWrite(request.firmwareTarget, request.transport, request.region, request.accessMethod)) {
             return EcuWriteTransaction.Outcome(
@@ -250,7 +254,9 @@ internal class EcuWriteExecutionEngine(
                 val region = EcuProgrammingDriverContract.RegionRequest(
                     request.region, sector.absoluteAddress, sector.originalBytes.size.toLong()
                 )
-                if (!driver.read(region).contentEquals(sector.originalBytes) ||
+                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
+                    !driver.read(region).contentEquals(sector.originalBytes) ||
+                    !powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
                     !driver.independentReadback(region).contentEquals(sector.originalBytes)
                 ) {
                     return EcuWriteTransaction.Outcome(

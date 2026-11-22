@@ -668,3 +668,9 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 ### 22/11/2026 — Socle commun K-Line passif
 - Connectors ee9927f : analyse hors ligne ISO 14230-2 adressage physique, longueur courte/étendue, checksum, adresses exactes ; tests C++ et CI. Aucun TX, initialisation K-Line, ISO 9141 ou accès ECU.
 - Côté CamaroDiag : KwpFrameInspector et tests Kotlin, mêmes vecteurs synthétiques que le firmware (82 F1 12 61 01 E7 et 80 F1 12 02 61 01 E7). Aucun support TuneECU réel déduit, aucune capacité K-Line active. Maintenir les tests physiques #12 séparés.
+
+
+### 22/11/2026 — Session coordonnée pont Windows et protections
+- PR70 a026fbf : découverte locale CD/1 dans le pont Windows, CLI explicite COM, test simulé et package System.IO.Ports ; pas de backend ECU ni relais réseau. 13445d8 / Connectors c5349e3 : délai Windows global par échange, test de réponse lente et réutilisation refusée.
+- Connectors ad92a68 : arbitre de sessions exclusives de lecture, générations locales, refus de callback obsolète et verrou de récupération ; modèle isolé sans I/O. Le précédent lot ee9927f a ses quatre workflows verts.
+- PR70 : snapshot privé unique avant contrôle/planification et protections pendant la double lecture baseline ; tests de coupure et mutation des images. Aucune activation de driver ECU. Attendre les CI complètes, pas de fusion avant build sans avertissements et validation des critères existants.

@@ -50,6 +50,8 @@ class EcuWriteTransactionTest {
         var disturbEarlierSector = false
         var disturbNextSector = false
         var finalReadbackCount = 0
+        var reads = 0
+        var afterRead: (() -> Unit)? = null
         override val descriptor = EcuProgrammingDriverContract.Descriptor(
             id = "in-memory-test-only",
             transport = EcuProgrammingDriverContract.Transport.J2534,
@@ -78,7 +80,8 @@ class EcuWriteTransactionTest {
             identityAfterErases?.takeIf { eraseCalls >= it.first }?.second ?: identity
         override suspend fun read(request: EcuProgrammingDriverContract.RegionRequest): ByteArray {
             val start = start(request)
-            return memory.copyOfRange(start, start + request.length.toInt())
+            reads++
+            return memory.copyOfRange(start, start + request.length.toInt()).also { afterRead?.invoke() }
         }
         override suspend fun erase(request: EcuProgrammingDriverContract.RegionRequest) {
             if (failOnErase) error("Lost connection before erasure")
@@ -256,6 +259,31 @@ class EcuWriteTransactionTest {
         assertEquals(1, device.eraseCalls)
         assertEquals(4, device.writeCalls)
         assertEquals(1, records.count { it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE })
+    }
+
+    @Test fun lossOfPowerDuringBaselineReadNeverStartsSecondAcquisitionOrErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        var stable = true
+        device.afterRead = { stable = false }
+        val both = original.copyOf().also { it[2] = 100; it[10] = 110 }
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { stable }
+        ).run(request(both))
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, device.reads)
+        assertEquals(0, device.eraseCalls)
+    }
+
+    @Test fun mutatingCallerImageDuringReadDoesNotChangeFrozenProgrammingPlan() = runBlocking {
+        val req = request()
+        val expected = req.updatedImage.copyOf()
+        val device = FakeDriver(original, expectedIdentity)
+        device.afterRead = { req.updatedImage.fill(0); req.originalImage.fill(0) }
+        val result = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true }
+        ).run(req)
+        assertEquals(EcuWriteTransaction.Status.COMPLETED, result.status)
+        assertArrayEquals(expected, device.memory)
     }
 
     @Test fun baselineMismatchStopsBeforeAnyErase() = runBlocking {
