@@ -41,7 +41,10 @@ internal static class NativeE39BackupQualification
             throw new UnauthorizedAccessException("Original image OSID differs from live ECU.");
 
         var expectedHash = Convert.ToHexString(SHA256.HashData(original));
-        if (captured.Bytes.Length != NativeE39ImageInspector.ImageBytes ||
+        if (captured.SecondBytes is null ||
+            ReferenceEquals(captured.Bytes, captured.SecondBytes) ||
+            !CryptographicOperations.FixedTimeEquals(captured.Bytes, captured.SecondBytes) ||
+            captured.Bytes.Length != NativeE39ImageInspector.ImageBytes ||
             captured.BlocksPerPass != (scope.Length + (uint)scope.MaxReadBytes - 1) /
                 (uint)scope.MaxReadBytes ||
             captured.Sha256 != expectedHash ||
@@ -97,32 +100,8 @@ internal static class NativeE39BackupQualification
             if (first.Vin != scope.ExpectedVin ||
                 NativeE39ImageInspector.Inspect(original).OsIdentifier != first.OperatingSystemId)
                 throw new UnauthorizedAccessException("Live VIN or OSID differs from the original image/profile.");
-            var extended = false;
-            NativeScopedMemoryReader.VerifiedCapture capture;
-            try
-            {
-                if (scope.Session == 3)
-                {
-                    var ack = await link.ExchangeAsync([0x10, 0x03], cancel.Token);
-                    if (ack.Length < 2 || ack[0] != 0x50 || ack[1] != 0x03)
-                        throw new InvalidDataException("Extended diagnostic read session refused.");
-                    extended = true;
-                }
-                Console.WriteLine("Acquiring full flash twice via the explicitly selected J2534 read scope.");
-                capture = await NativeScopedMemoryReader.ReadTwiceAsync(link, scope, null, cancel.Token);
-            }
-            finally
-            {
-                if (extended)
-                {
-                    // Never change session on a replacement ECU. Do not retry.
-                    // If cleanup cannot be confirmed, fail qualification.
-                    await NativeScopedMemoryReader.RequireLiveVinAsync(link, scope, CancellationToken.None);
-                    var ack = await link.ExchangeAsync([0x10, 0x01], CancellationToken.None);
-                    if (ack.Length < 2 || ack[0] != 0x50 || ack[1] != 0x01)
-                        throw new InvalidDataException("Return to default diagnostic session was not confirmed.");
-                }
-            }
+            Console.WriteLine("Acquiring full flash twice via the explicitly selected J2534 read scope.");
+            var capture = await NativeScopedMemoryReader.ReadWithSessionAsync(link, scope, null, cancel.Token);
             cancel.Token.ThrowIfCancellationRequested();
             var second = device.ReadGmlanIdentification();
             var evidence = Compare(scope, original, capture, first, second);
