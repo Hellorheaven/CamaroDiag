@@ -250,6 +250,15 @@ object CamaroUdsProtocol {
         return null
     }
 
+    /**
+     * SAE J1979 PID 0x43 absolute load is not limited to 100%.
+     * Formula: (256*A + B) * 100/255; the maximum encoded value is 25700%.
+     */
+    fun decodeAbsoluteLoadPercent(bytes: IntArray?): Double? {
+        if (bytes?.size != 2 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[0] shl 8) or bytes[1]) * 100.0 / 255.0
+    }
+
     /** SAE J1979 Mode 01 PID 0x52 returns exactly one unsigned ethanol byte. */
     fun decodeEthanolPercent(bytes: IntArray?): Double? {
         val raw = bytes?.singleOrNull() ?: return null
