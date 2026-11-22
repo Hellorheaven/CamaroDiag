@@ -695,6 +695,7 @@ fun CamaroDiagApp(
                     isAvailable = viewModel.canMonitorAvailable(),
                     canReadObdAvailable = viewModel.canConsoleReadObd(),
                     canTransmitAvailable = adapter.supportsCanTransmit,
+                    knownModules = modules,
                     onStart = { viewModel.startCanMonitor() },
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
@@ -1680,6 +1681,7 @@ fun CanSnifferScreen(
     isAvailable: Boolean,
     canReadObdAvailable: Boolean,
     canTransmitAvailable: Boolean,
+    knownModules: List<EcuModule>,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
@@ -1708,6 +1710,15 @@ fun CanSnifferScreen(
         if (selectedObservedCanId != null && selectedObservedCanId !in observedCanIds) {
             selectedObservedCanId = null
         }
+    }
+    // Only identify a module by name if its actual CAN responder was observed
+    // during a verified physical scan, not from the predicted vehicle topology.
+    val physicallyIdentifiedModules = remember(knownModules, observedCanIds) {
+        knownModules.filter { module ->
+            module.status == ModuleStatus.ACCESSIBLE &&
+                module.notesEn.startsWith("Observed ") &&
+                module.rxHeader.toLongOrNull(16) in observedCanIds
+        }.associateBy { it.rxHeader.toLongOrNull(16) }
     }
     val rawCanFrameInput = remember(requestInput) { RawCanFrameParser.parse(requestInput) != null }
     val unsafeRawCanInput = remember(requestInput) {
@@ -1839,10 +1850,20 @@ fun CanSnifferScreen(
                             observedCanIds.forEach { id ->
                                 DropdownMenuItem(
                                     text = {
-                                        Text(stringResource(
-                                            R.string.can_console_filter_observed_id,
-                                            CanConsoleDisplayFilter.displayId(id)
-                                        ))
+                                        val module = physicallyIdentifiedModules[id]
+                                        Text(
+                                            if (module == null)
+                                                stringResource(
+                                                    R.string.can_console_filter_observed_id,
+                                                    CanConsoleDisplayFilter.displayId(id)
+                                                )
+                                            else stringResource(
+                                                R.string.can_console_filter_verified_ecu,
+                                                if (LocalConfiguration.current.locales[0].language == "fr")
+                                                    module.nameFr else module.nameEn,
+                                                CanConsoleDisplayFilter.displayId(id)
+                                            )
+                                        )
                                     },
                                     onClick = {
                                         selectedObservedCanId = id
