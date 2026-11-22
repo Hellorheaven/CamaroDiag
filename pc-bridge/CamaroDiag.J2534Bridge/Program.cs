@@ -31,6 +31,11 @@ internal static class Program
             return 2;
         }
 
+        // Explicit local programming path; malformed invocations cannot fall
+        // through to a network listener, updater or another CLI operation.
+        if (args.Contains(NativeE39QualifiedBenchCli.Command, StringComparer.OrdinalIgnoreCase))
+            return await NativeE39QualifiedBenchCli.RunAsync(args);
+
         // Offline, no-driver validation for Windows CI. Never starts a bridge listener.
         if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
             return BridgeSelfTests.Run();
