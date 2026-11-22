@@ -204,8 +204,13 @@ class CanConsoleRecordParserTest {
         }
     }
     @Test fun isoTpAutomaticFlowControlMustBeConfirmedBeforeRawDiagnosticRequest() {
+        assertEquals("ATFCSM0", CanConsoleIsotpFlowControlPolicy.RESTORE_AUTOMATIC_MODE)
         assertEquals("ATCFC1", CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC)
-        for (reply in listOf("OK", "ok>", "ATCFC1\r\nOK")) {
+        assertEquals(
+            listOf("ATFCSM0", "ATCFC1"),
+            CanConsoleIsotpFlowControlPolicy.setupCommands()
+        )
+        for (reply in listOf("OK", "ok>", "ATFCSM0\r\nOK", "ATCFC1\r\nOK")) {
             assertTrue(reply, CanConsoleIsotpFlowControlPolicy.adapterConfirmed(reply))
         }
         for (reply in listOf(
