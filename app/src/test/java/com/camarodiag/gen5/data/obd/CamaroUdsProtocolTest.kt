@@ -451,4 +451,20 @@ class CamaroUdsProtocolTest {
         }
     }
 
+    @Test
+    fun absoluteLoadPid43UsesTheSaeScalingAndCanExceedOneHundredPercent() {
+        assertEquals(0.0,
+            requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(0, 0))), 0.001)
+        assertEquals(100.0,
+            requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(0, 255))), 0.001)
+        assertEquals(200.0,
+            requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(1, 254))), 0.001)
+        assertEquals(25700.0,
+            requireNotNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(255, 255))), 0.001)
+        assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(255)))
+        assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(255, 0, 0)))
+        assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(-1, 1)))
+        assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(256, 1)))
+    }
+
 }
