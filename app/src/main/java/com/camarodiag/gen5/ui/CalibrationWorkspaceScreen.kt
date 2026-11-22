@@ -1190,6 +1190,24 @@ fun CalibrationWorkspaceScreen(
                                 Text(stringResource(R.string.cal_archive_partial), color = CamaroAmber)
                             }
                             manifest.vehicleVin?.let { Text("${stringResource(R.string.obd_vin)} $it", color = TextPrimary) }
+                            if (manifest.channel != null) {
+                                val route = manifest.channel
+                                Text(
+                                    stringResource(
+                                        R.string.cal_archive_channel,
+                                        route.requestCanId.toString(16).uppercase(),
+                                        route.responseCanId.toString(16).uppercase(),
+                                        route.protocolNumber,
+                                        route.diagnosticSession
+                                    ),
+                                    color = TextMuted, fontSize = 11.sp
+                                )
+                            } else {
+                                Text(stringResource(R.string.cal_archive_legacy_route),
+                                    color = CamaroAmber, fontSize = 11.sp)
+                            }
+                            Text(stringResource(R.string.cal_archive_unattested),
+                                color = CamaroAmber, fontSize = 11.sp)
                             Text(stringResource(R.string.cal_payload_size, manifest.coverage.capturedBytes), color = TextPrimary)
                             for (entry in manifest.entries) {
                                 val end = entry.startAddress + entry.bytesCaptured - 1

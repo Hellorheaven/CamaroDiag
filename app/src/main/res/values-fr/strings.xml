@@ -900,7 +900,10 @@
     <string name="cal_archive_verify">Vérifier le ZIP de sauvegarde du calculateur</string>
     <string name="cal_archive_verified">Les deux lectures concordent et les empreintes SHA-256 sont valides pour les plages archivées.</string>
     <string name="cal_archive_partial">La sauvegarde ne couvre qu’une partie de la mémoire demandée.</string>
-    <string name="cal_archive_failed">Impossible de vérifier ce ZIP. La limite est de 32 Mio après décompression.</string>
+    <string name="cal_archive_failed">Impossible de vérifier ce ZIP. La limite est de 32 Mio de données et 64 Kio de métadonnées.</string>
+    <string name="cal_archive_channel">Canal J2534 déclaré : TX %1$s / RX %2$s, protocole %3$d, session de diagnostic %4$d.</string>
+    <string name="cal_archive_legacy_route">Archive ancienne : les identifiants CAN et la session ne sont pas enregistrés.</string>
+    <string name="cal_archive_unattested">Intégrité hors ligne uniquement : l’origine physique et la couverture complète du firmware ne sont pas certifiées.</string>
     <!-- Owner-only Debug downloads and staged license labels -->
     <string name="tab_debug_builds">Versions Debug</string>
     <string name="tab_license">Licence</string>

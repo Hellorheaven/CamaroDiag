@@ -897,7 +897,10 @@
     <string name="cal_archive_verify">Verify ECU backup ZIP</string>
     <string name="cal_archive_verified">Both reads match and the SHA-256 hashes are valid for the archived ranges.</string>
     <string name="cal_archive_partial">The backup covers only part of the requested memory.</string>
-    <string name="cal_archive_failed">Could not verify this ZIP. The limit is 32 MiB uncompressed.</string>
+    <string name="cal_archive_failed">Could not verify this ZIP. The maximum imported data is 32 MiB plus 64 KiB of metadata.</string>
+    <string name="cal_archive_channel">Declared J2534 route: TX %1$s / RX %2$s, protocol %3$d, diagnostic session %4$d.</string>
+    <string name="cal_archive_legacy_route">Legacy archive: CAN route and session were not recorded.</string>
+    <string name="cal_archive_unattested">Offline integrity only: physical ECU provenance and full firmware coverage are not certified.</string>
     <!-- Owner-only Debug downloads and staged license labels -->
     <string name="tab_debug_builds">Debug builds</string>
     <string name="tab_license">License</string>
