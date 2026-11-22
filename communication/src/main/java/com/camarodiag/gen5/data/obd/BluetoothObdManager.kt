@@ -560,6 +560,7 @@ class BluetoothObdManager(context: Context) {
      */
     suspend fun captureCanMonitor(
         durationMs: Long = Long.MAX_VALUE,
+        can29Bit: Boolean = false,
         onChunk: (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
@@ -587,6 +588,13 @@ class BluetoothObdManager(context: Context) {
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = CanCaptureTextBuffer()
             try {
+                // Select the actual frame format explicitly: the adapter's previous
+                // diagnostic protocol cannot be assumed to match the monitor.
+                val protocolAnswer = boundCommand(
+                    CanMonitorProtocolPolicy.protocolCommand(can29Bit), 1_500L
+                )
+                if (!CanConsoleAdapterRestorationPolicy.accepted(protocolAnswer))
+                    throw CanAdapterRestorationException()
                 for (command in listOf("ATE0", "ATL0", "ATS1", "ATH1")) {
                     val answer = boundCommand(command, 1_000L)
                     if (!CanConsoleAdapterRestorationPolicy.accepted(answer))
@@ -597,8 +605,9 @@ class BluetoothObdManager(context: Context) {
                     "The connected adapter cannot switch to raw CAN formatting."
                 }
                 if (isStnAdapter) {
-                    val canFilterResponse = boundCommand("ATCF 000", 1_000L)
-                    val canMaskResponse = boundCommand("ATCM 000", 1_000L)
+                    val filter = CanMonitorProtocolPolicy.clearFilter(can29Bit)
+                    val canFilterResponse = boundCommand("ATCF $filter", 1_000L)
+                    val canMaskResponse = boundCommand("ATCM $filter", 1_000L)
                     val filterResponse = boundCommand("STFAC", 1_000L)
                     check(
                         CanConsoleAdapterRestorationPolicy.accepted(canFilterResponse) &&
@@ -624,7 +633,7 @@ class BluetoothObdManager(context: Context) {
                     var restored = runCatching { boundCommand("\u001B", 1_000L) }.isSuccess
                     val commands = buildList {
                         if (isStnAdapter) add("ATAR")
-                        addAll(listOf("ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"))
+                        addAll(listOf("ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"))
                     }
                     // Restore the command-channel formatting established at probe time.
                     for (command in commands) {
