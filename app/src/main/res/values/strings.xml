@@ -914,4 +914,7 @@
     <string name="debug_builds_no_browser">No web browser is available to open this download.</string>
     <string name="obd_physical_can_scope">Physical CAN responder: 0x%1$s. This scan covers only the selected OBD ECU, not a functional scan of all modules. No GM programming or actuator commands were sent.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Enable emissions DTC clearing in the Windows bridge, reconnect, stop the engine and confirm the reset. Emissions readiness data will be reset; permanent codes are not erased.</string>
+    <string name="export_folder_instruction">Create or select the CamaroDiag folder in internal storage, then allow access. Exports are visible in shared storage.</string>
+    <string name="export_folder_success">Export saved in /CamaroDiag/.</string>
+    <string name="export_folder_failed">Unable to save the export in /CamaroDiag/.</string>
 </resources>
