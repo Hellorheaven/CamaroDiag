@@ -3,6 +3,10 @@
     {
       "source": "functions",
       "codebase": "billing"
+    },
+    {
+      "source": "functions-accounts",
+      "codebase": "accounts"
     }
   ],
   "firestore": {
