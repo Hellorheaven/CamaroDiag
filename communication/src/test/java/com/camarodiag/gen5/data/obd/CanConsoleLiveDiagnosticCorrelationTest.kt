@@ -156,6 +156,25 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals(false, failure.receivedRecords.last().record.succeeded)
     }
 
+    @Test fun timeoutPreservesFinalCompleteCanLineWithoutCrLf() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
+        correlation.append("7E9 04 03 41 0C 1B", 100L, 1_800_000_000_100L)
+        assertEquals(0, correlation.recentReceivedRecords().size)
+        // On timeout the physical manager drains the final fragment before
+        // creating the failure; the TX remains failed regardless of RX content.
+        correlation.complete(101L, 1_800_000_000_101L)
+        val error = CanConsolePhysicalExchangeException(
+            correlation.recentReceivedRecords(),
+            java.net.SocketTimeoutException("prompt timeout")
+        )
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(102L))
+        assertEquals(1, error.receivedRecords.size)
+        assertEquals("RX", error.receivedRecords.single().record.direction)
+        assertEquals("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B",
+            error.receivedRecords.single().record.content)
+        assertEquals(1_800_000_000_101L, error.receivedRecords.single().timestampMillis)
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
