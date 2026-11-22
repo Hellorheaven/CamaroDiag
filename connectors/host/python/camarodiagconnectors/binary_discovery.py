@@ -34,8 +34,14 @@ class BinaryDiscoveryClient:
             self._remaining(deadline)
             chunk = self._transport.read(count - len(data))
             self._remaining(deadline)
-            if not chunk or len(chunk) > count - len(data):
-                raise IOError("Incomplete or overlong binary reply")
+            if not chunk:
+                # A bounded pyserial read may expire before the full reply;
+                # use the shared deadline rather than failing on the first gap.
+                if hasattr(self._transport, "timeout"):
+                    continue
+                raise IOError("Incomplete binary reply")
+            if len(chunk) > count - len(data):
+                raise IOError("Overlong binary reply")
             data.extend(chunk)
         return bytes(data)
 
