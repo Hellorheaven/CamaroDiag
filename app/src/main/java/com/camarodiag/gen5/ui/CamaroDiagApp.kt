@@ -53,6 +53,7 @@ import com.camarodiag.gen5.control.VehicleControlId
 import com.camarodiag.gen5.data.obd.VxdiagProfiles
 import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
+import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.data.obd.CanTraceFilter
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
@@ -1694,7 +1695,7 @@ fun CanSnifferScreen(
     var canIdFilter by remember { mutableStateOf("") }
     var dataPrefixFilter by remember { mutableStateOf("") }
     var directionFilter by remember { mutableStateOf("ALL") }
-    var selectedObservedCanId by remember { mutableStateOf<Long?>(null) }
+    var selectedObservedCanId by remember { mutableStateOf<ObservedCanId?>(null) }
     var observedEcuMenuExpanded by remember { mutableStateOf(false) }
     var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
     val report = state.report
@@ -1717,8 +1718,10 @@ fun CanSnifferScreen(
         knownModules.filter { module ->
             module.status == ModuleStatus.ACCESSIBLE &&
                 module.notesEn.startsWith("Observed ") &&
-                module.rxHeader.toLongOrNull(16) in observedCanIds
-        }.associateBy { it.rxHeader.toLongOrNull(16) }
+                observedCanIds.any { it.hex.equals(module.rxHeader, ignoreCase = true) }
+        }.associateBy { module ->
+            observedCanIds.first { it.hex.equals(module.rxHeader, ignoreCase = true) }
+        }
     }
     val rawCanFrameInput = remember(requestInput) { RawCanFrameParser.parse(requestInput) != null }
     val unsafeRawCanInput = remember(requestInput) {
