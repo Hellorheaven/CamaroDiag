@@ -42,6 +42,18 @@ data class UdsAccessPolicy internal constructor(
                 items.mapValues { (_, allowed) -> frozenSet(allowed) }
             )
 
+        private fun validEcuIdentifier(value: String?): Boolean {
+            val normalized = value?.trim()?.uppercase(Locale.ROOT).orEmpty()
+            if (normalized.isBlank() || normalized in setOf(
+                    "UNKNOWN", "NONE", "N/A", "NULL", "PENDING", "TBD",
+                    "NO DATA", "NO RESPONSE", "INVALID", "ERROR", "TEST",
+                    "SIMULATED", "NOT SUPPORTED"
+                )) return false
+            val compact = normalized.removePrefix("0X").filter(Char::isLetterOrDigit)
+            return compact.isNotEmpty() && !compact.all { it == '0' } &&
+                !compact.all { it == 'F' }
+        }
+
         fun readOnly(readDids: Set<Int> = emptySet()) = UdsAccessPolicy(
             readDids = frozenSet(readDids),
             writeDids = emptySet(),
@@ -93,6 +105,13 @@ data class UdsAccessPolicy internal constructor(
             require(identity.controllerFamily.equals(expectedControllerFamily, true)) { "Controller family verification failed." }
             require(identity.hardwarePartNumber.equals(expectedHardwarePartNumber, true)) { "Hardware part number verification failed." }
             require(identity.operatingSystemId.equals(expectedOperatingSystemId, true)) { "Operating-system verification failed." }
+            require(listOf(expectedCalId, expectedCvn, expectedControllerFamily,
+                    expectedHardwarePartNumber, expectedOperatingSystemId,
+                    identity.calibrationId, identity.calibrationVerificationNumber,
+                    identity.controllerFamily, identity.hardwarePartNumber,
+                    identity.operatingSystemId).all(::validEcuIdentifier)) {
+                "Placeholder or invalid ECU identity cannot authorize programming."
+            }
             require(evidenceReference.isNotBlank()) { "Traceable OEM evidence is required." }
             // Freeze *before* validating: source collections may be mutable and
             // must not be able to widen later, even via their nested map sets.
