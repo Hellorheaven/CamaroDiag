@@ -118,6 +118,15 @@ internal static class NativeScopedMemoryReaderSelfTests
         Assert(Convert.ToHexString(NativeScopedMemoryReader.BuildReadRequest(
                scope, 0x80001080, 128)) == "23148000108080",
             "UDS 23 ALFI address and one-byte size framing");
+        Reject<ArgumentOutOfRangeException>(() => NativeScopedMemoryReader.ParseReadResponse(
+            new byte[] { 0x63 }, 0));
+        checks++;
+        Reject<ArgumentOutOfRangeException>(() => NativeScopedMemoryReader.ParseReadResponse(
+            new byte[258], 257));
+        checks++;
+        Assert(NativeScopedMemoryReader.ParseReadResponse(
+            new byte[] { 0x63, 0x5A }, 1).SequenceEqual(new byte[] { 0x5A }),
+            "Exactly sized UDS memory response is accepted");
         var allowed256 = new J2534MemoryReadScope(
             "1G1FA1RXXR0123456", 0x7E0, 0x7E8, 33, 0x80001000, 300, 256, 3);
         Assert(Convert.ToHexString(NativeScopedMemoryReader.BuildReadRequest(
