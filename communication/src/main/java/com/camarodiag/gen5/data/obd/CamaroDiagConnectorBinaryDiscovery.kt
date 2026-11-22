@@ -42,32 +42,40 @@ object CamaroDiagConnectorBinaryDiscovery {
             ensureActive()
             channel.write(request(op, seq))
             val deadline = System.nanoTime() + TIMEOUT_NANOS
-            fun readExact(length: Int): ByteArray {
-                val bytes = ByteArray(length)
-                var offset = 0
-                while (offset < length && System.nanoTime() - deadline < 0) {
-                    ensureActive()
-                    val buffer = ByteArray(length - offset)
-                    val count = channel.read(buffer, 100)
-                    if (count < 0 || count > buffer.size) throw IOException("Invalid binary USB read")
-                    buffer.copyInto(bytes, offset, 0, count)
-                    offset += count
+            // Read complete USB packets into a large buffer; a short header-sized
+            // USB bulk transfer can otherwise lose the remainder of a packet.
+            val buffer = ByteArray(512)
+            val frame = ByteArray(HEADER_BYTES + MAX_REPLY_PAYLOAD + TRAILER_BYTES)
+            var used = 0
+            var expectedLength = -1
+            while (System.nanoTime() - deadline < 0) {
+                ensureActive()
+                val count = channel.read(buffer, 100)
+                if (count < 0 || count > buffer.size || count > frame.size - used)
+                    throw IOException("Invalid binary USB read")
+                buffer.copyInto(frame, used, 0, count)
+                used += count
+                if (used >= HEADER_BYTES && expectedLength == -1) {
+                    if (u8(frame[0]) != 0x43 || u8(frame[1]) != 0x44 ||
+                        u8(frame[2]) != 1 || u8(frame[3]) != op || u16(frame, 4) != seq
+                    ) throw IOException("Unexpected binary discovery header")
+                    val length = u16(frame, 6)
+                    if (length !in 1..MAX_REPLY_PAYLOAD) throw IOException("Invalid binary discovery length")
+                    expectedLength = HEADER_BYTES + length + TRAILER_BYTES
                 }
-                if (offset != length) throw IOException("Incomplete binary USB reply")
-                return bytes
+                if (expectedLength != -1) {
+                    if (used > expectedLength) throw IOException("Unexpected trailing binary USB data")
+                    if (used == expectedLength) break
+                }
             }
-            val header = readExact(HEADER_BYTES)
-            if (u8(header[0]) != 0x43 || u8(header[1]) != 0x44 ||
-                u8(header[2]) != 1 || u8(header[3]) != op || u16(header, 4) != seq
-            ) throw IOException("Unexpected binary discovery header")
-            val length = u16(header, 6)
-            if (length !in 1..MAX_REPLY_PAYLOAD) throw IOException("Invalid binary discovery length")
-            val tail = readExact(length + TRAILER_BYTES)
-            val wire = header + tail
+            if (expectedLength == -1 || used != expectedLength)
+                throw IOException("Incomplete binary USB reply")
+            val wire = frame.copyOf(used)
+            val length = u16(wire, 6)
             val crcOffset = HEADER_BYTES + length
             val expectedCrc = wire.copyOf().also { putCrc(it, crcOffset) }
             if (!wire.contentEquals(expectedCrc)) throw IOException("Invalid binary discovery CRC")
-            val payload = tail.copyOfRange(0, length)
+            val payload = wire.copyOfRange(HEADER_BYTES, HEADER_BYTES + length)
             if (payload.any { u8(it) !in 32..126 }) throw IOException("Invalid binary discovery payload")
             seq++
             ensureActive()
