@@ -669,4 +669,39 @@ class Obd2FeatureEngineTest {
         assertTrue(confirmed("18DAF110 5 43 01 01 71").isEmpty())
     }
 
+    @Test
+    fun physicalScannerKeepsWidebandVoltageAndCurrentBanksDistinct() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0128" -> "412880008000"
+                "0134" -> "413480008000"
+                "0138" -> "413880008000"
+                else -> "NO DATA"
+            }
+        })
+        val values = engine.readLiveData(setOf(0x28, 0x34, 0x38))
+        val bankTwoVoltage = values.filter { it.pid == 0x28 }
+        assertEquals(setOf("lambda", "V"), bankTwoVoltage.map { it.unit }.toSet())
+        assertTrue(bankTwoVoltage.all { it.name.contains("Bank 2 sensor 1") })
+        val bankOneCurrent = values.filter { it.pid == 0x34 }
+        assertEquals(setOf("lambda", "mA"), bankOneCurrent.map { it.unit }.toSet())
+        assertTrue(bankOneCurrent.all { it.name.contains("Bank 1 sensor 1") })
+        val bankTwoCurrent = values.filter { it.pid == 0x38 }
+        assertEquals(setOf("lambda", "mA"), bankTwoCurrent.map { it.unit }.toSet())
+        assertTrue(bankTwoCurrent.all { it.name.contains("Bank 2 sensor 1") })
+        assertEquals("0.00", bankTwoCurrent.single { it.unit == "mA" }.value)
+    }
+
+    @Test
+    fun physicalScannerNeverAcceptsExtraWidebandSensorBytes() = runBlocking {
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            when (command) {
+                "0128" -> "41288000800000"
+                "0138" -> "4138800080"
+                else -> "NO DATA"
+            }
+        })
+        assertTrue(engine.readLiveData(setOf(0x28, 0x38)).isEmpty())
+    }
+
 }
