@@ -651,4 +651,7 @@
     <string name="cal_native_catalog_loading">Oma kataloogi laadimine…</string>
     <string name="cal_native_catalog_empty">Praegu pole ükski Camaro omandiõiguslik DID kasutuskõlblikuks tunnistatud. Tundmatuid aadresse ega skaleeringuid ei mõelda välja.</string>
     <string name="cal_native_catalog_read_disabled">Sõiduki lugemine on keelatud, kuni adresseerimine ja dekodeerimine on samasugusel konfiguratsioonil kontrollitud.</string>
+    <string name="export_folder_instruction">Looge või valige sisemälus kaust CamaroDiag ja lubage juurdepääs. Eksporditud failid on nähtavad jagatud salvestusruumis.</string>
+    <string name="export_folder_success">Eksport salvestati kausta /CamaroDiag/.</string>
+    <string name="export_folder_failed">Eksporti ei õnnestunud salvestada kausta /CamaroDiag/.</string>
 </resources>
