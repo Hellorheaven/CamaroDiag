@@ -76,6 +76,18 @@ object CanConsoleEcuRouting {
 
 /** Presentation has no diagnostic ownership: every valid bus frame is RX.
  * Diagnostic correlation is a separate operation and must never relabel traffic. */
+/** Transport-level failure: adapter configuration is no longer trusted.
+ * The caller must stop the physical session before another diagnostic request. */
+class CanAdapterRestorationException : IllegalStateException()
+
+object CanConsoleAdapterRestorationPolicy {
+    /** Adapter AT configuration changes require an explicit OK, not ECU traffic. */
+    fun accepted(reply: String): Boolean =
+        !CanConsoleAdapterReplyPolicy.isFailure(reply) &&
+            reply.lineSequence().any { it.trim().removeSuffix(">").trim()
+                .equals("OK", ignoreCase = true) }
+}
+
 object CanConsoleRecordParser {
     fun parse(output: String): List<ParsedCanConsoleRecord> =
         output.lineSequence().mapNotNull { rawLine ->
