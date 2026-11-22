@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession } = require("./account-policy");
+const { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession, isValidAuthTime } = require("./account-policy");
 
 test("administrator can inspect unverified accounts without an entitlement read", () => {
   assert.deepEqual(displayLicenseWithoutLookup({disabled: false, emailVerified: false, email: "u@example.com"}),
@@ -23,6 +23,15 @@ test("rejected token cannot outlive the server revocation cutoff", () => {
   assert.equal(isSessionRevoked(boundary, undefined), true);
   assert.equal(isSessionRevoked("unparseable", seconds + 10), true);
   assert.equal(isSessionRevoked(undefined, seconds - 1), false);
+});
+
+test("Firebase auth_time must be a positive numeric epoch, never coerced from missing values", () => {
+  const timestamp = 1795344000;
+  assert.equal(isValidAuthTime(timestamp), true);
+  for (const invalid of [null, undefined, "", "1795344000", 0, -1, 1.5, NaN, Infinity, {}]) {
+    assert.equal(isValidAuthTime(invalid), false);
+    assert.equal(isSessionRevoked("2026-11-22T09:00:00.000Z", invalid), true);
+  }
 });
 
 test("administration requires a verified current Google sign-in, not merely a linked Google provider", () => {
