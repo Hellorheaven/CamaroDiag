@@ -31,6 +31,14 @@ internal static class NativeScopedBackupImport
         if (zip.Entries.Count != expected.Count ||
             zip.Entries.Any(e => !expected.Remove(e.FullName)) || expected.Count != 0)
             throw new InvalidDataException("Unexpected, missing or repeated backup entry.");
+        // Symlinks and special ZIP entry types are not valid evidence files.
+        // Some archives encode Unix attributes in the upper 16 bits.
+        foreach (var entry in zip.Entries)
+        {
+            int mode = (entry.ExternalAttributes >> 16) & 0xF000;
+            if (mode != 0 && mode != 0x8000)
+                throw new InvalidDataException("Backup archive contains a non-regular file.");
+        }
 
         var manifest = zip.GetEntry("manifest.properties")!;
         if (manifest.Length is <= 0 or > 2048)
