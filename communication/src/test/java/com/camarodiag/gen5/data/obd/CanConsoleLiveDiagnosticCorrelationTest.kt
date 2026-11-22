@@ -194,6 +194,24 @@ class CanConsoleLiveDiagnosticCorrelationTest {
             CanConsoleDiagnosticStatus.POSITIVE, ack = true, error = true))
     }
 
+    @Test fun failedExchangeRetainsOnlyBoundedLatestForeignEcuFrames() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
+        val traffic = (0 until 640).joinToString("\r\n") { index ->
+            if (index % 2 == 0) "7E9 04 03 41 0C 1B" else "18DAF111 04 03 62 F1 90"
+        } + "\r\n"
+        correlation.append(traffic, 100L)
+        val error = CanConsolePhysicalExchangeException(
+            correlation.recentReceivedRecords(), java.net.SocketTimeoutException("prompt timeout")
+        )
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(101L))
+        assertEquals(300, error.receivedRecords.size)
+        assertEquals(300, error.receivedRecords.count { it.record.direction == "RX" })
+        assertEquals("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B",
+            error.receivedRecords.first().record.content)
+        assertEquals("CAN ID=18DAF111 DLC=4 DATA=03 62 F1 90",
+            error.receivedRecords.last().record.content)
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
