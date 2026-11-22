@@ -878,6 +878,10 @@
     <string name="live_pid_wbo2_b1s2">Wideband lambda B1S2</string>
     <string name="live_pid_wbo2_b2s1">Wideband lambda B2S1</string>
     <string name="live_pid_wbo2_b2s2">Wideband lambda B2S2</string>
+    <string name="live_pid_wbo2_current_b1s1">Wideband oxygen current B1S1</string>
+    <string name="live_pid_wbo2_current_b1s2">Wideband oxygen current B1S2</string>
+    <string name="live_pid_wbo2_current_b2s1">Wideband oxygen current B2S1</string>
+    <string name="live_pid_wbo2_current_b2s2">Wideband oxygen current B2S2</string>
     <string name="system_language_follow_phone">Follow the phone language</string>
 
     <!-- Live physical J2534 ECU memory capture -->
