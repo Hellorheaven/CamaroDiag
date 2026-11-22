@@ -219,10 +219,13 @@ class J2534BridgeTransport(
             require(SafeObdRequestPolicy.parse(command.elmCommand) == command) {
                 "Unrecognized or modified read-only console command."
             }
-            return if (command.parameter == null) {
+            // SafeObdRequest belongs to another Gradle module: Kotlin cannot
+            // smart-cast its public nullable property across module boundaries.
+            val parameter = command.parameter
+            return if (parameter == null) {
                 byteArrayOf(command.service.toByte())
             } else {
-                byteArrayOf(command.service.toByte(), command.parameter.toByte())
+                byteArrayOf(command.service.toByte(), parameter.toByte())
             }
         }
 
