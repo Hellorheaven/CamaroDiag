@@ -4,15 +4,9 @@ name: Connectors CI
 # One cross-component gate for the common firmware/host contract. A hardware
 # documentation-only change does not trigger compilation; run manually for bench work.
 on:
-  pull_request:
-    branches: [main]
-    types: [ready_for_review]
-    paths:
-      - 'connectors/firmware/**'
-      - 'connectors/host/**'
-      - 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnector*.kt'
-      - 'pc-bridge/CamaroDiag.J2534Bridge/Connector*.cs'
-      - '.github/workflows/connectors-ci.yml'
+  # Manual component checkpoint only. Full PR check is orchestrated by pr-unit-tests.yml.
+  # Disabled implicit PR triggers to prevent duplicate Debug validation.
+  # No automatic runs per commit or Ready transition.
   workflow_dispatch:
   workflow_call:
 permissions:
