@@ -10,6 +10,28 @@ package com.camarodiag.gen5.data.obd
 object EcuBackupManifest {
     enum class Origin { IMPORTED_FILE, SIMULATION, REPORTED_HARDWARE_READ }
 
+    /** Operator-selected physical J2534 route; never by itself a hardware attestation. */
+    data class Channel(
+        val requestCanId: Int,
+        val responseCanId: Int,
+        val protocolNumber: Int,
+        val diagnosticSession: Int
+    ) {
+        init {
+            require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) {
+                "Invalid ECU backup J2534 protocol."
+            }
+            val maximumCanId = if (protocolNumber in setOf(34, 36, 64)) 0x1FFFFFFF else 0x7FF
+            require(requestCanId in 0..maximumCanId &&
+                responseCanId in 0..maximumCanId && requestCanId != responseCanId) {
+                "Backup CAN request and response IDs do not match the protocol."
+            }
+            require(diagnosticSession == 1 || diagnosticSession == 3) {
+                "Invalid ECU backup diagnostic session."
+            }
+        }
+    }
+
     data class Capture(
         val region: EcuBackupCoverage.Region,
         val startAddress: Long,
@@ -37,7 +59,9 @@ object EcuBackupManifest {
         /** Always false until a separately validated hardware reader can attest provenance. */
         val hardwareProvenanceVerified: Boolean = false,
         /** VIN reported during acquisition, when available. It is not an attestation. */
-        val vehicleVin: String? = null
+        val vehicleVin: String? = null,
+        /** Only a declared read route, not independently authenticated provenance. */
+        val channel: Channel? = null
     )
 
     fun inspect(
@@ -45,10 +69,14 @@ object EcuBackupManifest {
         createdAtUtcMillis: Long,
         captures: List<Capture>,
         expectedRegions: Set<EcuBackupCoverage.Region>,
-        vehicleVin: String? = null
+        vehicleVin: String? = null,
+        channel: Channel? = null
     ): Manifest {
         require(vehicleVin == null || vehicleVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
             "Invalid VIN in ECU backup manifest"
+        }
+        require(channel == null || vehicleVin != null) {
+            "A physical channel cannot be recorded without a VIN."
         }
         val entries = captures.map { capture ->
             Entry(
@@ -83,7 +111,8 @@ object EcuBackupManifest {
             createdAtUtcMillis = createdAtUtcMillis,
             entries = entries,
             coverage = conservativeCoverage,
-            vehicleVin = vehicleVin
+            vehicleVin = vehicleVin,
+            channel = channel
         )
     }
 }

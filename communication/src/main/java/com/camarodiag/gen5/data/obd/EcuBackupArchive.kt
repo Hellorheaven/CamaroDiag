@@ -15,6 +15,7 @@ import java.util.zip.ZipOutputStream
  */
 object EcuBackupArchive {
     private const val FORMAT_WITH_VIN = "CamaroDiag ECU offline archive v2"
+    private const val FORMAT_WITH_CHANNEL = "CamaroDiag ECU offline archive v3"
     private const val FORMAT = "CamaroDiag ECU offline archive v1"
     private const val MAX_ENTRIES = 128
     private const val MAX_REGION_BYTES = 64 * 1024 * 1024
@@ -50,7 +51,8 @@ object EcuBackupArchive {
         requiredRegions: Set<EcuBackupCoverage.Region>,
         controllerLabel: String? = null,
         createdAtUtcMillis: Long = System.currentTimeMillis(),
-        vehicleVin: String? = null
+        vehicleVin: String? = null,
+        channel: EcuBackupManifest.Channel? = null
     ) {
         require(createdAtUtcMillis > 0L) { "Invalid ECU archive creation timestamp" }
         require(captures.isNotEmpty()) { "Cannot export an empty ECU backup" }
@@ -74,11 +76,23 @@ object EcuBackupArchive {
         // Reject inconsistent captures before writing any archive header or bytes.
         // In particular, two independent reads must agree, or the archive
         // would be rejected by the corresponding import validation.
-        val manifest = EcuBackupManifest.inspect(controllerLabel, createdAtUtcMillis, snapshots, requiredRegions, vehicleVin)
+        val manifest = EcuBackupManifest.inspect(
+            controllerLabel, createdAtUtcMillis, snapshots, requiredRegions, vehicleVin, channel
+        )
         val verification = EcuBackupIntegrity.verify(manifest, snapshots, requiredRegions)
         require(verification.consistent) { "Inconsistent backup captures: ${verification.problems}" }
         val properties = Properties()
-        properties.setProperty("format", if (vehicleVin == null) FORMAT else FORMAT_WITH_VIN)
+        properties.setProperty("format", when {
+            channel != null -> FORMAT_WITH_CHANNEL
+            vehicleVin != null -> FORMAT_WITH_VIN
+            else -> FORMAT
+        })
+        if (channel != null) {
+            properties.setProperty("channel.requestCanId", channel.requestCanId.toString())
+            properties.setProperty("channel.responseCanId", channel.responseCanId.toString())
+            properties.setProperty("channel.protocolNumber", channel.protocolNumber.toString())
+            properties.setProperty("channel.session", channel.diagnosticSession.toString())
+        }
         if (vehicleVin != null) properties.setProperty("vin", vehicleVin)
         properties.setProperty("controller", manifest.controllerLabel.orEmpty())
         properties.setProperty("created", createdAtUtcMillis.toString())
@@ -163,9 +177,26 @@ object EcuBackupArchive {
                 require("vin" !in properties.stringPropertyNames()) { "Unexpected VIN in v1 archive" }
                 null
             }
-            FORMAT_WITH_VIN -> requireNotNull(properties.getProperty("vin")) { "Missing archive VIN" }
+            FORMAT_WITH_VIN, FORMAT_WITH_CHANNEL ->
+                requireNotNull(properties.getProperty("vin")) { "Missing archive VIN" }
             else -> throw IllegalArgumentException("Unsupported archive format")
         }
+        val channel = if (properties.getProperty("format") == FORMAT_WITH_CHANNEL) {
+            fun integer(name: String): Int {
+                val raw = properties.getProperty("channel.$name")
+                    ?: throw IllegalArgumentException("Missing ECU backup channel.$name")
+                val parsed = raw.toIntOrNull()
+                    ?: throw IllegalArgumentException("Invalid ECU backup channel.$name")
+                require(parsed.toString() == raw) { "Noncanonical channel.$name" }
+                return parsed
+            }
+            EcuBackupManifest.Channel(
+                requestCanId = integer("requestCanId"),
+                responseCanId = integer("responseCanId"),
+                protocolNumber = integer("protocolNumber"),
+                diagnosticSession = integer("session")
+            )
+        } else null
         val count = properties.getProperty("count")?.toIntOrNull()
         require(count != null && count in 1..MAX_ENTRIES) { "Invalid segment count" }
         val declaredRegions = properties.getProperty("required", "")
@@ -204,8 +235,13 @@ object EcuBackupArchive {
             )
         }
         require(files.isEmpty()) { "Unreferenced archive data" }
+        val allowedChannelKeys = if (channel != null) setOf(
+            "channel.requestCanId", "channel.responseCanId",
+            "channel.protocolNumber", "channel.session"
+        ) else emptySet()
         require(properties.stringPropertyNames().all { key ->
             key in setOf("format", "controller", "created", "count", "required", "vin") ||
+                key in allowedChannelKeys ||
                 (0 until count).any { index ->
                     key in setOf("region", "start", "expected", "origin", "sha256", "second")
                         .map { "capture.$index.$it" }
@@ -216,7 +252,7 @@ object EcuBackupArchive {
             ?: throw IllegalArgumentException("Invalid creation timestamp")
         val manifest = EcuBackupManifest.inspect(
             properties.getProperty("controller").orEmpty().ifBlank { null },
-            created, captures, required, vehicleVin
+            created, captures, required, vehicleVin, channel
         )
         val verification = EcuBackupIntegrity.verify(manifest, captures, required)
         require(verification.consistent) { "Archive failed offline verification: ${verification.problems}" }

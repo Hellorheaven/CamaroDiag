@@ -23,6 +23,7 @@ object EcuBackupIntegrity {
         EMPTY_CAPTURE,
         INVALID_VIN,
         PHYSICAL_ORIGIN_MISSING_VIN,
+        PHYSICAL_CHANNEL_MISSING_VIN,
         INVALID_CAPTURE_TIMESTAMP
     }
 
@@ -49,6 +50,9 @@ object EcuBackupIntegrity {
             manifest.vehicleVin == null
         ) {
             problems += Problem.PHYSICAL_ORIGIN_MISSING_VIN
+        }
+        if (manifest.channel != null && manifest.vehicleVin == null) {
+            problems += Problem.PHYSICAL_CHANNEL_MISSING_VIN
         }
         if (manifest.hardwareProvenanceVerified) {
             // No hardware reader currently issues an independently authenticated attestation.

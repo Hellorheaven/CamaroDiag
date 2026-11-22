@@ -44,6 +44,37 @@ class EcuBackupArchiveTest {
         assertTrue(!imported.manifest.hardwareProvenanceVerified)
     }
 
+    @Test fun routeBoundArchiveRetainsExactCanIdsProtocolAndSession() {
+        val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 3)
+        val zip = ByteArrayOutputStream()
+        EcuBackupArchive.export(
+            zip, listOf(capture()), emptySet(), vehicleVin = "1G1FA1RXXR0123456",
+            channel = channel
+        )
+        val imported = EcuBackupArchive.import(zip.toByteArray().inputStream())
+        assertEquals(channel, imported.manifest.channel)
+        assertEquals("1G1FA1RXXR0123456", imported.manifest.vehicleVin)
+        assertTrue(imported.verification.consistent)
+        assertTrue(!imported.manifest.hardwareProvenanceVerified)
+    }
+
+    @Test fun invalidPhysicalRouteShapeIsRejectedBeforeZipWriting() {
+        for (illegal in listOf(
+            { EcuBackupManifest.Channel(0x7E0, 0x7E0, 33, 1) },
+            { EcuBackupManifest.Channel(0x800, 0x7E8, 33, 1) },
+            { EcuBackupManifest.Channel(0x18DAF110.toInt(), 0x18DA10F1.toInt(), 33, 1) },
+            { EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 2) }
+        )) assertTrue(runCatching { illegal() }.isFailure)
+        val zip = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(
+                zip, listOf(capture()), emptySet(),
+                channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+            )
+        }.isFailure)
+        assertEquals(0, zip.size())
+    }
+
     @Test fun exportAndImportPreserveBytesAndCoverage() {
         val archive = ByteArrayOutputStream()
         EcuBackupArchive.export(archive, listOf(capture()), setOf(capture().region), "LFX offline")
