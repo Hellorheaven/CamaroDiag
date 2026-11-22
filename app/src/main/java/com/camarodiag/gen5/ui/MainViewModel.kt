@@ -1987,7 +1987,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 timestampMillis = System.currentTimeMillis(),
                                 content = localizedContext.getString(
                                     R.string.can_console_adapter_ack,
-                                    response.ifBlank { "No adapter text returned" }
+                                    response.ifBlank { localizedContext.getString(R.string.can_console_no_adapter_text) }
                                 )
                             )
                         )
@@ -2091,7 +2091,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         } else {
                             localizedContext.getString(
                                 R.string.can_console_adapter_ack,
-                                response.ifBlank { "No adapter text returned" }
+                                response.ifBlank { localizedContext.getString(R.string.can_console_no_adapter_text) }
                             )
                         },
                         succeeded = hasEcuResponse
