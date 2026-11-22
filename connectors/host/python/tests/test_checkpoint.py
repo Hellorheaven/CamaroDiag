@@ -42,6 +42,36 @@ class CheckpointTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(bytes(changed))
 
+    def test_serial_read_timeout_is_bounded_and_restored(self):
+        class SerialPort(Port):
+            def __init__(self, response):
+                super().__init__(response)
+                self.timeout = None
+                self.read_timeouts = []
+            def read(self, count):
+                self.read_timeouts.append(self.timeout)
+                return super().read(count)
+
+        for reply in (b"CDJ/1 NONE\\n", b"CDJ/1 CORRUPT\\n"):
+            with self.subTest(reply=reply):
+                port = SerialPort(reply)
+                try:
+                    retrieve_checkpoint(port)
+                except OSError:
+                    pass
+                self.assertEqual([0.1] * len(port.read_timeouts), port.read_timeouts)
+                self.assertIsNone(port.timeout)
+
+    def test_serial_timeout_restored_when_write_fails(self):
+        class ShortWritePort(Port):
+            timeout = None
+            def write(self, data):
+                return 0
+        port = ShortWritePort(b"")
+        with self.assertRaisesRegex(OSError, "Short checkpoint"):
+            retrieve_checkpoint(port)
+        self.assertIsNone(port.timeout)
+
     def test_deadline(self):
         ticks = iter([0.0, 3.0])
         with self.assertRaises(TimeoutError):
