@@ -9,6 +9,7 @@ on:
       - 'app/**'
       - 'tools/admin/**'
       - 'functions/**'
+      - 'functions-accounts/**'
       - 'firebase.json'
       - 'firestore.rules'
       - 'communication/**'
@@ -50,6 +51,13 @@ jobs:
         run: node --test tools/admin/enroll-functional-test-owner.test.mjs
       - name: Verify staged licensing backend policies without Firebase deployment
         run: node --test functions/licensing-policy.test.js
+      - name: Verify dedicated Firebase account and license backend
+        run: |
+          node --check functions-accounts/index.js
+          node --check functions-accounts/account-admin.js
+          node --check functions-accounts/license-status.js
+          node --check functions-accounts/entitlement-policy.js
+          node --test functions-accounts/entitlement-policy.test.js
       - name: Execute Android unit tests (warnings fail)
         run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
       - name: Collect unit test reports
