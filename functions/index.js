@@ -287,3 +287,6 @@ exports.stripeLicenseWebhook = onRequest(
 const accountAdmin = require("./account-admin");
 exports.adminGetAccount = accountAdmin.adminGetAccount;
 exports.adminUpdateAccount = accountAdmin.adminUpdateAccount;
+
+// Informational license status (paywall remains disabled).
+exports.getMyLicenseStatus = require("./license-status").getMyLicenseStatus;
