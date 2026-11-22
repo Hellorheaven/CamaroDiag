@@ -1,5 +1,10 @@
 package com.camarodiag.gen5.ui
 
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.OutputStream
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -34,6 +39,38 @@ class CamaroDiagExportStorageTest {
         assertFalse(result.contains("\\"))
         assertFalse(result.startsWith("."))
         assertTrue(result.endsWith(".zip"))
+    }
+
+    @Test fun partialDocumentDoesNotHaveACompletedFileExtension() {
+        val temporary = CamaroDiagExportStorage.temporaryFileName("backup.zip")
+        assertTrue(temporary.startsWith(".camarodiag-"))
+        assertTrue(temporary.endsWith(".partial"))
+        assertFalse(temporary.endsWith(".zip"))
+    }
+
+    @Test fun freshReadbackMatchesExactlyWrittenBytes() = runBlocking {
+        val sink = ByteArrayOutputStream()
+        val output = CamaroDiagExportStorage.VerifiedOutput(sink)
+        output.use {
+            it.write(0x61)
+            it.write(byteArrayOf(0, 0x62, 0x63, 0), 1, 2)
+        }
+        val expected = output.fingerprint()
+        assertEquals(3L, expected.length)
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            expected.sha256)
+        assertEquals(expected, CamaroDiagExportStorage.fingerprint(ByteArrayInputStream(sink.toByteArray())))
+        assertNotEquals(expected, CamaroDiagExportStorage.fingerprint(ByteArrayInputStream(byteArrayOf(0x61, 0x62, 0))))
+    }
+
+    @Test fun diskWriteFailureIsNotReportedAsAnAdapterFailure() {
+        val broken = object : OutputStream() {
+            override fun write(value: Int) { throw IOException("disk full") }
+        }
+        val output = CamaroDiagExportStorage.VerifiedOutput(broken)
+        val error = runCatching { output.write(1) }.exceptionOrNull()
+        assertTrue(error is CamaroDiagExportStorage.ExportStorageException)
+        assertTrue(error?.cause is IOException)
     }
 
     @Test fun randomlyGeneratedNamesAreDifferent() {
