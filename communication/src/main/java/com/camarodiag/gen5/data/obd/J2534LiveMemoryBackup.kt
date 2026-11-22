@@ -88,6 +88,11 @@ object J2534LiveMemoryBackup {
             channel: EcuBackupManifest.Channel? = null,
             firmwareEvidence: EcuBackupManifest.FirmwareEvidence? = null
         ) {
+            if (capture.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ) {
+                requireNotNull(channel) {
+                    "A physically acquired backup must retain its J2534 CAN route."
+                }
+            }
             // Bind the archive to the acquisition's original digest, not a newly
             // computed digest of potentially mutated public capture buffers.
             check(capture.independentRead != null && capture.firstRead !== capture.independentRead) {
@@ -123,18 +128,6 @@ object J2534LiveMemoryBackup {
         return acquire(bridge, request, EcuBackupManifest.Origin.REPORTED_HARDWARE_READ, progress) {
             bridge.isConnected && bridge.isScopedMemoryReadEnabled
         }
-    }
-
-    suspend fun captureAndExport(
-        bridge: J2534BridgeTransport,
-        request: Request,
-        output: OutputStream,
-        progress: (CaptureProgress) -> Unit = {}
-    ): CaptureResult {
-        val read = capture(bridge, request, progress)
-        currentCoroutineContext().ensureActive()
-        read.export(output)
-        return read
     }
 
     /** Only fake transport may enter unit tests; fake data is never marked as hardware. */

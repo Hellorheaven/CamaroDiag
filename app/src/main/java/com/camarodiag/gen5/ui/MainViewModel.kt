@@ -1260,7 +1260,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val entry = restored.manifest.entries.single()
                         check(restored.verification.consistent &&
                             restored.manifest.vehicleVin == request.expectedVin &&
+                            restored.manifest.channel == capture.manifest.channel &&
                             restored.manifest.channel?.diagnosticSession == request.diagnosticSession &&
+                            restored.manifest.firmwareEvidence == capture.manifest.firmwareEvidence &&
+                            restored.manifest.createdAtUtcMillis == capture.manifest.createdAtUtcMillis &&
+                            restored.manifest.controllerLabel == capture.manifest.controllerLabel &&
                             entry == original &&
                             entry.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ &&
                             entry.region == request.region &&

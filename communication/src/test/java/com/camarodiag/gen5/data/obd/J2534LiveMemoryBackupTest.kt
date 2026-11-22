@@ -107,6 +107,30 @@ class J2534LiveMemoryBackupTest {
         }.isFailure)
     }
 
+    @Test fun physicalOriginCannotExportAnArchiveWithoutItsJ2534Route() = runBlocking {
+        val acquired = J2534LiveMemoryBackup.captureForTest(
+            ScriptedEcu(baseline, vin), request()
+        )
+        val physical = acquired.capture.copy(
+            origin = EcuBackupManifest.Origin.REPORTED_HARDWARE_READ
+        )
+        val physicalManifest = EcuBackupManifest.inspect(
+            "Read-only test", 1L, listOf(physical), emptySet(), vin
+        )
+        val result = J2534LiveMemoryBackup.CaptureResult(
+            physicalManifest, physical,
+            EcuBackupIntegrity.verify(physicalManifest, listOf(physical), emptySet())
+        )
+        val refused = ByteArrayOutputStream()
+        assertTrue(runCatching { result.export(refused) }.isFailure)
+        assertEquals(0, refused.size())
+        val accepted = ByteArrayOutputStream()
+        result.export(accepted, EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1))
+        val reopened = EcuBackupArchive.import(accepted.toByteArray().inputStream())
+        assertEquals(33, reopened.manifest.channel?.protocolNumber)
+        assertFalse(reopened.manifest.hardwareProvenanceVerified)
+    }
+
     @Test fun simulatedCaptureCanRecordRouteWithoutPromotingHardwareProvenance() = runBlocking {
         val result = J2534LiveMemoryBackup.captureForTest(ScriptedEcu(baseline, vin), request())
         val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)

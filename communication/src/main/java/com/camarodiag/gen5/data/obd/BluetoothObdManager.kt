@@ -1121,9 +1121,20 @@ class BluetoothObdManager(context: Context) {
                 diagnosticSession = request.diagnosticSession
             )
             transportSessionEpoch.requireQueuedCurrent(epoch)
+            val bound = result.copy(
+                manifest = result.manifest.copy(
+                    channel = channel,
+                    firmwareEvidence = firmwareEvidence
+                )
+            )
+            check(EcuBackupIntegrity.verify(
+                bound.manifest, listOf(bound.capture), emptySet()
+            ).consistent) {
+                "Physical ECU backup evidence became inconsistent before export."
+            }
             result.export(output, channel, firmwareEvidence)
             transportSessionEpoch.requireQueuedCurrent(epoch)
-            result
+            bound
         }
     }
 
