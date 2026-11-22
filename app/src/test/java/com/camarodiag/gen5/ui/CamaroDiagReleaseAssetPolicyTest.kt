@@ -13,6 +13,22 @@ class CamaroDiagReleaseAssetPolicyTest {
         }
     }
 
+    @Test fun stagedApkCopyRequiresProgressAndHonorsConfiguredSizeLimit() {
+        val source = byteArrayOf(1, 2, 3, 4)
+        val copied = java.io.ByteArrayOutputStream()
+        assertTrue(CamaroDiagReleaseAssetPolicy.copyBounded(
+            source.inputStream(), copied, maxBytes = 4) == 4L)
+        assertTrue(copied.toByteArray().contentEquals(source))
+        val limited = java.io.ByteArrayOutputStream()
+        assertTrue(runCatching {
+            CamaroDiagReleaseAssetPolicy.copyBounded(source.inputStream(), limited, maxBytes = 3)
+        }.isFailure)
+        assertTrue(limited.size() == 0)
+        assertTrue(runCatching {
+            CamaroDiagReleaseAssetPolicy.copyBounded(byteArrayOf().inputStream(),
+                java.io.ByteArrayOutputStream(), maxBytes = 8)
+        }.isFailure)
+    }
     @Test fun onlyOfficialRepositoryExactNameAndPlainTagAreAccepted() {
         val name = "CamaroDiag-release.apk"
         for (url in listOf(
