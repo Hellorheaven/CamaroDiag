@@ -27,6 +27,11 @@ class J2534ApprovedMemoryScopeTest {
         assertFalse(scope.permits(request.copy(chunkBytes = 129)))
         assertFalse(scope.permits(request.copy(diagnosticSession = 1)))
         assertFalse(scope.permits(request.copy(lengthBytes = 0)))
+        assertTrue(J2534ApprovedMemoryScope(vin, EcuBackupCoverage.Region.OTHER,
+            0, 0xFFFF_FFFFL, 256, 1).permits(request.copy(
+                region = EcuBackupCoverage.Region.OTHER, address = 0,
+                lengthBytes = 4 * 1024 * 1024, chunkBytes = 256,
+                diagnosticSession = 1)))
     }
 
     @Test fun malformedBridgeMemoryReadScopeCannotBeAuthorized() {
@@ -35,7 +40,7 @@ class J2534ApprovedMemoryScopeTest {
             { scope.copy(startAddress = -1) },
             { scope.copy(startAddress = 0xFFFF_FFFFL, lengthBytes = 2) },
             { scope.copy(lengthBytes = 0) },
-            { scope.copy(lengthBytes = 16L * 1024 * 1024 + 1) },
+            { scope.copy(lengthBytes = 0x1_0000_0000L) },
             { scope.copy(maxReadBytes = 257) },
             { scope.copy(maxReadBytes = 0) },
             { scope.copy(diagnosticSession = 2) }

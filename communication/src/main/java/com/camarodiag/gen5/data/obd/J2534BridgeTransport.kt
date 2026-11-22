@@ -98,7 +98,7 @@ class J2534BridgeTransport(
                 ) { "The PC bridge did not confirm the selected read-only CAN channel." }
                 connectedResponseCanId = responseLabel
                 val memoryAllowed = response.opt("scopedPhysicalMemoryRead") == true
-                approvedMemoryReadScope = if (memoryAllowed) {
+                approvedMemoryReadScope = if (memoryAllowed) runCatching {
                     // Older or malformed PC bridges may not supply physical
                     // profile evidence. Refuse memory privileges rather than
                     // trusting a boolean and re-labelling an unrelated span.
@@ -112,7 +112,7 @@ class J2534BridgeTransport(
                     }
                     fun exactSmallNumber(key: String): Int {
                         val value = exactNumber(key)
-                        require(value in Int.MIN_VALUE..Int.MAX_VALUE) {
+                        require(value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
                             "PC bridge supplied an out-of-range memory profile: $key."
                         }
                         return value.toInt()
@@ -129,7 +129,7 @@ class J2534BridgeTransport(
                         maxReadBytes = exactSmallNumber("memoryReadMaxReadBytes"),
                         diagnosticSession = exactSmallNumber("memoryReadSession")
                     )
-                } else null
+                }.getOrNull() else null
                 scopedMemoryReadEnabled = approvedMemoryReadScope != null
                 standardObdPhysicalReadEnabled = response.opt("standardObdPhysicalRead") == true &&
                     J2534StandardObd.supportsChannel(requestCanId, responseCanId, protocolNumber)
@@ -145,7 +145,10 @@ class J2534BridgeTransport(
                 val voltageLabel = if (voltage >= 0) {
                     String.format(Locale.getDefault(), " • %.2f V", voltage / 1000.0)
                 } else ""
-                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s$voltageLabel"
+                val backupWarning = if (memoryAllowed && approvedMemoryReadScope == null)
+                    " • Sauvegarde ECU désactivée : profil de lecture non confirmé par ce pont PC."
+                    else ""
+                "$adapter • ${response.optString("protocol", "ISO15765")} • ${response.optInt("baudRate")} bit/s$voltageLabel$backupWarning"
             } catch (error: Exception) {
                 closeInternal()
                 throw error

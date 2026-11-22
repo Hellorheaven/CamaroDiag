@@ -16,7 +16,9 @@ internal data class J2534ApprovedMemoryScope(
     init {
         require(vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) { "Malformed approved ECU VIN." }
         require(startAddress in 0L..0xFFFF_FFFFL &&
-            lengthBytes in 1L..(16L * 1024 * 1024) &&
+            // The PC may authorize a larger region for other readers.
+            // Android still limits each requested capture to four MiB.
+            lengthBytes in 1L..0xFFFF_FFFFL &&
             startAddress + lengthBytes <= 0x1_0000_0000L
         ) { "Invalid approved ECU memory range." }
         require(maxReadBytes in 1..256 && diagnosticSession in setOf(1, 3)) {
