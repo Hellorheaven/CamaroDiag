@@ -4215,8 +4215,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     // Keep normal engine-load changes visible without clipping measured values.
                                     values += LivePidValue("ABS_LOAD", "Absolute Engine Load", "Charge moteur absolue", v, "%", v, "%", 0.0, maxOf(300.0, v * 1.2), push("ABS_LOAD", v))
                                 }
-                                read("44")?.takeIf { it.size >= 2 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 2.0) / 65535.0
+                                CamaroUdsProtocol.decodeCommandedEquivalenceRatio(read("44"))?.let { v ->
                                     values += LivePidValue("EQ_RATIO", "Commanded Equivalence Ratio", "Rapport d'équivalence demandé", v, "λ", v, "λ", 0.0, 2.0, push("EQ_RATIO", v))
                                 }
                                 read("45")?.firstOrNull()?.let { b ->
