@@ -228,6 +228,8 @@ class SafeObdRequestPolicyTest {
             calibration, "49 04 01 31 32"))
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
             cvn, "49 06 01 01 02 03 04"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            cvn, "49 06 02 01 02 03 04 05 06 07 08"))
         for (invalid in listOf("49 06 01 01 02 03", "49 06 00",
             "49 06 02 01 02 03 04", "49 06 01 01 02 03 04 00")) {
             assertEquals(invalid, false, SafeObdRequestPolicy.hasPositiveResponse(cvn, invalid))
