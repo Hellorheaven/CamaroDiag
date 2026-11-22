@@ -28,8 +28,22 @@ data class UdsAccessPolicy internal constructor(
     val evidenceReference: String
 ) {
     companion object {
+        // All published policy collections must be immutable, even when the
+        // caller retains a mutable source set/map or casts a returned Set.
+        // Authorization is checked against these snapshots, never live UI data.
+        private fun <T> frozenSet(items: Collection<T>): Set<T> =
+            java.util.Collections.unmodifiableSet(LinkedHashSet(items))
+
+        private fun <T> frozenList(items: Collection<T>): List<T> =
+            java.util.Collections.unmodifiableList(ArrayList(items))
+
+        private fun <K, V> frozenMapOfSets(items: Map<K, Set<V>>): Map<K, Set<V>> =
+            java.util.Collections.unmodifiableMap(
+                items.mapValues { (_, allowed) -> frozenSet(allowed) }
+            )
+
         fun readOnly(readDids: Set<Int> = emptySet()) = UdsAccessPolicy(
-            readDids = readDids,
+            readDids = frozenSet(readDids),
             writeDids = emptySet(),
             allowedSessions = setOf(0x01),
             routineControlPermissions = emptyMap(),
@@ -80,20 +94,35 @@ data class UdsAccessPolicy internal constructor(
             require(identity.hardwarePartNumber.equals(expectedHardwarePartNumber, true)) { "Hardware part number verification failed." }
             require(identity.operatingSystemId.equals(expectedOperatingSystemId, true)) { "Operating-system verification failed." }
             require(evidenceReference.isNotBlank()) { "Traceable OEM evidence is required." }
-            require(readDids.all { it in 0..0xFFFF } && writeDids.all { it in 0..0xFFFF })
-            require(allowedSessions.isNotEmpty() && allowedSessions.all { it in 1..0x7F })
-            require(routineControlPermissions.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 1..3 } })
-            require(ioControlPermissions.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 0..0xFF } })
-            require(allowedSecurityLevels.all { it in 1..0x7D && it % 2 == 1 })
-            require(allowedCommunicationControls.all { (type, communication) -> type in 0..3 && communication in 0..0xFF })
-            require(allowedDtcSettingTypes.all { it in 1..2 })
-            require(allowedDtcGroups.all { it in 0..0xFFFFFF })
-            require(allowedEcuResetTypes.all { it in 1..0x7F })
+            // Freeze *before* validating: source collections may be mutable and
+            // must not be able to widen later, even via their nested map sets.
+            val safeReadDids = frozenSet(readDids)
+            val safeWriteDids = frozenSet(writeDids)
+            val safeSessions = frozenSet(allowedSessions)
+            val safeRoutineControls = frozenMapOfSets(routineControlPermissions)
+            val safeIoControls = frozenMapOfSets(ioControlPermissions)
+            val safeSecurityLevels = frozenSet(allowedSecurityLevels)
+            val safeCommunicationControls = frozenSet(allowedCommunicationControls)
+            val safeDtcSettings = frozenSet(allowedDtcSettingTypes)
+            val safeDtcGroups = frozenSet(allowedDtcGroups)
+            val safeEcuResets = frozenSet(allowedEcuResetTypes)
+            val safeReadableRegions = frozenList(readableMemoryRegions)
+            val safeWritableRegions = frozenList(writableMemoryRegions)
+            require(safeReadDids.all { it in 0..0xFFFF } &&
+                safeWriteDids.all { it in 0..0xFFFF })
+            require(safeSessions.isNotEmpty() && safeSessions.all { it in 1..0x7F })
+            require(safeRoutineControls.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 1..3 } })
+            require(safeIoControls.all { (id, types) -> id in 0..0xFFFF && types.isNotEmpty() && types.all { it in 0..0xFF } })
+            require(safeSecurityLevels.all { it in 1..0x7D && it % 2 == 1 })
+            require(safeCommunicationControls.all { (type, communication) -> type in 0..3 && communication in 0..0xFF })
+            require(safeDtcSettings.all { it in 1..2 })
+            require(safeDtcGroups.all { it in 0..0xFFFFFF })
+            require(safeEcuResets.all { it in 1..0x7F })
             require(maxTransferBytes >= 0)
             return UdsAccessPolicy(
-                readDids, writeDids, allowedSessions, routineControlPermissions, ioControlPermissions,
-                allowedSecurityLevels, allowedCommunicationControls, allowedDtcSettingTypes,
-                allowedDtcGroups, allowedEcuResetTypes, readableMemoryRegions, writableMemoryRegions,
+                safeReadDids, safeWriteDids, safeSessions, safeRoutineControls, safeIoControls,
+                safeSecurityLevels, safeCommunicationControls, safeDtcSettings,
+                safeDtcGroups, safeEcuResets, safeReadableRegions, safeWritableRegions,
                 maxTransferBytes, requireSecurityAccess, evidenceReference
             )
         }
