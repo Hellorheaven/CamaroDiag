@@ -19,11 +19,14 @@ object CanConsoleAdapterReplyPolicy {
         failures.containsMatchIn(text)
     /** Only a parsed physical CAN reply or an explicit adapter OK confirms an exchange.
      * SEARCHING, command echo and malformed CAN records are not acknowledgements. */
-    fun hasConfirmedTransmission(text: String): Boolean {
+    fun hasConfirmedTransmission(text: String, request: RawCanFrame? = null): Boolean {
         if (isFailure(text)) return false
         return text.lineSequence().map { it.trim().removeSuffix(">").trim() }
             .any { line -> line.equals("OK", ignoreCase = true) ||
-                RawCanFrameParser.parseReceivedFrames(line).isNotEmpty() }
+                RawCanFrameParser.parseReceivedFrames(line).any { response ->
+                    request == null || CanConsoleEcuRouting.expectedResponder(request) == null ||
+                        CanConsoleEcuRouting.isSelectedResponder(request, response)
+                } }
     }
 }
 
