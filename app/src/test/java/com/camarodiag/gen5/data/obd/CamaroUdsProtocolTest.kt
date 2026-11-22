@@ -480,4 +480,44 @@ class CamaroUdsProtocolTest {
         assertNull(CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(128, 0, 0)))
     }
 
+    @Test
+    fun widebandVoltageAndCurrentFamiliesUseDistinctSaeScaling() {
+        val sample = intArrayOf(0x80, 0x00, 0x80, 0x00)
+        assertEquals(32768 * 2.0 / 65535.0,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandLambda(sample)), 0.000001)
+        assertEquals(32768 * 8.0 / 65535.0,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandVoltage(sample)), 0.000001)
+        assertEquals(0.0,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandCurrent(sample)), 0.000001)
+        assertEquals(-128.0,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandCurrent(
+                intArrayOf(0, 0, 0, 0))), 0.000001)
+        assertEquals(127.99609375,
+            requireNotNull(CamaroUdsProtocol.decodeWidebandCurrent(
+                intArrayOf(0xFF, 0xFF, 0xFF, 0xFF))), 0.000001)
+        for (invalid in listOf(
+            intArrayOf(0, 0, 0), intArrayOf(0, 0, 0, 0, 0),
+            intArrayOf(0, 0, -1, 0), intArrayOf(0, 0, 256, 0)
+        )) {
+            assertNull(CamaroUdsProtocol.decodeWidebandLambda(invalid))
+            assertNull(CamaroUdsProtocol.decodeWidebandVoltage(invalid))
+            assertNull(CamaroUdsProtocol.decodeWidebandCurrent(invalid))
+        }
+    }
+
+    @Test
+    fun bankTwoWidebandSensorPidsHaveStrictFourByteFraming() {
+        for (pid in listOf("28", "29", "38", "39")) {
+            val request = requireNotNull(SafeObdRequestPolicy.parse("01$pid"))
+            assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+                request, "41 $pid 80 00 80 00"))
+            assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+                request, "41 $pid 80 00 80"))
+            assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+                request, "41 $pid 80 00 80 00 00"))
+            assertArrayEquals(intArrayOf(128, 0, 128, 0),
+                CamaroUdsProtocol.parsePidBytes("41 $pid 80 00 80 00", pid))
+        }
+    }
+
 }
