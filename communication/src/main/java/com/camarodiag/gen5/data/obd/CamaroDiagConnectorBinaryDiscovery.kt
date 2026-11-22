@@ -73,7 +73,7 @@ object CamaroDiagConnectorBinaryDiscovery {
                     if (used == expectedLength) break
                 }
             }
-            if (expectedLength == -1 || used != expectedLength)
+            if (System.nanoTime() - deadline >= 0 || expectedLength == -1 || used != expectedLength)
                 throw IOException("Incomplete binary USB reply")
             val wire = frame.copyOf(used)
             val length = u16(wire, 6)

@@ -36,6 +36,15 @@ class CamaroDiagConnectorDiscoveryTest {
         assertEquals(listOf("PING\n", "CAPS\n", "STATUS\n"), c.sent)
     }
 
+    @Test fun completeCapsPacketIsNotTruncatedToLegacySerialBuffer() {
+        val c = FakeChannel(listOf("$ping\r\n", "$caps\r\n", "$status\r\n"), 512)
+        assertEquals(listOf(ping, caps, status), CamaroDiagConnectorDiscovery.inspect(c).lines)
+        assertEquals(listOf("PING\n", "CAPS\n", "STATUS\n"), c.sent)
+        val trailing = FakeChannel(listOf("$ping\n", "$caps\nEXTRA\n"), 512)
+        assertTrue(runCatching { CamaroDiagConnectorDiscovery.inspect(trailing) }.exceptionOrNull() is IOException)
+        assertEquals(listOf("PING\n", "CAPS\n"), trailing.sent)
+    }
+
     @Test fun publicDiscoveryNeverAuthenticatesOrEnablesEcuTraffic() {
         val c = FakeChannel(listOf("$ping\n", "$caps\n", "$status\n"))
         val report = CamaroDiagConnectorDiscovery.inspect(c)
