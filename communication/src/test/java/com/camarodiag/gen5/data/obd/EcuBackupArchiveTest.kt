@@ -44,6 +44,34 @@ class EcuBackupArchiveTest {
         assertTrue(!imported.manifest.hardwareProvenanceVerified)
     }
 
+    @Test fun firmwareOsidEvidenceRequiresPhysicalRouteAndPreservesItsReadDid() {
+        val route = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+        val observed = EcuBackupManifest.FirmwareEvidence(0x01234567, 0xC1)
+        val zip = ByteArrayOutputStream()
+        EcuBackupArchive.export(
+            zip, listOf(capture()), emptySet(), vehicleVin = "1G1FA1RXXR0123456",
+            channel = route, firmwareEvidence = observed
+        )
+        val reopened = EcuBackupArchive.import(zip.toByteArray().inputStream())
+        assertEquals(observed, reopened.manifest.firmwareEvidence)
+        assertEquals(route, reopened.manifest.channel)
+        assertTrue(!reopened.manifest.hardwareProvenanceVerified)
+
+        val unsafe = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(
+                unsafe, listOf(capture()), emptySet(),
+                vehicleVin = "1G1FA1RXXR0123456", firmwareEvidence = observed
+            )
+        }.isFailure)
+        assertEquals(0, unsafe.size())
+        for (invalid in listOf(
+            { EcuBackupManifest.FirmwareEvidence(0L, 0xC1) },
+            { EcuBackupManifest.FirmwareEvidence(0xFFFFFFFFL, 0xC9) },
+            { EcuBackupManifest.FirmwareEvidence(1234L, 0x90) }
+        )) assertTrue(runCatching { invalid() }.isFailure)
+    }
+
     @Test fun routeBoundArchiveRetainsExactCanIdsProtocolAndSession() {
         val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 3)
         val zip = ByteArrayOutputStream()

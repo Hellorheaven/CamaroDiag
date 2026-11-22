@@ -32,6 +32,22 @@ object EcuBackupManifest {
         }
     }
 
+    /**
+     * An OSID obtained from a real read-only GM identification response.
+     * It is NOT a calibration ID, hardware part number, verified firmware map,
+     * flash permission or guarantee that the memory bytes are restorable.
+     */
+    data class FirmwareEvidence(val operatingSystemId: Long, val osDid: Int) {
+        init {
+            require(operatingSystemId in 1L..0xFFFFFFFEL) {
+                "Invalid declared GM firmware OSID."
+            }
+            require(osDid in setOf(0xC1, 0xC9)) {
+                "Unsupported GM firmware identification DID."
+            }
+        }
+    }
+
     data class Capture(
         val region: EcuBackupCoverage.Region,
         val startAddress: Long,
@@ -61,7 +77,8 @@ object EcuBackupManifest {
         /** VIN reported during acquisition, when available. It is not an attestation. */
         val vehicleVin: String? = null,
         /** Only a declared read route, not independently authenticated provenance. */
-        val channel: Channel? = null
+        val channel: Channel? = null,
+        val firmwareEvidence: FirmwareEvidence? = null
     )
 
     fun inspect(
@@ -70,13 +87,17 @@ object EcuBackupManifest {
         captures: List<Capture>,
         expectedRegions: Set<EcuBackupCoverage.Region>,
         vehicleVin: String? = null,
-        channel: Channel? = null
+        channel: Channel? = null,
+        firmwareEvidence: FirmwareEvidence? = null
     ): Manifest {
         require(vehicleVin == null || vehicleVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
             "Invalid VIN in ECU backup manifest"
         }
         require(channel == null || vehicleVin != null) {
             "A physical channel cannot be recorded without a VIN."
+        }
+        require(firmwareEvidence == null || channel != null) {
+            "Observed GM firmware metadata requires a VIN-bound physical channel."
         }
         val entries = captures.map { capture ->
             Entry(
@@ -112,7 +133,8 @@ object EcuBackupManifest {
             entries = entries,
             coverage = conservativeCoverage,
             vehicleVin = vehicleVin,
-            channel = channel
+            channel = channel,
+            firmwareEvidence = firmwareEvidence
         )
     }
 }

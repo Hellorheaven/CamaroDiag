@@ -52,7 +52,8 @@ object EcuBackupArchive {
         controllerLabel: String? = null,
         createdAtUtcMillis: Long = System.currentTimeMillis(),
         vehicleVin: String? = null,
-        channel: EcuBackupManifest.Channel? = null
+        channel: EcuBackupManifest.Channel? = null,
+        firmwareEvidence: EcuBackupManifest.FirmwareEvidence? = null
     ) {
         require(createdAtUtcMillis > 0L) { "Invalid ECU archive creation timestamp" }
         require(captures.isNotEmpty()) { "Cannot export an empty ECU backup" }
@@ -77,7 +78,8 @@ object EcuBackupArchive {
         // In particular, two independent reads must agree, or the archive
         // would be rejected by the corresponding import validation.
         val manifest = EcuBackupManifest.inspect(
-            controllerLabel, createdAtUtcMillis, snapshots, requiredRegions, vehicleVin, channel
+            controllerLabel, createdAtUtcMillis, snapshots, requiredRegions,
+            vehicleVin, channel, firmwareEvidence
         )
         val verification = EcuBackupIntegrity.verify(manifest, snapshots, requiredRegions)
         require(verification.consistent) { "Inconsistent backup captures: ${verification.problems}" }
@@ -92,6 +94,10 @@ object EcuBackupArchive {
             properties.setProperty("channel.responseCanId", channel.responseCanId.toString())
             properties.setProperty("channel.protocolNumber", channel.protocolNumber.toString())
             properties.setProperty("channel.session", channel.diagnosticSession.toString())
+        }
+        if (firmwareEvidence != null) {
+            properties.setProperty("ecu.osId", firmwareEvidence.operatingSystemId.toString())
+            properties.setProperty("ecu.osDid", firmwareEvidence.osDid.toString())
         }
         if (vehicleVin != null) properties.setProperty("vin", vehicleVin)
         properties.setProperty("controller", manifest.controllerLabel.orEmpty())
@@ -197,6 +203,21 @@ object EcuBackupArchive {
                 diagnosticSession = integer("session")
             )
         } else null
+        val firmwareEvidence = if (properties.getProperty("format") == FORMAT_WITH_CHANNEL &&
+            ("ecu.osId" in properties || "ecu.osDid" in properties)
+        ) {
+            fun canonicalLong(name: String): Long {
+                val raw = properties.getProperty(name)
+                    ?: throw IllegalArgumentException("Incomplete ECU firmware evidence.")
+                val parsed = raw.toLongOrNull()
+                    ?: throw IllegalArgumentException("Invalid ECU firmware evidence.")
+                require(parsed.toString() == raw) { "Noncanonical ECU firmware evidence." }
+                return parsed
+            }
+            val did = canonicalLong("ecu.osDid")
+            require(did in 0..255) { "Invalid ECU firmware DID." }
+            EcuBackupManifest.FirmwareEvidence(canonicalLong("ecu.osId"), did.toInt())
+        } else null
         val count = properties.getProperty("count")?.toIntOrNull()
         require(count != null && count in 1..MAX_ENTRIES) { "Invalid segment count" }
         val declaredRegions = properties.getProperty("required", "")
@@ -239,9 +260,11 @@ object EcuBackupArchive {
             "channel.requestCanId", "channel.responseCanId",
             "channel.protocolNumber", "channel.session"
         ) else emptySet()
+        val allowedFirmwareKeys = if (firmwareEvidence != null)
+            setOf("ecu.osId", "ecu.osDid") else emptySet()
         require(properties.stringPropertyNames().all { key ->
             key in setOf("format", "controller", "created", "count", "required", "vin") ||
-                key in allowedChannelKeys ||
+                key in allowedChannelKeys || key in allowedFirmwareKeys ||
                 (0 until count).any { index ->
                     key in setOf("region", "start", "expected", "origin", "sha256", "second")
                         .map { "capture.$index.$it" }
@@ -252,7 +275,7 @@ object EcuBackupArchive {
             ?: throw IllegalArgumentException("Invalid creation timestamp")
         val manifest = EcuBackupManifest.inspect(
             properties.getProperty("controller").orEmpty().ifBlank { null },
-            created, captures, required, vehicleVin, channel
+            created, captures, required, vehicleVin, channel, firmwareEvidence
         )
         val verification = EcuBackupIntegrity.verify(manifest, captures, required)
         require(verification.consistent) { "Archive failed offline verification: ${verification.problems}" }
