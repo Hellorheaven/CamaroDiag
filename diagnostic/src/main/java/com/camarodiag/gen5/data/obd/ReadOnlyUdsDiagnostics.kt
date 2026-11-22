@@ -130,10 +130,19 @@ internal class IsoTpChannel(
     }
 
     private suspend fun awaitFlowControl(timeoutMs: Long): Pair<Int, Long> {
+        require(timeoutMs in 1..30_000L) { "Flow-control timeout is out of range." }
+        val deadline = System.nanoTime() + timeoutMs * NANOS_PER_MILLISECOND
         var waits = 0
         var unrelated = 0
         while (true) {
-            val frame = awaitFrame(timeoutMs)
+            // Wait/irrelevant flow-control frames consume a single deadline;
+            // they must not repeatedly reset the adapter's timeout budget.
+            val remaining = deadline - System.nanoTime()
+            if (remaining <= 0L)
+                throw IsoTpException("ISO-TP flow-control deadline exceeded.")
+            val remainingMs =
+                ((remaining + NANOS_PER_MILLISECOND - 1) / NANOS_PER_MILLISECOND).coerceAtLeast(1L)
+            val frame = awaitFrame(remainingMs)
             requireFrameLength(frame, 3, "Flow-control frame")
             if ((frame.data[0].toInt() and 0xF0) != 0x30) {
                 if (++unrelated > MAX_UNEXPECTED_FLOW_CONTROL_FRAMES)
