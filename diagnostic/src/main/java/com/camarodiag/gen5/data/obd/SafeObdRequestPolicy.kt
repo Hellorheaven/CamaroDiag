@@ -71,6 +71,45 @@ object SafeObdRequestPolicy {
         return SafeObdRequest(service, parameter, compact)
     }
 
+    /**
+     * A command echo, adapter banner, or UDS negative response is never proof
+     * of a successful physical read. Works with spaced and compact ELM/J2534
+     * payloads, optionally prefixed by a supported CAN responder header.
+     */
+    fun hasPositiveResponse(request: SafeObdRequest, response: String): Boolean {
+        if (parse(request.elmCommand) != request) return false
+        val expected = when (request.service) {
+            0x01 -> "41%02X".format(java.util.Locale.ROOT, requireNotNull(request.parameter))
+            0x03 -> "43"
+            0x07 -> "47"
+            0x0A -> "4A"
+            0x09 -> "49%02X".format(java.util.Locale.ROOT, requireNotNull(request.parameter))
+            else -> return false
+        }
+        for (line in response.lineSequence()) {
+            val trimmed = line.trim().uppercase(java.util.Locale.ROOT)
+            if (trimmed.isEmpty() || trimmed.any {
+                    it !in '0'..'9' && it !in 'A'..'F' && !it.isWhitespace()
+                }) continue
+            var bytes = trimmed.filterNot(Char::isWhitespace)
+            // Only known OBD physical response headers are stripped.
+            if (bytes.startsWith("18DAF1") && bytes.length >= 8) {
+                bytes = bytes.drop(8)
+            } else if (bytes.length >= 3 && bytes.startsWith("7E") &&
+                bytes[2] in '8'..'F') {
+                bytes = bytes.drop(3)
+            }
+            // ELM's optional single-frame PCI may precede the positive service.
+            if (bytes.length >= 4 && bytes.take(2).toIntOrNull(16) in 1..7 &&
+                bytes.drop(2).startsWith(expected)) {
+                bytes = bytes.drop(2)
+            }
+            if (bytes.startsWith(expected) && bytes.length > expected.length &&
+                bytes.length % 2 == 0) return true
+        }
+        return false
+    }
+
     private fun normalizeHexToken(token: String, expectedLength: Int): String? {
         val value = if (token.startsWith("0x", ignoreCase = true)) token.substring(2) else token
         return value.takeIf {
