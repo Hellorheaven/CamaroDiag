@@ -83,6 +83,37 @@ class J2534LiveMemoryBackupTest {
         assertEquals(result.manifest, imported.manifest)
     }
 
+    @Test fun modifyingBothReadBuffersCannotReplaceTheVerifiedAcquisition() = runBlocking {
+        val result = J2534LiveMemoryBackup.captureForTest(ScriptedEcu(baseline, vin), request())
+        result.capture.firstRead[0] = 42
+        requireNotNull(result.capture.independentRead)[0] = 42
+        val output = ByteArrayOutputStream()
+
+        assertThrows(IllegalStateException::class.java) { result.export(output) }
+        assertEquals(0, output.size())
+    }
+
+    @Test fun cancellationDuringDefaultSessionCleanupCannotReturnACompletedCapture() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        var returned = false
+        val job = launch {
+            val caller = this
+            val transport = object : UdsPayloadTransport by ecu {
+                override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                    if (payload.contentEquals(byteArrayOf(0x10, 0x01))) caller.cancel()
+                    return ecu.exchange(payload, timeoutMs)
+                }
+            }
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+            returned = true
+        }
+        job.join()
+        assertTrue(job.isCancelled)
+        assertFalse(returned)
+        assertEquals(6, ecu.reads)
+        assertEquals(listOf(3, 1), ecu.sent.filter { it[0] == 0x10.toByte() }.map { it[1].toInt() })
+    }
+
     @Test fun aDifferentLiveVinStopsBeforeAnyMemoryRequest() = runBlocking {
         val fake = ScriptedEcu(baseline, vin)
         val invalid = request("1G1FA1RXXR0123457")
