@@ -13,7 +13,7 @@ internal static class NativeE39BackupQualificationSelfTests
             (uint)original.Length, 256, 1);
         var identity = new NativeGmlanIdentification.Identity(vin, 12664221u, 0xC1, true, "test");
         var capture = new NativeScopedMemoryReader.VerifiedCapture(original.ToArray(), 0,
-            vin, hash, original.Length / 256);
+            vin, hash, original.Length / 256, original.ToArray());
         var evidence = NativeE39BackupQualification.Compare(scope, original, capture, identity, identity);
         if (evidence.Sha256 != hash || evidence.Bytes != original.Length)
             throw new InvalidOperationException("Valid full image comparison failed.");
@@ -30,6 +30,11 @@ internal static class NativeE39BackupQualificationSelfTests
         Reject<UnauthorizedAccessException>(() => NativeE39BackupQualification.Compare(scope, original, capture, identity with { OperatingSystemId = 1 }, identity with { OperatingSystemId = 1 }));
         Reject<InvalidDataException>(() => NativeE39BackupQualification.Compare(scope, original, capture, identity, identity with { PhysicalRead = false }));
         Reject<InvalidDataException>(() => NativeE39BackupQualification.Compare(scope, original, capture with { BlocksPerPass = 1 }, identity, identity));
+        Reject<InvalidDataException>(() => NativeE39BackupQualification.Compare(scope, original, capture with { SecondBytes = null }, identity, identity));
+        Reject<InvalidDataException>(() => NativeE39BackupQualification.Compare(scope, original, capture with { SecondBytes = capture.Bytes }, identity, identity));
+        var corruptSecond = original.ToArray();
+        corruptSecond[0] ^= 1;
+        Reject<InvalidDataException>(() => NativeE39BackupQualification.Compare(scope, original, capture with { SecondBytes = corruptSecond }, identity, identity));
         var altered = original.ToArray();
         altered[0x20040] ^= 1;
         Reject<InvalidDataException>(() => NativeE39BackupQualification.Compare(scope, original, capture with { Bytes = altered }, identity, identity));
