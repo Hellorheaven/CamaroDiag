@@ -7,55 +7,50 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
 
 /**
  * Read-only license status is independent of the disabled paywall.
  * Never interpret an unavailable backend as an unlicensed account.
  */
+/**
+ * The account dialog only displays the license result already checked when
+ * the app started. Opening the dialog never triggers another Firebase call.
+ */
 @Composable
-internal fun AccountLicenseStatus(french: Boolean) {
-    val uid = FirebaseAuth.getInstance().currentUser?.uid
-    var result by remember(uid) { mutableStateOf<String?>(null) }
-    var loading by remember(uid) { mutableStateOf(true) }
-
-    LaunchedEffect(uid) {
-        if (uid == null) {
-            loading = false
-            return@LaunchedEffect
-        }
-        FirebaseFunctions.getInstance("europe-west1")
-            .getHttpsCallable("getMyLicenseStatus").call()
-            .addOnCompleteListener { task ->
-                loading = false
-                if (!task.isSuccessful) {
-                    result = if (french) "Statut indisponible" else "Status unavailable"
-                    return@addOnCompleteListener
-                }
-                val data = (task.result?.data as? Map<*, *>).orEmpty()
-                val licensed = data["licensed"] as? Boolean
-                val source = data["source"] as? String
-                result = when (licensed) {
-                    true -> if (source == "purchase") {
-                        if (french) "Oui (achat)" else "Yes (purchase)"
-                    } else {
-                        if (french) "Oui (attribution administrative)" else "Yes (admin grant)"
-                    }
-                    false -> if (french) "Non" else "No"
-                    null -> if (french) "Statut indisponible" else "Status unavailable"
-                }
-            }
+internal fun AccountLicenseStatus(
+    french: Boolean,
+    level: LicenseLevel,
+    confirmed: Boolean?,
+    source: String?
+) {
+    val value = when {
+        !LicenseRolloutConfig.ENABLED ->
+            if (french) "Contrôle des licences non activé" else "License checks not enabled"
+        level == LicenseLevel.OWNER ->
+            if (french) "Oui (propriétaire)" else "Yes (owner)"
+        confirmed == null ->
+            if (french) "Vérification en cours…" else "Checking…"
+        confirmed == false ->
+            if (french) "Indisponible" else "Unavailable"
+        level == LicenseLevel.FREE ->
+            if (french) "Non" else "No"
+        source == "purchase" ->
+            if (french) "Oui (achat)" else "Yes (purchase)"
+        source == "promotion" ->
+            if (french) "Oui (offerte)" else "Yes (complimentary)"
+        source == "administrative" ->
+            if (french) "Oui (attribution administrative)" else "Yes (admin grant)"
+        else ->
+            if (french) "Oui" else "Yes"
     }
-
     Text(
-        if (french) "Licence : " + (if (loading) "Chargement…" else result ?: "Indisponible")
-        else "License: " + (if (loading) "Loading…" else result ?: "Unavailable"),
+        (if (french) "Licence : " else "License: ") + value,
         style = MaterialTheme.typography.bodyMedium
     )
     Text(
-        if (french) "Toutes les fonctions standard restent accessibles pendant la phase de lancement."
-        else "All standard features remain available during rollout.",
+        if (french) "Statut contrôlé au démarrage ou après une reconnexion."
+        else "Status checked at startup or after signing in again.",
         style = MaterialTheme.typography.bodySmall
     )
 }
