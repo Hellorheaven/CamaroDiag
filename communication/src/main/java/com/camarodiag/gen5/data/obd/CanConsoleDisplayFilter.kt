@@ -44,12 +44,28 @@ object CanConsoleDisplayFilter {
             .distinct().sortedWith(compareBy({ it.value }, { it.extended })).toList()
     }
 
+    /** Retain IDs seen earlier in a live session even after the visible history
+     * ring buffer has discarded their RX lines. Cap the catalogue for hostile buses. */
+    fun accumulateObserved(
+        current: Set<ObservedCanId>,
+        batch: List<ParsedCanConsoleRecord>
+    ): Set<ObservedCanId> {
+        if (current.size >= 4_096) return current
+        val result = current.toMutableSet()
+        for (entry in batch) {
+            receivedId(entry)?.let { result.add(it) }
+            if (result.size >= 4_096) break
+        }
+        return result
+    }
+
     /** Use width-preserving trace frames when available, never a guessed ID type. */
     fun observedFrameIds(
         history: List<ParsedCanConsoleRecord>,
-        frames: Collection<CanTraceFrame>
+        frames: Collection<CanTraceFrame>,
+        previouslyObserved: Set<ObservedCanId> = emptySet()
     ): List<ObservedCanId> =
-        (history.asSequence().mapNotNull(::receivedId) +
+        (previouslyObserved.asSequence() + history.asSequence().mapNotNull(::receivedId) +
             frames.asSequence().mapNotNull { frame ->
                 frame.extendedId?.let { extended ->
                     runCatching { ObservedCanId(frame.canId.toLong(), extended) }.getOrNull()
