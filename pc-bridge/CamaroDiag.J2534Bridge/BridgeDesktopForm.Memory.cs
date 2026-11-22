@@ -13,7 +13,11 @@ internal sealed partial class BridgeDesktopForm
         public Task<byte[]> ExchangeAsync(byte[] request, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            return Task.FromResult(device.Exchange(request, 6000));
+            var response = device.Exchange(request, 6000);
+            // J2534 Exchange is synchronous: cancellation can occur while
+            // PassThruReadMsgs is blocked. A late reply must not be accepted.
+            token.ThrowIfCancellationRequested();
+            return Task.FromResult(response);
         }
     }
 

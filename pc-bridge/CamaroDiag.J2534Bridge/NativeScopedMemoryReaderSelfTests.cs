@@ -182,6 +182,18 @@ internal static class NativeScopedMemoryReaderSelfTests
                 denied, scope, null, CancellationToken.None).GetAwaiter().GetResult());
         checks++;
         Assert(denied.Calls == 1, "A negative ECU response halts before a second attempt");
+        var explicitDenied = new FakeEcu(scope.StartAddress, memory) { Deny = true };
+        NativeScopedMemoryReader.MemoryReadRefusedException? deniedReason = null;
+        try
+        {
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                explicitDenied, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        }
+        catch (NativeScopedMemoryReader.MemoryReadRefusedException error) { deniedReason = error; }
+        Assert(deniedReason is not null && deniedReason.Address == scope.StartAddress &&
+               deniedReason.RequestedBytes == 128 && deniedReason.Nrc == 0x31 &&
+               explicitDenied.Calls == 1,
+               "Refused physical address, requested block size and ECU NRC are retained without retry");
         var truncated = new FakeEcu(scope.StartAddress, memory) { Truncate = true };
         Reject<InvalidDataException>(() =>
             NativeScopedMemoryReader.ReadTwiceAsync(

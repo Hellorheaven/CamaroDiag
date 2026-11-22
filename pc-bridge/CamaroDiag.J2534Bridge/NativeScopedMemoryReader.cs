@@ -11,6 +11,15 @@ internal static class NativeScopedMemoryReader
 {
     internal const int MaximumUiCaptureBytes = 16 * 1024 * 1024;
 
+    internal sealed class MemoryReadRefusedException(uint address, int size, byte nrc) :
+        IOException($"ECU denied memory read at 0x{address:X8} ({size} bytes, NRC 0x{nrc:X2}). " +
+            "No SecurityAccess, flash write or privileged retry was attempted.")
+    {
+        internal uint Address { get; } = address;
+        internal int RequestedBytes { get; } = size;
+        internal byte Nrc { get; } = nrc;
+    }
+
     internal interface ITransport
     {
         Task<byte[]> ExchangeAsync(byte[] request, CancellationToken cancellationToken);
@@ -181,6 +190,8 @@ internal static class NativeScopedMemoryReader
                 var request = BuildReadRequest(scope, address, length);
                 var reply = await link.ExchangeAsync(request, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                if (reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x23)
+                    throw new MemoryReadRefusedException(address, length, reply[2]);
                 var data = ParseReadResponse(reply, length);
                 data.CopyTo(output, offset);
                 offset += length;
