@@ -17,6 +17,9 @@ int main(){
   n=s.dispatch(v,out,sizeof(out));
   assert(n && decode(out,n,reply)==FrameError::None);
   assert(reply.opcode==2 && reply.sequence==1);
+  const char* capabilities="CAPS hs_can=disabled sw_can=disabled eeprom_read=disabled eeprom_write=disabled ecu_flash=disabled j2534=disabled";
+  assert(reply.length==std::strlen(capabilities));
+  assert(!std::memcmp(reply.payload,capabilities,reply.length));
   v.sequence=2; v.opcode=3;
   n=s.dispatch(v,out,sizeof(out));
   assert(n && decode(out,n,reply)==FrameError::None);
