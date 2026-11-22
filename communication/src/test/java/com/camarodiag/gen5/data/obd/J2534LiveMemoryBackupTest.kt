@@ -412,4 +412,35 @@ class J2534LiveMemoryBackupTest {
         }
     }
 
+    @Test fun udsSecurityAccessRefusalNeverProducesOrExportsAMemoryBackup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload[0] == 0x23.toByte())
+                    byteArrayOf(0x7F, 0x23, 0x33)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertTrue(ecu.sent.none { it[0] == 0x27.toByte() ||
+            it[0] == 0x34.toByte() || it[0] == 0x36.toByte() })
+    }
+
+    @Test fun exportedCaptureRejectsMutationOfEitherIndividualReadBuffer() = runBlocking {
+        for (changeFirst in listOf(true, false)) {
+            val result = J2534LiveMemoryBackup.captureForTest(
+                ScriptedEcu(baseline, vin), request())
+            if (changeFirst) result.capture.firstRead[0] =
+                (result.capture.firstRead[0].toInt() xor 1).toByte()
+            else {
+                val second = requireNotNull(result.capture.independentRead)
+                second[0] = (second[0].toInt() xor 1).toByte()
+            }
+            val output = ByteArrayOutputStream()
+            assertTrue(runCatching { result.export(output) }.isFailure)
+            assertEquals(0, output.size())
+        }
+    }
+
 }
