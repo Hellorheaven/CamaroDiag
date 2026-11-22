@@ -4210,9 +4210,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val v = ((b[0] * 256 + b[1]) * 2.0) / 65536.0
                                     values += LivePidValue("WBO2_B2S2", "Wideband Lambda B2S2", "Sonde large bande B2S2 - lambda", v, "λ", v, "λ", 0.0, 2.0, push("WBO2_B2S2", v))
                                 }
-                                read("43")?.takeIf { it.size >= 2 }?.let { b ->
-                                    val v = ((b[0] * 256 + b[1]) * 100.0) / 65535.0
-                                    values += LivePidValue("ABS_LOAD", "Absolute Engine Load", "Charge moteur absolue", v, "%", v, "%", 0.0, 100.0, push("ABS_LOAD", v))
+                                CamaroUdsProtocol.decodeAbsoluteLoadPercent(read("43"))?.let { v ->
+                                    values += LivePidValue("ABS_LOAD", "Absolute Engine Load", "Charge moteur absolue", v, "%", v, "%", 0.0, 25700.0, push("ABS_LOAD", v))
                                 }
                                 read("44")?.takeIf { it.size >= 2 }?.let { b ->
                                     val v = ((b[0] * 256 + b[1]) * 2.0) / 65535.0
