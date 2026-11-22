@@ -253,3 +253,7 @@ Le pont inclut désormais un mode local explicite : `CamaroDiag.J2534Bridge.exe 
 L'onglet **CamaroDiagConnectors** du pont propose aussi cette découverte sans terminal : actualiser les ports COM, sélectionner uniquement la carte CD/1 isolée, confirmer l'absence de cible et lancer le test. Aucun port n'est sélectionné ou interrogé automatiquement. L'opération exige l'arrêt du pont et de la console ; le résultat n'autorise aucun accès véhicule.
 
 Pour examiner un checkpoint CDJ/1 local de 64 octets : onglet Récupération ECU, bouton « Ouvrir un checkpoint CDJ/1 », ou `CamaroDiag.J2534Bridge.exe --inspect-connector-checkpoint checkpoint.bin`. Le fichier exporté doit être fourni par l'utilisateur ; le firmware public ne propose pas encore de commande d'export. Analyse hors ligne, non authentifiée, aucune reprise automatique.
+
+
+### Journal du boîtier en USB (prototype isolé)
+Dans l'onglet CamaroDiagConnectors, sélectionner explicitement un port COM et le firmware de service `esp32s3-journal-export`, sans ECU ni véhicule connecté, puis exporter un fichier `.cdj` inédit. En ligne de commande : `CamaroDiag.J2534Bridge.exe --capture-connector-checkpoint COM5 checkpoint.cdj --isolated`. Les fichiers existants ne sont jamais écrasés. Le journal 64 octets est compatible avec le lecteur hors ligne Android/Windows. Absence de journal, corruption et état de récupération ne donnent aucune autorisation de programmation. Ne jamais reflasher un boîtier en opération ni effacer NVS. Qualification réelle sur carte encore requise.

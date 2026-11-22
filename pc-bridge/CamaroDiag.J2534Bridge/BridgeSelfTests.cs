@@ -12,6 +12,7 @@ internal static class BridgeSelfTests
         ConnectorTlsReferenceSelfTests.Run();
         if (ConnectorDiscoverySelfTests.Run() != 0) return 1;
         ConnectorCheckpointSelfTests.Run();
+        ConnectorCheckpointCaptureSelfTests.Run();
         var checks = 0;
         void Assert(bool condition, string name)
         {

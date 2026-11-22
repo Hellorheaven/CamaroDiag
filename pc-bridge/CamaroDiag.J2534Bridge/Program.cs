@@ -36,6 +36,9 @@ internal static class Program
         if (args.Contains(ConnectorDiscoveryCli.Command, StringComparer.OrdinalIgnoreCase))
             return ConnectorDiscoveryCli.Run(args);
 
+        if (args.Contains(ConnectorCheckpointCapture.Command, StringComparer.OrdinalIgnoreCase))
+            return ConnectorCheckpointCapture.Run(args);
+
         // Explicit local programming path; malformed invocations cannot fall
         // through to a network listener, updater or another CLI operation.
         if (args.Contains(NativeE39QualifiedBenchCli.Command, StringComparer.OrdinalIgnoreCase))
