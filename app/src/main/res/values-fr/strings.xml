@@ -917,4 +917,7 @@
     <string name="debug_builds_no_browser">Aucun navigateur disponible pour ouvrir ce téléchargement.</string>
     <string name="obd_physical_can_scope">Répondant CAN physique : 0x%1$s. Ce scan couvre uniquement le calculateur OBD sélectionné, pas un balayage fonctionnel de tous les modules. Aucune commande de programmation GM ni d’actionneur n’a été envoyée.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Autorisez l’effacement des défauts antipollution dans le pont Windows, reconnectez-vous, arrêtez le moteur et confirmez la réinitialisation. Les données de préparation antipollution seront réinitialisées ; les codes permanents ne sont pas effacés.</string>
+    <string name="export_folder_instruction">Créez ou sélectionnez le dossier CamaroDiag dans le stockage interne, puis autorisez son accès. Les exports sont visibles dans le stockage partagé.</string>
+    <string name="export_folder_success">Export enregistré dans /CamaroDiag/.</string>
+    <string name="export_folder_failed">Impossible d’enregistrer l’export dans /CamaroDiag/.</string>
 </resources>
