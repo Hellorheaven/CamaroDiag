@@ -56,11 +56,16 @@ class EcuWriteTransactionTest {
             capabilities = EcuProgrammingDriverContract.Capability.values().toSet(),
             controllerFamilies = setOf("E39"),
             physicalHardwareValidated = validated,
-            qualifiedWriteRegions = setOf(EcuBackupCoverage.Region.CALIBRATION),
             writeTargets = setOf(
                 EcuProgrammingDriverContract.FirmwareTarget("E39", "E39-test", "firmware-test"),
                 EcuProgrammingDriverContract.FirmwareTarget("E39", "E39-test", "firmware-update")
-            )
+            ),
+            writeQualifications = setOf("firmware-test", "firmware-update").map { firmware ->
+                EcuProgrammingDriverContract.WriteQualification(
+                    EcuProgrammingDriverContract.FirmwareTarget("E39", "E39-test", firmware),
+                    EcuBackupCoverage.Region.CALIBRATION, EcuBenchExpertPlan.AccessMethod.OBD
+                )
+            }.toSet()
         )
 
         private fun start(request: EcuProgrammingDriverContract.RegionRequest): Int {
@@ -147,6 +152,32 @@ class EcuWriteTransactionTest {
         assertTrue(EcuWriteTransaction.Blocker.UNVERIFIED_OEM_CHECKSUM in result.blockers)
         assertTrue(EcuWriteTransaction.Blocker.UNVERIFIED_HARDWARE_BACKUP in result.blockers)
         assertTrue(EcuWriteTransaction.Blocker.NO_VALIDATED_RECOVERY in result.blockers)
+    }
+
+    @Test fun programmingTransportCannotSubstituteForAQualifiedConnectionRoute() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true }
+        ).run(request().copy(accessMethod = EcuBenchExpertPlan.AccessMethod.BENCH))
+        assertEquals(EcuWriteTransaction.Status.BLOCKED, outcome.status)
+        assertTrue(EcuWriteTransaction.Blocker.NO_VALIDATED_DRIVER in outcome.blockers)
+        assertEquals(0, device.eraseCalls)
+        assertTrue(EcuWriteTransaction.Blocker.INCOMPATIBLE_ACCESS_METHOD in
+            EcuWriteTransaction.prepare(request().copy(accessMethod = EcuBenchExpertPlan.AccessMethod.BDM)).blockers)
+    }
+
+    @Test fun externalEepromCannotEnterFlashSectorEraseEngine() {
+        for ((transport, method) in listOf(
+            EcuProgrammingDriverContract.Transport.EEPROM_ISP to EcuBenchExpertPlan.AccessMethod.EXTERNAL_EEPROM_ISP,
+            EcuProgrammingDriverContract.Transport.CHIP_OFF to EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF
+        )) {
+            val result = EcuWriteTransaction.prepare(request().copy(
+                transport = transport, accessMethod = method,
+                region = EcuBackupCoverage.Region.EXTERNAL_EEPROM
+            ))
+            assertTrue(EcuWriteTransaction.Blocker.SEPARATE_EEPROM_WORKFLOW_REQUIRED in result.blockers)
+            assertFalse(result.canAttemptWithValidatedHardware)
+        }
     }
 
     @Test fun simulatedSectorSequencePreservesNeighborsAndVerifiesEveryWrittenSector() = runBlocking {
