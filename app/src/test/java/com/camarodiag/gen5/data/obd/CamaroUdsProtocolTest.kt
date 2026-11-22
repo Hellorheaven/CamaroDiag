@@ -108,6 +108,43 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun negativeAtRepliesDoNotGrantCanOrSwCanCapabilities() {
+        for (failure in listOf("NOT OK", "NOK", "OK?", "ERROR", "UNABLE TO CONNECT")) {
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "OBDLink MX+",
+                macAddress = "00:00:00:00:00:01",
+                atzResp = "OBDLink",
+                stiResp = "STN2120 v5.6.5",
+                atalResp = failure,
+                stp61Resp = failure,
+                headersResp = failure,
+                protocolResp = failure
+            )
+            assertFalse("Must not trust $failure as ATAL", capabilities.supportsLongFrames)
+            assertFalse("Must not trust $failure as STP 61", capabilities.supportsSwCan)
+            assertFalse("Must not trust $failure as CAN headers", capabilities.supportsCanHeaders)
+        }
+    }
+
+    @Test
+    fun echoedAtCommandsWithSeparateOkAcknowledgementsRemainSupported() {
+        val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+            deviceName = "OBDLink MX+",
+            macAddress = "00:00:00:00:00:01",
+            atzResp = "OBDLink",
+            stiResp = "STN2120 v5.6.5",
+            atalResp = "ATAL\\r\\nOK\\r\\n>",
+            stp61Resp = "STP 61\\r\\nOK\\r\\n>",
+            headersResp = "ATH1\\r\\nOK\\r\\n>",
+            protocolResp = "ATSP6\\r\\nOK\\r\\n>"
+        )
+        assertTrue(capabilities.supportsLongFrames)
+        assertTrue(capabilities.supportsSwCan)
+        assertTrue(capabilities.supportsCanHeaders)
+        assertFalse(capabilities.supportsCanTransmit)
+    }
+
+    @Test
     fun doesNotConfuseCanHeaderSupportWithPhysicalTransmitCapability() {
         val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "ELM327 Bluetooth",
