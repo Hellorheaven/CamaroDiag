@@ -190,9 +190,11 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         val pending = ask("07")
         val permanent = ask("0A")
         val proved = listOf(
-            confirmed to 0x43, pending to 0x47, permanent to 0x4A
-        ).any { (raw, service) ->
-            parseResponseBytes(raw)?.contains(service) == true
+            Triple(confirmed, 0x43, "confirmed"),
+            Triple(pending, 0x47, "pending"),
+            Triple(permanent, 0x4A, "permanent")
+        ).any { (raw, service, status) ->
+            decodeDtcResponseOrNull(raw, service, status) != null
         }
         return Triple(
             decodeDtcResponse(confirmed, 0x43, "confirmed"),
@@ -477,12 +479,36 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
         return null
     }
 
-    private fun decodeDtcResponse(response: String, positiveService: Int, status: String): List<ObdDtc> {
-        val bytes = parseResponseBytes(response) ?: return emptyList()
+    private fun decodeDtcResponse(response: String, positiveService: Int, status: String): List<ObdDtc> =
+        decodeDtcResponseOrNull(response, positiveService, status).orEmpty()
+
+    /**
+     * Distinguish counted physical CAN frames from legacy ELM DTC pairs,
+     * rejecting ambiguous truncated packets rather than returning fake codes.
+     * Non-null also proves that the read was physically acknowledged, even
+     * when the ECU returned a valid zero-DTC response.
+     */
+    private fun decodeDtcResponseOrNull(
+        response: String, positiveService: Int, status: String
+    ): List<ObdDtc>? {
+        val bytes = parseResponseBytes(response) ?: return null
         val start = bytes.indexOf(positiveService)
-        if (start < 0) return emptyList()
+        if (start < 0) return null
         val payload = bytes.drop(start + 1)
-        return payload.chunked(2).filter { it.size == 2 }.mapNotNull { pair ->
+        if (payload.isEmpty()) return null
+        val count = payload.first()
+        val data = when {
+            count == 0 && payload.size == 1 -> emptyList()
+            count > 0 && payload.size == 1 + 2 * count -> payload.drop(1)
+            payload.size == 2 && payload.all { it == 0 } -> payload
+            // Legacy ELM pairs often include a trailing 0000 DTC slot.
+            // A single ambiguous 2-byte pair could be a truncated count.
+            payload.size >= 4 && payload.size % 2 == 0 -> payload
+            else -> return null
+        }
+        val records = data.chunked(2)
+        if (records.any { it.size != 2 }) return null
+        return records.mapNotNull { pair ->
             val raw = (pair[0] shl 8) or pair[1]
             if (raw == 0) null else {
                 val prefix = "PCBU"[(raw shr 14) and 0x03]
