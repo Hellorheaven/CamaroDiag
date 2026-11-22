@@ -239,7 +239,7 @@ internal sealed partial class BridgeDesktopForm
         consoleHistory.SelectionStart = consoleHistory.TextLength;
         consoleHistory.SelectionLength = 0;
         consoleHistory.SelectionColor = color;
-        consoleHistory.AppendText($"{DateTime.Now:HH:mm:ss} [{direction}] {message}{Environment.NewLine}");
+        consoleHistory.AppendText($"{DateTime.Now:HH:mm:ss} [{BridgeConsoleDirection.Normalize(direction)}] {message}{Environment.NewLine}");
         consoleHistory.SelectionColor = consoleHistory.ForeColor;
         consoleHistory.ScrollToCaret();
     }
