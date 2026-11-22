@@ -570,3 +570,10 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 - Sauvegarde J2534 : export lié à l'empreinte originale vérifiée, copies figées, rejet si les deux buffers ont été modifiés ensemble, annulation respectée après retour en session par défaut. Deux tests de régression.
 - Mise à jour APK : refus d'un même ID DownloadManager associé à des versions divergentes ; les entrées ambiguës ne permettent ni reprise ni suppression. Tests de régression ajoutés.
 - Dernier SHA de code/tests f2c91de : CI à confirmer ; aucune validation physique ECU, aucun nouveau profil qualifié, ne pas activer le flash sur un appareil non qualifié. Poursuivre développement fonctionnel restant, puis traductions réelles fichier par fichier, vraie CI Android/Windows/native complète, et recette matérielle.
+
+
+### 22/11/2026 — session suivante PR #70 (checkpoint 29aa0e2)
+- 13 commits de code, tests et ressources depuis 30ce459, uniquement sur feat/ecu-backup-integrity. Aucun merge, aucun changement CamaroDiagConnectors.
+- 510 chaînes traduites (255 SV + 255 RO). Les trois fichiers de chaînes agrégés contiennent 881/881 clés dans ces deux locales, aucune clé inconnue ou dupliquée et aucun écart de paramètres détecté. Reste 2 479 chaînes de strings.xml réparties dans 10 langues. Conserver le test bloquant de parité et prévoir validation linguistique et lint.
+- Sauvegarde ECU : vérification renforcée des acquisitions partageant un même buffer, segments vides et VIN mal formé ; refus d'export avant toute écriture ZIP si les buffers sont aliasés ; 4 tests supplémentaires. Une paire de buffers distincts ne prouve pas une acquisition physique indépendante.
+- CI à l'entrée 30ce459 : 196/197 tests Android, seul échec de parité, noyau natif vert. CI du nouveau HEAD à confirmer. L'écriture physique reste non qualifiée ; ne pas activer le flash sur un ECU non validé.
