@@ -940,4 +940,5 @@
     <string name="can_console_tx_ack_only">Trame envoyée à l’interface ; aucune réponse diagnostique correspondante du calculateur n’a été confirmée.</string>
     <string name="can_console_negative_ecu_response">Le calculateur sélectionné a renvoyé une réponse diagnostique négative ; aucune lecture réussie n’a été confirmée.</string>
     <string name="can_console_oversized_line">Lignes de surveillance CAN malformées ignorées : %1$d. La capture brute d’origine est conservée.</string>
+    <string name="can_console_response_timeout">Délai dépassé pour la réponse diagnostique CAN ; les trames déjà reçues restent dans la console.</string>
 </resources>
