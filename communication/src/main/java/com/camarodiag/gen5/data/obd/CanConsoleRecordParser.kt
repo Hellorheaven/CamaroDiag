@@ -27,8 +27,27 @@ object CanConsoleAdapterReplyPolicy {
     }
 }
 
+/** Physical OBD CAN requests have one responder. Never attribute another ECU's
+ * frames to the selected physical ECU. Passive capture stays unfiltered. */
+object CanConsoleEcuRouting {
+    fun expectedResponder(request: RawCanFrame): Long? = when {
+        !request.isExtended && request.canId in 0x7E0L..0x7E7L ->
+            request.canId + 8L
+        request.isExtended && request.canId and 0xFFFF00FFL == 0x18DA00F1L ->
+            0x18DAF100L or ((request.canId shr 8) and 0xFFL)
+        else -> null
+    }
+
+    fun isSelectedResponder(request: RawCanFrame, response: RawCanFrame): Boolean {
+        val expected = expectedResponder(request) ?: return false
+        return response.isExtended == request.isExtended && response.canId == expected
+    }
+}
+
 object CanConsoleRecordParser {
-    fun parse(output: String): List<ParsedCanConsoleRecord> =
+    /** A request-specific exchange never presents unmatched CAN IDs as ECU RX.
+     * Use the no-request overload only for an intentionally passive capture. */
+    fun parse(output: String, request: RawCanFrame? = null): List<ParsedCanConsoleRecord> =
         output.lineSequence().mapNotNull { rawLine ->
             val line = rawLine.trim().removeSuffix(">").trim()
             if (line.isEmpty()) return@mapNotNull null
@@ -39,6 +58,12 @@ object CanConsoleRecordParser {
                     direction = "SYSTEM",
                     content = line.take(4_096),
                     succeeded = !CanConsoleAdapterReplyPolicy.isFailure(line)
+                )
+            } else if (request != null && !CanConsoleEcuRouting.isSelectedResponder(request, frame)) {
+                ParsedCanConsoleRecord(
+                    direction = "SYSTEM",
+                    content = line.take(4_096),
+                    succeeded = false
                 )
             } else {
                 val identifier = frame.canId.toString(16).uppercase().padStart(
