@@ -85,6 +85,10 @@ class CanConsoleLiveDiagnosticCorrelation(
     /** Mark the actual TX command start, after the adapter's AT setup. */
     fun beginRequest(sentAtMs: Long) {
         require(startedAtMs == null) { "CAN request session already started." }
+        // A partial CAN/OK line begun before physical TX must never be
+        // completed by a later chunk and claimed by this request.
+        // Completed pre-TX records remain in the global display history.
+        framer.reset()
         startedAtMs = sentAtMs
     }
 
