@@ -203,4 +203,13 @@ class SafeObdRequestPolicyTest {
         }
     }
 
+    @Test
+    fun physicalEcuNameReadRequiresMatchingMode09Pid() {
+        val name = requireNotNull(SafeObdRequestPolicy.parse("090A"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(name, "49 0A 01 45 43 4D"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(name, "49 04 01 45 43 4D"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(name, "7F 09 12"))
+        assertEquals(true, SafeObdRequestPolicy.hasNegativeResponse(name, "7F 09 12"))
+    }
+
 }
