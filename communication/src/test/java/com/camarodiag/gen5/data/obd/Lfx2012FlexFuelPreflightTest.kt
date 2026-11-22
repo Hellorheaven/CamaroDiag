@@ -70,7 +70,7 @@ class Lfx2012FlexFuelPreflightTest {
         )
     }
     @Test fun zeroFilledAndUnavailableIdentitiesAreRejected() {
-        val invalidIds = listOf("00000000", "0x000000", "FFFFFFFF", "0xFFFFFF", "N/A", "TBD", "pending", "not supported", "test")
+        val invalidIds = listOf("00000000", "0x000000", "FFFFFFFF", "0xFFFFFF", "N/A", "TBD", "pending", "not supported", "test", "mock-ecu", "fake-ecu", "placeholder", "simulation")
         invalidIds.forEach { invalid ->
             val problems = Lfx2012FlexFuelPreflight.missingPreconditions(
                 vehicle,
