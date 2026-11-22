@@ -669,6 +669,7 @@
     <string name="can_sniffer_send">Envoyer</string>
     <string name="can_sniffer_empty">Aucune trame CAN capturée pour le moment.</string>
     <string name="can_console_no_adapter_text">Aucun texte de réponse reçu de l’interface</string>
+    <string name="can_console_unsafe_can_payload">Trame CAN refusée : commande de diagnostic dangereuse ou adresse de réponse ECU réservée.</string>
     <string name="can_console_obd_unavailable">La surveillance CAN est disponible, mais l’interface n’a pas de canal de lecture OBD standard actif.</string>
     <string name="can_console_read_only_available">Les commandes OBD en lecture seule restent accessibles avec l’interface connectée. La surveillance CAN passive n’est pas disponible sur cet adaptateur.</string>
     <string name="can_sniffer_unavailable">Connectez un adaptateur réel prenant en charge les en-têtes CAN. La simulation et les ponts non compatibles ne permettent pas la capture en direct.</string>
