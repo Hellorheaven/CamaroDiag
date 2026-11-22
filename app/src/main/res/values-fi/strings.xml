@@ -651,4 +651,7 @@
     <string name="cal_native_catalog_loading">Ladataan omaa luetteloa…</string>
     <string name="cal_native_catalog_empty">Yhtäkään Camaron valmistajakohtaista DID-tunnusta ei ole vielä määritelty käyttökelpoiseksi. Tuntemattomia osoitteita tai skaalauskertoimia ei keksitä.</string>
     <string name="cal_native_catalog_read_disabled">Ajoneuvosta lukeminen on estetty, kunnes osoitus ja dekoodaus on varmennettu vastaavalla kokoonpanolla.</string>
+    <string name="export_folder_instruction">Luo tai valitse sisäisestä tallennustilasta CamaroDiag-kansio ja salli käyttöoikeus. Vientitiedostot näkyvät jaetussa tallennustilassa.</string>
+    <string name="export_folder_success">Vienti tallennettu kansioon /CamaroDiag/.</string>
+    <string name="export_folder_failed">Vientiä ei voitu tallentaa kansioon /CamaroDiag/.</string>
 </resources>
