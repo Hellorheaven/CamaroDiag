@@ -72,6 +72,71 @@ class EcuBackupArchiveTest {
         )) assertTrue(runCatching { invalid() }.isFailure)
     }
 
+    @Test fun windowsV3ArchiveWithObservedOsidImportsOnAndroidAndRejectsMalformedMetadata() {
+        val bytes = byteArrayOf(0x11, 0x22, 0x33, 0x44)
+        val hash = EcuBenchExpertPlan.sha256Hex(bytes).uppercase()
+        val metadata = """
+            format=CamaroDiag ECU offline archive v3
+            vin=1G1FA1RXXR0123456
+            controller=
+            created=1795320000000
+            count=1
+            channel.requestCanId=2016
+            channel.responseCanId=2024
+            channel.protocolNumber=33
+            channel.session=3
+            ecu.osId=19088743
+            ecu.osDid=193
+            required=
+            capture.0.region=OTHER
+            capture.0.start=4096
+            capture.0.expected=4
+            capture.0.origin=REPORTED_HARDWARE_READ
+            capture.0.sha256=$hash
+            capture.0.second=true
+        """.trimIndent() + "\n"
+        fun archiveWithManifest(manifest: String): ByteArray {
+            val output = ByteArrayOutputStream()
+            ZipOutputStream(output).use { zip ->
+                for ((name, data) in listOf(
+                    "manifest.properties" to manifest.toByteArray(Charsets.US_ASCII),
+                    "capture/0/first.bin" to bytes,
+                    "capture/0/second.bin" to bytes.copyOf()
+                )) {
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write(data)
+                    zip.closeEntry()
+                }
+            }
+            return output.toByteArray()
+        }
+        val imported = EcuBackupArchive.import(archiveWithManifest(metadata).inputStream())
+        assertEquals(
+            EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 3),
+            imported.manifest.channel
+        )
+        assertEquals(
+            EcuBackupManifest.FirmwareEvidence(19088743L, 0xC1),
+            imported.manifest.firmwareEvidence
+        )
+        assertEquals(EcuBackupCoverage.Status.PARTIAL, imported.manifest.coverage.status)
+        assertTrue(imported.verification.consistent)
+        assertTrue(!imported.manifest.hardwareProvenanceVerified)
+
+        val malformed = listOf(
+            metadata.replace("channel.requestCanId=2016", "channel.requestCanId=2048"),
+            metadata.replace("channel.session=3", "channel.session=2"),
+            metadata.replace("ecu.osId=19088743\n", ""),
+            metadata.replace("ecu.osDid=193", "ecu.osDid=144"),
+            metadata.replace("ecu.osId=19088743", "ecu.osId=0"),
+            metadata.replace("offline archive v3", "offline archive v2")
+        )
+        for (bad in malformed) {
+            assertTrue("Forged or incomplete Windows v3 metadata must be rejected",
+                runCatching { EcuBackupArchive.import(archiveWithManifest(bad).inputStream()) }.isFailure)
+        }
+    }
+
     @Test fun routeBoundArchiveRetainsExactCanIdsProtocolAndSession() {
         val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 3)
         val zip = ByteArrayOutputStream()
