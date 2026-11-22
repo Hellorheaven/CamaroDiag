@@ -897,4 +897,7 @@
     <string name="debug_builds_no_browser">没有可用的浏览器打开下载链接。</string>
     <string name="obd_physical_can_scope">物理 CAN 响应节点：0x%1$s。本次扫描仅涉及选定的 OBD ECU，并非所有模块的功能寻址扫描。未发送 GM 编程或执行器控制命令。</string>
     <string name="msg_dtc_j2534_clear_requires_permission">在 Windows 桥接器中启用排放相关 DTC 清除，重新连接，停止发动机并确认重置。排放系统就绪状态数据将被重置；永久故障码不会被清除。</string>
+    <string name="export_folder_instruction">请在内部存储中创建或选择 CamaroDiag 文件夹，然后授权访问。导出文件在共享存储中可见。</string>
+    <string name="export_folder_success">导出文件已保存到 /CamaroDiag/。</string>
+    <string name="export_folder_failed">无法将导出文件保存到 /CamaroDiag/。</string>
 </resources>
