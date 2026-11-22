@@ -47,6 +47,7 @@ import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
 import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
 import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
+import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeException
 import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
@@ -2112,6 +2113,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (canRequestJob === requestJob) {
                     reportConnectionLoss(error)
                     val current = _liveCanMonitorState.value
+                    val receivedEvents = (error as? CanConsolePhysicalExchangeException)
+                        ?.receivedRecords.orEmpty().map { timed ->
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = timed.record.direction,
+                                timestampMillis = timed.timestampMillis,
+                                content = timed.record.content,
+                                succeeded = timed.record.succeeded
+                            )
+                        }
                     val errorEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
@@ -2121,7 +2132,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
-                        consoleHistory = (current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = false) else it } + errorEvent).takeLast(300),
+                        consoleHistory = (
+                            current.consoleHistory.map {
+                                if (it.id == txEvent.id) it.copy(succeeded = false) else it
+                            } + receivedEvents + errorEvent
+                        ).takeLast(300),
+                        observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents),
                         message = localizedContext.getString(R.string.can_sniffer_request_failed)
                     )
                 }
