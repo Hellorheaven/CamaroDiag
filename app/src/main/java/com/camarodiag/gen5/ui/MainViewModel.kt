@@ -1730,7 +1730,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     /** Starts passive monitoring until Stop, disconnect, adapter exit or an explicit timeout. */
-    fun startCanMonitor(durationMs: Long = Long.MAX_VALUE) {
+    fun startCanMonitor(durationMs: Long = Long.MAX_VALUE, can29Bit: Boolean = false) {
         if (!requirePremiumLicense()) return
         if (canMonitorJob != null || detachedCanMonitorJob?.isCompleted == false ||
             canRequestJob?.isCompleted == false || detachedCanRequestJob?.isCompleted == false
@@ -1774,7 +1774,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 activeCanCaptureFile = archive
                 previousArchive?.delete()
                 val captured = archive.bufferedWriter(Charsets.US_ASCII).use { writer ->
-                    obdManager.captureCanMonitor(durationMs) { chunk ->
+                    obdManager.captureCanMonitor(durationMs, can29Bit) { chunk ->
                     if (canMonitorJob === monitorJob) {
                         writer.write(chunk)
                         // Keep the raw stream unchanged, but decode only complete lines:
