@@ -2131,12 +2131,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Export the latest raw CAN capture without transforming adapter output. */
     fun exportCanCapture(fileName: String) {
         if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
         val exportGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        fun current() = canResumeExport(exportGeneration, owner) &&
+            _vehicle.value == profile && hasPremiumLicense()
+        val snapshot = _liveCanMonitorState.value
+        val history = snapshot.consoleHistory.toList()
+        val selectedArchive = activeCanCaptureFile
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val snapshot = _liveCanMonitorState.value
-                val history = snapshot.consoleHistory
-                val archive = activeCanCaptureFile?.takeIf { it.isFile }
+                if (!current()) return@launch
+                val archive = selectedArchive?.takeIf { it.isFile }
                 require(history.isNotEmpty() || snapshot.rawText.isNotBlank() ||
                     (archive?.length() ?: 0L) > 0L) {
                     "No CAN console history is available to export."
@@ -2162,7 +2168,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
-                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                    beforePublish = { check(current()) }
                 ) { sink ->
                     sink.write(outputText.toByteArray(Charsets.UTF_8))
                     if (archive != null) {
@@ -2171,15 +2177,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         sink.write(snapshot.rawText.toByteArray(Charsets.UTF_8))
                     }
                 }
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
-                    message = localizedContext.getString(R.string.can_sniffer_capture_complete)
-                )
+                if (current()) _liveCanMonitorState.update {
+                    it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_complete))
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
-                    message = localizedContext.getString(R.string.can_sniffer_capture_failed)
-                )
+                if (current()) _liveCanMonitorState.update {
+                    it.copy(message = localizedContext.getString(R.string.can_sniffer_capture_failed))
+                }
             }
         }
     }
@@ -2811,26 +2817,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Exports the selected local calibration file through Android's Storage Access Framework. */
     fun exportCalibrationFile(fileName: String) {
         if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
         val exportGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        fun current() = canResumeExport(exportGeneration, owner) &&
+            _vehicle.value == profile && hasPremiumLicense()
+        val workspace = _calibrationWorkspace.value
+        val selectedPath = workspace.activeFilePath ?: workspace.importedFilePath
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val sourcePath = _calibrationWorkspace.value.activeFilePath
-                    ?: _calibrationWorkspace.value.importedFilePath
-                    ?: error("Aucun fichier de calibration n'est chargé.")
+                if (!current()) return@launch
+                val sourcePath = selectedPath ?: error("Aucun fichier de calibration n'est chargé.")
                 val source = File(sourcePath)
                 check(source.isFile && source.exists()) { "Le fichier local de calibration est introuvable." }
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/octet-stream",
-                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                    beforePublish = { check(current()) }
                 ) { target -> source.inputStream().use { it.copyTo(target) } }
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = localizedContext.getString(R.string.msg_cal_file_exported)
-                )
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_exported))
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = localizedContext.getString(R.string.msg_cal_file_export_failed)
-                )
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_export_failed))
+                }
             }
         }
     }
@@ -3069,30 +3080,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exportLiveRecording(fileName: String) {
         if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
         val exportGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        fun current() = canResumeExport(exportGeneration, owner) &&
+            _vehicle.value == profile && hasPremiumLicense()
         viewModelScope.launch {
             try {
+                if (!current()) return@launch
                 if (_liveRecordingState.value.isRecording) stopLiveRecording()
                 val snapshot = recordedLiveSamples.toList()
                 check(snapshot.isNotEmpty()) { "Aucune donnée enregistrée à exporter." }
-                val v = _vehicle.value
+                val v = profile
                 val csv = LiveTelemetryCsv.encode(
                     samples = snapshot,
                     vin = v.vin,
                     vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
                 )
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
-                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                    beforePublish = { check(current()) }
                 ) { it.write(csv.toByteArray(Charsets.UTF_8)) }
-                _liveRecordingState.value = _liveRecordingState.value.copy(
-                    message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size)
-                )
+                if (current()) _liveRecordingState.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size))
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _liveRecordingState.value = _liveRecordingState.value.copy(
-                    message = localizedContext.getString(R.string.msg_live_csv_export_failed)
-                )
+                if (current()) _liveRecordingState.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_live_csv_export_failed))
+                }
             }
         }
     }
