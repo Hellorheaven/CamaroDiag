@@ -3043,12 +3043,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun markAdapterDisconnected() {
+        // Capture the active state *before* Stop can complete asynchronously.
+        // Otherwise a partially archived monitor session could be exported as complete.
+        val wasCapturing = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
         stopCanMonitor()
-        // Keep RX/TX history and already captured text across a disconnect or
-        // adapter switch. Only explicit "clear history" may erase the console.
+        // Keep RX/TX history and the raw archive across adapter disconnects;
+        // explicit vehicle/VIN changes still clear both to prevent data mixing.
         _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
             isCapturing = false,
-            isSendingRequest = false
+            isSendingRequest = false,
+            rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+                _liveCanMonitorState.value.rawArchiveFailed, wasCapturing
+            )
         )
         _adapter.value = AdapterCapabilities()
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
