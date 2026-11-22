@@ -39,6 +39,7 @@ import com.camarodiag.gen5.data.obd.CanTraceAnalyzer
 import com.camarodiag.gen5.data.obd.CanTraceAnalysisReport
 import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
+import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
 import com.camarodiag.gen5.domain.model.*
@@ -1946,6 +1947,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun sendRawCanConsoleFrame(input: String, frame: com.camarodiag.gen5.data.obd.RawCanFrame) {
+        if (!SafeRawCanTransmitPolicy.allows(frame)) {
+            val message = localizedContext.getString(R.string.can_console_unsafe_can_payload)
+            appendCanConsoleSystemEvent(message, succeeded = false)
+            _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
+            return
+        }
         val currentState = _liveCanMonitorState.value
         if (currentState.isSendingRequest || canRequestJob?.isActive == true ||
             detachedCanRequestJob?.isActive == true
