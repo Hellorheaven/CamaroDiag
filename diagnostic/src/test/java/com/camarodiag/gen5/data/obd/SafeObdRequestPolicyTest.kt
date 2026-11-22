@@ -270,4 +270,24 @@ class SafeObdRequestPolicyTest {
         }
     }
 
+    @Test
+    fun unrelatedTwentyNineBitResponderMustNotConfirmPhysicalIdentityOrEthanol() {
+        val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        val vin = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        val payload = "49 02 01 " + "1G1FA1RXXR0123456"
+            .toByteArray(Charsets.US_ASCII).joinToString(" ") {
+                "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+            }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            ethanol, "18DAF110 41 52 80"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            ethanol, "18DAF111 41 52 80"))
+        assertEquals(false, SafeObdRequestPolicy.hasNegativeResponse(
+            ethanol, "18DAF111 7F 01 11"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            vin, "18DAF111 $payload"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            vin, "18DAF110 $payload"))
+    }
+
 }
