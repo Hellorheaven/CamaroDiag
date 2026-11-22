@@ -198,4 +198,22 @@ class J2534StandardObdTest {
         }
     }
 
+    @Test fun physicalBridgeRejectsShortOrPaddedObdPidsAllowedByConsole() {
+        val lengths = mapOf(
+            0x00 to 4, 0x01 to 4, 0x0C to 2, 0x10 to 2,
+            0x1F to 2, 0x42 to 2, 0x43 to 2, 0x44 to 2,
+            0x45 to 1, 0x46 to 1, 0x4C to 1, 0x52 to 1,
+            0x20 to 4, 0x40 to 4, 0x60 to 4
+        )
+        for ((pid, expectedSize) in lengths) {
+            val valid = bytes(0x41, pid) + ByteArray(expectedSize)
+            assertEquals(expectedSize, J2534StandardObd.pidData(pid, valid).size)
+            for (wrong in listOf(expectedSize - 1, expectedSize + 1)) {
+                assertThrows(IllegalArgumentException::class.java) {
+                    J2534StandardObd.pidData(pid, bytes(0x41, pid) + ByteArray(wrong))
+                }
+            }
+        }
+    }
+
 }
