@@ -206,10 +206,32 @@ class SafeObdRequestPolicyTest {
     @Test
     fun physicalEcuNameReadRequiresMatchingMode09Pid() {
         val name = requireNotNull(SafeObdRequestPolicy.parse("090A"))
-        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(name, "49 0A 01 45 43 4D"))
+        val encodedName = "ECM".padEnd(20, ' ').toByteArray(Charsets.US_ASCII)
+            .joinToString(" ") { "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF) }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            name, "49 0A 01 $encodedName"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(name, "49 0A 01 45 43 4D"))
         assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(name, "49 04 01 45 43 4D"))
         assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(name, "7F 09 12"))
         assertEquals(true, SafeObdRequestPolicy.hasNegativeResponse(name, "7F 09 12"))
+    }
+
+    @Test
+    fun mode09CalibrationAndCvnRequireFullDeclaredRecords() {
+        val calibration = requireNotNull(SafeObdRequestPolicy.parse("0904"))
+        val cvn = requireNotNull(SafeObdRequestPolicy.parse("0906"))
+        val calText = "12612345".padEnd(16, ' ').toByteArray(Charsets.US_ASCII)
+            .joinToString(" ") { "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF) }
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            calibration, "49 04 01 $calText"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(
+            calibration, "49 04 01 31 32"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(
+            cvn, "49 06 01 01 02 03 04"))
+        for (invalid in listOf("49 06 01 01 02 03", "49 06 00",
+            "49 06 02 01 02 03 04", "49 06 01 01 02 03 04 00")) {
+            assertEquals(invalid, false, SafeObdRequestPolicy.hasPositiveResponse(cvn, invalid))
+        }
     }
 
 }
