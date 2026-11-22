@@ -678,7 +678,9 @@ class BluetoothObdManager(context: Context) {
             } else {
                 frame.canId.toString(16).uppercase().padStart(3, '0')
             }
-            val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(frame)
+            val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(
+                frame, requireExplicitStart = true
+            )
             try {
                 val protocolResponse = boundCommand("ATSP$protocol", 1_500L)
                 check(CanConsoleAdapterRestorationPolicy.accepted(protocolResponse)) {
