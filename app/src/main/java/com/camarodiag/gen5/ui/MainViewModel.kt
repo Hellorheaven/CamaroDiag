@@ -3891,6 +3891,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveCurrentSession() {
+        if (!requirePremiumLicense()) return
         // Capture the identity and evidence at the user's action, never after
         // a queued coroutine may have crossed a Firebase account switch.
         val ownerUid = authenticatedAccountUid ?: return
@@ -3916,7 +3917,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     maxDeltaKm = report?.maxDeltaKm ?: 0.0
                 )
                 if (authenticatedAccountUid != ownerUid ||
-                    !isCurrentAccountGeneration(exportGeneration)) return@launch
+                    !isCurrentAccountGeneration(exportGeneration) || !hasPremiumLicense()) return@launch
                 val backup = JSONObject()
                     .put("schema", "camarodiag-diagnostic-session-v1")
                     .put("timestamp", entity.timestamp)
@@ -3931,10 +3932,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(),
                     "CamaroDiag_session_${entity.timestamp}.json", "application/json",
                     category = CamaroDiagExportStorage.Category.DIAGNOSTIC_SESSIONS, beforePublish = { check(authenticatedAccountUid == ownerUid &&
-                        isCurrentAccountGeneration(exportGeneration)) }
+                        isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
                 ) { it.write(backup.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (authenticatedAccountUid != ownerUid ||
-                    !isCurrentAccountGeneration(exportGeneration)) return@launch
+                    !isCurrentAccountGeneration(exportGeneration) || !hasPremiumLicense()) return@launch
                 sessionDao.insertSession(entity)
                 if (isCurrentAccountGeneration(exportGeneration)) {
                     _connectionMessage.value = localizedContext.getString(R.string.msg_session_saved) +
