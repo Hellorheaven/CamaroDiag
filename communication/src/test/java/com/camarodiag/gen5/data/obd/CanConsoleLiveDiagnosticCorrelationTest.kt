@@ -86,6 +86,42 @@ class CanConsoleLiveDiagnosticCorrelationTest {
             correlation.recentReceivedRecords().map { it.record.direction })
     }
 
+    @Test fun failedPhysicalTxKeepsAllObservedEcusWithoutClaimingDiagnosticSuccess() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
+        correlation.append("7E9 04 03 41 0C 1B\r\n", 50L, 1_800_000_000_050L)
+        correlation.append("7E8 04 03 41 0D 1A\r\n", 60L, 1_800_000_000_060L)
+        val failure = CanConsolePhysicalExchangeException(
+            correlation.recentReceivedRecords(),
+            java.net.SocketTimeoutException("ELM prompt timeout")
+        )
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(61L))
+        assertEquals(2, failure.receivedRecords.size)
+        assertEquals(
+            listOf("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B", "CAN ID=7E8 DLC=4 DATA=03 41 0D 1A"),
+            failure.receivedRecords.map { it.record.content }
+        )
+        assertEquals(listOf(1_800_000_000_050L, 1_800_000_000_060L),
+            failure.receivedRecords.map { it.timestampMillis })
+        assertEquals(false, ObdTransportFailurePolicy.isConnectionLoss(failure))
+    }
+
+    @Test fun interruptedIsoTpRetainsVisibleForeignRxButNotAValidatedResult() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("18DA10F1 03 22 F1 90"))
+        correlation.append("18DAF111 08 10 0A 62 F1 90 31 32 33\r\n", 10L)
+        correlation.append("18DAF110 08 10 0A 62 F1 90 31 32 33\r\n", 20L)
+        correlation.append("18DAF111 05 21 34 35 36 37\r\n", 30L)
+        val failure = CanConsolePhysicalExchangeException(
+            correlation.recentReceivedRecords(), java.io.EOFException("connection lost")
+        )
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(31L))
+        assertEquals(3, failure.receivedRecords.size)
+        assertEquals(
+            listOf("18DAF111", "18DAF110", "18DAF111"),
+            failure.receivedRecords.map { it.record.content.substringAfter("CAN ID=").substringBefore(" ") }
+        )
+        assertEquals(true, ObdTransportFailurePolicy.isConnectionLoss(failure))
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
