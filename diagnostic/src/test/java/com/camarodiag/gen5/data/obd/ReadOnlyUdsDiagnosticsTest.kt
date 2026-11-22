@@ -203,6 +203,37 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun malformedAsciiIdentityDidsCannotAuthorizeProfiledReads() = runBlocking {
+        val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
+        for (corrupt in listOf(0x01, 0x7F, 0xFF)) {
+            val responses = listOf(
+                singleFrameResponse(0x0101, byteArrayOf(corrupt.toByte(), 0x43, 0x4D)),
+                singleFrameResponse(0x0102, "HW1".toByteArray()),
+                singleFrameResponse(0x0103, "OS1".toByteArray()),
+                singleFrameResponse(0x0104, "CAL1".toByteArray()),
+                singleFrameResponse(0x0105, byteArrayOf(0xA1.toByte(), 0xB2.toByte())),
+                CanFrame(0x7A8, byteArrayOf(0x10, 0x14, 0x62, 0x01, 0x06,
+                    vin[0], vin[1], vin[2])),
+                CanFrame(0x7A8, byteArrayOf(0x21, vin[3], vin[4], vin[5], vin[6],
+                    vin[7], vin[8], vin[9])),
+                CanFrame(0x7A8, byteArrayOf(0x22, vin[10], vin[11], vin[12],
+                    vin[13], vin[14], vin[15], vin[16]))
+            )
+            val transport = FakeCanTransport(responses)
+            val rejected = runCatching {
+                ProfiledUdsReadSession.open(transport,
+                    VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX,
+                        vin = "1G1FA1RXXR0123456"),
+                    syntheticReadProfile())
+            }.exceptionOrNull()
+            assertTrue(rejected is IllegalArgumentException)
+            assertTrue(rejected?.message?.contains("ASCII") == true)
+            assertTrue(transport.sent.none { it.data.size >= 2 &&
+                (it.data[1].toInt() and 0xFF) == 0x19 })
+        }
+    }
+
+    @Test
     fun rejectsProfileWhenEcuReportsDifferentCalibrationBeforeOpeningSession() = runBlocking {
         val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
         val transport = FakeCanTransport(
