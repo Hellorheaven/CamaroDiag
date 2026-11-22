@@ -51,6 +51,72 @@ class UdsClientTest {
         )
     }
 
+    @Test fun callerCannotExpandVerifiedWritePermissionsOrSessionsAfterAdmission() = runBlocking {
+        val writes = mutableSetOf(0x1234)
+        val sessions = mutableSetOf(0x01, 0x02)
+        val policy = verifiedPolicy(writeDids = writes, sessions = sessions)
+        writes.add(0x5678)
+        sessions.add(0x03)
+        assertEquals(setOf(0x1234), policy.writeDids)
+        assertEquals(setOf(0x01, 0x02), policy.allowedSessions)
+        assertTrue(runCatching {
+            (policy.writeDids as MutableSet<Int>).add(0x5678)
+        }.isFailure)
+        val transport = FakeTransport(emptyList())
+        val client = UdsClient(transport, 0x7E0, 0x7E8, policy = policy)
+        assertTrue(runCatching {
+            client.writeDataByIdentifier(0x5678, byteArrayOf(0x01))
+        }.isFailure)
+        assertTrue(runCatching { client.diagnosticSessionControl(0x03) }.isFailure)
+        assertTrue(transport.sent.isEmpty())
+    }
+
+    @Test fun readOnlyDidAllowlistIsAnImmutableSnapshot() = runBlocking {
+        val source = mutableSetOf(0xF190)
+        val policy = UdsAccessPolicy.readOnly(source)
+        source.add(0x1234)
+        assertEquals(setOf(0xF190), policy.readDids)
+        assertTrue(runCatching { (policy.readDids as MutableSet<Int>).add(0x1234) }.isFailure)
+        val transport = FakeTransport(emptyList())
+        val client = UdsClient(transport, 0x7E0, 0x7E8, policy = policy)
+        assertTrue(runCatching { client.readDataByIdentifier(0x1234) }.isFailure)
+        assertTrue(transport.sent.isEmpty())
+    }
+
+    @Test fun nestedRoutineAndIoPermissionsRemainFrozenAfterCallerMutation() {
+        val allowedRoutineTypes = mutableSetOf(0x01)
+        val allowedIoTypes = mutableSetOf(0x03)
+        val routines = mutableMapOf(0x9000 to allowedRoutineTypes as Set<Int>)
+        val ioControls = mutableMapOf(0xF100 to allowedIoTypes as Set<Int>)
+        val identity = UdsEcuIdentity("ECM", "HW-1", "OS-1", "CAL-1",
+            "A1B2", "1G1FA1RXXR0123456")
+        val policy = UdsAccessPolicy.verified(
+            vehicleVin = identity.vin!!, identity = identity,
+            expectedVin = identity.vin!!, expectedCalId = "CAL-1",
+            expectedCvn = "A1B2", expectedControllerFamily = "ECM",
+            expectedHardwarePartNumber = "HW-1", expectedOperatingSystemId = "OS-1",
+            readDids = emptySet(), writeDids = emptySet(),
+            allowedSessions = setOf(0x01, 0x02),
+            routineControlPermissions = routines, ioControlPermissions = ioControls,
+            readableMemoryRegions = emptyList(), writableMemoryRegions = emptyList(),
+            maxTransferBytes = 0, requireSecurityAccess = true,
+            evidenceReference = "Synthetic identity-bound policy test"
+        )
+        allowedRoutineTypes.add(0x02)
+        allowedIoTypes.add(0x04)
+        routines[0x9001] = setOf(0x01)
+        ioControls[0xF101] = setOf(0x03)
+        assertEquals(mapOf(0x9000 to setOf(0x01)), policy.routineControlPermissions)
+        assertEquals(mapOf(0xF100 to setOf(0x03)), policy.ioControlPermissions)
+        assertTrue(runCatching {
+            (policy.ioControlPermissions[0xF100] as MutableSet<Int>).add(0x04)
+        }.isFailure)
+        assertTrue(runCatching {
+            (policy.routineControlPermissions as MutableMap<Int, Set<Int>>)[0x9002] =
+                setOf(0x01)
+        }.isFailure)
+    }
+
     @Test fun sessionControlAndTesterPresentValidatePositiveResponses() = runBlocking {
         val transport = FakeTransport(listOf(response(0x50, 0x02, 0x00, 0x32), response(0x7E, 0x00)))
         val client = UdsClient(transport, 0x7E0, 0x7E8, policy = verifiedPolicy())
