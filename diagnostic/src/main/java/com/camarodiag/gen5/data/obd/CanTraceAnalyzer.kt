@@ -9,7 +9,9 @@ data class CanTraceFrame(
     val timestampSeconds: Double?,
     val canId: Int,
     val direction: CanTraceDirection,
-    val data: List<Int>
+    val data: List<Int>,
+    /** Null only when the source did not preserve CAN-ID width. */
+    val extendedId: Boolean? = null
 )
 
 data class UdsTraceMessage(
@@ -503,7 +505,8 @@ object CanTraceAnalyzer {
                 errors += "Line ${index + 1}: DLC does not match the available data bytes."
                 return@forEachIndexed
             }
-            frames += CanTraceFrame(index + 1, timestamp, canId, direction, bytes.take(dlc))
+            frames += CanTraceFrame(index + 1, timestamp, canId, direction, bytes.take(dlc),
+                extendedId = match.groupValues[2].length > 3)
         }
         return ParsedFrames(frames, errors)
     }
@@ -524,7 +527,8 @@ object CanTraceAnalyzer {
                 errors += "Line ${index + 1}: invalid ELM327 header/DLC/data record."
                 return@forEachIndexed
             }
-            frames += CanTraceFrame(index + 1, null, canId, CanTraceDirection.UNKNOWN, bytes.take(dlc))
+            frames += CanTraceFrame(index + 1, null, canId, CanTraceDirection.UNKNOWN, bytes.take(dlc),
+                extendedId = match.groupValues[1].length > 3)
         }
         if (frames.isEmpty()) errors += "No ELM327 header records found; enable CAN headers and save the monitor output."
         return ParsedFrames(frames, errors)
@@ -611,7 +615,8 @@ object CanTraceAnalyzer {
                 errors += "Line ${lineIndex + 1}: invalid CSV CAN frame."
                 continue
             }
-            frames += CanTraceFrame(lineIndex + 1, timestamp, canId, direction, bytes.take(dlc))
+            frames += CanTraceFrame(lineIndex + 1, timestamp, canId, direction, bytes.take(dlc),
+                extendedId = field(canIdIndex).trim().removePrefix("0x").removePrefix("0X").length > 3)
         }
         return ParsedFrames(frames, errors)
     }
@@ -707,7 +712,7 @@ object CanTraceAnalyzer {
     private fun reassemble(frames: List<CanTraceFrame>): ReassemblyResult {
         val messages = mutableListOf<UdsTraceMessage>()
         val errors = mutableListOf<String>()
-        val pending = mutableMapOf<Pair<Int, CanTraceDirection>, PendingIsoTp>()
+        val pending = mutableMapOf<Triple<Int, Boolean?, CanTraceDirection>, PendingIsoTp>()
         var discardedIncompleteMessages = 0
 
         frames.forEach { frame ->
@@ -715,7 +720,7 @@ object CanTraceAnalyzer {
             val pci = frame.data[0]
             when (pci and 0xF0) {
                 0x00 -> {
-                    val key = frame.canId to frame.direction
+                    val key = Triple(frame.canId, frame.extendedId, frame.direction)
                     if (pending.remove(key) != null) {
                         errors += "Line ${frame.lineNumber}: single frame interrupted an unfinished ISO-TP message."
                         discardedIncompleteMessages++
@@ -737,7 +742,7 @@ object CanTraceAnalyzer {
                     }
                 }
                 0x10 -> {
-                    val key = frame.canId to frame.direction
+                    val key = Triple(frame.canId, frame.extendedId, frame.direction)
                     if (pending.remove(key) != null) {
                         errors += "Line ${frame.lineNumber}: replaced an unfinished ISO-TP message."
                         discardedIncompleteMessages++
@@ -786,7 +791,7 @@ object CanTraceAnalyzer {
                     }
                 }
                 0x20 -> {
-                    val key = frame.canId to frame.direction
+                    val key = Triple(frame.canId, frame.extendedId, frame.direction)
                     val state = pending[key]
                     if (state == null) {
                         errors += "Line ${frame.lineNumber}: ISO-TP consecutive frame has no matching first frame."
