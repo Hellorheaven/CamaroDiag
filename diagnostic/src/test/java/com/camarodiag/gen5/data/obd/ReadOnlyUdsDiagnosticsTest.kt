@@ -205,9 +205,15 @@ class ReadOnlyUdsDiagnosticsTest {
     @Test
     fun malformedAsciiIdentityDidsCannotAuthorizeProfiledReads() = runBlocking {
         val vin = "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII)
-        for (corrupt in listOf(0x01, 0x7F, 0xFF)) {
+        for (corrupt in listOf(
+                byteArrayOf(0x01, 0x43, 0x4D),
+                byteArrayOf(0x7F, 0x43, 0x4D),
+                byteArrayOf(0xFF.toByte(), 0x43, 0x4D),
+                byteArrayOf(0x00, 0x42, 0x43, 0x4D),
+                byteArrayOf(0x42, 0x00, 0x43, 0x4D)
+            )) {
             val responses = listOf(
-                singleFrameResponse(0x0101, byteArrayOf(corrupt.toByte(), 0x43, 0x4D)),
+                singleFrameResponse(0x0101, corrupt),
                 singleFrameResponse(0x0102, "HW1".toByteArray()),
                 singleFrameResponse(0x0103, "OS1".toByteArray()),
                 singleFrameResponse(0x0104, "CAL1".toByteArray()),
@@ -227,7 +233,7 @@ class ReadOnlyUdsDiagnosticsTest {
                     syntheticReadProfile())
             }.exceptionOrNull()
             assertTrue(rejected is IllegalArgumentException)
-            assertTrue(rejected?.message?.contains("ASCII") == true)
+            assertTrue(rejected?.message?.contains("identity") == true)
             assertTrue(transport.sent.none { it.data.size >= 2 &&
                 (it.data[1].toInt() and 0xFF) == 0x19 })
         }
