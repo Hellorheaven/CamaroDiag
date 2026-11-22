@@ -10,6 +10,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
+const { readEntitlement, shouldAutoGrant } = require("./entitlement-policy");
 
 const REGION = "europe-west1";
 // Start in monitoring mode: enable enforcement only after debug and release
@@ -36,33 +37,11 @@ async function licenseStatus(uid, { autoGrant = false } = {}) {
     const snapshot = await transaction.get(licenseRef);
     const license = snapshot.data();
 
-    if (license && (license.uid !== uid ||
-        license.emailLower !== emailLower)) {
-      // UID/email changes require explicit reconciliation, not a new grant.
-      return { licensed: false, source: "mismatch", verified: true };
-    }
+    // Every existing document is authoritative, including a manual NO.
+    const existing = readEntitlement(license, uid, emailLower);
+    if (existing) return existing;
 
-    // An explicit administrative YES or NO always overrides the promotion.
-    if (typeof license?.manualOverride === "boolean")
-      return {
-        licensed: license.manualOverride,
-        source: "administrative",
-        verified: true
-      };
-
-    const active = license?.status === "active";
-    const paid = active && license?.kind === "perpetual" &&
-      typeof license?.stripePaymentIntentId === "string" &&
-      license.stripePaymentIntentId.length > 0 &&
-      license?.expiresAt == null;
-    if (paid)
-      return { licensed: true, source: "purchase", verified: true };
-
-    if (active && license?.source === "promotion")
-      return { licensed: true, source: "promotion", verified: true };
-
-    // Any existing inactive license prevents a new free auto-grant.
-    if (snapshot.exists || !autoGrant || !AUTO_GRANT_ENABLED())
+    if (!shouldAutoGrant(snapshot.exists, autoGrant, AUTO_GRANT_ENABLED()))
       return { licensed: false, source: "none", verified: true };
 
     transaction.create(licenseRef, {
