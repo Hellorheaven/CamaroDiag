@@ -498,6 +498,28 @@ class J2534LiveMemoryBackupTest {
         }
     }
 
+    @Test fun memoryDeniedByEcuReportsExactAddressAndNeverEscalatesPrivileges() = runBlocking {
+        for (nrc in listOf(0x31, 0x33, 0x22)) {
+            val ecu = ScriptedEcu(baseline, vin)
+            val transport = object : UdsPayloadTransport by ecu {
+                override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                    if (payload[0] == 0x23.toByte())
+                        byteArrayOf(0x7F, 0x23, nrc.toByte())
+                    else ecu.exchange(payload, timeoutMs)
+            }
+            val result = runCatching {
+                J2534LiveMemoryBackup.captureForTest(transport, request())
+            }
+            val refusal = result.exceptionOrNull() as? J2534LiveMemoryBackup.ReadRefused
+            assertTrue("A physical ECU denial needs a typed error", refusal != null)
+            assertEquals(0x1000L, refusal?.requestedAddress)
+            assertEquals(128, refusal?.requestedBytes)
+            assertEquals(nrc, refusal?.nrc)
+            assertTrue(ecu.sent.none { (it[0].toInt() and 0xFF) in
+                setOf(0x27, 0x2E, 0x31, 0x34, 0x36, 0x37) })
+        }
+    }
+
     @Test fun udsSecurityAccessRefusalNeverProducesOrExportsAMemoryBackup() = runBlocking {
         val ecu = ScriptedEcu(baseline, vin)
         val transport = object : UdsPayloadTransport by ecu {

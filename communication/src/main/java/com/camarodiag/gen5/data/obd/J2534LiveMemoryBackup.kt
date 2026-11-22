@@ -21,6 +21,17 @@ object J2534LiveMemoryBackup {
     private const val MAX_CAPTURE_BYTES = 4 * 1024 * 1024
     private const val TIMEOUT_MS = 6000L
 
+    /** Exact, non-destructive reason the ECU refused a documented memory span. */
+    internal class ReadRefused(
+        val requestedAddress: Long,
+        val requestedBytes: Int,
+        val nrc: Int
+    ) : IllegalStateException(
+        "ECU refused memory read at 0x${requestedAddress.toString(16).uppercase()} " +
+            "($requestedBytes bytes, NRC 0x${nrc.toString(16).uppercase().padStart(2, '0')}). " +
+            "No security access, retries with new privileges or writes were attempted."
+    )
+
     /**
      * UDS DiagnosticSessionControl has either a minimal echoed subfunction
      * or the full P2/P2* timing parameters. A three-, four- or five-byte
@@ -196,9 +207,15 @@ object J2534LiveMemoryBackup {
                     liveVin()
                 }
                 val length = minOf(request.chunkBytes, image.size - offset)
+                val requestedAddress = request.address + offset
                 val response = transport.exchange(
-                    memoryRequest(request.address + offset, length), TIMEOUT_MS
+                    memoryRequest(requestedAddress, length), TIMEOUT_MS
                 )
+                if (response.size == 3 &&
+                    response[0] == 0x7F.toByte() && response[1] == 0x23.toByte()
+                ) {
+                    throw ReadRefused(requestedAddress, length, response[2].toInt() and 0xFF)
+                }
                 require(response.size == length + 1 && response[0] == 0x63.toByte()) {
                     "ECU memory response is not a complete ReadMemoryByAddress result."
                 }
