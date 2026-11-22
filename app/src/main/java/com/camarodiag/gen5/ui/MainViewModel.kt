@@ -22,6 +22,8 @@ import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.EcuBackupArchive
+import com.camarodiag.gen5.data.obd.EcuExternalDumpPair
+import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
 import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.data.obd.CalibrationTableCodec
@@ -2815,6 +2817,57 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Exports the selected local calibration file through Android's Storage Access Framework. */
+    fun exportExternalDumpPair(
+        method: EcuBenchExpertPlan.AccessMethod,
+        region: EcuBenchExpertPlan.MemoryRegion,
+        startAddress: Long,
+        originalPath: String,
+        comparisonPath: String
+    ) {
+        if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val generation = accountSessionGeneration
+        val profile = _vehicle.value
+        val snapshot = _calibrationWorkspace.value
+        fun current() = canResumeExport(generation, owner) &&
+            _vehicle.value == profile && hasPremiumLicense() &&
+            _calibrationWorkspace.value.importedFilePath == originalPath &&
+            _calibrationWorkspace.value.comparisonFilePath == comparisonPath
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (!current()) return@launch
+                require(snapshot.inspectionFormat == "RAW_BINARY")
+                val original = File(originalPath)
+                val repeated = File(comparisonPath)
+                require(original.isFile && repeated.isFile && original.canonicalFile != repeated.canonicalFile)
+                val length = original.length()
+                require(length in 1L..EcuExternalDumpPair.MAX_DUMP_BYTES.toLong() &&
+                    repeated.length() == length)
+                CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_ECU_import_${method.name}_${System.currentTimeMillis()}.zip",
+                    "application/zip", beforePublish = { check(current()) }
+                ) { output ->
+                    original.inputStream().use { first ->
+                        repeated.inputStream().use { second ->
+                            EcuExternalDumpPair.export(output, first, second, method, region,
+                                startAddress, length.toInt(),
+                                controllerLabel = profile.engine.ecmType + " / " + method.name)
+                        }
+                    }
+                }
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.export_folder_success))
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.export_folder_failed))
+                }
+            }
+        }
+    }
+
     fun exportCalibrationFile(fileName: String) {
         if (!requirePremiumLicense()) return
         val owner = authenticatedAccountUid ?: return
