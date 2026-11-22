@@ -470,10 +470,38 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     private fun decodeDtcResponseOrNull(
         response: String, positiveService: Int, status: String
     ): List<ObdDtc>? {
-        val bytes = parseResponseBytes(response) ?: return null
-        val start = bytes.indexOf(positiveService)
-        if (start < 0) return null
-        val payload = bytes.drop(start + 1)
+        val decoded = response.lineSequence().mapNotNull { rawLine ->
+            val line = rawLine.trim().uppercase(Locale.ROOT)
+            if (line.isEmpty()) return@mapNotNull null
+            // Decode each physical responder independently. Concatenating
+            // several CAN frames can create synthetic fault codes.
+            val tagged = Regex("^(?:7E[8-F]|18DAF1[0-9A-F]{2})(?:\\\\s+|(?=[0-9A-F]{4}))")
+            val compactHeader = when {
+                line.matches(Regex("^7E[8-F][0-9A-F]{6,}$")) -> line.substring(3)
+                line.matches(Regex("^18DAF1[0-9A-F]{2}[0-9A-F]{6,}$")) -> line.substring(8)
+                else -> null
+            }
+            val dataText = when {
+                compactHeader != null -> compactHeader
+                tagged.containsMatchIn(line) ->
+                    line.replaceFirst(tagged, "").replace(Regex("\\\\s+"), "")
+                else -> line.replace(Regex("\\\\s+"), "")
+            }
+            if (dataText.length % 2 != 0 ||
+                dataText.isEmpty() ||
+                dataText.any { it !in '0'..'9' && it !in 'A'..'F' }
+            ) return@mapNotNull null
+            val raw = dataText.chunked(2).map { it.toInt(16) }
+            val bytes = if (raw.first() in 1..8 && raw.first() == raw.size - 1) raw.drop(1)
+                else raw
+            if (bytes.firstOrNull() != positiveService) return@mapNotNull null
+            decodeSingleDtcPayload(bytes.drop(1), status)
+        }.toList()
+        if (decoded.isEmpty()) return null
+        return decoded.flatten().distinctBy(ObdDtc::code)
+    }
+
+    private fun decodeSingleDtcPayload(payload: List<Int>, status: String): List<ObdDtc>? {
         if (payload.isEmpty()) return null
         val count = payload.first()
         val data = when {
