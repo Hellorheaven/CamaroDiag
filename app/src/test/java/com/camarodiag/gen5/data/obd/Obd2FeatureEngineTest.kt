@@ -535,4 +535,20 @@ class Obd2FeatureEngineTest {
         assertTrue(malformed.readLiveData(setOf(0x52)).isEmpty())
     }
 
+    @Test
+    fun mode09IdentityCountCannotIgnoreTrailingOrMissingCalibrationBytes() = runBlocking {
+        suspend fun calibrations(reply: String): List<String> =
+            Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "0904") reply else "NO DATA"
+            }).readCalibrationIds()
+        val bytes = "ABCDEFGH12345678".toByteArray(Charsets.US_ASCII)
+            .joinToString("") { "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF) }
+        assertEquals(listOf("ABCDEFGH12345678"), calibrations("490401" + bytes))
+        assertTrue(calibrations("490401" + bytes + "00").isEmpty())
+        assertTrue(calibrations("490401" + bytes.dropLast(2)).isEmpty())
+        // Even when the overall byte length looks like two records, a
+        // declared count of one must not fall through to count-less parsing.
+        assertTrue(calibrations("490401" + bytes + "00".repeat(15)).isEmpty())
+    }
+
 }
