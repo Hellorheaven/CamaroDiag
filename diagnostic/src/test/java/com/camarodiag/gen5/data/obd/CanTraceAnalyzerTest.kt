@@ -1117,4 +1117,33 @@ class CanTraceAnalyzerTest {
         assertEquals(UdsExchangeStatus.UNANSWERED, report.exchanges.single().status)
         assertTrue(report.exchanges.single().responses.isEmpty())
     }
+
+    @Test
+    fun physicalTwentyNineBitExchangeUsesOnlyTheAddressedResponder() {
+        val trace = listOf(
+            "0.000000 1 18DA10F1x Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.010000 1 18DAF111x Rx d 8 04 62 F1 90 01 00 00 00",
+            "0.020000 1 18DAF110x Rx d 8 04 62 F1 90 02 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "physical-29-bit.asc")
+        assertEquals(listOf(true, true, true), report.frames.map { it.extendedId })
+        assertEquals(1, report.exchanges.size)
+        val exchange = report.exchanges.single()
+        assertEquals(UdsExchangeStatus.COMPLETED, exchange.status)
+        assertEquals(0x18DAF110, exchange.responses.single().canId)
+        assertEquals(true, exchange.responses.single().extendedId)
+        assertEquals(20.0, exchange.elapsedMilliseconds!!, 0.001)
+        assertEquals(3, report.frames.size) // Unrelated ECU is still visible.
+    }
+
+    @Test
+    fun physicalTwentyNineBitRequestCannotUseAnotherEcUsResponse() {
+        val trace = listOf(
+            "0.000000 1 18DA10F1x Tx d 8 03 22 F1 90 00 00 00 00",
+            "0.010000 1 18DAF111x Rx d 8 04 62 F1 90 01 00 00 00"
+        ).joinToString("\n")
+        val exchange = CanTraceAnalyzer.analyze(trace, "wrong-29-bit-ecu.asc").exchanges.single()
+        assertEquals(UdsExchangeStatus.UNANSWERED, exchange.status)
+        assertTrue(exchange.responses.isEmpty())
+    }
 }
