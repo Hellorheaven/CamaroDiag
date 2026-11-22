@@ -149,7 +149,7 @@ object SafeObdRequestPolicy {
                         val values = (0 until count).map { index ->
                             bytes.substring(6 + index * width * 2, 6 + (index + 1) * width * 2)
                                 .chunked(2).mapNotNull { it.toIntOrNull(16)?.toChar() }
-                                .joinToString("").trim(' ', '\\u0000')
+                                .joinToString("").trim(' ', '\u0000')
                         }
                         if (pid == 0x02) {
                             if (!Regex("[A-HJ-NPR-Z0-9]{17}").matches(values.single())) continue
