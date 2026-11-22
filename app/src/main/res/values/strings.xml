@@ -653,7 +653,7 @@
     <string name="vin_photo_success">VIN detected and copied to the vehicle profile. Verify every character.</string>
     <string name="vin_photo_not_found">No valid 17-character VIN detected. Enter it manually or take another photo.</string>
     <string name="vin_photo_error">Could not read the VIN photo. Try again with better lighting and focus.</string>
-    <string name="tab_can_sniffer">CAN Sniffer</string>
+    <string name="tab_can_sniffer">CAN / OBD Console</string>
     <string name="can_sniffer_raw_heading">Raw CAN adapter output</string>
     <string name="can_sniffer_export_raw">Export raw log</string>
     <string name="can_sniffer_title">Live CAN Monitor</string>
