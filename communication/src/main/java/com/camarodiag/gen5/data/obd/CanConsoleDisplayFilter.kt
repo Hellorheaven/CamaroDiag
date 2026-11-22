@@ -60,7 +60,7 @@ object CanConsoleDisplayFilter {
         previouslyObserved: Set<ObservedCanId> = emptySet()
     ): List<ObservedCanId> =
         (previouslyObserved.asSequence() + history.asSequence().mapNotNull(::receivedId) +
-            frames.asSequence().mapNotNull { frame ->
+            frames.asSequence().filter { it.direction != CanTraceDirection.TX }.mapNotNull { frame ->
                 frame.extendedId?.let { extended ->
                     runCatching { ObservedCanId(frame.canId.toLong(), extended) }.getOrNull()
                 }
