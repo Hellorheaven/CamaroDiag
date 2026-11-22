@@ -250,6 +250,13 @@ internal static class BridgeSelfTests
         var map = new J2534MemoryReadScope(
             "1G1FA1RXXR0123456", 0x7E0, 0x7E8, 33,
             0x80001000u, 0x100u, 64, 0x03);
+        Assert(map.Region == "OTHER", "Old scoped read maps cannot claim a region type");
+        Assert(J2534MemoryReadScope.IsKnownRegion("CALIBRATION") &&
+               J2534MemoryReadScope.IsKnownRegion("PROGRAM_FLASH") &&
+               J2534MemoryReadScope.IsKnownRegion("DATA_FLASH") &&
+               J2534MemoryReadScope.IsKnownRegion("EXTERNAL_EEPROM") &&
+               !J2534MemoryReadScope.IsKnownRegion("COMPLETE_ECU"),
+               "Declared ECU memory regions never imply complete coverage");
         Assert(map.MatchesChannel(0x7E0, 0x7E8, 33), "Read map CAN channel");
         Assert(!map.MatchesChannel(0x7E1, 0x7E8, 33), "Wrong CAN ID rejected");
         Assert(map.AllowsReadMemory(new byte[] {
@@ -285,6 +292,15 @@ internal static class BridgeSelfTests
             File.WriteAllText(scopedFile, scopedJson);
             var loaded = J2534MemoryReadScope.Load(scopedFile);
             Assert(loaded.StartAddress == 0x80001000u, "Unsigned 32-bit memory region parsed");
+            Assert(loaded.Region == "OTHER", "Legacy read profile has unknown region type");
+            File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"region\":\"CALIBRATION\"}");
+            var typed = J2534MemoryReadScope.Load(scopedFile);
+            Assert(typed.Region == "CALIBRATION", "Operator-declared calibration range is retained");
+            File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"region\":\"COMPLETE_ECU\"}");
+            var invalidRegion = false;
+            try { J2534MemoryReadScope.Load(scopedFile); }
+            catch (ArgumentException) { invalidRegion = true; }
+            Assert(invalidRegion, "Invented full-ECU region type cannot be selected");
             Assert(loaded.AllowsReadMemory(new byte[] {
                 0x23, 0x14, 0x80, 0x00, 0x10, 0x00, 0x20 }), "Parsed read profile usable");
             File.WriteAllText(scopedFile, scopedJson[..^1] + ",\"allowWrite\":true}");

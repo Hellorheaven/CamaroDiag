@@ -22,10 +22,16 @@ internal sealed class J2534MemoryReadScope
     public uint Length { get; }
     public int MaxReadBytes { get; }
     public int Session { get; }
+    /** Declared type of this documented range, never inferred from its address. */
+    public string Region { get; }
+
+    internal static bool IsKnownRegion(string? region) => region is
+        "CALIBRATION" or "PROGRAM_FLASH" or "DATA_FLASH" or "EXTERNAL_EEPROM" or "OTHER";
 
     internal J2534MemoryReadScope(
         string expectedVin, int requestCanId, int responseCanId, int protocolNumber,
-        uint startAddress, uint length, int maxReadBytes, int session)
+        uint startAddress, uint length, int maxReadBytes, int session,
+        string region = "OTHER")
     {
         if (!Regex.IsMatch(expectedVin, @"\A[A-HJ-NPR-Z0-9]{17}\z"))
             throw new ArgumentException("Memory read profile requires a valid 17-character VIN.");
@@ -42,6 +48,8 @@ internal sealed class J2534MemoryReadScope
             throw new ArgumentException("Allowed memory read block length must be 1..256 bytes.");
         if (session is not (0x01 or 0x03))
             throw new ArgumentException("Only default or extended diagnostic read session is allowed.");
+        if (!IsKnownRegion(region))
+            throw new ArgumentException("A documented ECU memory region type is required.");
         ExpectedVin = expectedVin;
         RequestCanId = requestCanId;
         ResponseCanId = responseCanId;
@@ -50,6 +58,7 @@ internal sealed class J2534MemoryReadScope
         Length = length;
         MaxReadBytes = maxReadBytes;
         Session = session;
+        Region = region;
     }
 
     public bool MatchesChannel(int requestCanId, int responseCanId, int protocolNumber) =>
@@ -88,15 +97,26 @@ internal sealed class J2534MemoryReadScope
         var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
             throw new ArgumentException("Memory read profile must be a JSON object.");
-        // Deliberately no default region, adapter, session or VIN.
+        // No default ECU address map, adapter, session or VIN. Older profiles
+        // without a region remain usable but explicitly mean OTHER/unknown.
         var required = new HashSet<string>(StringComparer.Ordinal)
         {
             "expectedVin", "requestCanIdHex", "responseCanIdHex", "protocolNumber",
             "startAddressHex", "lengthBytes", "maxReadBytes", "session"
         };
+        var seenRegion = false;
         foreach (var property in root.EnumerateObject())
+        {
+            if (property.Name == "region")
+            {
+                if (seenRegion)
+                    throw new ArgumentException("Duplicate profile region.");
+                seenRegion = true;
+                continue;
+            }
             if (!required.Remove(property.Name))
                 throw new ArgumentException("Unexpected or duplicate profile field: " + property.Name);
+        }
         if (required.Count > 0)
             throw new ArgumentException("Incomplete memory read profile: " + string.Join(",", required));
         var vin = root.GetProperty("expectedVin").GetString() ?? "";
@@ -106,7 +126,8 @@ internal sealed class J2534MemoryReadScope
         return new J2534MemoryReadScope(
             vin, request, response, root.GetProperty("protocolNumber").GetInt32(),
             start, checked((uint)root.GetProperty("lengthBytes").GetInt64()),
-            root.GetProperty("maxReadBytes").GetInt32(), root.GetProperty("session").GetInt32()
+            root.GetProperty("maxReadBytes").GetInt32(), root.GetProperty("session").GetInt32(),
+            seenRegion ? root.GetProperty("region").GetString() ?? "" : "OTHER"
         );
     }
 
