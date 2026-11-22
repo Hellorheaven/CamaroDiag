@@ -57,6 +57,27 @@ internal static class NativeGmlanIdentificationSelfTests
             NativeGmlanIdentification.Compose(vinReply,
                 [0x7F, 0x1A, 0x33], unused, false));
         checks++;
+        bool accessDeniedIsNotOptional = false;
+        try
+        {
+            NativeGmlanIdentification.Compose(vinReply,
+                [0x7F, 0x1A, 0x33], unused, false);
+        }
+        catch (NativeGmlanIdentification.IdentityUnavailableException) { }
+        catch (IOException) { accessDeniedIsNotOptional = true; }
+        Assert(accessDeniedIsNotOptional,
+            "A denied GMLAN OSID read must not be treated as unsupported identity");
+
+        bool malformedOsIdIsNotOptional = false;
+        try
+        {
+            NativeGmlanIdentification.Compose(vinReply,
+                [0x5A, 0xC1, 0x00, 0x01], unused, false);
+        }
+        catch (NativeGmlanIdentification.IdentityUnavailableException) { }
+        catch (InvalidDataException) { malformedOsIdIsNotOptional = true; }
+        Assert(malformedOsIdIsNotOptional,
+            "A truncated GM OSID reply must fail, not downgrade to optional absence");
         Reject<InvalidDataException>(() =>
             NativeGmlanIdentification.Compose([0x5A, 0x90, 0x00], osReply, unused, false));
         checks++;
