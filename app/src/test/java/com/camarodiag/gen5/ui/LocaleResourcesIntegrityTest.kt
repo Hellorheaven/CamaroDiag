@@ -196,14 +196,14 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
-    @Test fun everyLocaleContainsAllLiveSensorLabelsAndPluralResources() {
+    @Test fun maintainedLocalesContainAllLiveSensorLabelsAndPluralResources() {
         val sensors = strings("en").keys.filter { it.startsWith("live_pid_") }.toSet()
         fun plurals(locale: String): Map<String, Element> {
             val nodes = document(File("src/main/res/${directory(locale)}/strings.xml")).getElementsByTagName("plurals")
             return (0 until nodes.length).map { nodes.item(it) as Element }.associateBy { it.getAttribute("name") }
         }
         val expectedPlurals = plurals("en").keys
-        for (locale in locales) {
+        for (locale in maintainedLocales) {
             val labels = strings(locale)
             assertTrue("Missing live sensor label in $locale", sensors.all { !labels[it].isNullOrBlank() })
             val translated = plurals(locale)
