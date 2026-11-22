@@ -897,4 +897,7 @@
     <string name="debug_builds_no_browser">다운로드 링크를 열 웹 브라우저가 없습니다.</string>
     <string name="obd_physical_can_scope">물리적 CAN 응답 노드: 0x%1$s. 이 스캔은 선택한 OBD ECU만 대상으로 하며 모든 모듈의 기능 주소 지정 스캔이 아닙니다. GM 프로그래밍 또는 액추에이터 명령을 전송하지 않았습니다.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Windows 브리지에서 배출가스 관련 DTC 삭제를 허용하고 다시 연결한 후 엔진을 정지시키고 초기화를 확인하세요. 배출가스 시스템 준비 상태 데이터가 초기화되며 영구 고장 코드는 삭제되지 않습니다.</string>
+    <string name="export_folder_instruction">내부 저장소에 CamaroDiag 폴더를 만들거나 선택한 후 접근을 허용하세요. 내보낸 파일은 공유 저장소에서 볼 수 있습니다.</string>
+    <string name="export_folder_success">/CamaroDiag/에 내보내기를 저장했습니다.</string>
+    <string name="export_folder_failed">/CamaroDiag/에 내보내기를 저장할 수 없습니다.</string>
 </resources>
