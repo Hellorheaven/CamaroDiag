@@ -901,6 +901,8 @@
     <string name="cal_archive_channel">Declared J2534 route: TX %1$s / RX %2$s, protocol %3$d, diagnostic session %4$d.</string>
     <string name="cal_archive_legacy_route">Legacy archive: CAN route and session were not recorded.</string>
     <string name="cal_archive_unattested">Offline integrity only: physical ECU provenance and full firmware coverage are not certified.</string>
+    <string name="cal_archive_osid">Recorded GM operating-system ID: %1$d (DID 0x%2$s). This does not identify a verified ECU firmware variant.</string>
+    <string name="cal_archive_osid_missing">No GM operating-system ID recorded in this archive.</string>
     <!-- Owner-only Debug downloads and staged license labels -->
     <string name="tab_debug_builds">Debug builds</string>
     <string name="tab_license">License</string>

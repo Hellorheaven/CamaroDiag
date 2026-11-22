@@ -904,6 +904,8 @@
     <string name="cal_archive_channel">Canal J2534 déclaré : TX %1$s / RX %2$s, protocole %3$d, session de diagnostic %4$d.</string>
     <string name="cal_archive_legacy_route">Archive ancienne : les identifiants CAN et la session ne sont pas enregistrés.</string>
     <string name="cal_archive_unattested">Intégrité hors ligne uniquement : l’origine physique et la couverture complète du firmware ne sont pas certifiées.</string>
+    <string name="cal_archive_osid">Identifiant OS GM enregistré : %1$d (DID 0x%2$s). Cela ne qualifie pas une variante de firmware ECU.</string>
+    <string name="cal_archive_osid_missing">Aucun identifiant OS GM enregistré dans cette archive.</string>
     <!-- Owner-only Debug downloads and staged license labels -->
     <string name="tab_debug_builds">Versions Debug</string>
     <string name="tab_license">Licence</string>

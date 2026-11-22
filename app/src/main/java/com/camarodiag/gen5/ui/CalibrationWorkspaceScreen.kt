@@ -1206,6 +1206,20 @@ fun CalibrationWorkspaceScreen(
                                 Text(stringResource(R.string.cal_archive_legacy_route),
                                     color = CamaroAmber, fontSize = 11.sp)
                             }
+                            val firmware = manifest.firmwareEvidence
+                            if (firmware != null) {
+                                Text(
+                                    stringResource(
+                                        R.string.cal_archive_osid,
+                                        firmware.operatingSystemId,
+                                        firmware.osDid.toString(16).uppercase()
+                                    ),
+                                    color = TextPrimary, fontSize = 11.sp
+                                )
+                            } else {
+                                Text(stringResource(R.string.cal_archive_osid_missing),
+                                    color = TextMuted, fontSize = 11.sp)
+                            }
                             Text(stringResource(R.string.cal_archive_unattested),
                                 color = CamaroAmber, fontSize = 11.sp)
                             Text(stringResource(R.string.cal_payload_size, manifest.coverage.capturedBytes), color = TextPrimary)
