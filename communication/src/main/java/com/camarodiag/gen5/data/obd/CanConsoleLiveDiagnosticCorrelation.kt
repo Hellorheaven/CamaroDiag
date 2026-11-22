@@ -22,7 +22,7 @@ class CanConsoleLiveDiagnosticCorrelation(
     init { require(timeoutMs > 0) }
 
     private val framer = CanConsoleStreamFramer()
-    private val recentRecords = ArrayDeque<ParsedCanConsoleRecord>()
+    private val recentRecords = java.util.ArrayDeque<ParsedCanConsoleRecord>()
     private val perResponder = mutableMapOf<Long, CanConsoleDiagnosticCorrelation>()
     private var diagnosticStatus = CanConsoleDiagnosticStatus.NONE
 
