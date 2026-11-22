@@ -121,21 +121,44 @@ class CanConsoleDiagnosticCorrelationTest {
         val correlation = CanConsoleDiagnosticCorrelation(frame("7E0 03 19 02 FF"))
         // UDS 0x19/0x02: 59 02 <statusAvailabilityMask> ... ; this is
         // not an echo of the requested statusMask FF.
-        assertNull(correlation.accept(frame("7E9 06 59 02 A5 12 34 56"), 1))
-        assertNull(correlation.accept(frame("7E8 06 59 01 A5 12 34 56"), 2))
-        assertArrayEquals(byteArrayOf(0x59, 0x02, 0xA5.toByte(), 0x12, 0x34, 0x56),
-            correlation.accept(frame("7E8 06 59 02 A5 12 34 56"), 3))
+        assertNull(correlation.accept(frame("7E9 07 59 02 A5 12 34 56 01"), 1))
+        assertNull(correlation.accept(frame("7E8 07 59 01 A5 12 34 56 01"), 2))
+        assertArrayEquals(byteArrayOf(0x59, 0x02, 0xA5.toByte(), 0x12, 0x34, 0x56, 0x01),
+            correlation.accept(frame("7E8 07 59 02 A5 12 34 56 01"), 3))
     }
 
     @Test fun uds19UnexpectedExtraRequestParametersCannotClaimAnotherReply() {
         val unsupportedLayout = CanConsoleDiagnosticCorrelation(frame("7E0 04 19 02 FF AA"))
-        assertNull(unsupportedLayout.accept(frame("7E8 06 59 02 A5 12 34 56"), 1))
+        assertNull(unsupportedLayout.accept(frame("7E8 07 59 02 A5 12 34 56 01"), 1))
         val numberByMask = CanConsoleDiagnosticCorrelation(frame("7E0 03 19 01 FF"))
-        assertArrayEquals(byteArrayOf(0x59, 0x01, 0xA5.toByte(), 0x00),
-            numberByMask.accept(frame("7E8 04 59 01 A5 00"), 2))
+        assertArrayEquals(byteArrayOf(0x59, 0x01, 0xA5.toByte(), 0x01, 0x00, 0x00),
+            numberByMask.accept(frame("7E8 06 59 01 A5 01 00 00"), 2))
         val supportedDtc = CanConsoleDiagnosticCorrelation(frame("7E0 02 19 0A"))
         assertArrayEquals(byteArrayOf(0x59, 0x0A, 0x00),
             supportedDtc.accept(frame("7E8 03 59 0A 00"), 3))
+    }
+
+    @Test fun uds19ReadOnlyResponsesRequireCompletePayloadLayouts() {
+        val countRequest = frame("7E0 03 19 01 FF")
+        val malformedCount = CanConsoleDiagnosticCorrelation(countRequest)
+        assertNull(malformedCount.accept(frame("7E8 04 59 01 A5 00"), 10L))
+        assertNull(malformedCount.accept(frame("7E8 05 59 01 A5 01 00"), 11L))
+        assertArrayEquals(
+            byteArrayOf(0x59, 0x01, 0xA5.toByte(), 0x01, 0x00, 0x00),
+            malformedCount.accept(frame("7E8 06 59 01 A5 01 00 00"), 12L)
+        )
+
+        val listRequest = frame("7E0 03 19 02 FF")
+        val list = CanConsoleDiagnosticCorrelation(listRequest)
+        assertNull(list.accept(frame("7E8 06 59 02 A5 12 34 56"), 1L))
+        assertNull(list.accept(frame("7E8 04 59 02 A5 12"), 2L))
+        assertArrayEquals(byteArrayOf(0x59, 0x02, 0xA5.toByte()),
+            list.accept(frame("7E8 03 59 02 A5"), 3L))
+
+        val supported = CanConsoleDiagnosticCorrelation(frame("7E0 02 19 0A"))
+        assertNull(supported.accept(frame("7E8 04 59 0A A5 12"), 1L))
+        assertArrayEquals(byteArrayOf(0x59, 0x0A, 0xA5.toByte()),
+            supported.accept(frame("7E8 03 59 0A A5"), 2L))
     }
 
     @Test fun readDataByIdentifierStillRequiresExactDidEcho() {
