@@ -67,6 +67,19 @@ class Lfx2012ProgrammingAuditTest {
         }
     }
 
+    @Test fun nonFiniteVoltageNeverCountsAsMeasuredEvidence() {
+        for (voltage in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+            val report = Lfx2012ProgrammingAudit.review(
+                before, before.copy(voltage = voltage, capturedAtUtcMillis = 2L)
+            )
+            assertEquals(Lfx2012ProgrammingAudit.Overall.INCOMPLETE, report.overall)
+            assertTrue(report.after.any {
+                it.item == Lfx2012ProgrammingAudit.Item.VOLTAGE &&
+                    it.status == Lfx2012ProgrammingAudit.CheckStatus.UNAVAILABLE
+            })
+        }
+    }
+
     @Test fun failedCommunicationCannotBeReportedAsPassing() {
         val report = Lfx2012ProgrammingAudit.review(
             before, before.copy(communicationConfirmed = false, capturedAtUtcMillis = 2L))
