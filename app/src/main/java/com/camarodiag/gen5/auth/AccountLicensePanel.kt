@@ -71,6 +71,7 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
     var source by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var searchGeneration by remember { mutableIntStateOf(0) }
     var confirm by remember { mutableStateOf<Pair<String, Boolean?>?>(null) }
 
     fun updateFromServer(raw: Any?) {
@@ -90,15 +91,21 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
     }
 
     fun fetchAccount() {
-        if (email.isBlank()) return
+        val searchedEmail = email.trim()
+        if (searchedEmail.isBlank() || busy) return
+        val requestGeneration = ++searchGeneration
         busy = true
         message = ""
         uid = null
         licensed = null
         functions.getHttpsCallable("adminGetAccount")
-            .call(mapOf("email" to email.trim()))
+            .call(mapOf("email" to searchedEmail))
             .addOnCompleteListener { task ->
                 busy = false
+                // A response for a previous search must never select another user.
+                if (requestGeneration != searchGeneration ||
+                    !email.trim().equals(searchedEmail, ignoreCase = true)
+                ) return@addOnCompleteListener
                 if (task.isSuccessful) {
                     updateFromServer(task.result?.data)
                     if (uid == null) message = if (french) "Réponse incomplète" else "Incomplete response"
@@ -111,6 +118,7 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
 
     fun changeAccount(action: String, value: Boolean? = null) {
         val targetUid = uid ?: return
+        val targetEmail = selectedEmail
         if (isOwner || busy) return
         busy = true
         message = ""
@@ -120,6 +128,8 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
             .call(payload)
             .addOnCompleteListener { task ->
                 busy = false
+                // Never display a stale change result for another selected user.
+                if (uid != targetUid || selectedEmail != targetEmail) return@addOnCompleteListener
                 if (task.isSuccessful) {
                     updateFromServer(task.result?.data)
                     message = if (french) "Modification enregistrée." else "Change saved."
@@ -143,7 +153,10 @@ internal fun AccountAdministrationDialog(french: Boolean, onClose: () -> Unit) {
                     value = email,
                     onValueChange = {
                         email = it
+                        searchGeneration++
                         uid = null
+                        selectedEmail = ""
+                        confirm = null
                         licensed = null
                         message = ""
                     },
