@@ -1,0 +1,94 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+
+namespace CamaroDiag.J2534Bridge;
+
+/// <summary>Local bench entry point. Never routed through the network bridge.</summary>
+internal static class NativeE39QualifiedBenchCli
+{
+    internal const string Command = "--program-e39-bench";
+
+    internal static async Task<int> RunAsync(string[] args)
+    {
+        if (args.Length != 8 || !args[0].Equals(Command, StringComparison.OrdinalIgnoreCase) ||
+            !int.TryParse(args[1], out int index) || index < 0)
+        {
+            Console.Error.WriteLine("Usage: --program-e39-bench <adapter-index> <profile.json> <profile.sig> <original.bin> <target.bin> <kernel.bin> <NEW-journal.jsonl>");
+            return 6;
+        }
+        using var cancel = new CancellationTokenSource();
+        void Cancel(object? sender, ConsoleCancelEventArgs e) { e.Cancel = true; cancel.Cancel(); }
+        Console.CancelKeyPress += Cancel;
+        try
+        {
+            // Verify trusted qualification BEFORE discovering adapters or
+            // processing operator input. There is no self-qualification switch.
+            var qualified = NativeE39QualifiedBenchProfile.Load(args[2], args[3]);
+            var original = NativeE39QualifiedBenchProfile.ReadBounded(args[4], NativeE39ImageInspector.ImageBytes);
+            var target = NativeE39QualifiedBenchProfile.ReadBounded(args[5], NativeE39ImageInspector.ImageBytes);
+            var kernel = NativeE39QualifiedBenchProfile.ReadBounded(args[6], NativeE39RamLoader.MaximumKernelBytes);
+            var journalPath = Path.GetFullPath(args[7]);
+            if (File.Exists(journalPath) || File.Exists(journalPath + ".meta.json"))
+                throw new IOException("Choose a new journal path; previous recovery evidence is retained.");
+            var originalHash = Hash(original);
+            var targetHash = Hash(target);
+            var q = qualified.Policy.Session;
+            var provisional = new NativeE39BackupQualification.Evidence(q.ExpectedVin, q.ExpectedOsId,
+                originalHash, original.Length);
+            // Offline image validation does not certify the actual ECU backup.
+            _ = NativeE39BenchWorkflow.Prepare(qualified.Policy, provisional, original, target, kernel);
+            var adapters = J2534Registry.Discover();
+            if (index >= adapters.Count)
+                throw new ArgumentException("Selected J2534 adapter does not exist.");
+            var adapter = adapters[index];
+            using var lease = NativeE39PhysicalAdmission.OpenVerifiedDriverLease(
+                adapter, qualified.Scope, qualified.Channel);
+            if (Console.IsInputRedirected)
+                throw new UnauthorizedAccessException("Interactive local bench confirmation is required.");
+            Console.WriteLine("Qualified isolated bench ONLY. Not for a vehicle in service.");
+            Console.WriteLine($"ECU: {qualified.Family}; VIN: {q.ExpectedVin}; OS: {q.ExpectedOsId}");
+            Console.WriteLine("Adapter: " + adapter.DisplayName);
+            Console.WriteLine("Target SHA-256: " + targetHash);
+            Console.WriteLine("Journal: " + journalPath);
+            Console.WriteLine("No automatic retry, ECU reset or power cycle is performed.");
+            var confirmation = "BENCH " + q.ExpectedVin + " " + targetHash;
+            Console.WriteLine("Confirm the isolated qualified bench by typing: " + confirmation);
+            if (Console.ReadLine() != confirmation)
+                throw new OperationCanceledException("Operator did not confirm the exact target.");
+            cancel.Token.ThrowIfCancellationRequested();
+            // Separate immutable metadata and crash-resilient phase journal.
+            // Both must be created and flushed before any ECU is opened.
+            using (var metadata = new FileStream(journalPath + ".meta.json", FileMode.CreateNew,
+                FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough))
+            {
+                JsonSerializer.Serialize(metadata, new
+                {
+                    Schema = 1, Utc = DateTimeOffset.UtcNow, qualified.Family,
+                    q.ExpectedVin, q.ExpectedOsId, qualified.ProfileSha256,
+                    qualified.BoardEvidenceSha256, qualified.RecoveryEvidenceSha256,
+                    qualified.Channel.DriverSha256, qualified.Channel.RegistryView,
+                    OriginalSha256 = originalHash, TargetSha256 = targetHash,
+                    KernelSha256 = Hash(kernel)
+                });
+                metadata.Flush(true);
+            }
+            await using var journal = new NativeE39FileWriteJournal(journalPath);
+            var result = await J2534Device.RunQualifiedNativeE39BenchAsync(adapter, qualified.Scope,
+                qualified.Channel, qualified.Policy, original, target, kernel, journal, cancel.Token);
+            Console.WriteLine(result);
+            Console.WriteLine("Preserve backup and journal. Independent functional bench evaluation remains necessary.");
+            return 0;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+            ArgumentException or InvalidOperationException or OperationCanceledException or
+            CryptographicException or JsonException or OverflowException or NotSupportedException)
+        {
+            Console.Error.WriteLine("Bench transaction refused or interrupted: " + error.Message);
+            Console.Error.WriteLine("Preserve original and any journal. Do not automatically retry or reset the ECU.");
+            return 8;
+        }
+        finally { Console.CancelKeyPress -= Cancel; }
+    }
+
+    private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
+}
