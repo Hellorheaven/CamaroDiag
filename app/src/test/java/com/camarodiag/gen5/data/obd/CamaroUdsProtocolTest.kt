@@ -467,4 +467,17 @@ class CamaroUdsProtocolTest {
         assertNull(CamaroUdsProtocol.decodeAbsoluteLoadPercent(intArrayOf(256, 1)))
     }
 
+    @Test
+    fun commandedEquivalenceRatioPid44UsesExactSaeDivisor() {
+        assertEquals(1.0, requireNotNull(
+            CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(0x80, 0))), 0.000001)
+        assertEquals(0.5, requireNotNull(
+            CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(0x40, 0))), 0.000001)
+        assertEquals(65535.0 / 32768.0, requireNotNull(
+            CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(255, 255))), 0.000001)
+        assertNull(CamaroUdsProtocol.decodeCommandedEquivalenceRatio(null))
+        assertNull(CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(128)))
+        assertNull(CamaroUdsProtocol.decodeCommandedEquivalenceRatio(intArrayOf(128, 0, 0)))
+    }
+
 }
