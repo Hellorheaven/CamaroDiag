@@ -31,6 +31,18 @@ object J2534LiveMemoryBackup {
             reply[0] == 0x50.toByte() &&
             (reply[1].toInt() and 0xFF) == expectedSubfunction
 
+    /** Two independently observed GM identities, never an assumed firmware family. */
+    internal fun verifiedStableFirmware(
+        before: GmlanIdentityEvidence,
+        after: GmlanIdentityEvidence,
+        expectedVin: String
+    ): EcuBackupManifest.FirmwareEvidence {
+        require(before.vin == expectedVin && after == before) {
+            "GM VIN/OSID changed during memory acquisition; refuse to archive firmware evidence."
+        }
+        return EcuBackupManifest.FirmwareEvidence(before.operatingSystemId, before.osDid)
+    }
+
     data class Request(
         val expectedVin: String,
         val region: EcuBackupCoverage.Region,
@@ -62,7 +74,8 @@ object J2534LiveMemoryBackup {
     ) {
         internal fun export(
             output: OutputStream,
-            channel: EcuBackupManifest.Channel? = null
+            channel: EcuBackupManifest.Channel? = null,
+            firmwareEvidence: EcuBackupManifest.FirmwareEvidence? = null
         ) {
             // Bind the archive to the acquisition's original digest, not a newly
             // computed digest of potentially mutated public capture buffers.
@@ -79,7 +92,7 @@ object J2534LiveMemoryBackup {
             ) { "Capture no longer matches the verified acquisition." }
             EcuBackupArchive.export(
                 output, listOf(snapshot), required, manifest.controllerLabel,
-                manifest.createdAtUtcMillis, manifest.vehicleVin, channel
+                manifest.createdAtUtcMillis, manifest.vehicleVin, channel, firmwareEvidence
             )
         }
     }

@@ -84,6 +84,29 @@ class J2534LiveMemoryBackupTest {
         assertEquals(result.manifest, imported.manifest)
     }
 
+    @Test fun firmwareEvidenceRequiresMatchingPhysicalGmlanVinOsidAndResponder() {
+        fun observed(v: String = vin, osId: Long = 0x123456L, did: Int = 0xC1,
+            responseId: String = "7E8") = GmlanIdentityEvidence.validate(
+            vin = v, osId = osId, osDid = did, responseId = responseId,
+            expectedResponseId = responseId, physicalRead = true,
+            readOnly = true, flashQualified = false
+        )
+        val first = observed()
+        val second = observed()
+        assertEquals(
+            EcuBackupManifest.FirmwareEvidence(0x123456, 0xC1),
+            J2534LiveMemoryBackup.verifiedStableFirmware(first, second, vin)
+        )
+        for (changed in listOf(
+            observed(v = "1G1FA1RXXR0123457"),
+            observed(osId = 0x123457L),
+            observed(did = 0xC9),
+            observed(responseId = "7E9")
+        )) assertTrue(runCatching {
+            J2534LiveMemoryBackup.verifiedStableFirmware(first, changed, vin)
+        }.isFailure)
+    }
+
     @Test fun simulatedCaptureCanRecordRouteWithoutPromotingHardwareProvenance() = runBlocking {
         val result = J2534LiveMemoryBackup.captureForTest(ScriptedEcu(baseline, vin), request())
         val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)

@@ -1079,11 +1079,37 @@ class BluetoothObdManager(context: Context) {
             check(isJ2534BridgeConnected() && bridge.isScopedMemoryReadEnabled) {
                 "The J2534 bridge has no approved physical ECU memory read scope."
             }
+            // GM GMLAN OSID is optional: other ECUs may support scoped 0x23
+            // memory reads but not legacy 0x1A identity. Never infer an OSID
+            // from the VIN, adapter name, model year or an imported calibration.
+            val identityBefore = try {
+                bridge.readGmlanIdentification()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (unavailable: Exception) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                if (!bridge.isConnected || !bridge.isScopedMemoryReadEnabled)
+                    throw unavailable
+                null
+            }
+            if (identityBefore != null) {
+                require(identityBefore.vin == request.expectedVin) {
+                    "Physical GM identity VIN differs from the memory-read scope."
+                }
+            }
             val result = try {
                 J2534LiveMemoryBackup.capture(bridge, request, progress)
             } finally {
                 // A reconnect can use the same VIN with a different adapter.
                 transportSessionEpoch.requireQueuedCurrent(epoch)
+            }
+            val firmwareEvidence = identityBefore?.let { before ->
+                // A second physical identity read is mandatory if the first
+                // succeeded. Any OSID, VIN or responder change fails closed.
+                val after = bridge.readGmlanIdentification()
+                J2534LiveMemoryBackup.verifiedStableFirmware(
+                    before, after, request.expectedVin
+                )
             }
             // Bind the physical acquisition to the selected CAN channel and
             // approved read session. The ZIP may be opened on another device,
@@ -1095,7 +1121,7 @@ class BluetoothObdManager(context: Context) {
                 diagnosticSession = request.diagnosticSession
             )
             transportSessionEpoch.requireQueuedCurrent(epoch)
-            result.export(output, channel)
+            result.export(output, channel, firmwareEvidence)
             transportSessionEpoch.requireQueuedCurrent(epoch)
             result
         }
