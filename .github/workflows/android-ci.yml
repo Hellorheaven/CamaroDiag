@@ -23,6 +23,18 @@ on:
       - 'version.properties'
       - '.github/workflows/android-ci.yml'
 
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Branch or exact SHA to validate"
+        required: true
+        default: "main"
+        type: string
+      pr_number:
+        description: "Pull request number (optional, for artifact naming)"
+        required: false
+        type: string
+
 concurrency:
   group: android-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || inputs.target_ref || 'manual' }}
   cancel-in-progress: true
@@ -34,7 +46,7 @@ permissions:
 
 jobs:
   evaluate-build-checkpoint:
-    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
     outputs:
       validated_sha: ${{ steps.resolve_revision.outputs.sha }}
@@ -146,6 +158,13 @@ jobs:
           configured="${BUILD_INTERVAL:-}"
           if [[ "$configured" =~ ^[1-9][0-9]*$ ]]; then interval="$configured"; else interval=50; fi
           echo "interval=$interval" >> "$GITHUB_OUTPUT"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "validation_applies=true" >> "$GITHUB_OUTPUT"
+            echo "build_required=true" >> "$GITHUB_OUTPUT"
+            echo "commits_since_build=0" >> "$GITHUB_OUTPUT"
+            echo "Manual Android validation, independent of PR changes."
+            exit 0
+          fi
           if [[ "$ANDROID_CHANGED" != "true" ]]; then
             echo "validation_applies=false" >> "$GITHUB_OUTPUT"
             echo "build_required=false" >> "$GITHUB_OUTPUT"
@@ -167,13 +186,8 @@ jobs:
           commits_since_build="$(git rev-list --count "$count_base..$HEAD_SHA" -- "${paths[@]}")"
           echo "commits_since_build=$commits_since_build" >> "$GITHUB_OUTPUT"
 
-          # Manual dispatch is an explicit request for a complete validation, independent of the 50-commit draft checkpoint.
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "validation_applies=true" >> "$GITHUB_OUTPUT"
-            echo "build_required=true" >> "$GITHUB_OUTPUT"
-            echo "Manual Android Debug validation explicitly requested."
-          # Ready transition validates the PR scope; subsequent Ready synchronize events validate only files changed in that commit.
-          elif [[ "$IS_DRAFT" == "true" ]]; then
+          # Full validation at ready-for-review, periodic checkpoints on draft PRs.
+          if [[ "$IS_DRAFT" == "true" ]]; then
             # The secure bridge must never be called "CI-green" on a
             # checkpoint-only run. Force a complete Android build/lint/test
             # whenever its TLS client or network policy changed since the
@@ -290,7 +304,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-unit-tests-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha }}
+          name: CamaroDiag-unit-tests-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
@@ -364,7 +378,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-lint-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
+          name: CamaroDiag-lint-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
           path: |
             **/build/reports/lint-results-debug.html
             **/build/reports/lint-results-debug.xml
@@ -396,7 +410,7 @@ jobs:
       - name: Upload debug APK for this PR commit
         uses: actions/upload-artifact@v7
         with:
-          name: CamaroDiag-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ inputs.target_ref || github.event.pull_request.head.sha || 'manual' }}
+          name: CamaroDiag-debug-pr-${{ inputs.pr_number || github.event.pull_request.number || 'manual' }}-${{ needs.evaluate-build-checkpoint.outputs.validated_sha }}
           path: app/build/outputs/apk/debug/CamaroDiag-debug.apk
           if-no-files-found: error
           retention-days: 30

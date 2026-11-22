@@ -4,6 +4,30 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'app/**'
+      - 'communication/**'
+      - 'core/**'
+      - 'diagnostic/**'
+      - 'storage/**'
+      - 'control/**'
+      - 'mileageaudit/**'
+      - 'pc-bridge/**'
+      - 'ecu-native/**'
+      - 'third_party/**'
+      - '**/*.gradle'
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'version.properties'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'global.json'
+      - '**/*.props'
+      - '**/*.targets'
+      - 'NuGet.Config'
+      - 'nuget.config'
+      - '.github/workflows/release-apk.yml'
   workflow_dispatch:
 
 permissions:

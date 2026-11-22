@@ -1,12 +1,22 @@
-name: Connectors — Firmware validation
+name: Connectors CI
+# One cross-component gate for the common firmware/host contract. A hardware
+# documentation-only change does not trigger compilation; run manually for bench work.
 on:
   pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - 'connectors/firmware/esp32s3/**'
-      - 'connectors/firmware/stm32g4/**'
-      - 'connectors/firmware/shared/**'
-      - '.github/workflows/connectors-firmware-validation.yml'
+      - 'connectors/firmware/**'
+      - 'connectors/host/**'
+      - 'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnector*.kt'
+      - 'pc-bridge/CamaroDiag.J2534Bridge/Connector*.cs'
+      - '.github/workflows/connectors-ci.yml'
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: connectors-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   native-parser:
     runs-on: ubuntu-latest
@@ -57,3 +67,51 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install platformio==6.1.18
       - run: pio run -d connectors/firmware/stm32g4
+  native-usb-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test portable Java protocol
+        run: |
+          mkdir -p /tmp/android-protocol
+          javac -Xlint:all -Werror -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/BinaryDiscovery.java connectors/host/android/src/test/java/com/camarodiag/connectors/BinaryDiscoveryTest.java
+          java -ea -cp /tmp/android-protocol com.camarodiag.connectors.BinaryDiscoveryTest
+      - name: Use runner Android SDK
+        run: |
+          test -n "$ANDROID_HOME"
+          if [ ! -f "$ANDROID_HOME/platforms/android-35/android.jar" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35"
+          fi
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+      - name: Compile native USB Host adapter
+        run: |
+          javac -Xlint:all -Werror -cp "$ANDROID_HOME/platforms/android-35/android.jar" -d /tmp/android-protocol connectors/host/android/src/main/java/com/camarodiag/connectors/*.java
+  python-host-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    defaults:
+      run:
+        working-directory: connectors/host/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q camarodiagconnectors tests
+  windows-discovery:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build connectors/host/windows-discovery/WindowsDiscovery.csproj -c Release -warnaserror
+      - run: dotnet run --project connectors/host/windows-discovery/WindowsDiscovery.csproj -c Release --no-build -- --self-test

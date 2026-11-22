@@ -1,20 +1,16 @@
-name: PR70 Release size and compatibility checkpoint
+name: Release validation (no publication)
 on:
   workflow_dispatch:
-    inputs:
-      target_ref:
-        description: "Exact branch or commit to validate"
-        required: true
-        type: string
 permissions:
   contents: read
 jobs:
   windows-release:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.target_ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
@@ -27,11 +23,12 @@ jobs:
           dotnet run --project .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --no-build -- --self-test
           if ($LASTEXITCODE -ne 0) { throw 'Release bridge self-test failed' }
   android-release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.target_ref }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -85,8 +82,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: pr70-release-optimization-results
+          name: release-validation-${{ github.sha }}
           path: |
-            app/build/outputs/apk/release/*.apk
             **/build/reports/lint-results-*.xml
             **/build/test-results/testDebugUnitTest/**
