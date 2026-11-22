@@ -192,6 +192,60 @@ class J2534BridgeTransport(
         return reply.toHex()
     }
 
+    /**
+     * One operator-requested, non-destructive SAE OBD command on the currently
+     * selected physical J2534 responder. No ELM commands, write services, or
+     * fallback to demonstration data are accepted on this path.
+     */
+    suspend fun readOnlyConsoleRequest(command: SafeObdRequest): String {
+        check(isStandardObdPhysicalReadEnabled) {
+            "J2534 physical standard OBD reading is not enabled."
+        }
+        require(SafeObdRequestPolicy.parse(command.elmCommand) == command) {
+            "Unrecognized or modified read-only console command."
+        }
+        val payload = if (command.parameter == null) {
+            byteArrayOf(command.service.toByte())
+        } else {
+            byteArrayOf(command.service.toByte(), command.parameter.toByte())
+        }
+        val reply = exchange(payload, 4_000L)
+        validateReadOnlyConsoleReply(command, reply)
+        check(isStandardObdPhysicalReadEnabled) {
+            "J2534 disconnected before the physical console response was accepted."
+        }
+        return reply.toHex()
+    }
+
+    internal companion object {
+        /** A negative, mismatched, or truncated reply is never a successful read. */
+        fun validateReadOnlyConsoleReply(command: SafeObdRequest, reply: ByteArray) {
+            require(SafeObdRequestPolicy.parse(command.elmCommand) == command) {
+                "Unsupported console read request."
+            }
+            when (command.service) {
+                0x01 -> {
+                    val pid = requireNotNull(command.parameter)
+                    if (pid % 0x20 == 0) J2534StandardObd.supportPage(pid, reply)
+                    else J2534StandardObd.pidData(pid, reply)
+                }
+                0x03, 0x07, 0x0A -> {
+                    requireNotNull(J2534StandardObd.optionalDtcs(command.service, reply)) {
+                        "The ECU does not support this DTC read mode."
+                    }
+                }
+                0x09 -> {
+                    val pid = requireNotNull(command.parameter)
+                    require(reply.size > 2 &&
+                        (reply[0].toInt() and 0xFF) == 0x49 &&
+                        (reply[1].toInt() and 0xFF) == pid
+                    ) { "Invalid or negative physical vehicle information response." }
+                }
+                else -> throw IllegalArgumentException("Not a read-only OBD console service.")
+            }
+        }
+    }
+
     suspend fun readStandardObdDtcs(): PhysicalObdDtcSnapshot {
         check(isStandardObdPhysicalReadEnabled)
         // An absent/refused read is not equivalent to a confirmed empty list.
