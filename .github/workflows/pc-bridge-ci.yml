@@ -5,24 +5,9 @@ name: PC J2534 Bridge CI
 # Validate Windows-relevant PR updates at the configured build checkpoint.
 # Keep manual full validation available even when no Windows files changed.
 on:
-  pull_request:
-    branches: [main]
-    types: [ready_for_review]
-    paths:
-      - 'pc-bridge/**'
-      - 'global.json'
-      - '.editorconfig'
-      - '.github/actions/**'
-      - 'NuGet.Config'
-      - 'nuget.config'
-      - '**/Directory.Build.props'
-      - '**/Directory.Build.targets'
-      - '**/Directory.Packages.props'
-      - '**/*.sln'
-      - '**/*.slnx'
-      - '**/*.props'
-      - '**/*.targets'
-      - '.github/workflows/pc-bridge-ci.yml'
+  # Manual component checkpoint only. Full PR check is orchestrated by pr-unit-tests.yml.
+  # Disabled implicit PR triggers to prevent duplicate Debug validation.
+  # No automatic runs per commit or Ready transition.
   workflow_dispatch:
     inputs:
       target_ref:
