@@ -55,6 +55,26 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(51L))
     }
 
+    @Test fun adapterAckBeyondOneKilobyteIsStillDetectedFromFullStream() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
+        val chatter = (0 until 120).joinToString("\r\n") {
+            "7E9 04 03 41 0D 1A"
+        } + "\r\nOK\r\n"
+        assert(chatter.length > 1024)
+        correlation.append(chatter, 200L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(201L))
+        assertEquals(true, correlation.hasExplicitAdapterAck())
+        assertEquals(false, correlation.hasAdapterError())
+    }
+
+    @Test fun adapterErrorAfterAckOverridesPhysicalTransmissionSuccess() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
+        correlation.append("OK\r\nCAN ERROR\r\n", 100L)
+        correlation.complete(101L)
+        assertEquals(true, correlation.hasAdapterError())
+        assertEquals(false, correlation.hasExplicitAdapterAck())
+    }
+
     @Test fun independentPhysicalReceiveChunksKeepTheirActualHostTimestamps() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E9 04 03 41 0C 1B\r\n", 10L, 1_800_000_000_010L)
