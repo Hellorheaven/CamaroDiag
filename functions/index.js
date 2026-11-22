@@ -282,3 +282,8 @@ exports.stripeLicenseWebhook = onRequest(
         }
     }
 );
+
+// Account management is permissioned separately from license and functional tests.
+const accountAdmin = require("./account-admin");
+exports.adminGetAccount = accountAdmin.adminGetAccount;
+exports.adminUpdateAccount = accountAdmin.adminUpdateAccount;
