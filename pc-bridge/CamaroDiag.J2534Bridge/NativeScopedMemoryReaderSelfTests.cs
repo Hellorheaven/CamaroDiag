@@ -94,6 +94,9 @@ internal static class NativeScopedMemoryReaderSelfTests
 
         Assert(verified.Bytes.SequenceEqual(memory) && verified.Bytes.Length == 300,
             "Two physical reads return exactly the requested memory range");
+        Assert(verified.SecondBytes is not null && verified.SecondBytes.SequenceEqual(memory) &&
+            !ReferenceEquals(verified.Bytes, verified.SecondBytes),
+            "Both separate acquisitions are retained for export");
         Assert(verified.BlocksPerPass == 3 && link.Calls == 6,
             "All three blocks were independently re-read");
         Assert(link.VinCalls == 3,
