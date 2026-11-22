@@ -230,6 +230,21 @@ internal static class NativeScopedMemoryReaderSelfTests
         Assert(failedReset.Calls == 6 && failedReset.Sessions.SequenceEqual(new byte[] { 3, 1 }),
             "Failed default-session confirmation prevents successful capture");
 
+        var deniedWithinExtended = new FakeEcu(scope.StartAddress, memory) { Deny = true };
+        Reject<IOException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            deniedWithinExtended, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(deniedWithinExtended.Sessions.SequenceEqual(new byte[] { 3, 1 }) &&
+               deniedWithinExtended.Calls == 1,
+               "ECU memory refusal after session entry still restores the default session");
+
+        var blockedByScope = new FakeEcu(scope.StartAddress, memory) {
+            AfterRead = () => throw new UnauthorizedAccessException("Scoped memory operation blocked")
+        };
+        Reject<UnauthorizedAccessException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            blockedByScope, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(blockedByScope.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+               "Non-VIN authorization failures still trigger safe default-session cleanup");
+
         var failedEnter = new FakeEcu(scope.StartAddress, memory) { MalformedExtendedReply = true };
         Reject<InvalidDataException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
             failedEnter, scope, null, CancellationToken.None).GetAwaiter().GetResult());

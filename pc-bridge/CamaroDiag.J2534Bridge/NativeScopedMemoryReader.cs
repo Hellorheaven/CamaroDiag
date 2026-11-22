@@ -11,6 +11,13 @@ internal static class NativeScopedMemoryReader
 {
     internal const int MaximumUiCaptureBytes = 16 * 1024 * 1024;
 
+    internal sealed class LiveVinMismatchException :
+        UnauthorizedAccessException
+    {
+        internal LiveVinMismatchException() :
+            base("Live ECU VIN no longer matches the approved memory scope.") { }
+    }
+
     internal sealed class MemoryReadRefusedException(uint address, int size, byte nrc) :
         IOException($"ECU denied memory read at 0x{address:X8} ({size} bytes, NRC 0x{nrc:X2}). " +
             "No SecurityAccess, flash write or privileged retry was attempted.")
@@ -78,8 +85,7 @@ internal static class NativeScopedMemoryReader
             reply[1] != 0xF1 || reply[2] != 0x90 ||
             !string.Equals(System.Text.Encoding.ASCII.GetString(reply, 3, 17),
                 scope.ExpectedVin, StringComparison.Ordinal))
-            throw new UnauthorizedAccessException(
-                "Live ECU VIN no longer matches the approved memory scope.");
+            throw new LiveVinMismatchException();
     }
 
     /// <summary>
@@ -116,9 +122,11 @@ internal static class NativeScopedMemoryReader
             cancellationToken.ThrowIfCancellationRequested();
             captureCompleted = true;
         }
-        catch (UnauthorizedAccessException)
+        catch (LiveVinMismatchException)
         {
-            // A VIN or scope failure is not a reason to send another command.
+            // A changed VIN is unsafe to address again. In contrast, a
+            // scoped request denial on the SAME ECU must still attempt a
+            // bounded return to the default session after verifying VIN.
             identityUncertain = true;
             throw;
         }
