@@ -2276,6 +2276,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         requestJob.start()
     }
 
+    /** The console button and the export worker must enforce identical archive rules. */
+    fun canExportCanCapture(): Boolean {
+        val state = _liveCanMonitorState.value
+        val archive = activeCanCaptureFile?.takeIf { it.isFile }
+        return CanConsoleExportPolicy.canExport(
+            isCapturing = state.isCapturing,
+            archiveFailed = state.rawArchiveFailed,
+            hasHistory = state.consoleHistory.isNotEmpty(),
+            hasRawData = state.rawText.isNotBlank() || (archive?.length() ?: 0L) > 0L,
+            requiresRawArchive = state.captureArchiveRequired,
+            hasRawArchive = archive != null
+        )
+    }
+
     /** Export the latest raw CAN capture without transforming adapter output. */
     fun exportCanCapture(fileName: String) {
         if (!requirePremiumLicense()) return
