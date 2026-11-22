@@ -34,21 +34,38 @@ internal static class ConnectorCheckpointCapture
         var timer = Stopwatch.StartNew();
         var request = "CDJ/1 READ\n"u8.ToArray();
         serial.Write(request, 0, request.Length);
+        return ReadResponse(
+            timeout => { serial.ReadTimeout = timeout; return serial.ReadByte(); },
+            () => serial.BytesToRead, () => timer.ElapsedMilliseconds);
+    }
+
+    // Testable boundary: a per-byte serial timeout is not a whole capture timeout.
+    internal static byte[]? ReadResponse(Func<int, int> readByte, Func<int> bufferedBytes,
+        Func<long> elapsedMilliseconds)
+    {
         var line = new StringBuilder(135);
         while (line.Length < 135)
         {
-            var remaining = DeadlineMs - timer.ElapsedMilliseconds;
+            var remaining = DeadlineMs - elapsedMilliseconds();
             if (remaining <= 0) throw new TimeoutException("Checkpoint deadline exceeded.");
-            serial.ReadTimeout = (int)Math.Min(1500L, remaining);
-            int value = serial.ReadByte();
-            if (value < 0 || timer.ElapsedMilliseconds >= DeadlineMs)
+            int value;
+            try
+            {
+                value = readByte((int)Math.Max(1L, Math.Min(1500L, remaining)));
+            }
+            catch (TimeoutException)
+            {
+                // Allow another bounded serial read until the shared deadline.
+                continue;
+            }
+            if (value < 0 || elapsedMilliseconds() >= DeadlineMs)
                 throw new IOException("Incomplete checkpoint response.");
             if (value != '\n' && (value < 32 || value > 126))
                 throw new InvalidDataException("Non-ASCII checkpoint response.");
             line.Append((char)value);
             if (value == '\n') break;
         }
-        if (serial.BytesToRead != 0) throw new InvalidDataException("Unexpected trailing response.");
+        if (bufferedBytes() != 0) throw new InvalidDataException("Unexpected trailing response.");
         return Decode(line.ToString());
     }
 
