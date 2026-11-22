@@ -701,6 +701,7 @@ class BluetoothObdManager(context: Context) {
                 val payload = frame.data.joinToString(" ") {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
+                timedCorrelation.beginRequest(System.nanoTime() / 1_000_000L)
                 val frameResponse = boundCommand(payload, 4_000L) { chunk ->
                     timedCorrelation.append(
                         chunk, System.nanoTime() / 1_000_000L, System.currentTimeMillis()
