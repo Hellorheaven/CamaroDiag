@@ -65,4 +65,20 @@ class CanConsoleDisplayFilterTest {
         assertFalse(CanConsoleDisplayFilter.visible(traffic[1], standard))
         assertTrue(CanConsoleEcuRouting.isSelectedResponder(request, expected))
     }
+
+    @Test fun typedTraceFramesRetainExactIdentifierWidthInDropdownAndList() {
+        val frames = listOf(
+            CanTraceFrame(1, null, 0x7E8, CanTraceDirection.RX, listOf(0x03), false),
+            CanTraceFrame(2, null, 0x7E8, CanTraceDirection.RX, listOf(0x03), true),
+            CanTraceFrame(3, null, 0x7E8, CanTraceDirection.RX, listOf(0x03), null),
+            CanTraceFrame(4, null, 0x18DAF110, CanTraceDirection.RX, listOf(0x03), true)
+        )
+        assertEquals(listOf(standard, extendedSameNumber, extended),
+            CanConsoleDisplayFilter.observedFrameIds(emptyList(), frames))
+        assertEquals(listOf(frames[0]),
+            frames.filter { CanConsoleDisplayFilter.visibleTrace(it, standard) })
+        assertEquals(listOf(frames[1]),
+            frames.filter { CanConsoleDisplayFilter.visibleTrace(it, extendedSameNumber) })
+        assertEquals(frames, frames.filter { CanConsoleDisplayFilter.visibleTrace(it, null) })
+    }
 }
