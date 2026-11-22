@@ -200,11 +200,12 @@ jobs:
               if ! git diff --quiet "$(git rev-parse --verify "${HEAD_SHA}^" 2>/dev/null || printf '%s' "$BASE_SHA")" "$HEAD_SHA" -- \
                   'app/src/main/java/com/camarodiag/gen5/ui/UpdateManager.kt' \
                   'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagUpdateCleanup.kt' \
+                  'app/src/main/java/com/camarodiag/gen5/ui/CamaroDiagExportStorage.kt' \
                   'app/src/main/AndroidManifest.xml' \
                   'app/src/main/res/xml/update_file_paths.xml' \
                   '.github/workflows/android-ci.yml'; then
                 echo "build_required=true" >> "$GITHUB_OUTPUT"
-                echo "APK updater or CI safety-critical change: full Android Debug validation required."
+                echo "APK updater, public export storage or CI safety-critical change: full Android Debug validation required."
               elif (( commits_since_build >= interval )); then
                 echo "build_required=true" >> "$GITHUB_OUTPUT"
                 echo "Android Debug build due: $commits_since_build relevant commits (interval $interval)."
