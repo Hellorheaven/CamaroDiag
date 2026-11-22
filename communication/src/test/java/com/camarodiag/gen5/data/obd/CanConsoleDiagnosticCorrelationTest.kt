@@ -103,6 +103,20 @@ class CanConsoleDiagnosticCorrelationTest {
         ))
     }
 
+    @Test fun udsResponsePendingDoesNotCompleteOrHideLaterFinalReply() {
+        val request = frame("7E0 03 22 F1 90")
+        val correlation = CanConsoleDiagnosticCorrelation(request)
+        assertNull(correlation.accept(frame("7E8 03 7F 22 78"), 0))
+        assertArrayEquals(byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()),
+            correlation.accept(frame("7E8 03 62 F1 90"), 1))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E8 04 03 7F 22 78", request
+        ))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E8 04 03 7F 22 78\\r\\n7E8 04 03 62 F1 90", request
+        ))
+    }
+
     @Test fun unknownOrFunctionalPhysicalContextCannotAcquireOtherEcu() {
         for (request in listOf("7DF 02 01 0C", "123 02 01 0C", "18DAF110 03 22 F1 90")) {
             try {
