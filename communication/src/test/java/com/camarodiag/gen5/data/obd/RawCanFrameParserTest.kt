@@ -121,4 +121,23 @@ class RawCanFrameParserTest {
         }
     }
 
+    @Test fun nonstandardCanIdsCannotBecomeAnObdWriteLoophole() {
+        for (input in listOf(
+            "123 03 2E F1 90", "123 02 27 01", "123 02 04 00",
+            "456 03 31 01 01", "456 03 34 00 44",
+            "18DA20F1 03 2E F1 90", "18DA20F1 03 36 01 42",
+            "123 10 14 34 00 11 22", "18DA20F1 10 14 2E F1 90"
+        )) {
+            assertFalse(input, SafeRawCanTransmitPolicy.allows(
+                requireNotNull(RawCanFrameParser.parse(input))))
+        }
+        for (input in listOf(
+            "123 03 22 F1 90", "123 02 01 0C", "18DA20F1 03 22 F1 90",
+            "123 55 AA BB", "123 08 00 FF"
+        )) {
+            assertTrue(input, SafeRawCanTransmitPolicy.allows(
+                requireNotNull(RawCanFrameParser.parse(input))))
+        }
+    }
+
 }
