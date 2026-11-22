@@ -10,9 +10,11 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const region = "europe-west1";
 const adminRole = "admin_accounts";
 const maxSessionAge = 5 * 60;
+const { licenseStatus } = require("./license-status");
 
 function adminIdentity(request) {
-    if (!request.auth?.uid || request.auth.token?.[adminRole] !== true)
+    if (!request.auth?.uid || request.auth.token?.[adminRole] !== true &&
+        request.auth.token?.owner_functional_tests !== true)
         throw new HttpsError("permission-denied", "Droits administrateur requis.");
     const authenticatedAt = Number(request.auth.token.auth_time);
     if (!Number.isFinite(authenticatedAt) ||
@@ -60,7 +62,8 @@ exports.adminGetAccount = onCall({ region, enforceAppCheck: true }, async reques
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
         throw new HttpsError("invalid-argument", "Adresse e-mail invalide.");
     try {
-        return { account: publicUser(await getAuth().getUserByEmail(email.trim().toLowerCase())) };
+        const user = await getAuth().getUserByEmail(email.trim().toLowerCase());
+        return { account: { ...publicUser(user), license: await licenseStatus(user.uid) } };
     } catch (e) {
         if (e.code === "auth/user-not-found")
             throw new HttpsError("not-found", "Compte introuvable.");
@@ -74,7 +77,7 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: true }, async req
     const { uid, action, value } = request.data || {};
     if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid))
         throw new HttpsError("invalid-argument", "UID invalide.");
-    if (!["disable", "revoke_sessions", "administrator"].includes(action))
+    if (!["disable", "revoke_sessions", "administrator", "license"].includes(action))
         throw new HttpsError("invalid-argument", "Action non autorisée.");
     if (uid === actor)
         throw new HttpsError("failed-precondition", "Modification de son propre compte interdite.");
@@ -84,7 +87,14 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: true }, async req
     // Owner enrolment stays exclusive to its separate, HMAC-guarded script.
     if (target.customClaims?.owner_functional_tests === true)
         throw new HttpsError("permission-denied", "Compte propriétaire protégé.");
-    if (action === "disable") {
+    if (action === "license") {
+        if (typeof value !== "boolean")
+            throw new HttpsError("invalid-argument", "Valeur booléenne requise.");
+        await getFirestore().collection("manualLicenseOverrides").doc(uid).set({
+            licensed: value, actorUid: actor,
+            updatedAt: FieldValue.serverTimestamp()
+        });
+    } else if (action === "disable") {
         if (typeof value !== "boolean")
             throw new HttpsError("invalid-argument", "Valeur booléenne requise.");
         if (target.customClaims?.[adminRole] === true && value)
@@ -106,5 +116,5 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: true }, async req
         await auth.revokeRefreshTokens(uid);
     }
     await audit(actor, uid, action);
-    return { account: publicUser(await auth.getUser(uid)) };
+    return { account: { ...publicUser(await auth.getUser(uid)), license: await licenseStatus(uid) } };
 });
