@@ -319,8 +319,12 @@ internal sealed partial class BridgeDesktopForm
         var cancellation = memoryCancellation;
         memoryCancel.Enabled = true;
         memoryCapture.Enabled = false;
+        var progressActive = true;
         var progress = new Progress<(int Pass, int BytesRead, int TotalBytes)>(state =>
         {
+            // Progress<T> marshals updates onto the UI dispatcher. Old updates
+            // queued before failure/cancellation cannot overwrite its status.
+            if (!progressActive) return;
             memoryStatus.Text = $"Lecture {state.Pass}/2 : " +
                 $"{state.BytesRead:N0}/{state.TotalBytes:N0} octets.";
         });
@@ -382,6 +386,7 @@ internal sealed partial class BridgeDesktopForm
                             StringComparison.OrdinalIgnoreCase))
                         NativeScopedBackupImport.VerifyZip(destination.FileName, scope);
                 }, cancellation.Token);
+                progressActive = false;
                 memoryStatus.Text = "Sauvegarde de plage ECU vérifiée par deux lectures : " +
                     result.Capture.Bytes.Length + " octets, SHA-256 " + result.Capture.Sha256 +
                     ". Couverture limitée à la zone demandée, pas à tout le calculateur. " +
@@ -394,11 +399,13 @@ internal sealed partial class BridgeDesktopForm
                 }
                 catch (OperationCanceledException)
                 {
+                    progressActive = false;
                     memoryStatus.Text = "Lecture ECU annulée : aucune nouvelle archive validée.";
                     throw;
                 }
                 catch (Exception)
                 {
+                    progressActive = false;
                     memoryStatus.Text = "Sauvegarde ECU non validée : lire l'erreur et contrôler le dossier de destination.";
                     throw;
                 }
@@ -406,6 +413,7 @@ internal sealed partial class BridgeDesktopForm
         }
         finally
         {
+            progressActive = false;
             memoryCancel.Enabled = false;
             memoryCapture.Enabled = true;
             memoryCancellation = null;
