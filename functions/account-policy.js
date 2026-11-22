@@ -13,14 +13,18 @@ function displayLicenseWithoutLookup(user) {
   return null;
 }
 
+/** Require a real Firebase authentication epoch, not null/empty coercing to zero. */
+function isValidAuthTime(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
 /** Compare Firebase auth_time with the Admin SDK revocation boundary. */
 function isSessionRevoked(tokensValidAfterTime, authTimeSeconds) {
   if (!tokensValidAfterTime) return false;
   const validAfterSeconds = Date.parse(tokensValidAfterTime) / 1000;
   // A malformed token cannot bypass a known revocation timestamp.
   if (!Number.isFinite(validAfterSeconds)) return true;
-  const authTime = Number(authTimeSeconds);
-  return !Number.isFinite(authTime) || authTime < validAfterSeconds;
+  return !isValidAuthTime(authTimeSeconds) || authTimeSeconds < validAfterSeconds;
 }
 
 function isVerifiedGoogleSession(token) {
@@ -28,4 +32,4 @@ function isVerifiedGoogleSession(token) {
     token?.firebase?.sign_in_provider === "google.com";
 }
 
-module.exports = { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession };
+module.exports = { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession, isValidAuthTime };
