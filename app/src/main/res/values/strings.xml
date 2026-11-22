@@ -784,6 +784,7 @@
     <string name="flexfuel_lfx2012_parts_warning">These part numbers are references only, not proof of the ECU fitted to this VIN or permission to change its calibration.</string>
     <string name="flexfuel_lfx2012_calid_label">ECU-reported calibration ID: %1$s</string>
     <string name="flexfuel_lfx2012_boot">Catalog boot-file reference: %1$s (not verified on this vehicle).</string>
+    <string name="flexfuel_lfx2012_readonly_testing_notice">Live ECU reading and identification remain available for individual vehicle testing, independently of ECU writing qualification.</string>
     <string name="flexfuel_lfx2012_checks">Conditions still preventing calibration changes</string>
     <string name="flexfuel_preflight_vehicle_missing">No vehicle profile selected</string>
     <string name="flexfuel_preflight_wrong_vehicle">Vehicle is not a 2012 Camaro LFX</string>
