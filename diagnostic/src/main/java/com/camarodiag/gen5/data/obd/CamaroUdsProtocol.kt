@@ -162,14 +162,40 @@ object CamaroUdsProtocol {
         }
     }
 
+    /**
+     * Only interpret a complete, single-line positive Mode 01 response.
+     * Adapter banners, echoed requests and neighbouring ECU replies cannot
+     * contribute bytes to a sensor or an odometer calculation.
+     */
     fun parsePidBytes(response: String, pid: String): IntArray? {
-        val cleaned = response.uppercase().replace(Regex("[^0-9A-F]"), "")
-        val marker = "41${pid.uppercase().padStart(2, '0')}"
-        val index = cleaned.indexOf(marker)
-        if (index < 0) return null
-        val payload = cleaned.substring(index + marker.length)
-        if (payload.length < 2 || payload.length % 2 != 0) return null
-        return runCatching { payload.chunked(2).map { it.toInt(16) }.toIntArray() }.getOrNull()
+        val pidHex = pid.trim().uppercase(Locale.ROOT).padStart(2, '0')
+        if (!Regex("[0-9A-F]{2}").matches(pidHex)) return null
+        val expectedPid = pidHex.toInt(16)
+        val hexPairData = Regex("(?:[0-9A-F]{2}){3,10}")
+        val canHeader = Regex("(?:[0-9A-F]{3}|[0-9A-F]{8})")
+        for (sourceLine in response.lineSequence()) {
+            val line = sourceLine.trim().uppercase(Locale.ROOT)
+            if (line.isEmpty()) continue
+            val parts = line.split(Regex("\\s+"))
+            var data = when {
+                parts.size > 1 && canHeader.matches(parts[0]) ->
+                    parts.drop(1).joinToString("")
+                // 11-bit CAN ID prepended without spaces (e.g. 7E8410C1AF8).
+                parts.size == 1 && line.length % 2 == 1 &&
+                    canHeader.matches(line.take(3)) -> line.drop(3)
+                else -> parts.joinToString("")
+            }
+            if (!hexPairData.matches(data)) continue
+            var bytes = data.chunked(2).map { it.toInt(16) }
+            if (bytes.first() != 0x41) {
+                val dlc = bytes.first()
+                if (dlc !in 1..8 || dlc != bytes.size - 1) continue
+                bytes = bytes.drop(1)
+            }
+            if (bytes.size < 3 || bytes[0] != 0x41 || bytes[1] != expectedPid) continue
+            return bytes.drop(2).toIntArray()
+        }
+        return null
     }
 
     fun parseOdometerPidA6(response: String): Double? = parseOdometerPid(response, "A6")
@@ -177,14 +203,12 @@ object CamaroUdsProtocol {
     fun parseOdometerPidD3(response: String): Double? = parseOdometerPid(response, "D3")
 
     private fun parseOdometerPid(response: String, pid: String): Double? {
-        val cleaned = response.uppercase().replace(Regex("[^0-9A-F]"), "")
-        val marker = cleaned.indexOf("41$pid")
-        if (marker < 0 || cleaned.length < marker + 12) return null
-        return runCatching {
-            val raw = cleaned.substring(marker + 4, marker + 12).toLong(16)
-            raw / 10.0
-        }.getOrNull()
+        val bytes = parsePidBytes(response, pid) ?: return null
+        // The four-byte definition is required; a truncated or concatenated
+        // reply must never become a plausible vehicle mileage reading.
+        if (bytes.size != 4) return null
+        val value = bytes.fold(0L) { acc, byte -> (acc shl 8) or byte.toLong() }
+        return value / 10.0
     }
-
 
 }
