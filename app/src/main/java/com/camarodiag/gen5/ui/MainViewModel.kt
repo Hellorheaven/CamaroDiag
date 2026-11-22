@@ -2061,26 +2061,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val current = _liveCanMonitorState.value
                     val diagnosticStatus = transmission.diagnosticStatus
                     val streamedRecords = transmission.receivedRecords
-                    val receivedEvents = if (streamedRecords.isNotEmpty()) {
-                        streamedRecords.map { timed ->
-                            CanConsoleHistoryEntry(
-                                id = System.nanoTime(),
-                                direction = timed.record.direction,
-                                timestampMillis = timed.timestampMillis,
-                                content = timed.record.content,
-                                succeeded = timed.record.succeeded
-                            )
-                        }
-                    } else {
-                        CanConsoleRecordParser.parse(response).map { record ->
-                            CanConsoleHistoryEntry(
-                                id = System.nanoTime(),
-                                direction = record.direction,
-                                timestampMillis = System.currentTimeMillis(),
-                                content = record.content,
-                                succeeded = record.succeeded
-                            )
-                        }
+                    // Only frames observed through the physical receive callback
+                    // have a trustworthy RX provenance and reception timestamp.
+                    // Adapter output alone can contain echoes, prompts or truncated
+                    // text; never reconstruct ECU RX from that fallback string.
+                    val receivedEvents = streamedRecords.map { timed ->
+                        CanConsoleHistoryEntry(
+                            id = System.nanoTime(),
+                            direction = timed.record.direction,
+                            timestampMillis = timed.timestampMillis,
+                            content = timed.record.content,
+                            succeeded = timed.record.succeeded
+                        )
                     }
                     val displayedReceivedEvents = receivedEvents.ifEmpty {
                         listOf(CanConsoleHistoryEntry(
