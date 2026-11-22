@@ -31,6 +31,18 @@ class CanConsolePhysicalExchangeException(
     cause: Throwable
 ) : IllegalStateException(cause)
 
+/**
+ * Cancellation preserves observed RX without converting cancellation into a
+ * recoverable command failure. The UI may publish these records only while
+ * the original request job still owns the active vehicle session.
+ */
+class CanConsolePhysicalExchangeCancelled(
+    val receivedRecords: List<CanConsoleTimedRecord>,
+    cause: java.util.concurrent.CancellationException
+) : java.util.concurrent.CancellationException(cause.message) {
+    init { initCause(cause) }
+}
+
 class CanConsoleLiveDiagnosticCorrelation(
     private val request: RawCanFrame,
     private val timeoutMs: Long = 1_000L
