@@ -10,7 +10,33 @@ import java.security.MessageDigest
  * is registered in CamaroDiag yet; these checks must never enable a write.
  */
 object EcuBenchExpertPlan {
-    enum class AccessMethod { OBD, BENCH, BOOT_BAM, NEXUS_JTAG, EXTERNAL_CHIP_OFF }
+    enum class AccessMethod {
+        OBD, BENCH, BOOT_BAM, NEXUS_JTAG, EXTERNAL_CHIP_OFF,
+        CAN_DIRECT, BDM, EXTERNAL_EEPROM_ISP;
+
+        fun permitsRegion(region: MemoryRegion): Boolean =
+            when (this) {
+                EXTERNAL_CHIP_OFF, EXTERNAL_EEPROM_ISP -> region == MemoryRegion.EXTERNAL_EEPROM
+                OBD, BENCH, BOOT_BAM, NEXUS_JTAG, CAN_DIRECT, BDM ->
+                    region != MemoryRegion.EXTERNAL_EEPROM
+            }
+
+        /** Candidate driver interfaces, not advertised live capabilities. */
+        val candidateTransports: Set<EcuProgrammingDriverContract.Transport>
+            get() = when (this) {
+                OBD -> setOf(EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS,
+                    EcuProgrammingDriverContract.Transport.J2534)
+                BENCH -> setOf(EcuProgrammingDriverContract.Transport.BENCH,
+                    EcuProgrammingDriverContract.Transport.J2534)
+                BOOT_BAM -> setOf(EcuProgrammingDriverContract.Transport.BOOT_BAM)
+                NEXUS_JTAG -> setOf(EcuProgrammingDriverContract.Transport.NEXUS_JTAG)
+                EXTERNAL_CHIP_OFF -> setOf(EcuProgrammingDriverContract.Transport.CHIP_OFF)
+                CAN_DIRECT -> setOf(EcuProgrammingDriverContract.Transport.CAN_DIRECT,
+                    EcuProgrammingDriverContract.Transport.J2534)
+                BDM -> setOf(EcuProgrammingDriverContract.Transport.BDM)
+                EXTERNAL_EEPROM_ISP -> setOf(EcuProgrammingDriverContract.Transport.EEPROM_ISP)
+            }
+    }
     enum class MemoryRegion { PFLASH, DFLASH, EXTERNAL_EEPROM }
     enum class Blocker {
         CONTROLLER_NOT_IDENTIFIED,
@@ -59,9 +85,8 @@ object EcuBenchExpertPlan {
         if (target.chipMarking.isNullOrBlank() ||
             target.chipMarking.trim().equals("unknown", ignoreCase = true)
         ) missing += Blocker.CHIP_NOT_IDENTIFIED
-        if ((target.accessMethod == AccessMethod.EXTERNAL_CHIP_OFF) !=
-            (target.region == MemoryRegion.EXTERNAL_EEPROM)
-        ) missing += Blocker.ACCESS_REGION_INCOMPATIBLE
+        if (!target.accessMethod.permitsRegion(target.region))
+            missing += Blocker.ACCESS_REGION_INCOMPATIBLE
         if (target.programmerName.isNullOrBlank()) missing += Blocker.PROGRAMMER_NOT_IDENTIFIED
         if (image?.fileName.isNullOrBlank() || (image?.sizeBytes ?: 0L) <= 0L) {
             missing += Blocker.IMAGE_MISSING
@@ -93,7 +118,7 @@ object EcuBenchExpertPlan {
 
     /** Compare two actual byte arrays, not merely two filenames or reported hashes. */
     fun verifiedReadback(sourceBytes: ByteArray, readbackBytes: ByteArray): Boolean =
-        sourceBytes.isNotEmpty() && sourceBytes.contentEquals(readbackBytes)
+        sourceBytes !== readbackBytes && sourceBytes.isNotEmpty() && sourceBytes.contentEquals(readbackBytes)
 
     fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
