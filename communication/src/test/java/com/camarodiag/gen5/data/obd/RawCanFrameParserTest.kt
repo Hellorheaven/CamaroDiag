@@ -98,4 +98,25 @@ class RawCanFrameParserTest {
         assertNull(SafeObdRequestPolicy.parse(physicalFrame))
     }
 
+    @Test fun rawConsoleAllowsRealReadQueriesButRejectsDiagnosticProgramming() {
+        for (safe in listOf(
+            "7E0 02 01 0C", "7DF 02 01 52", "7E0 02 09 02",
+            "7E0 01 03", "7E0 03 22 F1 90", "7E0 02 3E 00",
+            "18DA10F1 03 22 F1 90", "7E0 02 01 0C 00 00"
+        )) {
+            assertTrue(safe, SafeRawCanTransmitPolicy.allows(
+                requireNotNull(RawCanFrameParser.parse(safe))))
+        }
+        for (unsafe in listOf(
+            "7E0 02 04 00", "7E0 02 27 01", "7E0 03 2E F1 90",
+            "7E0 02 31 01", "7E0 02 34 00", "7E0 02 36 01",
+            "7E0 02 11 01", "7DF 02 14 01", "7E0 02 85 01",
+            "7E0 10 14 34 00", "7E0 21 00 00", "7E0 02 01 FF",
+            "7E0 02 01 0C FF", "18DA10F1 03 2E F1 90"
+        )) {
+            assertFalse(unsafe, SafeRawCanTransmitPolicy.allows(
+                requireNotNull(RawCanFrameParser.parse(unsafe))))
+        }
+    }
+
 }
