@@ -99,4 +99,20 @@ class CanConsoleRecordParserTest {
         assertFalse(CanConsoleAdapterReplyPolicy.isFailure("7E8 03 41 52 80"))
     }
 
+    @Test fun rawCanRequiresARealAdapterAcknowledgementOrValidatedFrame() {
+        for (response in listOf(
+            "OK", "ok>", "7E8 03 41 0C 1A",
+            "18DAF110 03 7F 22 31",
+            "SEARCHING...\\r\\n7E8 03 41 0C 1A"
+        )) {
+            assertTrue(response, CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(response))
+        }
+        for (response in listOf(
+            "", "?", "SEARCHING...", "ATSP6", "7E8 03 41 0C",
+            "NO DATA", "OK\\r\\nCAN ERROR", "7E8 03 41 0C 1A\\nBUS ERROR"
+        )) {
+            assertFalse(response, CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(response))
+        }
+    }
+
 }
