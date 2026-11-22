@@ -39,7 +39,11 @@ internal static class NativeScopedBackupArchiveSelfTests
                 using (var reader = new StreamReader(zip.GetEntry("manifest.properties")!.Open(), Encoding.ASCII))
                 {
                     var manifest = reader.ReadToEnd();
-                    Check(manifest.Contains("format=CamaroDiag ECU offline archive v2\n") &&
+                    Check(manifest.Contains("format=CamaroDiag ECU offline archive v3\n") &&
+                        manifest.Contains("channel.requestCanId=2016\n") &&
+                        manifest.Contains("channel.responseCanId=2024\n") &&
+                        manifest.Contains("channel.protocolNumber=33\n") &&
+                        manifest.Contains("channel.session=1\n") &&
                         manifest.Contains("vin=" + vin + "\n") &&
                         manifest.Contains("required=\n") &&
                         manifest.Contains("capture.0.start=4096\n") &&
@@ -75,8 +79,17 @@ internal static class NativeScopedBackupArchiveSelfTests
                 imported.Vin == vin && imported.StartAddress == scope.StartAddress &&
                 imported.Sha256 == sha && imported.DeclaredRegion == "OTHER" &&
                 imported.DeclaredOrigin == "REPORTED_HARDWARE_READ" &&
-                imported.RequiredRegions.Count == 0,
+                imported.RequiredRegions.Count == 0 && imported.ChannelBound,
                 "Read-only inspection verifies backup integrity without exposing programming bytes");
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(zipPath,
+                new J2534MemoryReadScope(vin, 0x7E1, 0x7E9, 33, scope.StartAddress,
+                    scope.Length, scope.MaxReadBytes, scope.Session)));
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(zipPath,
+                new J2534MemoryReadScope(vin, scope.RequestCanId, scope.ResponseCanId, 35,
+                    scope.StartAddress, scope.Length, scope.MaxReadBytes, scope.Session)));
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(zipPath,
+                new J2534MemoryReadScope(vin, scope.RequestCanId, scope.ResponseCanId, 33,
+                    scope.StartAddress, scope.Length, scope.MaxReadBytes, 3)));
             var wrongScope = new J2534MemoryReadScope("1G1FA1RXXR0123457",
                 scope.RequestCanId, scope.ResponseCanId, scope.ProtocolNumber,
                 scope.StartAddress, scope.Length, scope.MaxReadBytes, scope.Session);
@@ -90,6 +103,26 @@ internal static class NativeScopedBackupArchiveSelfTests
                     scope.ProtocolNumber, scope.StartAddress, scope.Length - 1,
                     scope.MaxReadBytes, scope.Session)));
 
+            // Legacy v2 files have no channel evidence. They are still
+            // inspectable, but the UI must clearly flag missing route binding.
+            var legacyPath = Path.Combine(directory, "legacy-v2.zip");
+            File.Copy(zipPath, legacyPath);
+            using (var legacy = ZipFile.Open(legacyPath, ZipArchiveMode.Update))
+            {
+                var entry = legacy.GetEntry("manifest.properties")!;
+                string textManifest;
+                using (var reader = new StreamReader(entry.Open(), Encoding.ASCII))
+                    textManifest = reader.ReadToEnd();
+                entry.Delete();
+                using var writer = new StreamWriter(legacy.CreateEntry("manifest.properties").Open(),
+                    Encoding.ASCII);
+                writer.Write(string.Join("\n", textManifest.Split('\n').Where(line =>
+                    !line.StartsWith("channel.", StringComparison.Ordinal)))
+                    .Replace(NativeScopedBackupArchive.Format, NativeScopedBackupArchive.LegacyFormat));
+            }
+            Check(!NativeScopedBackupImport.VerifyZip(legacyPath, scope).ChannelBound,
+                "Legacy v2 archive is accepted without falsely claiming a bound CAN channel");
+            File.Delete(legacyPath);
             var originalZip = File.ReadAllBytes(zipPath);
             var alteredPath = Path.Combine(directory, "altered.zip");
             File.WriteAllBytes(alteredPath, originalZip);

@@ -5,7 +5,7 @@ using System.Text;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// Strict, read-only import of v2 archives. Integrity verification never
+/// Strict, read-only import of v2 (legacy) and v3 archives. Integrity verification never
 /// proves physical provenance, complete ECU coverage, or permission to write.
 /// </summary>
 internal static class NativeScopedBackupImport
@@ -24,7 +24,8 @@ internal static class NativeScopedBackupImport
     // VerifiedCapture that could accidentally satisfy a programming preflight.
     internal sealed record Inspection(
         string Vin, uint StartAddress, int ByteCount, string Sha256,
-        string DeclaredRegion, string DeclaredOrigin, IReadOnlyList<string> RequiredRegions);
+        string DeclaredRegion, string DeclaredOrigin, IReadOnlyList<string> RequiredRegions,
+        bool ChannelBound);
 
     internal static Inspection VerifyZip(
         string source, J2534MemoryReadScope scope, bool allowInternalStage = false)
@@ -79,7 +80,7 @@ internal static class NativeScopedBackupImport
             .Where(line => !line.StartsWith('#'))
             .ToArray();
         if (!properties.EndsWith('\n') || allLines[^1] != "" ||
-            lines.Length != 12 ||
+            lines.Length is not (12 or 16) ||
             lines.Any(line => line.Length == 0 || line.IndexOf('=') <= 0))
             throw new InvalidDataException("Invalid backup manifest schema.");
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -109,9 +110,33 @@ internal static class NativeScopedBackupImport
             "capture.0.region", "capture.0.start", "capture.0.expected",
             "capture.0.origin", "capture.0.sha256", "capture.0.second"
         };
-        // The writer emits twelve fields; reject additions or omissions.
+        // The current format binds every archive to the actual operator-selected
+        // CAN route. Older v2 imports remain readable but cannot claim that link.
+        bool channelBound = values.TryGetValue("format", out var format) &&
+            format == NativeScopedBackupArchive.Format;
+        if (!channelBound && format != NativeScopedBackupArchive.LegacyFormat)
+            throw new InvalidDataException("Unsupported backup archive format.");
+        if (channelBound)
+        {
+            keys.UnionWith(new[] {
+                "channel.requestCanId", "channel.responseCanId",
+                "channel.protocolNumber", "channel.session"
+            });
+        }
         if (values.Count != keys.Count || values.Keys.Any(k => !keys.Contains(k)))
-            throw new InvalidDataException("Unrecognized backup manifest field.");
+            throw new InvalidDataException("Unrecognized or incomplete backup manifest fields.");
+        if (channelBound)
+        {
+            static bool ExactInt(Dictionary<string, string> fields, string key, int expected) =>
+                fields.TryGetValue(key, out var actual) &&
+                actual == expected.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!ExactInt(values, "channel.requestCanId", scope.RequestCanId) ||
+                !ExactInt(values, "channel.responseCanId", scope.ResponseCanId) ||
+                !ExactInt(values, "channel.protocolNumber", scope.ProtocolNumber) ||
+                !ExactInt(values, "channel.session", scope.Session))
+                throw new InvalidDataException(
+                    "Backup CAN IDs, J2534 protocol or diagnostic session differ from the approved profile.");
+        }
         // Android can capture other qualified regions and declare missing
         // required regions. These labels are evidence only, never permission
         // to restore or to access an ECU.
@@ -121,8 +146,7 @@ internal static class NativeScopedBackupImport
         if (requiredRegions.Any(region => !KnownRegions.Contains(region)) ||
             requiredRegions.Distinct(StringComparer.Ordinal).Count() != requiredRegions.Length)
             throw new InvalidDataException("Invalid required ECU region metadata.");
-        if (values["format"] != NativeScopedBackupArchive.Format ||
-            values["vin"] != scope.ExpectedVin || values["controller"].Length > 128 ||
+        if (values["vin"] != scope.ExpectedVin || values["controller"].Length > 128 ||
             values["count"] != "1" ||
             !KnownRegions.Contains(values["capture.0.region"]) ||
             values["capture.0.start"] != scope.StartAddress.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
@@ -146,7 +170,7 @@ internal static class NativeScopedBackupImport
         return new Inspection(scope.ExpectedVin, scope.StartAddress, first.Length,
             Convert.ToHexString(SHA256.HashData(first)),
             values["capture.0.region"], values["capture.0.origin"],
-            Array.AsReadOnly(requiredRegions));
+            Array.AsReadOnly(requiredRegions), channelBound);
     }
 
     private static string DecodeControllerLabel(string encoded)

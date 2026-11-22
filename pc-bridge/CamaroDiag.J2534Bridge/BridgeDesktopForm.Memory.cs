@@ -232,7 +232,11 @@ internal sealed partial class BridgeDesktopForm
                 .Where(region => region != result.DeclaredRegion).ToArray();
             memoryStatus.Text = "Archive vérifiée sans contacter l'ECU : " +
                 result.ByteCount + " octets, SHA-256 " + result.Sha256 +
-                ". Deux copies identiques, VIN lié au profil. Région déclarée : " +
+                ". Deux copies identiques, VIN lié au profil. " +
+                (result.ChannelBound
+                    ? "Canal CAN et session liés au profil."
+                    : "Ancien format sans preuve de canal CAN/session.") +
+                " Région déclarée : " +
                 result.DeclaredRegion + ", origine déclarée : " + result.DeclaredOrigin + ". " +
                 (missing.Length == 0 ? "" :
                     "Régions requises absentes de ce ZIP : " + string.Join(", ", missing) + ". ") +

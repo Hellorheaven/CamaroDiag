@@ -6,14 +6,15 @@ using System.Text;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// Portable read-only ECU archive, compatible with CamaroDiag Android v2.
+/// Portable read-only ECU archive, compatible with CamaroDiag Android v3.
 /// The archive records reported hardware reads, not certified hardware
 /// provenance, an OEM checksum or permission to program the controller.
 /// Without a verified complete ECU map, coverage remains partial.
 /// </summary>
 internal static class NativeScopedBackupArchive
 {
-    internal const string Format = "CamaroDiag ECU offline archive v2";
+    internal const string LegacyFormat = "CamaroDiag ECU offline archive v2";
+    internal const string Format = "CamaroDiag ECU offline archive v3";
 
     private static (byte[] First, byte[] Second, string Hash) Snapshot(
         J2534MemoryReadScope scope, NativeScopedMemoryReader.VerifiedCapture capture)
@@ -60,6 +61,10 @@ internal static class NativeScopedBackupArchive
                 "controller=\n" +
                 "created=" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture) + "\n" +
                 "count=1\n" +
+                "channel.requestCanId=" + scope.RequestCanId.ToString(CultureInfo.InvariantCulture) + "\n" +
+                "channel.responseCanId=" + scope.ResponseCanId.ToString(CultureInfo.InvariantCulture) + "\n" +
+                "channel.protocolNumber=" + scope.ProtocolNumber.ToString(CultureInfo.InvariantCulture) + "\n" +
+                "channel.session=" + scope.Session.ToString(CultureInfo.InvariantCulture) + "\n" +
                 // OTHER deliberately does not infer a region from a numeric address;
                 // an empty required map conservatively describes partial ECU coverage.
                 "required=\n" +
