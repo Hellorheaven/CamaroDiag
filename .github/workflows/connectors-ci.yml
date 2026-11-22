@@ -130,5 +130,5 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
-      - run: dotnet build connectors/host/windows-discovery/WindowsDiscovery.csproj -c Release -warnaserror
-      - run: dotnet run --project connectors/host/windows-discovery/WindowsDiscovery.csproj -c Release --no-build -- --self-test
+      - run: dotnet build connectors/host/windows-discovery/WindowsDiscovery.csproj -c Debug -warnaserror
+      - run: dotnet run --project connectors/host/windows-discovery/WindowsDiscovery.csproj -c Debug --no-build -- --self-test
