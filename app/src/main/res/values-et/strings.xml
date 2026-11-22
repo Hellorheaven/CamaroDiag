@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Rakenduse keel</string>
     <string name="system_language_hint">Valige rakenduse CamaroDiag keel.</string>
     <string name="about_title">Teave rakenduse CamaroDiag kohta</string>
@@ -642,7 +642,7 @@
     <string name="cal_pc_ip_address">Arvuti IP-aadress</string>
     <string name="cal_connect_j2534">Ühenda J2534 sild</string>
     <string name="cal_disconnect_pc_bridge">Katkesta PC-silla ühendus</string>
-    <string name="cal_bridge_capabilities">Sild: HS-CAN ISO15765 250/500 kbit/s ja J2534-2 SW-ISO15765, kui draiver seda toetab. CAN FD jääb keelatuks.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Sild: HS-CAN ISO15765 250/500 kbit/s ja J2534-2 SW-ISO15765, kui draiver seda toetab. CAN FD jääb keelatuks.</string>
     <string name="cal_read_uds_did">Loe UDS DID</string>
     <string name="cal_read_uds_dtcs">Loe UDS DTC-d</string>
     <string name="cal_uds_trouble_codes">UDS veakoodid (0x19)</string>
