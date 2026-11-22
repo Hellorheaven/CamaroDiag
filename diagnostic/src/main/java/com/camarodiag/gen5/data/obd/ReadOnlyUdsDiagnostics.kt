@@ -538,11 +538,17 @@ class ProfiledUdsReadSession private constructor(
             val encoding = definitions.single { it.field == field }.encoding
             return when (encoding) {
                 UdsIdentityEncoding.ASCII -> {
+                    var nullPaddingStarted = false
                     require(bytes.isNotEmpty() && bytes.all { byte ->
                         val value = byte.toInt() and 0xFF
-                        value == 0 || value in 0x20..0x7E
+                        if (value == 0) {
+                            nullPaddingStarted = true
+                            true
+                        } else {
+                            !nullPaddingStarted && value in 0x20..0x7E
+                        }
                     }) {
-                        "ECU identity contains control or non-ASCII bytes."
+                        "ECU identity contains non-ASCII bytes or invalid NUL padding."
                     }
                     bytes.toString(Charsets.US_ASCII)
                         .trim()
