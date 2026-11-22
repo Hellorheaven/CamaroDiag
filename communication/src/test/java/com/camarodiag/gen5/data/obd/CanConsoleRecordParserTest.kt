@@ -371,4 +371,14 @@ class CanConsoleRecordParserTest {
                 "7E9 04 03 7F 22 31\r\n7E8 04 03 62 F1 90"
             ).map { it.direction })
     }
+
+    @Test fun monitorFailsClosedWhenOversizedLineWasDiscarded() {
+        val terminated = CanMonitorErrorTracker()
+        terminated.append("7E8 03 41 0C 1A\r\n" + "X".repeat(4_097) + "\r\n")
+        assertTrue(terminated.hasFailureAtEnd())
+
+        val unterminated = CanMonitorErrorTracker()
+        unterminated.append("X".repeat(4_097))
+        assertTrue(unterminated.hasFailureAtEnd())
+    }
 }

@@ -509,4 +509,44 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         malformed.append("7E8 05 03 41 0C 1A", 50)
         assertEquals(CanConsoleDiagnosticStatus.NONE, malformed.complete(60))
     }
+
+    @Test fun oversizedPostTxLineOverridesEarlierPhysicalAckAndMatchingEcuReply() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.beginRequest(1_000L)
+        correlation.append("OK\r\n7E8 04 03 41 0C 1A\r\n", 1_010L)
+        correlation.append("X".repeat(4_097) + "\r\n", 1_020L)
+        val status = correlation.complete(1_021L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, status)
+        assertEquals(true, correlation.hasAdapterError())
+        assertEquals(false, correlation.hasExplicitAdapterAck())
+        assertEquals(false, CanConsolePhysicalTransmissionPolicy.confirmed(
+            "OK", status, correlation.hasExplicitAdapterAck(), correlation.hasAdapterError()
+        ))
+    }
+
+    @Test fun unterminatedOversizedPostTxLineFailsClosedAtCompletion() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.beginRequest(1_000L)
+        correlation.append("OK\r\n" + "X".repeat(4_097), 1_010L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(1_011L))
+        assertEquals(true, correlation.hasAdapterError())
+        assertEquals(false, correlation.hasExplicitAdapterAck())
+    }
+
+    @Test fun oversizedPreTxSetupLineDoesNotPoisonFollowingPhysicalExchange() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.append("X".repeat(4_097) + "\r\n", 990L)
+        assertEquals(false, correlation.hasAdapterError())
+        correlation.beginRequest(1_000L)
+        correlation.append("OK\r\n7E8 04 03 41 0C 1A\r\n", 1_010L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(1_011L))
+        assertEquals(false, correlation.hasAdapterError())
+        assertEquals(true, correlation.hasExplicitAdapterAck())
+    }
 }

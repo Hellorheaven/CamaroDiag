@@ -113,7 +113,14 @@ class CanConsoleLiveDiagnosticCorrelation(
             lastChunkAtMs = receivedAtMs
             lastChunkWallClockMs = receivedAtWallClockMs
         }
-        evaluate(framer.append(chunk).completeLines, receivedAtMs, receivedAtWallClockMs)
+        val batch = framer.append(chunk)
+        // Discarding an oversized adapter line can conceal an error after OK.
+        // A physical exchange with missing adapter data must fail closed.
+        if (batch.discardedLines > 0 &&
+            (startedAtMs?.let { receivedAtMs >= it } ?: !requireExplicitStart)) {
+            adapterErrorSeen = true
+        }
+        evaluate(batch.completeLines, receivedAtMs, receivedAtWallClockMs)
     }
 
     /** Every received record is decoded, then the UI's bounded history keeps the latest 300. */
@@ -123,9 +130,14 @@ class CanConsoleLiveDiagnosticCorrelation(
 
     /** Called after the adapter command completes to process a final unterminated line. */
     fun complete(receivedAtMs: Long, receivedAtWallClockMs: Long = receivedAtMs): CanConsoleDiagnosticStatus {
-        val trailing = framer.drainTrailing().completeLines
-        if (trailing.isNotEmpty()) {
-            evaluate(trailing, lastChunkAtMs ?: receivedAtMs,
+        val trailingBatch = framer.drainTrailing()
+        val trailingAtMs = lastChunkAtMs ?: receivedAtMs
+        if (trailingBatch.discardedLines > 0 &&
+            (startedAtMs?.let { trailingAtMs >= it } ?: !requireExplicitStart)) {
+            adapterErrorSeen = true
+        }
+        if (trailingBatch.completeLines.isNotEmpty()) {
+            evaluate(trailingBatch.completeLines, trailingAtMs,
                 lastChunkWallClockMs ?: receivedAtWallClockMs)
         }
         return diagnosticStatus

@@ -178,11 +178,16 @@ class CanMonitorErrorTracker {
     private var failed = false
 
     fun append(chunk: String) {
-        observe(framer.append(chunk).completeLines)
+        val batch = framer.append(chunk)
+        // Unknown discarded monitor content cannot justify a valid capture.
+        if (batch.discardedLines > 0) failed = true
+        observe(batch.completeLines)
     }
 
     fun hasFailureAtEnd(): Boolean {
-        observe(framer.drainTrailing().completeLines)
+        val trailing = framer.drainTrailing()
+        if (trailing.discardedLines > 0) failed = true
+        observe(trailing.completeLines)
         return failed
     }
 
