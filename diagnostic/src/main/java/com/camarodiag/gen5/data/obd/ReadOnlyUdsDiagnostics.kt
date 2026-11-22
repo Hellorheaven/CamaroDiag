@@ -356,10 +356,19 @@ data class DocumentedUdsReadProfile(
     val verifiedVin: String,
     val evidenceReference: String
 ) {
+    private fun unverifiedIdentityLabel(value: String?): Boolean {
+        val text = value?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        if (text.isBlank() || text in setOf("unknown", "n/a", "none", "null",
+                "pending", "tbd", "test", "simulated", "invalid", "no data",
+                "not supported", "-", "0", "ff")) return true
+        val bytes = text.removePrefix("0x").replace(Regex("[\\s:_-]"), "")
+        return bytes.isNotEmpty() && (bytes.all { it == '0' } || bytes.all { it == 'f' })
+    }
+
     fun compatibilityDefinitionIssues(vehicle: VehicleProfile): List<String> = buildList {
         if (profileId.isBlank()) add("Profile ID is missing.")
         if (moduleId.isBlank()) add("Module ID is missing.")
-        if (controllerFamily.isBlank()) add("Controller family is missing.")
+        if (unverifiedIdentityLabel(controllerFamily)) add("A real ECU controller family is required.")
         if (vehicle.generation != generation || vehicle.modelYear !in modelYears) add("Model year/generation does not match.")
         if (!vehicle.engine.rpo.equals(engineRpo, ignoreCase = true)) add("Engine RPO does not match.")
 
@@ -370,8 +379,10 @@ data class DocumentedUdsReadProfile(
         if (!profileVin.matches(vinPattern)) add("The verified profile VIN must be a valid 17-character VIN.")
         if (selectedVin != profileVin) add("Selected vehicle VIN does not match the VIN validated for this profile.")
 
-        if (hardwarePartNumber.isBlank() || operatingSystemId.isBlank() || calibrationId.isBlank() ||
-            calibrationVerificationNumber.isBlank()) add("Exact hardware, OS, calibration and CVN values are required.")
+        if (listOf(hardwarePartNumber, operatingSystemId, calibrationId,
+                calibrationVerificationNumber).any(::unverifiedIdentityLabel)) {
+            add("Exact non-placeholder hardware, OS, calibration and CVN values are required.")
+        }
 
         val maxCanId = if (extendedCanId) 0x1FFFFFFF else 0x7FF
         if (requestCanId !in 0..maxCanId || responseCanId !in 0..maxCanId || requestCanId == responseCanId) {
