@@ -146,8 +146,9 @@ object SafeObdRequestPolicy {
             if (bytes.startsWith("18DAF1") && bytes.length >= 8) bytes = bytes.drop(8)
             else if (bytes.length >= 3 && bytes.startsWith("7E") &&
                 bytes[2] in '8'..'F') bytes = bytes.drop(3)
-            if (bytes.startsWith("03" + expectedPrefix) && bytes.length == 8) {
-                bytes = bytes.drop(2)
+            if (bytes.startsWith("03" + expectedPrefix) && bytes.length >= 8 &&
+                (bytes.length - 8) % 2 == 0 && bytes.drop(8).all { it == '0' }) {
+                bytes = bytes.substring(2, 8)
             }
             if (bytes.length == 6 && bytes.startsWith(expectedPrefix)) return true
         }
