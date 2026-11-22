@@ -95,6 +95,9 @@ class CanConsoleDiagnosticCorrelation(
                     response[i + 1] == requestPayload[i + 1]
                 })
         if (!negative && !positive) return null
+        // UDS NRC 0x78 means "response pending", never a completed result.
+        // The outer bounded transport request still enforces its deadline.
+        if (negative && (response[2].toInt() and 0xFF) == 0x78) return null
         completed = true
         return response.copyOf()
     }
