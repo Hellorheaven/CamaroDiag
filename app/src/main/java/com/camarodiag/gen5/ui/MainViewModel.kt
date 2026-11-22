@@ -41,7 +41,6 @@ import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
-import com.camarodiag.gen5.data.obd.CanConsoleAdapterReplyPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
 import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
@@ -2050,11 +2049,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
-                val response = obdManager.sendRawCanFrame(frame)
+                val transmission = obdManager.sendRawCanFrameWithStatus(frame)
+                val response = transmission.adapterOutput
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val diagnosticStatus =
-                        CanConsoleAdapterReplyPolicy.diagnosticStatus(response, frame)
+                    val diagnosticStatus = transmission.diagnosticStatus
                     val receivedEvents = CanConsoleRecordParser.parse(response).map { record ->
                         CanConsoleHistoryEntry(
                             id = System.nanoTime(),
