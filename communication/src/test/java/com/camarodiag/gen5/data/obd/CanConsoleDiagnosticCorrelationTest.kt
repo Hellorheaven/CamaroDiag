@@ -117,6 +117,23 @@ class CanConsoleDiagnosticCorrelationTest {
         ))
     }
 
+    @Test fun udsReadDtcByStatusMaskDoesNotRequireResponseToEchoRequestMask() {
+        val correlation = CanConsoleDiagnosticCorrelation(frame("7E0 03 19 02 FF"))
+        // UDS 0x19/0x02: 59 02 <statusAvailabilityMask> ... ; this is
+        // not an echo of the requested statusMask FF.
+        assertNull(correlation.accept(frame("7E9 06 59 02 A5 12 34 56"), 1))
+        assertNull(correlation.accept(frame("7E8 06 59 01 A5 12 34 56"), 2))
+        assertArrayEquals(byteArrayOf(0x59, 0x02, 0xA5.toByte(), 0x12, 0x34, 0x56),
+            correlation.accept(frame("7E8 06 59 02 A5 12 34 56"), 3))
+    }
+
+    @Test fun readDataByIdentifierStillRequiresExactDidEcho() {
+        val correlation = CanConsoleDiagnosticCorrelation(frame("7E0 03 22 F1 90"))
+        assertNull(correlation.accept(frame("7E8 04 62 F1 91 01"), 1))
+        assertArrayEquals(byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte(), 0x01),
+            correlation.accept(frame("7E8 04 62 F1 90 01"), 2))
+    }
+
     @Test fun unknownOrFunctionalPhysicalContextCannotAcquireOtherEcu() {
         for (request in listOf("7DF 02 01 0C", "123 02 01 0C", "18DAF110 03 22 F1 90")) {
             try {
