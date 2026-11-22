@@ -321,12 +321,17 @@ internal sealed partial class BridgeDesktopForm
         using var destination = new SaveFileDialog
         {
             Title = "Nouvelle sauvegarde vérifiable de la zone lue",
-            Filter = "Archive ECU vérifiable Android/Windows (*.zip)|*.zip|Binaire brut seul (*.bin)|*.bin",
+            Filter = "Archive ECU vérifiable Android/Windows (*.zip)|*.zip",
             AddExtension = true,
             FileName = "CamaroDiag-Memoire-ECU.zip"
         };
         if (!PrepareExportDialog(destination, UserExportStorage.Category.EcuBackups, "CamaroDiag-Memoire-ECU.zip")) return;
         if (destination.ShowDialog(this) != DialogResult.OK) return;
+        if (!Path.GetExtension(destination.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowError("La sauvegarde vérifiable doit conserver les deux lectures et le manifeste dans un ZIP.");
+            return;
+        }
         if (File.Exists(destination.FileName))
         {
             ShowError("Choisissez un nouveau fichier : une sauvegarde ne doit jamais être écrasée.");
@@ -398,11 +403,9 @@ internal sealed partial class BridgeDesktopForm
                     NativeScopedBackupArchive.SaveNew(
                         destination.FileName, scope, result.Capture, cancellation.Token,
                         result.Firmware);
-                    // Import the published ZIP once more through the same
-                    // user-facing offline verifier, without any ECU I/O.
-                    if (Path.GetExtension(destination.FileName).Equals(".zip",
-                            StringComparison.OrdinalIgnoreCase))
-                        NativeScopedBackupImport.VerifyZip(destination.FileName, scope);
+                    // The GUI now requires ZIP, not an unverifiable raw BIN.
+                    // Inspect the published archive once more offline.
+                    NativeScopedBackupImport.VerifyZip(destination.FileName, scope);
                 }, cancellation.Token);
                 progressActive = false;
                 memoryStatus.Text = "Sauvegarde de plage ECU vérifiée par deux lectures : " +
@@ -411,9 +414,7 @@ internal sealed partial class BridgeDesktopForm
                     (result.Firmware is { } firmware
                         ? $"OSID GM lu deux fois : {firmware.OperatingSystemId} (DID 0x{firmware.OsDid:X2}). "
                         : "OSID GM non disponible sur ce chemin de lecture. ") +
-                    (Path.GetExtension(destination.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase)
-                        ? "Les deux lectures sont conservées dans le ZIP."
-                        : "Le BIN brut ne conserve pas la seconde acquisition ni son manifeste.");
+                    "Les deux lectures et le manifeste sont conservés dans le ZIP.");
                 }
                 catch (OperationCanceledException)
                 {
