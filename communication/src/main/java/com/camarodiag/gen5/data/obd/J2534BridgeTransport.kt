@@ -157,14 +157,17 @@ class J2534BridgeTransport(
     }
 
     /** Refuse an unapproved ECU span before issuing VIN, OSID or memory commands. */
-    internal fun requireApprovedMemoryReadScope(request: J2534LiveMemoryBackup.Request) {
+    internal fun requireApprovedMemoryReadScope(
+        request: J2534LiveMemoryBackup.Request
+    ): J2534LiveMemoryBackup.Request {
         val scope = approvedMemoryReadScope
         check(isScopedMemoryReadEnabled && scope != null) {
             "A current Windows J2534 bridge with an approved memory read profile is required."
         }
         require(scope.permits(request)) {
-            "ECU VIN, memory range, region, block size or session differs from the PC read profile."
+            "ECU VIN, memory range, region or session differs from the PC read profile."
         }
+        return scope.constrain(request)
     }
 
     suspend fun readCalibrationIdentification(): ObdEcuIdentification = withContext(Dispatchers.IO) {

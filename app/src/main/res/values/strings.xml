@@ -890,7 +890,7 @@
     <string name="cal_live_memory_length">Bytes to read (max 4 MiB)</string>
     <string name="cal_live_memory_region_calibration">Calibration</string>
     <string name="cal_live_memory_region_other">Unknown / not qualified</string>
-    <string name="cal_live_memory_region_profile_match">The region, address range, block size and session must exactly match the Windows J2534 read profile. Unknown does not imply a complete ECU backup.</string>
+    <string name="cal_live_memory_region_profile_match">The region, address range and session must match the Windows J2534 profile. Read blocks are automatically limited to its maximum. Unknown does not imply a complete ECU backup.</string>
     <string name="cal_live_memory_extended">Extended diagnostic session (0x03)</string>
     <string name="cal_live_memory_save">Read twice and save ECU memory ZIP</string>
     <string name="cal_live_memory_partial_notice">Partial memory region only. This archive is not a verified full ECU backup or a proven restorable image.</string>

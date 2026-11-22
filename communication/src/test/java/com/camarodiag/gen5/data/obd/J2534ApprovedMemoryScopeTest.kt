@@ -1,5 +1,6 @@
 package com.camarodiag.gen5.data.obd
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,7 +25,12 @@ class J2534ApprovedMemoryScopeTest {
         assertFalse(scope.permits(request.copy(expectedVin = "1G1FA1RXXR0123457")))
         assertFalse(scope.permits(request.copy(address = 0x0FFFL)))
         assertFalse(scope.permits(request.copy(address = 0x2FFFL, lengthBytes = 2)))
-        assertFalse(scope.permits(request.copy(chunkBytes = 129)))
+        assertTrue(scope.permits(request.copy(chunkBytes = 129)))
+        assertEquals(128, scope.constrain(request.copy(chunkBytes = 129)).chunkBytes)
+        assertEquals(64, scope.copy(maxReadBytes = 64).constrain(request).chunkBytes)
+        assertEquals(1, scope.copy(maxReadBytes = 1).constrain(request).chunkBytes)
+        assertFalse(scope.permits(request.copy(chunkBytes = 0)))
+        assertFalse(scope.permits(request.copy(chunkBytes = 257)))
         assertFalse(scope.permits(request.copy(diagnosticSession = 1)))
         assertFalse(scope.permits(request.copy(lengthBytes = 0)))
         assertTrue(J2534ApprovedMemoryScope(vin, EcuBackupCoverage.Region.OTHER,

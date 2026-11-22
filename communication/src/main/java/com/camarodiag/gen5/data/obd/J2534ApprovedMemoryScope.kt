@@ -30,9 +30,15 @@ internal data class J2534ApprovedMemoryScope(
         request.expectedVin == vin &&
             request.region == region &&
             request.diagnosticSession == diagnosticSession &&
-            request.chunkBytes in 1..maxReadBytes &&
+            request.chunkBytes in 1..256 &&
             request.lengthBytes in 1..(4 * 1024 * 1024) &&
             request.address >= startAddress &&
             request.address <= 0xFFFF_FFFFL &&
             request.address + request.lengthBytes.toLong() <= startAddress + lengthBytes
+
+    /** Downshift an operator-requested block to the exact PC-authorized maximum. */
+    fun constrain(request: J2534LiveMemoryBackup.Request): J2534LiveMemoryBackup.Request {
+        require(permits(request)) { "ECU memory read falls outside the approved PC profile." }
+        return request.copy(chunkBytes = minOf(request.chunkBytes, maxReadBytes))
+    }
 }
