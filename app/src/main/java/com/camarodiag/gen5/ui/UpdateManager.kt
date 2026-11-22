@@ -7,8 +7,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Environment
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,7 @@ import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import com.camarodiag.gen5.BuildConfig
 import com.camarodiag.gen5.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -107,9 +109,7 @@ private object CamaroDiagUpdateChecker {
 
     @Suppress("DEPRECATION")
     fun enqueue(context: Context, update: CamaroDiagUpdate): Long {
-        // Public, visible top-level Downloads directory, NOT Android/data/<package>/files.
-        // Distinct filename allows retry after cancelled installation without
-        // colliding with an older APK the user deliberately kept in Downloads.
+        // Private DownloadManager transit only; verified APKs are published through SAF in CamaroDiag/APK.
         val safeVersion = update.version.replace(Regex("[^A-Za-z0-9._-]"), "_").take(64)
         require(safeVersion.isNotBlank()) { "Missing update version." }
         val fileName = "CamaroDiag-${update.channel}-${safeVersion}-${System.currentTimeMillis()}.apk"
@@ -117,7 +117,7 @@ private object CamaroDiagUpdateChecker {
             .setTitle(context.getString(R.string.update_notification_title, update.version))
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            .setDestinationInExternalFilesDir(context, "camarodiag-apk-staging", fileName)
         val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val id = manager.enqueue(request)
         // Persist BEFORE starting the installer; only the installer success (new
@@ -191,6 +191,9 @@ private object CamaroDiagUpdateChecker {
                     "Downloaded APK certificate, package or version does not match."
                 }
                 file
+            } catch (cancelled: CancellationException) {
+                file.delete()
+                throw cancelled
             } catch (_: Exception) {
                 file.delete()
                 null
@@ -217,6 +220,34 @@ fun AboutUpdateCard() {
     val setStatus = rememberUpdatedState<(String?) -> Unit>({ status = it })
     val latestInstallRequested = rememberUpdatedState(installRequested)
     val latestDownloadedApk = rememberUpdatedState(downloadedApk)
+    var awaitingFolder by remember { mutableStateOf(false) }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        awaitingFolder = false
+        if (uri != null && CamaroDiagExportStorage.authorize(context, uri)) {
+            status = CamaroDiagExportStorage.displayPath(CamaroDiagExportStorage.Category.APK)
+        } else {
+            status = context.getString(R.string.export_folder_instruction)
+        }
+    }
+
+    fun requestFolder() {
+        if (awaitingFolder) return
+        awaitingFolder = true
+        status = context.getString(R.string.export_folder_instruction)
+        folderPicker.launch(CamaroDiagExportStorage.initialPickerUri())
+    }
+
+    suspend fun archiveVerified(file: File, id: Long): Boolean {
+        val version = CamaroDiagUpdateCleanup.targetVersion(context, id) ?: return false
+        return try {
+            CamaroDiagApkArchive.publish(context, file, id, version)
+            true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     // The DownloadManager broadcast is not guaranteed while this Compose
     // screen is absent or the process is killed. Recover *owned* downloads
@@ -238,7 +269,8 @@ fun AboutUpdateCard() {
                         downloadId = pending.downloadId
                         downloadedApk = staged
                         downloading = false
-                        status = context.getString(R.string.update_ready_to_install)
+                        status = context.getString(if (archiveVerified(staged, pending.downloadId))
+                            R.string.update_ready_to_install else R.string.export_folder_failed)
                     } else {
                         withContext(Dispatchers.IO) {
                             CamaroDiagUpdateCleanup.discardInvalidDownload(context, pending.downloadId)
@@ -346,6 +378,10 @@ fun AboutUpdateCard() {
                     }
                     setDownloadedApk.value(verifiedFile)
                     setDownloading.value(false)
+                    if (!archiveVerified(verifiedFile, completedId)) {
+                        setStatus.value(context.getString(R.string.export_folder_failed))
+                        return@launch
+                    }
                     setStatus.value(context.getString(R.string.update_download_complete))
                     try {
                         launchInstaller(verifiedFile)
@@ -378,6 +414,7 @@ fun AboutUpdateCard() {
             Text(stringResource(R.string.about_title))
             Text(stringResource(R.string.about_version, BuildConfig.VERSION_NAME))
             Text(stringResource(R.string.about_build, BuildConfig.VERSION_CODE))
+            Text(CamaroDiagExportStorage.displayPath(CamaroDiagExportStorage.Category.APK))
             status?.let { Text(it) }
             update?.let {
                 Text(stringResource(R.string.update_version_available, it.version))
@@ -423,13 +460,23 @@ fun AboutUpdateCard() {
                         onClick = {
                             val available = update
                             if (available != null) {
-                                try {
-                                    downloadId = CamaroDiagUpdateChecker.enqueue(context, available)
-                                    downloading = true
-                                    status = context.getString(R.string.update_downloading)
-                                } catch (_: Exception) {
-                                    downloading = false
-                                    status = context.getString(R.string.update_download_failed)
+                                scope.launch {
+                                    try {
+                                        if (CamaroDiagExportStorage.availableTree(context) == null) {
+                                            requestFolder()
+                                            return@launch
+                                        }
+                                        downloadId = withContext(Dispatchers.IO) {
+                                            CamaroDiagUpdateChecker.enqueue(context, available)
+                                        }
+                                        downloading = true
+                                        status = context.getString(R.string.update_downloading)
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        downloading = false
+                                        status = context.getString(R.string.update_download_failed)
+                                    }
                                 }
                             }
                         }
@@ -447,10 +494,20 @@ fun AboutUpdateCard() {
                     Button(
                         enabled = !checking && !downloading,
                         onClick = {
-                            try {
-                                launchInstaller(staged)
-                            } catch (_: Exception) {
-                                status = context.getString(R.string.update_download_failed)
+                            scope.launch {
+                                if (CamaroDiagExportStorage.availableTree(context) == null) {
+                                    requestFolder()
+                                    return@launch
+                                }
+                                if (!archiveVerified(staged, downloadId)) {
+                                    status = context.getString(R.string.export_folder_failed)
+                                    return@launch
+                                }
+                                try {
+                                    launchInstaller(staged)
+                                } catch (_: Exception) {
+                                    status = context.getString(R.string.update_download_failed)
+                                }
                             }
                         }
                     ) {

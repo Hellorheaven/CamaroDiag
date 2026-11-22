@@ -25,7 +25,7 @@ internal object CamaroDiagExportStorage {
         ECU_BACKUPS("Backups/ECU"), DIAGNOSTIC_SESSIONS("Backups/Diagnostics"),
         REPORTS("Reports"), CONSOLE("Logs/Console"), RECOVERY("Logs/Recovery"),
         TELEMETRY("Telemetry"), CALIBRATIONS("Calibrations"), TESTS("Tests"),
-        EXPORTS("Exports")
+        EXPORTS("Exports"), APK("APK")
     }
 
     internal fun categoryDocumentId(category: Category): String = "$DOCUMENT_ID/${category.folder}"
@@ -179,7 +179,7 @@ internal object CamaroDiagExportStorage {
     // The primary-storage provider uses root-relative document IDs. Only fixed
     // category segments are used; never accept a path from an exported filename.
     @Synchronized
-    private fun categoryDirectory(context: Context, tree: Uri, category: Category): Uri {
+    internal fun categoryDirectory(context: Context, tree: Uri, category: Category): Uri {
         val resolver = context.contentResolver
         var parentId = DOCUMENT_ID
         var parent = DocumentsContract.buildDocumentUriUsingTree(tree, parentId)
@@ -223,20 +223,33 @@ internal object CamaroDiagExportStorage {
      */
     suspend fun write(context: Context, requested: String, mimeType: String,
         category: Category, beforePublish: () -> Unit = {}, writeBytes: suspend (OutputStream) -> Unit): String =
+        writeNamed(context, uniqueFileName(requested), mimeType, category, beforePublish, writeBytes)
+
+    // Controlled name for a verified APK; all ordinary exports remain unique.
+    internal suspend fun writeArchivedApk(context: Context, name: String, file: java.io.File): String {
+        require(CamaroDiagApkRetention.parse(name) != null)
+        return writeNamed(context, name, "application/vnd.android.package-archive", Category.APK, {}) { output ->
+            file.inputStream().use { input -> input.copyTo(output) }
+        }
+    }
+
+    private suspend fun writeNamed(context: Context, finalName: String, mimeType: String,
+        category: Category, beforePublish: () -> Unit, writeBytes: suspend (OutputStream) -> Unit): String =
         withContext(Dispatchers.IO) {
             require(mimeType.isNotBlank())
             val resolver = context.contentResolver
             val tree = availableTree(context) ?: throw ExportStorageException("CamaroDiag folder access is required.")
             val root = categoryDirectory(context, tree, category)
-            val finalName = uniqueFileName(requested)
+            val stagedName = if (category == Category.APK) temporaryFileName(uniqueFileName(finalName))
+                else temporaryFileName(finalName)
             // Use a generic MIME until publication: Android's file provider
             // otherwise may append the target extension to the partial name.
             val temporary = storageOperation {
                 DocumentsContract.createDocument(resolver, root,
-                    "application/octet-stream", temporaryFileName(finalName))
+                    "application/octet-stream", stagedName)
             } ?: throw ExportStorageException("Could not create export document.")
             if (!isCategoryFile(temporary.authority, DocumentsContract.getDocumentId(temporary),
-                    category, temporaryFileName(finalName))) {
+                    category, stagedName)) {
                 // Do not write to or delete an unexpected provider document.
                 throw ExportStorageException("Unexpected temporary export identity.")
             }
