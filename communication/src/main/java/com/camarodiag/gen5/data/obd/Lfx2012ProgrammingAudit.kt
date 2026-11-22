@@ -79,7 +79,7 @@ object Lfx2012ProgrammingAudit {
                     "sample", "mock", "fake", "placeholder", "not available")) return true
             // Reject explicit demo/synthetic tokens even in compound ECU labels.
             // Do not reject short substrings inside legitimate identifiers.
-            return Regex("(?:^|[^a-z0-9])(?:simulated|simulation|demo|sample|mock|fake|placeholder)(?:$|[^a-z0-9])")
+            return Regex("(?:^|[^a-z0-9])(?:unknown|unavailable|pending|simulated|simulation|demo|sample|mock|fake|placeholder)(?:$|[^a-z0-9])")
                 .containsMatchIn(normalized)
         }
         fun reported(text: String?): CheckStatus = when {
