@@ -67,29 +67,8 @@ internal sealed partial class J2534Device
             first.OperatingSystemId != policy.Session.ExpectedOsId)
             throw new UnauthorizedAccessException("Physical ECU identity differs from qualified policy.");
         var readOnly = new ScopedBackupLink(device);
-        bool extended = false;
-        NativeScopedMemoryReader.VerifiedCapture capture;
-        try
-        {
-            if (scope.Session == 3)
-            {
-                var ack = await readOnly.ExchangeAsync([0x10,0x03], token);
-                if (ack.Length < 2 || ack[0] != 0x50 || ack[1] != 0x03)
-                    throw new IOException("Extended diagnostic read session refused.");
-                extended = true;
-            }
-            capture = await NativeScopedMemoryReader.ReadTwiceAsync(readOnly, scope, null, token);
-        }
-        finally
-        {
-            if (extended)
-            {
-                await NativeScopedMemoryReader.RequireLiveVinAsync(readOnly, scope, CancellationToken.None);
-                var ack = await readOnly.ExchangeAsync([0x10,0x01], CancellationToken.None);
-                if (ack.Length < 2 || ack[0] != 0x50 || ack[1] != 0x01)
-                    throw new IOException("Return to default diagnostic session not confirmed.");
-            }
-        }
+        var capture = await NativeScopedMemoryReader.ReadWithSessionAsync(readOnly, scope, null, token);
+        token.ThrowIfCancellationRequested();
         var second = device.ReadGmlanIdentification();
         var backup = NativeE39BackupQualification.Compare(scope, original, capture, first, second);
         token.ThrowIfCancellationRequested();
