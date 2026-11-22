@@ -206,9 +206,13 @@ object CamaroUdsProtocol {
             val data = when {
                 parts.size > 1 && canHeader.matches(parts[0]) ->
                     parts.drop(1).joinToString("")
-                // 11-bit CAN ID prepended without spaces (e.g. 7E8410C1AF8).
+                // 11-bit (3 hex chars) or 29-bit (8 hex chars) CAN
+                // responder header without spacing, never an arbitrary prefix.
                 parts.size == 1 && line.length % 2 == 1 &&
                     canHeader.matches(line.take(3)) -> line.drop(3)
+                parts.size == 1 && line.length >= 14 &&
+                    line.length % 2 == 0 && canHeader.matches(line.take(8)) ->
+                    line.drop(8)
                 else -> parts.joinToString("")
             }
             if (!hexPairData.matches(data)) continue
