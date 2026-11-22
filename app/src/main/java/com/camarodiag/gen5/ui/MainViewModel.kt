@@ -4138,8 +4138,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                                 // SAE J1979 Mode 01 PID 0x52: ethanol fuel percentage (A * 100 / 255).
                                 // This is reported only when the ECU advertises/supports the PID; trims are not an ethanol sensor.
-                                read("52")?.firstOrNull()?.let { a ->
-                                    val ethanolPercent = a * 100.0 / 255.0
+                                CamaroUdsProtocol.decodeEthanolPercent(read("52"))?.let { ethanolPercent ->
                                     values += LivePidValue(
                                         "ETHANOL",
                                         "Ethanol content (SAE PID 0x52)",
