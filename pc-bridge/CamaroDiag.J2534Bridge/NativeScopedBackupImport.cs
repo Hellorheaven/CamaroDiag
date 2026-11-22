@@ -66,13 +66,27 @@ internal static class NativeScopedBackupImport
             .ToArray();
         if (!properties.EndsWith('\n') || allLines[^1] != "" ||
             lines.Length != 12 ||
-            lines.Any(line => line.Length == 0 || line.Count(c => c == '=') != 1))
+            lines.Any(line => line.Length == 0 || line.IndexOf('=') <= 0))
             throw new InvalidDataException("Invalid backup manifest schema.");
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (string line in lines)
         {
-            var parts = line.Split('=', 2);
-            if (!values.TryAdd(parts[0], parts[1]))
+            int separator = line.IndexOf('=');
+            string key = line[..separator];
+            string rawValue = line[(separator + 1)..];
+            // Java Properties escapes punctuation and non-ASCII values.
+            // Only the descriptive controller label is permitted to contain
+            // escapes: all security-relevant properties remain canonical.
+            string value;
+            if (key == "controller")
+                value = DecodeControllerLabel(rawValue);
+            else
+            {
+                if (rawValue.Contains('=') || rawValue.Contains('\\'))
+                    throw new InvalidDataException("Noncanonical backup metadata.");
+                value = rawValue;
+            }
+            if (!values.TryAdd(key, value))
                 throw new InvalidDataException("Duplicate backup manifest field.");
         }
         var keys = new HashSet<string>(StringComparer.Ordinal)
@@ -118,6 +132,42 @@ internal static class NativeScopedBackupImport
         return new NativeScopedMemoryReader.VerifiedCapture(first, scope.StartAddress,
             scope.ExpectedVin, digest,
             checked((int)((scope.Length + (uint)scope.MaxReadBytes - 1) / (uint)scope.MaxReadBytes)), second);
+    }
+
+    private static string DecodeControllerLabel(string encoded)
+    {
+        var decoded = new StringBuilder(encoded.Length);
+        for (int i = 0; i < encoded.Length; ++i)
+        {
+            char ch = encoded[i];
+            if (ch != '\\')
+            {
+                if (ch == '=')
+                    throw new InvalidDataException("Unescaped controller metadata separator.");
+                decoded.Append(ch);
+                continue;
+            }
+            if (++i >= encoded.Length)
+                throw new InvalidDataException("Incomplete Java Properties escape.");
+            char escaped = encoded[i];
+            if (escaped == 'u')
+            {
+                if (i + 4 >= encoded.Length ||
+                    !ushort.TryParse(encoded.AsSpan(i + 1, 4),
+                        System.Globalization.NumberStyles.HexNumber,
+                        System.Globalization.CultureInfo.InvariantCulture, out ushort scalar))
+                    throw new InvalidDataException("Invalid Java Properties unicode escape.");
+                decoded.Append((char)scalar);
+                i += 4;
+            }
+            else if (escaped is '\\' or '=' or ':' or ' ' or '#' or '!')
+                decoded.Append(escaped);
+            else
+                throw new InvalidDataException("Unsupported Java Properties controller escape.");
+            if (decoded.Length > 128)
+                throw new InvalidDataException("Controller label too long.");
+        }
+        return decoded.ToString();
     }
 
     private static byte[] ReadExactlyBounded(ZipArchiveEntry entry, int expected)
