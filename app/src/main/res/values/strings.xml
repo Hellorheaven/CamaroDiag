@@ -657,7 +657,7 @@
     <string name="can_sniffer_raw_heading">Raw CAN adapter output</string>
     <string name="can_sniffer_export_raw">Export raw log</string>
     <string name="can_sniffer_title">Live CAN Monitor</string>
-    <string name="can_sniffer_description">Capture CAN frames on a real compatible ELM or STN adapter. Each capture stops automatically after a short session.</string>
+    <string name="can_sniffer_description">Read standard OBD data from a connected ELM or J2534 adapter, or capture CAN frames with a compatible ELM/STN device. CAN capture sessions stop automatically.</string>
     <string name="can_sniffer_safety">Only read-only OBD-II requests are accepted. Arbitrary CAN frames and UDS write services are blocked.</string>
     <string name="can_sniffer_start">Start capture</string>
     <string name="can_sniffer_stop">Stop capture</string>
