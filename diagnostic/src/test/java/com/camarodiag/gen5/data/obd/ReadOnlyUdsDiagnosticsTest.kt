@@ -118,6 +118,30 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun placeholderEcuIdentityLabelsCannotEnableAnyEnhancedModuleRead() = runBlocking {
+        val vehicle = VehicleProfile(
+            modelYear = 2013, engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456")
+        val original = syntheticReadProfile()
+        val profiles = listOf(
+            original.copy(hardwarePartNumber = "unknown"),
+            original.copy(operatingSystemId = "0x00000000"),
+            original.copy(calibrationId = "PENDING"),
+            original.copy(calibrationVerificationNumber = "FFFFFFFF"),
+            original.copy(controllerFamily = "n/a")
+        )
+        for (profile in profiles) {
+            val transport = FakeCanTransport()
+            val issues = profile.compatibilityDefinitionIssues(vehicle)
+            assertTrue(issues.isNotEmpty())
+            assertTrue(runCatching {
+                ProfiledUdsReadSession.open(transport, vehicle, profile)
+            }.isFailure)
+            assertTrue("Rejected module profile must send no CAN frames.",
+                transport.sent.isEmpty())
+        }
+    }
+
+    @Test
     fun refusesToOpenProfileWhenSelectedVehicleVinDoesNotMatch() = runBlocking {
         val transport = FakeCanTransport()
         val otherVin = "1G1FA1RXXR0123457"
