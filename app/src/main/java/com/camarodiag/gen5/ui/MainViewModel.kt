@@ -2871,7 +2871,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fun current() = canResumeExport(generation, owner) &&
             _vehicle.value == profile && hasPremiumLicense() &&
             _calibrationWorkspace.value.importedFilePath == originalPath &&
-            _calibrationWorkspace.value.comparisonFilePath == comparisonPath
+            _calibrationWorkspace.value.activeFilePath == originalPath &&
+            _calibrationWorkspace.value.comparisonFilePath == comparisonPath &&
+            _calibrationWorkspace.value.comparisonIdentical == true
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (!current()) return@launch
