@@ -50,10 +50,22 @@ object J2534LiveMemoryBackup {
         val capture: EcuBackupManifest.Capture,
         val verification: EcuBackupIntegrity.Result
     ) {
-        internal fun export(output: OutputStream) = EcuBackupArchive.export(
-            output, listOf(capture), setOf(capture.region), manifest.controllerLabel,
-            manifest.createdAtUtcMillis, manifest.vehicleVin
-        )
+        internal fun export(output: OutputStream) {
+            // Bind the archive to the acquisition's original digest, not a newly
+            // computed digest of potentially mutated public capture buffers.
+            val snapshot = capture.copy(
+                firstRead = capture.firstRead.copyOf(),
+                independentRead = capture.independentRead?.copyOf()
+            )
+            val required = setOf(snapshot.region)
+            check(verification.consistent &&
+                EcuBackupIntegrity.verify(manifest, listOf(snapshot), required).consistent
+            ) { "Capture no longer matches the verified acquisition." }
+            EcuBackupArchive.export(
+                output, listOf(snapshot), required, manifest.controllerLabel,
+                manifest.createdAtUtcMillis, manifest.vehicleVin
+            )
+        }
     }
 
     /**
@@ -78,6 +90,7 @@ object J2534LiveMemoryBackup {
         progress: (CaptureProgress) -> Unit = {}
     ): CaptureResult {
         val read = capture(bridge, request, progress)
+        currentCoroutineContext().ensureActive()
         read.export(output)
         return read
     }
@@ -225,7 +238,10 @@ object J2534LiveMemoryBackup {
                 }
                 // Preserve the original failure/cancellation. A nominally successful
                 // extended capture is not reported as successful if cleanup failed.
-                if (captureCompleted) reset.getOrThrow()
+                if (captureCompleted) {
+                    reset.getOrThrow()
+                    currentCoroutineContext().ensureActive()
+                }
             }
         }
     }
