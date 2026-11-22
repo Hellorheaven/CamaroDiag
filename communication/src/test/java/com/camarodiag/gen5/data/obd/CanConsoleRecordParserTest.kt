@@ -181,4 +181,16 @@ class CanConsoleRecordParserTest {
         assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission("OK", request11))
         assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission("SEARCHING...", request11))
     }
+
+    @Test fun canAdapterRestorationRequiresExplicitCleanOk() {
+        for (reply in listOf("OK", "ok>", "\r\nOK\r\n", "ATSP6\r\nOK")) {
+            assertTrue(reply, CanConsoleAdapterRestorationPolicy.accepted(reply))
+        }
+        for (reply in listOf(
+            "", "?", "NO DATA", "BUS ERROR", "OK\r\nCAN ERROR",
+            "ATSP6", "SEARCHING...", "7E8 04 03 41 0C 1A"
+        )) {
+            assertFalse(reply, CanConsoleAdapterRestorationPolicy.accepted(reply))
+        }
+    }
 }
