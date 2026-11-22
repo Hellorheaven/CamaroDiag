@@ -25,7 +25,7 @@ internal static class NativeScopedBackupImport
     internal sealed record Inspection(
         string Vin, uint StartAddress, int ByteCount, string Sha256,
         string DeclaredRegion, string DeclaredOrigin, IReadOnlyList<string> RequiredRegions,
-        bool ChannelBound);
+        bool ChannelBound, NativeScopedBackupArchive.FirmwareIdentity? Firmware);
 
     internal static Inspection VerifyZip(
         string source, J2534MemoryReadScope scope, bool allowInternalStage = false)
@@ -80,7 +80,7 @@ internal static class NativeScopedBackupImport
             .Where(line => !line.StartsWith('#'))
             .ToArray();
         if (!properties.EndsWith('\n') || allLines[^1] != "" ||
-            lines.Length is not (12 or 16) ||
+            lines.Length is not (12 or 16 or 18) ||
             lines.Any(line => line.Length == 0 || line.IndexOf('=') <= 0))
             throw new InvalidDataException("Invalid backup manifest schema.");
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -123,6 +123,9 @@ internal static class NativeScopedBackupImport
                 "channel.protocolNumber", "channel.session"
             });
         }
+        bool hasFirmware = channelBound &&
+            (values.ContainsKey("ecu.osId") || values.ContainsKey("ecu.osDid"));
+        if (hasFirmware) keys.UnionWith(new[] { "ecu.osId", "ecu.osDid" });
         if (values.Count != keys.Count || values.Keys.Any(k => !keys.Contains(k)))
             throw new InvalidDataException("Unrecognized or incomplete backup manifest fields.");
         if (channelBound)
@@ -136,6 +139,26 @@ internal static class NativeScopedBackupImport
                 !ExactInt(values, "channel.session", scope.Session))
                 throw new InvalidDataException(
                     "Backup CAN IDs, J2534 protocol or diagnostic session differ from the approved profile.");
+        }
+        NativeScopedBackupArchive.FirmwareIdentity? firmware = null;
+        if (hasFirmware)
+        {
+            static uint ReadCanonicalUInt(Dictionary<string, string> fields, string key)
+            {
+                if (!fields.TryGetValue(key, out var text) ||
+                    !uint.TryParse(text, System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture, out uint value) ||
+                    value.ToString(System.Globalization.CultureInfo.InvariantCulture) != text)
+                    throw new InvalidDataException("Malformed declared GM firmware identity.");
+                return value;
+            }
+            uint osId = ReadCanonicalUInt(values, "ecu.osId");
+            uint osDid = ReadCanonicalUInt(values, "ecu.osDid");
+            if (osDid > 255)
+                throw new InvalidDataException("Invalid firmware DID.");
+            firmware = new NativeScopedBackupArchive.FirmwareIdentity(osId, (byte)osDid);
+            if (!firmware.IsValid)
+                throw new InvalidDataException("Invalid declared GM firmware OSID or DID.");
         }
         // Android can capture other qualified regions and declare missing
         // required regions. These labels are evidence only, never permission
@@ -170,7 +193,7 @@ internal static class NativeScopedBackupImport
         return new Inspection(scope.ExpectedVin, scope.StartAddress, first.Length,
             Convert.ToHexString(SHA256.HashData(first)),
             values["capture.0.region"], values["capture.0.origin"],
-            Array.AsReadOnly(requiredRegions), channelBound);
+            Array.AsReadOnly(requiredRegions), channelBound, firmware);
     }
 
     private static string DecodeControllerLabel(string encoded)

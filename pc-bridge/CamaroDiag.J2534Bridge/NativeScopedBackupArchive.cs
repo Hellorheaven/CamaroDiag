@@ -16,6 +16,12 @@ internal static class NativeScopedBackupArchive
     internal const string LegacyFormat = "CamaroDiag ECU offline archive v2";
     internal const string Format = "CamaroDiag ECU offline archive v3";
 
+    internal sealed record FirmwareIdentity(uint OperatingSystemId, byte OsDid)
+    {
+        internal bool IsValid => OperatingSystemId is > 0 and < uint.MaxValue &&
+            OsDid is 0xC1 or 0xC9;
+    }
+
     private static (byte[] First, byte[] Second, string Hash) Snapshot(
         J2534MemoryReadScope scope, NativeScopedMemoryReader.VerifiedCapture capture)
     {
@@ -38,8 +44,11 @@ internal static class NativeScopedBackupArchive
     }
 
     internal static void SaveNew(string destination, J2534MemoryReadScope scope,
-        NativeScopedMemoryReader.VerifiedCapture capture, CancellationToken token)
+        NativeScopedMemoryReader.VerifiedCapture capture, CancellationToken token,
+        FirmwareIdentity? firmware = null)
     {
+        if (firmware is not null && !firmware.IsValid)
+            throw new InvalidDataException("Invalid observed GM firmware identity.");
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         token.ThrowIfCancellationRequested();
         var data = Snapshot(scope, capture);
@@ -65,6 +74,9 @@ internal static class NativeScopedBackupArchive
                 "channel.responseCanId=" + scope.ResponseCanId.ToString(CultureInfo.InvariantCulture) + "\n" +
                 "channel.protocolNumber=" + scope.ProtocolNumber.ToString(CultureInfo.InvariantCulture) + "\n" +
                 "channel.session=" + scope.Session.ToString(CultureInfo.InvariantCulture) + "\n" +
+                (firmware is null ? "" :
+                    "ecu.osId=" + firmware.OperatingSystemId.ToString(CultureInfo.InvariantCulture) + "\n" +
+                    "ecu.osDid=" + firmware.OsDid.ToString(CultureInfo.InvariantCulture) + "\n") +
                 // OTHER deliberately does not infer a region from a numeric address;
                 // an empty required map conservatively describes partial ECU coverage.
                 "required=\n" +

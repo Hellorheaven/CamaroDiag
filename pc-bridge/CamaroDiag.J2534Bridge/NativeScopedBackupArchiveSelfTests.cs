@@ -103,6 +103,31 @@ internal static class NativeScopedBackupArchiveSelfTests
                     scope.ProtocolNumber, scope.StartAddress, scope.Length - 1,
                     scope.MaxReadBytes, scope.Session)));
 
+            var firmwarePath = Path.Combine(directory, "observed-osid.zip");
+            var observedFirmware = new NativeScopedBackupArchive.FirmwareIdentity(0x123456, 0xC1);
+            NativeScopedBackupArchive.SaveNew(
+                firmwarePath, scope, capture, CancellationToken.None, observedFirmware);
+            var observed = NativeScopedBackupImport.VerifyZip(firmwarePath, scope);
+            Check(observed.Firmware == observedFirmware && observed.ChannelBound,
+                "Both physical channel and the observed GM OSID are preserved in v3 ZIP");
+            var incompleteOsidPath = Path.Combine(directory, "missing-osdid.zip");
+            File.Copy(firmwarePath, incompleteOsidPath);
+            using (var changedZip = ZipFile.Open(incompleteOsidPath, ZipArchiveMode.Update))
+            {
+                var entry = changedZip.GetEntry("manifest.properties")!;
+                string textManifest;
+                using (var reader = new StreamReader(entry.Open(), Encoding.ASCII))
+                    textManifest = reader.ReadToEnd();
+                entry.Delete();
+                using var writer = new StreamWriter(changedZip.CreateEntry("manifest.properties").Open(),
+                    Encoding.ASCII);
+                writer.Write(string.Join("\n", textManifest.Split('\n').Where(line =>
+                    !line.StartsWith("ecu.osDid=", StringComparison.Ordinal))));
+            }
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupImport.VerifyZip(incompleteOsidPath, scope));
+            File.Delete(incompleteOsidPath);
+            File.Delete(firmwarePath);
             // Legacy v2 files have no channel evidence. They are still
             // inspectable, but the UI must clearly flag missing route binding.
             var legacyPath = Path.Combine(directory, "legacy-v2.zip");
