@@ -7,7 +7,7 @@ import org.junit.Test
 
 class Lfx2012ProgrammingAuditTest {
     private val before = Lfx2012ProgrammingAudit.Snapshot(
-        vin = "2G1FF3D36C9104199", ecuName = "E39",
+        vin = "2G1TEST00C0000001", ecuName = "E39",
         calibrationIds = listOf("12612345"), verificationNumbers = listOf("1234ABCD"),
         dtcs = emptyList(), voltage = 12.6, communicationConfirmed = true,
         functionalCheckPassed = true, oemRelearnReviewed = true, capturedAtUtcMillis = 1L
