@@ -6,7 +6,7 @@ internal static class NativeE39BackupQualificationSelfTests
 {
     internal static int Run()
     {
-        const string vin = "2G1FF3D36C9100001";
+        const string vin = "2G1TEST00C0000001";
         var original = NativeE39ImageInspectorSelfTests.Fixture();
         var hash = Convert.ToHexString(SHA256.HashData(original));
         var scope = new J2534MemoryReadScope(vin, 0x7E0, 0x7E8, 33, 0,
@@ -26,7 +26,7 @@ internal static class NativeE39BackupQualificationSelfTests
         }
         var partial = new J2534MemoryReadScope(vin, 0x7E0, 0x7E8, 33, 0, 256, 256, 1);
         Reject<ArgumentException>(() => NativeE39BackupQualification.Compare(partial, original, capture, identity, identity));
-        Reject<UnauthorizedAccessException>(() => NativeE39BackupQualification.Compare(scope, original, capture with { ExpectedVin = "2G1FF3D36C9100002" }, identity, identity));
+        Reject<UnauthorizedAccessException>(() => NativeE39BackupQualification.Compare(scope, original, capture with { ExpectedVin = "2G1TEST00C0000002" }, identity, identity));
         Reject<UnauthorizedAccessException>(() => NativeE39BackupQualification.Compare(scope, original, capture, identity with { OperatingSystemId = 1 }, identity with { OperatingSystemId = 1 }));
         Reject<InvalidDataException>(() => NativeE39BackupQualification.Compare(scope, original, capture, identity, identity with { PhysicalRead = false }));
         Reject<InvalidDataException>(() => NativeE39BackupQualification.Compare(scope, original, capture with { BlocksPerPass = 1 }, identity, identity));
