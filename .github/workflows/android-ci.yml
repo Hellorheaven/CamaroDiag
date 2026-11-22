@@ -187,6 +187,9 @@ jobs:
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuProgrammingDriverContract.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuBenchExpertPlan.kt' \
                 'communication/src/main/java/com/camarodiag/gen5/data/obd/EcuExternalDumpPair.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/CamaroDiagConnectorDiscovery.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/BluetoothObdManager.kt' \
+                'communication/src/main/java/com/camarodiag/gen5/data/obd/NetworkUsbObdTransport.kt' \
                 'app/src/main/java/com/camarodiag/gen5/ui/CalibrationWorkspaceScreen.kt' \
                 'communication/src/test/java/com/camarodiag/gen5/data/obd/J2534BridgeTlsTest.kt' \
                 'app/src/main/AndroidManifest.xml' \
