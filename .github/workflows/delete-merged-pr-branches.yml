@@ -1,14 +1,53 @@
 name: Delete merged pull request branches
 on:
   pull_request:
-    types: [closed]
-    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, closed]
+  workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 jobs:
+  single-pr-policy:
+    name: Single PR and branch policy
+    if: github.event_name == 'workflow_dispatch' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the complete branch and open PR inventory
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const branches = await github.paginate(github.rest.repos.listBranches, {
+              owner, repo, per_page: 100
+            });
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+            const names = branches.map(branch => branch.name);
+            const expected = new Set(['main']);
+            if (prs.length > 1) {
+              core.setFailed('Only one open PR is allowed, including drafts.');
+              return;
+            }
+            if (prs.length === 1) {
+              const pr = prs[0];
+              if (pr.base.ref !== 'main' || pr.head.ref === 'main' ||
+                  pr.head.repo?.full_name !== owner + '/' + repo) {
+                core.setFailed('The single development PR must use a local branch targeting main.');
+                return;
+              }
+              expected.add(pr.head.ref);
+            }
+            if (names.length !== expected.size || names.some(name => !expected.has(name))) {
+              core.setFailed('Expected only ' + [...expected].join(', ') + '; found ' + names.join(', '));
+              return;
+            }
+            core.info('Repository policy satisfied: ' + prs.length + ' open PR, ' + names.length + ' branches.');
   delete-merged-pr-branch:
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    permissions:
+      contents: write
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
       - name: Delete only the merged, unchanged head branch
@@ -39,7 +78,12 @@ jobs:
             } catch (error) {
               if (error.status === 404) {
                 core.info('Branch already absent.');
-                return;
+              } else {
+                throw error;
               }
-              throw error;
+            }
+            const branches = await github.paginate(github.rest.repos.listBranches, {owner, repo, per_page: 100});
+            const prs = await github.paginate(github.rest.pulls.list, {owner, repo, state: 'open', per_page: 100});
+            if (branches.length !== 1 || branches[0].name !== 'main' || prs.length !== 0) {
+              core.setFailed('After merge, expected only main and no open PR. Inspect remaining work; do not delete blindly.');
             }

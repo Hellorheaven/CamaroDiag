@@ -14,3 +14,9 @@ Les actions de développement sont consultables depuis [GitHub Actions](https://
 | Delete merged pull request branches | Nettoyer uniquement la branche d'une PR venant d'être fusionnée, sous contrôles. |
 
 Les builds Debug périodiques sur PR brouillon sont configurables (50 commits pertinents par défaut) ; les changements critiques et le passage prêt à relire nécessitent une validation complète. Un checkpoint vert avec jobs ignorés n'est pas un build. Pour les validations complètes manuelles Android/Windows, sélectionner le workflow depuis main, puis fournir la référence ou le SHA à contrôler. Les changements matériel/documentaire seuls ne doivent pas déclencher toutes les compilations ni une publication de l'application.
+
+## Politique Git obligatoire (#96)
+
+Une branche de développement correspond à la seule PR ouverte, brouillon compris. Au maximum deux branches : `main` et cette branche. Ne pas créer une autre branche ou PR tant que le lot est ouvert. Une fois accepté et les CI requises réussies, fusionner vers `main`, supprimer la branche fusionnée et vérifier que `main` est seule et qu'aucune PR n'est ouverte avant le prochain lot. Ne jamais supprimer du travail non fusionné.
+
+L'action de gestion des branches vérifie la politique à l'ouverture et aux mises à jour des PR, et après le nettoyage d'une fusion. Un lancement manuel permet d'auditer le dépôt au repos. Ce contrôle signale les violations après création ; il ne constitue pas un verrou serveur empêchant à lui seul de créer une branche ou une PR supplémentaire.
