@@ -70,10 +70,21 @@ object CamaroUdsProtocol {
 
     /** Accept an adapter's isolated OK acknowledgement, not substrings such
      * as NOT OK or NOK in its diagnostic chatter. Echoes and prompts are allowed. */
-    private fun hasStandaloneOk(response: String): Boolean =
-        response.lineSequence().any { line ->
-            line.trim().removeSuffix(">").trim().equals("OK", ignoreCase = true)
-        }
+    private fun hasStandaloneOk(response: String): Boolean {
+        // The final non-prompt status must be OK; a stale OK followed by
+        // ERROR, NO DATA or another rejection is not a capability grant.
+        val lines = response.lineSequence()
+            .map { it.trim().removeSuffix(">").trim() }
+            .filter(String::isNotEmpty)
+            .toList()
+        return lines.lastOrNull()?.equals("OK", ignoreCase = true) == true &&
+            lines.none { line ->
+                line.equals("ERROR", ignoreCase = true) ||
+                    line.equals("NO DATA", ignoreCase = true) ||
+                    line.equals("?", ignoreCase = true) ||
+                    line.equals("UNABLE TO CONNECT", ignoreCase = true)
+            }
+    }
 
     /**
      * Accept only a complete positive Mode 01 PID 00 ECU response. A substring
