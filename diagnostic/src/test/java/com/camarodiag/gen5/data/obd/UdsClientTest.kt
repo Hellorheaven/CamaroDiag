@@ -86,8 +86,8 @@ class UdsClientTest {
     @Test fun nestedRoutineAndIoPermissionsRemainFrozenAfterCallerMutation() {
         val allowedRoutineTypes = mutableSetOf(0x01)
         val allowedIoTypes = mutableSetOf(0x03)
-        val routines = mutableMapOf(0x9000 to allowedRoutineTypes as Set<Int>)
-        val ioControls = mutableMapOf(0xF100 to allowedIoTypes as Set<Int>)
+        val routines = mutableMapOf<Int, Set<Int>>(0x9000 to allowedRoutineTypes)
+        val ioControls = mutableMapOf<Int, Set<Int>>(0xF100 to allowedIoTypes)
         val identity = UdsEcuIdentity("ECM", "HW-1", "OS-1", "CAL-1",
             "A1B2", "1G1FA1RXXR0123456")
         val policy = UdsAccessPolicy.verified(
