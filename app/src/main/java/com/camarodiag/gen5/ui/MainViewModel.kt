@@ -2054,7 +2054,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
                     val diagnosticStatus = transmission.diagnosticStatus
-                    val receivedEvents = CanConsoleRecordParser.parse(response).map { record ->
+                    val receivedEvents = transmission.receivedRecords.map { record ->
                         CanConsoleHistoryEntry(
                             id = System.nanoTime(),
                             direction = record.direction,
@@ -2063,7 +2063,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             succeeded = record.succeeded
                         )
                     }.ifEmpty {
-                        listOf(
+                        CanConsoleRecordParser.parse(response).map { record ->
+                            CanConsoleHistoryEntry(
+                                id = System.nanoTime(),
+                                direction = record.direction,
+                                timestampMillis = System.currentTimeMillis(),
+                                content = record.content,
+                                succeeded = record.succeeded
+                            )
+                        }.ifEmpty { listOf(
                             CanConsoleHistoryEntry(
                                 id = System.nanoTime(),
                                 direction = "SYSTEM",
@@ -2074,6 +2082,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 )
                             )
                         )
+                        ) }
                     }
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
