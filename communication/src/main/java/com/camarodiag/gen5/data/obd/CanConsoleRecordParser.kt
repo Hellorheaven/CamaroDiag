@@ -126,6 +126,20 @@ object CanConsoleRecordParser {
 object CanMonitorProtocolPolicy {
     fun protocolCommand(can29Bit: Boolean): String = if (can29Bit) "ATSP7" else "ATSP6"
     fun clearFilter(can29Bit: Boolean): String = if (can29Bit) "00000000" else "000"
+
+    fun setupCommands(can29Bit: Boolean, stn: Boolean): List<String> = buildList {
+        add(protocolCommand(can29Bit))
+        addAll(listOf("ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0"))
+        if (stn) {
+            val filter = clearFilter(can29Bit)
+            addAll(listOf("ATCF $filter", "ATCM $filter", "STFAC"))
+        }
+    }
+
+    fun restoreCommands(stn: Boolean): List<String> = buildList {
+        if (stn) add("ATAR")
+        addAll(listOf("ATSP6", "ATE0", "ATL0", "ATH1", "ATS0", "ATCAF1"))
+    }
 }
 
 object CanConsoleCapabilityPolicy {
