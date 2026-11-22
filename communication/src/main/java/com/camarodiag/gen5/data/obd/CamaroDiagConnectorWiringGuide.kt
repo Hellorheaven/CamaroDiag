@@ -7,7 +7,7 @@ package com.camarodiag.gen5.data.obd
  */
 object CamaroDiagConnectorWiringGuide {
     // Pin the reviewed documentary snapshot; do not silently inherit later pin changes.
-    private const val BASE = "https://github.com/Hellorheaven/CamaroDiagConnectors/blob/04883775d7f97de4cd89da0de75c46bf076f3332/docs/user/wiring/"
+    private const val BASE = "https://github.com/Hellorheaven/CamaroDiag/blob/84c21a5f11d7618bba50163614048684dc7bfbb9/connectors/docs/user/wiring/"
     const val genericUrl = BASE + "README.md"
     const val catalogueUrl = BASE + "ecu/README.md"
 

@@ -29,7 +29,7 @@ class CamaroDiagConnectorWiringGuideTest {
     @Test fun documentaryLinksAreNotElectricalOrFlashApprovals() {
         for (reference in CamaroDiagConnectorWiringGuide.Reference.values()) {
             assertFalse(reference.qualifiedForConnection)
-            assertTrue(reference.url.startsWith("https://github.com/Hellorheaven/CamaroDiagConnectors/blob/"))
+            assertTrue(reference.url.startsWith("https://github.com/Hellorheaven/CamaroDiag/blob/"))
         }
         assertEquals(3, CamaroDiagConnectorWiringGuide.Reference.values().map { it.url }.distinct().size)
     }
