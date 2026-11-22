@@ -212,4 +212,29 @@ class CanConsoleRecordParserTest {
         assertTrue(CanConsoleAdapterRestorationPolicy.accepted("OK"))
     }
 
+
+    @Test fun adapterAckOnlyNeverBecomesAValidatedEcuReply() {
+        val physical = requireNotNull(RawCanFrameParser.parse("7E0 02 01 0C"))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission("OK", physical))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse("OK", physical))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(
+            "7E9 04 03 41 0C 1A", physical
+        ))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(
+            "7E8 04 03 41 0D 1A", physical
+        ))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(
+            "7E8 04 03 41 0C 1A", physical
+        ))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "OK\r\n7E9 04 03 41 0C 1A", physical
+        ))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(
+            "OK\r\n7E9 04 03 41 0C 1A", physical
+        ))
+        val functional = requireNotNull(RawCanFrameParser.parse("7DF 02 01 0C"))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(
+            "7E9 04 03 41 0C 1B", functional
+        ))
+    }
 }
