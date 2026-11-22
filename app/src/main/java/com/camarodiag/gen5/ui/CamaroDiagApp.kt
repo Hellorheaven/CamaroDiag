@@ -1703,9 +1703,11 @@ fun CanSnifferScreen(
     var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
     val report = state.report
     // The menu describes CAN IDs seen in this session, not assumed ECU identities.
-    val observedCanIds = remember(state.consoleHistory, state.observedCanIds, report) {
+    val observedCanIds = remember(state.observedCanIds, report) {
+        // Old log entries remain visible in the global monitor, but cannot
+        // advertise an ECU as present in a newly started physical capture.
         CanConsoleDisplayFilter.observedFrameIds(
-            state.consoleHistory.map { ParsedCanConsoleRecord(it.direction, it.content, it.succeeded) },
+            emptyList(),
             report?.frames.orEmpty(),
             state.observedCanIds
         )
