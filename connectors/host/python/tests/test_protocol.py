@@ -92,6 +92,17 @@ class DiscoveryTests(unittest.TestCase):
             DiscoveryClient(transport).execute("EEPROM_WRITE")
         self.assertEqual(bytes(transport.outgoing), b"")
 
+    def test_usb_discovery_requires_canonical_capability_order(self):
+        canonical = (b"CAPS hs_can=disabled sw_can=disabled eeprom_read=disabled "
+                     b"eeprom_write=disabled ecu_flash=disabled j2534=disabled\\n")
+        reordered = canonical.replace(b"hs_can=disabled sw_can=disabled",
+                                      b"sw_can=disabled hs_can=disabled")
+        for reply in (reordered, canonical.replace(b"CAPS ", b"CAPS  ")):
+            with self.subTest(reply=reply), self.assertRaises(IOError):
+                DiscoveryClient(MockSerial(reply)).execute("CAPS")
+        self.assertEqual(DiscoveryClient(MockSerial(canonical)).execute("CAPS"),
+                         canonical.decode("ascii").strip())
+
     def test_reject_incomplete_capabilities(self):
         with self.assertRaises(ValueError):
             parse_caps("CAPS hs_can=enabled")
