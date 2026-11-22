@@ -460,8 +460,11 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     private fun recordData(data: List<Int>, recordWidth: Int): List<List<Int>>? {
         if (data.isEmpty() || recordWidth <= 0) return null
         val count = data.first()
-        if (count in 1..32 && data.size >= 1 + count * recordWidth) {
-            return data.drop(1).take(count * recordWidth).chunked(recordWidth)
+        if (count in 1..32) {
+            // Never truncate an overlong response or reinterpret its declared
+            // count byte as a count-less identity record.
+            if (data.size != 1 + count * recordWidth) return null
+            return data.drop(1).chunked(recordWidth)
         }
         if (data.size % recordWidth == 0) return data.chunked(recordWidth)
         return null
