@@ -36,6 +36,28 @@ class CamaroDiagConnectorDiscoveryTest {
         assertEquals(listOf("PING\n", "CAPS\n", "STATUS\n"), c.sent)
     }
 
+    @Test fun publicDiscoveryNeverAuthenticatesOrEnablesEcuTraffic() {
+        val c = FakeChannel(listOf("$ping\n", "$caps\n", "$status\n"))
+        val report = CamaroDiagConnectorDiscovery.inspect(c)
+        assertFalse(report.authenticated)
+        assertFalse(report.vehicleAccessAllowed)
+        val capabilities = report.toAdapterCapabilities()
+        assertEquals(com.camarodiag.gen5.domain.model.AdapterTier.DISCONNECTED, capabilities.tier)
+        assertFalse(capabilities.supportsCanTransmit)
+        assertFalse(capabilities.supportsCanHeaders)
+        assertFalse(capabilities.supportsLongFrames)
+        assertFalse(capabilities.supportsSwCan)
+    }
+
+    @Test fun namedConnectorCannotBeRoutedThroughLegacyUsbProbe() {
+        val labels = listOf("ELM327 #12", "camarodiagconnectors #123", "CamaroDiagConnectors #5")
+        assertTrue(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(123, labels))
+        assertTrue(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(5, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(12, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(1, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(7, emptyList()))
+    }
+
     @Test fun unknownIdentityAndFutureVersionsCannotEnterLegacyDiscovery() {
         for (response in listOf("ELM327 v1.5", "PONG CamaroDiagConnectors 1.0.0", "PONG Other 0.1.0")) {
             val c = FakeChannel(listOf("$response\n"))
