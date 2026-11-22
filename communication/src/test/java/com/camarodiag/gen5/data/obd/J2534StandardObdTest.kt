@@ -89,4 +89,17 @@ class J2534StandardObdTest {
         assertFalse(J2534StandardObd.supportsChannel(0x7DF,0x7E8,33))
         assertFalse(J2534StandardObd.supportsChannel(0x7E0,0x7E8,63))
     }
+    @Test fun j2534EthanolSupportBitIsDiscoveredOnPid40Page() {
+        val (pids, continuation) = J2534StandardObd.supportPage(
+            0x40, bytes(0x41, 0x40, 0x00, 0x00, 0x40, 0x00)
+        )
+        assertEquals(setOf(0x52), pids)
+        assertFalse(continuation)
+        assertArrayEquals(bytes(0x80), J2534StandardObd.pidData(
+            0x52, bytes(0x41, 0x52, 0x80)))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534StandardObd.pidData(0x52, bytes(0x41, 0x53, 0x80))
+        }
+    }
+
 }
