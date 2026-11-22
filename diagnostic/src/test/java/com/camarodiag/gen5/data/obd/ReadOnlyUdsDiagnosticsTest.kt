@@ -174,11 +174,22 @@ class ReadOnlyUdsDiagnosticsTest {
         )
         val transport = FakeCanTransport(responses)
 
+        val mutableAllowedDids = syntheticReadProfile().readableDids.toMutableSet()
+        val mutableIdentityDids = syntheticReadProfile().identityDids.toMutableList()
+        val callerProfile = syntheticReadProfile().copy(
+            readableDids = mutableAllowedDids, identityDids = mutableIdentityDids
+        )
         val session = ProfiledUdsReadSession.open(
             transport = transport,
             vehicle = VehicleProfile(modelYear = 2013, engine = CamaroEngine.LFX, vin = "1G1FA1RXXR0123456"),
-            profile = syntheticReadProfile()
+            profile = callerProfile
         )
+        // Simulate UI/protocol-pack edits after authorization. The frozen
+        // session cannot acquire fresh DID permissions or lose identity fields.
+        mutableAllowedDids.add(0x0108)
+        mutableIdentityDids.clear()
+        assertFalse(session.profile.allowsDid(0x0108))
+        assertEquals(6, session.profile.identityDids.size)
 
         assertEquals("BCM", session.identity.controllerFamily)
         assertEquals("HW1", session.identity.hardwarePartNumber)
