@@ -2322,10 +2322,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @Volatile private var calibrationFileImportGeneration = 0L
+
     fun importCalibrationFile(uri: Uri) {
         if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val accountGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        val importGeneration = ++calibrationFileImportGeneration
+        fun current() = canResumeExport(accountGeneration, owner) &&
+            _vehicle.value == profile && importGeneration == calibrationFileImportGeneration &&
+            hasPremiumLicense()
         viewModelScope.launch(Dispatchers.IO) {
+            var staged: File? = null
             try {
+                if (!current()) return@launch
                 val resolver = getApplication<Application>().contentResolver
                 val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                     ?.use { cursor ->
@@ -2336,6 +2347,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val buffer = ByteArray(8192)
                     var total = 0
                     while (true) {
+                        currentCoroutineContext().ensureActive()
+                        check(current())
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
@@ -2351,10 +2364,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val storageDir = File(getApplication<Application>().filesDir, "calibrations")
                 check(storageDir.exists() || storageDir.mkdirs()) { "Impossible de créer le dossier local des cartographies." }
                 val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifBlank { "calibration.bin" }
-                val storedFile = File(storageDir, "${System.currentTimeMillis()}_${safeName}")
+                val storedFile = File.createTempFile("original_", "_$safeName", storageDir)
+                staged = storedFile
                 storedFile.writeBytes(bytes)
                 val preview = bytes.take(64).joinToString(" ") { "%02X".format(it) }
-                val previousState = _calibrationWorkspace.value
+                withContext(Dispatchers.Main) {
+                    if (!current()) return@withContext
+                    val previousState = _calibrationWorkspace.value
                 previousState.importedFilePath?.let { previousPath ->
                     if (previousPath != storedFile.absolutePath) runCatching { File(previousPath).delete() }
                 }
@@ -2400,12 +2416,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     partialWriteSectorAddresses = emptyList(),
                     message = localizedContext.getString(R.string.msg_cal_file_imported)
                 )
+                    staged = null
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = localizedContext.getString(R.string.msg_cal_file_import_failed)
-                )
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_file_import_failed))
+                }
+            } finally {
+                staged?.let { runCatching { it.delete() } }
             }
         }
     }
@@ -2773,6 +2793,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearCalibrationFile() {
+        calibrationFileImportGeneration++
         _calibrationWorkspace.value.importedFilePath?.let { path -> runCatching { File(path).delete() } }
         _calibrationWorkspace.value.activeFilePath?.takeIf { it != _calibrationWorkspace.value.importedFilePath }?.let { path ->
             runCatching { File(path).delete() }
