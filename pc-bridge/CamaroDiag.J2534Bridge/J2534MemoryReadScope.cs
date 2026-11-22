@@ -27,7 +27,7 @@ internal sealed class J2534MemoryReadScope
         string expectedVin, int requestCanId, int responseCanId, int protocolNumber,
         uint startAddress, uint length, int maxReadBytes, int session)
     {
-        if (!Regex.IsMatch(expectedVin, "^[A-HJ-NPR-Z0-9]{17}$"))
+        if (!Regex.IsMatch(expectedVin, @"\A[A-HJ-NPR-Z0-9]{17}\z"))
             throw new ArgumentException("Memory read profile requires a valid 17-character VIN.");
         if (protocolNumber is not (33 or 34 or 35 or 36 or 63 or 64))
             throw new ArgumentException("Unsupported J2534 protocol in memory read profile.");
