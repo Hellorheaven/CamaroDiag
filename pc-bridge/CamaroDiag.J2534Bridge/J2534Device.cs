@@ -417,7 +417,14 @@ internal sealed partial class J2534Device : IDisposable
         payload.Length >= 2 && (payload[0] switch
         {
             0x22 => payload.Length == 3,
-            0x19 => true,
+            // ReadDTCInformation 01/02 require a status mask; 0A does not.
+            // Reject unknown or truncated subfunctions in the C1 console.
+            0x19 => payload[1] switch
+            {
+                0x01 or 0x02 => payload.Length == 3,
+                0x0A => payload.Length == 2,
+                _ => false
+            },
             _ => false
         });
 
