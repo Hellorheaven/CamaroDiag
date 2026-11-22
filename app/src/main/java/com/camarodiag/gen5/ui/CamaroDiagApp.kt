@@ -51,6 +51,7 @@ import com.camarodiag.gen5.control.VehicleGear
 import com.camarodiag.gen5.control.VehicleSignal
 import com.camarodiag.gen5.control.VehicleControlId
 import com.camarodiag.gen5.data.obd.VxdiagProfiles
+import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
 import com.camarodiag.gen5.data.obd.CanTraceFilter
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.CanTraceDirection
@@ -1827,10 +1828,14 @@ fun CanSnifferScreen(
                                 onSendRequest(requestInput)
                             }
                         },
-                        enabled = !state.isCapturing && !state.isSendingRequest &&
-                            requestInput.isNotBlank() &&
-                            (if (rawCanFrameInput) isAvailable && canTransmitAvailable
-                             else canReadObdAvailable),
+                        enabled = CanConsoleCapabilityPolicy.canSubmit(
+                            rawCanFrame = rawCanFrameInput,
+                            monitorAvailable = isAvailable,
+                            canTransmit = canTransmitAvailable,
+                            readObdAvailable = canReadObdAvailable,
+                            inputPresent = requestInput.isNotBlank(),
+                            busy = state.isCapturing || state.isSendingRequest
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(R.string.can_sniffer_send))
