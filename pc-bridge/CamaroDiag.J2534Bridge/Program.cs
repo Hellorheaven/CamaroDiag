@@ -39,6 +39,11 @@ internal static class Program
         if (args.Contains(ConnectorCheckpointCapture.Command, StringComparer.OrdinalIgnoreCase))
             return ConnectorCheckpointCapture.Run(args);
 
+        // Offline verification must never load a vendor DLL, contact an ECU,
+        // start the network bridge or launch the updater.
+        if (args.Contains(NativeScopedBackupImportCli.Command, StringComparer.OrdinalIgnoreCase))
+            return NativeScopedBackupImportCli.Run(args);
+
         // Explicit local programming path; malformed invocations cannot fall
         // through to a network listener, updater or another CLI operation.
         if (args.Contains(NativeE39QualifiedBenchCli.Command, StringComparer.OrdinalIgnoreCase))
