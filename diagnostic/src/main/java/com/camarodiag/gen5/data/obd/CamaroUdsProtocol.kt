@@ -265,6 +265,27 @@ object CamaroUdsProtocol {
         return ((bytes[0] shl 8) or bytes[1]) / 32768.0
     }
 
+    /**
+     * SAE wideband O2 PID 0x24..0x2B or 0x34..0x3B.
+     * A/B encode lambda (2/65535); C/D encode either voltage (8/65535 V)
+     * or signed current (1/256 mA offset by -128), depending on PID family.
+     * Scaling overrides advertised through PID 0x4F require separate handling.
+     */
+    fun decodeWidebandLambda(bytes: IntArray?): Double? {
+        if (bytes?.size != 4 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[0] shl 8) or bytes[1]) * 2.0 / 65535.0
+    }
+
+    fun decodeWidebandVoltage(bytes: IntArray?): Double? {
+        if (bytes?.size != 4 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[2] shl 8) or bytes[3]) * 8.0 / 65535.0
+    }
+
+    fun decodeWidebandCurrent(bytes: IntArray?): Double? {
+        if (bytes?.size != 4 || bytes.any { it !in 0..255 }) return null
+        return ((bytes[2] shl 8) or bytes[3]) / 256.0 - 128.0
+    }
+
     /** SAE J1979 Mode 01 PID 0x52 returns exactly one unsigned ethanol byte. */
     fun decodeEthanolPercent(bytes: IntArray?): Double? {
         val raw = bytes?.singleOrNull() ?: return null
