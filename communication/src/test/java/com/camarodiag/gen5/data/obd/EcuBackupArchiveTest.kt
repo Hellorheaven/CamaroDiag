@@ -137,6 +137,26 @@ class EcuBackupArchiveTest {
         }
     }
 
+    @Test fun routedPhysicalV3ArchivesCannotClaimIncompleteMemoryOrFullEcuMap() {
+        val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+        val vin = "1G1FA1RXXR0123456"
+        val illegal = listOf(
+            { EcuBackupArchive.export(ByteArrayOutputStream(), listOf(capture()),
+                setOf(EcuBackupCoverage.Region.CALIBRATION),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture().copy(expectedBytes = 5)), emptySet(),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture()), emptySet(), controllerLabel = "X".repeat(129),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture()), emptySet(), controllerLabel = "ECU\nBAD",
+                vehicleVin = vin, channel = channel) }
+        )
+        for (write in illegal) assertTrue(runCatching { write() }.isFailure)
+    }
+
     @Test fun routeBoundArchiveRetainsExactCanIdsProtocolAndSession() {
         val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 3)
         val zip = ByteArrayOutputStream()

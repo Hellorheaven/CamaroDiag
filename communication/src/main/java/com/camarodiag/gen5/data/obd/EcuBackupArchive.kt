@@ -58,6 +58,23 @@ object EcuBackupArchive {
         require(createdAtUtcMillis > 0L) { "Invalid ECU archive creation timestamp" }
         require(captures.isNotEmpty()) { "Cannot export an empty ECU backup" }
         require(captures.size <= MAX_ENTRIES) { "Too many memory segments" }
+        if (channel != null) {
+            // The portable Windows verifier understands one completely read
+            // physical scope, not an inferred full-ECU memory map. A v3 archive
+            // must not advertise complete coverage from a single approved span.
+            require(captures.size == 1 && requiredRegions.isEmpty()) {
+                "A physical J2534 archive must contain one scope with unknown ECU-wide coverage."
+            }
+            require(captures.all {
+                it.expectedBytes == it.firstRead.size.toLong() &&
+                    it.independentRead?.size?.toLong() == it.expectedBytes
+            }) { "A physical J2534 archive cannot publish incomplete double reads." }
+            require(controllerLabel == null ||
+                (controllerLabel.length <= 128 &&
+                    controllerLabel.none { Character.isISOControl(it) })) {
+                "Controller label is not compatible with the portable J2534 manifest."
+            }
+        }
         require(captures.all { it.firstRead.isNotEmpty() && it.expectedBytes > 0 &&
             it.startAddress >= 0 && it.startAddress <= Long.MAX_VALUE - it.expectedBytes &&
             it.firstRead.size.toLong() <= it.expectedBytes }) { "Invalid capture range" }
