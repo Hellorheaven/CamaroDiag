@@ -88,6 +88,20 @@ internal static class NativeScopedBackupArchiveSelfTests
                 extraZip.CreateEntry("untrusted/extra.bin");
             Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(extraPath, scope));
             File.Delete(extraPath);
+            var malformedPath = Path.Combine(directory, "malformed.zip");
+            File.WriteAllBytes(malformedPath, originalZip);
+            string originalManifest;
+            using (var intact = ZipFile.OpenRead(zipPath))
+            using (var reader = new StreamReader(intact.GetEntry("manifest.properties")!.Open()))
+                originalManifest = reader.ReadToEnd();
+            using (var malformed = ZipFile.Open(malformedPath, ZipArchiveMode.Update))
+            {
+                malformed.GetEntry("manifest.properties")!.Delete();
+                using var output = new StreamWriter(malformed.CreateEntry("manifest.properties").Open());
+                output.Write(originalManifest + "\n");
+            }
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(malformedPath, scope));
+            File.Delete(malformedPath);
             Reject<IOException>(() => NativeScopedBackupArchive.SaveNew(zipPath, scope, capture, CancellationToken.None));
             Check(File.ReadAllBytes(zipPath).SequenceEqual(originalZip), "Prior backup never overwritten");
 
