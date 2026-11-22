@@ -34,4 +34,17 @@ int main() {
   assert(line(parser, "CAPS\n", 0x00000301u) == R::Caps);
   assert(line(parser, "STA", 1000) == R::None);
   assert(line(parser, "TUS\n", 1999) == R::Status);
+  // Slow-drip bytes cannot keep a command alive past three seconds.
+  assert(parser.feed('P', 0) == R::None);
+  assert(parser.feed('I', 900) == R::None);
+  assert(parser.feed('N', 1800) == R::None);
+  assert(parser.feed('G', 2700) == R::None);
+  assert(parser.feed('\n', 3600) == R::Timeout);
+  assert(line(parser, "PING\n", 3601) == R::Ping);
+  // The total deadline also survives millis() wraparound.
+  assert(parser.feed('P', 0xfffffff0u) == R::None);
+  assert(parser.feed('I', 0x00000200u) == R::None);
+  assert(parser.feed('N', 0x00000500u) == R::None);
+  assert(parser.feed('G', 0x00000800u) == R::None);
+  assert(parser.feed('\n', 0x00000ba8u) == R::Timeout);
 }
