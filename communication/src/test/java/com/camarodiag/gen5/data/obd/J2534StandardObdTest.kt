@@ -118,7 +118,11 @@ class J2534StandardObdTest {
         }
         val vehicleInfo = requireNotNull(SafeObdRequestPolicy.parse("0902"))
         J2534BridgeTransport.validateReadOnlyConsoleReply(vehicleInfo,
-            bytes(0x49, 0x02, 0x01, 0x31))
+            bytes(0x49, 0x02, 0x01) + "1G1FA1RXXR0123456".toByteArray(Charsets.US_ASCII))
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.validateReadOnlyConsoleReply(vehicleInfo,
+                bytes(0x49, 0x02, 0x01, 0x31))
+        }
         assertThrows(IllegalArgumentException::class.java) {
             J2534BridgeTransport.validateReadOnlyConsoleReply(vehicleInfo,
                 bytes(0x49, 0x04, 0x01, 0x31))
