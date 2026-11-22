@@ -14,6 +14,23 @@ int main(){
   assert(!expired.feed('C',0));expired.poll(2000);assert(expired.closed());
   ExportRequest slow;
   assert(!slow.feed('C',1));assert(!slow.feed('D',2001)&&slow.closed());
+  // A wrong byte, a repeated request or a stalled partial command must
+  // never release two snapshots during the same service-firmware boot.
+  ExportRequest wrongSuffix;
+  const char* partial="CDJ/1 READ";
+  for(size_t i=0;i<std::strlen(partial);++i)
+    assert(!wrongSuffix.feed(uint8_t(partial[i]),uint32_t(i)));
+  assert(!wrongSuffix.feed('X',50)&&wrongSuffix.closed());
+  assert(!wrongSuffix.feed('\\n',51));
+  ExportRequest repeated;
+  for(size_t i=0;i<std::strlen(command);++i)
+    assert(repeated.feed(uint8_t(command[i]),uint32_t(i))==(i==std::strlen(command)-1));
+  for(size_t i=0;i<std::strlen(command);++i)
+    assert(!repeated.feed(uint8_t(command[i]),uint32_t(i+40)));
+  ExportRequest elapsedBeforeFinish;
+  assert(!elapsedBeforeFinish.feed('C',123));
+  elapsedBeforeFinish.poll(2123);
+  assert(elapsedBeforeFinish.closed());
   Record rec;rec.transaction[0]=1;rec.manifestDigest[0]=2;
   rec.stage=Stage::EraseIntent;rec.sequence=1;
   char line[140]{};
