@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Lietotnes valoda</string>
     <string name="system_language_hint">Izvēlieties CamaroDiag valodu.</string>
     <string name="about_title">Par CamaroDiag</string>
@@ -642,7 +642,7 @@
     <string name="cal_pc_ip_address">Datora IP adrese</string>
     <string name="cal_connect_j2534">Pievienot J2534 tiltu</string>
     <string name="cal_disconnect_pc_bridge">Atvienot PC tiltu</string>
-    <string name="cal_bridge_capabilities">Tilts: HS-CAN ISO15765 250/500 kbit/s un J2534-2 SW-ISO15765, ja draiveris tos atbalsta. CAN FD paliek atspējots.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Tilts: HS-CAN ISO15765 250/500 kbit/s un J2534-2 SW-ISO15765, ja draiveris tos atbalsta. CAN FD paliek atspējots.</string>
     <string name="cal_read_uds_did">Nolasīt UDS DID</string>
     <string name="cal_read_uds_dtcs">Nolasīt UDS DTC</string>
     <string name="cal_uds_trouble_codes">UDS kļūdu kodi (0x19)</string>
