@@ -124,6 +124,21 @@ class CanConsoleDisplayFilterTest {
         assertTrue(CanConsoleDisplayFilter.visibleTrace(broadcast, null))
     }
 
+    @Test fun newCaptureUsesCurrentSessionIdsWithoutErasingHistoricalTraffic() {
+        val pastTraffic = listOf(
+            ParsedCanConsoleRecord("RX", "CAN ID=7E9 DLC=3 DATA=41 0C 1A")
+        )
+        val currentSession = setOf(ObservedCanId(0x7E8, false))
+        assertEquals(
+            listOf(ObservedCanId(0x7E8, false)),
+            CanConsoleDisplayFilter.observedFrameIds(
+                emptyList(), emptyList(), currentSession
+            )
+        )
+        assertEquals(1, pastTraffic.size) // Preserved global log is independent.
+        assertTrue(CanConsoleDisplayFilter.visible(pastTraffic[0], null))
+    }
+
     @Test fun observedEcusRemainSelectableAfterRecentHistoryRollsOver() {
         val initial = listOf(
             ParsedCanConsoleRecord("RX", "CAN ID=7E8 DLC=3 DATA=41 0C 1A"),
