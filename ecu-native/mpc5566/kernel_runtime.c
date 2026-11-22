@@ -116,8 +116,23 @@ bool cd_kernel_runtime_step(cd_kernel_runtime *r,
     size_t size = cd_kernel_process(&r->kernel, r->request, r->rx.used,
         r->response, sizeof(r->response));
     cd_isotp_rx_release(&r->rx);
+    /* Once an erase has occurred, a rejected command is not permission to
+     * retry. Deliver the diagnostic rejection, then permanently stop this
+     * runtime rather than accepting another fragment on uncertain flash. */
+    bool rejected_incomplete = remaining_before != 0 &&
+        (size == 0 || r->response[0] != 0x76);
+    if (rejected_incomplete && (size != 3u || r->response[0] != 0x7Fu)) {
+        r->response[0] = 0x7Fu;
+        r->response[1] = r->request[0];
+        r->response[2] = 0x24u;
+        size = 3u;
+    }
     if (r->kernel.remaining != remaining_before) r->write_idle_armed = false;
     if (size == 0 || !cd_isotp_tx_start(&r->tx, r->response, size, now_us)) {
+        cd_kernel_runtime_link_failure(r);
+        return false;
+    }
+    if (rejected_incomplete) {
         cd_kernel_runtime_link_failure(r);
         return false;
     }
