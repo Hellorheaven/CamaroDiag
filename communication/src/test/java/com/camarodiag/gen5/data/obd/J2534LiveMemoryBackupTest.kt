@@ -383,4 +383,33 @@ class J2534LiveMemoryBackupTest {
         assertEquals(6, ecu.reads)
     }
 
+    @Test fun lastTwoBytesOfFourGigabyteAddressSpaceEncodeWithoutWrap() = runBlocking {
+        val requests = mutableListOf<ByteArray>()
+        val transport = object : UdsPayloadTransport {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                requests += payload.copyOf()
+                return when (payload[0].toInt() and 0xFF) {
+                    0x22 -> byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()) +
+                        vin.toByteArray(Charsets.US_ASCII)
+                    0x23 -> byteArrayOf(0x63, 0x12, 0x34)
+                    else -> error("Unexpected physical read service")
+                }
+            }
+            override suspend fun sendOnly(payload: ByteArray, timeoutMs: Long) =
+                error("A backup never sends a write-only request")
+        }
+        val result = J2534LiveMemoryBackup.captureForTest(
+            transport, request(length = 2).copy(
+                address = 0xFFFF_FFFEL, chunkBytes = 2))
+        assertEquals(0xFFFF_FFFEL, result.capture.startAddress)
+        assertTrue(result.verification.consistent)
+        assertEquals(2, requests.count { it[0] == 0x23.toByte() })
+        val memoryRequests = requests.filter { it[0] == 0x23.toByte() }
+        for (payload in memoryRequests) {
+            assertArrayEquals(byteArrayOf(0x23, 0x24,
+                0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFE.toByte(),
+                0x00, 0x02), payload)
+        }
+    }
+
 }
