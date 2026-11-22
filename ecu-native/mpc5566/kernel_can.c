@@ -5,16 +5,19 @@ bool cd_kernel_can_bind(cd_kernel_can *board, cd_flash_controller *flash,
     uint32_t request_id, uint32_t response_id, bool extended,
     uint32_t timeout_us, uint8_t block_size, uint8_t st_min)
 {
-    if (!board || !flash || !cd_flexcan_bind(&board->can, can_bus, rx_mb,
+    if (!board) return false;
+    board->initialized = false;
+    if (!flash || !cd_flexcan_bind(&board->can, can_bus, rx_mb,
         tx_mb, request_id, response_id, extended)) return false;
     cd_isotp_channel channel = {request_id, response_id, extended, 0,
         timeout_us, &board->can, cd_flexcan_send};
-    return cd_kernel_runtime_init(&board->runtime, flash, &channel,
+    board->initialized = cd_kernel_runtime_init(&board->runtime, flash, &channel,
         block_size, st_min);
+    return board->initialized;
 }
 bool cd_kernel_can_poll(cd_kernel_can *board, uint32_t now_us)
 {
-    if (!board || board->runtime.link_failed) return false;
+    if (!board || !board->initialized || board->runtime.link_failed) return false;
     cd_can_frame frame;
     cd_can_poll result=cd_flexcan_receive(&board->can,&frame);
     if (result==CD_CAN_ERROR) {
