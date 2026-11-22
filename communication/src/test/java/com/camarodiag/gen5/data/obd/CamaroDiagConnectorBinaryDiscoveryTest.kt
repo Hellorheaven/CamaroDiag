@@ -19,7 +19,7 @@ class CamaroDiagConnectorBinaryDiscoveryTest {
         return raw + ByteArray(4) { (crc ushr (8 * it)).toByte() }
     }
 
-    private class Channel(private val replies: List<ByteArray>) : CamaroDiagConnectorDiscovery.Channel {
+    private class Channel(private val replies: List<ByteArray>, private val chunkSize: Int = 3) : CamaroDiagConnectorDiscovery.Channel {
         val requests = mutableListOf<ByteArray>()
         private var pending = byteArrayOf()
         override fun write(bytes: ByteArray) {
@@ -28,7 +28,7 @@ class CamaroDiagConnectorBinaryDiscoveryTest {
             requests += bytes.copyOf()
         }
         override fun read(buffer: ByteArray, timeoutMs: Int): Int {
-            val count = minOf(3, pending.size, buffer.size)
+            val count = minOf(chunkSize, pending.size, buffer.size)
             if (count == 0) return -1
             pending.copyInto(buffer, 0, 0, count)
             pending = pending.copyOfRange(count, pending.size)
@@ -77,6 +77,17 @@ class CamaroDiagConnectorBinaryDiscoveryTest {
             assertTrue(runCatching { CamaroDiagConnectorBinaryDiscovery.inspect(c) }.exceptionOrNull() is IOException)
             assertEquals(replies.size, c.requests.size)
         }
+    }
+
+    @Test fun completeUsbPacketAndConcatenatedRepliesAreHandledWithoutTruncation() {
+        val all = listOf(frame(1, 0, ping), frame(2, 1, caps), frame(3, 2, status))
+        val fullPacket = Channel(all, 512)
+        assertEquals(listOf(ping, caps, status), CamaroDiagConnectorBinaryDiscovery.inspect(fullPacket).lines)
+        val concatenated = Channel(listOf(all[0] + all[1]), 512)
+        assertTrue(runCatching {
+            CamaroDiagConnectorBinaryDiscovery.inspect(concatenated)
+        }.exceptionOrNull() is IOException)
+        assertEquals(1, concatenated.requests.size)
     }
 
     @Test fun cancellationDoesNotSendAnyRequest() {
