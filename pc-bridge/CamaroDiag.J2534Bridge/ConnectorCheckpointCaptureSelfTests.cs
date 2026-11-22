@@ -17,6 +17,31 @@ internal static class ConnectorCheckpointCaptureSelfTests
             catch (InvalidDataException) { rejected=true; }
             Check(rejected);
         }
+        // A transient per-byte timeout must not fail an otherwise valid response.
+        var wire = "CDJ/1 " + fixture + "\n";
+        int offset = 0, attempts = 0;
+        var captured = ConnectorCheckpointCapture.ReadResponse(
+            timeout =>
+            {
+                Check(timeout > 0 && timeout <= 1500);
+                if (++attempts <= 2) throw new TimeoutException("short serial timeout");
+                return wire[offset++];
+            }, () => 0, () => 500);
+        Check(captured is not null && captured.SequenceEqual(bytes!));
+        Check(attempts == wire.Length + 2);
+
+        // An incomplete response cannot be mistaken for a missing journal.
+        long elapsed = 0;
+        bool deadlineRejected = false;
+        try
+        {
+            ConnectorCheckpointCapture.ReadResponse(
+                _ => { elapsed += 1000; throw new TimeoutException("serial"); },
+                () => 0, () => elapsed);
+        }
+        catch (TimeoutException) { deadlineRejected = true; }
+        Check(deadlineRejected && elapsed >= 3000);
+
         string directory = Path.Combine(Path.GetTempPath(), "CamaroDiag-CDJ-" + Guid.NewGuid());
         Directory.CreateDirectory(directory);
         try
