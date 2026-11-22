@@ -35,6 +35,15 @@ async function requireCurrentAdmin(uid) {
         throw new HttpsError("permission-denied", "Compte administrateur non autorisé.");
 }
 
+async function visibleAccount(user) {
+    // Disabled accounts cannot invoke licenseStatus; admins must still be
+    // able to review/reactivate them and inspect their last license choice.
+    const license = user.disabled
+        ? { licensed: false, source: "disabled", verified: true }
+        : await licenseStatus(user.uid);
+    return { ...publicUser(user), license };
+}
+
 function publicUser(user) {
     return {
         uid: user.uid,
@@ -56,7 +65,7 @@ exports.adminGetAccount = onCall({ region, enforceAppCheck: true }, async reques
         throw new HttpsError("invalid-argument", "Adresse e-mail invalide.");
     try {
         const user = await getAuth().getUserByEmail(email.trim().toLowerCase());
-        return { account: { ...publicUser(user), license: await licenseStatus(user.uid) } };
+        return { account: await visibleAccount(user) };
     } catch (e) {
         if (e.code === "auth/user-not-found")
             throw new HttpsError("not-found", "Compte introuvable.");
@@ -111,5 +120,5 @@ exports.adminUpdateAccount = onCall({ region, enforceAppCheck: true }, async req
         await auth.setCustomUserClaims(uid, claims);
         await auth.revokeRefreshTokens(uid);
     }
-    return { account: { ...publicUser(await auth.getUser(uid)), license: await licenseStatus(uid) } };
+    return { account: await visibleAccount(await auth.getUser(uid)) };
 });
