@@ -200,12 +200,21 @@ internal sealed partial class J2534Device : IDisposable
         return ExchangeCore(payload, timeoutMs, nativeBenchReply: false);
     }
 
+    // Memory 0x63 replies contain no address echo: a previously queued reply
+    // from the same ECU CAN ID could otherwise be assigned to a later block.
+    // Also clear before VIN identity reads on the scoped channel so a stale
+    // F190 response cannot authenticate an ECU that was since replaced.
+    // A driver without the standard CLEAR_RX_BUFFER ioctl fails closed.
+    internal static bool NeedsFreshReceiveQueue(bool nativeBenchReply, bool hasMemoryReadProfile) =>
+        nativeBenchReply || hasMemoryReadProfile;
+
     // The future isolated bench caller uses a separate reply dialect.
     // The public network exchange above always remains read-only.
     private byte[] ExchangeCore(byte[] payload, int timeoutMs, bool nativeBenchReply)
     {
         EnsureOpen();
-        if (nativeBenchReply) ClearNativeReceiveQueue();
+        if (NeedsFreshReceiveQueue(nativeBenchReply, _memoryReadScope is not null))
+            ClearNativeReceiveQueue();
         var tx = CreatePayloadMessage(_requestCanId, payload);
         var messages = new[] { tx };
         uint count = 1;

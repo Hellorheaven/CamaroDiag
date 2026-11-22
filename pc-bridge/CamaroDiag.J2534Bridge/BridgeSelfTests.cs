@@ -50,6 +50,16 @@ internal static class BridgeSelfTests
         Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
             [0x14, 0xFF, 0xFF, 0xFF]), "J2534 UDS clear DTC not a read-only query");
 
+        // A memory-scoped J2534 channel must purge stale RX before every
+        // request, including its first physical F190 VIN identification.
+        // Unscoped console/diagnostic channels retain their existing policy.
+        Assert(J2534Device.NeedsFreshReceiveQueue(false, true),
+            "Scoped ECU memory requires RX queue isolation before every request");
+        Assert(J2534Device.NeedsFreshReceiveQueue(true, false),
+            "Qualified native bench always requires isolated receive traffic");
+        Assert(!J2534Device.NeedsFreshReceiveQueue(false, false),
+            "Standard read-only J2534 console does not require the memory RX policy");
+
         const string memoryVin = "1G1FA1RXXR0123456";
         var memoryVinReply = new byte[] { 0x62, 0xF1, 0x90 }
             .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray();
