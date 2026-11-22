@@ -475,7 +475,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             if (line.isEmpty()) return@mapNotNull null
             // Decode each physical responder independently. Concatenating
             // several CAN frames can create synthetic fault codes.
-            val tagged = Regex("^(?:7E[8-F]|18DAF1[0-9A-F]{2})(?:\\\\s+|(?=[0-9A-F]{4}))")
+            val tagged = Regex("""^(?:7E[8-F]|18DAF1[0-9A-F]{2})(?:\s+|(?=[0-9A-F]{4}))""")
             val compactHeader = when {
                 line.matches(Regex("^7E[8-F][0-9A-F]{6,}$")) -> line.substring(3)
                 line.matches(Regex("^18DAF1[0-9A-F]{2}[0-9A-F]{6,}$")) -> line.substring(8)
@@ -484,8 +484,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             val dataText = when {
                 compactHeader != null -> compactHeader
                 tagged.containsMatchIn(line) ->
-                    line.replaceFirst(tagged, "").replace(Regex("\\\\s+"), "")
-                else -> line.replace(Regex("\\\\s+"), "")
+                    line.replaceFirst(tagged, "").replace(Regex("""\s+"""), "")
+                else -> line.replace(Regex("""\s+"""), "")
             }
             if (dataText.length % 2 != 0 ||
                 dataText.isEmpty() ||
