@@ -660,4 +660,7 @@
     <string name="cal_native_catalog_loading">Qed jitgħabba l-katalgu proprju…</string>
     <string name="cal_native_catalog_empty">Bħalissa ebda DID proprjetarju Camaro mhu ddikjarat li jista’ jintuża. Indirizzi u skalar mhux magħrufa ma jiġux ivvintati.</string>
     <string name="cal_native_catalog_read_disabled">Il-qari mill-vettura huwa diżattivat sakemm l-indirizzar u d-dekodifikazzjoni jiġu vverifikati fuq konfigurazzjoni identika.</string>
+    <string name="export_folder_instruction">Oħloq jew agħżel il-folder CamaroDiag fil-ħażna interna u ppermetti l-aċċess. Il-fajls esportati jidhru fil-ħażna kondiviża.</string>
+    <string name="export_folder_success">Esportazzjoni ssejvjata f’/CamaroDiag/.</string>
+    <string name="export_folder_failed">Ma setgħetx tiġi ssejvjata l-esportazzjoni f’/CamaroDiag/.</string>
 </resources>
