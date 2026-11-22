@@ -121,6 +121,26 @@ class EcuBackupIntegrityTest {
         assertTrue(EcuBackupIntegrity.Problem.DIVERGENT_INDEPENDENT_READ in problems)
     }
 
+    @Test fun sameBufferCannotServeAsTwoIndependentAcquisitions() {
+        val bytes = byteArrayOf(1, 2, 3)
+        val captures = listOf(capture(bytes).copy(independentRead = bytes))
+        val result = EcuBackupIntegrity.verify(manifest(captures), captures, required)
+        assertTrue(EcuBackupIntegrity.Problem.ALIASED_INDEPENDENT_READ in result.problems)
+    }
+
+    @Test fun emptyMemorySegmentCannotPassIntegrityCheck() {
+        val captures = listOf(capture(byteArrayOf()))
+        val result = EcuBackupIntegrity.verify(manifest(captures), captures, required)
+        assertTrue(EcuBackupIntegrity.Problem.EMPTY_CAPTURE in result.problems)
+    }
+
+    @Test fun editedMalformedVinCannotPassIntegrityCheck() {
+        val captures = listOf(capture())
+        val edited = manifest(captures).copy(vehicleVin = "NOT-A-VIN")
+        val result = EcuBackupIntegrity.verify(edited, captures, required)
+        assertTrue(EcuBackupIntegrity.Problem.INVALID_VIN in result.problems)
+    }
+
     @Test fun emptyOfflineManifestDoesNotCountAsValidBackup() {
         val captures = emptyList<EcuBackupManifest.Capture>()
         val emptyManifest = manifest(captures)
