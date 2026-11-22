@@ -161,6 +161,24 @@ class CanConsoleDiagnosticCorrelationTest {
             supported.accept(frame("7E8 03 59 0A A5"), 2L))
     }
 
+    @Test fun uds19MultiFrameDtcListOnlyCompletesAtFullRecordBoundary() {
+        val valid = CanConsoleDiagnosticCorrelation(frame("7E0 03 19 02 FF"))
+        // Two complete 4-byte DTC records: 59 02 A5 + [12 34 56 01]
+        // + [78 9A BC 02], total ISO-TP length 11 bytes.
+        assertNull(valid.accept(frame("7E8 10 0B 59 02 A5 12 34 56"), 10L))
+        assertNull(valid.accept(frame("7E9 21 01 78 9A BC 02"), 11L))
+        assertArrayEquals(byteArrayOf(
+            0x59, 0x02, 0xA5.toByte(),
+            0x12, 0x34, 0x56, 0x01,
+            0x78, 0x9A.toByte(), 0xBC.toByte(), 0x02
+        ), valid.accept(frame("7E8 21 01 78 9A BC 02"), 12L))
+
+        val truncated = CanConsoleDiagnosticCorrelation(frame("7E0 03 19 02 FF"))
+        // Claims 10 bytes: last DTC missing its status byte.
+        assertNull(truncated.accept(frame("7E8 10 0A 59 02 A5 12 34 56"), 20L))
+        assertNull(truncated.accept(frame("7E8 21 01 78 9A BC"), 21L))
+    }
+
     @Test fun readDataByIdentifierStillRequiresExactDidEcho() {
         val correlation = CanConsoleDiagnosticCorrelation(frame("7E0 03 22 F1 90"))
         assertNull(correlation.accept(frame("7E8 04 62 F1 91 01"), 1))
