@@ -58,6 +58,8 @@ import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.data.obd.UdsNegativeResponse
 import com.camarodiag.gen5.data.obd.J2534LiveMemoryBackup
 import com.camarodiag.gen5.ui.theme.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -210,6 +212,7 @@ fun CamaroDiagApp(
         if (!premiumAllowed && currentTab in premiumTabs) currentTab = DiagTab.LICENSE
     }
     val permissionContext = LocalContext.current
+    val exportScope = rememberCoroutineScope()
     var pendingExport by remember { mutableStateOf<(() -> Unit)?>(null) }
     val exportFolderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -226,18 +229,30 @@ fun CamaroDiagApp(
     }
 
     fun withExportFolder(action: () -> Unit) {
+        if (pendingExport != null) return
         val owner = viewModel.activeAccountUid.value ?: return
-        val vin = viewModel.vehicle.value.vin
+        val generation = viewModel.exportAccountGeneration()
+        val selectedProfile = viewModel.vehicle.value
         val guardedAction: () -> Unit = {
-            if (viewModel.activeAccountUid.value == owner && viewModel.vehicle.value.vin == vin) action()
+            if (viewModel.canResumeExport(generation, owner) &&
+                viewModel.vehicle.value == selectedProfile) action()
         }
-        if (CamaroDiagExportStorage.authorizedTree(permissionContext) != null) {
-            guardedAction()
-        } else if (pendingExport == null) {
-            pendingExport = guardedAction
-            Toast.makeText(permissionContext, R.string.export_folder_instruction, Toast.LENGTH_LONG).show()
+        pendingExport = guardedAction
+        exportScope.launch {
             try {
-                exportFolderPicker.launch(CamaroDiagExportStorage.initialPickerUri())
+                if (CamaroDiagExportStorage.availableTree(permissionContext) != null) {
+                    pendingExport = null
+                    guardedAction()
+                } else if (viewModel.canResumeExport(generation, owner) &&
+                    viewModel.vehicle.value == selectedProfile) {
+                    Toast.makeText(permissionContext, R.string.export_folder_instruction, Toast.LENGTH_LONG).show()
+                    exportFolderPicker.launch(CamaroDiagExportStorage.initialPickerUri())
+                } else {
+                    pendingExport = null
+                }
+            } catch (cancelled: CancellationException) {
+                pendingExport = null
+                throw cancelled
             } catch (_: Exception) {
                 pendingExport = null
                 Toast.makeText(permissionContext, R.string.export_folder_failed, Toast.LENGTH_LONG).show()
