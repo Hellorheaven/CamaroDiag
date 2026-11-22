@@ -69,9 +69,19 @@ class CanConsolePhysicalExchangeCancelled(
 
 class CanConsoleLiveDiagnosticCorrelation(
     private val request: RawCanFrame,
-    private val timeoutMs: Long = 1_000L
+    private val timeoutMs: Long = 1_000L,
+    private val requestStartedAtMs: Long? = null,
+    private val requestDeadlineMs: Long = 4_000L
 ) {
-    init { require(timeoutMs > 0) }
+    init {
+        require(timeoutMs > 0)
+        require(requestDeadlineMs > 0)
+    }
+
+    private fun withinRequestSession(receivedAtMs: Long): Boolean {
+        val started = requestStartedAtMs ?: return true
+        return receivedAtMs >= started && receivedAtMs - started < requestDeadlineMs
+    }
 
     private val framer = CanConsoleStreamFramer()
     private val recentRecords = java.util.ArrayDeque<CanConsoleTimedRecord>()
@@ -106,6 +116,10 @@ class CanConsoleLiveDiagnosticCorrelation(
             if (recentRecords.size > 300) recentRecords.removeFirst()
         }
         for (frame in RawCanFrameParser.parseReceivedFrames(lines)) {
+            // Display is independent of diagnostic ownership. Late or stale
+            // frames remain in recentRecords above, but never complete a
+            // physical request after its bounded transport session expires.
+            if (!withinRequestSession(receivedAtMs)) continue
             val matcher = if (!request.isExtended && request.canId == 0x7DFL) {
                 if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) continue
                 perResponder.getOrPut(frame.canId) {
