@@ -55,7 +55,7 @@ int main(){
   // Valid CRC alone is not enough: stage/sequence inconsistency fails closed.
   golden.sequence=0;
   assert(exportLine(BootDisposition::RecoveryRequired,golden,line,sizeof(line))==14);
-  assert(std::memcmp(line,"CDJ/1 CORRUPT\\n",14)==0);
+  assert(std::memcmp(line,"CDJ/1 CORRUPT\n",14)==0);
   // Null output and undersized buffers never create a partial checkpoint.
   assert(exportLine(BootDisposition::RecoveryRequired,golden,nullptr,135)==0);
 
