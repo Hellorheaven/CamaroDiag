@@ -6,6 +6,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CamaroDiagApkRetentionTest {
+    @Test fun apkArchivePathIsDedicatedAndMatchesTheUserVisibleDestination() {
+        val category = CamaroDiagExportStorage.Category.APK
+        assertEquals("/storage/emulated/0/CamaroDiag/APK/", CamaroDiagExportStorage.displayPath(category))
+        assertEquals("primary:CamaroDiag/APK", CamaroDiagExportStorage.categoryDocumentId(category))
+        val name = CamaroDiagApkRetention.name(42, 100)
+        assertEquals("/storage/emulated/0/CamaroDiag/APK/$name", CamaroDiagExportStorage.fileDisplayPath(category, name))
+        assertTrue(CamaroDiagExportStorage.Category.values().filter { it != category }.none {
+            it.folder.startsWith("APK")
+        })
+    }
+
     @Test fun onlyManagedCompletedApksBeyondFiveAreRemoved() {
         val names = (1L..7L).map { CamaroDiagApkRetention.name(it, 100 + it) }
         val unrelated = setOf("manual.apk", "backup.zip", ".camarodiag-update.partial",
