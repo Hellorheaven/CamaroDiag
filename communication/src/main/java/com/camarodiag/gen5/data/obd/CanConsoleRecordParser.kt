@@ -54,10 +54,10 @@ object CanConsoleEcuRouting {
         } else isSelectedResponder(request, response)
 }
 
+/** Presentation has no diagnostic ownership: every valid bus frame is RX.
+ * Diagnostic correlation is a separate operation and must never relabel traffic. */
 object CanConsoleRecordParser {
-    /** A request-specific exchange never presents unmatched CAN IDs as ECU RX.
-     * Use the no-request overload only for an intentionally passive capture. */
-    fun parse(output: String, request: RawCanFrame? = null): List<ParsedCanConsoleRecord> =
+    fun parse(output: String): List<ParsedCanConsoleRecord> =
         output.lineSequence().mapNotNull { rawLine ->
             val line = rawLine.trim().removeSuffix(">").trim()
             if (line.isEmpty()) return@mapNotNull null
@@ -68,12 +68,6 @@ object CanConsoleRecordParser {
                     direction = "SYSTEM",
                     content = line.take(4_096),
                     succeeded = !CanConsoleAdapterReplyPolicy.isFailure(line)
-                )
-            } else if (request != null && !CanConsoleEcuRouting.isExpectedResponse(request, frame)) {
-                ParsedCanConsoleRecord(
-                    direction = "SYSTEM",
-                    content = line.take(4_096),
-                    succeeded = false
                 )
             } else {
                 val identifier = frame.canId.toString(16).uppercase().padStart(
