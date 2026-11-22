@@ -723,7 +723,9 @@ class BluetoothObdManager(context: Context) {
                     frameResponse, diagnosticStatus, timedCorrelation.recentReceivedRecords()
                 )
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
+                throw CanConsolePhysicalExchangeCancelled(
+                    timedCorrelation.recentReceivedRecords(), cancelled
+                )
             } catch (superseded: ObdSupersededSessionException) {
                 throw superseded
             } catch (error: Exception) {
