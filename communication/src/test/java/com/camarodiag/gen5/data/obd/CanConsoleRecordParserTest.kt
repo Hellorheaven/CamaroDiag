@@ -274,6 +274,28 @@ class CanConsoleRecordParserTest {
         }
     }
 
+    @Test fun monitorErrorsBeyondShortAdapterReplyBufferCannotBeHidden() {
+        val tracker = CanMonitorErrorTracker()
+        val traffic = (0 until 180).joinToString("\r\n") { "7E8 03 41 0C 1A" } + "\r\n"
+        tracker.append(traffic)
+        // The physical command's summarized reply can be truncated to 1 KiB.
+        assertTrue(traffic.length > 1024)
+        assertTrue(CanMonitorCompletionPolicy.accepted(traffic.take(1024)))
+        tracker.append("CAN ER")
+        tracker.append("ROR")
+        assertTrue(tracker.hasFailureAtEnd())
+    }
+
+    @Test fun monitorTrackerSupportsQuietBusAndFragmentedValidCanFrames() {
+        val quiet = CanMonitorErrorTracker()
+        assertFalse(quiet.hasFailureAtEnd())
+        val tracker = CanMonitorErrorTracker()
+        tracker.append("7E8 03 41")
+        tracker.append(" 0C 1A\r")
+        tracker.append("\n7E9 03 41 0D 1B")
+        assertFalse(tracker.hasFailureAtEnd())
+    }
+
     @Test fun monitorCommandSequencesConfigureAndRestoreOnlySelectedBusFormat() {
         assertEquals(
             listOf("ATSP6", "ATE0", "ATL0", "ATS1", "ATH1", "ATCAF0"),
