@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Teanga an aip</string>
     <string name="system_language_hint">Roghnaigh teanga CamaroDiag.</string>
     <string name="about_title">Maidir le CamaroDiag</string>
@@ -648,7 +648,7 @@
     <string name="cal_pc_ip_address">Seoladh IP an ríomhaire</string>
     <string name="cal_connect_j2534">Ceangail droichead J2534</string>
     <string name="cal_disconnect_pc_bridge">Dícheangail droichead PC</string>
-    <string name="cal_bridge_capabilities">Droichead: HS-CAN ISO15765 250/500 kbit/s agus J2534-2 SW-ISO15765 nuair a thacaíonn an tiománaí leo. Fanann CAN FD díchumasaithe.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Droichead: HS-CAN ISO15765 250/500 kbit/s agus J2534-2 SW-ISO15765 nuair a thacaíonn an tiománaí leo. Fanann CAN FD díchumasaithe.</string>
     <string name="cal_read_uds_did">Léigh UDS DID</string>
     <string name="cal_read_uds_dtcs">Léigh DTCanna UDS</string>
     <string name="cal_uds_trouble_codes">Cóid locht UDS (0x19)</string>
