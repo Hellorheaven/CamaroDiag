@@ -330,8 +330,16 @@ internal sealed partial class BridgeDesktopForm
                 }, cancellation.Token);
                 // Cancellation after the final read must not create a file.
                 cancellation.Token.ThrowIfCancellationRequested();
-                await Task.Run(() => NativeScopedBackupArchive.SaveNew(
-                    destination.FileName, scope, result, cancellation.Token), cancellation.Token);
+                await Task.Run(() =>
+                {
+                    NativeScopedBackupArchive.SaveNew(
+                        destination.FileName, scope, result, cancellation.Token);
+                    // Import the published ZIP once more through the same
+                    // user-facing offline verifier, without any ECU I/O.
+                    if (Path.GetExtension(destination.FileName).Equals(".zip",
+                            StringComparison.OrdinalIgnoreCase))
+                        NativeScopedBackupImport.VerifyZip(destination.FileName, scope);
+                }, cancellation.Token);
                 memoryStatus.Text = "Sauvegarde physique vérifiée : " +
                     result.Bytes.Length + " octets, SHA-256 " + result.Sha256 +
                     ". Couverture limitée à la zone demandée, pas à tout le calculateur. " +
