@@ -172,6 +172,7 @@ internal static class NativeScopedBackupImport
         if (values["vin"] != scope.ExpectedVin || values["controller"].Length > 128 ||
             values["count"] != "1" ||
             !KnownRegions.Contains(values["capture.0.region"]) ||
+            (channelBound && values["capture.0.region"] != scope.Region) ||
             values["capture.0.start"] != scope.StartAddress.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
             values["capture.0.expected"] != scope.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
             !KnownOrigins.Contains(values["capture.0.origin"]) ||

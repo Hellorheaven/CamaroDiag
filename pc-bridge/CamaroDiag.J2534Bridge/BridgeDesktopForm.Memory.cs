@@ -29,6 +29,8 @@ internal sealed partial class BridgeDesktopForm
         { Dock = DockStyle.Fill, Minimum = 1, Maximum = 256, Value = 64 };
     private readonly ComboBox memorySession = new()
         { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox memoryRegion = new()
+        { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Label memoryStatus = new()
         { Dock = DockStyle.Fill, AutoSize = true, Text = "Profil non défini." };
     private readonly Button memoryCreateProfile = Button("Créer le profil JSON");
@@ -45,6 +47,10 @@ internal sealed partial class BridgeDesktopForm
         memorySession.Items.Add("01 - Diagnostic par défaut");
         memorySession.Items.Add("03 - Diagnostic étendu");
         memorySession.SelectedIndex = 0;
+        foreach (var region in new[] {
+            "OTHER", "CALIBRATION", "PROGRAM_FLASH", "DATA_FLASH", "EXTERNAL_EEPROM"
+        }) memoryRegion.Items.Add(region);
+        memoryRegion.SelectedIndex = 0;
 
         WideRow(fields, new Label
         {
@@ -58,6 +64,7 @@ internal sealed partial class BridgeDesktopForm
         Row(fields, "Longueur de lecture (octets)", memoryLength);
         Row(fields, "Octets par bloc", memoryBlock);
         Row(fields, "Session autorisée", memorySession);
+        Row(fields, "Région déclarée (non certifiée)", memoryRegion);
         var profileButtons = new FlowLayoutPanel { Dock = DockStyle.Fill };
         profileButtons.Controls.Add(memoryCreateProfile);
         profileButtons.Controls.Add(memoryLoadProfile);
@@ -116,7 +123,8 @@ internal sealed partial class BridgeDesktopForm
             memoryVin.Text.Trim().ToUpperInvariant(),
             channel.RequestCanId, channel.ResponseCanId, channel.ProtocolNumber,
             ParseUiHex(memoryStart.Text), checked((uint)memoryLength.Value),
-            checked((int)memoryBlock.Value), memorySession.SelectedIndex == 1 ? 3 : 1);
+            checked((int)memoryBlock.Value), memorySession.SelectedIndex == 1 ? 3 : 1,
+            memoryRegion.SelectedItem?.ToString() ?? "OTHER");
     }
 
     private void SaveMemoryProfile()
@@ -147,7 +155,8 @@ internal sealed partial class BridgeDesktopForm
                 startAddressHex = scope.StartAddress.ToString("X8", CultureInfo.InvariantCulture),
                 lengthBytes = scope.Length,
                 maxReadBytes = scope.MaxReadBytes,
-                session = scope.Session
+                session = scope.Session,
+                region = scope.Region
             }, new JsonSerializerOptions { WriteIndented = true });
             using (var file = new FileStream(picker.FileName,
                 FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -190,6 +199,7 @@ internal sealed partial class BridgeDesktopForm
             memoryLength.Value = scope.Length;
             memoryBlock.Value = scope.MaxReadBytes;
             memorySession.SelectedIndex = scope.Session == 3 ? 1 : 0;
+            memoryRegion.SelectedItem = scope.Region;
             consoleRequestId.Text = scope.RequestCanId.ToString("X", CultureInfo.InvariantCulture);
             consoleResponseId.Text = scope.ResponseCanId.ToString("X", CultureInfo.InvariantCulture);
             consoleProtocol.SelectedItem = scope.ProtocolNumber.ToString(CultureInfo.InvariantCulture);
@@ -283,7 +293,8 @@ internal sealed partial class BridgeDesktopForm
                 input.StartAddress != scope.StartAddress ||
                 input.Length != scope.Length ||
                 input.MaxReadBytes != scope.MaxReadBytes ||
-                input.Session != scope.Session)
+                input.Session != scope.Session ||
+                input.Region != scope.Region)
                 throw new UnauthorizedAccessException(
                     "Les champs de l'écran diffèrent du profil JSON : régénérez ou rechargez le profil.");
         }

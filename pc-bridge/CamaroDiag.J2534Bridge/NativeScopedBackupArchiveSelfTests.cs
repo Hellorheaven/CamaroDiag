@@ -128,6 +128,15 @@ internal static class NativeScopedBackupArchiveSelfTests
                 NativeScopedBackupImport.VerifyZip(incompleteOsidPath, scope));
             File.Delete(incompleteOsidPath);
             File.Delete(firmwarePath);
+            var typedScope = new J2534MemoryReadScope(vin, scope.RequestCanId,
+                scope.ResponseCanId, scope.ProtocolNumber, scope.StartAddress,
+                scope.Length, scope.MaxReadBytes, scope.Session, "CALIBRATION");
+            var typedPath = Path.Combine(directory, "declared-calibration.zip");
+            NativeScopedBackupArchive.SaveNew(typedPath, typedScope, capture, CancellationToken.None);
+            Check(NativeScopedBackupImport.VerifyZip(typedPath, typedScope).DeclaredRegion ==
+                "CALIBRATION", "Explicit calibration region survives portable ZIP export");
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(typedPath, scope));
+            File.Delete(typedPath);
             // Legacy v2 files have no channel evidence. They are still
             // inspectable, but the UI must clearly flag missing route binding.
             var legacyPath = Path.Combine(directory, "legacy-v2.zip");
@@ -195,7 +204,10 @@ internal static class NativeScopedBackupArchiveSelfTests
                     .Replace("capture.0.sha256=" + sha,
                         "capture.0.sha256=" + sha.ToLowerInvariant()));
             }
-            var mobile = NativeScopedBackupImport.VerifyZip(androidStylePath, scope);
+            var mobile = NativeScopedBackupImport.VerifyZip(androidStylePath,
+                new J2534MemoryReadScope(vin, scope.RequestCanId, scope.ResponseCanId,
+                    scope.ProtocolNumber, scope.StartAddress, scope.Length,
+                    scope.MaxReadBytes, scope.Session, "CALIBRATION"));
             Check(mobile.ByteCount == bytes.Length && mobile.Sha256 == sha &&
                 mobile.DeclaredRegion == "CALIBRATION" &&
                 mobile.DeclaredOrigin == "IMPORTED_FILE" &&

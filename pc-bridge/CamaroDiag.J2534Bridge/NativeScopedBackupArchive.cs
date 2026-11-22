@@ -80,7 +80,7 @@ internal static class NativeScopedBackupArchive
                 // OTHER deliberately does not infer a region from a numeric address;
                 // an empty required map conservatively describes partial ECU coverage.
                 "required=\n" +
-                "capture.0.region=OTHER\n" +
+                "capture.0.region=" + scope.Region + "\n" +
                 "capture.0.start=" + scope.StartAddress.ToString(CultureInfo.InvariantCulture) + "\n" +
                 "capture.0.expected=" + scope.Length.ToString(CultureInfo.InvariantCulture) + "\n" +
                 "capture.0.origin=REPORTED_HARDWARE_READ\n" +
