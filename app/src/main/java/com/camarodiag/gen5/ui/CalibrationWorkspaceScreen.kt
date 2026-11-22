@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import com.camarodiag.gen5.R
@@ -65,6 +66,7 @@ import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
+import com.camarodiag.gen5.data.obd.CamaroDiagConnectorWiringGuide
 import com.camarodiag.gen5.data.obd.EcuBackupManifest
 import com.camarodiag.gen5.data.obd.GmlanIdentityEvidence
 import com.camarodiag.gen5.data.obd.EcuBackupCoverage
@@ -1517,6 +1519,27 @@ fun CalibrationWorkspaceScreen(
                                 }
                             }
                         }
+                        val wiringUriHandler = LocalUriHandler.current
+                        val wiringReference = CamaroDiagConnectorWiringGuide.findReference(
+                            vehicle.modelYear, vehicle.engine.rpo, expertControllerFamily
+                        )
+                        OutlinedButton(
+                            onClick = { runCatching { wiringUriHandler.openUri(CamaroDiagConnectorWiringGuide.genericUrl) } },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("CamaroDiagConnectors · " + stringResource(R.string.guide_title))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    wiringUriHandler.openUri(wiringReference?.url ?: CamaroDiagConnectorWiringGuide.catalogueUrl)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(wiringReference?.label ?: "ECU · CamaroDiagConnectors")
+                        }
+                        Text(stringResource(R.string.cal_expert_block_driver), color = WarnRed, fontSize = 11.sp)
                         val expertTarget = EcuBenchExpertPlan.Target(
                             controllerFamily = expertControllerFamily.trim(),
                             chipMarking = expertChipMarking.trim(),
