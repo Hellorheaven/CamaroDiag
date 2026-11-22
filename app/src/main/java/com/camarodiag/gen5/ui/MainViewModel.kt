@@ -2079,6 +2079,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val current = _liveCanMonitorState.value
                     val hasEcuResponse = SafeObdRequestPolicy.hasUnambiguousPositiveResponse(request, response)
                     val hasNegativeEcuResponse = SafeObdRequestPolicy.hasNegativeResponse(request, response)
+                    // An ECU negative response proves the TX was delivered,
+                    // although the requested diagnostic read was refused.
                     val isEcuTraffic = hasEcuResponse || hasNegativeEcuResponse
                     val responseEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
@@ -2097,7 +2099,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
-                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = hasEcuResponse) else it } +
+                            current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = isEcuTraffic) else it } +
                                 responseEvent
                         ).takeLast(300),
                         message = localizedContext.getString(
