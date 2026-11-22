@@ -60,7 +60,7 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         val chatter = (0 until 120).joinToString("\r\n") {
             "7E9 04 03 41 0D 1A"
         } + "\r\nOK\r\n"
-        assert(chatter.length > 1024)
+        assertEquals(true, chatter.length > 1024)
         correlation.append(chatter, 200L)
         assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(201L))
         assertEquals(true, correlation.hasExplicitAdapterAck())
