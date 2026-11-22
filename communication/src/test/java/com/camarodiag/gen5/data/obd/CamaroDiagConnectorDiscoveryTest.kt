@@ -45,6 +45,28 @@ class CamaroDiagConnectorDiscoveryTest {
         assertEquals(listOf("PING\n", "CAPS\n"), trailing.sent)
     }
 
+    @Test fun slowDripUsbReplyCannotExtendDiscoveryDeadline() {
+        val c = FakeChannel(listOf("$ping\n", "$caps\n", "$status\n"), chunkSize = 1)
+        var clockNanos = 0L
+        val error = runCatching {
+            CamaroDiagConnectorDiscovery.inspectWithClock(c, clock = {
+                clockNanos += 500_000_000L
+                clockNanos
+            })
+        }.exceptionOrNull()
+        assertTrue(error is IOException)
+        assertEquals(listOf("PING\n"), c.sent)
+    }
+
+    @Test fun replyArrivingExactlyAtDeadlineIsNotAccepted() {
+        val c = FakeChannel(listOf("$ping\n"), chunkSize = 512)
+        val times = listOf(0L, 0L, 3_000_000_000L).iterator()
+        assertTrue(runCatching {
+            CamaroDiagConnectorDiscovery.inspectWithClock(c, clock = { times.next() })
+        }.exceptionOrNull() is IOException)
+        assertEquals(listOf("PING\n"), c.sent)
+    }
+
     @Test fun publicDiscoveryNeverAuthenticatesOrEnablesEcuTraffic() {
         val c = FakeChannel(listOf("$ping\n", "$caps\n", "$status\n"))
         val report = CamaroDiagConnectorDiscovery.inspect(c)
