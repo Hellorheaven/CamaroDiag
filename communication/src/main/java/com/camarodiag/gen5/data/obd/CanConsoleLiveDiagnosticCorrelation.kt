@@ -39,9 +39,9 @@ object CanConsolePhysicalTransmissionPolicy {
         hasAdapterError: Boolean
     ): Boolean =
         !hasAdapterError && !CanConsoleAdapterReplyPolicy.isFailure(adapterOutput) &&
-            (hasExplicitAck ||
-                CanConsoleAdapterRestorationPolicy.accepted(adapterOutput) ||
-                diagnosticStatus != CanConsoleDiagnosticStatus.NONE)
+            // Only a timestamp-validated stream ACK can confirm TX. The
+            // adapterOutput is truncated and has no individual receive times.
+            (hasExplicitAck || diagnosticStatus != CanConsoleDiagnosticStatus.NONE)
 }
 
 class CanConsolePhysicalExchangeException(
@@ -116,7 +116,8 @@ class CanConsoleLiveDiagnosticCorrelation(
     private fun evaluate(lines: String, receivedAtMs: Long, receivedAtWallClockMs: Long) {
         for (line in lines.lineSequence().map { it.trim().removeSuffix(">").trim() }) {
             if (line.isEmpty()) continue
-            if (line.equals("OK", ignoreCase = true)) adapterAckSeen = true
+            if (line.equals("OK", ignoreCase = true) &&
+                withinRequestSession(receivedAtMs)) adapterAckSeen = true
             if (CanConsoleAdapterReplyPolicy.isFailure(line)) adapterErrorSeen = true
         }
         for (record in CanConsoleRecordParser.parse(lines)) {
