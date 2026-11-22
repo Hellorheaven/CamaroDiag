@@ -562,7 +562,7 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             // Camaro uses a two-bank layout; the 3/4-bank PID-to-sensor
             // arrangement is a different SAE table and needs explicit detection.
             val currentFamily = pid in 0x34..0x3B
-            val index = pid - if (currentFamily) 0x34 else 0x24
+            val index = pid - (if (currentFamily) 0x34 else 0x24)
             val bank = if (index < 4) 1 else 2
             val sensor = index % 4 + 1
             val sensorLabel = "Bank $bank sensor $sensor"
@@ -572,8 +572,9 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
                 CamaroUdsProtocol.decodeWidebandCurrent(four)
             else CamaroUdsProtocol.decodeWidebandVoltage(four)
             val reading = secondary ?: return emptyList()
+            val secondaryName = if (currentFamily) "current" else "voltage"
             return value("O2 $sensorLabel equivalence ratio", ratio, "lambda") +
-                value("O2 $sensorLabel " + if (currentFamily) "current" else "voltage",
+                value("O2 $sensorLabel $secondaryName",
                     reading, if (currentFamily) "mA" else "V")
         }
 
