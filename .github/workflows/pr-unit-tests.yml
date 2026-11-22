@@ -5,6 +5,12 @@ name: PR unit tests
 # automatically once when the finished PR is marked ready_for_review.
 # Never build Release or publish artifacts from a PR.
 on:
+  # Explicit checkpoint from the existing PR branch; no per-commit builds.
+  # Update .github/ci-checkpoint-request.txt to request a full Debug run.
+  push:
+    branches: [chore/unified-ci]
+    paths:
+      - '.github/ci-checkpoint-request.txt'
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -46,7 +52,7 @@ concurrency:
 
 jobs:
   verify-revision:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Require the requested immutable revision
@@ -59,7 +65,7 @@ jobs:
           fi
 
   unit-tests:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     needs: verify-revision
     runs-on: ubuntu-latest
     steps:
@@ -106,7 +112,7 @@ jobs:
           retention-days: 14
 
   windows-debug:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     needs: verify-revision
     runs-on: windows-latest
     steps:
@@ -127,7 +133,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Debug bridge self-tests failed' }
 
   native-ecu-debug:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     needs: verify-revision
     runs-on: ubuntu-latest
     steps:
@@ -139,7 +145,7 @@ jobs:
         run: bash ecu-native/mpc5566/verify.sh
 
   connectors:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     needs: verify-revision
     uses: ./.github/workflows/connectors-ci.yml
 
@@ -160,11 +166,14 @@ jobs:
             }
             const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
               owner, repo, workflow_id: 'pr-unit-tests.yml',
-              event: 'workflow_dispatch', branch: pr.head.ref,
-              status: 'completed', per_page: 100
+              branch: pr.head.ref, status: 'completed', per_page: 100
             });
+            // A marker-only push is a deliberate operator checkpoint, not
+            // automatic CI on every commit. Both authorized triggers must
+            // validate the exact current HEAD before the PR review gate opens.
             const approved = runs.find(run =>
-              run.head_sha === pr.head.sha && run.conclusion === 'success'
+              run.head_sha === pr.head.sha && run.conclusion === 'success' &&
+              ['workflow_dispatch', 'push'].includes(run.event)
             );
             if (!approved) {
               core.setFailed('Full Debug checkpoint has not succeeded on PR head ' + pr.head.sha +
