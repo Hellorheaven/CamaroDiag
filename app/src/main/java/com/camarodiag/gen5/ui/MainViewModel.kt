@@ -104,6 +104,8 @@ data class LiveCanMonitorState(
     val observedCanIds: Set<ObservedCanId> = emptySet(),
     val rawArchiveFailed: Boolean = false,
     val captureArchiveRequired: Boolean = false,
+    /** Invalidates any CAN TX confirmation opened under an older adapter or vehicle. */
+    val consoleContextGeneration: Long = 0L,
     val message: String? = null
 )
 
@@ -867,18 +869,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
+        val newCanContext = ++canConsoleContextGeneration
         val interruptedCapture = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
         discardCanMonitor(deleteArchive = !preserveCanConsole)
         detachCanRequest()
         _liveCanMonitorState.value = if (preserveCanConsole) {
             _liveCanMonitorState.value.copy(
+                consoleContextGeneration = newCanContext,
                 isCapturing = false,
                 isSendingRequest = false,
                 rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterDisconnect(
                     _liveCanMonitorState.value.rawArchiveFailed, interruptedCapture
                 )
             )
-        } else LiveCanMonitorState()
+        } else LiveCanMonitorState(consoleContextGeneration = newCanContext)
         obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
             obdManager.disconnect()
@@ -917,6 +921,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val calibrationWorkspace: StateFlow<CalibrationWorkspaceState> = _calibrationWorkspace.asStateFlow()
 
     private val _liveCanMonitorState = MutableStateFlow(LiveCanMonitorState())
+    private var canConsoleContextGeneration = 0L
     val liveCanMonitorState: StateFlow<LiveCanMonitorState> = _liveCanMonitorState.asStateFlow()
     private var canMonitorJob: Job? = null
     /** Complete raw recording on private storage; rawText is only a bounded UI preview. */
@@ -1783,6 +1788,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             content = localizedContext.getString(R.string.can_sniffer_start)
         )
         _liveCanMonitorState.value = previousState.copy(
+            consoleContextGeneration = ++canConsoleContextGeneration,
             isCapturing = true,
             rawArchiveFailed = false,
             captureArchiveRequired = true,
@@ -1978,6 +1984,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         activeCanCaptureFile?.delete()
         activeCanCaptureFile = null
         _liveCanMonitorState.value = current.copy(
+            consoleContextGeneration = ++canConsoleContextGeneration,
             rawText = "",
             report = null,
             consoleHistory = emptyList(),
