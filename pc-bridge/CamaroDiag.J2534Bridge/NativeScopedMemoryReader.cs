@@ -50,6 +50,8 @@ internal static class NativeScopedMemoryReader
     internal static byte[] ParseReadResponse(byte[] reply, int requestedBytes)
     {
         ArgumentNullException.ThrowIfNull(reply);
+        if (requestedBytes is < 1 or > 256)
+            throw new ArgumentOutOfRangeException(nameof(requestedBytes));
         if (reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x23)
             throw new IOException($"The ECU refused memory read: NRC 0x{reply[2]:X2}.");
         if (reply.Length != requestedBytes + 1 || reply[0] != 0x63)
