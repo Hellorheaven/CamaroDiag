@@ -14,6 +14,8 @@ import stat
 import re
 from pathlib import Path
 
+MAX_MANIFEST_BYTES = 64 * 1024
+
 
 def _open_regular_nofollow(path: Path):
     """Open a regular file without following a final-component symlink."""
@@ -94,6 +96,10 @@ def write_bundle(prefix: Path, image: bytes, manifest: Manifest) -> None:
     )
     if manifest != expected:
         raise ValueError("Untrusted or inconsistent backup metadata")
+    encoded_manifest = (json.dumps(asdict(manifest), indent=2, sort_keys=True) + "\n").encode("utf-8")
+    if len(encoded_manifest) > MAX_MANIFEST_BYTES:
+        raise ValueError("Manifest exceeds 64 KiB")
+
     binary = prefix.with_suffix(".bin")
     metadata = prefix.with_suffix(".json")
     # Path.exists() follows symlinks and misses dangling links; reject those too.
@@ -106,10 +112,9 @@ def write_bundle(prefix: Path, image: bytes, manifest: Manifest) -> None:
         with binary.open("xb") as out:
             binary_created = True
             out.write(image)
-        with metadata.open("x", encoding="utf-8") as out:
+        with metadata.open("xb") as out:
             metadata_created = True
-            json.dump(asdict(manifest), out, indent=2, sort_keys=True)
-            out.write("\n")
+            out.write(encoded_manifest)
     except BaseException:
         if metadata_created:
             metadata.unlink(missing_ok=True)
@@ -136,8 +141,8 @@ def verify_bundle(prefix: Path) -> Manifest:
         if not stat.S_ISREG(mode):
             raise ValueError("Backup components must be regular files")
     with _open_regular_nofollow(metadata_path) as stream:
-        raw = stream.read(64 * 1024 + 1)
-    if len(raw) > 64 * 1024:
+        raw = stream.read(MAX_MANIFEST_BYTES + 1)
+    if len(raw) > MAX_MANIFEST_BYTES:
         raise ValueError("Manifest exceeds 64 KiB")
     metadata = json.loads(
         raw.decode("utf-8"),

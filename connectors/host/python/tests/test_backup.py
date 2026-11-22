@@ -106,6 +106,15 @@ class BackupTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify_bundle(prefix)
 
+    def test_oversized_manifest_never_publishes_a_bundle(self):
+        image = b"abcd"
+        manifest = backup_manifest("é" * 12_000, len(image), 0, image)
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory) / "new-directory" / "backup"
+            with self.assertRaisesRegex(ValueError, "Manifest exceeds 64 KiB"):
+                write_bundle(prefix, image, manifest)
+            self.assertFalse(prefix.parent.exists())
+
     def test_oversized_manifest_rejected(self):
         m = backup_manifest("chip", 4, 0, b"abcd")
         with tempfile.TemporaryDirectory() as directory:
