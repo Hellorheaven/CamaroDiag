@@ -57,6 +57,7 @@ class Lfx2012FlexFuelPreflightTest {
         val identified = evidence.copy(controllerId = "12600001", firmwareId = "CAL-12345")
         val problems = Lfx2012FlexFuelPreflight.missingPreconditions(vehicle, identified)
         assertFalse(problems.contains(Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_UNVERIFIED))
+        assertFalse(problems.contains(Lfx2012FlexFuelPreflight.Status.VIN_MISMATCH))
         assertTrue(problems.contains(Lfx2012FlexFuelPreflight.Status.WRITE_NOT_VALIDATED))
         assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(vehicle, identified))
     }
