@@ -661,6 +661,9 @@ class BluetoothObdManager(context: Context) {
         require(if (frame.isExtended) frame.canId in 0..0x1FFFFFFFL else frame.canId in 0..0x7FFL) {
             "CAN identifier is outside the selected 11-bit/29-bit range."
         }
+        require(SafeRawCanTransmitPolicy.allows(frame)) {
+            "The raw CAN console refused an unsafe or unqualified diagnostic request."
+        }
 
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
