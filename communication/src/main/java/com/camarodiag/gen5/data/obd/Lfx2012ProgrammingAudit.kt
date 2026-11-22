@@ -71,9 +71,17 @@ object Lfx2012ProgrammingAudit {
     }
 
     private fun checks(snapshot: Snapshot): List<Check> {
-        fun placeholder(text: String): Boolean = text.trim().lowercase() in
-            setOf("unknown", "pending", "n/a", "no response", "unavailable",
-                "not supported", "no data", "test", "error", "ffffffff", "00000000")
+        fun placeholder(text: String): Boolean {
+            val normalized = text.trim().lowercase(java.util.Locale.ROOT)
+            if (normalized in setOf("unknown", "pending", "n/a", "no response",
+                    "unavailable", "not supported", "no data", "test", "error",
+                    "ffffffff", "00000000", "simulated", "simulation", "demo",
+                    "sample", "mock", "fake", "placeholder", "not available")) return true
+            // Reject explicit demo/synthetic tokens even in compound ECU labels.
+            // Do not reject short substrings inside legitimate identifiers.
+            return Regex("(?:^|[^a-z0-9])(?:simulated|simulation|demo|sample|mock|fake|placeholder)(?:$|[^a-z0-9])")
+                .containsMatchIn(normalized)
+        }
         fun reported(text: String?): CheckStatus = when {
             text.isNullOrBlank() -> CheckStatus.UNAVAILABLE
             placeholder(text) -> CheckStatus.REQUIRES_REVIEW
