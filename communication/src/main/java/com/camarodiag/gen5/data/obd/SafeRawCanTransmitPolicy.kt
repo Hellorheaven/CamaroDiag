@@ -7,6 +7,25 @@ package com.camarodiag.gen5.data.obd
  * arbitrary OEM CAN commands are safe or qualified.
  */
 object SafeRawCanTransmitPolicy {
+    private val disallowedDiagnosticServices = setOf(
+        0x04, 0x10, 0x11, 0x14, 0x27, 0x28, 0x2E, 0x2F,
+        0x31, 0x34, 0x35, 0x36, 0x37, 0x38, 0x85
+    )
+
+    private fun isRecognizableUnsafeDiagnostic(data: ByteArray): Boolean {
+        val first = data.firstOrNull()?.toInt()?.and(0xFF) ?: return false
+        val service = when {
+            // ISO-TP single frame: byte 1 holds the UDS/OBD service.
+            first in 1..7 && data.size >= first + 1 ->
+                data[1].toInt() and 0xFF
+            // ISO-TP first frame: byte 2 holds the diagnostic service.
+            first in 0x10..0x1F && data.size >= 3 ->
+                data[2].toInt() and 0xFF
+            else -> return false
+        }
+        return service in disallowedDiagnosticServices
+    }
+
     fun allows(frame: RawCanFrame): Boolean {
         if (frame.data.size !in 1..8) return false
         // CAN IDs reserved for ECU replies must never be used to impersonate
@@ -19,9 +38,11 @@ object SafeRawCanTransmitPolicy {
         } else {
             frame.canId == 0x7DFL || frame.canId in 0x7E0L..0x7E7L
         }
-        // Existing expert CAN traffic on other addresses is not reclassified
-        // as OBD; its remaining risks are tracked by the security audit.
-        if (!diagnosticAddress) return true
+        // GM and aftermarket interfaces can use non-standard diagnostic IDs.
+        // Block unmistakable ISO-TP programming services on *any* CAN ID,
+        // rather than allowing writes simply because the header is unknown.
+        // This does not certify arbitrary non-diagnostic CAN traffic as safe.
+        if (!diagnosticAddress) return !isRecognizableUnsafeDiagnostic(frame.data)
         val first = frame.data[0].toInt() and 0xFF
         if (first !in 1..7 || frame.data.size < first + 1) return false
         val all = frame.data.map { it.toInt() and 0xFF }
