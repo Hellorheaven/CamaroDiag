@@ -129,6 +129,31 @@ object SafeObdRequestPolicy {
         return false
     }
 
+    /**
+     * A negative response is still real ECU RX traffic, not an adapter
+     * acknowledgement. It must echo the requested service and include one NRC.
+     */
+    fun hasNegativeResponse(request: SafeObdRequest, response: String): Boolean {
+        if (parse(request.elmCommand) != request) return false
+        val serviceHex = "%02X".format(java.util.Locale.ROOT, request.service)
+        val expectedPrefix = "7F" + serviceHex
+        for (line in response.lineSequence()) {
+            val trimmed = line.trim().uppercase(java.util.Locale.ROOT)
+            if (trimmed.isEmpty() || trimmed.any {
+                    it !in '0'..'9' && it !in 'A'..'F' && !it.isWhitespace()
+                }) continue
+            var bytes = trimmed.filterNot(Char::isWhitespace)
+            if (bytes.startsWith("18DAF1") && bytes.length >= 8) bytes = bytes.drop(8)
+            else if (bytes.length >= 3 && bytes.startsWith("7E") &&
+                bytes[2] in '8'..'F') bytes = bytes.drop(3)
+            if (bytes.startsWith("03" + expectedPrefix) && bytes.length == 8) {
+                bytes = bytes.drop(2)
+            }
+            if (bytes.length == 6 && bytes.startsWith(expectedPrefix)) return true
+        }
+        return false
+    }
+
     private fun normalizeHexToken(token: String, expectedLength: Int): String? {
         val value = if (token.startsWith("0x", ignoreCase = true)) token.substring(2) else token
         return value.takeIf {
