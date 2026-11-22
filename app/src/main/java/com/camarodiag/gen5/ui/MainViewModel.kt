@@ -3702,6 +3702,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Capture the identity and evidence at the user's action, never after
         // a queued coroutine may have crossed a Firebase account switch.
         val ownerUid = authenticatedAccountUid ?: return
+        val exportGeneration = accountSessionGeneration
         val v = _vehicle.value
         val report = _mileageReport.value
         val adapterName = _adapter.value.deviceName
@@ -3722,10 +3723,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     hasMileageDiscrepancy = report?.hasDiscrepancy ?: false,
                     maxDeltaKm = report?.maxDeltaKm ?: 0.0
                 )
-                if (authenticatedAccountUid != ownerUid) return@launch
+                if (authenticatedAccountUid != ownerUid ||
+                    !isCurrentAccountGeneration(exportGeneration)) return@launch
+                val backup = JSONObject()
+                    .put("schema", "camarodiag-diagnostic-session-v1")
+                    .put("timestamp", entity.timestamp)
+                    .put("vehicle", entity.vehicleLabel)
+                    .put("vin", entity.vin)
+                    .put("adapter", entity.adapterName)
+                    .put("dtcs", JSONArray(diagnosticCodes))
+                    .put("mileageAuditPerformed", report != null)
+                    .put("mileageSummary", entity.mileageSummary)
+                    .put("hasMileageDiscrepancy", entity.hasMileageDiscrepancy)
+                    .put("maxDeltaKm", entity.maxDeltaKm)
+                CamaroDiagExportStorage.write(getApplication<Application>(),
+                    "CamaroDiag_session_${entity.timestamp}.json", "application/json",
+                    beforePublish = { check(authenticatedAccountUid == ownerUid &&
+                        isCurrentAccountGeneration(exportGeneration)) }
+                ) { it.write(backup.toString(2).toByteArray(Charsets.UTF_8)) }
+                if (authenticatedAccountUid != ownerUid ||
+                    !isCurrentAccountGeneration(exportGeneration)) return@launch
                 sessionDao.insertSession(entity)
-                if (authenticatedAccountUid == ownerUid) {
-                    _connectionMessage.value = localizedContext.getString(R.string.msg_session_saved)
+                if (isCurrentAccountGeneration(exportGeneration)) {
+                    _connectionMessage.value = localizedContext.getString(R.string.msg_session_saved) +
+                        "\n" + CamaroDiagExportStorage.DISPLAY_PATH
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
