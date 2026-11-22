@@ -10,7 +10,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Guard the 24 EU languages and the six additional supported languages.
- * Partial translations may fall back to English, but must never contain broken resources.
+ * Every advertised language must ship its complete nonblank resource set.
  */
 class LocaleResourcesIntegrityTest {
     private val locales = listOf(
@@ -166,6 +166,31 @@ class LocaleResourcesIntegrityTest {
             "Incomplete translations: $missingTotal missing keys in ${missingByLocale.size} locales\n$details",
             missingByLocale.isEmpty()
         )
+    }
+
+    @Test fun advertisedLocalesDoNotContainBlankTranslationsForNonblankSourceStrings() {
+        val source = strings("en").filterValues { it.isNotBlank() }.keys
+        val blank = locales.flatMap { locale ->
+            val localized = strings(locale)
+            source.filter { key -> localized[key]?.isBlank() == true }.map { "$locale/$it" }
+        }
+        assertTrue("Blank translations: ${blank.joinToString(", ")}", blank.isEmpty())
+    }
+
+    @Test fun sharedExportFolderGuidanceIsLocalizedAndPreservesFolderName() {
+        val keys = listOf("export_folder_instruction", "export_folder_success", "export_folder_failed")
+        val source = strings("en")
+        for (locale in locales) {
+            val localized = strings(locale)
+            for (key in keys) {
+                val value = localized.getValue(key)
+                assertTrue("Missing CamaroDiag folder name in $locale/$key", value.contains("CamaroDiag"))
+                if (key != "export_folder_instruction")
+                    assertTrue("Missing public folder path in $locale/$key", value.contains("/CamaroDiag/"))
+                if (locale != "en")
+                    assertFalse("Export folder guidance not localized in $locale/$key", value == source.getValue(key))
+            }
+        }
     }
 
     @Test fun everyLocaleContainsAllLiveSensorLabelsAndPluralResources() {
