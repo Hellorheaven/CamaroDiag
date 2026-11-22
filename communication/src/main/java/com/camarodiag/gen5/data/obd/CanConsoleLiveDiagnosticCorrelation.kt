@@ -47,7 +47,13 @@ object CanConsolePhysicalTransmissionPolicy {
 class CanConsolePhysicalExchangeException(
     val receivedRecords: List<CanConsoleTimedRecord>,
     cause: Throwable
-) : IllegalStateException(cause)
+) : IllegalStateException(cause) {
+    /** A command-response timeout is not necessarily a disconnected adapter. */
+    fun isResponseTimeout(): Boolean =
+        generateSequence(this.cause) { it.cause }
+            .take(16)
+            .any { it is java.net.SocketTimeoutException }
+}
 
 /**
  * Cancellation preserves observed RX without converting cancellation into a
