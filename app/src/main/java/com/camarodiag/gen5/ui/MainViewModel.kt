@@ -46,6 +46,7 @@ import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
 import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
+import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
@@ -1788,14 +1789,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // A quickly cancelled or superseded session must not create or claim a new archive.
                 if (canMonitorJob !== monitorJob || !currentCoroutineContext().isActive) return@launch
-                val archive = File.createTempFile("camarodiag-can-", ".log", getApplication<Application>().cacheDir)
+                val archive = try {
+                    File.createTempFile("camarodiag-can-", ".log", getApplication<Application>().cacheDir)
+                } catch (error: java.io.IOException) {
+                    throw CanCaptureArchiveWriteException(error)
+                }
                 val previousArchive = activeCanCaptureFile
                 activeCanCaptureFile = archive
                 previousArchive?.delete()
                 val captured = archive.bufferedWriter(Charsets.US_ASCII).use { writer ->
                     obdManager.captureCanMonitor(durationMs, can29Bit) { chunk ->
                     if (canMonitorJob === monitorJob) {
-                        writer.write(chunk)
+                        try {
+                            writer.write(chunk)
+                        } catch (error: java.io.IOException) {
+                            throw CanCaptureArchiveWriteException(error)
+                        }
                         // Keep the raw stream unchanged, but decode only complete lines:
                         // Bluetooth/USB reads may split a CAN record at any character.
                         val current = _liveCanMonitorState.value
