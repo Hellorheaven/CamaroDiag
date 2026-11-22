@@ -72,7 +72,7 @@ internal static class SelfTests
             using var link=new Simulation(false,false,gap.Item1,gap.Item2);
             var client=new BinaryDiscovery(link);
             Require(client.Verify().Length==3 && link.Commands==3);
-            Require(link.ReadTimeout > 0 && link.WriteTimeout > 0);
+            Require(link.ReadTimeout == 1500 && link.WriteTimeout == 1500);
         }
         foreach(var bad in new[]{(true,false),(false,true)})
         {
@@ -81,6 +81,12 @@ internal static class SelfTests
             ExpectFailure(()=>client.Verify());
             ExpectFailure(()=>client.Verify());
             Require(link.Commands==1);
+        }
+        using (var broken = new Simulation(true, false, zeroRead: true))
+        {
+            var client = new BinaryDiscovery(broken);
+            ExpectFailure(() => client.Verify());
+            Require(broken.ReadTimeout == 1500 && broken.WriteTimeout == 1500);
         }
         using (var slow = new Simulation(false, false))
         {
