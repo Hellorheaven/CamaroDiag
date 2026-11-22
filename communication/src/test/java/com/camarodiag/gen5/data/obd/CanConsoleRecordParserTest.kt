@@ -160,4 +160,23 @@ class CanConsoleRecordParserTest {
         assertTrue(records[0].content.contains("ID=7E8"))
         assertTrue(records[1].content.contains("ID=7E9"))
     }
+
+    @Test fun rawCanAdapterCannotConfirmPhysicalRequestUsingAnotherEcu() {
+        val request11 = requireNotNull(RawCanFrameParser.parse("7E0 02 01 0C"))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E9 03 41 0C 1A", request11
+        ))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E9 03 41 0C 1A\r\n7E8 03 41 0C 1A", request11
+        ))
+        val request29 = requireNotNull(RawCanFrameParser.parse("18DA10F1 03 22 F1 90"))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "18DAF111 03 62 F1 90", request29
+        ))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "18DAF110 03 62 F1 90", request29
+        ))
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission("OK", request11))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission("SEARCHING...", request11))
+    }
 }
