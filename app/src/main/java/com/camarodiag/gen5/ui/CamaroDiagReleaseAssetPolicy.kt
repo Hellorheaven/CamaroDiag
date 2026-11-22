@@ -2,7 +2,7 @@ package com.camarodiag.gen5.ui
 
 /** Only fixed-name APK assets from the official CamaroDiag release path are installable. */
 internal object CamaroDiagReleaseAssetPolicy {
-    private val allowedTag = Regex("[A-Za-z0-9._-]+")
+    private val allowedTag = Regex("[A-Za-z0-9._+-]+")
     private const val prefix = "https://github.com/Hellorheaven/CamaroDiag/releases/download/"
 
     fun accepts(url: String?, fileName: String): Boolean {
