@@ -58,6 +58,8 @@ Pour la version prototype 0.1.0, la seule fonction disponible est la découverte
 3. Sélectionner **CamaroDiagConnectors • USB ASCII** pour le firmware normal, ou **CamaroDiagConnectors • USB CD/1** uniquement pour la variante binaire expérimentale. Autoriser l'accès USB dans Android ; si nécessaire, sélectionner de nouveau le bouton.
 4. Consulter la version et les capacités retournées. En mode CD/1, une erreur de CRC, version ou séquence arrête la découverte sans repli ASCII. Le CRC ne constitue pas une authentification. Le diagnostic doit rester indisponible : la liaison de découverte est refermée à la fin de cette opération.
 
+Le mode CD/1 exige un seul port série CDC ACM compatible, sans sélection arbitraire de port. Redémarrer uniquement le prototype isolé entre découvertes binaires, conformément à sa documentation. Pour Windows, l'outil autonome de découverte est disponible dans le dépôt CamaroDiagConnectors, indépendamment du pont J2534 ; il ne s'agit pas d'un pilote de programmation.
+
 Le mode CD/1 est prévu pour les essais sur carte isolée, conformément au [guide USB binaire](https://github.com/Hellorheaven/CamaroDiagConnectors/blob/e8593d29c711e7d09f3bb00b69f467f529f75647/docs/user/usb-binary-discovery.md). Aucun mode ne permet de communiquer avec un ECU via ce prototype.
 
 Les futurs modes CAN, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD et EEPROM ISP/chip-off nécessitent un firmware et du matériel réellement compatibles et qualifiés. Voir les [exigences du connecteur](https://github.com/Hellorheaven/CamaroDiagConnectors/issues/7). Aucun mode de programmation n'est activé à partir d'une réponse de découverte.
