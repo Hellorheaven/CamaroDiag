@@ -207,7 +207,7 @@ class DiscoveryTests(unittest.TestCase):
             def readline(self):
                 return next(self.replies)
         transport = Sequence()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IOError):
             DiscoveryClient(transport).verify_read_only()
         self.assertEqual(transport.commands, [b"PING\n", b"CAPS\n"])
 
@@ -252,7 +252,7 @@ class DiscoveryTests(unittest.TestCase):
             def readline(self):
                 return next(self.replies)
         transport = Sequence()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IOError):
             DiscoveryClient(transport).verify_read_only()
         self.assertEqual(transport.commands, [b"PING\n", b"CAPS\n", b"STATUS\n"])
 
