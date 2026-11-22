@@ -71,7 +71,9 @@ class CanConsoleLiveDiagnosticCorrelation(
     private val request: RawCanFrame,
     private val timeoutMs: Long = 1_000L,
     private val requestStartedAtMs: Long? = null,
-    private val requestDeadlineMs: Long = 4_000L
+    private val requestDeadlineMs: Long = 4_000L,
+    /** Physical transport requires beginRequest before any diagnostic ownership. */
+    private val requireExplicitStart: Boolean = false
 ) {
     init {
         require(timeoutMs > 0)
@@ -87,7 +89,7 @@ class CanConsoleLiveDiagnosticCorrelation(
     }
 
     private fun withinRequestSession(receivedAtMs: Long): Boolean {
-        val started = startedAtMs ?: return true
+        val started = startedAtMs ?: return !requireExplicitStart
         return receivedAtMs >= started && receivedAtMs - started < requestDeadlineMs
     }
 
