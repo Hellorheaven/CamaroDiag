@@ -18,7 +18,7 @@ internal static class NativeScopedMemoryReader
 
     internal sealed record VerifiedCapture(
         byte[] Bytes, uint StartAddress, string ExpectedVin, string Sha256,
-        int BlocksPerPass);
+        int BlocksPerPass, byte[]? SecondBytes = null);
 
     internal static byte[] BuildReadRequest(
         J2534MemoryReadScope scope, uint address, int bytes)
@@ -157,6 +157,7 @@ internal static class NativeScopedMemoryReader
 
         var size = checked((int)scope.Length);
         byte[]? first = null;
+        byte[]? second = null;
         var blocksPerPass = 0;
         for (var pass = 1; pass <= 2; pass++)
         {
@@ -187,17 +188,23 @@ internal static class NativeScopedMemoryReader
                 first = output;
                 blocksPerPass = blocks;
             }
-            else if (first is null || !CryptographicOperations.FixedTimeEquals(first, output))
-                throw new InvalidDataException(
-                    "Two independent physical memory readings differ. No backup may be exported.");
+            else
+            {
+                if (first is null || blocks != blocksPerPass ||
+                    !CryptographicOperations.FixedTimeEquals(first, output))
+                    throw new InvalidDataException(
+                        "Two independent physical memory readings differ. No backup may be exported.");
+                second = output;
+            }
         }
 
         // A replacement during the final block must invalidate the entire
         // result even if the replacement happens to have identical bytes.
         await RequireLiveVinAsync(link, scope, cancellationToken);
-        if (first is null) throw new InvalidDataException("No physical bytes received.");
+        if (first is null || second is null)
+            throw new InvalidDataException("No independent physical bytes received.");
         return new VerifiedCapture(
             first, scope.StartAddress, scope.ExpectedVin,
-            Convert.ToHexString(SHA256.HashData(first)), blocksPerPass);
+            Convert.ToHexString(SHA256.HashData(first)), blocksPerPass, second);
     }
 }
