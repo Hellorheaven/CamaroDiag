@@ -272,6 +272,26 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun stnSubstringWithoutRealFirmwareVersionCannotElevateAdapterCapabilities() {
+        for (banner in listOf("NOT STN2120", "unknown STN", "STN", "STN21201", "STN2120BROKEN")) {
+            val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
+                deviceName = "OBDLink MX+",
+                macAddress = "00:00:00:00:00:01",
+                atzResp = banner,
+                stiResp = banner,
+                atalResp = "OK",
+                stp61Resp = "OK",
+                headersResp = "OK",
+                protocolResp = "OK"
+            )
+            assertFalse("SW-CAN must require a versioned STN firmware banner: $banner",
+                capabilities.supportsSwCan)
+            assertTrue("Unverified STN banner must not set PRO_STN: $banner",
+                capabilities.tier != AdapterTier.PRO_STN)
+        }
+    }
+
+    @Test
     fun enablesSwCanOnlyForDocumentedMxHardwareWithAcceptedProtocol() {
         val mxPlus = CamaroUdsProtocol.evaluateAdapterProbe(
             deviceName = "OBDLink MX+",
