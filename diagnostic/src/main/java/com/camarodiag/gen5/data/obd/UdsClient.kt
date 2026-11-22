@@ -203,7 +203,13 @@ class UdsClient private constructor(
     suspend fun diagnosticSessionControl(session: Int): ByteArray {
         require(session in policy.allowedSessions) { "Diagnostic session is not allowed by the verified ECU profile." }
         val response = request(0x10, byteArrayOf(session.toByte()))
-        require(response.size >= 2 && (response[1].toInt() and 0x7F) == session) {
+        // ISO 14229 positive session response: SID + echoed subfunction,
+        // optionally followed by the complete four-byte P2/P2* timing tuple.
+        // A partial timing tuple cannot authorize later security/write calls.
+        require(response.size == 2 || response.size == 6) {
+            "ECU returned a truncated or overlong diagnostic session acknowledgement."
+        }
+        require((response[1].toInt() and 0xFF) == session) {
             "ECU did not echo the requested diagnostic session."
         }
         activeSession = session
