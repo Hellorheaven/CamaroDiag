@@ -31,8 +31,8 @@ object CamaroUdsProtocol {
         // Select STN-only monitor commands only when the adapter's firmware response
         // identifies an STN chipset. A Bluetooth name or the OBDLink product banner is
         // not sufficient: some adapters expose ELM-compatible firmware instead.
-        val isStn = stiResp.contains("STN", ignoreCase = true) ||
-            atzResp.contains("STN", ignoreCase = true)
+        val isStn = hasStnFirmwareBanner(stiResp) ||
+            hasStnFirmwareBanner(atzResp)
 
         // STP 61 alone is not proof of DLC pin-1 wiring. MX/MX+ are explicitly listed by the adapter maker as SW-CAN capable.
         val normalizedDeviceName = deviceName.uppercase(Locale.ROOT)
@@ -60,6 +60,12 @@ object CamaroUdsProtocol {
             rawProbeLog = logs,
             supportsCanTransmit = hasPositiveMode01Pid00Response(transmitProbeResp)
         )
+    }
+
+    /** STN status must be a real firmware banner, never an arbitrary substring. */
+    private fun hasStnFirmwareBanner(response: String): Boolean {
+        val banner = Regex("^STN[0-9]{4}(?:$|[^0-9].*)", RegexOption.IGNORE_CASE)
+        return response.lineSequence().any { banner.matches(it.trim()) }
     }
 
     /** Accept an adapter's isolated OK acknowledgement, not substrings such
