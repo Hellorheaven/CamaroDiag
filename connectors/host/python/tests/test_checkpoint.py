@@ -71,6 +71,16 @@ class CheckpointTest(unittest.TestCase):
             self.assertFalse(final.exists())
             self.assertEqual([], list(pathlib.Path(root).iterdir()))
 
+    def test_checkpoint_fsync_failure_never_publishes_uncommitted_evidence(self):
+        with tempfile.TemporaryDirectory() as root:
+            final = pathlib.Path(root) / "checkpoint.cdj"
+            with patch("camarodiagconnectors.checkpoint.os.fsync",
+                       side_effect=OSError("sync failed")):
+                with self.assertRaisesRegex(OSError, "sync failed"):
+                    save_checkpoint(final, FIXTURE)
+            self.assertFalse(final.exists())
+            self.assertEqual([], list(pathlib.Path(root).iterdir()))
+
     def test_checkpoint_atomic_publish_preserves_unrelated_existing_evidence(self):
         with tempfile.TemporaryDirectory() as root:
             final = pathlib.Path(root) / "checkpoint.cdj"
