@@ -103,8 +103,16 @@ class CanConsoleLiveDiagnosticCorrelation(
     private var diagnosticStatus = CanConsoleDiagnosticStatus.NONE
     private var adapterAckSeen = false
     private var adapterErrorSeen = false
+    // The final unterminated line arrived with the last RX chunk, not when
+    // the adapter command later returned or timed out.
+    private var lastChunkAtMs: Long? = null
+    private var lastChunkWallClockMs: Long? = null
 
     fun append(chunk: String, receivedAtMs: Long, receivedAtWallClockMs: Long = receivedAtMs) {
+        if (chunk.isNotEmpty()) {
+            lastChunkAtMs = receivedAtMs
+            lastChunkWallClockMs = receivedAtWallClockMs
+        }
         evaluate(framer.append(chunk).completeLines, receivedAtMs, receivedAtWallClockMs)
     }
 
@@ -115,7 +123,11 @@ class CanConsoleLiveDiagnosticCorrelation(
 
     /** Called after the adapter command completes to process a final unterminated line. */
     fun complete(receivedAtMs: Long, receivedAtWallClockMs: Long = receivedAtMs): CanConsoleDiagnosticStatus {
-        evaluate(framer.drainTrailing().completeLines, receivedAtMs, receivedAtWallClockMs)
+        val trailing = framer.drainTrailing().completeLines
+        if (trailing.isNotEmpty()) {
+            evaluate(trailing, lastChunkAtMs ?: receivedAtMs,
+                lastChunkWallClockMs ?: receivedAtWallClockMs)
+        }
         return diagnosticStatus
     }
 
