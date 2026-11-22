@@ -168,6 +168,7 @@ internal static class NativeE39WriteSequence
                 foreach (var frame in item.Dry)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    await RequireSupplyAsync();
                     NativeE39FlashCommands.RequireWriteSuccess(
                         await link.ExchangeAsync(frame, cancellationToken));
                 }
@@ -182,6 +183,11 @@ internal static class NativeE39WriteSequence
                 cancellationToken.ThrowIfCancellationRequested();
                 var s = item.Sector;
                 currentSector = s;
+                // Previous sector operations or a changed connection may have
+                // invalidated the all-sector preflight. Reacquire this sector
+                // immediately before its erase, never trusting cached bytes.
+                await RequireFreshBytesAsync(s.Address, s.Original,
+                    "ECU sector changed since preflight; refusing further erase.");
                 await RequireSupplyAsync();
                 // No network, retransmission or automatic recovery here: the
                 // caller's journal must persist the decision before erase.
