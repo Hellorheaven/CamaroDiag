@@ -194,6 +194,19 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun repeatedInvalidFlowControlFramesCannotKeepIsoTpSendAliveForever() = runBlocking {
+        val wrongFrames = List(9) { CanFrame(0x7E8, byteArrayOf(0x21, 0x00, 0x00)) }
+        val transport = FakeCanTransport(wrongFrames)
+        val channel = IsoTpChannel(transport, 0x7E0, 0x7E8)
+        val error = runCatching {
+            channel.sendOnly(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 100)
+        }.exceptionOrNull()
+        assertTrue(error is IsoTpException)
+        assertTrue(error?.message?.contains("non-flow-control") == true)
+        assertEquals(1, transport.sent.size)
+    }
+
+    @Test
     fun acceptsExactlyFiveIsoTpFlowControlWaitFramesBeforeContinueToSend() = runBlocking {
         val flowControlWait = CanFrame(0x7E8, byteArrayOf(0x31, 0x00, 0x00))
         val flowControlContinue = CanFrame(0x7E8, byteArrayOf(0x30, 0x00, 0x00))
