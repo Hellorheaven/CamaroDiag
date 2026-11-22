@@ -278,4 +278,51 @@ class J2534LiveMemoryBackupTest {
         }.isFailure)
         assertEquals(32, ecu.reads)
     }
+    @Test fun truncatedMemoryReplyIsRejectedWithoutCompletingBackup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                val reply = ecu.exchange(payload, timeoutMs)
+                return if (payload[0] == 0x23.toByte()) reply.copyOf(reply.size - 1) else reply
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertEquals(1, ecu.reads)
+    }
+
+    @Test fun wrongMemoryServiceReplyIsRejectedWithoutCompletingBackup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                val reply = ecu.exchange(payload, timeoutMs)
+                if (payload[0] == 0x23.toByte()) reply[0] = 0x62
+                return reply
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertEquals(1, ecu.reads)
+    }
+
+    @Test fun corruptedReadReplyCannotBecomeAExportableBackup() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                val reply = ecu.exchange(payload, timeoutMs)
+                // All first-pass chunks are unchanged; corrupt the first reply of pass 2.
+                if (payload[0] == 0x23.toByte() && ecu.reads == 4) {
+                    reply[1] = (reply[1].toInt() xor 0x01).toByte()
+                }
+                return reply
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request())
+        }.isFailure)
+        assertEquals(6, ecu.reads)
+    }
+
 }
