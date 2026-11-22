@@ -137,4 +137,18 @@ class Lfx2012ProgrammingAuditTest {
         })
     }
 
+    @Test fun syntheticOrDemoEvidenceIsNeverPresentedAsRealObservation() {
+        val suspectValues = listOf("SIMULATED", "demo", "SAMPLE", "mock",
+            "fake", "placeholder", "CAL-DEMO-01")
+        suspectValues.forEach { suspect ->
+            val report = Lfx2012ProgrammingAudit.review(before,
+                before.copy(ecuName = suspect, capturedAtUtcMillis = 2L))
+            assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, report.overall)
+            assertFalse(report.physicalValidationComplete)
+        }
+        val dtcReport = Lfx2012ProgrammingAudit.review(before,
+            before.copy(dtcs = listOf("SIMULATED"), capturedAtUtcMillis = 2L))
+        assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, dtcReport.overall)
+    }
+
 }
