@@ -14,6 +14,18 @@ data class SafeObdRequest(
 )
 
 object SafeObdRequestPolicy {
+    // A complete ECU-looking data line does not override a physical adapter
+    // failure reported elsewhere in the same ELM/STN command response.
+    private val adapterFailureMarkers = Regex(
+        """\b(CAN ERROR|BUS ERROR|BUFFER FULL|NO DATA|UNABLE TO CONNECT|STOPPED|ERROR)\b""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private fun hasAdapterFailure(response: String): Boolean =
+        response.lineSequence().any { line ->
+            line.contains('?') || adapterFailureMarkers.containsMatchIn(line)
+        }
+
     // Accepted commands are tiny; reject oversized text before allocating token lists.
     private const val MAX_INPUT_LENGTH = 32
 
@@ -91,7 +103,7 @@ object SafeObdRequestPolicy {
      * payloads, optionally prefixed by a supported CAN responder header.
      */
     fun hasPositiveResponse(request: SafeObdRequest, response: String): Boolean {
-        if (parse(request.elmCommand) != request) return false
+        if (parse(request.elmCommand) != request || hasAdapterFailure(response)) return false
         if (request.service == 0x09 && ':' in response) {
             val assembled = ObdNumberedIdentityFrames.parse(response) ?: return false
             return hasPositiveResponse(request, assembled.joinToString("") {
@@ -190,7 +202,7 @@ object SafeObdRequestPolicy {
      * acknowledgement. It must echo the requested service and include one NRC.
      */
     fun hasNegativeResponse(request: SafeObdRequest, response: String): Boolean {
-        if (parse(request.elmCommand) != request) return false
+        if (parse(request.elmCommand) != request || hasAdapterFailure(response)) return false
         val serviceHex = "%02X".format(java.util.Locale.ROOT, request.service)
         val expectedPrefix = "7F" + serviceHex
         for (line in response.lineSequence()) {

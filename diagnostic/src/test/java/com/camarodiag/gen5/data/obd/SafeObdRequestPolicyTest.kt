@@ -307,4 +307,26 @@ class SafeObdRequestPolicyTest {
             complete.replace("490201", "490401")))
     }
 
+
+    @Test
+    fun adapterFaultOverridesApparentlyValidObdEcuResponse() {
+        val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        for (fault in listOf("CAN ERROR", "BUS ERROR", "BUFFER FULL",
+            "NO DATA", "UNABLE TO CONNECT", "STOPPED", "ERROR", "?")) {
+            val positiveAndFault = "41 52 80\r\n" + fault
+            val negativeAndFault = "7F 01 11\r\n" + fault
+            assertEquals(fault, false,
+                SafeObdRequestPolicy.hasPositiveResponse(ethanol, positiveAndFault))
+            assertEquals(fault, false,
+                SafeObdRequestPolicy.hasNegativeResponse(ethanol, negativeAndFault))
+            assertEquals(fault, false,
+                SafeObdRequestPolicy.hasUnambiguousPositiveResponse(ethanol, positiveAndFault))
+            assertEquals(fault, SafeObdRequestPolicy.ReadResponseKind.UNMATCHED_OR_ADAPTER,
+                SafeObdRequestPolicy.classifyResponse(ethanol, positiveAndFault))
+            assertEquals(fault, SafeObdRequestPolicy.ReadResponseKind.UNMATCHED_OR_ADAPTER,
+                SafeObdRequestPolicy.classifyResponse(ethanol, negativeAndFault))
+        }
+        assertEquals(SafeObdRequestPolicy.ReadResponseKind.POSITIVE_ECU,
+            SafeObdRequestPolicy.classifyResponse(ethanol, "41 52 80\r\nOK"))
+    }
 }
