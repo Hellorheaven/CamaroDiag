@@ -136,7 +136,11 @@ class CanConsoleLiveDiagnosticCorrelation(
             if (line.isEmpty()) continue
             if (line.equals("OK", ignoreCase = true) &&
                 withinRequestSession(receivedAtMs)) adapterAckSeen = true
-            if (CanConsoleAdapterReplyPolicy.isFailure(line)) adapterErrorSeen = true
+            // Pre-TX setup output is visible history, but cannot poison the
+            // transmission that has not yet begun. Once TX has started, any
+            // adapter failure remains authoritative (including a late one).
+            if (startedAtMs != null && CanConsoleAdapterReplyPolicy.isFailure(line))
+                adapterErrorSeen = true
         }
         for (record in CanConsoleRecordParser.parse(lines)) {
             recentRecords.addLast(CanConsoleTimedRecord(record, receivedAtWallClockMs))
