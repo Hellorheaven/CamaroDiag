@@ -258,15 +258,14 @@ class SafeObdRequestPolicyTest {
     @Test
     fun readResponseClassificationPreservesSentVsAcceptedMeaning() {
         val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
-        val kind = SafeObdRequestPolicy.ReadResponseKind
-        assertEquals(kind.POSITIVE_ECU,
+        assertEquals(SafeObdRequestPolicy.ReadResponseKind.POSITIVE_ECU,
             SafeObdRequestPolicy.classifyResponse(request, "41 52 80"))
-        assertEquals(kind.NEGATIVE_ECU,
+        assertEquals(SafeObdRequestPolicy.ReadResponseKind.NEGATIVE_ECU,
             SafeObdRequestPolicy.classifyResponse(request, "7F 01 11"))
-        assertEquals(kind.NEGATIVE_ECU,
+        assertEquals(SafeObdRequestPolicy.ReadResponseKind.NEGATIVE_ECU,
             SafeObdRequestPolicy.classifyResponse(request, "41 52 80\n7F 01 11"))
         for (invalid in listOf("OK", "NO DATA", "41 52", "41 53 80", "")) {
-            assertEquals(invalid, kind.UNMATCHED_OR_ADAPTER,
+            assertEquals(invalid, SafeObdRequestPolicy.ReadResponseKind.UNMATCHED_OR_ADAPTER,
                 SafeObdRequestPolicy.classifyResponse(request, invalid))
         }
     }
