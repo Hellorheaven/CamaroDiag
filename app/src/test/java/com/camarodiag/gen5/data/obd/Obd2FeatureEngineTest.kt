@@ -481,4 +481,42 @@ class Obd2FeatureEngineTest {
         assertTrue(identity.ecuNames.isEmpty())
     }
 
+    @Test
+    fun discoversAndReadsEthanolPidOnlyWhenEcuAdvertisesIt() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000001"
+                "0120" -> "412000000001"
+                "0140" -> "414000004000"
+                "0152" -> "415280"
+                else -> "NO DATA"
+            }
+        })
+        val supported = engine.discoverSupportedPids()
+        assertTrue(0x52 in supported)
+        val response = engine.readMode01PidIfSupported(0x52, supported)
+        assertEquals("415280", response)
+        assertEquals(listOf("0100", "0120", "0140", "0152"), commands)
+    }
+
+    @Test
+    fun absentEthanolBitmapBitNeverSendsPid52() = runBlocking {
+        val commands = mutableListOf<String>()
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            commands += command
+            when (command) {
+                "0100" -> "410000000001"
+                "0120" -> "412000000001"
+                "0140" -> "414000000000"
+                else -> "NO DATA"
+            }
+        })
+        val supported = engine.discoverSupportedPids()
+        assertTrue(0x52 !in supported)
+        assertNull(engine.readMode01PidIfSupported(0x52, supported))
+        assertTrue("0152" !in commands)
+    }
+
 }
