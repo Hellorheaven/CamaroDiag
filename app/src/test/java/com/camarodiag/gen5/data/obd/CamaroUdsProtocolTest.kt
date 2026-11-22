@@ -41,7 +41,9 @@ class CamaroUdsProtocolTest {
         assertArrayEquals(intArrayOf(0x1A, 0xF8),
             CamaroUdsProtocol.parsePidBytes("7E804410C1AF8", "0C"))
         for (invalid in listOf("410C", "41 0C", "7E8 03 41 0C 1A F8",
-                "SEARCH410C1AF8", "41 0D 1A F8", "7E8 41 0C GG F8")) {
+                "SEARCH410C1AF8", "41 0D 1A F8", "7E8 41 0C GG F8",
+                "BAD 04 41 0C 1A F8", "7DF 04 41 0C 1A F8",
+                "18DB33F1 04 41 0C 1A F8")) {
             assertNull("Invalid telemetry must not be interpreted: $invalid",
                 CamaroUdsProtocol.parsePidBytes(invalid, "0C"))
         }
