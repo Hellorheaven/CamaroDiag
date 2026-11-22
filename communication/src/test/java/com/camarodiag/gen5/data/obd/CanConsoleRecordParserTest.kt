@@ -182,6 +182,16 @@ class CanConsoleRecordParserTest {
         assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission("SEARCHING...", request11))
     }
 
+    @Test fun normalizedElmCommandReplyRemainsAcceptableForRestoration() {
+        assertEquals("OK", normalizeElmReply("ATSP6\r\nOK\r\n", "ATSP6"))
+        assertTrue(CanConsoleAdapterRestorationPolicy.accepted(
+            normalizeElmReply("ATSP6\r\nOK\r\n", "ATSP6")
+        ))
+        assertFalse(CanConsoleAdapterRestorationPolicy.accepted(
+            normalizeElmReply("ATSP6\r\n?\r\n", "ATSP6")
+        ))
+    }
+
     @Test fun canAdapterRestorationRequiresExplicitCleanOk() {
         for (reply in listOf("OK", "ok>", "\r\nOK\r\n", "ATSP6\r\nOK")) {
             assertTrue(reply, CanConsoleAdapterRestorationPolicy.accepted(reply))
