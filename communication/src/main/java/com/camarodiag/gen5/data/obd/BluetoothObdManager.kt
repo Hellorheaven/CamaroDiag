@@ -705,13 +705,25 @@ class BluetoothObdManager(context: Context) {
             } finally {
                 // Return to the app's configured 11-bit HS-CAN / automatic-format state.
                 withContext(NonCancellable) {
-                    runCatching { boundCommand("ATSP6", 1_500L) }
-                    // Restore the app's standard functional OBD request header as well
-                    // as formatting; otherwise later requests could remain physically addressed.
-                    runCatching { boundCommand("ATSH 7DF", 1_500L) }
-                    runCatching { boundCommand("ATCAF1", 1_500L) }
-                    runCatching { boundCommand("ATH1", 1_000L) }
-                    runCatching { boundCommand("ATS0", 1_000L) }
+                    // A successful TX is not permission to keep using an adapter whose
+                    // CAN protocol/header could not be restored. Try every cleanup step,
+                    // then close the physical session if *any* step was unconfirmed.
+                    var restored = true
+                    for ((command, timeout) in listOf(
+                        "ATSP6" to 1_500L,
+                        "ATSH 7DF" to 1_500L,
+                        "ATCAF1" to 1_500L,
+                        "ATH1" to 1_000L,
+                        "ATS0" to 1_000L
+                    )) {
+                        val answer = runCatching { boundCommand(command, timeout) }.getOrNull()
+                        if (answer == null || !CanConsoleAdapterRestorationPolicy.accepted(answer))
+                            restored = false
+                    }
+                    if (!restored) {
+                        disconnect()
+                        throw CanAdapterRestorationException()
+                    }
                 }
             }
         }
