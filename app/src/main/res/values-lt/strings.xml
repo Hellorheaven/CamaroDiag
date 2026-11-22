@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Programėlės kalba</string>
     <string name="system_language_hint">Pasirinkite CamaroDiag kalbą.</string>
     <string name="about_title">Apie CamaroDiag</string>
@@ -645,7 +645,7 @@
     <string name="cal_pc_ip_address">Kompiuterio IP adresas</string>
     <string name="cal_connect_j2534">Prijungti J2534 tiltą</string>
     <string name="cal_disconnect_pc_bridge">Atjungti kompiuterio tiltą</string>
-    <string name="cal_bridge_capabilities">Tiltas: HS-CAN ISO15765 250/500 kbit/s ir J2534-2 SW-ISO15765, kai tai palaiko tvarkyklė. CAN FD lieka išjungtas.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Tiltas: HS-CAN ISO15765 250/500 kbit/s ir J2534-2 SW-ISO15765, kai tai palaiko tvarkyklė. CAN FD lieka išjungtas.</string>
     <string name="cal_read_uds_did">Skaityti UDS DID</string>
     <string name="cal_read_uds_dtcs">Skaityti UDS DTC</string>
     <string name="cal_uds_trouble_codes">UDS gedimų kodai (0x19)</string>
