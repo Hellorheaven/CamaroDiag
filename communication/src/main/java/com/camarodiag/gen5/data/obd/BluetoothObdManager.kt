@@ -1085,7 +1085,17 @@ class BluetoothObdManager(context: Context) {
                 // A reconnect can use the same VIN with a different adapter.
                 transportSessionEpoch.requireQueuedCurrent(epoch)
             }
-            result.export(output)
+            // Bind the physical acquisition to the selected CAN channel and
+            // approved read session. The ZIP may be opened on another device,
+            // so these observations must travel with the bytes and VIN.
+            val channel = EcuBackupManifest.Channel(
+                requestCanId = checkNotNull(j2534BridgeRequestCanId),
+                responseCanId = checkNotNull(j2534BridgeResponseCanId),
+                protocolNumber = checkNotNull(j2534BridgeProtocolNumber),
+                diagnosticSession = request.diagnosticSession
+            )
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            result.export(output, channel)
             transportSessionEpoch.requireQueuedCurrent(epoch)
             result
         }

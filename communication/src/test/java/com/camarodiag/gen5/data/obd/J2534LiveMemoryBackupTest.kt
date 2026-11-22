@@ -84,6 +84,17 @@ class J2534LiveMemoryBackupTest {
         assertEquals(result.manifest, imported.manifest)
     }
 
+    @Test fun simulatedCaptureCanRecordRouteWithoutPromotingHardwareProvenance() = runBlocking {
+        val result = J2534LiveMemoryBackup.captureForTest(ScriptedEcu(baseline, vin), request())
+        val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+        val archive = ByteArrayOutputStream()
+        result.export(archive, channel)
+        val restored = EcuBackupArchive.import(archive.toByteArray().inputStream())
+        assertEquals(channel, restored.manifest.channel)
+        assertEquals(EcuBackupManifest.Origin.SIMULATION, restored.captures.single().origin)
+        assertFalse(restored.manifest.hardwareProvenanceVerified)
+    }
+
     @Test fun modifyingBothReadBuffersCannotReplaceTheVerifiedAcquisition() = runBlocking {
         val result = J2534LiveMemoryBackup.captureForTest(ScriptedEcu(baseline, vin), request())
         result.capture.firstRead[0] = 42

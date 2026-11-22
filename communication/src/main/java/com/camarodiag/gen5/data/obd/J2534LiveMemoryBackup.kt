@@ -60,7 +60,10 @@ object J2534LiveMemoryBackup {
         val capture: EcuBackupManifest.Capture,
         val verification: EcuBackupIntegrity.Result
     ) {
-        internal fun export(output: OutputStream) {
+        internal fun export(
+            output: OutputStream,
+            channel: EcuBackupManifest.Channel? = null
+        ) {
             // Bind the archive to the acquisition's original digest, not a newly
             // computed digest of potentially mutated public capture buffers.
             check(capture.independentRead != null && capture.firstRead !== capture.independentRead) {
@@ -76,7 +79,7 @@ object J2534LiveMemoryBackup {
             ) { "Capture no longer matches the verified acquisition." }
             EcuBackupArchive.export(
                 output, listOf(snapshot), required, manifest.controllerLabel,
-                manifest.createdAtUtcMillis, manifest.vehicleVin
+                manifest.createdAtUtcMillis, manifest.vehicleVin, channel
             )
         }
     }
