@@ -18,7 +18,10 @@ object EcuBackupIntegrity {
         INVALID_COVERAGE,
         UNVERIFIABLE_HARDWARE_PROVENANCE,
         MISSING_INDEPENDENT_READ,
-        DIVERGENT_INDEPENDENT_READ
+        DIVERGENT_INDEPENDENT_READ,
+        ALIASED_INDEPENDENT_READ,
+        EMPTY_CAPTURE,
+        INVALID_VIN
     }
 
     data class Result(val problems: Set<Problem>) {
@@ -32,6 +35,9 @@ object EcuBackupIntegrity {
     ): Result {
         val problems = mutableSetOf<Problem>()
         if (captures.isEmpty()) problems += Problem.EMPTY_BACKUP
+        if (manifest.vehicleVin != null && !manifest.vehicleVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
+            problems += Problem.INVALID_VIN
+        }
         if (manifest.hardwareProvenanceVerified) {
             // No hardware reader currently issues an independently authenticated attestation.
             problems += Problem.UNVERIFIABLE_HARDWARE_PROVENANCE
@@ -41,8 +47,12 @@ object EcuBackupIntegrity {
         }
         // Do not let an absent second read pass simply because the manifest also says false.
         captures.forEach { capture ->
+            if (capture.firstRead.isEmpty()) problems += Problem.EMPTY_CAPTURE
             if (capture.independentRead == null) {
                 problems += Problem.MISSING_INDEPENDENT_READ
+            } else if (capture.firstRead === capture.independentRead) {
+                // The same mutable object cannot represent two separate acquisitions.
+                problems += Problem.ALIASED_INDEPENDENT_READ
             } else if (!capture.firstRead.contentEquals(capture.independentRead)) {
                 problems += Problem.DIVERGENT_INDEPENDENT_READ
             }
