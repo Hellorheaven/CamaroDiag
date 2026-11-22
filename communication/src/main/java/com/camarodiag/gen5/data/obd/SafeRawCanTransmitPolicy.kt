@@ -30,6 +30,9 @@ object SafeRawCanTransmitPolicy {
         val body = all.subList(1, first + 1)
         val standard = body.joinToString("") { "%02X".format(java.util.Locale.ROOT, it) }
         if (SafeObdRequestPolicy.parse(standard) != null) return true
+        // Enhanced UDS reads are addressed to an identified physical ECU,
+        // never broadcast to every ECU on the vehicle bus.
+        if (!frame.isExtended && frame.canId == 0x7DFL) return false
         // ReadDataByIdentifier and ReadDTCInformation are query-only UDS services.
         // TesterPresent is limited to its ordinary/suppressed-positive forms.
         return when (service) {
