@@ -48,10 +48,22 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         correlation.append(stream, 50L)
         val recent = correlation.recentReceivedRecords()
         assertEquals(300, recent.size)
-        assertEquals(300, recent.count { it.direction == "RX" })
-        assertEquals("CAN ID=7E8 DLC=4 DATA=03 41 0C 1A", recent.first().content)
-        assertEquals("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B", recent.last().content)
+        assertEquals(300, recent.count { it.record.direction == "RX" })
+        assertEquals("CAN ID=7E8 DLC=4 DATA=03 41 0C 1A", recent.first().record.content)
+        assertEquals("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B", recent.last().record.content)
+        assertEquals(50L, recent.first().timestampMillis)
         assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(51L))
+    }
+
+    @Test fun independentPhysicalReceiveChunksKeepTheirActualHostTimestamps() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
+        correlation.append("7E9 04 03 41 0C 1B\r\n", 10L, 1_800_000_000_010L)
+        correlation.append("7E8 04 03 41 0C 1A\r\n", 20L, 1_800_000_000_020L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(30L))
+        assertEquals(listOf(1_800_000_000_010L, 1_800_000_000_020L),
+            correlation.recentReceivedRecords().map { it.timestampMillis })
+        assertEquals(listOf("RX", "RX"),
+            correlation.recentReceivedRecords().map { it.record.direction })
     }
 
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
