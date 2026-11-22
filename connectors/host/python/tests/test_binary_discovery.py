@@ -105,6 +105,37 @@ class BinaryDiscoveryTests(unittest.TestCase):
         self.assertIsNone(serial.timeout)
         self.assertIsNone(serial.write_timeout)
 
+    def test_binary_serial_recovers_from_transient_empty_reads(self):
+        class GappedSerial(SimulatedSerial):
+            timeout = None
+            write_timeout = None
+            gaps = 3
+            def read(self, count):
+                if self.gaps > 0:
+                    self.gaps -= 1
+                    return b""
+                return super().read(count)
+        serial = GappedSerial()
+        self.assertEqual(BinaryDiscoveryClient(serial).verify_read_only(),
+                         tuple(v.decode() for v in REPLIES.values()))
+        self.assertEqual([0, 1, 2], [frame.sequence for frame in serial.sent])
+        self.assertIsNone(serial.timeout)
+        self.assertIsNone(serial.write_timeout)
+
+    def test_binary_empty_read_timeout_never_resets_global_deadline(self):
+        class StalledSerial(SimulatedSerial):
+            timeout = None
+            write_timeout = None
+            def read(self, count):
+                return b""
+        clock = iter(i * 0.5 for i in range(20))
+        serial = StalledSerial()
+        client = BinaryDiscoveryClient(serial, clock=lambda: next(clock))
+        with self.assertRaises(TimeoutError):
+            client.execute(Op.PING)
+        self.assertTrue(client.closed)
+        self.assertIsNone(serial.timeout)
+        self.assertIsNone(serial.write_timeout)
     def test_bounded_binary_timeout_restored_on_corruption(self):
         class TimedSerial(SimulatedSerial):
             timeout = None
