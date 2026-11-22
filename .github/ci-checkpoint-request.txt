@@ -1,5 +1,5 @@
 CamaroDiag PR #95 - explicit full Debug CI checkpoint
 Branch: chore/unified-ci
-Requested after C1 capture error fixes and Kotlin test call-site fixes: 5bbb71d1917f768ab8a65544be4314c6434bc1a5
+Requested after legacy-vs-explicit CAN correlation regression fix: 566856fb672fc307e0a737f63f1436239efd033f
 Scope: C1 CAN/OBD unit tests; Android Debug; Windows J2534 Debug; native ECU; connectors
 Safety: no Release build, no ECU write, no merge.
