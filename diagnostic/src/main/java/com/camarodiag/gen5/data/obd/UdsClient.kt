@@ -375,9 +375,17 @@ class UdsClient private constructor(
         requireSecurityIfConfigured()
         // ISO 14229 ALFI: upper nibble = memory size width, lower nibble = address width.
         val format = sizeLength shl 4 or addressLength
-        val requestData = byteArrayOf(format.toByte()) + encodeUnsigned(address, addressLength) +
-            encodeUnsigned(data.size.toLong(), sizeLength) + data
-        request(0x3D, requestData)
+        val addressAndLength = byteArrayOf(format.toByte()) +
+            encodeUnsigned(address, addressLength) +
+            encodeUnsigned(data.size.toLong(), sizeLength)
+        val response = request(0x3D, addressAndLength + data)
+        // ISO 14229 WriteMemoryByAddress (0x3D) requires the ECU to echo
+        // ALFID, the exact memory address, and the exact memory size.
+        // An uncorrelated 0x7D alone cannot prove this request was accepted.
+        require(response.size == addressAndLength.size + 1 &&
+            response.copyOfRange(1, response.size).contentEquals(addressAndLength)) {
+            "ECU did not acknowledge the requested memory address and size."
+        }
     }
 
     suspend fun requestDownload(address: Long, size: Long, dataFormatIdentifier: Int = 0, addressLength: Int = 4, sizeLength: Int = 4) {
