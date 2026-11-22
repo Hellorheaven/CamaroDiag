@@ -78,4 +78,13 @@ class ObdTransportFailurePolicyTest {
         ))
     }
 
+    @Test
+    fun adapterRestoreErrorPreservesTheOriginalPhysicalTransportForTheUi() {
+        for (kind in listOf("USB", "WIFI", "BLE", "BLUETOOTH")) {
+            val error = CanAdapterRestorationException(kind)
+            assertTrue(ObdTransportFailurePolicy.isConnectionLoss(error))
+            assertTrue(error.originalTransportKind == kind)
+        }
+    }
+
 }
