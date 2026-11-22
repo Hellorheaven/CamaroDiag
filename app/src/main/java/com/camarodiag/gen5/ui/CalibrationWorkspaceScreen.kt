@@ -1520,25 +1520,34 @@ fun CalibrationWorkspaceScreen(
                             }
                         }
                         val wiringUriHandler = LocalUriHandler.current
+                        var wiringLinkFailed by remember { mutableStateOf(false) }
                         val wiringReference = CamaroDiagConnectorWiringGuide.findReference(
                             vehicle.modelYear, vehicle.engine.rpo, expertControllerFamily
                         )
                         OutlinedButton(
-                            onClick = { runCatching { wiringUriHandler.openUri(CamaroDiagConnectorWiringGuide.genericUrl) } },
+                            onClick = {
+                                wiringLinkFailed = runCatching {
+                                    wiringUriHandler.openUri(CamaroDiagConnectorWiringGuide.genericUrl)
+                                }.isFailure
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("CamaroDiagConnectors · " + stringResource(R.string.guide_title))
+                            Text("CamaroDiagConnectors · " + stringResource(R.string.tab_guide))
                         }
                         OutlinedButton(
                             onClick = {
-                                runCatching {
+                                wiringLinkFailed = runCatching {
                                     wiringUriHandler.openUri(wiringReference?.url ?: CamaroDiagConnectorWiringGuide.catalogueUrl)
-                                }
+                                }.isFailure
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(wiringReference?.label ?: "ECU · CamaroDiagConnectors")
                         }
+                        if (wiringLinkFailed) {
+                            Text(stringResource(R.string.obd_data_unavailable), color = WarnRed, fontSize = 11.sp)
+                        }
+                        Text(stringResource(R.string.status_not_verified), color = WarnRed, fontSize = 11.sp)
                         Text(stringResource(R.string.cal_expert_block_driver), color = WarnRed, fontSize = 11.sp)
                         val expertTarget = EcuBenchExpertPlan.Target(
                             controllerFamily = expertControllerFamily.trim(),
