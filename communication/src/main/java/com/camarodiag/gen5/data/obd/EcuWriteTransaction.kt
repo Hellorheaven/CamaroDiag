@@ -201,8 +201,30 @@ internal class EcuWriteExecutionEngine(
                 setOf(EcuWriteTransaction.Blocker.NO_VALIDATED_DRIVER)
             )
         }
+        val changedAddresses = preview.affectedSectors.map { it.absoluteAddress }.toSet()
+        // Unchanged sectors within the qualified input region must also match:
+        // an erase/program disturbance can extend beyond the selected sector.
+        val untouchedOffsets = original.indices.step(request.layout.eraseBlockBytes).filter {
+            (request.layout.regionStartAddress + it) !in changedAddresses
+        }
         var verified = 0
         var currentAddress: Long? = null
+        suspend fun verifyUntouchedSectors(doubleRead: Boolean): Boolean {
+            for (offset in untouchedOffsets) {
+                val address = request.layout.regionStartAddress + offset
+                currentAddress = address
+                val length = request.layout.eraseBlockBytes
+                val region = EcuProgrammingDriverContract.RegionRequest(
+                    request.region, address, length.toLong()
+                )
+                val expected = original.copyOfRange(offset, offset + length)
+                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
+                    (doubleRead && !driver.read(region).contentEquals(expected)) ||
+                    !driver.independentReadback(region).contentEquals(expected)
+                ) return false
+            }
+            return true
+        }
         try {
             if (!powerMonitor.isStable()) {
                 return EcuWriteTransaction.Outcome(
@@ -213,6 +235,12 @@ internal class EcuWriteExecutionEngine(
             if (identity != request.expectedIdentity) {
                 return EcuWriteTransaction.Outcome(
                     EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT
+                )
+            }
+            if (!verifyUntouchedSectors(doubleRead = true)) {
+                return EcuWriteTransaction.Outcome(
+                    EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
+                    failedAddress = currentAddress
                 )
             }
             // Check EVERY sector before the first erase. Readback must be an
@@ -336,6 +364,14 @@ internal class EcuWriteExecutionEngine(
                 )
             }
             if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) {
+                return EcuWriteTransaction.Outcome(
+                    EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
+                    verifiedSectors = verified, failedAddress = currentAddress
+                )
+            }
+            if (!verifyUntouchedSectors(doubleRead = false) ||
+                !powerMonitor.isStable() || driver.identify() != request.expectedIdentity
+            ) {
                 return EcuWriteTransaction.Outcome(
                     EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                     verifiedSectors = verified, failedAddress = currentAddress
