@@ -27,6 +27,19 @@ class CanConsoleExportPolicyTest {
         }
     }
 
+    @Test fun missingFullArchiveCannotFallBackToTruncatedRecentMemory() {
+        assertFalse(CanConsoleExportPolicy.canExport(
+            isCapturing = false, archiveFailed = false,
+            hasHistory = true, hasRawData = true,
+            requiresRawArchive = true, hasRawArchive = false
+        ))
+        assertTrue(CanConsoleExportPolicy.canExport(
+            isCapturing = false, archiveFailed = false,
+            hasHistory = true, hasRawData = true,
+            requiresRawArchive = true, hasRawArchive = true
+        ))
+    }
+
     @Test fun inProgressOrEmptyCaptureIsNotExportable() {
         assertFalse(CanConsoleExportPolicy.canExport(
             isCapturing = true, archiveFailed = false,
