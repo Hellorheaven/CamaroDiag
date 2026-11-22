@@ -651,4 +651,7 @@
     <string name="cal_native_catalog_loading">Saját katalógus betöltése…</string>
     <string name="cal_native_catalog_empty">Jelenleg egyetlen saját Camaro DID sincs használhatónak deklarálva. Ismeretlen címek és skálázások nem kerülnek kitalálásra.</string>
     <string name="cal_native_catalog_read_disabled">A jármű olvasása letiltva, amíg a címzést és dekódolást nem ellenőrizték azonos konfiguráción.</string>
+    <string name="export_folder_instruction">Hozza létre vagy válassza ki a CamaroDiag mappát a belső tárhelyen, majd engedélyezze a hozzáférést. Az exportált fájlok a megosztott tárhelyen láthatók.</string>
+    <string name="export_folder_success">Export mentve a /CamaroDiag/ mappába.</string>
+    <string name="export_folder_failed">Az export nem menthető a /CamaroDiag/ mappába.</string>
 </resources>
