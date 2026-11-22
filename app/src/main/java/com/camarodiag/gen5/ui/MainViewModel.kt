@@ -22,6 +22,8 @@ import com.camarodiag.gen5.data.obd.CalibrationFileFormat
 import com.camarodiag.gen5.data.obd.CalibrationFileInspection
 import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.EcuBackupArchive
+import com.camarodiag.gen5.data.obd.EcuBackupCoverage
+import com.camarodiag.gen5.data.obd.EcuBackupManifest
 import com.camarodiag.gen5.data.obd.EcuExternalDumpPair
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
