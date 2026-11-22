@@ -912,4 +912,7 @@
     <string name="debug_builds_no_browser">Δεν υπάρχει πρόγραμμα περιήγησης για αυτή τη λήψη.</string>
     <string name="obd_physical_can_scope">Φυσικός κόμβος CAN που απάντησε: 0x%1$s. Η σάρωση καλύπτει μόνο την επιλεγμένη ECU OBD, όχι λειτουργική σάρωση όλων των μονάδων. Δεν εστάλησαν εντολές προγραμματισμού GM ή ενεργοποιητών.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Ενεργοποιήστε τη διαγραφή DTC εκπομπών στη γέφυρα Windows, επανασυνδεθείτε, σβήστε τον κινητήρα και επιβεβαιώστε την επαναφορά. Θα επαναφερθούν τα δεδομένα ετοιμότητας εκπομπών· οι μόνιμοι κωδικοί δεν διαγράφονται.</string>
+    <string name="export_folder_instruction">Δημιουργήστε ή επιλέξτε τον φάκελο CamaroDiag στον εσωτερικό χώρο αποθήκευσης και επιτρέψτε την πρόσβαση. Οι εξαγωγές είναι ορατές στον κοινόχρηστο χώρο.</string>
+    <string name="export_folder_success">Η εξαγωγή αποθηκεύτηκε στο /CamaroDiag/.</string>
+    <string name="export_folder_failed">Δεν ήταν δυνατή η αποθήκευση στο /CamaroDiag/.</string>
 </resources>
