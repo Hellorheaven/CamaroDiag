@@ -27,6 +27,24 @@ class CanConsoleExportPolicyTest {
         }
     }
 
+    @Test fun disconnectionRetainsFinishedArchiveButMarksInterruptedCaptureIncomplete() {
+        assertFalse(CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+            alreadyFailed = false, wasCapturing = false
+        ))
+        assertTrue(CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+            alreadyFailed = false, wasCapturing = true
+        ))
+        assertTrue(CanConsoleExportPolicy.archiveFailedAfterDisconnect(
+            alreadyFailed = true, wasCapturing = false
+        ))
+        assertFalse(CanConsoleExportPolicy.canExport(
+            isCapturing = false,
+            archiveFailed = CanConsoleExportPolicy.archiveFailedAfterDisconnect(false, true),
+            hasHistory = true, hasRawData = true,
+            requiresRawArchive = true, hasRawArchive = true
+        ))
+    }
+
     @Test fun missingFullArchiveCannotFallBackToTruncatedRecentMemory() {
         assertFalse(CanConsoleExportPolicy.canExport(
             isCapturing = false, archiveFailed = false,
