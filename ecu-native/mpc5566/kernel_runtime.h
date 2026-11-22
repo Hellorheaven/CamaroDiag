@@ -9,6 +9,7 @@ typedef struct {
     cd_isotp_tx tx;
     uint8_t request[CD_ISOTP_MAX];
     uint8_t response[CD_ISOTP_MAX];
+    bool initialized;
     bool destructive_response;
     bool link_failed;
     bool write_idle_armed;
