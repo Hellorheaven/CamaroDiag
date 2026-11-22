@@ -274,6 +274,19 @@ class EcuWriteTransactionTest {
         assertEquals(0, device.eraseCalls)
     }
 
+    @Test fun lossOfPowerDuringUntouchedBaselineReadPreventsSecondAcquisitionAndErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        var stable = true
+        device.afterRead = { stable = false }
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { stable }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(0x1008L, outcome.failedAddress)
+        assertEquals(1, device.reads)
+        assertEquals(0, device.eraseCalls)
+    }
+
     @Test fun mutatingCallerImageDuringReadDoesNotChangeFrozenProgrammingPlan() = runBlocking {
         val req = request()
         val expected = req.updatedImage.copyOf()

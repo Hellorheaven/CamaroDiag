@@ -222,9 +222,14 @@ internal class EcuWriteExecutionEngine(
                     request.region, address, length.toLong()
                 )
                 val expected = original.copyOfRange(offset, offset + length)
-                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
-                    (doubleRead && !driver.read(region).contentEquals(expected)) ||
-                    !driver.independentReadback(region).contentEquals(expected)
+                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) return false
+                if (doubleRead) {
+                    if (!driver.read(region).contentEquals(expected) ||
+                        !powerMonitor.isStable() || driver.identify() != request.expectedIdentity
+                    ) return false
+                }
+                if (!driver.independentReadback(region).contentEquals(expected) ||
+                    !powerMonitor.isStable() || driver.identify() != request.expectedIdentity
                 ) return false
             }
             return true
