@@ -113,7 +113,7 @@ class SafeObdRequestPolicyTest {
     fun positiveResponsesAcceptCompactSpacedAndPhysicalHeaderFormats() {
         val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
         for (response in listOf("41 52 80", "415280", "7E8 41 52 80",
-            "7E8 03 41 52 80", "18DAF110 41 52 80")) {
+            "7E8 03 41 52 80", "7E8 03 41 52 80 00 00", "18DAF110 41 52 80")) {
             assertEquals(response, true, SafeObdRequestPolicy.hasPositiveResponse(request, response))
         }
         val dtc = requireNotNull(SafeObdRequestPolicy.parse("03"))
