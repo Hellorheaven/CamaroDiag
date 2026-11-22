@@ -1,7 +1,9 @@
 name: Delete merged pull request branches
+# Heavy tests are never triggered by pull_request synchronize.
+# Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review, closed]
+    types: [opened, reopened, ready_for_review, closed]
   workflow_dispatch:
 permissions:
   contents: read

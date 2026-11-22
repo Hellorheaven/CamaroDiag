@@ -1,10 +1,13 @@
 name: PR unit tests
+# Heavy tests are never triggered by pull_request synchronize.
+# Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
 # Lightweight regression gate on PR changes. Full Android/Windows checkpoint
 # remains explicitly launched through the existing manual CI workflows.
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [ready_for_review]
     paths:
       - 'app/**'
       - 'tools/admin/**'
@@ -26,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pr-unit-tests-${{ github.event.pull_request.number }}
+  group: pr-unit-tests-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -64,7 +67,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: android-unit-tests-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          name: android-unit-tests-${{ github.event.pull_request.number || github.ref_name }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
