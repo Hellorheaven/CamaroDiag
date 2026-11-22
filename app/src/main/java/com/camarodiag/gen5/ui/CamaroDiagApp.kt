@@ -209,11 +209,36 @@ fun CamaroDiagApp(
         ) currentTab = if (LicenseRolloutConfig.ENABLED) DiagTab.LICENSE else DiagTab.SETUP
         if (!premiumAllowed && currentTab in premiumTabs) currentTab = DiagTab.LICENSE
     }
-    val functionalTestsExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri -> if (uri != null) viewModel.exportFunctionalTests(uri) }
-
     val permissionContext = LocalContext.current
+    var pendingExport by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val exportFolderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        val action = pendingExport
+        pendingExport = null
+        if (uri != null) {
+            if (CamaroDiagExportStorage.authorize(permissionContext, uri)) {
+                action?.invoke()
+            } else {
+                Toast.makeText(permissionContext, R.string.export_folder_instruction, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun withExportFolder(action: () -> Unit) {
+        val owner = viewModel.activeAccountUid.value ?: return
+        val vin = viewModel.vehicle.value.vin
+        val guardedAction = {
+            if (viewModel.activeAccountUid.value == owner && viewModel.vehicle.value.vin == vin) action()
+        }
+        if (CamaroDiagExportStorage.authorizedTree(permissionContext) != null) {
+            guardedAction()
+        } else if (pendingExport == null) {
+            pendingExport = guardedAction
+            Toast.makeText(permissionContext, R.string.export_folder_instruction, Toast.LENGTH_LONG).show()
+            exportFolderPicker.launch(CamaroDiagExportStorage.initialPickerUri())
+        }
+    }
     var pendingBluetoothMac by remember { mutableStateOf<String?>(null) }
     val btPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -311,47 +336,6 @@ fun CamaroDiagApp(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { viewModel.importCalibrationDefinitions(it) }
-    }
-
-    val calibrationDefinitionsTemplateSaver = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/tab-separated-values")
-    ) { uri ->
-        uri?.let { viewModel.exportCalibrationDefinitionTemplate(it) }
-    }
-
-    val liveRecordingExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        uri?.let { viewModel.exportLiveRecording(it) }
-    }
-
-    val canTraceExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/plain")
-    ) { uri ->
-        uri?.let { viewModel.exportCanCapture(it) }
-    }
-
-    val calibrationFileExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        uri?.let { viewModel.exportCalibrationFile(it) }
-    }
-
-    val ecuIdentityExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        uri?.let { viewModel.exportEcuIdentification(it) }
-    }
-
-    var pendingJ2534MemoryCapture by remember { mutableStateOf<J2534LiveMemoryBackup.Request?>(null) }
-    val ecuMemoryArchiveExporter = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/zip")
-    ) { uri ->
-        val request = pendingJ2534MemoryCapture
-        pendingJ2534MemoryCapture = null
-        if (uri != null && request != null) {
-            viewModel.captureJ2534Memory(uri, request)
-        }
     }
 
      Scaffold(
@@ -606,7 +590,9 @@ fun CamaroDiagApp(
                         onRunAll = { viewModel.runFunctionalTests() },
                         onStop = { viewModel.cancelFunctionalTests() },
                         onExport = {
-                            functionalTestsExporter.launch("CamaroDiag_functional_tests_" + System.currentTimeMillis() + ".json")
+                            withExportFolder {
+                                viewModel.exportFunctionalTests("CamaroDiag_functional_tests_" + System.currentTimeMillis() + ".json")
+                            }
                         }
                     )
                 }
@@ -637,7 +623,7 @@ fun CamaroDiagApp(
                     },
                     onExportRecording = {
                         if (!premiumAllowed) currentTab = DiagTab.LICENSE
-                        else liveRecordingExporter.launch("CamaroDiag_live_${System.currentTimeMillis()}.csv")
+                        else withExportFolder { viewModel.exportLiveRecording("CamaroDiag_live_${System.currentTimeMillis()}.csv") }
                     }
                 )
                 DiagTab.CAN_SNIFFER -> CanSnifferScreen(
@@ -648,7 +634,7 @@ fun CamaroDiagApp(
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
-                    onExport = { canTraceExporter.launch("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") }
+                    onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
                 DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { viewModel.saveCurrentSession() })
@@ -678,9 +664,9 @@ fun CamaroDiagApp(
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onReadGmlanIdentification = { viewModel.readGmlanIdentification() },
                     onExportIdentification = {
-                        ecuIdentityExporter.launch(
-                            "CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json"
-                        )
+                        withExportFolder {
+                            viewModel.exportEcuIdentification("CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json")
+                        }
                     },
                     onCreateVehicleFromEcuVin = { viewModel.createVehicleFromEcuVin(it) },
                     onSyncVehicleVinFromEcu = { viewModel.syncVehicleVinFromEcu(it) },
@@ -698,7 +684,7 @@ fun CamaroDiagApp(
                             address + bytes <= 0x1_0000_0000L &&
                             vehicle.vin.uppercase().matches(Regex("[A-HJ-NPR-Z0-9]{17}"))
                         ) {
-                            pendingJ2534MemoryCapture = J2534LiveMemoryBackup.Request(
+                            val request = J2534LiveMemoryBackup.Request(
                                 expectedVin = vehicle.vin.uppercase(),
                                 region = region,
                                 address = address,
@@ -706,9 +692,9 @@ fun CamaroDiagApp(
                                 diagnosticSession = session,
                                 controllerLabel = vehicle.engine.ecmType
                             )
-                            ecuMemoryArchiveExporter.launch(
-                                "CamaroDiag_ECU_memory_${System.currentTimeMillis()}.zip"
-                            )
+                            withExportFolder {
+                                viewModel.captureJ2534Memory("CamaroDiag_ECU_memory_${System.currentTimeMillis()}.zip", request)
+                            }
                         }
                     },
                     onReadObdbSignal = { signalId, profile -> viewModel.readObdbSignal(signalId, profile) },
@@ -723,7 +709,7 @@ fun CamaroDiagApp(
                         calibrationDefinitionsPicker.launch(arrayOf("text/*", "text/csv", "text/tab-separated-values", "*/*"))
                     },
                     onExportDefinitionTemplate = {
-                        calibrationDefinitionsTemplateSaver.launch("camaro_calibration_tables_template.tsv")
+                        withExportFolder { viewModel.exportCalibrationDefinitionTemplate("CamaroDiag_calibration_tables_template.tsv") }
                     },
                     onSelectMap = { viewModel.selectCalibrationMap(it) },
                     onCellChange = { row, column, value -> viewModel.updateCalibrationCell(row, column, value) },
@@ -731,7 +717,7 @@ fun CamaroDiagApp(
                     onDiscardMap = { viewModel.discardCalibrationTableChanges() },
                     onExportFile = {
                         calibrationWorkspace.importedFileName?.let { fileName ->
-                            calibrationFileExporter.launch(fileName)
+                            withExportFolder { viewModel.exportCalibrationFile(fileName) }
                         }
                     },
                     onClearFile = { viewModel.clearCalibrationFile() }
