@@ -44,6 +44,20 @@ internal sealed partial class BridgeDesktopForm
     private readonly Button memoryCancel = Button("Annuler la lecture");
     private CancellationTokenSource? memoryCancellation;
 
+    private void SetMemoryProfileInputsEnabled(bool enabled)
+    {
+        // All these controls describe the same approved ECU acquisition.
+        // A user changing the adapter or CAN IDs halfway through would only
+        // mutate labels; the hardware still uses its original scoped device.
+        foreach (Control input in new Control[]
+        {
+            adapter, consoleRequestId, consoleResponseId, consoleProtocol,
+            memoryVin, memoryStart, memoryLength, memoryBlock, memorySession,
+            memoryRegion
+        })
+            input.Enabled = enabled;
+    }
+
     private TabPage BuildMemoryTab()
     {
         var tab = new TabPage("Lecture mémoire ECU");
@@ -355,6 +369,7 @@ internal sealed partial class BridgeDesktopForm
         memoryCreateProfile.Enabled = false;
         memoryLoadProfile.Enabled = false;
         memoryVerifyArchive.Enabled = false;
+        SetMemoryProfileInputsEnabled(false);
         var progressActive = true;
         var progress = new Progress<(int Pass, int BytesRead, int TotalBytes)>(state =>
         {
@@ -462,6 +477,7 @@ internal sealed partial class BridgeDesktopForm
             memoryCreateProfile.Enabled = true;
             memoryLoadProfile.Enabled = true;
             memoryVerifyArchive.Enabled = true;
+            SetMemoryProfileInputsEnabled(true);
             memoryCancellation = null;
             cancellation.Dispose();
         }
