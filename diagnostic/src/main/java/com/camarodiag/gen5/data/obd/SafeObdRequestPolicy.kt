@@ -28,7 +28,7 @@ object SafeObdRequestPolicy {
             0x4B, 0x4C, 0x52, 0x60, 0x80, 0xA0, 0xC0
         ),
         // SAE J1979 vehicle information: VIN, calibration IDs and CVNs.
-        0x09 to setOf(0x02, 0x04, 0x06)
+        0x09 to setOf(0x02, 0x04, 0x06, 0x0A)
     )
     // Standard diagnostic trouble-code retrieval modes; these have no PID parameter.
     private val parameterlessReadOnlyServices = setOf(0x03, 0x07, 0x0A)
