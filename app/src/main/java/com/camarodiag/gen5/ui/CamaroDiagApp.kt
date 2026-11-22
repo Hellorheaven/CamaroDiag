@@ -1701,9 +1701,9 @@ fun CanSnifferScreen(
     val report = state.report
     // The menu describes CAN IDs seen in this session, not assumed ECU identities.
     val observedCanIds = remember(state.consoleHistory, report) {
-        CanConsoleDisplayFilter.observedIds(
+        CanConsoleDisplayFilter.observedFrameIds(
             state.consoleHistory.map { ParsedCanConsoleRecord(it.direction, it.content, it.succeeded) },
-            report?.observedCanIds.orEmpty()
+            report?.frames.orEmpty()
         )
     }
     // If capture/vehicle changes, do not retain a stale selected identifier.
@@ -1751,7 +1751,7 @@ fun CanSnifferScreen(
     }
     val visibleFrames = if (filterInputValid) {
         report?.frames.orEmpty().filterCanTrace(traceFilter)
-            .filter { CanConsoleDisplayFilter.visibleId(it.canId.toLong(), selectedObservedCanId) }
+            .filter { CanConsoleDisplayFilter.visibleTrace(it, selectedObservedCanId) }
             .asReversed()
     } else emptyList()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
