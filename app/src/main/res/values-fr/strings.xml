@@ -938,4 +938,5 @@
     <string name="can_monitor_format_29">Capture CAN 29 bits</string>
     <string name="can_monitor_format_notice">L’interface physique surveille un seul format CAN à la fois ; les autres bus et formats non pris en charge ne sont pas visibles pendant cette session.</string>
     <string name="can_console_tx_ack_only">Trame envoyée à l’interface ; aucune réponse diagnostique correspondante du calculateur n’a été confirmée.</string>
+    <string name="can_console_negative_ecu_response">Le calculateur sélectionné a renvoyé une réponse diagnostique négative ; aucune lecture réussie n’a été confirmée.</string>
 </resources>
