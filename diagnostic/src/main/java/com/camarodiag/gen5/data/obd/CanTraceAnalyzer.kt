@@ -346,7 +346,7 @@ object CanTraceAnalyzer {
      * Correlate only the conventional 11-bit OBD-II response ranges.
      * For physical requests 7E0..7E7 the matching response is +8;
      * functional request 7DF may be answered by 7E8..7EF.
-     * Unknown/29-bit addressing is deliberately left unpaired.
+     * 29-bit physical responses require verified normal-fixed address pairing.
      */
     private fun isCompatibleObdCanResponseId(
         requestId: Int, responseId: Int, extended: Boolean
