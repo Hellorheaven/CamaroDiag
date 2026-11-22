@@ -23,8 +23,8 @@ internal static class BridgeSelfTests
 
         Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
             [0x22, 0xF1, 0x90]), "J2534 UDS single DID shape");
-        Assert(J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
-            [0x22, 0xF1, 0x90, 0xF1, 0x91]), "J2534 UDS multiple complete DIDs");
+        Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
+            [0x22, 0xF1, 0x90, 0xF1, 0x91]), "J2534 multi-DID denied until correlation is supported");
         Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
             [0x22]), "J2534 UDS missing DID rejected");
         Assert(!J2534Device.IsWellFormedReadOnlyDiagnosticPayload(
