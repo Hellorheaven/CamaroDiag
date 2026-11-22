@@ -17,14 +17,16 @@ object ObdTransportFailurePolicy {
         val visited = Collections.newSetFromMap(IdentityHashMap<Throwable, Boolean>())
         var current: Throwable? = error
         var hasIoFailure = false
+        var hasUnsafeAdapterState = false
         while (current != null && visited.add(current)) {
             // A late failure from an already replaced connection is not a
             // failure of the currently connected physical adapter.
             if (current is ObdSupersededSessionException) return false
             if (current is SocketTimeoutException) return false
             if (current is IOException) hasIoFailure = true
+            if (current is CanAdapterRestorationException) hasUnsafeAdapterState = true
             current = current.cause
         }
-        return hasIoFailure
+        return hasIoFailure || hasUnsafeAdapterState
     }
 }
