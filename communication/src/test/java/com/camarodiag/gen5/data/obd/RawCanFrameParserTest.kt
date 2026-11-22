@@ -131,9 +131,18 @@ class RawCanFrameParserTest {
             assertFalse(input, SafeRawCanTransmitPolicy.allows(
                 requireNotNull(RawCanFrameParser.parse(input))))
         }
+        // The same bytes on an *unknown* CAN address are not proof of a safe
+        // diagnostic request. Only qualified physical diagnostic addressing passes.
         for (input in listOf(
-            "123 03 22 F1 90", "123 02 01 0C", "18DA20F1 03 22 F1 90",
-            "123 55 AA BB", "123 08 00 FF"
+            "123 03 22 F1 90", "123 02 01 0C", "123 55 AA BB",
+            "123 08 00 FF", "456 02 01 0C", "00000123 03 22 F1 90"
+        )) {
+            assertFalse(input, SafeRawCanTransmitPolicy.allows(
+                requireNotNull(RawCanFrameParser.parse(input))))
+        }
+        for (input in listOf(
+            "18DA20F1 03 22 F1 90", "7E0 03 22 F1 90",
+            "7DF 02 01 0C"
         )) {
             assertTrue(input, SafeRawCanTransmitPolicy.allows(
                 requireNotNull(RawCanFrameParser.parse(input))))
