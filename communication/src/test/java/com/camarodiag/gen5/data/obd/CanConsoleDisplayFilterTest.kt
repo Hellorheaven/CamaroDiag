@@ -97,6 +97,20 @@ class CanConsoleDisplayFilterTest {
         assertEquals(frames, frames.filter { CanConsoleDisplayFilter.visibleTrace(it, null) })
     }
 
+    @Test fun transmittedOnlyCanIdentifiersAreNotAdvertisedAsVehicleEcus() {
+        val sent = CanTraceFrame(1, null, 0x7E0, CanTraceDirection.TX, listOf(2, 1, 12), false)
+        val received = CanTraceFrame(2, null, 0x7E8, CanTraceDirection.RX, listOf(3, 65, 12, 26), false)
+        val passive = CanTraceFrame(3, null, 0x18DAF110, CanTraceDirection.UNKNOWN, listOf(3, 98, 241, 144), true)
+        val ambiguous = CanTraceFrame(4, null, 0x7E9, CanTraceDirection.UNKNOWN, listOf(3), null)
+        assertEquals(
+            listOf(ObservedCanId(0x7E8, false), extended),
+            CanConsoleDisplayFilter.observedFrameIds(emptyList(), listOf(sent, received, passive, ambiguous))
+        )
+        // Display filtering never mutates or drops the underlying transmitted frame.
+        assertTrue(CanConsoleDisplayFilter.visibleTrace(sent, null))
+        assertFalse(CanConsoleDisplayFilter.visibleTrace(sent, standard))
+    }
+
     @Test fun observedEcusRemainSelectableAfterRecentHistoryRollsOver() {
         val initial = listOf(
             ParsedCanConsoleRecord("RX", "CAN ID=7E8 DLC=3 DATA=41 0C 1A"),
