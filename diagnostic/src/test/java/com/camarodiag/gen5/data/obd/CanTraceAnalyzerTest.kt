@@ -1104,4 +1104,17 @@ class CanTraceAnalyzerTest {
         assertEquals(false, exchange.responses.single().extendedId)
         assertEquals(20.0, exchange.elapsedMilliseconds!!, 0.001)
     }
+
+    @Test
+    fun extendedIdentifiersWithObdLikeNumericValuesAreNotStandardObdChannels() {
+        val trace = listOf(
+            "0.000000 1 000007E0x Tx d 8 02 01 0C 00 00 00 00 00",
+            "0.020000 1 000007E8x Rx d 8 04 41 0C 1A F8 00 00 00"
+        ).joinToString("\n")
+        val report = CanTraceAnalyzer.analyze(trace, "extended-not-standard-obd.asc")
+        assertEquals(listOf(true, true), report.messages.map { it.extendedId })
+        assertEquals(1, report.exchanges.size)
+        assertEquals(UdsExchangeStatus.UNANSWERED, report.exchanges.single().status)
+        assertTrue(report.exchanges.single().responses.isEmpty())
+    }
 }
