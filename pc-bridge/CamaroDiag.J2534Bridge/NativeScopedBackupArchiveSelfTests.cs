@@ -133,9 +133,16 @@ internal static class NativeScopedBackupArchiveSelfTests
                 scope.Length, scope.MaxReadBytes, scope.Session, "CALIBRATION");
             var typedPath = Path.Combine(directory, "declared-calibration.zip");
             NativeScopedBackupArchive.SaveNew(typedPath, typedScope, capture, CancellationToken.None);
-            Check(NativeScopedBackupImport.VerifyZip(typedPath, typedScope).DeclaredRegion ==
-                "CALIBRATION", "Explicit calibration region survives portable ZIP export");
-            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(typedPath, scope));
+            var typedImported = NativeScopedBackupImport.VerifyZip(typedPath, typedScope);
+            Check(typedImported.DeclaredRegion == "CALIBRATION" && typedImported.RegionBound,
+                "Explicit calibration region is checked against its profile");
+            var legacyUnknown = NativeScopedBackupImport.VerifyZip(typedPath, scope);
+            Check(legacyUnknown.DeclaredRegion == "CALIBRATION" && !legacyUnknown.RegionBound,
+                "Older OTHER profiles can inspect a region without claiming it is qualified");
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(typedPath,
+                new J2534MemoryReadScope(vin, scope.RequestCanId, scope.ResponseCanId,
+                    scope.ProtocolNumber, scope.StartAddress, scope.Length, scope.MaxReadBytes,
+                    scope.Session, "DATA_FLASH")));
             File.Delete(typedPath);
             // Legacy v2 files have no channel evidence. They are still
             // inspectable, but the UI must clearly flag missing route binding.

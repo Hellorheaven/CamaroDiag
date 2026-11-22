@@ -248,6 +248,9 @@ internal sealed partial class BridgeDesktopForm
                     : "Ancien format sans preuve de canal CAN/session.") +
                 " Région déclarée : " +
                 result.DeclaredRegion + ", origine déclarée : " + result.DeclaredOrigin + ". " +
+                (result.RegionBound
+                    ? "Région liée au type déclaré par le profil."
+                    : "Type de région non qualifié dans le profil de lecture.") + " " +
                 (result.Firmware is { } firmware
                     ? $"OSID GM déclaré dans l'archive : {firmware.OperatingSystemId} (DID 0x{firmware.OsDid:X2}). "
                     : "OSID GM non enregistré. ") +

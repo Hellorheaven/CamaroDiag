@@ -25,7 +25,8 @@ internal static class NativeScopedBackupImport
     internal sealed record Inspection(
         string Vin, uint StartAddress, int ByteCount, string Sha256,
         string DeclaredRegion, string DeclaredOrigin, IReadOnlyList<string> RequiredRegions,
-        bool ChannelBound, NativeScopedBackupArchive.FirmwareIdentity? Firmware);
+        bool ChannelBound, bool RegionBound,
+        NativeScopedBackupArchive.FirmwareIdentity? Firmware);
 
     internal static Inspection VerifyZip(
         string source, J2534MemoryReadScope scope, bool allowInternalStage = false)
@@ -169,10 +170,11 @@ internal static class NativeScopedBackupImport
         if (requiredRegions.Any(region => !KnownRegions.Contains(region)) ||
             requiredRegions.Distinct(StringComparer.Ordinal).Count() != requiredRegions.Length)
             throw new InvalidDataException("Invalid required ECU region metadata.");
+        var regionBound = channelBound && scope.Region != "OTHER";
         if (values["vin"] != scope.ExpectedVin || values["controller"].Length > 128 ||
             values["count"] != "1" ||
             !KnownRegions.Contains(values["capture.0.region"]) ||
-            (channelBound && values["capture.0.region"] != scope.Region) ||
+            (regionBound && values["capture.0.region"] != scope.Region) ||
             values["capture.0.start"] != scope.StartAddress.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
             values["capture.0.expected"] != scope.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
             !KnownOrigins.Contains(values["capture.0.origin"]) ||
@@ -194,7 +196,7 @@ internal static class NativeScopedBackupImport
         return new Inspection(scope.ExpectedVin, scope.StartAddress, first.Length,
             Convert.ToHexString(SHA256.HashData(first)),
             values["capture.0.region"], values["capture.0.origin"],
-            Array.AsReadOnly(requiredRegions), channelBound, firmware);
+            Array.AsReadOnly(requiredRegions), channelBound, regionBound, firmware);
     }
 
     private static string DecodeControllerLabel(string encoded)
