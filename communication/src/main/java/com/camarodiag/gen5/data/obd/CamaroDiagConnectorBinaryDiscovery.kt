@@ -9,6 +9,11 @@ import java.util.zip.CRC32
  * CRC32 is error detection, not authentication or anti-replay security.
  */
 object CamaroDiagConnectorBinaryDiscovery {
+    private val expectedReplies = listOf(
+        "PONG CamaroDiagConnectors 0.1.0",
+        "CAPS hs_can=disabled sw_can=disabled eeprom_read=disabled eeprom_write=disabled ecu_flash=disabled j2534=disabled",
+        "STATUS mode=prototype write=disabled"
+    )
     private const val HEADER_BYTES = 8
     private const val TRAILER_BYTES = 4
     private const val MAX_REPLY_PAYLOAD = 244
@@ -77,9 +82,13 @@ object CamaroDiagConnectorBinaryDiscovery {
             if (!wire.contentEquals(expectedCrc)) throw IOException("Invalid binary discovery CRC")
             val payload = wire.copyOfRange(HEADER_BYTES, HEADER_BYTES + length)
             if (payload.any { u8(it) !in 32..126 }) throw IOException("Invalid binary discovery payload")
+            val text = payload.toString(Charsets.US_ASCII)
+            // Match the canonical fixed replies used by the firmware and both
+            // reference native clients; no new or reordered fields in CD/1.
+            if (text != expectedReplies[op - 1]) throw IOException("Noncanonical binary discovery reply")
             seq++
             ensureActive()
-            return payload.toString(Charsets.US_ASCII)
+            return text
         }
         return CamaroDiagConnectorDiscovery.verifyReplies(::exchange, ensureActive)
     }

@@ -79,6 +79,13 @@ class CamaroDiagConnectorBinaryDiscoveryTest {
         }
     }
 
+    @Test fun referenceNativeClientsRequireCanonicalCapabilityOrder() {
+        val reordered = caps.replace("hs_can=disabled sw_can=disabled", "sw_can=disabled hs_can=disabled")
+        val c = Channel(listOf(frame(1, 0, ping), frame(2, 1, reordered)))
+        assertTrue(runCatching { CamaroDiagConnectorBinaryDiscovery.inspect(c) }.exceptionOrNull() is IOException)
+        assertEquals(2, c.requests.size)
+    }
+
     @Test fun completeUsbPacketAndConcatenatedRepliesAreHandledWithoutTruncation() {
         val all = listOf(frame(1, 0, ping), frame(2, 1, caps), frame(3, 2, status))
         val fullPacket = Channel(all, 512)

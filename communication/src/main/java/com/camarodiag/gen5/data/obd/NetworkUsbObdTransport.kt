@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.hardware.usb.UsbManager
 import android.os.Build
+import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +37,9 @@ class ElmUsbTransport(private val context: Context) {
 
     suspend fun connect(
         deviceId: Int,
-        baudRate: Int = 38400
+        baudRate: Int = 38400,
+        discoveryOnly: Boolean = false,
+        requireCdc: Boolean = false
     ): Result<Unit> = withContext(Dispatchers.IO) {
         close()
         try {
@@ -46,6 +49,16 @@ class ElmUsbTransport(private val context: Context) {
                 ?: return@withContext Result.failure(
                     IllegalArgumentException("USB serial OBD device not found")
                 )
+
+            // Connectors' binary prototype supports one unambiguous CDC ACM
+            // channel. Never select port zero from an unknown multiport device.
+            if ((discoveryOnly && driver.ports.size != 1) ||
+                (requireCdc && driver !is CdcAcmSerialDriver)
+            ) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("Unsupported or ambiguous connector USB interface")
+                )
+            }
 
             if (!usbManager.hasPermission(driver.device)) {
                 val intent = Intent(UsbPermissionReceiver.ACTION)

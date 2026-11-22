@@ -39,6 +39,8 @@ class BluetoothObdManager(context: Context) {
     @Volatile private var cachedSupportedMode01Pids: Set<Int>? = null
     @Volatile private var cachedSupportedMode01PidsAtMillis: Long = 0L
     private val usbTransport = ElmUsbTransport(context)
+    private val connectorUsbContext = context.applicationContext
+    private val connectorDiscoveryMutex = Mutex()
     private val wifiTransport = ElmWifiTransport()
     private val bleTransport = OBDLinkBleTransport(context)
     private var j2534BridgeTransport: J2534BridgeTransport? = null
@@ -183,26 +185,46 @@ class BluetoothObdManager(context: Context) {
     /** Discovery only. Close the probe before returning: never expose an ELM channel. */
     suspend fun discoverCamaroDiagConnector(deviceId: Int, binary: Boolean = false): Result<AdapterCapabilities> =
         withContext(Dispatchers.IO) {
-            disconnect()
-            try {
-                usbTransport.connect(deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE).getOrThrow()
-                val context = currentCoroutineContext()
-                val channel = object : CamaroDiagConnectorDiscovery.Channel {
-                    override fun write(bytes: ByteArray) = usbTransport.write(bytes)
-                    override fun read(buffer: ByteArray, timeoutMs: Int) = usbTransport.read(buffer, timeoutMs)
-                }
-                val report = if (binary) {
-                    CamaroDiagConnectorBinaryDiscovery.inspect(channel) { context.ensureActive() }
-                } else {
-                    CamaroDiagConnectorDiscovery.inspect(channel) { context.ensureActive() }
-                }
-                Result.success(report.toAdapterCapabilities())
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                Result.failure(error)
-            } finally {
+            connectorDiscoveryMutex.withLock {
                 disconnect()
+                val epoch = transportSessionEpoch.capture()
+                // The discovery handle is never the shared ELM transport.
+                // A stale probe can close only its own handle, never a new OBD session.
+                val probe = ElmUsbTransport(connectorUsbContext)
+                try {
+                    probe.connect(
+                        deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE,
+                        discoveryOnly = true, requireCdc = binary
+                    ).getOrThrow()
+                    val context = currentCoroutineContext()
+                    val ensureCurrent = {
+                        context.ensureActive()
+                        transportSessionEpoch.requireQueuedCurrent(epoch)
+                    }
+                    val channel = object : CamaroDiagConnectorDiscovery.Channel {
+                        override fun write(bytes: ByteArray) {
+                            ensureCurrent()
+                            probe.write(bytes)
+                        }
+                        override fun read(buffer: ByteArray, timeoutMs: Int): Int {
+                            ensureCurrent()
+                            return probe.read(buffer, timeoutMs)
+                        }
+                    }
+                    val report = if (binary) {
+                        CamaroDiagConnectorBinaryDiscovery.inspect(channel, ensureCurrent)
+                    } else {
+                        CamaroDiagConnectorDiscovery.inspect(channel, ensureCurrent)
+                    }
+                    ensureCurrent()
+                    Result.success(report.toAdapterCapabilities())
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Result.failure(error)
+                } finally {
+                    probe.close()
+                }
             }
         }
 
