@@ -30,4 +30,14 @@ int main(){
   foreign.durable(prepared);
   Record replacement=prepared;replacement.manifestDigest[2]=3;
   assert(!foreign.permits(StoredState::Valid,replacement,erase)&&foreign.locked());
+  WriterGate reader;
+  assert(reader.observe(StoredState::Missing,Record{}));
+  assert(reader.observe(StoredState::Valid,erase));
+  reader.durable(erase);
+  assert(reader.observe(StoredState::Valid,erase));
+  assert(!reader.observe(StoredState::Missing,Record{}));
+  assert(reader.locked());
+  WriterGate stale;
+  stale.durable(erase);
+  assert(!stale.observe(StoredState::Valid,prepared)&&stale.locked());
 }

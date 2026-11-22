@@ -8,9 +8,16 @@ namespace cd { namespace journal {
 enum class StoredState { Missing, Valid, Error };
 class WriterGate {
  public:
-  bool permits(StoredState state,const Record& stored,const Record& next){
+  // A read-only inspection must also detect loss or replacement during an owned transaction.
+  bool observe(StoredState state,const Record& stored){
     if(locked_)return false;
-    if(state==StoredState::Error){locked_=true;return false;}
+    if(state==StoredState::Error||(owned_&&(state!=StoredState::Valid||!same(stored,last_)))){
+      locked_=true;return false;
+    }
+    return true;
+  }
+  bool permits(StoredState state,const Record& stored,const Record& next){
+    if(!observe(state,stored))return false;
     if(!owned_){
       if(state!=StoredState::Missing){locked_=true;return false;}
       return valid(next)&&next.stage==Stage::Prepared&&next.sequence==0;
