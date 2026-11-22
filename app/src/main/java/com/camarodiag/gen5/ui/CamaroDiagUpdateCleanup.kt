@@ -42,7 +42,7 @@ internal data class PendingCamaroDiagApk(val downloadId: Long, val targetVersion
             if (parts.size != 2) return null
             val id = parts[0].toLongOrNull() ?: return null
             val code = parts[1].toLongOrNull() ?: return null
-            if (id <= 0 || code <= 0) return null
+            if (id <= 0 || code <= 0 || value != "$id:$code") return null
             return PendingCamaroDiagApk(id, code)
         }
     }
