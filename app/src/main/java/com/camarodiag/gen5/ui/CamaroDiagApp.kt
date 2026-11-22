@@ -1830,10 +1830,19 @@ fun CanSnifferScreen(
                             Text(
                                 if (selectedObservedCanId == null)
                                     stringResource(R.string.can_console_filter_all_ecus)
-                                else stringResource(
-                                    R.string.can_console_filter_observed_id,
-                                    CanConsoleDisplayFilter.displayId(selectedObservedCanId!!)
-                                )
+                                else {
+                                    val id = selectedObservedCanId!!
+                                    val module = physicallyIdentifiedModules[id]
+                                    if (module == null) stringResource(
+                                        R.string.can_console_filter_observed_id,
+                                        CanConsoleDisplayFilter.displayId(id)
+                                    ) else stringResource(
+                                        R.string.can_console_filter_verified_ecu,
+                                        if (LocalConfiguration.current.locales[0].language == "fr")
+                                            module.nameFr else module.nameEn,
+                                        CanConsoleDisplayFilter.displayId(id)
+                                    )
+                                }
                             )
                         }
                         DropdownMenu(
