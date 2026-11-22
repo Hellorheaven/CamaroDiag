@@ -78,8 +78,16 @@ class CanConsoleLiveDiagnosticCorrelation(
         require(requestDeadlineMs > 0)
     }
 
+    private var startedAtMs: Long? = requestStartedAtMs
+
+    /** Mark the actual TX command start, after the adapter's AT setup. */
+    fun beginRequest(sentAtMs: Long) {
+        require(startedAtMs == null) { "CAN request session already started." }
+        startedAtMs = sentAtMs
+    }
+
     private fun withinRequestSession(receivedAtMs: Long): Boolean {
-        val started = requestStartedAtMs ?: return true
+        val started = startedAtMs ?: return true
         return receivedAtMs >= started && receivedAtMs - started < requestDeadlineMs
     }
 
