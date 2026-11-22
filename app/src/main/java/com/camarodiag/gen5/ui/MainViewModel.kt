@@ -1932,7 +1932,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isCapturing = false,
                         rawText = raw,
                         message = failureMessage,
-                        rawArchiveFailed = error is CanCaptureArchiveWriteException,
+                        // Any abnormal capture termination leaves the physical stream incomplete.
+                        // Keep partial RX visible for diagnostics, but never advertise
+                        // its archive as a completed physical CAN acquisition.
+                        rawArchiveFailed = true,
                         consoleHistory = (current.consoleHistory + trailingEvents + failureEvent).takeLast(300),
                         observedCanIds = retainObservedCanIds(current.observedCanIds, trailingEvents)
                     )
