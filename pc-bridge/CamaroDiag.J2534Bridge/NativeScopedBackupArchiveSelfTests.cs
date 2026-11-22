@@ -96,6 +96,15 @@ internal static class NativeScopedBackupArchiveSelfTests
                 extraZip.CreateEntry("untrusted/extra.bin");
             Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(extraPath, scope));
             File.Delete(extraPath);
+            var symlinkPath = Path.Combine(directory, "symlink.zip");
+            File.WriteAllBytes(symlinkPath, originalZip);
+            using (var symlinkZip = ZipFile.Open(symlinkPath, ZipArchiveMode.Update))
+            {
+                var entry = symlinkZip.GetEntry("capture/0/first.bin")!;
+                entry.ExternalAttributes = unchecked((int)(0xA000 << 16));
+            }
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(symlinkPath, scope));
+            File.Delete(symlinkPath);
             var malformedPath = Path.Combine(directory, "malformed.zip");
             File.WriteAllBytes(malformedPath, originalZip);
             string originalManifest;
