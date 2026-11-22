@@ -232,6 +232,57 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals(true, ObdTransportFailurePolicy.isConnectionLoss(disconnected))
     }
 
+    @Test fun lateSingleFrameResponseStaysVisibleButCannotCompleteExpiredPhysicalRequest() {
+        val request = frame("7E0 02 01 0C")
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            request, requestStartedAtMs = 1_000L, requestDeadlineMs = 400L
+        )
+        correlation.append("7E9 04 03 41 0C 1B\r\n", 1_100L)
+        correlation.append("7E8 04 03 41 0C 1A\r\n", 1_401L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(1_402L))
+        assertEquals(2, correlation.recentReceivedRecords().size)
+        assertEquals(listOf("RX", "RX"),
+            correlation.recentReceivedRecords().map { it.record.direction })
+    }
+
+    @Test fun lateMultiFrameContinuationCannotCompleteExpiredPhysicalRequest() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("18DA10F1 03 22 F1 90"),
+            timeoutMs = 2_000L,
+            requestStartedAtMs = 100L,
+            requestDeadlineMs = 500L
+        )
+        correlation.append("18DAF110 08 10 0A 62 F1 90 31 32 33\r\n", 200L)
+        correlation.append("18DAF110 05 21 34 35 36 37\r\n", 600L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(601L))
+        assertEquals(2, correlation.recentReceivedRecords().size)
+    }
+
+    @Test fun requestDeadlineCoversPhysicalElevenAndTwentyNineBitReplies() {
+        val eleven = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requestStartedAtMs = 200L, requestDeadlineMs = 500L
+        )
+        eleven.append("7E8 04 03 41 0C 1A\r\n", 699L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, eleven.complete(700L))
+        val twentyNine = CanConsoleLiveDiagnosticCorrelation(
+            frame("18DA10F1 03 22 F1 90"), requestStartedAtMs = 200L, requestDeadlineMs = 500L
+        )
+        twentyNine.append("18DAF110 04 03 62 F1 90\r\n", 201L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, twentyNine.complete(202L))
+    }
+
+    @Test fun diagnosticDeadlineRejectsClockReversalAndReinitialization() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), timeoutMs = 100L, requestDeadlineMs = 400L
+        )
+        correlation.beginRequest(1_000L)
+        correlation.append("7E8 04 03 41 0C 1A\r\n", 999L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(1_001L))
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            correlation.beginRequest(1_050L)
+        }
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
