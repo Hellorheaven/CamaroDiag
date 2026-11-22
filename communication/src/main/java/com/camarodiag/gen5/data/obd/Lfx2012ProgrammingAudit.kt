@@ -116,7 +116,10 @@ object Lfx2012ProgrammingAudit {
             Check(Item.VOLTAGE,
                 when {
                     snapshot.voltage == null || !snapshot.voltage.isFinite() -> CheckStatus.UNAVAILABLE
-                    snapshot.voltage <= 0.0 -> CheckStatus.REQUIRES_REVIEW
+                    // These broad sanity bounds flag implausible measurements;
+                    // they are not ECU-programming power limits or a flash authorization.
+                    snapshot.voltage < 6.0 || snapshot.voltage > 20.0 ->
+                        CheckStatus.REQUIRES_REVIEW
                     else -> CheckStatus.OBSERVED
                 }),
             Check(Item.COMMUNICATION,
