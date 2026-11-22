@@ -54,6 +54,7 @@ import com.camarodiag.gen5.data.obd.VxdiagProfiles
 import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
 import com.camarodiag.gen5.data.obd.CanTraceFilter
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
+import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanTraceDirection
 import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.data.obd.UdsNegativeResponse
@@ -1686,6 +1687,11 @@ fun CanSnifferScreen(
     var expandedFrameLine by remember { mutableStateOf<Int?>(null) }
     val report = state.report
     val rawCanFrameInput = remember(requestInput) { RawCanFrameParser.parse(requestInput) != null }
+    val unsafeRawCanInput = remember(requestInput) {
+        RawCanFrameParser.parse(requestInput)?.let {
+            !SafeRawCanTransmitPolicy.allows(it)
+        } == true
+    }
     val parsedCanId = remember(canIdFilter) {
         if (canIdFilter.isBlank()) null else CanTraceFilter.parseCanId(canIdFilter)
     }
@@ -1828,6 +1834,10 @@ fun CanSnifferScreen(
                     Text(stringResource(R.string.can_console_input_hint), color = TextMuted, fontSize = 10.sp)
                     if (rawCanFrameInput && !canTransmitAvailable) {
                         Text(stringResource(R.string.can_console_tx_unverified), color = WarnRed, fontSize = 11.sp)
+                    }
+                    if (unsafeRawCanInput) {
+                        Text(stringResource(R.string.can_console_unsafe_can_payload),
+                            color = WarnRed, fontSize = 11.sp)
                     }
                     Button(
                         onClick = {
