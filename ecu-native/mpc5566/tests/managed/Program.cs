@@ -20,6 +20,8 @@ internal static class Program
         internal static extern int cd_sim_recovery();
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void cd_sim_fail_next_pulse();
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void cd_sim_disturb_adjacent_unit();
     }
 
     private static void Check(bool ok, string message)
@@ -41,14 +43,15 @@ internal static class Program
         Directory.CreateDirectory(folder);
         try
         {
-            // Three distinct outcomes: completed transaction, wrong original,
-            // and physical flash-pulse failure in the native model.
-            foreach (var scenario in new[] { "complete", "wrong-original", "pulse-failed" })
+            // Completion and distinct failure modes on the native model,
+            // including corruption of the next doubleword by a previous pulse.
+            foreach (var scenario in new[] { "complete", "wrong-original", "pulse-failed", "adjacent-disturbance" })
             {
                 byte[] baseline = original.ToArray();
                 if (scenario == "wrong-original") baseline[0x11234] ^= 0x80;
                 Check(Model.cd_sim_init(baseline, (uint)baseline.Length) == 1, "Model reset failed.");
                 if (scenario == "pulse-failed") Model.cd_sim_fail_next_pulse();
+                if (scenario == "adjacent-disturbance") Model.cd_sim_disturb_adjacent_unit();
                 var link = new NativeE39KernelLink(Exchange, _ => Task.FromResult<uint?>(13500), 1024);
                 await link.ProbeAsync(CancellationToken.None);
                 string journalPath = Path.Combine(folder, scenario + ".jsonl");
@@ -86,10 +89,14 @@ internal static class Program
                 }
                 else
                 {
-                    Check(failure is IOException && Model.cd_sim_pulses() == 1 &&
+                    uint expectedPulses = scenario == "pulse-failed" ? 1u : 2u;
+                    Check(failure is IOException && Model.cd_sim_pulses() == expectedPulses &&
                         Model.cd_sim_recovery() == 1 &&
                         state == NativeE39FileWriteJournal.CompletionState.RecoveryRequired,
                         "Native pulse failure was not persisted as recovery required.");
+                    var inspection = NativeE39FileWriteJournal.InspectDetailed(journalPath);
+                    Check(inspection.PossiblyIncompleteAddress == 0x20000u,
+                        "Recovery evidence must identify the interrupted sector.");
                 }
                 Console.WriteLine("PASS: actual C / C# integration " + scenario);
             }
