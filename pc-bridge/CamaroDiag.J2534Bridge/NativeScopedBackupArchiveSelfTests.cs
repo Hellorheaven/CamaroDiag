@@ -68,6 +68,14 @@ internal static class NativeScopedBackupArchiveSelfTests
                 scope.RequestCanId, scope.ResponseCanId, scope.ProtocolNumber,
                 scope.StartAddress, scope.Length, scope.MaxReadBytes, scope.Session);
             Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(zipPath, wrongScope));
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(zipPath,
+                new J2534MemoryReadScope(vin, scope.RequestCanId, scope.ResponseCanId,
+                    scope.ProtocolNumber, scope.StartAddress + 1, scope.Length,
+                    scope.MaxReadBytes, scope.Session)));
+            Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(zipPath,
+                new J2534MemoryReadScope(vin, scope.RequestCanId, scope.ResponseCanId,
+                    scope.ProtocolNumber, scope.StartAddress, scope.Length - 1,
+                    scope.MaxReadBytes, scope.Session)));
 
             var originalZip = File.ReadAllBytes(zipPath);
             var alteredPath = Path.Combine(directory, "altered.zip");
