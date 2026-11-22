@@ -317,6 +317,31 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         ))
     }
 
+    @Test fun expiredNegativeAndPendingUdsRepliesRemainRxOnly() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 03 22 F1 90"), requestStartedAtMs = 100L, requestDeadlineMs = 500L
+        )
+        correlation.append("7E8 04 03 7F 22 78\r\n", 200L)
+        correlation.append("7E8 04 03 7F 22 31\r\n", 600L)
+        correlation.append("7E8 04 03 62 F1 90\r\n", 601L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(602L))
+        assertEquals(3, correlation.recentReceivedRecords().size)
+        assertEquals(3, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
+    }
+
+    @Test fun functionalResponderBeforeDeadlineWinsWithoutClaimingLateForeignEcu() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7DF 02 01 0C"), requestStartedAtMs = 10L, requestDeadlineMs = 200L
+        )
+        correlation.append("7E8 04 03 41 0C 1A\r\n", 209L)
+        correlation.append("7E9 04 03 41 0C 1B\r\n", 210L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(211L))
+        assertEquals(2, correlation.recentReceivedRecords().size)
+        assertEquals(listOf("CAN ID=7E8 DLC=4 DATA=03 41 0C 1A",
+                "CAN ID=7E9 DLC=4 DATA=03 41 0C 1B"),
+            correlation.recentReceivedRecords().map { it.record.content })
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
