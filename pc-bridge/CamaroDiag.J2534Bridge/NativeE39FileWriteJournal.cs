@@ -15,6 +15,7 @@ internal sealed class NativeE39FileWriteJournal :
     private readonly FileStream stream;
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool disposed;
+    private bool appendFailed;
 
     internal enum CompletionState
     {
@@ -47,6 +48,8 @@ internal sealed class NativeE39FileWriteJournal :
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
+            if (appendFailed)
+                throw new IOException("Previous journal append failed; retain the interrupted journal for assessment.");
             var entry = JsonSerializer.Serialize(new
             {
                 Schema = 3,
@@ -58,10 +61,21 @@ internal sealed class NativeE39FileWriteJournal :
             var encoded = Encoding.UTF8.GetBytes(entry + "\n");
             if (encoded.Length > MaximumJournalBytes - stream.Length)
                 throw new IOException("ECU journal size limit reached; refusing further programming.");
-            await stream.WriteAsync(encoded, cancellationToken);
-            // Flush(true) propagates file buffers to the storage subsystem.
-            // Filesystem/drive caches are still a hardware-dependent boundary.
-            stream.Flush(flushToDisk: true);
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await stream.WriteAsync(encoded, cancellationToken);
+                // Flush(true) propagates file buffers to the storage subsystem.
+                // Filesystem/drive caches are still a hardware-dependent boundary.
+                stream.Flush(flushToDisk: true);
+            }
+            catch
+            {
+                // An interrupted write may already have left a JSON fragment.
+                // Do not append another phase to a physically ambiguous record.
+                appendFailed = true;
+                throw;
+            }
         }
         finally
         {
@@ -249,9 +263,9 @@ internal sealed class NativeE39FileWriteJournal :
         try
         {
             if (disposed) return;
-            stream.Flush(flushToDisk: true);
-            await stream.DisposeAsync();
             disposed = true;
+            try { stream.Flush(flushToDisk: true); }
+            finally { await stream.DisposeAsync(); }
         }
         finally
         {
