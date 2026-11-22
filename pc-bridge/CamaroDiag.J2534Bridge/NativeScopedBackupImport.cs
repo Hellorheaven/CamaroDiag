@@ -76,7 +76,7 @@ internal static class NativeScopedBackupImport
         if (values.Count != keys.Count || values.Keys.Any(k => !keys.Contains(k)))
             throw new InvalidDataException("Unrecognized backup manifest field.");
         if (values["format"] != NativeScopedBackupArchive.Format ||
-            values["vin"] != scope.ExpectedVin || values["controller"] != "" ||
+            values["vin"] != scope.ExpectedVin || values["controller"].Length > 128 ||
             values["count"] != "1" || values["required"] != "" ||
             values["capture.0.region"] != "OTHER" ||
             values["capture.0.start"] != scope.StartAddress.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
