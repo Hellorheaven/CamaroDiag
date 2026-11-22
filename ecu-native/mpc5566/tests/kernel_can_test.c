@@ -21,6 +21,12 @@ int main(void) {
     m.regs[0x90/4]=8u<<24;
     cd_flexcan_bus bus={&m,read,write,service};
     init_model(&memory);cd_flash_controller flash=controller_for(&memory);
+    assert(!cd_kernel_can_poll(&board,0));
+    assert(!cd_kernel_can_bind(&board,&flash,&bus,0,0,0x7e0,0x7e8,false,1000000,4,1));
+    assert(!cd_kernel_can_poll(&board,0));
+    assert(!cd_kernel_can_bind(&board,&flash,&bus,0,1,0x7e0,0x7e8,false,0,4,1));
+    assert(!cd_kernel_can_poll(&board,0));
+    assert(memory.pulses == 0 && !flash.recovery_required);
     assert(cd_kernel_can_bind(&board,&flash,&bus,0,1,0x7e0,0x7e8,false,1000000,4,1));
     assert(cd_kernel_can_poll(&board,0));
     /* Single-frame unsupported request: negative response via mailbox. */
