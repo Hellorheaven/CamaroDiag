@@ -100,9 +100,15 @@ object SafeObdRequestPolicy {
                 bytes = bytes.drop(3)
             }
             // ELM's optional single-frame PCI may precede the positive service.
-            if (bytes.length >= 4 && (bytes.take(2).toIntOrNull(16)?.let { it in 1..7 } == true) &&
+            val declaredLength = bytes.take(2).toIntOrNull(16)
+            if (declaredLength != null && declaredLength in 1..7 &&
+                bytes.length >= 2 + declaredLength * 2 &&
                 bytes.drop(2).startsWith(expected)) {
-                bytes = bytes.drop(2)
+                val trailing = bytes.drop(2 + declaredLength * 2)
+                // A short DLC, or arbitrary bytes masquerading as CAN padding,
+                // must not turn a truncated reply into successful ECU evidence.
+                if (trailing.length % 2 != 0 || trailing.any { it != '0' }) continue
+                bytes = bytes.substring(2, 2 + declaredLength * 2)
             }
             if (bytes.startsWith(expected) && bytes.length > expected.length &&
                 bytes.length % 2 == 0) {
