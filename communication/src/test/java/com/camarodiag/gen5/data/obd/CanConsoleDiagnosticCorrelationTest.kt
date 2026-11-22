@@ -127,6 +127,17 @@ class CanConsoleDiagnosticCorrelationTest {
             correlation.accept(frame("7E8 06 59 02 A5 12 34 56"), 3))
     }
 
+    @Test fun uds19UnexpectedExtraRequestParametersCannotClaimAnotherReply() {
+        val unsupportedLayout = CanConsoleDiagnosticCorrelation(frame("7E0 04 19 02 FF AA"))
+        assertNull(unsupportedLayout.accept(frame("7E8 06 59 02 A5 12 34 56"), 1))
+        val numberByMask = CanConsoleDiagnosticCorrelation(frame("7E0 03 19 01 FF"))
+        assertArrayEquals(byteArrayOf(0x59, 0x01, 0xA5.toByte(), 0x00),
+            numberByMask.accept(frame("7E8 04 59 01 A5 00"), 2))
+        val supportedDtc = CanConsoleDiagnosticCorrelation(frame("7E0 02 19 0A"))
+        assertArrayEquals(byteArrayOf(0x59, 0x0A, 0x00),
+            supportedDtc.accept(frame("7E8 03 59 0A 00"), 3))
+    }
+
     @Test fun readDataByIdentifierStillRequiresExactDidEcho() {
         val correlation = CanConsoleDiagnosticCorrelation(frame("7E0 03 22 F1 90"))
         assertNull(correlation.accept(frame("7E8 04 62 F1 91 01"), 1))
