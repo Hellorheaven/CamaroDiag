@@ -646,4 +646,7 @@
     <string name="cal_native_catalog_loading">Načítava sa vlastný katalóg…</string>
     <string name="cal_native_catalog_empty">Momentálne nie je žiadny proprietárny DID Camaro označený ako použiteľný. Neznáme adresy ani škálovanie sa nevymýšľajú.</string>
     <string name="cal_native_catalog_read_disabled">Čítanie vozidla je vypnuté, kým sa neoverí adresovanie a dekódovanie na identickej konfigurácii.</string>
+    <string name="export_folder_instruction">Vytvorte alebo vyberte priečinok CamaroDiag v internom úložisku a povoľte prístup. Exportované súbory sú viditeľné v zdieľanom úložisku.</string>
+    <string name="export_folder_success">Export uložený do /CamaroDiag/.</string>
+    <string name="export_folder_failed">Export sa nepodarilo uložiť do /CamaroDiag/.</string>
 </resources>
