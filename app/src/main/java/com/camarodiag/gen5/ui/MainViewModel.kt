@@ -448,8 +448,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isJ2534BridgeConnecting = false,
             isJ2534BridgeConnected = false
         )
-        val failureTransport = (error as? CanAdapterRestorationException)
-            ?.originalTransportKind ?: obdManager.currentTransportKind
+        val restoration = when (error) {
+            is CanAdapterRestorationException -> error
+            is CanConsolePhysicalExchangeException -> error.cause as? CanAdapterRestorationException
+            else -> null
+        }
+        val failureTransport = restoration?.originalTransportKind ?: obdManager.currentTransportKind
         val messageId = when (failureTransport) {
             "BLUETOOTH", "BLE" -> R.string.connection_lost_bluetooth
             "USB" -> R.string.connection_lost_usb
