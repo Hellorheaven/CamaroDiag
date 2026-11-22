@@ -70,14 +70,14 @@ class CanConsoleDiagnosticCorrelationTest {
 
     @Test fun physicalTransportUsesCompleteIsotpPayloadWithoutSuppressingOtherFrames() {
         val request = frame("7E0 03 22 F1 90")
-        val batch = "7E9 08 10 0A 62 F1 90 31 32 33\\r\\n" +
-            "7E8 08 10 0A 62 F1 90 31 32 33\\r\\n" +
-            "7E9 05 21 34 35 36 37\\r\\n" +
+        val batch = "7E9 08 10 0A 62 F1 90 31 32 33\r\n" +
+            "7E8 08 10 0A 62 F1 90 31 32 33\r\n" +
+            "7E9 05 21 34 35 36 37\r\n" +
             "7E8 05 21 34 35 36 37"
         assertEquals(4, CanConsoleRecordParser.parse(batch).count { it.direction == "RX" })
         assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(batch, request))
         assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
-            "7E9 08 10 0A 62 F1 90 31 32 33\\r\\n7E9 05 21 34 35 36 37", request
+            "7E9 08 10 0A 62 F1 90 31 32 33\r\n7E9 05 21 34 35 36 37", request
         ))
         assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
             "7E8 08 10 0A 62 F1 90 31 32 33", request
@@ -86,13 +86,13 @@ class CanConsoleDiagnosticCorrelationTest {
 
     @Test fun functionalBroadcastAcceptsSeparateRespondersButNeverMixesTheirSegments() {
         val functional = frame("7DF 03 22 F1 90")
-        val mixed = "7E8 08 10 0A 62 F1 90 31 32 33\\r\\n" +
-            "7E9 05 21 34 35 36 37\\r\\n" +
+        val mixed = "7E8 08 10 0A 62 F1 90 31 32 33\r\n" +
+            "7E9 05 21 34 35 36 37\r\n" +
             "7E8 05 21 34 35 36 37"
         assertEquals(3, CanConsoleRecordParser.parse(mixed).count { it.direction == "RX" })
         assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(mixed, functional))
         assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
-            "7E8 08 10 0A 62 F1 90 31 32 33\\r\\n7E9 05 21 34 35 36 37",
+            "7E8 08 10 0A 62 F1 90 31 32 33\r\n7E9 05 21 34 35 36 37",
             functional
         ))
         assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
@@ -113,7 +113,7 @@ class CanConsoleDiagnosticCorrelationTest {
             "7E8 04 03 7F 22 78", request
         ))
         assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
-            "7E8 04 03 7F 22 78\\r\\n7E8 04 03 62 F1 90", request
+            "7E8 04 03 7F 22 78\r\n7E8 04 03 62 F1 90", request
         ))
     }
 
