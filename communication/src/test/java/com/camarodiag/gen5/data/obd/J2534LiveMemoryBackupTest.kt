@@ -72,6 +72,7 @@ class J2534LiveMemoryBackupTest {
         assertArrayEquals(baseline, result.capture.firstRead)
         assertArrayEquals(baseline, result.capture.independentRead)
         assertTrue(result.verification.consistent)
+        assertEquals(EcuBackupCoverage.Status.PARTIAL, result.manifest.coverage.status)
         assertFalse(result.manifest.hardwareProvenanceVerified)
         assertEquals(EcuBackupManifest.Origin.SIMULATION, result.capture.origin)
         assertEquals(6, fake.reads)
