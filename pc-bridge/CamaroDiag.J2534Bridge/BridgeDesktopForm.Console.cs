@@ -204,16 +204,19 @@ internal sealed partial class BridgeDesktopForm
             object value;
             if (gmlan)
             {
-                ConsoleLine("TX", "1A 90 / 1A C1 / 1A C9 (GM GMLAN)", Color.DarkOrange);
+                ConsoleLine("SYSTEM", "Demande de lecture d'identité GM GMLAN en cours (1A 90 / 1A C1 / 1A C9).", Color.DarkSlateGray);
                 value = await Task.Run(() => device.ReadGmlanIdentification());
             }
             else
             {
-                ConsoleLine("TX", "09 02 / 09 04 / 09 06 / 09 0A (OBD Mode 09)", Color.DarkOrange);
+                ConsoleLine("SYSTEM", "Demande de lecture d'identité OBD Mode 09 en cours (09 02 / 09 04 / 09 06 / 09 0A).", Color.DarkSlateGray);
                 value = await Task.Run(() => device.ReadCalibrationIdentification());
             }
-            ConsoleLine("RX", JsonSerializer.Serialize(value,
-                new JsonSerializerOptions { WriteIndented = true }), Color.DarkGreen);
+            // The returned identity is a decoded aggregate of several ECU
+            // responses, not one byte-for-byte physical RX frame.
+            ConsoleLine("SYSTEM", "Identité ECU lue et décodée : " +
+                JsonSerializer.Serialize(value,
+                    new JsonSerializerOptions { WriteIndented = true }), Color.DarkGreen);
         });
     }
 
