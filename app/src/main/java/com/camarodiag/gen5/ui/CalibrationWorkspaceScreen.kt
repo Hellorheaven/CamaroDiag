@@ -1190,8 +1190,8 @@ fun CalibrationWorkspaceScreen(
                                 Text(stringResource(R.string.cal_archive_partial), color = CamaroAmber)
                             }
                             manifest.vehicleVin?.let { Text("${stringResource(R.string.obd_vin)} $it", color = TextPrimary) }
-                            if (manifest.channel != null) {
-                                val route = manifest.channel
+                            val route = manifest.channel
+                            if (route != null) {
                                 Text(
                                     stringResource(
                                         R.string.cal_archive_channel,
