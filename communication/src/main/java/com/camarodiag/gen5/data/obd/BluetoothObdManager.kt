@@ -702,9 +702,13 @@ class BluetoothObdManager(context: Context) {
                 }
                 val timedCorrelation = CanConsoleLiveDiagnosticCorrelation(frame)
                 val frameResponse = boundCommand(payload, 4_000L) { chunk ->
-                    timedCorrelation.append(chunk, System.nanoTime() / 1_000_000L)
+                    timedCorrelation.append(
+                        chunk, System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                    )
                 }
-                val diagnosticStatus = timedCorrelation.complete(System.nanoTime() / 1_000_000L)
+                val diagnosticStatus = timedCorrelation.complete(
+                    System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                )
                 // An explicit adapter OK establishes TX only. A correlated ECU
                 // reply may also establish completion, but unmatched bus traffic
                 // and late ISO-TP continuations never do.
