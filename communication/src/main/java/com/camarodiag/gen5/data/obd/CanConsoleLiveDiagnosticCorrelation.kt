@@ -38,9 +38,13 @@ object CanConsolePhysicalTransmissionPolicy {
         hasExplicitAck: Boolean,
         hasAdapterError: Boolean
     ): Boolean =
-        !hasAdapterError && !CanConsoleAdapterReplyPolicy.isFailure(adapterOutput) &&
-            // Only a timestamp-validated stream ACK can confirm TX. The
-            // adapterOutput is truncated and has no individual receive times.
+        !hasAdapterError &&
+            // The command's small adapterOutput buffer can be empty even while
+            // the real receive callback saw a complete ECU reply or explicit OK.
+            // A blank fallback is not proof of failure; a nonblank error is.
+            (adapterOutput.isBlank() || !CanConsoleAdapterReplyPolicy.isFailure(adapterOutput)) &&
+            // Only timestamp-validated stream evidence authorizes TX. Neither
+            // an empty command reply nor uncorrelated bus traffic is sufficient.
             (hasExplicitAck || diagnosticStatus != CanConsoleDiagnosticStatus.NONE)
 }
 

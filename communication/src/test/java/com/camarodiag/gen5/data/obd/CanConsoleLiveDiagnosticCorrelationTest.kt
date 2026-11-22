@@ -182,6 +182,12 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         ): Boolean = CanConsolePhysicalTransmissionPolicy.confirmed(output, status, ack, error)
 
         assertEquals(true, confirmed("OK", CanConsoleDiagnosticStatus.NONE, ack = true))
+        // A small command-return buffer may be blank even if the physical RX
+        // stream has confirmed an ECU reply or explicit adapter acknowledgement.
+        assertEquals(true, confirmed("", CanConsoleDiagnosticStatus.POSITIVE))
+        assertEquals(true, confirmed("", CanConsoleDiagnosticStatus.NONE, ack = true))
+        assertEquals(false, confirmed("", CanConsoleDiagnosticStatus.NONE))
+        assertEquals(false, confirmed("CAN ERROR", CanConsoleDiagnosticStatus.POSITIVE))
         assertEquals(true, confirmed("7E8 04 03 41 0C 1A", CanConsoleDiagnosticStatus.POSITIVE))
         assertEquals(true, confirmed("7E8 04 03 7F 22 31", CanConsoleDiagnosticStatus.NEGATIVE))
         assertEquals(false, confirmed("7E9 04 03 41 0C 1B", CanConsoleDiagnosticStatus.NONE))
