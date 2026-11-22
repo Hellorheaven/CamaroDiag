@@ -149,6 +149,34 @@ class UdsClientTest {
         assertTrue(runCatching { grant("A1B2", "HW-1", "OS-1") }.isSuccess)
     }
 
+    @Test fun stateChangingGrantsCannotDisableSecurityAccessOrOmitKeyLevels() {
+        assertTrue(runCatching {
+            verifiedPolicy(writeDids = setOf(0x1234), requireSecurity = false)
+        }.isFailure)
+        val vin = "1G1FA1RXXR0123456"
+        val id = UdsEcuIdentity("ECM", "HW-1", "OS-1", "CAL-1", "A1B2", vin)
+        assertTrue(runCatching {
+            UdsAccessPolicy.verified(
+                vehicleVin = vin, identity = id, expectedVin = vin,
+                expectedCalId = "CAL-1", expectedCvn = "A1B2",
+                expectedControllerFamily = "ECM",
+                expectedHardwarePartNumber = "HW-1", expectedOperatingSystemId = "OS-1",
+                readDids = emptySet(), writeDids = setOf(0x1234),
+                allowedSessions = setOf(0x01, 0x02), routineControlPermissions = emptyMap(),
+                allowedSecurityLevels = emptySet(),
+                readableMemoryRegions = emptyList(), writableMemoryRegions = emptyList(),
+                maxTransferBytes = 0, requireSecurityAccess = true,
+                evidenceReference = "Synthetic negative programming security test"
+            )
+        }.isFailure)
+        // Read-only memory inspection may remain usable without unlocking
+        // security since it grants no state-changing capability.
+        assertTrue(runCatching {
+            verifiedPolicy(memoryRegions = listOf(UdsMemoryRegion(0x1000, 0x100)),
+                maxTransferBytes = 0x100, requireSecurity = false)
+        }.isSuccess)
+    }
+
     @Test fun sessionControlAndTesterPresentValidatePositiveResponses() = runBlocking {
         val transport = FakeTransport(listOf(
             response(0x50, 0x02, 0x00, 0x32, 0x01, 0xF4),
