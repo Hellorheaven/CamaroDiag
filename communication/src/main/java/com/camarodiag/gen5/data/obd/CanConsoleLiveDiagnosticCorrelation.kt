@@ -139,8 +139,12 @@ class CanConsoleLiveDiagnosticCorrelation(
             // Pre-TX setup output is visible history, but cannot poison the
             // transmission that has not yet begun. Once TX has started, any
             // adapter failure remains authoritative (including a late one).
-            if (startedAtMs?.let { receivedAtMs >= it } == true &&
-                CanConsoleAdapterReplyPolicy.isFailure(line)) adapterErrorSeen = true
+            // Legacy/implicit correlation starts with its first RX chunk; explicit
+            // physical TX correlation must exclude pre-start adapter errors.
+            val belongsToRequest = startedAtMs?.let { receivedAtMs >= it }
+                ?: !requireExplicitStart
+            if (belongsToRequest && CanConsoleAdapterReplyPolicy.isFailure(line))
+                adapterErrorSeen = true
         }
         for (record in CanConsoleRecordParser.parse(lines)) {
             recentRecords.addLast(CanConsoleTimedRecord(record, receivedAtWallClockMs))
