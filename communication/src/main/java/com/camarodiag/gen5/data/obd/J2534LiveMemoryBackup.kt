@@ -21,6 +21,16 @@ object J2534LiveMemoryBackup {
     private const val MAX_CAPTURE_BYTES = 4 * 1024 * 1024
     private const val TIMEOUT_MS = 6000L
 
+    /**
+     * UDS DiagnosticSessionControl has either a minimal echoed subfunction
+     * or the full P2/P2* timing parameters. A three-, four- or five-byte
+     * reply cannot establish a valid session transition.
+     */
+    internal fun isValidSessionReply(reply: ByteArray, expectedSubfunction: Int): Boolean =
+        (reply.size == 2 || reply.size == 6) &&
+            reply[0] == 0x50.toByte() &&
+            (reply[1].toInt() and 0xFF) == expectedSubfunction
+
     data class Request(
         val expectedVin: String,
         val region: EcuBackupCoverage.Region,
@@ -195,9 +205,8 @@ object J2534LiveMemoryBackup {
                 // A lost or malformed positive response can still mean the ECU changed session.
                 extendedRequested = true
                 val response = transport.exchange(byteArrayOf(0x10, 0x03), TIMEOUT_MS)
-                require(response.size >= 2 && response[0] == 0x50.toByte() &&
-                    response[1] == 0x03.toByte()) {
-                    "ECU did not accept the extended read session."
+                require(isValidSessionReply(response, 0x03)) {
+                    "ECU did not accept a well-formed extended read session."
                 }
             }
             val first = pass(1)
@@ -240,9 +249,8 @@ object J2534LiveMemoryBackup {
                         withTimeout(2 * (TIMEOUT_MS + 3000L) + 1000L) {
                             liveVin()
                             val response = transport.exchange(byteArrayOf(0x10, 0x01), TIMEOUT_MS)
-                            require(response.size >= 2 && response[0] == 0x50.toByte() &&
-                                response[1] == 0x01.toByte()) {
-                                "ECU did not confirm return to the default diagnostic session."
+                            require(isValidSessionReply(response, 0x01)) {
+                                "ECU did not confirm a well-formed return to the default diagnostic session."
                             }
                         }
                     }

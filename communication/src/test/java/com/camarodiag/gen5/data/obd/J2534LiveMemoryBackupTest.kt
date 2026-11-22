@@ -183,6 +183,58 @@ class J2534LiveMemoryBackupTest {
         assertTrue(snapshots.all { it.requiredBytesRead == 600L })
     }
 
+    @Test fun diagnosticSessionRepliesRequireExactUdsTimingShape() {
+        for (session in listOf(1, 3)) {
+            assertTrue(J2534LiveMemoryBackup.isValidSessionReply(
+                byteArrayOf(0x50, session.toByte()), session))
+            assertTrue(J2534LiveMemoryBackup.isValidSessionReply(
+                byteArrayOf(0x50, session.toByte(), 0x00, 0x32, 0x01, 0xF4.toByte()), session))
+            for (bad in listOf(
+                byteArrayOf(0x50, session.toByte(), 0x00),
+                byteArrayOf(0x50, session.toByte(), 0x00, 0x32),
+                byteArrayOf(0x50, session.toByte(), 0x00, 0x32, 0x01),
+                byteArrayOf(0x50, session.toByte(), 0x00, 0x32, 0x01, 0xF4.toByte(), 0x00),
+                byteArrayOf(0x7F, 0x10, 0x12),
+                byteArrayOf(0x50, (session xor 2).toByte())
+            )) {
+                assertFalse(J2534LiveMemoryBackup.isValidSessionReply(bad, session))
+            }
+        }
+    }
+
+    @Test fun malformedExtendedSessionTimingNeverStartsMemoryRead() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val sessions = mutableListOf<Int>()
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
+                if (payload[0] == 0x10.toByte()) {
+                    sessions += payload[1].toInt() and 0xFF
+                    if (payload[1] == 0x03.toByte()) return byteArrayOf(0x50, 0x03, 0x00)
+                }
+                return ecu.exchange(payload, timeoutMs)
+            }
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.isFailure)
+        assertEquals(0, ecu.reads)
+        assertEquals(listOf(3, 1), sessions)
+    }
+
+    @Test fun malformedDefaultSessionTimingRejectsCompletedCapture() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val transport = object : UdsPayloadTransport by ecu {
+            override suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray =
+                if (payload.contentEquals(byteArrayOf(0x10, 0x01)))
+                    byteArrayOf(0x50, 0x01, 0x00)
+                else ecu.exchange(payload, timeoutMs)
+        }
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(transport, request(session = 3))
+        }.isFailure)
+        assertEquals(6, ecu.reads)
+    }
+
     @Test fun extendedReadSessionIsClosedAfterDoubleCapture() = runBlocking {
         val fake = ScriptedEcu(baseline, vin)
         J2534LiveMemoryBackup.captureForTest(fake, request(session = 3))
