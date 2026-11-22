@@ -62,7 +62,12 @@ class EcuFamilyCatalogCompatibilityTest {
             capabilities = capabilities,
             controllerFamilies = setOf("E39"),
             physicalHardwareValidated = true,
-            writeTargets = setOf(first, second)
+            writeTargets = setOf(first, second),
+            writeQualifications = setOf(first, second).map {
+                EcuProgrammingDriverContract.WriteQualification(
+                    it, EcuBackupCoverage.Region.CALIBRATION, EcuBenchExpertPlan.AccessMethod.BENCH
+                )
+            }.toSet()
         )
         assertTrue(driver.supportsFamilyProtocol("E39", EcuProgrammingDriverContract.Transport.J2534))
         assertTrue(driver.supportsFamilyProtocol(" e39 ", EcuProgrammingDriverContract.Transport.J2534))
