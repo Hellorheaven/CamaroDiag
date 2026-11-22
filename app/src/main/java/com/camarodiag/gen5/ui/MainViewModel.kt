@@ -2043,7 +2043,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (currentState.isSendingRequest || canRequestJob?.isActive == true ||
             detachedCanRequestJob?.isActive == true
         ) return
-        if (!obdManager.isObdCommandChannelAvailable ||
+        if (!obdManager.isStandardObdReadAvailable() ||
             currentState.isCapturing ||
             canMonitorJob?.isActive == true ||
             detachedCanMonitorJob?.isActive == true
@@ -2071,7 +2071,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
-                val response = obdManager.sendAtCommand(request.elmCommand, 4_000L)
+                val response = obdManager.sendReadOnlyConsoleCommand(request)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
                     val hasEcuResponse =
