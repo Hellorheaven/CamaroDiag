@@ -40,6 +40,20 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals(CanConsoleDiagnosticStatus.NEGATIVE, correlation.complete(101))
     }
 
+    @Test fun allAdapterFramesAreDecodedBeforeTheUiWindowIsBounded() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
+        val stream = (0 until 350).joinToString("\r\n") { index ->
+            if (index % 2 == 0) "7E8 04 03 41 0C 1A" else "7E9 04 03 41 0C 1B"
+        } + "\r\n"
+        correlation.append(stream, 50L)
+        val recent = correlation.recentReceivedRecords()
+        assertEquals(300, recent.size)
+        assertEquals(300, recent.count { it.direction == "RX" })
+        assertEquals("CAN ID=7E8 DLC=4 DATA=03 41 0C 1A", recent.first().content)
+        assertEquals("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B", recent.last().content)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(51L))
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
