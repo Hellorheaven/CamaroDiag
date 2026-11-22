@@ -173,4 +173,33 @@ class SafeObdRequestPolicyTest {
         assertEquals(true, SafeObdRequestPolicy.hasUnambiguousPositiveResponse(request, "41 52 80"))
     }
 
+    @Test
+    fun liveMode01ReadRequiresTheExactSaePayloadLength() {
+        val cases = listOf(
+            Triple("010C", "41 0C 1A F8", "41 0C 1A"),
+            Triple("0110", "41 10 00 64", "41 10 64"),
+            Triple("0105", "41 05 5B", "41 05 5B 00"),
+            Triple("0152", "41 52 80", "41 52 80 00"),
+            Triple("0140", "41 40 00 00 40 00", "41 40 00 00 40"),
+            Triple("0124", "41 24 00 01 02 03", "41 24 00 01"),
+            Triple("0144", "41 44 80 00", "41 44 80"),
+            Triple("0114", "41 14 80 80", "41 14 80")
+        )
+        for ((command, valid, invalid) in cases) {
+            val request = requireNotNull(SafeObdRequestPolicy.parse(command))
+            assertEquals(command, true, SafeObdRequestPolicy.hasPositiveResponse(request, valid))
+            assertEquals(command, false, SafeObdRequestPolicy.hasPositiveResponse(request, invalid))
+        }
+    }
+
+    @Test
+    fun allWhitelistedMode01PidsHaveAnExplicitPayloadLength() {
+        for (pid in 0..255) {
+            val command = "01%02X".format(java.util.Locale.ROOT, pid)
+            val request = SafeObdRequestPolicy.parse(command) ?: continue
+            assertEquals(command, 0x01, request.service)
+            assertEquals(command, true, SafeObdRequestPolicy.expectedMode01DataBytes(pid) != null)
+        }
+    }
+
 }
