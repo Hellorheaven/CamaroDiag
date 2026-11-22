@@ -1782,6 +1782,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             rawArchiveFailed = false,
             captureArchiveRequired = true,
             rawText = "",
+            observedCanIds = emptySet(),
             report = null,
             message = null,
             consoleHistory = (previousState.consoleHistory + startEvent).takeLast(300)
