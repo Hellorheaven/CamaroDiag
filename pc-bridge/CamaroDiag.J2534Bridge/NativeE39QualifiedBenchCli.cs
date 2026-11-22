@@ -79,7 +79,7 @@ internal static class NativeE39QualifiedBenchCli
             Console.WriteLine("Preserve backup and journal. Independent functional bench evaluation remains necessary.");
             return 0;
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or
             ArgumentException or InvalidOperationException or OperationCanceledException or
             CryptographicException or JsonException or OverflowException or NotSupportedException)
         {
