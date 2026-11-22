@@ -19,7 +19,14 @@ internal static class NativeScopedBackupImport
         "IMPORTED_FILE", "SIMULATION", "REPORTED_HARDWARE_READ"
     };
 
-    internal static NativeScopedMemoryReader.VerifiedCapture VerifyZip(
+    // An imported file is NEVER a validated physical acquisition. Return only
+    // immutable inspection metadata, not writable ECU image bytes or a live
+    // VerifiedCapture that could accidentally satisfy a programming preflight.
+    internal sealed record Inspection(
+        string Vin, uint StartAddress, int ByteCount, string Sha256,
+        string DeclaredRegion, string DeclaredOrigin, IReadOnlyList<string> RequiredRegions);
+
+    internal static Inspection VerifyZip(
         string source, J2534MemoryReadScope scope)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
@@ -129,9 +136,10 @@ internal static class NativeScopedBackupImport
         if (!CryptographicOperations.FixedTimeEquals(first, second) ||
             !string.Equals(Convert.ToHexString(SHA256.HashData(first)), digest, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Backup acquisitions or SHA-256 do not match.");
-        return new NativeScopedMemoryReader.VerifiedCapture(first, scope.StartAddress,
-            scope.ExpectedVin, digest,
-            checked((int)((scope.Length + (uint)scope.MaxReadBytes - 1) / (uint)scope.MaxReadBytes)), second);
+        return new Inspection(scope.ExpectedVin, scope.StartAddress, first.Length,
+            Convert.ToHexString(SHA256.HashData(first)),
+            values["capture.0.region"], values["capture.0.origin"],
+            Array.AsReadOnly(requiredRegions));
     }
 
     private static string DecodeControllerLabel(string encoded)
