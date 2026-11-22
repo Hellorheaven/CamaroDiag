@@ -259,6 +259,7 @@ internal static class BridgeSelfTests
         checks += NativeE39ProgrammingSessionSelfTests.Run();
         checks += NativeE39BenchWorkflowSelfTests.Run();
         checks += NativeE39PhysicalAdmissionSelfTests.Run();
+        checks += NativeE39QualifiedBenchSelfTests.Run();
         checks += NativeE39CalibrationRepairSelfTests.Run();
         checks += NativeGmlanBenchProbeSelfTests.Run();
         checks += NativeScopedMemoryReaderSelfTests.Run();
