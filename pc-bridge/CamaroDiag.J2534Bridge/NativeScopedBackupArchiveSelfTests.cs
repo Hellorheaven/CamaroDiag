@@ -121,6 +121,19 @@ internal static class NativeScopedBackupArchiveSelfTests
             Check(NativeScopedBackupImport.VerifyZip(androidStylePath, scope).Bytes.SequenceEqual(bytes),
                 "Java Properties comment headers remain importable");
             File.Delete(androidStylePath);
+            var oversizedLabelPath = Path.Combine(directory, "oversized-label.zip");
+            File.WriteAllBytes(oversizedLabelPath, originalZip);
+            using (var labelZip = ZipFile.Open(oversizedLabelPath, ZipArchiveMode.Update))
+            {
+                labelZip.GetEntry("manifest.properties")!.Delete();
+                using var writer = new StreamWriter(labelZip.CreateEntry("manifest.properties").Open());
+                writer.Write(androidManifest.Replace("controller=\n",
+                    "controller=" + new string('X', 129) + "\n"));
+            }
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupImport.VerifyZip(oversizedLabelPath, scope));
+            File.Delete(oversizedLabelPath);
+
             var alteredDigestPath = Path.Combine(directory, "bad-digest.zip");
             File.WriteAllBytes(alteredDigestPath, originalZip);
             using (var digestZip = ZipFile.Open(alteredDigestPath, ZipArchiveMode.Update))
