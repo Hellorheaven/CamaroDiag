@@ -11,7 +11,7 @@ internal object ObdNumberedIdentityFrames {
     fun parse(response: String): List<Int>? {
         val text = response.trim().removeSuffix(">").trim().uppercase(Locale.ROOT)
             .removePrefix("SEARCHING...").trim()
-        val markers = Regex("""(?:^|\\s)([0-9A-F]):""").findAll(text).toList()
+        val markers = Regex("""(?:^|\s)([0-9A-F]):""").findAll(text).toList()
         if (markers.isEmpty()) return null
         val header = text.substring(0, markers.first().range.first).trim()
         if (!header.matches(Regex("[0-9A-F]{3}"))) return null
