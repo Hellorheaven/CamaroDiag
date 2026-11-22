@@ -51,7 +51,8 @@ internal class IsoTpChannel(
     private val transport: RawCanFrameTransport,
     private val requestCanId: Int,
     private val responseCanId: Int,
-    private val extendedCanId: Boolean = false
+    private val extendedCanId: Boolean = false,
+    private val clock: () -> Long = System::nanoTime
 ) {
     suspend fun exchange(payload: ByteArray, timeoutMs: Long): ByteArray {
         require(payload.isNotEmpty()) { "ISO-TP payload cannot be empty." }
@@ -131,13 +132,13 @@ internal class IsoTpChannel(
 
     private suspend fun awaitFlowControl(timeoutMs: Long): Pair<Int, Long> {
         require(timeoutMs in 1..30_000L) { "Flow-control timeout is out of range." }
-        val deadline = System.nanoTime() + timeoutMs * NANOS_PER_MILLISECOND
+        val deadline = clock() + timeoutMs * NANOS_PER_MILLISECOND
         var waits = 0
         var unrelated = 0
         while (true) {
             // Wait/irrelevant flow-control frames consume a single deadline;
             // they must not repeatedly reset the adapter's timeout budget.
-            val remaining = deadline - System.nanoTime()
+            val remaining = deadline - clock()
             if (remaining <= 0L)
                 throw IsoTpException("ISO-TP flow-control deadline exceeded.")
             val remainingMs =
