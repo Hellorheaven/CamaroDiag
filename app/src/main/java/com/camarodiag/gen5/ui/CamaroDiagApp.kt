@@ -1746,6 +1746,9 @@ fun CanSnifferScreen(
                             color = if (canReadObdAvailable) TextMuted else WarnRed,
                             fontSize = 11.sp
                         )
+                    } else if (!canReadObdAvailable) {
+                        Text(stringResource(R.string.can_console_obd_unavailable),
+                            color = TextMuted, fontSize = 11.sp)
                     }
                     state.message?.takeIf { it.isNotBlank() }?.let {
                         Text(it, color = TextMuted, fontSize = 11.sp)
