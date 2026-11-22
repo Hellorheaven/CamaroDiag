@@ -712,7 +712,9 @@ class BluetoothObdManager(context: Context) {
                     diagnosticStatus != CanConsoleDiagnosticStatus.NONE) {
                     "The adapter did not confirm the raw CAN transmission."
                 }
-                CanConsoleRawTransmissionResult(frameResponse, diagnosticStatus)
+                CanConsoleRawTransmissionResult(
+                    frameResponse, diagnosticStatus, timedCorrelation.recentReceivedRecords()
+                )
             } finally {
                 // Return to the app's configured 11-bit HS-CAN / automatic-format state.
                 withContext(NonCancellable) {
