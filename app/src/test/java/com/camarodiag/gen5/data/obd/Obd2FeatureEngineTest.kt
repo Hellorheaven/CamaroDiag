@@ -657,4 +657,16 @@ class Obd2FeatureEngineTest {
         assertEquals(setOf("P0300", "P0171"), confirmed.map { it.code }.toSet())
     }
 
+    @Test
+    fun singleDigitCanDlcStillDecodesExactDtcPayloadAndRejectsMismatch() = runBlocking {
+        suspend fun confirmed(response: String): List<ObdDtc> =
+            Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "03") response else "NO DATA"
+            }).readDtcs().first
+        assertEquals(listOf("P0300"), confirmed("7E8 4 43 01 03 00").map { it.code })
+        assertEquals(listOf("P0171"), confirmed("18DAF110 4 43 01 01 71").map { it.code })
+        assertTrue(confirmed("7E8 3 43 01 03 00").isEmpty())
+        assertTrue(confirmed("18DAF110 5 43 01 01 71").isEmpty())
+    }
+
 }
