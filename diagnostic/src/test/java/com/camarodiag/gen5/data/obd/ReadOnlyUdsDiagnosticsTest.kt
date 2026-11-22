@@ -302,6 +302,21 @@ class ReadOnlyUdsDiagnosticsTest {
     }
 
     @Test
+    fun invalidIsoTpDeadlinesCannotSendAFirstCanFrame() = runBlocking {
+        for (deadline in listOf(-1L, 0L, 30_001L, Long.MAX_VALUE)) {
+            val transport = FakeCanTransport()
+            val channel = IsoTpChannel(transport, 0x7E0, 0x7E8)
+            assertTrue(runCatching {
+                channel.sendOnly(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), deadline)
+            }.isFailure)
+            assertTrue(runCatching {
+                channel.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), deadline)
+            }.isFailure)
+            assertTrue("Invalid timeout must send zero CAN frames", transport.sent.isEmpty())
+        }
+    }
+
+    @Test
     fun rejectsInvalidCanIdentifiersAndPayloadLengths() {
         assertTrue(runCatching { CanFrame(0x800, byteArrayOf(1)) }.isFailure)
         assertTrue(runCatching { CanFrame(0x7E0, ByteArray(9)) }.isFailure)
