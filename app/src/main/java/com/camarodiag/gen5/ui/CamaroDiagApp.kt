@@ -1481,10 +1481,10 @@ fun LiveDataScreen(
         "WBO2_B1S2" to R.string.live_pid_wbo2_b1s2,
         "WBO2_B2S1" to R.string.live_pid_wbo2_b2s1,
         "WBO2_B2S2" to R.string.live_pid_wbo2_b2s2,
-        "WBO2_I_B1S1" to R.string.live_pid_wbo2_current_b1s1,
-        "WBO2_I_B1S2" to R.string.live_pid_wbo2_current_b1s2,
-        "WBO2_I_B2S1" to R.string.live_pid_wbo2_current_b2s1,
-        "WBO2_I_B2S2" to R.string.live_pid_wbo2_current_b2s2
+        "WBO2_I_B1S1" to R.string.live_pid_wbo2_i_b1s1,
+        "WBO2_I_B1S2" to R.string.live_pid_wbo2_i_b1s2,
+        "WBO2_I_B2S1" to R.string.live_pid_wbo2_i_b2s1,
+        "WBO2_I_B2S2" to R.string.live_pid_wbo2_i_b2s2
     )
     val sensorContext = LocalContext.current
     val sensorLabels = liveCatalog.associate { signal ->
