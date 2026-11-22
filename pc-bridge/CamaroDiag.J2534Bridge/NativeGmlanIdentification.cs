@@ -15,7 +15,7 @@ internal static class NativeGmlanIdentification
     internal const byte OsFallbackDid = 0xC9;
 
     /** Unsupported legacy identity, distinct from an inconsistent or denied ECU response. */
-    internal sealed class IdentityUnavailableException(string reason) : InvalidDataException(reason);
+    internal sealed class IdentityUnavailableException(string reason) : InvalidDataException(reason) { }
 
     internal sealed record Identity(
         string Vin,
