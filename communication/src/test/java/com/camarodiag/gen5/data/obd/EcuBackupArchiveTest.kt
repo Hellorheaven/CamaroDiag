@@ -450,4 +450,34 @@ class EcuBackupArchiveTest {
         assertTrue(EcuBackupArchive.import(original.inputStream()).verification.consistent)
     }
 
+    @Test fun centralDirectoryCheckWorksWhenCompressedDataExceedsTailBuffer() {
+        val random = ByteArray(1024 * 1024)
+        java.util.Random(42L).nextBytes(random)
+        val archive = ByteArrayOutputStream()
+        ZipOutputStream(archive).use { zip ->
+            for (name in listOf("manifest.properties", "capture/0/first.bin")) {
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(random)
+                zip.closeEntry()
+            }
+        }
+        val data = archive.toByteArray()
+        assertTrue(data.size > 512 * 1024)
+        fun isFinished(bytes: ByteArray): Boolean = runCatching {
+            val tracked = EcuZipCompletionGuard(bytes.inputStream(), 8L * 1024 * 1024)
+            val names = mutableListOf<String>()
+            java.util.zip.ZipInputStream(tracked).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    names += entry.name
+                    zip.readBytes()
+                    zip.closeEntry()
+                }
+                tracked.requireCompletedArchive(names)
+            }
+        }.isSuccess
+        assertTrue(isFinished(data))
+        assertTrue(!isFinished(data.copyOf(data.size - 22)))
+    }
+
 }
