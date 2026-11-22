@@ -27,6 +27,20 @@ class CamaroDiagConnectorCheckpointTest {
         return seal(bytes)
     }
 
+    @Test fun sharedFirmwareGoldenCheckpointHasIdenticalWireInterpretation() {
+        // Same fixed vector as Connectors PR #6 native journal_record_test.cpp.
+        val wire = "43444a0102000000010000000102030405060708090a0b0c0d0e0f10202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3fa75e21b6"
+            .chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val audit = CamaroDiagConnectorCheckpoint.inspect(wire,
+            "0102030405060708090a0b0c0d0e0f10",
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f")
+        assertEquals(CamaroDiagConnectorCheckpoint.Stage.ERASE_INTENT, audit.record?.stage)
+        assertEquals(1L, audit.record?.sequence)
+        assertEquals(CamaroDiagConnectorCheckpoint.Disposition.RECOVERY_REQUIRED, audit.disposition)
+        assertFalse(audit.permitsProgramming)
+        assertFalse(audit.permitsAutomaticRecovery)
+    }
+
     @Test fun embeddedCriticalStagesAlwaysRequireAssessment() {
         for (stage in 2..7) {
             val audit = CamaroDiagConnectorCheckpoint.inspect(fixture(stage, (stage - 1).toLong()), tx, digest)
