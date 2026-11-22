@@ -214,6 +214,16 @@ class UdsClientTest {
         }
     }
 
+    @Test fun invalidUdsClientDeadlineIsRejectedBeforeAnyAdapterAccess() {
+        for (timeout in listOf(-1L, 0L, 30_001L, Long.MAX_VALUE)) {
+            val transport = FakeTransport(emptyList())
+            assertTrue(runCatching {
+                UdsClient(transport, 0x7E0, 0x7E8, timeoutMs = timeout)
+            }.isFailure)
+            assertTrue(transport.sent.isEmpty())
+        }
+    }
+
     @Test fun suppressPositiveResponseTesterPresentDoesNotWaitForAResponse() = runBlocking {
         val transport = FakeTransport(emptyList())
         val client = UdsClient(transport, 0x7E0, 0x7E8)
