@@ -209,6 +209,17 @@ jobs:
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanIdentification.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanIdentificationSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ProgrammingSession.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/J2534Device.NativeBench.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39BenchWorkflow.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39BenchWorkflowSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39PhysicalAdmission.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39PhysicalAdmissionSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39QualifiedBenchProfile.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39QualifiedBenchCli.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39QualifiedBenchSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeScopedBackupArchive.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeScopedBackupArchiveSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.Recovery.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ProgrammingSessionSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39CalibrationRepair.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39CalibrationRepairCli.cs' \
@@ -265,6 +276,17 @@ jobs:
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanIdentification.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeGmlanIdentificationSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ProgrammingSession.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/J2534Device.NativeBench.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39BenchWorkflow.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39BenchWorkflowSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39PhysicalAdmission.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39PhysicalAdmissionSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39QualifiedBenchProfile.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39QualifiedBenchCli.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeE39QualifiedBenchSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeScopedBackupArchive.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/NativeScopedBackupArchiveSelfTests.cs' \
+                'pc-bridge/CamaroDiag.J2534Bridge/BridgeDesktopForm.Recovery.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39ProgrammingSessionSelfTests.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39CalibrationRepair.cs' \
                 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39CalibrationRepairCli.cs' \
