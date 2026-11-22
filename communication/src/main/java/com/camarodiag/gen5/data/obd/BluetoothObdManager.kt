@@ -698,7 +698,7 @@ class BluetoothObdManager(context: Context) {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
                 val frameResponse = boundCommand(payload, 4_000L)
-                check(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(frameResponse)) {
+                check(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(frameResponse, frame)) {
                     "The adapter did not confirm the raw CAN transmission."
                 }
                 frameResponse
