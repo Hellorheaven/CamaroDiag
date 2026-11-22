@@ -327,3 +327,56 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.release.outputs.release_tag }}
         run: gh release edit "$env:RELEASE_TAG" --draft=false --repo "$env:GITHUB_REPOSITORY"
+
+  cleanup-merged-pr-branch:
+    name: Delete merged branch only after successful main Release
+    needs: [windows-preflight, release, bridge-installers]
+    if: ${{ github.ref == 'refs/heads/main' && needs.bridge-installers.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Delete reviewed source branch only if this release contains its merge
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const commitSha = context.sha;
+            const result = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner, repo, commit_sha: commitSha, per_page: 100
+            });
+            const merged = result.data.filter(pr =>
+              pr.merged_at && pr.base.ref === 'main' &&
+              pr.head.repo?.full_name === owner + '/' + repo &&
+              pr.head.ref !== 'main' &&
+              pr.merge_commit_sha === commitSha
+            );
+            if (merged.length !== 1) {
+              core.notice('No unique merged PR for this Release SHA; branch preserved.');
+              return;
+            }
+            const pr = merged[0], branch = pr.head.ref;
+            const open = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', head: owner + ':' + branch, per_page: 100
+            });
+            if (open.length) {
+              core.notice('Branch is still in use by an open PR; preserved.');
+              return;
+            }
+            let current;
+            try {
+              current = await github.rest.git.getRef({owner, repo, ref: 'heads/' + branch});
+            } catch (error) {
+              if (error.status === 404) {
+                core.info('Merged branch already removed.');
+                return;
+              }
+              throw error;
+            }
+            if (current.data.object.sha !== pr.head.sha) {
+              core.notice('Branch advanced since merge; preserved for safety.');
+              return;
+            }
+            await github.rest.git.deleteRef({owner, repo, ref: 'heads/' + branch});
+            core.info('Successful Release for merge ' + commitSha + ': removed merged branch ' + branch);
