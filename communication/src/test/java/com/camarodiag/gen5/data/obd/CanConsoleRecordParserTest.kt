@@ -203,6 +203,24 @@ class CanConsoleRecordParserTest {
             assertFalse(reply, CanConsoleAdapterRestorationPolicy.accepted(reply))
         }
     }
+    @Test fun isoTpAutomaticFlowControlMustBeConfirmedBeforeRawDiagnosticRequest() {
+        assertEquals("ATCFC1", CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC)
+        for (reply in listOf("OK", "ok>", "ATCFC1\r\nOK")) {
+            assertTrue(reply, CanConsoleIsotpFlowControlPolicy.adapterConfirmed(reply))
+        }
+        for (reply in listOf(
+            "", "?", "NO DATA", "UNABLE TO CONNECT", "CAN ERROR",
+            "OK\r\nBUS ERROR", "SEARCHING...", "7E8 08 10 0A 62 F1 90 31 32 33"
+        )) {
+            assertFalse(reply, CanConsoleIsotpFlowControlPolicy.adapterConfirmed(reply))
+        }
+        // Passive monitoring does not auto-ack ECU multi-frame requests.
+        assertFalse(CanMonitorProtocolPolicy.setupCommands(false, false)
+            .contains(CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC))
+        assertFalse(CanMonitorProtocolPolicy.setupCommands(true, true)
+            .contains(CanConsoleIsotpFlowControlPolicy.ENABLE_AUTOMATIC))
+    }
+
     @Test fun physicalMonitorModeSelectsExplicitFormatAndNeutralStnFilter() {
         assertEquals("ATSP6", CanMonitorProtocolPolicy.protocolCommand(false))
         assertEquals("ATSP7", CanMonitorProtocolPolicy.protocolCommand(true))
