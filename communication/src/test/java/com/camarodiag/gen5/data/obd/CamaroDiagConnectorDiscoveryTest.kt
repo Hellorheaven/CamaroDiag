@@ -90,6 +90,8 @@ class CamaroDiagConnectorDiscoveryTest {
     @Test fun malformedAndEnabledCapabilitiesAreRejectedRatherThanActivatingHardware() {
         val replies = listOf(
             caps.replace("hs_can=disabled", "hs_can=enabled"),
+            caps.replace("hs_can=disabled sw_can=disabled", "sw_can=disabled hs_can=disabled"),
+            caps.replace(" hs_can=disabled", "  hs_can=disabled"),
             caps.replace("ecu_flash=disabled", "ecu_flash=enabled"),
             caps.replace("j2534=disabled", "hs_can=disabled"),
             caps.replace(" j2534=disabled", ""),
