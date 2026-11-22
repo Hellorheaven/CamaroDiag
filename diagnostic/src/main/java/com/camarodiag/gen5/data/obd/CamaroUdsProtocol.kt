@@ -228,6 +228,13 @@ object CamaroUdsProtocol {
         return null
     }
 
+    /** SAE J1979 Mode 01 PID 0x52 returns exactly one unsigned ethanol byte. */
+    fun decodeEthanolPercent(bytes: IntArray?): Double? {
+        val raw = bytes?.singleOrNull() ?: return null
+        if (raw !in 0..255) return null
+        return raw * 100.0 / 255.0
+    }
+
     fun parseOdometerPidA6(response: String): Double? = parseOdometerPid(response, "A6")
 
     fun parseOdometerPidD3(response: String): Double? = parseOdometerPid(response, "D3")
