@@ -107,6 +107,16 @@ Pour autoriser l'effacement, arrêtez le pont et cochez **Autoriser l’effaceme
 
 La fonction est en cours de validation sur la PR de développement ; la compatibilité avec votre interface et votre véhicule doit être contrôlée en conditions réelles.
 
+### Utiliser la console Android avec le pont J2534
+
+Après avoir ouvert sur le PC un canal OBD physique compatible, puis appairé Android au pont sécurisé, ouvrez **Console CAN / OBD** dans l'application. Le champ de commande peut envoyer des **lectures OBD standard**, même si l'interface ne sait pas capturer ou transmettre des trames CAN brutes depuis Android. La capture CAN et la lecture OBD sont deux capacités distinctes.
+
+Exemples de requêtes en lecture : `010C` (régime moteur), `0152` (teneur en éthanol, **uniquement si le calculateur prend ce PID en charge**), `0902` (informations VIN), `03` (défauts confirmés), `07` (défauts en attente), `0A` (défauts permanents). Une réponse absente, négative ou non conforme n'est pas indiquée comme une lecture réussie. L'historique distingue la commande envoyée (TX) et les données retournées par le calculateur (RX).
+
+Le PID `0152` retourne une teneur déclarée par le calculateur ; son absence ne signifie pas que le carburant est dépourvu d'éthanol, et sa présence ne prouve pas à elle seule qu'une stratégie FlexFuel est active. Les commandes d'effacement, de reprogrammation, d'actionneurs et de sécurité ECU ne sont pas accessibles par ce champ de lecture.
+
+Cette fonction logicielle peut être testée individuellement sur véhicule réel pendant le développement ; **elle n'est pas encore déclarée validée physiquement**. Le cahier de tests exhaustif du projet restera le dernier lot.
+
 ### Vérifier une sauvegarde ECU depuis Windows
 
 Dans l'onglet **Lecture mémoire ECU**, ouvrez le profil JSON utilisé pour la sauvegarde, puis cliquez sur **Vérifier une sauvegarde ZIP**. Le contrôle fonctionne sans boîtier connecté et refuse les fichiers altérés, les lectures différentes ou un VIN et une plage mémoire incompatibles avec ce profil.
