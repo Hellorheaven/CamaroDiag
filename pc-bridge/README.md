@@ -224,3 +224,23 @@ L'écran Récupération ECU permet de consulter un journal de programmation hors
 Une entrée locale réservée au banc indépendant a été intégrée. Elle refuse les profils non qualifiés avant même de découvrir les interfaces J2534. Pour cette version, aucune autorité de qualification ni aucun noyau de flash physiquement approuvé n'est fourni : **la programmation physique reste fermée**. Un certificat généré pour un test logiciel ne donne aucun droit d'écriture.
 
 Les tests logiciels ne remplacent ni la validation de la révision matérielle, ni la preuve de récupération sur banc. Le pont TLS et la console Android n'exposent aucune commande de programmation.
+
+
+### Accès ECU : OBD, banc et carte électronique
+
+| Accès | Matériel / connexion | État dans CamaroDiag |
+| --- | --- | --- |
+| OBD | Prise diagnostic du véhicule, ELM/STN ou J2534 compatible | Diagnostic et télémétrie ; lecture mémoire limitée aux profils J2534 réellement compatibles |
+| CAN direct | Interface CAN/J2534 et raccordement documenté | Lecture ciblée avec le transport J2534 existant, si le calculateur répond aux services sélectionnés |
+| BENCH | Calculateur déposé, alimentation et connecteur documentés | Lecture ciblée J2534 ; programmation E39/E39A intégrée mais non qualifiée, verrouillée |
+| BOOT/BAM | Mode de démarrage spécial du microcontrôleur, interface correspondant à la carte | Préparation et vérification de fichiers ; pilote physique à qualifier |
+| BDM | Sonde de débogage compatible avec le processeur | Préparation et vérification de fichiers ; pilote physique manquant |
+| JTAG/Nexus | Sonde et points de connexion correspondant au processeur | Préparation et vérification de fichiers ; pilote physique manquant |
+| EEPROM ISP | Programmateur de mémoire compatible, connexion en circuit | Préparation et vérification de fichiers ; programmation par pages spécifique à ajouter |
+| Chip-off | Programmateur et support pour mémoire déposée | Préparation et vérification de fichiers ; programmation par pages spécifique à ajouter |
+
+Une qualification d'écriture est propre au calculateur, à la version du firmware, à la région mémoire, à l'interface et au mode de raccordement. Les interfaces ne sont pas interchangeables. Les modes mémoire directe ne reposent pas nécessairement sur CAN ; une interface J2534 n'est pas une sonde BDM/JTAG ou un programmateur EEPROM.
+
+Pour archiver deux acquisitions faites avec un programmateur externe : dans Android, importer le BIN original, importer la seconde lecture comme fichier de comparaison, puis ouvrir le mode Expert. Choisir le mode, la région et l'adresse de début effectivement lue. Lorsque les deux images correspondent, employer **Exporter (ZIP)**. Le ZIP est conservé dans le dossier public `/CamaroDiag/` après vérification de sa taille et de son intégrité. Deux images de 15 Mio maximum chacune sont acceptées. Les fichiers importés ne sont pas attestés comme lectures physiques effectuées par CamaroDiag, et ne prouvent pas une sauvegarde complète du calculateur.
+
+Le brouillon d'une géométrie de secteurs flash n'est pas applicable à une EEPROM externe. Ne pas utiliser un brochage d'une autre révision de carte. La qualification physique requiert le matériel et la procédure de récupération adaptés ; aucune connexion automatique aux sondes directes n'est actuellement fournie.
