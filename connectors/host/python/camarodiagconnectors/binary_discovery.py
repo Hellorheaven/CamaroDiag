@@ -45,7 +45,16 @@ class BinaryDiscoveryClient:
         try:
             if not isinstance(op, Op) or int(op) != self._next + 1:
                 raise ValueError("Unexpected discovery operation order")
-            # The caller must also provide bounded individual I/O timeouts.
+            # Bound blocking pyserial operations; restore caller settings below.
+            port = self._transport
+            has_timeout = hasattr(port, "timeout")
+            has_write_timeout = hasattr(port, "write_timeout")
+            old_timeout = getattr(port, "timeout", None)
+            old_write_timeout = getattr(port, "write_timeout", None)
+            if has_timeout:
+                port.timeout = 0.2
+            if has_write_timeout:
+                port.write_timeout = 0.2
             deadline = self._clock() + 3.0
             wire = encode_frame(Frame(op, self._next, b""))
             if self._transport.write(wire) != len(wire):
@@ -74,6 +83,11 @@ class BinaryDiscoveryClient:
         except BaseException:
             self._closed = True
             raise
+        finally:
+            if "has_timeout" in locals() and has_timeout:
+                port.timeout = old_timeout
+            if "has_write_timeout" in locals() and has_write_timeout:
+                port.write_timeout = old_write_timeout
 
     def verify_read_only(self):
         return tuple(self.execute(op) for op in (Op.PING, Op.CAPABILITIES, Op.STATUS))
