@@ -578,4 +578,26 @@ class Obd2FeatureEngineTest {
         assertTrue(engine.readCalibrationIds().isEmpty())
     }
 
+    @Test
+    fun acceptsCountedAndLegacyPaddedDtcRepliesWithoutInventingCodes() = runBlocking {
+        suspend fun result(raw: String) =
+            Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "03") raw else "NO DATA"
+            }).readDtcsWithPositiveResponseProof()
+        val counted = result("43010300")
+        assertEquals("P0300", counted.first.first.single().code)
+        assertTrue(counted.second)
+        val legacy = result("4301710000")
+        assertEquals("P0171", legacy.first.first.single().code)
+        assertTrue(legacy.second)
+        val clean = result("4300")
+        assertTrue(clean.first.first.isEmpty())
+        assertTrue(clean.second)
+        for (invalid in listOf("43", "4301", "430103", "NO DATA", "7F0311")) {
+            val parsed = result(invalid)
+            assertTrue(invalid, parsed.first.first.isEmpty())
+            assertFalse(invalid, parsed.second)
+        }
+    }
+
 }
