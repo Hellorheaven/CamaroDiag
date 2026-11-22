@@ -21,14 +21,19 @@ object CanConsoleAdapterReplyPolicy {
      * SEARCHING, command echo and malformed CAN records are not acknowledgements. */
     fun hasConfirmedTransmission(text: String, request: RawCanFrame? = null): Boolean {
         if (isFailure(text)) return false
-        val lines = text.lineSequence().map { it.trim().removeSuffix(">").trim() }.toList()
-        // Explicit adapter ACK proves transmission only; never label it an ECU reply.
-        if (lines.any { it.equals("OK", ignoreCase = true) }) return true
-        val frames = lines.flatMap { RawCanFrameParser.parseReceivedFrames(it) }
-        if (request == null) return frames.isNotEmpty()
+        // Explicit OK proves adapter transmission, not a diagnostic response.
+        if (text.lineSequence().any {
+                it.trim().removeSuffix(">").trim().equals("OK", ignoreCase = true)
+            }) return true
+        if (request == null) return RawCanFrameParser.parseReceivedFrames(text).isNotEmpty()
+        return hasMatchedDiagnosticResponse(text, request)
+    }
+
+    /** Diagnostic completion is independent of an adapter OK and CAN monitor display. */
+    fun hasMatchedDiagnosticResponse(text: String, request: RawCanFrame): Boolean {
+        if (isFailure(text)) return false
+        val frames = RawCanFrameParser.parseReceivedFrames(text)
         if (!request.isExtended && request.canId == 0x7DFL) {
-            // Functional OBD is broadcast. Assemble each physical responder in
-            // a different context; never mix consecutive frames from different ECUs.
             val responders = mutableMapOf<Long, CanConsoleDiagnosticCorrelation>()
             return frames.any { frame ->
                 if (frame.isExtended || frame.canId !in 0x7E8L..0x7EFL) false
@@ -40,10 +45,7 @@ object CanConsoleAdapterReplyPolicy {
                 }
             }
         }
-        if (CanConsoleEcuRouting.expectedResponder(request) == null) {
-            // Unknown raw CAN IDs need an explicit adapter ACK, not unrelated traffic.
-            return false
-        }
+        if (CanConsoleEcuRouting.expectedResponder(request) == null) return false
         val matcher = runCatching { CanConsoleDiagnosticCorrelation(request) }.getOrNull()
             ?: return false
         return frames.any { matcher.accept(it, 0L) != null }
