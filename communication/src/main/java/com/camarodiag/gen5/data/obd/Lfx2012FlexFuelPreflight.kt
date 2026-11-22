@@ -96,7 +96,7 @@ object Lfx2012FlexFuelPreflight {
             normalized == "none" || normalized == "null" || normalized == "-"
         ) return true
         val placeholders = Regex(
-            "(?:^|[^a-z0-9])(?:unknown|demo|sample|simulated|invalid|" +
+            "(?:^|[^a-z0-9])(?:unknown|demo|sample|simulated|simulation|mock|fake|placeholder|invalid|" +
                 "not available|not supported|unavailable|no data|no response|" +
                 "pending|tbd|test|error|stopped)(?:$|[^a-z0-9])"
         )
