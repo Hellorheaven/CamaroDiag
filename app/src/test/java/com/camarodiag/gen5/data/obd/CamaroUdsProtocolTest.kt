@@ -436,4 +436,19 @@ class CamaroUdsProtocolTest {
             requireNotNull(CamaroUdsProtocol.parseOdometerPidA6("41 A6 00 12 D6 87")), 0.01)
     }
 
+    @Test
+    fun primaryPowertrainTelemetryRejectsOtherPhysicalEcuResponses() {
+        for (valid in listOf("7E8 03 41 52 80", "18DAF110 03 41 52 80",
+            "7E803415280", "18DAF11003415280", "41 52 80")) {
+            assertArrayEquals(valid, intArrayOf(128),
+                CamaroUdsProtocol.parsePidBytes(valid, "52",
+                    primaryPowertrainResponderOnly = true))
+        }
+        for (foreign in listOf("7E9 03 41 52 80", "18DAF111 03 41 52 80",
+            "7E903415280", "18DAF11103415280")) {
+            assertNull(foreign, CamaroUdsProtocol.parsePidBytes(foreign, "52",
+                primaryPowertrainResponderOnly = true))
+        }
+    }
+
 }
