@@ -21,6 +21,16 @@ data class CanConsoleRawTransmissionResult(
     val receivedRecords: List<CanConsoleTimedRecord> = emptyList()
 )
 
+/**
+ * A physical request can fail after RX frames have already arrived. Keep
+ * those observations separate from diagnostic completion and preserve the
+ * original cause so transport-disconnect handling still works.
+ */
+class CanConsolePhysicalExchangeException(
+    val receivedRecords: List<CanConsoleTimedRecord>,
+    cause: Throwable
+) : IllegalStateException(cause)
+
 class CanConsoleLiveDiagnosticCorrelation(
     private val request: RawCanFrame,
     private val timeoutMs: Long = 1_000L
