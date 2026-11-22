@@ -176,7 +176,7 @@ class J2534LiveMemoryBackupTest {
     @Test fun reportsMonotonicProgressAcrossTwoActualReadPasses() = runBlocking {
         val snapshots = mutableListOf<J2534LiveMemoryBackup.CaptureProgress>()
         val fake = ScriptedEcu(baseline, vin)
-        val result = J2534LiveMemoryBackup.captureForTest(fake, request()) { snapshots += it }
+        val result = J2534LiveMemoryBackup.captureForTest(fake, request(), progress = { snapshots += it })
         assertTrue(result.verification.consistent)
         assertEquals(listOf(1, 1, 2, 2), snapshots.map { it.pass })
         assertEquals(listOf(0L, 300L, 300L, 600L), snapshots.map { it.totalBytesRead })
@@ -208,9 +208,9 @@ class J2534LiveMemoryBackupTest {
     @Test fun cancellationClosesExtendedSessionOnTheOriginalEcu() = runBlocking {
         val ecu = ScriptedEcu(baseline, vin)
         val job = launch {
-            J2534LiveMemoryBackup.captureForTest(ecu, request(session = 3)) { progress ->
+            J2534LiveMemoryBackup.captureForTest(ecu, request(session = 3), progress = { progress ->
                 if (progress.pass == 1 && progress.completedBytes == 0) this@launch.cancel()
-            }
+            })
         }
         job.join()
         assertTrue(job.isCancelled)
