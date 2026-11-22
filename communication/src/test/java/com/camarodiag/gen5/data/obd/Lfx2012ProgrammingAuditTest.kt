@@ -112,4 +112,29 @@ class Lfx2012ProgrammingAuditTest {
             before, before.copy(communicationConfirmed = false, capturedAtUtcMillis = 2L))
         assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, report.overall)
     }
+    @Test fun incompleteCalibrationListsCannotPassManualReview() {
+        val cases = listOf(
+            before.copy(calibrationIds = listOf("12612345", "")),
+            before.copy(verificationNumbers = listOf(" ", "1234ABCD")),
+            before.copy(calibrationIds = listOf("", " ")),
+            before.copy(verificationNumbers = emptyList())
+        )
+        cases.forEach { snapshot ->
+            val report = Lfx2012ProgrammingAudit.review(
+                before, snapshot.copy(capturedAtUtcMillis = 2L))
+            assertTrue(report.overall != Lfx2012ProgrammingAudit.Overall.READY_FOR_MANUAL_REVIEW)
+            assertFalse(report.physicalValidationComplete)
+        }
+    }
+
+    @Test fun blankDtcRecordMustNotLookLikeSuccessfulEmptyRead() {
+        val report = Lfx2012ProgrammingAudit.review(
+            before, before.copy(dtcs = listOf(" "), capturedAtUtcMillis = 2L))
+        assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, report.overall)
+        assertTrue(report.after.any {
+            it.item == Lfx2012ProgrammingAudit.Item.DIAGNOSTIC_TROUBLE_CODES &&
+                it.status == Lfx2012ProgrammingAudit.CheckStatus.REQUIRES_REVIEW
+        })
+    }
+
 }
