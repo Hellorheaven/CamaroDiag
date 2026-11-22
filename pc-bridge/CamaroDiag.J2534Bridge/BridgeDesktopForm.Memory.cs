@@ -247,10 +247,10 @@ internal sealed partial class BridgeDesktopForm
 
         using var destination = new SaveFileDialog
         {
-            Title = "Nouvelle sauvegarde binaire de la zone lue",
-            Filter = "Binaire ECU (*.bin)|*.bin",
+            Title = "Nouvelle sauvegarde vérifiable de la zone lue",
+            Filter = "Archive ECU vérifiable Android/Windows (*.zip)|*.zip|Binaire brut seul (*.bin)|*.bin",
             AddExtension = true,
-            FileName = "CamaroDiag-Memoire-ECU.bin"
+            FileName = "CamaroDiag-Memoire-ECU.zip"
         };
         if (destination.ShowDialog(this) != DialogResult.OK) return;
         if (File.Exists(destination.FileName))
@@ -284,39 +284,14 @@ internal sealed partial class BridgeDesktopForm
                 }, cancellation.Token);
                 // Cancellation after the final read must not create a file.
                 cancellation.Token.ThrowIfCancellationRequested();
-                // Exactly two full matching reads must precede creation.
-                var created = false;
-                try
-                {
-                    using (var file = new FileStream(destination.FileName,
-                        FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                        65536, FileOptions.WriteThrough))
-                    {
-                        created = true;
-                        file.Write(result.Bytes);
-                        file.Flush(flushToDisk: true);
-                    }
-                    var diskBytes = File.ReadAllBytes(destination.FileName);
-                    if (!diskBytes.SequenceEqual(result.Bytes) ||
-                        !string.Equals(
-                            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(diskBytes)),
-                            result.Sha256, StringComparison.Ordinal))
-                        throw new InvalidDataException("Backup disk readback differs from ECU capture.");
-                    cancellation.Token.ThrowIfCancellationRequested();
-                }
-                catch
-                {
-                    if (created)
-                    {
-                        try { File.Delete(destination.FileName); }
-                        catch (IOException) { }
-                        catch (UnauthorizedAccessException) { }
-                    }
-                    throw;
-                }
+                await Task.Run(() => NativeScopedBackupArchive.SaveNew(
+                    destination.FileName, scope, result, cancellation.Token), cancellation.Token);
                 memoryStatus.Text = "Sauvegarde physique vérifiée : " +
                     result.Bytes.Length + " octets, SHA-256 " + result.Sha256 +
-                    ". Couverture limitée à la zone demandée, pas à tout le calculateur.";
+                    ". Couverture limitée à la zone demandée, pas à tout le calculateur. " +
+                    (Path.GetExtension(destination.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase)
+                        ? "Les deux lectures sont conservées dans le ZIP."
+                        : "Le BIN brut ne conserve pas la seconde acquisition ni son manifeste.");
             });
         }
         finally
