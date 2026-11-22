@@ -11,7 +11,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const { readEntitlement, shouldAutoGrant } = require("./entitlement-policy");
-const { isSessionRevoked } = require("./account-policy");
+const { isSessionRevoked, isValidAuthTime } = require("./account-policy");
 
 const REGION = "europe-west1";
 // Start in monitoring mode: enable enforcement only after debug and release
@@ -66,8 +66,8 @@ exports.getMyLicenseStatus = onCall(
   async request => {
     if (!request.auth?.uid)
       throw new HttpsError("unauthenticated", "Connexion requise.");
-    if (!Number.isFinite(Number(request.auth.token?.auth_time)))
+    if (!isValidAuthTime(request.auth.token?.auth_time))
       throw new HttpsError("unauthenticated", "Session invalide.");
-    return licenseStatus(request.auth.uid, { autoGrant: true, authTime: Number(request.auth.token.auth_time) });
+    return licenseStatus(request.auth.uid, { autoGrant: true, authTime: request.auth.token.auth_time });
   }
 );
