@@ -150,7 +150,13 @@ object CanConsoleRecordParser {
  * Passive monitor modes must NOT issue any diagnostic flow control themselves.
  */
 object CanConsoleIsotpFlowControlPolicy {
+    // Mode 0 lets ELM choose both the Flow Control header and bytes.
+    // Otherwise a previous user-defined FC mode may target the wrong ECU.
+    const val RESTORE_AUTOMATIC_MODE = "ATFCSM0"
     const val ENABLE_AUTOMATIC = "ATCFC1"
+
+    fun setupCommands(): List<String> =
+        listOf(RESTORE_AUTOMATIC_MODE, ENABLE_AUTOMATIC)
 
     fun adapterConfirmed(reply: String): Boolean =
         CanConsoleAdapterRestorationPolicy.accepted(reply)
