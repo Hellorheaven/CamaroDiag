@@ -38,3 +38,21 @@ object CanConsoleRecordParser {
             }
         }.toList()
 }
+
+/**
+ * The OBD read console is independently usable on a physical J2534 bridge.
+ * CAN monitor availability is deliberately not a prerequisite for OBD reads.
+ */
+object CanConsoleCapabilityPolicy {
+    fun canSubmit(
+        rawCanFrame: Boolean,
+        monitorAvailable: Boolean,
+        canTransmit: Boolean,
+        readObdAvailable: Boolean,
+        inputPresent: Boolean,
+        busy: Boolean
+    ): Boolean {
+        if (!inputPresent || busy) return false
+        return if (rawCanFrame) monitorAvailable && canTransmit else readObdAvailable
+    }
+}
