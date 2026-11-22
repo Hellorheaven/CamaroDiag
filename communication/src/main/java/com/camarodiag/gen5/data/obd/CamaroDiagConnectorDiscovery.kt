@@ -18,12 +18,12 @@ object CamaroDiagConnectorDiscovery {
         fun read(buffer: ByteArray, timeoutMs: Int): Int
     }
 
-    /** Public ASCII replies establish neither device identity nor a secured session. */
+    /** Public discovery replies establish neither device identity nor a secured session. */
     data class Report(val firmware: String, val lines: List<String>) {
         val authenticated: Boolean get() = false
         val vehicleAccessAllowed: Boolean get() = false
 
-        /** Never map advertised ASCII fields to a live diagnostic capability. */
+        /** Never map advertised discovery fields to a live diagnostic capability. */
         fun toAdapterCapabilities() = com.camarodiag.gen5.domain.model.AdapterCapabilities(
             deviceName = "CamaroDiagConnectors",
             firmwareId = firmware,
@@ -70,9 +70,21 @@ object CamaroDiagConnectorDiscovery {
             }
             throw IOException("Connector discovery timed out")
         }
-        val ping = exchange("PING")
+        return verifyReplies({ opcode ->
+            exchange(when (opcode) {
+                1 -> "PING"
+                2 -> "CAPS"
+                3 -> "STATUS"
+                else -> error("Unsupported discovery opcode")
+            })
+        }, ensureActive)
+    }
+
+    /** Shared policy for both public discovery formats; neither grants ECU access. */
+    internal fun verifyReplies(exchange: (Int) -> String, ensureActive: () -> Unit): Report {
+        val ping = exchange(1)
         if (ping != "PONG CamaroDiagConnectors 0.1.0") throw IOException("Unsupported connector identity/version")
-        val caps = exchange("CAPS")
+        val caps = exchange(2)
         val tokens = caps.split(' ')
         if (tokens.firstOrNull() != "CAPS" || tokens.size != keys.size + 1)
             throw IOException("Invalid capability response")
@@ -82,7 +94,7 @@ object CamaroDiagConnectorDiscovery {
             if (pair.size != 2 || pair[0] !in keys || !seen.add(pair[0]) || pair[1] != "disabled")
                 throw IOException("Prototype capability not supported or malformed")
         }
-        val status = exchange("STATUS")
+        val status = exchange(3)
         if (status != "STATUS mode=prototype write=disabled")
             throw IOException("Unsupported connector status")
         ensureActive()

@@ -3062,14 +3062,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun discoverCamaroDiagConnector(deviceLabel: String) {
+    fun discoverCamaroDiagConnector(deviceLabel: String, binary: Boolean = false) {
         val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
         if (id == null) {
             _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
             return
         }
         connectWithResult(
-            connect = { obdManager.discoverCamaroDiagConnector(id) },
+            connect = { obdManager.discoverCamaroDiagConnector(id, binary) },
             fallbackMessage = localizedContext.getString(R.string.msg_usb_connection_failed),
             transport = "connector_usb",
             endpoint = deviceLabel,

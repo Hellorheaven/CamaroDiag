@@ -592,6 +592,7 @@ fun CamaroDiagApp(
                     onRefreshUsb = { viewModel.refreshUsbDevices() },
                     onConnectUsb = { viewModel.connectUsb(it) },
                     onDiscoverConnector = { viewModel.discoverCamaroDiagConnector(it) },
+                    onDiscoverBinaryConnector = { viewModel.discoverCamaroDiagConnector(it, binary = true) },
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
@@ -973,7 +974,8 @@ fun AdapterScreen(
     onRefreshUsb: () -> Unit,
     onConnectUsb: (String) -> Unit,
     onConnectWifi: (String, Int) -> Unit,
-    onDiscoverConnector: ((String) -> Unit)? = null
+    onDiscoverConnector: ((String) -> Unit)? = null,
+    onDiscoverBinaryConnector: ((String) -> Unit)? = null
 ) {
     var wifiHost by remember { mutableStateOf("192.168.0.10") }
     var wifiPort by remember { mutableStateOf("35000") }
@@ -1056,7 +1058,17 @@ fun AdapterScreen(
                             OutlinedButton(onClick = { onDiscoverConnector(label) }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Column {
-                                    Text("CamaroDiagConnectors • USB")
+                                    Text("CamaroDiagConnectors • USB ASCII")
+                                    Text(label, fontSize = 11.sp)
+                                    Text(stringResource(R.string.adapter_discovery_only), fontSize = 11.sp, color = TextMuted)
+                                }
+                            }
+                        }
+                        if (onDiscoverBinaryConnector != null) {
+                            OutlinedButton(onClick = { onDiscoverBinaryConnector(label) }, enabled = !isBusy,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    Text("CamaroDiagConnectors • USB CD/1")
                                     Text(label, fontSize = 11.sp)
                                     Text(stringResource(R.string.adapter_discovery_only), fontSize = 11.sp, color = TextMuted)
                                 }

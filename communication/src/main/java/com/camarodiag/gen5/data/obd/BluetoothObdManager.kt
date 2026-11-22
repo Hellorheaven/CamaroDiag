@@ -181,16 +181,21 @@ class BluetoothObdManager(context: Context) {
     }
 
     /** Discovery only. Close the probe before returning: never expose an ELM channel. */
-    suspend fun discoverCamaroDiagConnector(deviceId: Int): Result<AdapterCapabilities> =
+    suspend fun discoverCamaroDiagConnector(deviceId: Int, binary: Boolean = false): Result<AdapterCapabilities> =
         withContext(Dispatchers.IO) {
             disconnect()
             try {
                 usbTransport.connect(deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE).getOrThrow()
                 val context = currentCoroutineContext()
-                val report = CamaroDiagConnectorDiscovery.inspect(object : CamaroDiagConnectorDiscovery.Channel {
+                val channel = object : CamaroDiagConnectorDiscovery.Channel {
                     override fun write(bytes: ByteArray) = usbTransport.write(bytes)
                     override fun read(buffer: ByteArray, timeoutMs: Int) = usbTransport.read(buffer, timeoutMs)
-                }) { context.ensureActive() }
+                }
+                val report = if (binary) {
+                    CamaroDiagConnectorBinaryDiscovery.inspect(channel) { context.ensureActive() }
+                } else {
+                    CamaroDiagConnectorDiscovery.inspect(channel) { context.ensureActive() }
+                }
                 Result.success(report.toAdapterCapabilities())
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
