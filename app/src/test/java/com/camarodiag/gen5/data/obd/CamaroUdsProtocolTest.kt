@@ -392,4 +392,16 @@ class CamaroUdsProtocolTest {
         assertTrue(2020 in CamaroEngine.LGX.years)
         assertFalse(2020 in CamaroEngine.LFX.years)
     }
+    @Test
+    fun ethanolPidRequiresExactlyOneUnsignedDataByte() {
+        assertEquals(0.0, CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(0))!!, 0.00001)
+        assertEquals(100.0, CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(255))!!, 0.00001)
+        assertEquals(50.196078, CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(128))!!, 0.00001)
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(null))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf()))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(128, 0)))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(-1)))
+        assertNull(CamaroUdsProtocol.decodeEthanolPercent(intArrayOf(256)))
+    }
+
 }
