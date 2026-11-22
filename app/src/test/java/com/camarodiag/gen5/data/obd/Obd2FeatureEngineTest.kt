@@ -551,4 +551,31 @@ class Obd2FeatureEngineTest {
         assertTrue(calibrations("490401" + bytes + "00".repeat(15)).isEmpty())
     }
 
+    @Test
+    fun physicalVinReaderRejectsForbiddenLettersAndNonPrintableIdentityBytes() = runBlocking {
+        suspend fun vin(response: String) =
+            Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+                if (command == "0902") response else "NO DATA"
+            }).readVin()
+        fun encode(text: String) = "490201" + text.toByteArray(Charsets.US_ASCII)
+            .joinToString("") { "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF) }
+        assertEquals("1G1FA1RXXR0123456", vin(encode("1G1FA1RXXR0123456")))
+        for (invalid in listOf("1G1IA1RXXR0123456", "1G1OA1RXXR0123456",
+            "1G1QA1RXXR0123456", "1G1FA1RXXR012345" + '\u0001')) {
+            assertNull(vin(encode(invalid)))
+        }
+    }
+
+    @Test
+    fun mode09AsciiDecoderRejectsEmbeddedControlBytesRatherThanRemovingThem() = runBlocking {
+        val corruptId = "AB" + '\u0001' + "DEFGH12345678"
+        val reply = "490401" + corruptId.toByteArray(Charsets.US_ASCII).joinToString("") {
+            "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
+        }
+        val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0904") reply else "NO DATA"
+        })
+        assertTrue(engine.readCalibrationIds().isEmpty())
+    }
+
 }
