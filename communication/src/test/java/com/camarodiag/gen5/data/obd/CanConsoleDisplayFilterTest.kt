@@ -81,4 +81,32 @@ class CanConsoleDisplayFilterTest {
             frames.filter { CanConsoleDisplayFilter.visibleTrace(it, extendedSameNumber) })
         assertEquals(frames, frames.filter { CanConsoleDisplayFilter.visibleTrace(it, null) })
     }
+
+    @Test fun observedEcusRemainSelectableAfterRecentHistoryRollsOver() {
+        val initial = listOf(
+            ParsedCanConsoleRecord("RX", "CAN ID=7E8 DLC=3 DATA=41 0C 1A"),
+            ParsedCanConsoleRecord("RX", "CAN ID=000007E8 DLC=3 DATA=41 0C 1B")
+        )
+        val known = CanConsoleDisplayFilter.accumulateObserved(emptySet(), initial)
+        val last300 = listOf(
+            ParsedCanConsoleRecord("RX", "CAN ID=7E9 DLC=3 DATA=41 0C 1C")
+        )
+        val retained = CanConsoleDisplayFilter.accumulateObserved(known, last300)
+        assertEquals(
+            listOf(standard, extendedSameNumber, ObservedCanId(0x7E9, false)),
+            CanConsoleDisplayFilter.observedFrameIds(last300, emptyList(), retained)
+        )
+        assertEquals(3, retained.size)
+        assertEquals(emptySet<ObservedCanId>(),
+            CanConsoleDisplayFilter.accumulateObserved(emptySet(),
+                listOf(ParsedCanConsoleRecord("SYSTEM", "NO DATA"))))
+    }
+
+    @Test fun observedIdCatalogueIsBoundedAgainstUntrustedCanTraffic() {
+        val full = (0 until 4096).map { ObservedCanId(it.toLong(), true) }.toSet()
+        val ignored = CanConsoleDisplayFilter.accumulateObserved(
+            full, listOf(ParsedCanConsoleRecord("RX", "CAN ID=18DAF110 DLC=0 DATA=(empty)"))
+        )
+        assertEquals(full, ignored)
+    }
 }
