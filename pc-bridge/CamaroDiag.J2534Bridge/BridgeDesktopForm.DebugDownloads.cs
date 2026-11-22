@@ -18,6 +18,8 @@ internal sealed partial class BridgeDesktopForm
             RunId + "/artifacts/" + Id;
     }
 
+    private sealed record DebugPullRequest(int Number, string Branch);
+
     private static readonly HttpClient DebugArtifactClient = new()
     {
         Timeout = TimeSpan.FromSeconds(20)
@@ -47,7 +49,7 @@ internal sealed partial class BridgeDesktopForm
         WideRow(panel, new Label
         {
             AutoSize = true, Dock = DockStyle.Fill, ForeColor = Color.DarkSlateGray,
-            Text = "Versions Debug de la PR #70. Chaque ZIP provient d'un véritable " +
+            Text = "Versions Debug de la PR active. Chaque ZIP provient d'un véritable " +
                    "artefact GitHub Actions non expiré. Le téléchargement s'ouvre " +
                    "dans votre navigateur : GitHub exige sa propre connexion."
         }, 65);
@@ -123,7 +125,7 @@ internal sealed partial class BridgeDesktopForm
             currentWindowsDebug = result.Windows;
             static string Describe(string label, GitHubDebugArtifact? item) =>
                 item is null
-                    ? label + " : aucun artefact non expiré pour la PR #70."
+                    ? label + " : aucun artefact non expiré pour la PR active."
                     : label + Environment.NewLine +
                       "  Commit : " + item.Sha[..12] + Environment.NewLine +
                       "  Création UTC : " + item.CreatedAt.ToString("u") + Environment.NewLine +
@@ -151,8 +153,39 @@ internal sealed partial class BridgeDesktopForm
 
     private sealed record DebugArtifactListing(GitHubDebugArtifact? Android, GitHubDebugArtifact? Windows);
 
+    private static async Task<DebugPullRequest?> FetchActivePullRequestAsync()
+    {
+        const string repo = "Hellorheaven/CamaroDiag";
+        var endpoint = "https://api.github.com/repos/" + repo + "/pulls?state=open&per_page=100";
+        using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+        request.Headers.TryAddWithoutValidation("User-Agent", "CamaroDiag-Debug-Builds");
+        request.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
+        using var response = await DebugArtifactClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        DebugPullRequest? active = null;
+        foreach (var item in data.RootElement.EnumerateArray())
+        {
+            if (!item.TryGetProperty("base", out var basePr) ||
+                basePr.GetProperty("ref").GetString() != "main" ||
+                !item.TryGetProperty("head", out var headPr) ||
+                !headPr.TryGetProperty("repo", out var headRepo) ||
+                headRepo.ValueKind != JsonValueKind.Object ||
+                headRepo.GetProperty("full_name").GetString() != repo) continue;
+            var number = item.GetProperty("number").GetInt32();
+            var branch = headPr.GetProperty("ref").GetString();
+            if (number <= 0 || string.IsNullOrWhiteSpace(branch)) continue;
+            if (active is not null)
+                throw new InvalidOperationException("Multiple active CamaroDiag PRs.");
+            active = new DebugPullRequest(number, branch);
+        }
+        return active;
+    }
+
     private static async Task<DebugArtifactListing> FetchDebugArtifactsAsync()
     {
+        var pr = await FetchActivePullRequestAsync();
+        if (pr is null) return new DebugArtifactListing(null, null);
         var candidates = new List<(GitHubDebugArtifact Item, bool Android)>();
         for (var page = 1; page <= 4; page++)
         {
@@ -170,11 +203,11 @@ internal sealed partial class BridgeDesktopForm
                 if (!element.TryGetProperty("workflow_run", out var run) ||
                     run.ValueKind != JsonValueKind.Object) continue;
                 var name = element.GetProperty("name").GetString() ?? "";
-                var android = Regex.Match(name, "^CamaroDiag-debug-pr-70-([0-9a-f]{40})$");
-                var windows = Regex.Match(name, "^CamaroDiag-J2534-Bridge-debug-pr-70-([0-9a-f]{40})$");
+                var android = Regex.Match(name, "^CamaroDiag-debug-pr-" + pr.Number + "-([0-9a-f]{40})$");
+                var windows = Regex.Match(name, "^CamaroDiag-J2534-Bridge-debug-pr-" + pr.Number + "-([0-9a-f]{40})$");
                 if (!android.Success && !windows.Success) continue;
                 var match = android.Success ? android : windows;
-                if (run.GetProperty("head_branch").GetString() != "feat/ecu-backup-integrity" ||
+                if (run.GetProperty("head_branch").GetString() != pr.Branch ||
                     run.GetProperty("head_sha").GetString() != match.Groups[1].Value ||
                     element.GetProperty("expired").GetBoolean()) continue;
                 var id = element.GetProperty("id").GetInt64();

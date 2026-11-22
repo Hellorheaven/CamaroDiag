@@ -7,6 +7,7 @@ import org.junit.Test
 
 class DebugBuildCatalogTest {
     private val now = Instant.parse("2026-11-21T12:00:00Z")
+    private val currentPr = DebugBuildPullRequest(95, "chore/unified-ci")
     private val sha = "a".repeat(40)
     private val otherSha = "b".repeat(40)
 
@@ -14,14 +15,14 @@ class DebugBuildCatalogTest {
         platform: DebugBuildPlatform,
         shaInName: String = sha,
         runSha: String = sha,
-        branch: String = "feat/ecu-backup-integrity",
+        branch: String = "chore/unified-ci",
         expired: Boolean = false,
         expiresAt: String = "2026-12-21T12:00:00Z",
         createdAt: String = "2026-11-21T10:00:00Z",
         id: Long = 42L
     ): DebugBuildArtifact {
         val prefix = if (platform == DebugBuildPlatform.ANDROID)
-            "CamaroDiag-debug-pr-70-" else "CamaroDiag-J2534-Bridge-debug-pr-70-"
+            "CamaroDiag-debug-pr-95-" else "CamaroDiag-J2534-Bridge-debug-pr-95-"
         return DebugBuildArtifact(
             id, prefix + shaInName, 123L, branch, runSha, createdAt,
             expiresAt, expired, 42_000L
@@ -35,9 +36,9 @@ class DebugBuildCatalogTest {
             createdAt = "2026-11-21T11:00:00Z")
         val windows = artifact(DebugBuildPlatform.WINDOWS)
         assertEquals(5L, DebugBuildCatalog.choose(listOf(old, windows, newer),
-            DebugBuildPlatform.ANDROID, now)?.id)
+            DebugBuildPlatform.ANDROID, currentPr, now)?.id)
         assertEquals(windows, DebugBuildCatalog.choose(listOf(old, windows, newer),
-            DebugBuildPlatform.WINDOWS, now))
+            DebugBuildPlatform.WINDOWS, currentPr, now))
     }
 
     @Test fun expiredWrongBranchAndWrongShaNeverAppear() {
@@ -49,7 +50,16 @@ class DebugBuildCatalogTest {
             artifact(DebugBuildPlatform.ANDROID, id = 0),
             artifact(DebugBuildPlatform.WINDOWS)
         )
-        assertNull(DebugBuildCatalog.choose(items, DebugBuildPlatform.ANDROID, now))
+        assertNull(DebugBuildCatalog.choose(items, DebugBuildPlatform.ANDROID, currentPr, now))
+    }
+
+    @Test fun artifactsFromPreviousPullRequestsAreNeverSelected() {
+        val older = artifact(DebugBuildPlatform.ANDROID)
+            .copy(name = "CamaroDiag-debug-pr-70-$sha")
+        assertNull(DebugBuildCatalog.choose(listOf(older),
+            DebugBuildPlatform.ANDROID, currentPr, now))
+        assertNull(DebugBuildCatalog.choose(listOf(artifact(DebugBuildPlatform.ANDROID)),
+            DebugBuildPlatform.ANDROID, DebugBuildPullRequest(96, "chore/unified-ci"), now))
     }
 
     @Test fun generatedLinksStayOnPinnedGithubRepoAndNumericIds() {
