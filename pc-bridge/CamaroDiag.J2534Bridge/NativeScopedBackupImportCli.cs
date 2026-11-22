@@ -26,7 +26,8 @@ internal static class NativeScopedBackupImportCli
             return 0;
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException
-            or InvalidDataException or System.Text.Json.JsonException or OverflowException)
+            or InvalidDataException or System.Text.Json.JsonException or OverflowException
+            or NotSupportedException or InvalidOperationException)
         {
             Console.Error.WriteLine("ECU archive rejected: " + ex.Message);
             return 8;
