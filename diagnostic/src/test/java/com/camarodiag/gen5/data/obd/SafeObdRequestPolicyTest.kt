@@ -152,7 +152,7 @@ class SafeObdRequestPolicyTest {
     @Test
     fun unrelatedNegativeAndAdapterErrorsAreNotAttributedToEcu() {
         val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
-        for (reply in listOf("7F 09 11", "7F 01", "7F 01 11 00",
+        for (reply in listOf("7F 09 11", "7F 01", "7F 01 00", "7F 01 78", "7F 01 11 00",
             "7E0 7F 01 11", "7E8 03 7F 01 11 FF", "NO DATA", "OK", "41 52 80")) {
             assertEquals(reply, false, SafeObdRequestPolicy.hasNegativeResponse(request, reply))
         }
