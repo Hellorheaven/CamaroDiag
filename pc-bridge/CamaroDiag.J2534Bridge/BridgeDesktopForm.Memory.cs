@@ -229,8 +229,9 @@ internal sealed partial class BridgeDesktopForm
                 return NativeScopedBackupImport.VerifyZip(archivePath, scope);
             });
             memoryStatus.Text = "Archive vérifiée sans contacter l'ECU : " +
-                result.Bytes.Length + " octets, SHA-256 " + result.Sha256 +
-                ". Deux acquisitions identiques et VIN lié au profil. " +
+                result.ByteCount + " octets, SHA-256 " + result.Sha256 +
+                ". Deux copies identiques, VIN lié au profil. Région déclarée : " +
+                result.DeclaredRegion + ", origine déclarée : " + result.DeclaredOrigin + ". " +
                 "Cette vérification ne prouve ni la couverture ECU complète ni la restaurabilité.";
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or
