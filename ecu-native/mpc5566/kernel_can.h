@@ -6,6 +6,7 @@
 typedef struct {
     cd_flexcan can;
     cd_kernel_runtime runtime;
+    bool initialized;
 } cd_kernel_can;
 
 /* Only use after MCU/board initialization and dedicated mailbox setup. */
