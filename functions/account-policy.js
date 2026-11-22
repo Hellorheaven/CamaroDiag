@@ -18,6 +18,10 @@ function isValidAuthTime(value) {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
+function isRecentAuthTime(value, nowSeconds, maxAgeSeconds) {
+  return isValidAuthTime(value) && value <= nowSeconds && nowSeconds - value <= maxAgeSeconds;
+}
+
 /** Compare Firebase auth_time with the Admin SDK revocation boundary. */
 function isSessionRevoked(tokensValidAfterTime, authTimeSeconds) {
   if (!tokensValidAfterTime) return false;
@@ -32,4 +36,4 @@ function isVerifiedGoogleSession(token) {
     token?.firebase?.sign_in_provider === "google.com";
 }
 
-module.exports = { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession, isValidAuthTime };
+module.exports = { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession, isValidAuthTime, isRecentAuthTime };

@@ -18,6 +18,10 @@
  * Never log account emails, tokens, secrets or UIDs.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createRequire } from 'node:module';
+
+// Resolve the SDK from the Firebase Functions package that declares it.
+const requireFromFunctions = createRequire(new URL('../../functions/package.json', import.meta.url));
 
 const REQUIRED_OWNER_COUNT = 2;
 const OWNER_CLAIM = 'owner_functional_tests';
@@ -73,7 +77,7 @@ if (expected.length !== REQUIRED_OWNER_COUNT ||
 }
 
 try {
-    const { default: admin } = await import('firebase-admin');
+    const admin = requireFromFunctions('firebase-admin');
     if (!admin.apps.length) {
         admin.initializeApp({ credential: admin.credential.applicationDefault() });
     }
@@ -85,7 +89,7 @@ try {
     );
     if (new Set(targetAccounts.map((user) => user.uid)).size !== REQUIRED_OWNER_COUNT ||
         !targetAccounts.every((user, index) =>
-            user.emailVerified === true &&
+            !user.disabled && user.emailVerified === true &&
             (user.email ?? '').normalize('NFKC').toLowerCase() === emails[index] &&
             user.providerData.some((provider) => provider.providerId === 'google.com')
         )

@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession, isValidAuthTime } = require("./account-policy");
+const { displayLicenseWithoutLookup, isSessionRevoked, isVerifiedGoogleSession, isValidAuthTime, isRecentAuthTime } = require("./account-policy");
 
 test("administrator can inspect unverified accounts without an entitlement read", () => {
   assert.deepEqual(displayLicenseWithoutLookup({disabled: false, emailVerified: false, email: "u@example.com"}),
@@ -45,4 +45,13 @@ test("administration requires a verified current Google sign-in, not merely a li
     email_verified: false, firebase: {sign_in_provider: "google.com"}
   }), false);
   assert.equal(isVerifiedGoogleSession({ email_verified: true }), false);
+});
+
+test("administration freshness rejects invalid, future and stale authentication epochs", () => {
+  const now = 1795344000;
+  assert.equal(isRecentAuthTime(now, now, 300), true);
+  assert.equal(isRecentAuthTime(now - 300, now, 300), true);
+  assert.equal(isRecentAuthTime(now - 301, now, 300), false);
+  assert.equal(isRecentAuthTime(now + 1, now, 300), false);
+  assert.equal(isRecentAuthTime(String(now), now, 300), false);
 });

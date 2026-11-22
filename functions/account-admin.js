@@ -13,15 +13,13 @@ const maxSessionAge = 5 * 60;
 // Do not require attestation until real debug/release validation succeeds.
 const ENFORCE_APP_CHECK = process.env.CAMARODIAG_ENFORCE_APP_CHECK === "true";
 const { licenseStatus } = require("./license-status");
-const { isSessionRevoked, displayLicenseWithoutLookup, isVerifiedGoogleSession } = require("./account-policy");
+const { isSessionRevoked, displayLicenseWithoutLookup, isVerifiedGoogleSession, isRecentAuthTime } = require("./account-policy");
 
 function adminIdentity(request) {
     if (!request.auth?.uid || (request.auth.token?.[adminRole] !== true &&
         request.auth.token?.owner_functional_tests !== true))
         throw new HttpsError("permission-denied", "Droits administrateur requis.");
-    const authenticatedAt = Number(request.auth.token.auth_time);
-    if (!Number.isFinite(authenticatedAt) ||
-        Math.floor(Date.now() / 1000) - authenticatedAt > maxSessionAge)
+    if (!isRecentAuthTime(request.auth.token.auth_time, Math.floor(Date.now() / 1000), maxSessionAge))
         throw new HttpsError("failed-precondition", "Reconnectez-vous avant cette opération.");
     if (!isVerifiedGoogleSession(request.auth.token))
         throw new HttpsError("permission-denied", "Compte Google vérifié requis pour l'administration.");
@@ -43,7 +41,7 @@ async function requireCurrentAdmin(uid, authTime) {
 async function visibleAccount(user) {
     // Disabled accounts cannot invoke licenseStatus; admins must still be
     // able to review/reactivate them and inspect their last license choice.
-    const license = displayLicenseWithoutLookup(user) || await licenseStatus(user.uid);
+    const license = displayLicenseWithoutLookup(user) || await licenseStatus(user.uid, { allowOwnerEntitlement: true });
     return { ...publicUser(user), license };
 }
 

@@ -11,7 +11,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const { readEntitlement, shouldAutoGrant } = require("./entitlement-policy");
-const { isSessionRevoked, isValidAuthTime } = require("./account-policy");
+const { isSessionRevoked, isValidAuthTime, isVerifiedGoogleSession } = require("./account-policy");
 
 const REGION = "europe-west1";
 // Start in monitoring mode: enable enforcement only after debug and release
@@ -20,7 +20,7 @@ const ENFORCE_APP_CHECK = process.env.CAMARODIAG_ENFORCE_APP_CHECK === "true";
 const AUTO_GRANT_ENABLED = () =>
   process.env.CAMARODIAG_AUTO_GRANT_LICENSES !== "false";
 
-async function licenseStatus(uid, { autoGrant = false, authTime = null } = {}) {
+async function licenseStatus(uid, { autoGrant = false, authTime = null, allowOwnerEntitlement = false } = {}) {
   const user = await getAuth().getUser(uid);
   if (authTime !== null && isSessionRevoked(user.tokensValidAfterTime, authTime))
     throw new HttpsError("unauthenticated", "Session révoquée. Reconnectez-vous.");
@@ -30,7 +30,8 @@ async function licenseStatus(uid, { autoGrant = false, authTime = null } = {}) {
     throw new HttpsError("failed-precondition", "Adresse e-mail non vérifiée.");
 
   // Owner privileges live in Auth, never replicated in Firestore.
-  if (user.customClaims?.owner_functional_tests === true)
+  if (allowOwnerEntitlement && user.customClaims?.owner_functional_tests === true &&
+      user.providerData.some(provider => provider.providerId === "google.com"))
     return { licensed: true, source: "owner", verified: true };
 
   const licenseRef = getFirestore().collection("licenses").doc(uid);
@@ -68,6 +69,10 @@ exports.getMyLicenseStatus = onCall(
       throw new HttpsError("unauthenticated", "Connexion requise.");
     if (!isValidAuthTime(request.auth.token?.auth_time))
       throw new HttpsError("unauthenticated", "Session invalide.");
-    return licenseStatus(request.auth.uid, { autoGrant: true, authTime: request.auth.token.auth_time });
+    return licenseStatus(request.auth.uid, {
+      autoGrant: true,
+      authTime: request.auth.token.auth_time,
+      allowOwnerEntitlement: isVerifiedGoogleSession(request.auth.token)
+    });
   }
 );
