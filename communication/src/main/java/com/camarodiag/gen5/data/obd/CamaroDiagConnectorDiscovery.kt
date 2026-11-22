@@ -54,16 +54,24 @@ object CamaroDiagConnectorDiscovery {
                 Regex("#(\\d+)").find(label)?.groupValues?.get(1)?.toIntOrNull() == deviceId
         }
 
-    fun inspect(channel: Channel, ensureActive: () -> Unit = {}): Report {
+    fun inspect(channel: Channel, ensureActive: () -> Unit = {}): Report =
+        inspectWithClock(channel, ensureActive, System::nanoTime)
+
+    /** Fixed-clock injection for deadline regression tests; never exposes ECU access. */
+    internal fun inspectWithClock(
+        channel: Channel,
+        ensureActive: () -> Unit = {},
+        clock: () -> Long
+    ): Report {
         fun exchange(command: String): String {
             ensureActive()
             channel.write((command + "\n").toByteArray(Charsets.US_ASCII))
-            val deadline = System.nanoTime() + TIMEOUT_NANOS
+            val deadline = clock() + TIMEOUT_NANOS
             val reply = StringBuilder()
             // CDC bulk USB may deliver the complete CAPS reply in one packet.
             // Do not truncate it to the 64-byte chunk used by older serial devices.
             val buffer = ByteArray(512)
-            while (System.nanoTime() - deadline < 0) {
+            while (clock() - deadline < 0) {
                 ensureActive()
                 val count = channel.read(buffer, 100)
                 if (count < 0 || count > buffer.size) throw IOException("Invalid USB read")
@@ -72,7 +80,7 @@ object CamaroDiagConnectorDiscovery {
                     if (value == 10) {
                         if (i != count - 1) throw IOException("Unexpected trailing USB data")
                         ensureActive()
-                        if (System.nanoTime() - deadline >= 0) throw IOException("Connector discovery timed out")
+                        if (clock() - deadline >= 0) throw IOException("Connector discovery timed out")
                         val line = reply.toString().removeSuffix("\r")
                         if (line.isEmpty() || line.contains('\r')) throw IOException("Invalid connector reply")
                         return line
