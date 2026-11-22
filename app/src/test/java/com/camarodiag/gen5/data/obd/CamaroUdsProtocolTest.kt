@@ -152,7 +152,10 @@ class CamaroUdsProtocolTest {
             "7E8 05 41 00 BE 3E B8 13",
             "7E8 08 41 00 BE 3E B8 13",
             "18DAF110 07 41 00 BE 3E B8 13",
-            "NOPE4100BE3EB813"
+            "NOPE4100BE3EB813",
+            "BEE 06 41 00 BE 3E B8 13",
+            "7DF 06 41 00 BE 3E B8 13",
+            "18DB33F1 06 41 00 BE 3E B8 13"
         ).forEach { response ->
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "ELM327 Bluetooth",
@@ -175,7 +178,8 @@ class CamaroUdsProtocolTest {
             "41 00 BE 3E B8 13",
             "06 41 00 BE 3E B8 13",
             "7E8 06 41 00 BE 3E B8 13",
-            "18DAF110 06 41 00 BE 3E B8 13"
+            "18DAF110 06 41 00 BE 3E B8 13",
+            "7EF 06 41 00 BE 3E B8 13"
         ).forEach { response ->
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "ELM327 Bluetooth",
