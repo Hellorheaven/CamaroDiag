@@ -284,7 +284,7 @@ fun CamaroAuthGate(
                 onDismissRequest = { accountOpen = false },
                 title = { Text(if (french) "Mon compte" else "My account") },
                 text = {
-                    Column {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
                         Text(user.email.orEmpty())
                         Spacer(Modifier.height(8.dp))
                         Text(
