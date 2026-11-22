@@ -97,7 +97,7 @@ enum class DiagTab(val labelEn: String, val labelFr: String, val labelResourceId
     ADAPTER("Adapter", "Interface", R.string.tab_connect),
     MODULES("Modules", "Modules", R.string.tab_modules),
     LIVE("Live", "Direct", R.string.tab_live),
-    CAN_SNIFFER("CAN Sniffer", "CAN Sniffer", R.string.tab_can_sniffer),
+    CAN_SNIFFER("CAN / OBD Console", "Console CAN / OBD", R.string.tab_can_sniffer),
     DTCS("DTCs", "Défauts", R.string.tab_dtcs),
     MILEAGE("Mileage", "Odomètre", R.string.tab_mileage),
     CALIBRATION("ECU / Maps", "ECU / Cartographie", R.string.tab_calibration),
