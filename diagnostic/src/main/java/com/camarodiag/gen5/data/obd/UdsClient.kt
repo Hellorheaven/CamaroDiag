@@ -201,6 +201,10 @@ class UdsClient private constructor(
         timeoutMs: Long = 3000L
     ) : this(payloadTransport, policy, timeoutMs, true)
 
+    init {
+        require(timeoutMs in 1..30_000L) { "UDS timeout must be between 1 and 30000 ms." }
+    }
+
     private var activeSession = 0x01
     private val requestedSecuritySeeds = mutableSetOf<Int>()
     private var securityUnlocked = false
