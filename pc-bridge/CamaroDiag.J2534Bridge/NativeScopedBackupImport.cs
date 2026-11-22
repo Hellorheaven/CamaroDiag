@@ -40,7 +40,7 @@ internal static class NativeScopedBackupImport
             throw new InvalidDataException("Non-ASCII backup manifest.");
         string properties = Encoding.ASCII.GetString(manifestBytes);
         var lines = properties.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        if (!properties.EndsWith('\n') || lines.Length != 13 ||
+        if (!properties.EndsWith('\n') || lines.Length != 12 ||
             lines.Any(line => line.Count(c => c == '=') != 1))
             throw new InvalidDataException("Invalid backup manifest schema.");
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
