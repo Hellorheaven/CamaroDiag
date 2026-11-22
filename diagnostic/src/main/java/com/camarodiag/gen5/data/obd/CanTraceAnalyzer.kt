@@ -18,7 +18,8 @@ data class UdsTraceMessage(
     val timestampSeconds: Double?,
     val canId: Int,
     val direction: CanTraceDirection,
-    val payload: List<Int>
+    val payload: List<Int>,
+    val extendedId: Boolean? = null
 ) {
     val responseService: Int? get() = payload.firstOrNull()
     val service: Int?
@@ -270,11 +271,14 @@ object CanTraceAnalyzer {
                     val request = pending[index].request
                     request.direction != message.direction &&
                         isCompatibleObdCanResponseId(request.canId, message.canId) &&
+                        (request.extendedId == null || message.extendedId == null ||
+                            request.extendedId == message.extendedId) &&
                         // A physical ECU may send several NRC 0x78 responses before its final reply.
                         // For functional requests, also allow that same ECU to complete a pending
                         // exchange, but do not count duplicate terminal replies from one responder.
                         pending[index].responses.none {
-                            it.canId == message.canId && it.negativeResponseCode != 0x78
+                            it.canId == message.canId && it.extendedId == message.extendedId &&
+                                it.negativeResponseCode != 0x78
                         } &&
                         request.service == service &&
                         // If both timestamps exist, never pair a response that predates
@@ -679,7 +683,8 @@ object CanTraceAnalyzer {
         val direction: CanTraceDirection,
         val expectedLength: Int,
         val payload: MutableList<Int>,
-        var nextSequence: Int
+        var nextSequence: Int,
+        val extendedId: Boolean? = null
     ) {
         var lastFrameTimestampSeconds: Double? = timestampSeconds
     }
@@ -737,7 +742,7 @@ object CanTraceAnalyzer {
                     } else {
                         messages += UdsTraceMessage(
                             frame.timestampSeconds, frame.canId, frame.direction,
-                            frame.data.drop(headerLength).take(length)
+                            frame.data.drop(headerLength).take(length), frame.extendedId
                         )
                     }
                 }
@@ -777,13 +782,14 @@ object CanTraceAnalyzer {
                                 val bytes = frame.data.drop(headerLength).take(length).toMutableList()
                                 if (bytes.size >= length) {
                                     messages += UdsTraceMessage(
-                                        frame.timestampSeconds, frame.canId, frame.direction, bytes.take(length)
+                                        frame.timestampSeconds, frame.canId, frame.direction, bytes.take(length),
+                                        frame.extendedId
                                     )
                                     pending.remove(key)
                                 } else {
                                     pending[key] = PendingIsoTp(
                                         frame.timestampSeconds, frame.canId, frame.direction,
-                                        length, bytes, nextSequence = 1
+                                        length, bytes, nextSequence = 1, extendedId = frame.extendedId
                                     )
                                 }
                             }
@@ -831,7 +837,7 @@ object CanTraceAnalyzer {
                             if (state.payload.size >= state.expectedLength) {
                                 messages += UdsTraceMessage(
                                     state.timestampSeconds, state.canId, state.direction,
-                                    state.payload.take(state.expectedLength)
+                                    state.payload.take(state.expectedLength), state.extendedId
                                 )
                                 pending.remove(key)
                             }
