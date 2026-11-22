@@ -483,8 +483,15 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             }
             val dataText = when {
                 compactHeader != null -> compactHeader
-                tagged.containsMatchIn(line) ->
-                    line.replaceFirst(tagged, "").replace(Regex("""\s+"""), "")
+                tagged.containsMatchIn(line) -> {
+                    val body = line.replaceFirst(tagged, "").trim()
+                    val tokens = body.split(Regex("""\s+"""))
+                    // ELM/STN may emit the CAN DLC as either 4 or 04.
+                    // Normalize one-nibble DLC without touching payload bytes.
+                    if (tokens.size > 1 && tokens.first().length == 1)
+                        "0" + tokens.joinToString("")
+                    else tokens.joinToString("")
+                }
                 else -> line.replace(Regex("""\s+"""), "")
             }
             if (dataText.length % 2 != 0 ||
