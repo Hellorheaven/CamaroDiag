@@ -23,13 +23,20 @@ def retrieve_checkpoint(port, *, clock=monotonic):
     command = b"CDJ/1 READ\n"
     # pyserial's default timeout=None can block a stalled USB read indefinitely.
     original_timeout = getattr(port, "timeout", None)
-    if hasattr(port, "timeout"):
-        port.timeout = 0.1
+    original_write_timeout = getattr(port, "write_timeout", None)
+    has_read_timeout = hasattr(port, "timeout")
+    has_write_timeout = hasattr(port, "write_timeout")
     try:
+        if has_read_timeout:
+            port.timeout = 0.1
+        if has_write_timeout:
+            port.write_timeout = 0.1
         return _read_checkpoint(port, command, deadline, clock)
     finally:
-        if hasattr(port, "timeout"):
+        if has_read_timeout:
             port.timeout = original_timeout
+        if has_write_timeout:
+            port.write_timeout = original_write_timeout
 
 def _read_checkpoint(port, command, deadline, clock):
     if port.write(command) != len(command):
@@ -39,8 +46,13 @@ def _read_checkpoint(port, command, deadline, clock):
         if clock() >= deadline:
             raise TimeoutError("Checkpoint deadline")
         value = port.read(1)
-        if clock() >= deadline or not value or len(value) != 1:
-            raise IOError("Incomplete checkpoint reply")
+        if clock() >= deadline:
+            raise TimeoutError("Checkpoint deadline")
+        if not value:
+            # A timed-out individual serial read is not the overall deadline.
+            continue
+        if len(value) != 1:
+            raise IOError("Invalid checkpoint response fragment")
         data.extend(value)
         if value == b"\n":
             break
