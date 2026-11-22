@@ -1177,6 +1177,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!requirePremiumLicense()) return
         if (_calibrationWorkspace.value.isJ2534MemoryCapturing) return
         val accountGeneration = accountSessionGeneration
+        val connectionGeneration = connectionAttemptGeneration
+        fun current() = isCurrentAccountGeneration(accountGeneration) &&
+            connectionGeneration == connectionAttemptGeneration &&
+            request.expectedVin == _vehicle.value.vin.uppercase() && hasPremiumLicense()
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isJ2534MemoryCapturing = true,
             j2534MemoryCaptureBytesRead = 0L,
@@ -1185,7 +1189,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                check(request.expectedVin == _vehicle.value.vin.uppercase()) {
+                check(current()) {
                     "Selected vehicle VIN has changed."
                 }
                 check(obdManager.isJ2534BridgeConnected()) {
@@ -1193,22 +1197,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
                     beforePublish = {
-                        check(accountGeneration == accountSessionGeneration &&
-                            request.expectedVin == _vehicle.value.vin.uppercase() && hasPremiumLicense())
+                        check(current())
                     }
                 ) { output ->
                     obdManager.captureAndExportJ2534Memory(request, output) { progress ->
-                        check(accountGeneration == accountSessionGeneration &&
-                            request.expectedVin == _vehicle.value.vin.uppercase()
-                        ) { "Vehicle or account changed while ECU memory was being read." }
+                        check(current()) { "Vehicle or account changed while ECU memory was being read." }
                         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                             j2534MemoryCaptureBytesRead = progress.totalBytesRead,
                             j2534MemoryCaptureTotalBytes = progress.requiredBytesRead
                         )
                     }
                 }
-                check(accountGeneration == accountSessionGeneration &&
-                    request.expectedVin == _vehicle.value.vin.uppercase()) {
+                check(current()) {
                     "Vehicle or account changed during ECU capture."
                 }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
@@ -1217,13 +1217,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_live_memory_saved)
                 )
             } catch (cancelled: CancellationException) {
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                if (current()) _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534MemoryCapturing = false
                 )
                 throw cancelled
             } catch (error: Exception) {
-                // ExportStorage removes incomplete temporary documents.
-                reportConnectionLoss(error)
+                if (!current()) return@launch
+                // A full folder/revoked grant is not an ECU disconnection.
+                if (error !is CamaroDiagExportStorage.ExportStorageException) reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534MemoryCapturing = false,
                     j2534MemoryCaptureMessage =
