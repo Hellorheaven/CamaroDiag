@@ -52,6 +52,7 @@ object EcuBackupArchive {
         require(captures.all { it.firstRead.size <= MAX_REGION_BYTES &&
             (it.independentRead?.size ?: 0) <= MAX_REGION_BYTES }) { "Segment too large" }
         require(captures.sumOf { it.firstRead.size.toLong() + (it.independentRead?.size?.toLong() ?: 0L) } <= MAX_ARCHIVE_BYTES) { "Archive data exceeds size limit" }
+        require(captures.none { it.firstRead === it.independentRead }) { "Independent read aliases primary buffer" }
         // Freeze mutable byte arrays before hashing and serialization. Otherwise
         // a caller could change a ByteArray between checksum calculation and ZIP
         // writing, producing an archive with mismatched metadata and payload.
