@@ -562,3 +562,11 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 - 646 chaînes effectivement ajoutées dans les locales incomplètes (238 profils/DTC, 180 connexion/scan, 228 module/telemetrie/avertissements). La parité intégrale reste à terminer ; ne pas désactiver le contrôle.
 - CI précédente Android e080322 : 189/190 tests, seul échec parité locale. Noyau natif vert à f93b7f3 (44939072504), Windows vert au checkpoint 7eeeb1c de la session précédente. Résultats du dernier code à vérifier. Aucun noyau ECU déployable qualifié physiquement ni flash réel.
 - Suite : corriger toute régression CI, compléter les chaînes restantes, intégrer un démarrage RAM qualifié par carte et procédure de récupération vérifiée, tester les interfaces et variantes exactes sur matériel. Conserver les droits/licences en attente de commercialisation, les tests privés et l'absence de dépendance PCM Hammer. 
+
+
+### 22/11/2026 — reprise PR #70 (checkpoint f2c91de)
+- 17 commits de code/tests/ressources depuis 6b31a2f ; uniquement CamaroDiag, branche feat/ecu-backup-integrity, aucune fusion. À l'entrée : 194/195 tests Android réussis, parité locale en échec ; Windows et noyau natif verts. Douze avertissements TypographyDashes sur le nom normalisé J2534-2 corrigés localement, sans désactiver le lint global.
+- Audit direct de strings.xml : 870 clés de référence ; 2 989 manquantes dans ET/FI/HU/GA/LV/LT/MT/PL/RO/SK/SL/SV. BG, CS, DA complets en nombre de clés. Test de parité désormais exhaustif dans son rapport (toutes les locales et toutes les clés manquantes), reste bloquant.
+- Sauvegarde J2534 : export lié à l'empreinte originale vérifiée, copies figées, rejet si les deux buffers ont été modifiés ensemble, annulation respectée après retour en session par défaut. Deux tests de régression.
+- Mise à jour APK : refus d'un même ID DownloadManager associé à des versions divergentes ; les entrées ambiguës ne permettent ni reprise ni suppression. Tests de régression ajoutés.
+- Dernier SHA de code/tests f2c91de : CI à confirmer ; aucune validation physique ECU, aucun nouveau profil qualifié, ne pas activer le flash sur un appareil non qualifié. Poursuivre développement fonctionnel restant, puis traductions réelles fichier par fichier, vraie CI Android/Windows/native complète, et recette matérielle.
