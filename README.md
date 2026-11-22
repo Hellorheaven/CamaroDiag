@@ -60,6 +60,14 @@ Pour la version prototype 0.1.0, la seule fonction disponible est la découverte
 
 Les futurs modes CAN, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD et EEPROM ISP/chip-off nécessitent un firmware et du matériel réellement compatibles et qualifiés. Voir les [exigences du connecteur](https://github.com/Hellorheaven/CamaroDiagConnectors/issues/7). Aucun mode de programmation n'est activé à partir d'une réponse de découverte.
 
+### Préparation du raccordement sur banc
+
+Dans ECU/Maps → Expert, les neuf modes de connexion sont des choix de préparation, pas des capacités matérielles actives. SWD est distinct de BDM et JTAG/Nexus. Les boutons CamaroDiagConnectors donnent accès au guide générique de câblage et à la fiche correspondant au modèle, à l'année et à la famille ECU saisie si une fiche existe ; sinon le catalogue est proposé. E39A dispose d'une fiche indépendante non qualifiée. Les documents de référence sont figés sur la révision revue, et chaque écran indique que le raccordement n'est pas vérifié.
+
+Le boîtier est prévu pour une alimentation logique USB 5 V protégée. L'alimentation stabilisée externe de banc est dédiée au calculateur, avec protection et limitation adaptées au faisceau. Les opérations critiques devront disposer d'une alimentation logique maintenue indépendamment de la liaison USB ; les puces externes nécessitent leur propre VCC conforme à la référence exacte. Aucun brochage, courant ou tension de programmation universel n'est déduit. Ne raccorder aucune cible au prototype actuel.
+
+Voir [le suivi des fiches](https://github.com/Hellorheaven/CamaroDiagConnectors/issues/10). Les fiches documentaires ne valident ni le faisceau, ni le firmware, ni la récupération après interruption.
+
 ## Matrice des véhicules et fonctions
 
 Les familles ECM sont indicatives et doivent être confirmées sur le véhicule par le numéro matériel, VIN, CAL ID, CVN et OS.
