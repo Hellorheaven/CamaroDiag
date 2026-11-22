@@ -252,4 +252,27 @@ class J2534StandardObdTest {
         }
     }
 
+    @Test fun consolePhysicalPayloadIsExactlyTheWhitelistedRequest() {
+        val examples = mapOf(
+            "010C" to bytes(0x01, 0x0C),
+            "0152" to bytes(0x01, 0x52),
+            "0902" to bytes(0x09, 0x02),
+            "090A" to bytes(0x09, 0x0A),
+            "03" to bytes(0x03),
+            "07" to bytes(0x07),
+            "0A" to bytes(0x0A)
+        )
+        for ((input, expected) in examples) {
+            val parsed = requireNotNull(SafeObdRequestPolicy.parse(input))
+            assertArrayEquals(expected, J2534BridgeTransport.readOnlyConsolePayload(parsed))
+        }
+        for (command in listOf("04", "2E F190", "27 01", "34 00", "36 00")) {
+            assertNull(SafeObdRequestPolicy.parse(command))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            J2534BridgeTransport.readOnlyConsolePayload(
+                SafeObdRequest(0x34, 0x00, "0152"))
+        }
+    }
+
 }
