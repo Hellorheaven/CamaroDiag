@@ -16,6 +16,8 @@ internal static class NativeScopedMemoryReaderSelfTests
         internal bool MalformedVin;
         internal bool RejectDefaultSession;
         internal bool MalformedExtendedReply;
+        internal bool ExtendedReplyWithTrailingByte;
+        internal bool ExtendedReplyWithTimings;
         internal Action? AfterRead;
         internal readonly List<byte> Sessions = [];
 
@@ -42,6 +44,10 @@ internal static class NativeScopedMemoryReaderSelfTests
                 Sessions.Add(request[1]);
                 if (request[1] == 0x03 && MalformedExtendedReply)
                     return Task.FromResult(new byte[] { 0x50 });
+                if (request[1] == 0x03 && ExtendedReplyWithTrailingByte)
+                    return Task.FromResult(new byte[] { 0x50, 0x03, 0x12 });
+                if (request[1] == 0x03 && ExtendedReplyWithTimings)
+                    return Task.FromResult(new byte[] { 0x50, 0x03, 0x00, 0x32, 0x01, 0xF4 });
                 if (request[1] == 0x01 && RejectDefaultSession)
                     return Task.FromResult(new byte[] { 0x50, 0x03 });
                 return Task.FromResult(new byte[] { 0x50, request[1] });
@@ -209,6 +215,17 @@ internal static class NativeScopedMemoryReaderSelfTests
         Assert(failedEnter.Calls == 0 && failedEnter.Sessions.SequenceEqual(new byte[] { 3, 1 }),
             "Ambiguous extended-session response still triggers cleanup");
 
+        var badTiming = new FakeEcu(scope.StartAddress, memory) { ExtendedReplyWithTrailingByte = true };
+        Reject<InvalidDataException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
+            badTiming, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(badTiming.Calls == 0 && badTiming.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+            "Malformed session timing response cannot permit memory access");
+        var timedSession = new FakeEcu(scope.StartAddress, memory) { ExtendedReplyWithTimings = true };
+        var timedCapture = NativeScopedMemoryReader.ReadWithSessionAsync(
+            timedSession, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(timedCapture.Bytes.SequenceEqual(memory) &&
+            timedSession.Sessions.SequenceEqual(new byte[] { 3, 1 }),
+            "Complete positive UDS session timings remain supported");
         var replacement = new FakeEcu(scope.StartAddress, memory) { ChangeVinAfterMemoryCalls = 3 };
         Reject<UnauthorizedAccessException>(() => NativeScopedMemoryReader.ReadWithSessionAsync(
             replacement, scope, null, CancellationToken.None).GetAwaiter().GetResult());
