@@ -98,6 +98,27 @@ int main(void)
         assert(m.pulses == 1 && c.recovery_required);
         assert(cd_flash_probe_program(&c, 0x20000, 8) == CD_FLASH_RECOVERY_REQUIRED);
     }
+    /* An earlier pulse must not cause a second pulse on a disturbed
+     * doubleword, including an all-FF doubleword that would be skipped. */
+    init_model(&m);
+    c = controller_for(&m);
+    assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_OK);
+    m.disturb_next_unit = true;
+    assert(cd_flash_program(&c, 0x20000, data, sizeof(data)) == CD_FLASH_RECOVERY_REQUIRED);
+    assert(m.pulses == 2 && c.recovery_required && m.words[2] == UINT32_C(0xFFFFFFFE));
+
+    /* Both units initially pass, but the second pulse corrupts the first. */
+    const uint8_t two_units[16] = {
+        0x07, 0x02, 0x03, 0x04, 0xA0, 0xB0, 0xC0, 0xD0,
+        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88
+    };
+    init_model(&m);
+    c = controller_for(&m);
+    assert(cd_flash_erase(&c, 0x20000, 0x10000) == CD_FLASH_OK);
+    m.disturb_previous_unit = true;
+    assert(cd_flash_program(&c, 0x20000, two_units, sizeof(two_units)) == CD_FLASH_RECOVERY_REQUIRED);
+    assert(m.pulses == 3 && c.recovery_required && m.words[0] == UINT32_C(0x07020300));
+
     /* Independently exercise middle and high select bits, including last block. */
     const uint32_t addresses[] = {0x40000, 0x60000, 0x80000, 0x2E0000};
     const uint32_t lm[] = {0x10000, 0x20000, 0, 0};
