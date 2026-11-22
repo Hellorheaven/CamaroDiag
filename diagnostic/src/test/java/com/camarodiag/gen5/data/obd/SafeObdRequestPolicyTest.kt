@@ -109,4 +109,28 @@ class SafeObdRequestPolicyTest {
         }
     }
 
+    @Test
+    fun positiveResponsesAcceptCompactSpacedAndPhysicalHeaderFormats() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        for (response in listOf("41 52 80", "415280", "7E8 41 52 80",
+            "7E8 03 41 52 80", "18DAF110 41 52 80")) {
+            assertEquals(response, true, SafeObdRequestPolicy.hasPositiveResponse(request, response))
+        }
+        val dtc = requireNotNull(SafeObdRequestPolicy.parse("03"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 00"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "4300"))
+        val vin = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(vin, "49 02 01 31"))
+    }
+
+    @Test
+    fun commandEchoAdapterAcknowledgementAndNegativeReplyNeverCountAsSuccess() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        for (response in listOf("0152", "OK", "NO DATA", "7F 01 11",
+            "41 53 80", "41 52", "SEARCHING...", "7E0 41 52 80",
+            "41 52 80 0", "")) {
+            assertEquals(response, false, SafeObdRequestPolicy.hasPositiveResponse(request, response))
+        }
+    }
+
 }
