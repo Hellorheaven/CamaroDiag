@@ -102,6 +102,7 @@ data class LiveCanMonitorState(
     val consoleHistory: List<CanConsoleHistoryEntry> = emptyList(),
     val observedCanIds: Set<ObservedCanId> = emptySet(),
     val rawArchiveFailed: Boolean = false,
+    val captureArchiveRequired: Boolean = false,
     val message: String? = null
 )
 
@@ -1766,6 +1767,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _liveCanMonitorState.value = previousState.copy(
             isCapturing = true,
             rawArchiveFailed = false,
+            captureArchiveRequired = true,
             rawText = "",
             report = null,
             message = null,
@@ -1959,7 +1961,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             report = null,
             consoleHistory = emptyList(),
             observedCanIds = emptySet(),
-            rawArchiveFailed = false
+            rawArchiveFailed = false,
+            captureArchiveRequired = false
         )
     }
 
@@ -2227,7 +2230,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isCapturing = snapshot.isCapturing,
                     archiveFailed = snapshot.rawArchiveFailed,
                     hasHistory = history.isNotEmpty(),
-                    hasRawData = snapshot.rawText.isNotBlank() || (archive?.length() ?: 0L) > 0L
+                    hasRawData = snapshot.rawText.isNotBlank() || (archive?.length() ?: 0L) > 0L,
+                    requiresRawArchive = snapshot.captureArchiveRequired,
+                    hasRawArchive = archive != null
                 )) {
                     "CAN capture export is not available."
                 }
