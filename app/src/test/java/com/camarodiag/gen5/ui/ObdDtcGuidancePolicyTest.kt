@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ObdDtcGuidancePolicyTest {
-    private val vin = "2G1FF3D36C9104199"
+    private val vin = "2G1TEST00C0000001"
 
     @Test fun allowsOneRealEcmResponderWithMatchingVin() {
         assertTrue(ObdDtcGuidancePolicy.hasMatchedEcm(vin, vin, listOf("7E8"), false))
