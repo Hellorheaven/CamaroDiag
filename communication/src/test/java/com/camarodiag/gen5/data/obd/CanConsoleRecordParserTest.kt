@@ -120,10 +120,10 @@ class CanConsoleRecordParserTest {
         val request = requireNotNull(RawCanFrameParser.parse("7E0 02 01 0C"))
         assertEquals(0x7E8L, CanConsoleEcuRouting.expectedResponder(request))
         val records = CanConsoleRecordParser.parse(
-            "7E9 03 41 0C FF\r\n7E8 03 41 0C 1A", request
+            "7E9 03 41 0C FF\r\n7E8 03 41 0C 1A"
         )
-        assertEquals(listOf("SYSTEM", "RX"), records.map { it.direction })
-        assertFalse(records[0].succeeded)
+        assertEquals(listOf("RX", "RX"), records.map { it.direction })
+        assertTrue(records[0].content.startsWith("CAN ID=7E9"))
         assertTrue(records[1].content.startsWith("CAN ID=7E8"))
         assertFalse(CanConsoleEcuRouting.isSelectedResponder(
             request, requireNotNull(RawCanFrameParser.parse("7E9 03 41 0C 1A"))))
@@ -134,11 +134,10 @@ class CanConsoleRecordParserTest {
         assertEquals(0x18DAF110L, CanConsoleEcuRouting.expectedResponder(request))
         val records = CanConsoleRecordParser.parse(
             "18DAF111 03 62 F1 90\r\n7E8 03 62 F1 90\r\n18DAF110 03 62 F1 90",
-            request
         )
-        assertEquals(listOf("SYSTEM", "SYSTEM", "RX"), records.map { it.direction })
-        assertFalse(records[0].succeeded)
-        assertFalse(records[1].succeeded)
+        assertEquals(listOf("RX", "RX", "RX"), records.map { it.direction })
+        assertTrue(records[0].content.contains("ID=18DAF111"))
+        assertTrue(records[1].content.contains("ID=7E8"))
         assertEquals("CAN ID=18DAF110 DLC=3 DATA=62 F1 90", records[2].content)
     }
 
@@ -146,9 +145,9 @@ class CanConsoleRecordParserTest {
         for (input in listOf("7DF 02 01 0C", "123 02 01 0C", "18DAF110 03 22 F1 90")) {
             val request = requireNotNull(RawCanFrameParser.parse(input))
             assertEquals(null, CanConsoleEcuRouting.expectedResponder(request))
-            val records = CanConsoleRecordParser.parse("7E8 03 41 0C 1A", request)
-            assertEquals("SYSTEM", records.single().direction)
-            assertFalse(records.single().succeeded)
+            val records = CanConsoleRecordParser.parse("7E8 03 41 0C 1A")
+            assertEquals("RX", records.single().direction)
+            assertTrue(records.single().succeeded)
         }
     }
 
