@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
@@ -48,6 +49,7 @@ internal static class NativeScopedBackupImport
         using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (input.Length <= 0 || input.Length > 2L * NativeScopedMemoryReader.MaximumUiCaptureBytes + 65536)
             throw new InvalidDataException("Backup archive exceeds the import budget.");
+        RequireCompleteZipEnvelope(input);
         using var zip = new ZipArchive(input, ZipArchiveMode.Read, leaveOpen: false);
         var expected = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -203,6 +205,56 @@ internal static class NativeScopedBackupImport
             Convert.ToHexString(SHA256.HashData(first)),
             values["capture.0.region"], values["capture.0.origin"],
             Array.AsReadOnly(requiredRegions), channelBound, regionBound, firmware);
+    }
+
+    /// <summary>
+    /// Reject bytes appended after ZIP's final central-directory record, a
+    /// common ambiguity ZipArchive may tolerate but Android refuses. Preserve
+    /// a valid ZIP comment; this backup schema always has three entries and
+    /// cannot legitimately require a ZIP64 or multi-disk envelope.
+    /// </summary>
+    private static void RequireCompleteZipEnvelope(FileStream file)
+    {
+        const int minimum = 22;
+        const int maxComment = ushort.MaxValue;
+        if (file.Length < minimum + 4)
+            throw new InvalidDataException("Incomplete ECU backup ZIP envelope.");
+        file.Position = 0;
+        Span<byte> localHeader = stackalloc byte[4];
+        file.ReadExactly(localHeader);
+        if (BinaryPrimitives.ReadUInt32LittleEndian(localHeader) != 0x04034B50)
+            throw new InvalidDataException("An ECU backup must begin at the ZIP local header.");
+
+        int tailBytes = checked((int)Math.Min(file.Length, minimum + maxComment));
+        byte[] tail = new byte[tailBytes];
+        long tailStart = file.Length - tailBytes;
+        file.Position = tailStart;
+        file.ReadExactly(tail);
+        var found = false;
+        for (int pos = tailBytes - minimum; pos >= 0; --pos)
+        {
+            var record = tail.AsSpan(pos);
+            if (BinaryPrimitives.ReadUInt32LittleEndian(record) != 0x06054B50)
+                continue;
+            int commentBytes = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(20, 2));
+            if (commentBytes != tailBytes - pos - minimum)
+                continue;
+            // ZIP64 and multi-disk archives are not needed for an ECU backup.
+            int disk = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(4, 2));
+            int centralDisk = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(6, 2));
+            int diskCount = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(8, 2));
+            int totalCount = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(10, 2));
+            uint directorySize = BinaryPrimitives.ReadUInt32LittleEndian(record.Slice(12, 4));
+            uint directoryOffset = BinaryPrimitives.ReadUInt32LittleEndian(record.Slice(16, 4));
+            if (disk != 0 || centralDisk != 0 || diskCount != 3 || totalCount != 3 ||
+                (ulong)directoryOffset + directorySize != (ulong)(tailStart + pos))
+                throw new InvalidDataException("Invalid ECU ZIP central-directory boundaries.");
+            found = true;
+            break;
+        }
+        if (!found)
+            throw new InvalidDataException("ECU ZIP footer is missing or has trailing data.");
+        file.Position = 0;
     }
 
     private static string DecodeControllerLabel(string encoded)

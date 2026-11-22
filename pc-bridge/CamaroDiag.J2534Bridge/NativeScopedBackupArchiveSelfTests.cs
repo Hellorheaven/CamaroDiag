@@ -214,6 +214,31 @@ internal static class NativeScopedBackupArchiveSelfTests
                 NativeScopedBackupArchive.RequirePublishedCaptureMatch(
                     wrongOriginPath, scope, capture, null));
             File.Delete(wrongOriginPath);
+            var trailingPath = Path.Combine(directory, "appended-trailer.zip");
+            File.Copy(zipPath, trailingPath);
+            using (var appended = new FileStream(trailingPath, FileMode.Append))
+                appended.Write(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF });
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupImport.VerifyZip(trailingPath, scope));
+            File.Delete(trailingPath);
+
+            // A legitimate ZIP comment follows the declared EOCD comment
+            // length and is not stray data after the envelope.
+            var commentedPath = Path.Combine(directory, "zip-comment.zip");
+            var commentedBytes = File.ReadAllBytes(zipPath);
+            var footerAt = commentedBytes.Length - 22;
+            Check(commentedBytes[footerAt] == 0x50 &&
+                  commentedBytes[footerAt + 1] == 0x4B &&
+                  commentedBytes[footerAt + 2] == 0x05 &&
+                  commentedBytes[footerAt + 3] == 0x06,
+                  "Test ZIP includes a final EOCD footer");
+            commentedBytes[footerAt + 20] = 3;
+            commentedBytes[footerAt + 21] = 0;
+            File.WriteAllBytes(commentedPath,
+                commentedBytes.Concat(Encoding.ASCII.GetBytes("C2!")).ToArray());
+            Check(NativeScopedBackupImport.VerifyZip(commentedPath, scope).ChannelBound,
+                "A complete ZIP with a bounded EOCD comment stays importable");
+            File.Delete(commentedPath);
             var originalZip = File.ReadAllBytes(zipPath);
             var alteredPath = Path.Combine(directory, "altered.zip");
             File.WriteAllBytes(alteredPath, originalZip);
