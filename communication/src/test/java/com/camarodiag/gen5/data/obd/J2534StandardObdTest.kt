@@ -163,4 +163,23 @@ class J2534StandardObdTest {
         }
     }
 
+    @Test fun j2534NegativeReadIsPreservedAsFailedEcuRxOnlyWhenExact() {
+        val ethanol = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        assertTrue(J2534BridgeTransport.isMatchingNegativeConsoleReply(
+            ethanol, bytes(0x7F, 0x01, 0x11)))
+        for (bad in listOf(
+            bytes(0x7F, 0x09, 0x11),
+            bytes(0x7F, 0x01),
+            bytes(0x7F, 0x01, 0x11, 0),
+            bytes(0x7F, 0x01, 0),
+            bytes(0x7F, 0x01, 0x78),
+            bytes(0x41, 0x52, 0x80)
+        )) {
+            assertFalse(J2534BridgeTransport.isMatchingNegativeConsoleReply(ethanol, bad))
+        }
+        val forged = SafeObdRequest(0x34, 0, "0152")
+        assertFalse(J2534BridgeTransport.isMatchingNegativeConsoleReply(
+            forged, bytes(0x7F, 0x34, 0x11)))
+    }
+
 }
