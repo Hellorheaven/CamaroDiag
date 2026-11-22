@@ -13,7 +13,7 @@ Le pont relie CamaroDiag sur Android à un fournisseur SAE J2534 Pass-Thru insta
 | **Connexion Android** | Choisir et actualiser les pilotes J2534 installés, adresse IP locale du PC, port TLS, profil mémoire facultatif, autorisation facultative d’effacement des défauts antipollution, démarrer/arrêter le pont, copier séparément l'IP, le port et le code d'appairage TLS complet, ou copier les trois valeurs ensemble |
 | **Outils ECU E39/E39A** | Lire deux fois l'identification GM VIN/OSID (CAN IDs/profil explicites), inspecter une image brute de 3 Mio, recalculer les checksums GM SUM/CVN des calibrations et enregistrer un nouveau fichier sans écraser les originaux |
 | **Console CAN / OBD** | Ouvrir/fermer le canal J2534, envoyer des trames **autorisées en lecture**, afficher distinctement les trames TX et RX, envoyer les trames sans réponse autorisées, identification OBD Mode 09/GM GMLAN, tension du pilote, sauvegarder l'historique |
-| **Lecture mémoire ECU** | Créer/charger un profil de lecture avec VIN, plage mémoire, tailles de blocs, session et CAN IDs ; effectuer une lecture UDS 0x23, relire toute la plage, refuser les divergences, annuler, et exporter un nouveau fichier binaire à couverture déclarée |
+| **Lecture mémoire ECU** | Créer/charger un profil de lecture avec VIN, plage mémoire, tailles de blocs, session et CAN IDs ; effectuer une lecture UDS 0x23, comparer deux acquisitions, exporter un ZIP et vérifier hors ligne un ZIP existant sans connexion au calculateur |
 | **Pilotes et diagnostics** | Tester un ou tous les pilotes (ABI, connexion USB, version firmware/DLL/API), lancer les autotests du pont et copier le diagnostic |
 | **Mises à jour / À propos** | Voir la version du pont, rechercher les releases officielles, télécharger/installateur x86/x64 sans commande terminal, consulter le compte rendu d'installation |
 | **Aide et utilisation** | Instructions intégrées pas à pas pour toutes les fonctions, sécurité TLS et résolution des pannes courantes |
@@ -106,6 +106,12 @@ Utilisez la même version du pont et de l’application Android. Sélectionnez l
 Pour autoriser l'effacement, arrêtez le pont et cochez **Autoriser l’effacement OBD des défauts antipollution (moteur arrêté)** avant de le redémarrer. Reconnectez Android avec le nouveau code TLS. Immobilisez le véhicule, coupez le moteur en laissant le contact nécessaire au diagnostic, puis confirmez l'effacement dans l'écran DTC. Le calculateur doit confirmer une vitesse et un régime nuls. Relisez les défauts après l'opération. Les données de préparation antipollution et les données de contexte des défauts seront réinitialisées, mais les codes permanents ne sont pas effacés par cette commande. Elle ne répare pas le défaut à l'origine du code. Aucun effacement UDS des autres modules n'est autorisé.
 
 La fonction est en cours de validation sur la PR de développement ; la compatibilité avec votre interface et votre véhicule doit être contrôlée en conditions réelles.
+
+### Vérifier une sauvegarde ECU depuis Windows
+
+Dans l'onglet **Lecture mémoire ECU**, ouvrez le profil JSON utilisé pour la sauvegarde, puis cliquez sur **Vérifier une sauvegarde ZIP**. Le contrôle fonctionne sans boîtier connecté et refuse les fichiers altérés, les lectures différentes ou un VIN et une plage mémoire incompatibles avec ce profil.
+
+Pour vérifier sans interface graphique : `CamaroDiag.J2534Bridge.exe --verify-ecu-archive sauvegarde.zip profil.json`. Cette opération n'écrit rien sur le calculateur et **ne démontre pas que la sauvegarde est complète ou restaurable**. Le fichier BIN brut n'inclut pas les deux acquisitions et ne peut pas être vérifié de la même manière.
 
 ### Sauvegarde d’une plage mémoire
 
