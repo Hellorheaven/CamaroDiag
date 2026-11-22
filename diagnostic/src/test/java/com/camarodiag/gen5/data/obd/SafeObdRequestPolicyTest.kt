@@ -121,6 +121,8 @@ class SafeObdRequestPolicyTest {
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 00"))
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "4300"))
         assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 01 03 00"))
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 01 71 00 00"))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(dtc, "43 01 71"))
         for (invalid in listOf("43 FF", "43 01 03", "43 01 00 00", "43 00 03 00")) {
             assertEquals(invalid, false, SafeObdRequestPolicy.hasPositiveResponse(dtc, invalid))
         }
