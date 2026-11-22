@@ -911,4 +911,7 @@
     <string name="debug_builds_no_browser">Kein Webbrowser für diesen Download verfügbar.</string>
     <string name="obd_physical_can_scope">Physischer CAN-Teilnehmer: 0x%1$s. Dieser Scan erfasst nur das ausgewählte OBD-Steuergerät, nicht alle Module über eine funktionale Abfrage. Es wurden keine GM-Programmier- oder Stellgliedbefehle gesendet.</string>
     <string name="msg_dtc_j2534_clear_requires_permission">Aktivieren Sie das Löschen emissionsbezogener Fehlercodes in der Windows-Bridge, verbinden Sie sich erneut, stellen Sie den Motor ab und bestätigen Sie das Zurücksetzen. Die Emissionsbereitschaftsdaten werden zurückgesetzt; permanente Fehlercodes bleiben erhalten.</string>
+    <string name="export_folder_instruction">Erstellen oder wählen Sie den Ordner CamaroDiag im internen Speicher und erlauben Sie den Zugriff. Exporte sind im gemeinsamen Speicher sichtbar.</string>
+    <string name="export_folder_success">Export in /CamaroDiag/ gespeichert.</string>
+    <string name="export_folder_failed">Export konnte nicht in /CamaroDiag/ gespeichert werden.</string>
 </resources>
