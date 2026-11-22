@@ -1,8 +1,9 @@
 name: PR unit tests
 # Heavy tests are never triggered by pull_request synchronize.
 # Run manually at ~50-commit checkpoints and before merging; ready_for_review is a final gate.
-# Unit tests on ready-for-review. A manual checkpoint also runs Connectors
-# and Android/Windows Release validation on the same revision.
+# Single Debug-only PR checkpoint. Manual during large commit batches (~50),
+# automatically once when the finished PR is marked ready_for_review.
+# Never build Release or publish artifacts from a PR.
 on:
   workflow_dispatch:
     inputs:
@@ -14,6 +15,12 @@ on:
     types: [ready_for_review]
     paths:
       - 'app/**'
+      - 'pc-bridge/**'
+      - 'ecu-native/**'
+      - 'connectors/**'
+      - '.github/workflows/connectors-ci.yml'
+      - '.github/workflows/android-ci.yml'
+      - '.github/workflows/pc-bridge-ci.yml'
       - 'tools/admin/**'
       - 'functions/**'
       - 'firebase.json'
@@ -82,7 +89,7 @@ jobs:
           node --check functions/entitlement-policy.js
           node --test functions/entitlement-policy.test.js functions/account-policy.test.js
       - name: Execute Android unit tests (warnings fail)
-        run: ./gradlew testDebugUnitTest --stacktrace --warning-mode=fail
+        run: ./gradlew testDebugUnitTest lintDebug app:assembleDebug --stacktrace --warning-mode=fail
       - name: Collect unit test reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -94,12 +101,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  windows-debug:
+    needs: verify-revision
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build and self-test Windows bridge (Debug only)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Debug bridge compilation failed' }
+          dotnet run --project .\\pc-bridge\\CamaroDiag.J2534Bridge\\CamaroDiag.J2534Bridge.csproj --configuration Debug --no-build -- --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'Debug bridge self-tests failed' }
+
+  native-ecu-debug:
+    needs: verify-revision
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify native ECU components (no vehicle writes)
+        run: bash ecu-native/mpc5566/verify.sh
+
   connectors:
-    if: github.event_name == 'workflow_dispatch'
     needs: verify-revision
     uses: ./.github/workflows/connectors-ci.yml
-
-  release-validation:
-    if: github.event_name == 'workflow_dispatch'
-    needs: verify-revision
-    uses: ./.github/workflows/release-validation.yml
