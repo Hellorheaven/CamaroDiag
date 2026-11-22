@@ -31,6 +31,11 @@ internal static class Program
             return 2;
         }
 
+        // Explicit public CD/1 discovery. Never falls through to a vendor
+        // driver, network listener, updater or ECU operation.
+        if (args.Contains(ConnectorDiscoveryCli.Command, StringComparer.OrdinalIgnoreCase))
+            return ConnectorDiscoveryCli.Run(args);
+
         // Explicit local programming path; malformed invocations cannot fall
         // through to a network listener, updater or another CLI operation.
         if (args.Contains(NativeE39QualifiedBenchCli.Command, StringComparer.OrdinalIgnoreCase))

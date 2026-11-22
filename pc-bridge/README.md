@@ -244,3 +244,8 @@ Une qualification d'écriture est propre au calculateur, à la version du firmwa
 Pour archiver deux acquisitions faites avec un programmateur externe : dans Android, importer le BIN original, importer la seconde lecture comme fichier de comparaison, puis ouvrir le mode Expert. Choisir le mode, la région et l'adresse de début effectivement lue. Lorsque les deux images correspondent, employer **Exporter (ZIP)**. Le ZIP est conservé dans le dossier public `/CamaroDiag/` après vérification de sa taille et de son intégrité. Deux images de 15 Mio maximum chacune sont acceptées. Les fichiers importés ne sont pas attestés comme lectures physiques effectuées par CamaroDiag, et ne prouvent pas une sauvegarde complète du calculateur.
 
 Le brouillon d'une géométrie de secteurs flash n'est pas applicable à une EEPROM externe. Ne pas utiliser un brochage d'une autre révision de carte. La qualification physique requiert le matériel et la procédure de récupération adaptés ; aucune connexion automatique aux sondes directes n'est actuellement fournie.
+
+
+## Découverte locale CamaroDiagConnectors (prototype isolé)
+
+Le pont inclut désormais un mode local explicite : `CamaroDiag.J2534Bridge.exe --discover-connector COM5` (remplacer COM5 par le port vérifié de la carte isolée, firmware CD/1). Cette commande vérifie les trois réponses publiques, ferme le port, et n'exécute ni J2534 ni serveur réseau ni mise à jour. Redémarrer la carte isolée entre sessions. Ne pas utiliser avec un câble KKL/ELM ou un ECU raccordé. Le boîtier n'est pas authentifié, aucune capacité véhicule n'est accordée. Le backend natif sécurisé via pont reste à développer et qualifier.
