@@ -27,8 +27,7 @@ import com.camarodiag.gen5.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Source
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.launch
@@ -137,39 +136,20 @@ fun CamaroAuthGate(
                         signedClaims = verifiedClaims,
                         license = null
                     )
-                    if (LicenseRolloutConfig.ENABLED && accessLevel != LicenseLevel.OWNER &&
-                        verifiedClaims[LicenseAccessPolicy.PREMIUM_CLAIM] == true
-                    ) {
-                        FirebaseFirestore.getInstance().collection("licenses")
-                            .document(targetUid).get(Source.SERVER)
+                    if (LicenseRolloutConfig.ENABLED && accessLevel != LicenseLevel.OWNER) {
+                        // Entitlement is issued and checked by Firebase Admin on
+                        // each server call, never by a local preference or claim.
+                        FirebaseFunctions.getInstance("europe-west1")
+                            .getHttpsCallable("getMyLicenseStatus").call()
                             .addOnCompleteListener { licenseTask ->
                                 if (auth.currentUser?.uid != targetUid ||
                                     validationGeneration != attempt
                                 ) return@addOnCompleteListener
-                                // Task.result throws if the request failed. A network
-                                // error, permission denial or missing record must
-                                // simply leave the entitlement locked.
-                                val snapshot = if (licenseTask.isSuccessful) {
-                                    licenseTask.result?.takeIf { it.exists() }
-                                } else null
-                                val licenseRecord = snapshot?.let {
-                                    ServerLicenseRecord(
-                                        uid = it.getString("uid").orEmpty(),
-                                        emailLower = it.getString("emailLower").orEmpty(),
-                                        status = it.getString("status").orEmpty(),
-                                        kind = it.getString("kind").orEmpty(),
-                                        expiresAtEpochMillis = it.getTimestamp("expiresAt")?.toDate()?.time,
-                                        verifiedFromServer = !it.metadata.isFromCache
-                                    )
-                                }
-                                accessLevel = LicenseAccessPolicy.resolve(
-                                    uid = targetUid,
-                                    email = user.email,
-                                    emailVerified = verifiedEmail,
-                                    providerIds = providerIds,
-                                    signedClaims = verifiedClaims,
-                                    license = licenseRecord
-                                )
+                                val data = if (licenseTask.isSuccessful)
+                                    licenseTask.result?.data as? Map<*, *> else null
+                                accessLevel = if (data?.get("verified") == true &&
+                                    data["licensed"] == true
+                                ) LicenseLevel.PREMIUM else LicenseLevel.FREE
                             }
                     }
                     validationPrefs.edit {
