@@ -36,7 +36,7 @@ object EcuWriteTransaction {
     }
 
     enum class Blocker {
-        UNKNOWN_TARGET, DIAGNOSTIC_ONLY_TRANSPORT, UNVERIFIED_MEMORY_MAP,
+        UNKNOWN_TARGET, DIAGNOSTIC_ONLY_TRANSPORT, INCOMPATIBLE_TRANSPORT_REGION, UNVERIFIED_MEMORY_MAP,
         UNVERIFIED_OEM_CHECKSUM, UNVERIFIED_HARDWARE_BACKUP, NO_VALIDATED_RECOVERY,
         INVALID_IMAGE_OR_LAYOUT, NO_VALIDATED_DRIVER
     }
@@ -90,6 +90,10 @@ object EcuWriteTransaction {
         if (request.transport == EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS) {
             blockers += Blocker.DIAGNOSTIC_ONLY_TRANSPORT
         }
+        if (request.transport != EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS &&
+            !request.transport.permitsMemoryProgramming(request.region)) {
+            blockers += Blocker.INCOMPATIBLE_TRANSPORT_REGION
+        }
         if (!request.layout.mapVerifiedForTargetEcu) blockers += Blocker.UNVERIFIED_MEMORY_MAP
         if (!request.evidence.oemChecksumValidated) blockers += Blocker.UNVERIFIED_OEM_CHECKSUM
         if (!request.evidence.independentHardwareBackupVerified) {
@@ -128,7 +132,7 @@ object EcuWriteTransaction {
         }
         if (preparation.changedBytes == 0L) return Outcome(Status.NO_CHANGE)
         val driver = EcuProgrammingDriverContract.registeredHardwareDrivers.firstOrNull {
-            it.descriptor.supportsWrite(request.firmwareTarget, request.transport)
+            it.descriptor.supportsWrite(request.firmwareTarget, request.transport, request.region)
         } ?: return Outcome(Status.BLOCKED, setOf(Blocker.NO_VALIDATED_DRIVER))
         val journal = try {
             PersistentEcuWriteJournal(
@@ -155,7 +159,7 @@ object EcuWriteTransaction {
         }
         if (preparation.changedBytes == 0L) return Outcome(Status.NO_CHANGE)
         val driver = EcuProgrammingDriverContract.registeredHardwareDrivers.firstOrNull {
-            it.descriptor.supportsWrite(request.firmwareTarget, request.transport)
+            it.descriptor.supportsWrite(request.firmwareTarget, request.transport, request.region)
         } ?: return Outcome(Status.BLOCKED, setOf(Blocker.NO_VALIDATED_DRIVER))
         return EcuWriteExecutionEngine(driver, journal, powerMonitor).run(request)
     }
@@ -184,7 +188,7 @@ internal class EcuWriteExecutionEngine(
         val original = request.originalImage.copyOf()
         val updated = request.updatedImage.copyOf()
         val preview = EcuPartialWritePlanner.preview(request.layout, original, updated)
-        if (!driver.descriptor.supportsWrite(request.firmwareTarget, request.transport)) {
+        if (!driver.descriptor.supportsWrite(request.firmwareTarget, request.transport, request.region)) {
             return EcuWriteTransaction.Outcome(
                 EcuWriteTransaction.Status.BLOCKED,
                 setOf(EcuWriteTransaction.Blocker.NO_VALIDATED_DRIVER)
