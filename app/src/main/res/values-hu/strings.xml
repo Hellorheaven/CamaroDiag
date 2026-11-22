@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="system_language_title">Alkalmazás nyelve</string>
     <string name="system_language_hint">Válassza ki a CamaroDiag nyelvét.</string>
     <string name="about_title">A CamaroDiag névjegye</string>
@@ -642,7 +642,7 @@
     <string name="cal_pc_ip_address">Számítógép IP-címe</string>
     <string name="cal_connect_j2534">J2534 híd csatlakoztatása</string>
     <string name="cal_disconnect_pc_bridge">PC-híd leválasztása</string>
-    <string name="cal_bridge_capabilities">Híd: HS-CAN ISO15765 250/500 kbit/s és J2534-2 SW-ISO15765, ha az illesztőprogram támogatja. A CAN FD letiltva marad.</string>
+    <string name="cal_bridge_capabilities" tools:ignore="TypographyDashes">Híd: HS-CAN ISO15765 250/500 kbit/s és J2534-2 SW-ISO15765, ha az illesztőprogram támogatja. A CAN FD letiltva marad.</string>
     <string name="cal_read_uds_did">UDS DID olvasása</string>
     <string name="cal_read_uds_dtcs">UDS DTC-k olvasása</string>
     <string name="cal_uds_trouble_codes">UDS hibakódok (0x19)</string>
