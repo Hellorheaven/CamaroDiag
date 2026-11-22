@@ -41,6 +41,7 @@ import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
+import com.camarodiag.gen5.data.obd.CanConsoleAdapterReplyPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
@@ -2007,6 +2008,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendRawCanFrame(frame)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
+                    val hasVerifiedEcuResponse =
+                        CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(response, frame)
                     val receivedEvents = CanConsoleRecordParser.parse(response).map { record ->
                         CanConsoleHistoryEntry(
                             id = System.nanoTime(),
@@ -2035,7 +2038,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 receivedEvents
                         ).takeLast(300),
                         observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents),
-                        message = localizedContext.getString(R.string.can_sniffer_request_complete)
+                        message = localizedContext.getString(
+                            if (hasVerifiedEcuResponse) R.string.can_sniffer_request_complete
+                            else R.string.can_console_tx_ack_only
+                        )
                     )
                 }
             } catch (cancelled: CancellationException) {
