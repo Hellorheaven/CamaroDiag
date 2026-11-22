@@ -80,8 +80,10 @@ object Lfx2012ProgrammingAudit {
             else -> CheckStatus.OBSERVED
         }
         fun reportedIds(values: List<String>): CheckStatus = when {
-            values.none(String::isNotBlank) -> CheckStatus.UNAVAILABLE
-            values.any(::placeholder) -> CheckStatus.REQUIRES_REVIEW
+            values.isEmpty() || values.all(String::isBlank) -> CheckStatus.UNAVAILABLE
+            // A partial response must not masquerade as a complete calibration
+            // inventory simply because one entry contains a plausible ID.
+            values.any { it.isBlank() || placeholder(it) } -> CheckStatus.REQUIRES_REVIEW
             else -> CheckStatus.OBSERVED
         }
         val normalizedVin = snapshot.vin?.trim()?.uppercase()
@@ -98,7 +100,9 @@ object Lfx2012ProgrammingAudit {
             Check(Item.CALIBRATION_VERIFICATION_NUMBER, reportedIds(snapshot.verificationNumbers)),
             Check(Item.DIAGNOSTIC_TROUBLE_CODES, when {
                 snapshot.dtcs == null -> CheckStatus.UNAVAILABLE
-                snapshot.dtcs.any(::placeholder) -> CheckStatus.REQUIRES_REVIEW
+                // An empty list means a completed read with no codes. A blank
+                // element, however, is not a valid observed DTC.
+                snapshot.dtcs.any { it.isBlank() || placeholder(it) } -> CheckStatus.REQUIRES_REVIEW
                 else -> CheckStatus.OBSERVED
             }),
             Check(Item.VOLTAGE,
