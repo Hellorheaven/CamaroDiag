@@ -81,4 +81,30 @@ class Lfx2012FlexFuelPreflightTest {
         }
     }
 
+    @Test fun readOnlyInspectionDoesNotDependOnFlashQualification() {
+        val identified = evidence.copy(controllerId = "12600001", firmwareId = "CAL-12345",
+            verifiedFirmware = false, originalBackupVerified = false, recoveryVerified = false)
+        assertTrue(Lfx2012FlexFuelPreflight.readOnlyIdentityWarnings(vehicle, identified).isEmpty())
+        assertTrue(Lfx2012FlexFuelPreflight.missingPreconditions(vehicle, identified)
+            .contains(Lfx2012FlexFuelPreflight.Status.WRITE_NOT_VALIDATED))
+        assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(vehicle, identified))
+    }
+
+    @Test fun readOnlyInspectionReportsMissingPhysicalIdentityWithoutRequiringWrite() {
+        val unobserved = vehicle.copy(ecuVin = null)
+        val warnings = Lfx2012FlexFuelPreflight.readOnlyIdentityWarnings(unobserved,
+            evidence.copy(controllerId = null, firmwareId = null))
+        assertTrue(warnings.contains(Lfx2012FlexFuelPreflight.Status.VIN_MISMATCH))
+        assertTrue(warnings.contains(Lfx2012FlexFuelPreflight.Status.ECU_IDENTITY_MISSING))
+        assertFalse(warnings.contains(Lfx2012FlexFuelPreflight.Status.WRITE_NOT_VALIDATED))
+        assertFalse(warnings.contains(Lfx2012FlexFuelPreflight.Status.ORIGINAL_BACKUP_MISSING))
+    }
+
+    @Test fun wrongVehicleRemainsVisibleInReadOnlyIdentityWarnings() {
+        val warnings = Lfx2012FlexFuelPreflight.readOnlyIdentityWarnings(
+            vehicle.copy(modelYear = 2013), evidence)
+        assertTrue(warnings.contains(Lfx2012FlexFuelPreflight.Status.WRONG_VEHICLE))
+        assertFalse(Lfx2012FlexFuelPreflight.canWriteCalibration(vehicle.copy(modelYear = 2013), evidence))
+    }
+
 }
