@@ -105,6 +105,22 @@ internal static class NativeScopedBackupArchiveSelfTests
             }
             Reject<InvalidDataException>(() => NativeScopedBackupImport.VerifyZip(symlinkPath, scope));
             File.Delete(symlinkPath);
+            var androidStylePath = Path.Combine(directory, "android-properties.zip");
+            File.WriteAllBytes(androidStylePath, originalZip);
+            string androidManifest;
+            using (var intact = ZipFile.OpenRead(zipPath))
+            using (var reader = new StreamReader(intact.GetEntry("manifest.properties")!.Open()))
+                androidManifest = reader.ReadToEnd();
+            using (var converted = ZipFile.Open(androidStylePath, ZipArchiveMode.Update))
+            {
+                converted.GetEntry("manifest.properties")!.Delete();
+                using var writer = new StreamWriter(converted.CreateEntry("manifest.properties").Open());
+                writer.Write("#CamaroDiag ECU offline archive v2\n#Sun Nov 22 2026\n");
+                writer.Write(androidManifest);
+            }
+            Check(NativeScopedBackupImport.VerifyZip(androidStylePath, scope).Bytes.SequenceEqual(bytes),
+                "Java Properties comment headers remain importable");
+            File.Delete(androidStylePath);
             var malformedPath = Path.Combine(directory, "malformed.zip");
             File.WriteAllBytes(malformedPath, originalZip);
             string originalManifest;
