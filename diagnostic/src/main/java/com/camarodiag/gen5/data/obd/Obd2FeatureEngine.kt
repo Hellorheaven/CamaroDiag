@@ -257,7 +257,8 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     }
 
     suspend fun readVin(): String? =
-        decodeAsciiRecords(ask("0902"), 0x49, 0x02, 17).firstOrNull()?.takeIf { it.length == 17 }
+        decodeAsciiRecords(ask("0902"), 0x49, 0x02, 17).singleOrNull()
+            ?.takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
 
     suspend fun readCalibrationIds(): List<String> =
         decodeAsciiRecords(ask("0904"), 0x49, 0x04, 16)
@@ -436,9 +437,15 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
     ): List<String> {
         val data = payload(response, service, pid) ?: return emptyList()
         val records = recordData(data, recordWidth) ?: return emptyList()
-        return records.map { record ->
-            record.filter { it in 0x20..0x7E }.map(Int::toChar).joinToString("").trim()
-        }.filter(String::isNotBlank)
+        val decoded = records.map { record ->
+            val raw = record.map(Int::toChar).joinToString("")
+            val trimmed = raw.trim(' ', '\u0000')
+            // Padding is allowed only at either end. Do not silently discard
+            // embedded control bytes and turn corrupted ECU IDs into real IDs.
+            if (trimmed.isBlank() || trimmed.any { it !in ' '..'~' }) return emptyList()
+            trimmed
+        }
+        return decoded
     }
 
     private fun decodeHexRecords(
