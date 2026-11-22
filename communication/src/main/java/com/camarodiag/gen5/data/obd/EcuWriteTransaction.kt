@@ -243,6 +243,14 @@ internal class EcuWriteExecutionEngine(
                         verifiedSectors = verified, failedAddress = currentAddress
                     )
                 }
+                // Recheck bytes immediately before erasing the next sector:
+                // previous sector programming may have modified this one.
+                if (!driver.independentReadback(region).contentEquals(sector.originalBytes)) {
+                    return EcuWriteTransaction.Outcome(
+                        EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
+                        verifiedSectors = verified, failedAddress = currentAddress
+                    )
+                }
                 // Journal must accept the irreversible step before any erase.
                 journal.append(
                     EcuWriteTransaction.Record(
@@ -251,6 +259,14 @@ internal class EcuWriteExecutionEngine(
                         sector.originalSha256, sector.updatedSha256
                     )
                 )
+                // Durable storage and readback may take time. Recheck power
+                // after journal I/O before issuing the destructive operation.
+                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) {
+                    return EcuWriteTransaction.Outcome(
+                        EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
+                        verifiedSectors = verified, failedAddress = currentAddress
+                    )
+                }
                 driver.erase(region)
                 val unitBytes = request.layout.programBlockBytes
                 for (offset in sector.patchedBytes.indices step unitBytes) {
