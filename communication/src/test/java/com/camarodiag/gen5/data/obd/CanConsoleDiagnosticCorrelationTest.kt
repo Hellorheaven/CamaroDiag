@@ -68,6 +68,22 @@ class CanConsoleDiagnosticCorrelationTest {
         assertNull(correlation.accept(frame("7E8 03 62 F1 90"), 3))
     }
 
+    @Test fun physicalTransportUsesCompleteIsotpPayloadWithoutSuppressingOtherFrames() {
+        val request = frame("7E0 03 22 F1 90")
+        val batch = "7E9 08 10 0A 62 F1 90 31 32 33\\r\\n" +
+            "7E8 08 10 0A 62 F1 90 31 32 33\\r\\n" +
+            "7E9 05 21 34 35 36 37\\r\\n" +
+            "7E8 05 21 34 35 36 37"
+        assertEquals(4, CanConsoleRecordParser.parse(batch).count { it.direction == "RX" })
+        assertTrue(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(batch, request))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E9 08 10 0A 62 F1 90 31 32 33\\r\\n7E9 05 21 34 35 36 37", request
+        ))
+        assertFalse(CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(
+            "7E8 08 10 0A 62 F1 90 31 32 33", request
+        ))
+    }
+
     @Test fun unknownOrFunctionalPhysicalContextCannotAcquireOtherEcu() {
         for (request in listOf("7DF 02 01 0C", "123 02 01 0C", "18DAF110 03 22 F1 90")) {
             try {
