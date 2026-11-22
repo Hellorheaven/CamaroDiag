@@ -105,7 +105,13 @@ object SafeObdRequestPolicy {
                 bytes = bytes.drop(2)
             }
             if (bytes.startsWith(expected) && bytes.length > expected.length &&
-                bytes.length % 2 == 0) return true
+                bytes.length % 2 == 0) {
+                // PID 52 is precisely one measurement byte. A padded or
+                // malformed response cannot claim a valid ethanol reading.
+                if (request.service == 0x01 && request.parameter == 0x52 &&
+                    bytes.length != expected.length + 2) continue
+                return true
+            }
         }
         return false
     }
