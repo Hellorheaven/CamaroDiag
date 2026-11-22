@@ -1167,7 +1167,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * saves the resulting integrity-checked ZIP through Android SAF. The PC
      * must independently authorize the target VIN, channel and address map.
      */
-    fun captureJ2534Memory(destinationUri: Uri, request: J2534LiveMemoryBackup.Request) {
+    fun captureJ2534Memory(fileName: String, request: J2534LiveMemoryBackup.Request) {
         if (!requirePremiumLicense()) return
         if (_calibrationWorkspace.value.isJ2534MemoryCapturing) return
         val accountGeneration = accountSessionGeneration
@@ -1178,7 +1178,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             j2534MemoryCaptureMessage = ""
         )
         viewModelScope.launch(Dispatchers.IO) {
-            val resolver = getApplication<Application>().contentResolver
             try {
                 check(request.expectedVin == _vehicle.value.vin.uppercase()) {
                     "Selected vehicle VIN has changed."
@@ -1186,9 +1185,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 check(obdManager.isJ2534BridgeConnected()) {
                     "A real J2534 adapter must be connected."
                 }
-                val target = resolver.openOutputStream(destinationUri, "w")
-                    ?: error("Unable to open ECU backup destination.")
-                target.use { output ->
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/zip",
+                    beforePublish = {
+                        check(accountGeneration == accountSessionGeneration &&
+                            request.expectedVin == _vehicle.value.vin.uppercase() && hasPremiumLicense())
+                    }
+                ) { output ->
                     obdManager.captureAndExportJ2534Memory(request, output) { progress ->
                         check(accountGeneration == accountSessionGeneration &&
                             request.expectedVin == _vehicle.value.vin.uppercase()
@@ -1209,15 +1211,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         localizedContext.getString(R.string.cal_live_memory_saved)
                 )
             } catch (cancelled: CancellationException) {
-                runCatching { resolver.delete(destinationUri, null, null) }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534MemoryCapturing = false
                 )
                 throw cancelled
             } catch (error: Exception) {
-                // SAF may create the destination before acquisition starts. Never
-                // leave a partial/empty ZIP presented as a valid ECU backup.
-                runCatching { resolver.delete(destinationUri, null, null) }
+                // ExportStorage removes incomplete temporary documents.
                 reportConnectionLoss(error)
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     isJ2534MemoryCapturing = false,
@@ -1384,7 +1383,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Export SAE Mode 09 identification only; this is explicitly NOT an ECU-memory
      * backup and never grants any permission to write calibrations.
      */
-    fun exportEcuIdentification(destinationUri: Uri) {
+    fun exportEcuIdentification(fileName: String) {
         if (!requirePremiumLicense()) return
         val accountUid = authenticatedAccountUid ?: return
         val profile = _vehicle.value
@@ -1453,10 +1452,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     put("calibrationWritingPermitted", false)
                 }
                 if (!current()) return@launch
-                val output = getApplication<Application>().contentResolver
-                    .openOutputStream(destinationUri, "w")
-                    ?: error("Cannot create ECU identity report.")
-                output.use { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                    beforePublish = { check(current() && hasPremiumLicense()) }
+                ) { it.write(report.toString(2).toByteArray(Charsets.UTF_8)) }
                 if (current()) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         message = getApplication<Application>()
@@ -2116,8 +2114,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Export the latest raw CAN capture without transforming adapter output. */
-    fun exportCanCapture(destinationUri: Uri) {
+    fun exportCanCapture(fileName: String) {
         if (!requirePremiumLicense()) return
+        val exportGeneration = accountSessionGeneration
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val snapshot = _liveCanMonitorState.value
@@ -2147,9 +2146,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         appendLine("# RX RAW — received adapter stream (unmodified)")
                     }
                 }
-                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                    ?: error("Could not create the CAN console history file.")
-                output.use { sink ->
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
+                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                ) { sink ->
                     sink.write(outputText.toByteArray(Charsets.UTF_8))
                     if (archive != null) {
                         archive.inputStream().use { source -> source.copyTo(sink) }
@@ -2546,13 +2545,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun exportCalibrationDefinitionTemplate(destinationUri: Uri) {
+    fun exportCalibrationDefinitionTemplate(fileName: String) {
         if (!requirePremiumLicense()) return
+        val exportGeneration = accountSessionGeneration
         viewModelScope.launch {
             try {
-                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                    ?: error("Impossible de créer le fichier modèle.")
-                output.use { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/tab-separated-values",
+                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                ) { it.write(CalibrationTableCodec.template.toByteArray(Charsets.UTF_8)) }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = localizedContext.getString(R.string.msg_cal_template_exported)
                 )
@@ -2794,8 +2794,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Exports the selected local calibration file through Android's Storage Access Framework. */
-    fun exportCalibrationFile(destinationUri: Uri) {
+    fun exportCalibrationFile(fileName: String) {
         if (!requirePremiumLicense()) return
+        val exportGeneration = accountSessionGeneration
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val sourcePath = _calibrationWorkspace.value.activeFilePath
@@ -2803,11 +2804,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ?: error("Aucun fichier de calibration n'est chargé.")
                 val source = File(sourcePath)
                 check(source.isFile && source.exists()) { "Le fichier local de calibration est introuvable." }
-                val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                    ?: error("Impossible de créer le fichier de destination.")
-                source.inputStream().use { input ->
-                    output.use { target -> input.copyTo(target) }
-                }
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/octet-stream",
+                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                ) { target -> source.inputStream().use { it.copyTo(target) } }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                     message = localizedContext.getString(R.string.msg_cal_file_exported)
                 )
@@ -3053,8 +3052,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun exportLiveRecording(destinationUri: Uri) {
+    fun exportLiveRecording(fileName: String) {
         if (!requirePremiumLicense()) return
+        val exportGeneration = accountSessionGeneration
         viewModelScope.launch {
             try {
                 if (_liveRecordingState.value.isRecording) stopLiveRecording()
@@ -3066,11 +3066,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     vin = v.vin,
                     vehicleLabel = "${v.modelYear} Camaro ${v.engine.rpo} • ${v.generation.label} • ${v.transmission.name}"
                 )
-                withContext(Dispatchers.IO) {
-                    val output = getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                        ?: error("Impossible de créer le fichier CSV.")
-                    output.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
-                }
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/csv",
+                    beforePublish = { check(isCurrentAccountGeneration(exportGeneration) && hasPremiumLicense()) }
+                ) { it.write(csv.toByteArray(Charsets.UTF_8)) }
                 _liveRecordingState.value = _liveRecordingState.value.copy(
                     message = localizedContext.getString(R.string.msg_live_csv_exported, snapshot.size)
                 )
@@ -3581,7 +3579,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun exportFunctionalTests(destinationUri: Uri) {
+    fun exportFunctionalTests(fileName: String) {
         val accountUid = authenticatedAccountUid ?: return
         val sessionGeneration = accountSessionGeneration
         viewModelScope.launch {
@@ -3612,9 +3610,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             json.put("checks", checks)
-            withContext(Dispatchers.IO) {
-                getApplication<Application>().contentResolver.openOutputStream(destinationUri, "w")
-                    ?.use { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
+            try {
+                CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "application/json",
+                    beforePublish = { check(isCurrentAccountGeneration(sessionGeneration) &&
+                        authenticatedAccountUid == accountUid && currentLicenseLevel == LicenseLevel.OWNER) }
+                ) { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
+                if (isCurrentAccountGeneration(sessionGeneration)) {
+                    _connectionMessage.value = localizedContext.getString(R.string.export_folder_success)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (isCurrentAccountGeneration(sessionGeneration)) {
+                    _connectionMessage.value = localizedContext.getString(R.string.export_folder_failed)
+                }
             }
         }
     }
