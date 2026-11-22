@@ -372,6 +372,29 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals(2, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
     }
 
+    @Test fun partialPreTxFrameCannotBeCompletedByPostTxBytes() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.append("7E8 04 03 41", 990L)
+        correlation.beginRequest(1_000L)
+        correlation.append(" 0C 1A\r\n", 1_001L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(1_002L))
+        assertEquals(0, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
+    }
+
+    @Test fun partialPreTxOkCannotBeReusedAsFreshAdapterAcknowledgement() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.append("OK", 990L)
+        correlation.beginRequest(1_000L)
+        correlation.append("\r\n7E9 04 03 41 0C 1B\r\n", 1_001L)
+        assertEquals(false, correlation.hasExplicitAdapterAck())
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(1_002L))
+        assertEquals(1, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
