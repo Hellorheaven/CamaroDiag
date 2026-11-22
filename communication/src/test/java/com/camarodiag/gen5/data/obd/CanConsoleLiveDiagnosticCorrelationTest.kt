@@ -134,7 +134,8 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals("CAN ID=7E9 DLC=4 DATA=03 41 0C 1B",
             cancellation.receivedRecords.single().record.content)
         assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(11L))
-        assertEquals(true, cancellation is java.util.concurrent.CancellationException)
+        assertEquals(true,
+            java.util.concurrent.CancellationException::class.java.isInstance(cancellation))
         assertEquals(true, cancellation.cause is java.util.concurrent.CancellationException)
     }
 
