@@ -439,4 +439,15 @@ class EcuBackupArchiveTest {
         }
     }
 
+    @Test fun rejectsBytesAppendedAfterTheCompletedZipFooter() {
+        val archive = ByteArrayOutputStream()
+        EcuBackupArchive.export(archive, listOf(capture()), setOf(capture().region))
+        val original = archive.toByteArray()
+        val extraneous = original + byteArrayOf(0x00, 0x50, 0x4B, 0x05, 0x06)
+        assertTrue(runCatching {
+            EcuBackupArchive.import(extraneous.inputStream())
+        }.isFailure)
+        assertTrue(EcuBackupArchive.import(original.inputStream()).verification.consistent)
+    }
+
 }
