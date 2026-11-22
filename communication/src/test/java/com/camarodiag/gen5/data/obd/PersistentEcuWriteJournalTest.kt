@@ -61,6 +61,28 @@ class PersistentEcuWriteJournalTest {
         }.isFailure)
     }
 
+    @Test fun activeWriterRejectsRollbackToAnOtherwiseValidJournalPrefix() = runBlocking {
+        val (file, journal) = newJournal()
+        journal.append(record)
+        val baselineOnly = file.readBytes()
+        journal.append(record.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        val completePrefix = file.readBytes()
+        file.writeBytes(baselineOnly)
+        // The historical prefix is syntactically valid, but it is not the last
+        // durable record accepted by this live writer.
+        assertTrue(PersistentEcuWriteJournal.inspectExisting(file, target, vin).valid)
+        assertTrue(runCatching {
+            journal.append(record.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        }.isFailure)
+        assertTrue(baselineOnly.contentEquals(file.readBytes()))
+        // Restoring the file does not reopen a poisoned writer.
+        file.writeBytes(completePrefix)
+        assertTrue(runCatching {
+            journal.append(record.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        }.isFailure)
+        assertTrue(completePrefix.contentEquals(file.readBytes()))
+    }
+
     @Test fun existingTransactionLogCannotBeOverwritten() {
         val (file, _) = newJournal()
         assertTrue(runCatching {
