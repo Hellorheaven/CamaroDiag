@@ -86,4 +86,16 @@ class RawCanFrameParserTest {
         assertEquals(0x7E8L, frames[1].canId)
         assertTrue(frames[1].data.isEmpty())
     }
+    @Test fun obdEthanolConsoleInputCannotBeMisclassifiedAsRawCanTransmission() {
+        for (input in listOf("0152", "01 52", "0902", "03", "07", "0A")) {
+            assertNull("OBD request must use the diagnostic read channel: $input",
+                RawCanFrameParser.parse(input))
+            assertNotNull("Read-only OBD command must be recognized: $input",
+                SafeObdRequestPolicy.parse(input))
+        }
+        val physicalFrame = "7E0 02 01 52"
+        assertNotNull(RawCanFrameParser.parse(physicalFrame))
+        assertNull(SafeObdRequestPolicy.parse(physicalFrame))
+    }
+
 }
