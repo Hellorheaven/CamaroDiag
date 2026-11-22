@@ -253,6 +253,7 @@ fun CamaroAuthGate(
         }
     } else {
         var accountOpen by remember(user.uid) { mutableStateOf(false) }
+        var administrationOpen by remember(user.uid) { mutableStateOf(false) }
         var deleteConfirm by remember(user.uid) { mutableStateOf(false) }
         var deleting by remember(user.uid) { mutableStateOf(false) }
         var deleteError by remember(user.uid) { mutableStateOf(false) }
@@ -290,6 +291,17 @@ fun CamaroAuthGate(
                             if (french) "Connexion : $provider" else "Signed in with: $provider",
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        Spacer(Modifier.height(8.dp))
+                        AccountLicenseStatus(french)
+                        if (accessLevel == LicenseLevel.OWNER) {
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = {
+                                accountOpen = false
+                                administrationOpen = true
+                            }) {
+                                Text(if (french) "Administration des comptes" else "Account administration")
+                            }
+                        }
                         Spacer(Modifier.height(12.dp))
                         if (passwordLinked && !googleLinked && user.isEmailVerified) {
                             TextButton(enabled = !linking, onClick = {
@@ -378,6 +390,9 @@ fun CamaroAuthGate(
                     }
                 }
             )
+        }
+        if (administrationOpen && accessLevel == LicenseLevel.OWNER) {
+            AccountAdministrationDialog(french) { administrationOpen = false }
         }
         if (changePasswordOpen &&
             PasswordAccountPolicy.isEmailPasswordAccount(user.providerData.map { it.providerId })
