@@ -97,7 +97,7 @@ private object CamaroDiagUpdateChecker {
                     break
                 }
             }
-            val safeUrl = downloadUrl?.takeIf { it.startsWith("https://github.com/") }
+            val safeUrl = downloadUrl?.takeIf { CamaroDiagReleaseAssetPolicy.accepts(it, wanted) }
                 ?: return@withContext CamaroDiagUpdateCheck(null, true)
             CamaroDiagUpdateCheck(
                 CamaroDiagUpdate(
