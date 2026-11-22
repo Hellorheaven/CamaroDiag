@@ -30,8 +30,11 @@ internal static class NativeE39PhysicalAdmission
             !string.Equals(adapter.RegistryView, channel.RegistryView, StringComparison.Ordinal))
             throw new UnauthorizedAccessException("J2534 driver architecture or CAN read channel differs from qualified setup.");
 
-        if (!Path.IsPathFullyQualified(adapter.FunctionLibrary))
-            throw new UnauthorizedAccessException("Only an explicitly identified installed J2534 DLL is allowed.");
+        // Remote shares and Windows device/extended paths cannot provide the
+        // same local-file lease guarantees as an installed vendor DLL.
+        if (!Path.IsPathFullyQualified(adapter.FunctionLibrary) ||
+            adapter.FunctionLibrary.StartsWith(@"\\", StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only a local, explicitly identified installed J2534 DLL is allowed.");
         var stream = new FileStream(adapter.FunctionLibrary, FileMode.Open,
             FileAccess.Read, FileShare.Read);
         try
