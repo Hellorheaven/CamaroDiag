@@ -42,6 +42,7 @@ import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
 import com.camarodiag.gen5.data.obd.CanConsoleAdapterReplyPolicy
+import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
 import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.ObservedCanId
@@ -2011,8 +2012,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendRawCanFrame(frame)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val hasVerifiedEcuResponse =
-                        CanConsoleAdapterReplyPolicy.hasMatchedDiagnosticResponse(response, frame)
+                    val diagnosticStatus =
+                        CanConsoleAdapterReplyPolicy.diagnosticStatus(response, frame)
                     val receivedEvents = CanConsoleRecordParser.parse(response).map { record ->
                         CanConsoleHistoryEntry(
                             id = System.nanoTime(),
@@ -2041,10 +2042,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 receivedEvents
                         ).takeLast(300),
                         observedCanIds = retainObservedCanIds(current.observedCanIds, receivedEvents),
-                        message = localizedContext.getString(
-                            if (hasVerifiedEcuResponse) R.string.can_sniffer_request_complete
-                            else R.string.can_console_tx_ack_only
-                        )
+                        message = localizedContext.getString(when (diagnosticStatus) {
+                            CanConsoleDiagnosticStatus.POSITIVE -> R.string.can_sniffer_request_complete
+                            CanConsoleDiagnosticStatus.NEGATIVE -> R.string.can_console_negative_ecu_response
+                            CanConsoleDiagnosticStatus.NONE -> R.string.can_console_tx_ack_only
+                        })
                     )
                 }
             } catch (cancelled: CancellationException) {
