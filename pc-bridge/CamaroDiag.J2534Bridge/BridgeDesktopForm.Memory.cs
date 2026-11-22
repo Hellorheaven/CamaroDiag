@@ -421,10 +421,15 @@ internal sealed partial class BridgeDesktopForm
                     memoryStatus.Text = "Lecture ECU annulée : aucune nouvelle archive validée.";
                     throw;
                 }
-                catch (Exception)
+                catch (Exception error)
                 {
                     progressActive = false;
-                    memoryStatus.Text = "Sauvegarde ECU non validée : lire l'erreur et contrôler le dossier de destination.";
+                    memoryStatus.Text = error is
+                        NativeScopedMemoryReader.MemoryReadRefusedException denied
+                        ? $"Zone ECU non lisible : adresse 0x{denied.Address:X8}, " +
+                          $"{denied.RequestedBytes} octets, refus NRC 0x{denied.Nrc:X2}. " +
+                          "Aucune sauvegarde créée."
+                        : "Sauvegarde ECU non validée : " + error.Message;
                     throw;
                 }
             });
