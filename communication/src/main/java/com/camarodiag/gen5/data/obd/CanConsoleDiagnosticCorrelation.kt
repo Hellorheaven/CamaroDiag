@@ -90,16 +90,31 @@ class CanConsoleDiagnosticCorrelation(
             (response[0].toInt() and 0xFF) == 0x7F &&
             (response[1].toInt() and 0xFF) == service
         val positive = (response[0].toInt() and 0xFF) == service + 0x40 &&
-            (requestPayload.size == 1 || response.size >= requestPayload.size &&
-                requestPayload.drop(1).indices.all { i ->
-                    response[i + 1] == requestPayload[i + 1]
-                })
+            matchesPositiveEcho(service, response)
         if (!negative && !positive) return null
         // UDS NRC 0x78 means "response pending", never a completed result.
         // The outer bounded transport request still enforces its deadline.
         if (negative && (response[2].toInt() and 0xFF) == 0x78) return null
         completed = true
         return response.copyOf()
+    }
+
+    private fun matchesPositiveEcho(service: Int, response: ByteArray): Boolean {
+        if (requestPayload.size == 1) return true
+        // UDS ReadDTCInformation subfunctions 01/02 answer with the ECU's
+        // statusAvailabilityMask, NOT an echo of the request's statusMask.
+        // 0A similarly answers with a DTC list. Keep the subfunction matched,
+        // and retain strict full-parameter matching for other UDS requests.
+        if (service == 0x19 && requestPayload.size >= 2 &&
+            (requestPayload[1].toInt() and 0x7F) in setOf(0x01, 0x02, 0x0A)
+        ) {
+            return response.size >= 2 &&
+                (response[1].toInt() and 0x7F) == (requestPayload[1].toInt() and 0x7F)
+        }
+        return response.size >= requestPayload.size &&
+            requestPayload.drop(1).indices.all { i ->
+                response[i + 1] == requestPayload[i + 1]
+            }
     }
 
     fun reset() {
