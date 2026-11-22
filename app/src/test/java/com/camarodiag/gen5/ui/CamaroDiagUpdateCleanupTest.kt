@@ -36,6 +36,18 @@ class CamaroDiagUpdateCleanupTest {
         }
     }
 
+    @Test fun ambiguousDownloadIdCannotAuthorizeDeletionAtAnyVersion() {
+        val entries = setOf("23:400", "23:401", "24:400", "invalid")
+        val restored = PendingCamaroDiagApk.unambiguous(entries)
+        assertEquals(listOf(PendingCamaroDiagApk(24L, 400L)), restored)
+        assertTrue(restored.none { it.downloadId == 23L })
+    }
+
+    @Test fun matchingRepeatedRecordHasOneUnambiguousTarget() {
+        val pending = PendingCamaroDiagApk(23L, 400L)
+        assertEquals(listOf(pending), PendingCamaroDiagApk.unambiguous(setOf(pending.encode())))
+    }
+
     @Test fun distinctDownloadIdsDoNotOverwriteEachOther() {
         val first = PendingCamaroDiagApk(23L, 400L)
         val second = PendingCamaroDiagApk(24L, 401L)
