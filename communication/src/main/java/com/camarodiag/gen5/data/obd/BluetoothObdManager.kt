@@ -587,12 +587,14 @@ class BluetoothObdManager(context: Context) {
             val monitorCommand = if (isStnAdapter) "STM" else "ATMA"
             val captured = CanCaptureTextBuffer()
             try {
-                boundCommand("ATE0", 1_000L)
-                boundCommand("ATL0", 1_000L)
-                boundCommand("ATS1", 1_000L)
-                boundCommand("ATH1", 1_000L)
+                for (command in listOf("ATE0", "ATL0", "ATS1", "ATH1")) {
+                    val answer = boundCommand(command, 1_000L)
+                    check(CanConsoleAdapterRestorationPolicy.accepted(answer)) {
+                        "CAN adapter did not confirm the requested monitor configuration."
+                    }
+                }
                 val formattingResponse = boundCommand("ATCAF0", 1_000L)
-                check(!formattingResponse.contains("?")) {
+                check(CanConsoleAdapterRestorationPolicy.accepted(formattingResponse)) {
                     "The connected adapter cannot switch to raw CAN formatting."
                 }
                 if (isStnAdapter) {
@@ -600,9 +602,9 @@ class BluetoothObdManager(context: Context) {
                     val canMaskResponse = boundCommand("ATCM 000", 1_000L)
                     val filterResponse = boundCommand("STFAC", 1_000L)
                     check(
-                        !canFilterResponse.contains("?") &&
-                            !canMaskResponse.contains("?") &&
-                            !filterResponse.contains("?")
+                        CanConsoleAdapterRestorationPolicy.accepted(canFilterResponse) &&
+                            CanConsoleAdapterRestorationPolicy.accepted(canMaskResponse) &&
+                            CanConsoleAdapterRestorationPolicy.accepted(filterResponse)
                     ) {
                         "The STN adapter could not clear its temporary CAN filters."
                     }
