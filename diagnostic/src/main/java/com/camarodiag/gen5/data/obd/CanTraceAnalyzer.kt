@@ -180,7 +180,7 @@ object CanTraceAnalyzer {
     private const val MAX_ISOTP_CONSECUTIVE_FRAME_GAP_SECONDS = 1.0
 
     private val ascFrameRegex = Regex(
-        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})(?:x)?\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
+        """^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|NaN|Infinity)\s+\d+\s+([0-9A-Fa-f]{3,8})(x)?\s+(Tx|Rx)\s+[dD]\s+(\d+)\s*(.*)$""",
         RegexOption.IGNORE_CASE
     )
 
@@ -498,9 +498,9 @@ object CanTraceAnalyzer {
             val match = ascFrameRegex.matchEntire(line) ?: return@forEachIndexed
             val timestamp = match.groupValues[1].toDoubleOrNull()
             val canId = parseCanId(match.groupValues[2])
-            val direction = parseDirection(match.groupValues[3])
-            val dlc = match.groupValues[4].toIntOrNull()
-            val bytes = parseHexBytes(match.groupValues[5])
+            val direction = parseDirection(match.groupValues[4])
+            val dlc = match.groupValues[5].toIntOrNull()
+            val bytes = parseHexBytes(match.groupValues[6])
             if (timestamp == null || !timestamp.isFinite() || canId == null || dlc == null || bytes == null) {
                 errors += "Line ${index + 1}: invalid ASC frame header or hexadecimal data."
                 return@forEachIndexed
@@ -510,7 +510,7 @@ object CanTraceAnalyzer {
                 return@forEachIndexed
             }
             frames += CanTraceFrame(index + 1, timestamp, canId, direction, bytes.take(dlc),
-                extendedId = match.groupValues[2].length > 3)
+                extendedId = match.groupValues[2].length > 3 || match.groupValues[3].isNotEmpty())
         }
         return ParsedFrames(frames, errors)
     }
