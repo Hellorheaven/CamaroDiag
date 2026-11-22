@@ -1988,7 +1988,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendRawCanFrame(frame)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val receivedEvents = parseCanConsoleReceiveEvents(response).ifEmpty {
+                    val receivedEvents = CanConsoleRecordParser.parse(response, frame).map { record ->
+                        CanConsoleHistoryEntry(
+                            id = System.nanoTime(),
+                            direction = record.direction,
+                            timestampMillis = System.currentTimeMillis(),
+                            content = record.content,
+                            succeeded = record.succeeded
+                        )
+                    }.ifEmpty {
                         listOf(
                             CanConsoleHistoryEntry(
                                 id = System.nanoTime(),
