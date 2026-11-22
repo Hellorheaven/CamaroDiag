@@ -444,6 +444,46 @@ class CanConsoleLiveDiagnosticCorrelationTest {
             correlation.recentReceivedRecords().single().timestampMillis)
     }
 
+    @Test fun preTransmitAdapterErrorRemainsInHistoryWithoutPoisoningNewTx() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.append("CAN ERROR\\r\\n", 990L)
+        assertEquals(false, correlation.hasAdapterError())
+        assertEquals(false, correlation.hasExplicitAdapterAck())
+        assertEquals(listOf("SYSTEM"),
+            correlation.recentReceivedRecords().map { it.record.direction })
+        assertEquals(false, correlation.recentReceivedRecords().single().record.succeeded)
+
+        correlation.beginRequest(1_000L)
+        correlation.append("OK\\r\\n7E8 04 03 41 0C 1A\\r\\n", 1_010L)
+        val diagnostic = correlation.complete(1_011L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, diagnostic)
+        assertEquals(false, correlation.hasAdapterError())
+        assertEquals(true, correlation.hasExplicitAdapterAck())
+        assertEquals(true, CanConsolePhysicalTransmissionPolicy.confirmed(
+            "OK", diagnostic, correlation.hasExplicitAdapterAck(), correlation.hasAdapterError()
+        ))
+        assertEquals(listOf("SYSTEM", "SYSTEM", "RX"),
+            correlation.recentReceivedRecords().map { it.record.direction })
+    }
+
+    @Test fun adapterErrorAfterPhysicalTxAlwaysOverridesEarlierAckAndEcuReply() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.beginRequest(1_000L)
+        correlation.append("OK\\r\\n7E8 04 03 41 0C 1A\\r\\n", 1_100L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(1_101L))
+        correlation.append("CAN ERROR\\r\\n", 5_100L)
+        assertEquals(true, correlation.hasAdapterError())
+        assertEquals(false, correlation.hasExplicitAdapterAck())
+        assertEquals(false, CanConsolePhysicalTransmissionPolicy.confirmed(
+            "OK", correlation.complete(5_101L),
+            correlation.hasExplicitAdapterAck(), correlation.hasAdapterError()
+        ))
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
