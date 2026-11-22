@@ -44,6 +44,7 @@ object EcuBackupArchive {
         createdAtUtcMillis: Long = System.currentTimeMillis(),
         vehicleVin: String? = null
     ) {
+        require(createdAtUtcMillis > 0L) { "Invalid ECU archive creation timestamp" }
         require(captures.isNotEmpty()) { "Cannot export an empty ECU backup" }
         require(captures.size <= MAX_ENTRIES) { "Too many memory segments" }
         require(captures.all { it.firstRead.isNotEmpty() && it.expectedBytes > 0 &&
@@ -155,8 +156,14 @@ object EcuBackupArchive {
         }
         val count = properties.getProperty("count")?.toIntOrNull()
         require(count != null && count in 1..MAX_ENTRIES) { "Invalid segment count" }
-        val required = properties.getProperty("required", "").takeIf { it.isNotBlank() }
-            ?.split(",")?.map { EcuBackupCoverage.Region.valueOf(it) }?.toSet().orEmpty()
+        val declaredRegions = properties.getProperty("required", "")
+        val requiredNames = if (declaredRegions.isEmpty()) emptyList()
+            else declaredRegions.split(",")
+        require(requiredNames.size == requiredNames.toSet().size &&
+            requiredNames.none(String::isBlank)) {
+            "Duplicate or empty required ECU region"
+        }
+        val required = requiredNames.map { EcuBackupCoverage.Region.valueOf(it) }.toSet()
         val captures = (0 until count).map { index ->
             val prefix = "capture.$index."
             fun field(key: String) = properties.getProperty(prefix + key)
@@ -193,6 +200,7 @@ object EcuBackupArchive {
                 }
         }) { "Unknown archive manifest property" }
         val created = properties.getProperty("created")?.toLongOrNull()
+            ?.takeIf { it > 0L }
             ?: throw IllegalArgumentException("Invalid creation timestamp")
         val manifest = EcuBackupManifest.inspect(
             properties.getProperty("controller").orEmpty().ifBlank { null },
