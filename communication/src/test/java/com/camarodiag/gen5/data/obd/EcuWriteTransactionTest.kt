@@ -48,6 +48,7 @@ class EcuWriteTransactionTest {
         var corruptAfterWrite = false
         var failOnErase = false
         var disturbEarlierSector = false
+        var disturbNextSector = false
         var finalReadbackCount = 0
         override val descriptor = EcuProgrammingDriverContract.Descriptor(
             id = "in-memory-test-only",
@@ -78,6 +79,7 @@ class EcuWriteTransactionTest {
             val start = start(request)
             memory.fill(0.toByte(), start, start + request.length.toInt())
             eraseCalls++
+            if (disturbNextSector && eraseCalls == 1) memory[8] = (memory[8] + 1).toByte()
         }
         override suspend fun write(
             request: EcuProgrammingDriverContract.RegionRequest,
@@ -250,11 +252,10 @@ class EcuWriteTransactionTest {
 
     @Test fun lossOfPowerAfterEraseNeverCausesBlindWriteRetry() = runBlocking {
         val device = FakeDriver(original, expectedIdentity)
-        var checks = 0
         val records = mutableListOf<EcuWriteTransaction.Record>()
         val outcome = EcuWriteExecutionEngine(
             device, journal(records),
-            EcuWriteTransaction.PowerMonitor { ++checks < 3 }
+            EcuWriteTransaction.PowerMonitor { device.eraseCalls == 0 }
         ).run(request())
         assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
         assertEquals(1, device.eraseCalls)
@@ -343,6 +344,33 @@ class EcuWriteTransactionTest {
         assertEquals(2, records.count { it.stage == EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE })
         assertEquals(2, device.finalReadbackCount)
         assertEquals(0, device.resetCalls)
+    }
+
+    @Test fun changedNextSectorAfterPreflightCannotBeErased() = runBlocking {
+        val updated = original.copyOf().also { it[2] = 100; it[10] = 110 }
+        val device = FakeDriver(original, expectedIdentity).also { it.disturbNextSector = true }
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true }
+        ).run(request(updated))
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(1, device.eraseCalls)
+        assertEquals(1, outcome.verifiedSectors)
+        assertEquals(0x1008L, outcome.failedAddress)
+        assertEquals(1, records.count { it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE })
+    }
+
+    @Test fun powerLossWhilePersistingEraseMarkerStopsBeforeErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        var stable = true
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {
+                if (it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE) stable = false
+            }, EcuWriteTransaction.PowerMonitor { stable }
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
     }
 
     @Test fun powerLossDuringFinalReadbackDoesNotReportCompletion() = runBlocking {
