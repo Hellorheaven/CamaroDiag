@@ -53,3 +53,30 @@ La vérification des licences s'effectue côté serveur. Les données diagnostic
 seront jamais mises en base cloud pour ce contrôle. L'activation définitive des
 restrictions Premium exige une validation des protections d'opérations sensibles
 (y compris Windows/ECU), au-delà du simple grisement d'un menu.
+
+
+## Fréquence des vérifications (#105)
+
+L'application n'interroge pas les licences à intervalles réguliers.
+Au **démarrage**, CamaroDiag valide la session Firebase et effectue **une
+consultation explicite** du statut de licence côté serveur lorsque le
+contrôle commercial est activé. Le résultat, y compris l'origine de la licence,
+est conservé uniquement en mémoire pour cette session. L'ouverture de
+« Mon compte » affiche ce résultat sans nouvel appel réseau.
+
+Les seules exceptions applicatives : changement de compte, actualisation
+explicitement demandée ou action administrative (recherche, modification,
+révocation), qui doit contacter le serveur. Un redémarrage complet de
+l'Activity Android peut recréer la session visuelle. Le SDK Firebase
+Authentication peut lui-même rafraîchir ses jetons pour maintenir
+l'authentification : **cela ne garantit pas une seule requête réseau totale**.
+
+Compromis : la révocation côté serveur d'une licence ou d'un compte en cours
+d'utilisation ne se reflète normalement dans l'interface qu'au démarrage
+suivant, au changement de compte ou lors d'une actualisation explicite. Les
+opérations à risque (écriture ECU, commandes véhicule) doivent conserver
+leurs contrôles de sécurité propres, indépendamment de ce cache de présentation.
+
+Tant que `LicenseRolloutConfig.ENABLED=false`, les vérifications de licence
+au démarrage restent désactivées : ne pas activer le verrou sans déployer
+et tester le service serveur et la gestion Firebase App Check.
