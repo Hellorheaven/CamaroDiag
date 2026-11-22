@@ -83,7 +83,9 @@ object J2534LiveMemoryBackup {
         check(bridge.isConnected && bridge.isScopedMemoryReadEnabled) {
             "A real J2534 bridge with an approved ECU memory read scope must be connected."
         }
-        return acquire(bridge, request, EcuBackupManifest.Origin.REPORTED_HARDWARE_READ, progress)
+        return acquire(bridge, request, EcuBackupManifest.Origin.REPORTED_HARDWARE_READ, progress) {
+            bridge.isConnected && bridge.isScopedMemoryReadEnabled
+        }
     }
 
     suspend fun captureAndExport(
@@ -102,15 +104,17 @@ object J2534LiveMemoryBackup {
     internal suspend fun captureForTest(
         transport: UdsPayloadTransport,
         request: Request,
-        progress: (CaptureProgress) -> Unit = {}
+        progress: (CaptureProgress) -> Unit = {},
+        liveLinkValid: () -> Boolean = { true }
     ): CaptureResult =
-        acquire(transport, request, EcuBackupManifest.Origin.SIMULATION, progress)
+        acquire(transport, request, EcuBackupManifest.Origin.SIMULATION, progress, liveLinkValid)
 
     private suspend fun acquire(
         transport: UdsPayloadTransport,
         request: Request,
         origin: EcuBackupManifest.Origin,
-        progress: (CaptureProgress) -> Unit
+        progress: (CaptureProgress) -> Unit,
+        liveLinkValid: () -> Boolean = { true }
     ): CaptureResult {
         require(request.expectedVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) { "Invalid target VIN." }
         require(request.address in 0L..0xFFFFFFFFL &&
@@ -124,6 +128,7 @@ object J2534LiveMemoryBackup {
 
         var identityLost = false
         suspend fun liveVin(): String = try {
+            check(liveLinkValid()) { "Physical bridge or scoped read permission was lost." }
             val response = transport.exchange(byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), TIMEOUT_MS)
             require(response.size == 20 &&
                 response[0] == 0x62.toByte() &&
@@ -153,6 +158,7 @@ object J2534LiveMemoryBackup {
             var blocks = 0
             while (offset < image.size) {
                 currentCoroutineContext().ensureActive()
+                check(liveLinkValid()) { "Physical bridge or scoped read permission was lost." }
                 if (blocks > 0 && blocks % 32 == 0) {
                     val ping = transport.exchange(byteArrayOf(0x3E, 0x00), TIMEOUT_MS)
                     require(ping.size == 2 && ping[0] == 0x7E.toByte() && ping[1] == 0x00.toByte()) {
@@ -202,6 +208,7 @@ object J2534LiveMemoryBackup {
             val second = pass(2)
             // VIN could change after a session replacement or reconnect.
             val observedVin = liveVin()
+            check(liveLinkValid()) { "Physical bridge or scoped read permission was lost." }
             require(first.contentEquals(second)) {
                 "Two physical memory acquisitions disagree; do not export this backup."
             }
