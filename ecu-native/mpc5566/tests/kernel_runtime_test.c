@@ -98,6 +98,30 @@ int main(void)
     assert(!cd_kernel_runtime_step(&runtime, &unrelated, 2));
     assert(flash.recovery_required && runtime.link_failed && m.pulses == 1);
 
+    /* An explicit negative response after erase is terminal, not a retry. */
+    init_model(&m);
+    flash = controller_for(&m);
+    link.count = 0;
+    assert(cd_kernel_runtime_init(&runtime, &flash, &channel, 4, 1));
+    assert(cd_kernel_runtime_step(&runtime, &erase, 1));
+    assert(!cd_kernel_runtime_step(&runtime, &erase, 2));
+    assert(m.pulses == 1 && flash.recovery_required && runtime.link_failed);
+    assert(link.frames[link.count-1].bytes[1] == 0x7F &&
+        link.frames[link.count-1].bytes[2] == 0x3D &&
+        link.frames[link.count-1].bytes[3] == 0x24);
+    unsigned sent = link.count;
+    assert(!cd_kernel_runtime_step(&runtime, &erase, 3));
+    assert(link.count == sent && m.pulses == 1);
+    /* A capability probe cannot reopen a partly rewritten sector. */
+    init_model(&m);
+    flash = controller_for(&m);
+    link.count = 0;
+    assert(cd_kernel_runtime_init(&runtime, &flash, &channel, 4, 1));
+    assert(cd_kernel_runtime_step(&runtime, &erase, 1));
+    assert(!cd_kernel_runtime_step(&runtime, &probe, 2));
+    assert(flash.recovery_required && link.frames[link.count-1].bytes[0] == 3 &&
+        link.frames[link.count-1].bytes[1] == 0x7F);
+
     puts("PASS: native runtime CAN-to-flash dispatch and response-loss handling");
     return 0;
 }
