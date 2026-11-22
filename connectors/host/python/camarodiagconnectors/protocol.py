@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 _ALLOWED_COMMANDS = frozenset({"PING", "CAPS", "STATUS"})
+_EXPECTED_CAPS = ("CAPS hs_can=disabled sw_can=disabled eeprom_read=disabled "
+                  "eeprom_write=disabled ecu_flash=disabled j2534=disabled")
 
 
 class SerialLike(Protocol):
@@ -113,6 +115,10 @@ class DiscoveryClient:
             raise IOError("Unexpected device reply")
         if command == "PING" and response != "PONG CamaroDiagConnectors 0.1.0":
             raise IOError("Unsupported device identity or firmware version")
+        if command == "CAPS" and response != _EXPECTED_CAPS:
+            raise IOError("Noncanonical discovery capabilities")
+        if command == "STATUS" and response != "STATUS mode=prototype write=disabled":
+            raise IOError("Unsupported device mode or write state")
         return response
 
     def capabilities(self) -> Capabilities:
