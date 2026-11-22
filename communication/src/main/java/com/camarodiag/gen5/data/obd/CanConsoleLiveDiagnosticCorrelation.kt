@@ -7,6 +7,12 @@ package com.camarodiag.gen5.data.obd
  * engine never suppresses or re-labels traffic and never invents ECU replies.
  * Chunk timestamps are monotonic host receipt times, not claimed bus times.
  */
+/** Physical adapter output plus a reply validated within its receive-time session. */
+data class CanConsoleRawTransmissionResult(
+    val adapterOutput: String,
+    val diagnosticStatus: CanConsoleDiagnosticStatus
+)
+
 class CanConsoleLiveDiagnosticCorrelation(
     private val request: RawCanFrame,
     private val timeoutMs: Long = 1_000L
