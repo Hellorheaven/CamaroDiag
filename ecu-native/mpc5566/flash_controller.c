@@ -189,8 +189,14 @@ cd_flash_result cd_flash_program(cd_flash_controller *c, uint32_t address,
         const uint32_t first = read_be32(bytes + offset);
         const uint32_t second = read_be32(bytes + offset + 4u);
         uint32_t actual_first, actual_second;
+        /* Earlier pulses may have disturbed the following ECC unit.
+         * Recheck even an all-FF unit that would otherwise be skipped. */
+        if (!c->bus.service(c->bus.context) ||
+            !read_confirmed_word(c, address + offset, &actual_first) ||
+            !read_confirmed_word(c, address + offset + 4u, &actual_second) ||
+            actual_first != UINT32_MAX || actual_second != UINT32_MAX)
+            return fail_uncertain(c);
         if (first == UINT32_MAX && second == UINT32_MAX) continue;
-        if (!c->bus.service(c->bus.context)) return fail_uncertain(c);
         c->recovery_required = true;
         /* Two 32-bit words in one aligned doubleword, within a single page. */
         if (!change_mcr(c, CD_MCR_PGM, 0) ||
@@ -205,6 +211,15 @@ cd_flash_result cd_flash_program(cd_flash_controller *c, uint32_t address,
             actual_first != first || actual_second != second)
             return fail_uncertain(c);
         c->recovery_required = false;
+    }
+    /* Recheck the entire programmed span, not just the most recent pulse.
+     * A subsequent pulse may have disturbed an earlier verified unit. */
+    for (uint32_t offset = 0; offset < size; offset += 4u) {
+        uint32_t actual;
+        if (!c->bus.service(c->bus.context) ||
+            !read_confirmed_word(c, address + offset, &actual) ||
+            actual != read_be32(bytes + offset))
+            return fail_uncertain(c);
     }
     return CD_FLASH_OK;
 }
