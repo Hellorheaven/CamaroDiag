@@ -59,11 +59,12 @@ internal static class NativeScopedBackupArchiveSelfTests
             // Import does not imply restored physical data; it verifies the
             // exact archived two acquisitions and declared VIN-bound scope.
             var imported = NativeScopedBackupImport.VerifyZip(zipPath, scope);
-            Check(imported.Bytes.SequenceEqual(bytes) &&
-                imported.SecondBytes is not null &&
-                imported.SecondBytes.SequenceEqual(bytes) &&
-                imported.Sha256 == sha && imported.BlocksPerPass == 3,
-                "Read-only import preserves both original acquisitions");
+            Check(imported.ByteCount == bytes.Length &&
+                imported.Vin == vin && imported.StartAddress == scope.StartAddress &&
+                imported.Sha256 == sha && imported.DeclaredRegion == "OTHER" &&
+                imported.DeclaredOrigin == "REPORTED_HARDWARE_READ" &&
+                imported.RequiredRegions.Count == 0,
+                "Read-only inspection verifies backup integrity without exposing programming bytes");
             var wrongScope = new J2534MemoryReadScope("1G1FA1RXXR0123457",
                 scope.RequestCanId, scope.ResponseCanId, scope.ProtocolNumber,
                 scope.StartAddress, scope.Length, scope.MaxReadBytes, scope.Session);
@@ -124,8 +125,12 @@ internal static class NativeScopedBackupArchiveSelfTests
                     .Replace("capture.0.sha256=" + sha,
                         "capture.0.sha256=" + sha.ToLowerInvariant()));
             }
-            Check(NativeScopedBackupImport.VerifyZip(androidStylePath, scope).Bytes.SequenceEqual(bytes),
-                "Java Properties comment headers remain importable");
+            var mobile = NativeScopedBackupImport.VerifyZip(androidStylePath, scope);
+            Check(mobile.ByteCount == bytes.Length && mobile.Sha256 == sha &&
+                mobile.DeclaredRegion == "CALIBRATION" &&
+                mobile.DeclaredOrigin == "IMPORTED_FILE" &&
+                mobile.RequiredRegions.SequenceEqual(new[] { "CALIBRATION", "EXTERNAL_EEPROM" }),
+                "Android properties with separate origin and required regions remain importable");
             File.Delete(androidStylePath);
             foreach (var malformedLabel in new[] {
                 @"Bad\uZZZZ", @"Bad\u123", @"Bad\q", @"Bad\", "Bad=ECU"
