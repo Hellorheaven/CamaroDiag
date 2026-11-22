@@ -21,7 +21,8 @@ object EcuBackupIntegrity {
         DIVERGENT_INDEPENDENT_READ,
         ALIASED_INDEPENDENT_READ,
         EMPTY_CAPTURE,
-        INVALID_VIN
+        INVALID_VIN,
+        INVALID_CAPTURE_TIMESTAMP
     }
 
     data class Result(val problems: Set<Problem>) {
@@ -35,6 +36,9 @@ object EcuBackupIntegrity {
     ): Result {
         val problems = mutableSetOf<Problem>()
         if (captures.isEmpty()) problems += Problem.EMPTY_BACKUP
+        // An archive or manifest with no valid acquisition timestamp cannot
+        // be treated as verified evidence of when these ECU bytes were captured.
+        if (manifest.createdAtUtcMillis <= 0L) problems += Problem.INVALID_CAPTURE_TIMESTAMP
         if (manifest.vehicleVin != null && !manifest.vehicleVin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
             problems += Problem.INVALID_VIN
         }
