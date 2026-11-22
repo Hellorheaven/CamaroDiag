@@ -395,6 +395,25 @@ class CanConsoleLiveDiagnosticCorrelationTest {
         assertEquals(1, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
     }
 
+
+    @Test fun extendedCanIdWithSameNumericValueCannotConfirmStandardPhysicalRequest() {
+        val correlation = CanConsoleLiveDiagnosticCorrelation(
+            frame("7E0 02 01 0C"), requireExplicitStart = true
+        )
+        correlation.beginRequest(1_000L)
+        // Same numeric identifier, different CAN frame format: not ECU 7E8.
+        correlation.append("000007E8 04 03 41 0C 1A\r\n", 1_010L)
+        correlation.append("7E9 04 03 41 0C 1B\r\n", 1_020L)
+        assertEquals(CanConsoleDiagnosticStatus.NONE, correlation.complete(1_021L))
+        assertEquals(2, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
+        // A genuine standard-ID ECU 7E8 reply may arrive in separate chunks.
+        correlation.append("7E8 04 03 41", 1_030L)
+        correlation.append(" 0C 1A\r", 1_040L)
+        correlation.append("\n", 1_041L)
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE, correlation.complete(1_042L))
+        assertEquals(3, correlation.recentReceivedRecords().count { it.record.direction == "RX" })
+    }
+
     @Test fun trailingFrameIsProcessedWithoutInventingMissingBytes() {
         val correlation = CanConsoleLiveDiagnosticCorrelation(frame("7E0 02 01 0C"))
         correlation.append("7E8 04 03 41", 50)
