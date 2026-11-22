@@ -44,6 +44,24 @@ object CanConsoleDisplayFilter {
             .distinct().sortedWith(compareBy({ it.value }, { it.extended })).toList()
     }
 
+    /** Use width-preserving trace frames when available, never a guessed ID type. */
+    fun observedFrameIds(
+        history: List<ParsedCanConsoleRecord>,
+        frames: Collection<CanTraceFrame>
+    ): List<ObservedCanId> =
+        (history.asSequence().mapNotNull(::receivedId) +
+            frames.asSequence().mapNotNull { frame ->
+                frame.extendedId?.let { extended ->
+                    runCatching { ObservedCanId(frame.canId.toLong(), extended) }.getOrNull()
+                }
+            })
+            .distinct().sortedWith(compareBy({ it.value }, { it.extended })).toList()
+
+    fun visibleTrace(frame: CanTraceFrame, selectedId: ObservedCanId?): Boolean =
+        selectedId == null ||
+            (frame.extendedId != null && frame.canId.toLong() == selectedId.value &&
+                frame.extendedId == selectedId.extended)
+
     fun visible(entry: ParsedCanConsoleRecord, selectedId: ObservedCanId?): Boolean {
         if (selectedId == null || entry.direction == "SYSTEM") return true
         return when (entry.direction) {
