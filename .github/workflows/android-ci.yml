@@ -4,27 +4,9 @@ name: Android CI
 # Full Android validation remains available manually. For draft PRs,
 # evaluate the configurable 50-Android-commit checkpoint automatically.
 on:
-  pull_request:
-    branches: [main]
-    types: [ready_for_review]
-    paths:
-      - 'app/**'
-      - 'communication/**'
-      - 'core/**'
-      - 'diagnostic/**'
-      - 'control/**'
-      - 'mileageaudit/**'
-      - 'storage/**'
-      - 'third_party/**'
-      - '**/*.gradle'
-      - '**/*.gradle.kts'
-      - 'gradle/**'
-      - 'gradle.properties'
-      - 'gradlew'
-      - 'gradlew.bat'
-      - 'version.properties'
-      - '.github/workflows/android-ci.yml'
-
+  # Manual component checkpoint only. Full PR check is orchestrated by pr-unit-tests.yml.
+  # Disabled implicit PR triggers to prevent duplicate Debug validation.
+  # No automatic runs per commit or Ready transition.
   workflow_dispatch:
     inputs:
       target_ref:
