@@ -90,6 +90,27 @@ class CanConsoleRecordParserTest {
         }
     }
 
+    @Test fun rawCanConfirmationCannotMoveToAnotherPhysicalSession() {
+        val physical11 = requireNotNull(RawCanFrameParser.parse("7E0 02 01 0C"))
+        val physical29 = requireNotNull(RawCanFrameParser.parse("18DA10F1 03 22 F1 90"))
+        fun permitted(frame: RawCanFrame?, pending: Long = 5L, active: Long = 5L,
+                      monitor: Boolean = true, transmit: Boolean = true,
+                      busy: Boolean = false) = CanConsoleCapabilityPolicy.canConfirmPhysicalTx(
+            frame = frame, pendingContextGeneration = pending,
+            currentContextGeneration = active, monitorAvailable = monitor,
+            canTransmit = transmit, busy = busy
+        )
+        assertTrue(permitted(physical11))
+        assertTrue(permitted(physical29))
+        assertFalse(permitted(physical11, pending = 4L))
+        assertFalse(permitted(physical11, active = 6L))
+        assertFalse(permitted(physical11, monitor = false))
+        assertFalse(permitted(physical11, transmit = false))
+        assertFalse(permitted(physical11, busy = true))
+        assertFalse(permitted(null))
+        assertFalse(permitted(requireNotNull(RawCanFrameParser.parse("7E0 03 2E F1 90"))))
+    }
+
     @Test fun rawCanAdapterErrorsCannotBeReportedAsSuccessfulTransmissions() {
         for (response in listOf("", "?", "NO DATA", "CAN ERROR",
             "BUS ERROR", "UNABLE TO CONNECT", "BUFFER FULL", "STOPPED", "ERROR")) {
