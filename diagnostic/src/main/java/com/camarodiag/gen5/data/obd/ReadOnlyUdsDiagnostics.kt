@@ -289,7 +289,7 @@ class UdsReadOnlyClient(
 
     suspend fun readVin(): String {
         val data = readDataByIdentifier(0xF190)
-        val vin = data.toString(Charsets.US_ASCII).trim()
+        val vin = decodeAsciiEcuIdentity(data)
         require(vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}"))) {
             "ECU did not return a valid 17-character VIN in DID F190."
         }
@@ -323,6 +323,26 @@ class UdsReadOnlyClient(
             "Unexpected UDS positive service 0x" + service.toString(16).uppercase(Locale.ROOT) + "."
         }
     }
+}
+
+/** Decode only printable US-ASCII with optional *trailing* NUL padding. */
+private fun decodeAsciiEcuIdentity(bytes: ByteArray): String {
+    var nullPaddingStarted = false
+    require(bytes.isNotEmpty() && bytes.all { byte ->
+        val value = byte.toInt() and 0xFF
+        if (value == 0) {
+            nullPaddingStarted = true
+            true
+        } else {
+            !nullPaddingStarted && value in 0x20..0x7E
+        }
+    }) {
+        "ECU identity contains non-ASCII bytes or invalid NUL padding."
+    }
+    return bytes.toString(Charsets.US_ASCII)
+        .trimEnd('\u0000')
+        .trim()
+        .uppercase(Locale.ROOT)
 }
 
 enum class UdsIdentityField {
@@ -537,24 +557,7 @@ class ProfiledUdsReadSession private constructor(
         ): String {
             val encoding = definitions.single { it.field == field }.encoding
             return when (encoding) {
-                UdsIdentityEncoding.ASCII -> {
-                    var nullPaddingStarted = false
-                    require(bytes.isNotEmpty() && bytes.all { byte ->
-                        val value = byte.toInt() and 0xFF
-                        if (value == 0) {
-                            nullPaddingStarted = true
-                            true
-                        } else {
-                            !nullPaddingStarted && value in 0x20..0x7E
-                        }
-                    }) {
-                        "ECU identity contains non-ASCII bytes or invalid NUL padding."
-                    }
-                    bytes.toString(Charsets.US_ASCII)
-                        .trim()
-                        .trim('\u0000')
-                        .uppercase(Locale.ROOT)
-                }
+                UdsIdentityEncoding.ASCII -> decodeAsciiEcuIdentity(bytes)
                 UdsIdentityEncoding.HEX -> {
                     require(bytes.isNotEmpty()) { "ECU identity hex field is empty." }
                     bytes.joinToString("") {
