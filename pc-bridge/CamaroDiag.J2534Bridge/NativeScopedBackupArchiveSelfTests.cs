@@ -116,7 +116,7 @@ internal static class NativeScopedBackupArchiveSelfTests
                 converted.GetEntry("manifest.properties")!.Delete();
                 using var writer = new StreamWriter(converted.CreateEntry("manifest.properties").Open());
                 writer.Write("#CamaroDiag ECU offline archive v2\n#Sun Nov 22 2026\n");
-                writer.Write(androidManifest);
+                writer.Write(androidManifest.Replace("controller=\n", "controller=E39A\n"));
             }
             Check(NativeScopedBackupImport.VerifyZip(androidStylePath, scope).Bytes.SequenceEqual(bytes),
                 "Java Properties comment headers remain importable");
