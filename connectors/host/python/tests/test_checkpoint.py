@@ -42,6 +42,23 @@ class CheckpointTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(bytes(changed))
 
+    def test_corrupt_checkpoint_never_creates_evidence_file(self):
+        corrupted = bytearray(FIXTURE)
+        corrupted[28] ^= 0x01
+        with tempfile.TemporaryDirectory() as root:
+            path = pathlib.Path(root) / "invalid.cdj"
+            with self.assertRaises(ValueError):
+                save_checkpoint(path, corrupted)
+            self.assertFalse(path.exists())
+
+    def test_checkpoint_file_cannot_overwrite_unrelated_existing_data(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = pathlib.Path(root) / "existing.cdj"
+            path.write_bytes(b"keep this unrelated evidence")
+            with self.assertRaises(FileExistsError):
+                save_checkpoint(path, FIXTURE)
+            self.assertEqual(b"keep this unrelated evidence", path.read_bytes())
+
     def test_serial_read_timeout_is_bounded_and_restored(self):
         class SerialPort(Port):
             def __init__(self, response):
