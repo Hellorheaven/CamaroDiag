@@ -65,8 +65,10 @@ object CamaroDiagConnectorDiscovery {
     ): Report {
         fun exchange(command: String): String {
             ensureActive()
-            channel.write((command + "\n").toByteArray(Charsets.US_ASCII))
+            // Include USB write time in the deadline, not just response reads.
             val deadline = clock() + TIMEOUT_NANOS
+            channel.write((command + "\n").toByteArray(Charsets.US_ASCII))
+            ensureActive()
             val reply = StringBuilder()
             // CDC bulk USB may deliver the complete CAPS reply in one packet.
             // Do not truncate it to the 64-byte chunk used by older serial devices.
