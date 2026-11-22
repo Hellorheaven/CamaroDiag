@@ -2965,7 +2965,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         connect: suspend () -> Result<AdapterCapabilities>,
         fallbackMessage: String,
         transport: String,
-        endpoint: String
+        endpoint: String,
+        discoveryOnly: Boolean = false
     ) {
         val attempt = ++connectionAttemptGeneration
         val previousAttempt = connectionAttemptJob
@@ -2992,8 +2993,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .onSuccess { capabilities ->
                         if (attempt == connectionAttemptGeneration) {
                             _adapter.value = capabilities
-                            rememberConnectionProfile(transport, capabilities, endpoint)
-                            refreshTopologyAndDefaults(runInitialScans = true)
+                            if (!discoveryOnly) {
+                                rememberConnectionProfile(transport, capabilities, endpoint)
+                                refreshTopologyAndDefaults(runInitialScans = true)
+                            }
                         }
                     }
                     .onFailure {
@@ -3059,7 +3062,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun discoverCamaroDiagConnector(deviceLabel: String) {
+        val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
+        if (id == null) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
+            return
+        }
+        connectWithResult(
+            connect = { obdManager.discoverCamaroDiagConnector(id) },
+            fallbackMessage = localizedContext.getString(R.string.msg_usb_connection_failed),
+            transport = "connector_usb",
+            endpoint = deviceLabel,
+            discoveryOnly = true
+        )
+    }
+
     fun connectUsb(deviceLabel: String) {
+        if (deviceLabel.contains("CamaroDiagConnectors", ignoreCase = true)) {
+            discoverCamaroDiagConnector(deviceLabel)
+            return
+        }
         val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
         if (id == null) {
             _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
