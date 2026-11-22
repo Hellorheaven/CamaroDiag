@@ -86,13 +86,15 @@ internal static class NativeScopedBackupImport
             !long.TryParse(values["created"], out long created) || created <= 0)
             throw new InvalidDataException("Backup scope, provenance or metadata differs.");
         var digest = values["capture.0.sha256"];
-        if (digest.Length != 64 || digest.Any(c => !(c is >= '0' and <= '9' or >= 'A' and <= 'F')))
+        // Android writes lowercase SHA-256; the Windows exporter uses uppercase.
+        if (digest.Length != 64 || digest.Any(c =>
+            !(c is >= '0' and <= '9' or >= 'A' and <= 'F' or >= 'a' and <= 'f')))
             throw new InvalidDataException("Invalid backup SHA-256 manifest.");
 
         var first = ReadExactlyBounded(zip.GetEntry("capture/0/first.bin")!, checked((int)scope.Length));
         var second = ReadExactlyBounded(zip.GetEntry("capture/0/second.bin")!, checked((int)scope.Length));
         if (!CryptographicOperations.FixedTimeEquals(first, second) ||
-            !string.Equals(Convert.ToHexString(SHA256.HashData(first)), digest, StringComparison.Ordinal))
+            !string.Equals(Convert.ToHexString(SHA256.HashData(first)), digest, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Backup acquisitions or SHA-256 do not match.");
         return new NativeScopedMemoryReader.VerifiedCapture(first, scope.StartAddress,
             scope.ExpectedVin, digest,
