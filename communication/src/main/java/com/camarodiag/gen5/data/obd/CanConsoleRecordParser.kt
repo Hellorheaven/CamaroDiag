@@ -144,6 +144,18 @@ object CanConsoleRecordParser {
  * CAN monitor availability is deliberately not a prerequisite for OBD reads.
  */
 /** Hardware ELM/STN monitoring supports one Classical CAN format per session. */
+/**
+ * ELM327 ISO-TP Flow Control is required for a multi-frame ECU answer.
+ * CAF0 preserves raw PCI bytes; CFC1 independently enables automatic FC.
+ * Passive monitor modes must NOT issue any diagnostic flow control themselves.
+ */
+object CanConsoleIsotpFlowControlPolicy {
+    const val ENABLE_AUTOMATIC = "ATCFC1"
+
+    fun adapterConfirmed(reply: String): Boolean =
+        CanConsoleAdapterRestorationPolicy.accepted(reply)
+}
+
 object CanMonitorProtocolPolicy {
     fun protocolCommand(can29Bit: Boolean): String = if (can29Bit) "ATSP7" else "ATSP6"
     fun clearFilter(can29Bit: Boolean): String = if (can29Bit) "00000000" else "000"
