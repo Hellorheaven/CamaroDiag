@@ -145,6 +145,26 @@ class CamaroModuleDtcScannerTest {
     }
 
     @Test
+    fun ecmProfileIsEligibleForReadOnlyIdentityCheckWithoutClaimingAnyDtc() = runBlocking {
+        val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX,
+            vin = "2G1TEST00C0000001")
+        val ecm = documentedBcmProfile().copy(
+            moduleId = "ECM", profileId = "synthetic-ecm", controllerFamily = "E39"
+        )
+        var opened = 0
+        val scanner = CamaroModuleDtcScanner { error("Legacy scanner is not used.") }
+        val results = scanner.scanProfiled(vehicle, listOf(ecm), {
+            opened++
+            throw IllegalStateException("Hardware unavailable")
+        })
+        assertEquals(1, opened)
+        assertTrue(results.single { it.module == CamaroControlModule.ECM }
+            is ModuleDiagnosticResult.ReadFailure)
+        assertTrue(results.filter { it.module != CamaroControlModule.ECM }
+            .all { it is ModuleDiagnosticResult.NotConfigured })
+    }
+
+    @Test
     fun profiledDtcScannerNeverOpensBusForMissingOrMismatchedEcuProfiles() = runBlocking {
         val vehicle = VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX,
             vin = "2G1TEST00C0000001")
@@ -187,6 +207,6 @@ class CamaroModuleDtcScannerTest {
         val address = VerifiedModuleReadAddress(CamaroControlModule.BCM, 0x700, 0x708, evidenceReference = "Test fixture")
         val results = scanner.scan(CamaroTransmission.UNKNOWN, listOf(address))
         assertTrue(results.first() is ModuleDiagnosticResult.ReadFailure)
-        assertEquals(4, results.count { it is ModuleDiagnosticResult.NotConfigured })
+        assertEquals(5, results.count { it is ModuleDiagnosticResult.NotConfigured })
     }
 }
