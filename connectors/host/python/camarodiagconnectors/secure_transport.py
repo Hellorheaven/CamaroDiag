@@ -51,6 +51,11 @@ def _wrap(context, stream, *, allowed_peer_sha256, expected_name=None, server=Fa
         raise ValueError("TLS 1.3 required")
     if context.verify_mode != ssl.CERT_REQUIRED or (not server and not context.check_hostname):
         raise ValueError("Mutual certificate verification required")
+    # A valid certificate does not justify blocking a worker indefinitely.
+    # Deadline comes from the caller's socket and covers TLS handshake I/O.
+    timeout = stream.gettimeout()
+    if timeout is None or not 0 < timeout <= 5:
+        raise ValueError("Bounded TLS handshake socket timeout (<=5s) required")
     wrapped = context.wrap_socket(stream, server_side=server,
                                   server_hostname=None if server else expected_name)
     try:
