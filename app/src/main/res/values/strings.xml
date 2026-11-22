@@ -935,4 +935,5 @@
     <string name="can_monitor_format_29">CAN 29-bit capture</string>
     <string name="can_monitor_format_notice">The physical adapter monitors one CAN ID format at a time; other buses and unsupported formats cannot be displayed by this session.</string>
     <string name="can_console_tx_ack_only">Frame sent to the adapter; no matching ECU diagnostic response was confirmed.</string>
+    <string name="can_console_negative_ecu_response">The selected ECU returned a negative diagnostic response; no successful read was confirmed.</string>
 </resources>
