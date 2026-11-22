@@ -276,7 +276,8 @@ class CamaroUdsProtocolTest {
 
     @Test
     fun stnSubstringWithoutRealFirmwareVersionCannotElevateAdapterCapabilities() {
-        for (banner in listOf("NOT STN2120", "unknown STN", "STN", "STN21201", "STN2120BROKEN")) {
+        for (banner in listOf("NOT STN2120", "unknown STN", "STN", "STN21201",
+            "STN2120BROKEN", "STN2120 bogus", "STN2120_v6.6", "STN2120 vX.Y")) {
             val capabilities = CamaroUdsProtocol.evaluateAdapterProbe(
                 deviceName = "OBDLink MX+",
                 macAddress = "00:00:00:00:00:01",
