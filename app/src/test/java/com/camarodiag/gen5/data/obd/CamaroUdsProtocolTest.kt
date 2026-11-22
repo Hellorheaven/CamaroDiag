@@ -34,6 +34,38 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun ignoresAdapterBannersAndOtherPidsBeforeValidSingleLineTelemetry() {
+        assertArrayEquals(intArrayOf(0x1A, 0xF8),
+            CamaroUdsProtocol.parsePidBytes(
+                "SEARCHING...\\r\\n010C\\r\\nNO DATA\\r\\n7E8 04 41 0C 1A F8", "0C"))
+        assertArrayEquals(intArrayOf(0x1A, 0xF8),
+            CamaroUdsProtocol.parsePidBytes("7E804410C1AF8", "0C"))
+        for (invalid in listOf("410C", "41 0C 1A", "7E8 03 41 0C 1A F8",
+                "SEARCH410C1AF8", "41 0D 1A F8", "7E8 41 0C GG F8")) {
+            assertNull("Invalid telemetry must not be interpreted: $invalid",
+                CamaroUdsProtocol.parsePidBytes(invalid, "0C"))
+        }
+    }
+
+    @Test
+    fun odometerNeverCombinesChatterOrIncompleteAndOverlongPidReplies() {
+        for (invalid in listOf(
+            "A641A60012D687",
+            "410C01234567",
+            "41 A6 00 12 D6",
+            "41 A6 00 12 D6 87 01",
+            "7E8 05 41 A6 00 12 D6 87",
+            "7E8 07 41 A6 00 12 D6 87",
+            "SEARCHING...\\nNO DATA",
+            "410A410A410A",
+            "41 D3 00 12 D6 87"
+        )) assertNull("Never infer odometer from: $invalid",
+            CamaroUdsProtocol.parseOdometerPidA6(invalid))
+        assertEquals(123456.7, CamaroUdsProtocol.parseOdometerPidA6(
+            "SEARCHING...\\r\\n7E8 06 41 A6 00 12 D6 87"), 0.01)
+    }
+
+    @Test
     fun marksStandardEcmAccessUnavailableWhenNoCanAdapterIsConnected() {
         val modules = CamaroUdsProtocol.buildTopology(
             VehicleProfile(modelYear = 2012, engine = CamaroEngine.LFX),
