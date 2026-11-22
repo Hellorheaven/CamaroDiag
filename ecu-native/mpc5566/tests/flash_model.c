@@ -61,6 +61,10 @@ static bool write_reg(void *ctx, uint32_t offset, uint32_t value)
             unsigned start = (m->interlock - 0x20000) / 4;
             m->words[start] &= m->pending[0];
             m->words[start + 1] &= m->pending[1];
+            if (m->disturb_next_unit && start + 2 < CD_MODEL_FLASH_BYTES / 4u)
+                m->words[start + 2] &= UINT32_C(0xFFFFFFFE);
+            if (m->disturb_previous_unit && start >= 2)
+                m->words[start - 2] &= UINT32_C(0xFFFFFFFB);
         }
         m->pending_count = 0;
         m->regs[0] |= CD_MCR_DONE;
