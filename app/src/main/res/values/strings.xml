@@ -927,4 +927,7 @@
     <string name="export_folder_instruction">Create or select the CamaroDiag folder in internal storage, then allow access. Exports are visible in shared storage.</string>
     <string name="export_folder_success">Export saved in /CamaroDiag/.</string>
     <string name="export_folder_failed">Unable to save the export in /CamaroDiag/.</string>
+    <string name="can_console_filter_all_ecus">All observed CAN IDs (global monitor)</string>
+    <string name="can_console_filter_observed_id">Observed CAN ID 0x%1$s</string>
+    <string name="can_console_filter_observed_note">Only CAN IDs actually observed on the connected bus are listed. An ID alone does not confirm an ECU identity. This filter changes display only.</string>
 </resources>
