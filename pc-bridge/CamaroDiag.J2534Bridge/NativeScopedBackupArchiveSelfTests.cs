@@ -140,6 +140,24 @@ internal static class NativeScopedBackupArchiveSelfTests
                 NativeScopedBackupImport.VerifyZip(oversizedLabelPath, scope));
             File.Delete(oversizedLabelPath);
 
+            foreach (var invalidRequired in new[] {
+                "CALIBRATION,CALIBRATION", "CALIBRATION,UNKNOWN", ",CALIBRATION"
+            })
+            {
+                var invalidRequiredPath = Path.Combine(directory, "bad-regions.zip");
+                File.WriteAllBytes(invalidRequiredPath, originalZip);
+                using (var regionZip = ZipFile.Open(invalidRequiredPath, ZipArchiveMode.Update))
+                {
+                    regionZip.GetEntry("manifest.properties")!.Delete();
+                    using var writer = new StreamWriter(regionZip.CreateEntry("manifest.properties").Open());
+                    writer.Write(androidManifest.Replace("required=\n",
+                        "required=" + invalidRequired + "\n"));
+                }
+                Reject<InvalidDataException>(() =>
+                    NativeScopedBackupImport.VerifyZip(invalidRequiredPath, scope));
+                File.Delete(invalidRequiredPath);
+            }
+
             var alteredDigestPath = Path.Combine(directory, "bad-digest.zip");
             File.WriteAllBytes(alteredDigestPath, originalZip);
             using (var digestZip = ZipFile.Open(alteredDigestPath, ZipArchiveMode.Update))
