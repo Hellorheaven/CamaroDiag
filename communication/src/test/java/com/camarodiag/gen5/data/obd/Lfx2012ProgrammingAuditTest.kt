@@ -30,7 +30,7 @@ class Lfx2012ProgrammingAuditTest {
     @Test fun changedVinOrNonchronologicalEvidenceRequiresReview() {
         assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW,
             Lfx2012ProgrammingAudit.review(before,
-                before.copy(vin = "1G1FF3D36C9104199", capturedAtUtcMillis = 2L)).overall)
+                before.copy(vin = "1G1TEST00C0000001", capturedAtUtcMillis = 2L)).overall)
         assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW,
             Lfx2012ProgrammingAudit.review(before, before.copy(capturedAtUtcMillis = 1L)).overall)
     }
@@ -42,6 +42,29 @@ class Lfx2012ProgrammingAuditTest {
                 oemRelearnReviewed = false, capturedAtUtcMillis = 2L)
         )
         assertEquals(Lfx2012ProgrammingAudit.Overall.INCOMPLETE, report.overall)
+    }
+
+    @Test fun malformedVinAndNonpositiveVoltageCannotPassManualReviewGate() {
+        for (badVin in listOf("INVALID", "2G1I0000000000001")) {
+            val report = Lfx2012ProgrammingAudit.review(
+                before, before.copy(vin = badVin, capturedAtUtcMillis = 2L)
+            )
+            assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, report.overall)
+            assertTrue(report.after.any {
+                it.item == Lfx2012ProgrammingAudit.Item.VEHICLE_VIN &&
+                    it.status == Lfx2012ProgrammingAudit.CheckStatus.REQUIRES_REVIEW
+            })
+        }
+        for (voltage in listOf(0.0, -1.0)) {
+            val report = Lfx2012ProgrammingAudit.review(
+                before, before.copy(voltage = voltage, capturedAtUtcMillis = 2L)
+            )
+            assertEquals(Lfx2012ProgrammingAudit.Overall.REQUIRES_REVIEW, report.overall)
+            assertTrue(report.after.any {
+                it.item == Lfx2012ProgrammingAudit.Item.VOLTAGE &&
+                    it.status == Lfx2012ProgrammingAudit.CheckStatus.REQUIRES_REVIEW
+            })
+        }
     }
 
     @Test fun failedCommunicationCannotBeReportedAsPassing() {
