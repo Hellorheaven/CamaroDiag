@@ -12,7 +12,6 @@ class CanConsoleDiagnosticCorrelation(
     private val timeoutMs: Long = 1_000L
 ) {
     private val requestPayload: ByteArray
-    private val expectedResponder: Long
     private var expectedSize = 0
     private var nextSequence = 1
     private var startedAt = 0L
@@ -21,7 +20,7 @@ class CanConsoleDiagnosticCorrelation(
 
     init {
         require(timeoutMs > 0)
-        expectedResponder = requireNotNull(CanConsoleEcuRouting.expectedResponder(request)) {
+        requireNotNull(CanConsoleEcuRouting.expectedResponder(request)) {
             "Diagnostic correlation requires a known physical ECU address."
         }
         val bytes = request.data
