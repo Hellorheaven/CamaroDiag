@@ -57,6 +57,21 @@ class DiscoveryTests(unittest.TestCase):
         self.assertIsNone(port.timeout)
         self.assertIsNone(port.write_timeout)
 
+    def test_discovery_restores_timeouts_after_read_failure(self):
+        class BrokenSerial(MockSerial):
+            timeout = None
+            write_timeout = None
+            def readline(self):
+                self.read_deadline = self.timeout
+                raise IOError("USB disconnected")
+
+        port = BrokenSerial(b"")
+        with self.assertRaisesRegex(IOError, "USB disconnected"):
+            DiscoveryClient(port).execute("PING")
+        self.assertEqual(2, port.read_deadline)
+        self.assertIsNone(port.timeout)
+        self.assertIsNone(port.write_timeout)
+
     def test_ping_rejects_unknown_identity_or_version(self):
         for reply in (
             b"PONG OtherDevice 0.1.0\n",
