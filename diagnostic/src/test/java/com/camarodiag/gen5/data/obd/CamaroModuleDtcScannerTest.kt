@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CancellationException
 
 class CamaroModuleDtcScannerTest {
     @Test
@@ -38,6 +39,38 @@ class CamaroModuleDtcScannerTest {
             scanner.scan(CamaroTransmission.UNKNOWN, listOf(profile, profile))
             throw AssertionError("Ambiguous profiles must be rejected.")
         } catch (_: IllegalArgumentException) { }
+    }
+
+    @Test
+    fun operatorCancellationStopsBeforeAnyLaterModuleIsProbed() = runBlocking {
+        var opened = 0
+        val scanner = CamaroModuleDtcScanner {
+            opened++
+            throw CancellationException("Operator stopped scanning")
+        }
+        val profiles = listOf(
+            VerifiedModuleReadAddress(CamaroControlModule.BCM, 0x700, 0x708,
+                evidenceReference = "synthetic"),
+            VerifiedModuleReadAddress(CamaroControlModule.TCM, 0x720, 0x728,
+                evidenceReference = "synthetic")
+        )
+        val result = runCatching { scanner.scan(CamaroTransmission.AUTOMATIC, profiles) }
+        assertTrue(result.exceptionOrNull() is CancellationException)
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun invalidOrExcessiveTimeoutCannotStartModuleProbe() = runBlocking {
+        var opened = 0
+        val scanner = CamaroModuleDtcScanner { opened++; error("No CAN access") }
+        val profile = VerifiedModuleReadAddress(CamaroControlModule.BCM,
+            0x700, 0x708, evidenceReference = "synthetic")
+        for (timeout in listOf(-1L, 0L, 30_001L, Long.MAX_VALUE)) {
+            assertTrue(runCatching {
+                scanner.scan(CamaroTransmission.UNKNOWN, listOf(profile), timeout)
+            }.isFailure)
+        }
+        assertEquals(0, opened)
     }
 
     @Test
