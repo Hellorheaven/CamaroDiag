@@ -79,6 +79,18 @@ class ObdTransportFailurePolicyTest {
     }
 
     @Test
+    fun localCanArchiveFailureDoesNotMasqueradeAsVehicleDisconnect() {
+        val storage = CanCaptureArchiveWriteException(IOException("device storage full"))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(storage))
+        assertFalse(ObdTransportFailurePolicy.isConnectionLoss(
+            IllegalStateException("failed to capture CAN", storage)
+        ))
+        assertTrue(ObdTransportFailurePolicy.isConnectionLoss(
+            IOException("actual USB transport failure")
+        ))
+    }
+
+    @Test
     fun adapterRestoreErrorPreservesTheOriginalPhysicalTransportForTheUi() {
         for (kind in listOf("USB", "WIFI", "BLE", "BLUETOOTH")) {
             val error = CanAdapterRestorationException(kind)
