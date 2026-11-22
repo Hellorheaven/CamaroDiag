@@ -117,6 +117,36 @@ class UdsClientTest {
         }.isFailure)
     }
 
+    @Test fun placeholderIdentityCannotCreateVerifiedProgrammingGrants() {
+        val vin = "1G1FA1RXXR0123456"
+        fun grant(cvn: String, hardware: String, os: String): UdsAccessPolicy {
+            val identity = UdsEcuIdentity("ECM", hardware, os, "CAL-1", cvn, vin)
+            return UdsAccessPolicy.verified(
+                vehicleVin = vin, identity = identity, expectedVin = vin,
+                expectedCalId = "CAL-1", expectedCvn = cvn,
+                expectedControllerFamily = "ECM", expectedHardwarePartNumber = hardware,
+                expectedOperatingSystemId = os,
+                readDids = emptySet(), writeDids = setOf(0x1234),
+                allowedSessions = setOf(0x01, 0x02),
+                routineControlPermissions = emptyMap(),
+                readableMemoryRegions = emptyList(), writableMemoryRegions = emptyList(),
+                maxTransferBytes = 0, requireSecurityAccess = true,
+                evidenceReference = "Synthetic ECU identity fail-closed regression"
+            )
+        }
+        for (placeholder in listOf(
+                "UNKNOWN", "FFFFFFFF", "00000000", "PENDING", "N/A", "NO DATA",
+                "TEST", "SIMULATED"
+            )) {
+            assertTrue("Rejected CVN: $placeholder", runCatching {
+                grant(placeholder, "HW-1", "OS-1")
+            }.isFailure)
+        }
+        assertTrue(runCatching { grant("A1B2", "00000000", "OS-1") }.isFailure)
+        assertTrue(runCatching { grant("A1B2", "HW-1", "PENDING") }.isFailure)
+        assertTrue(runCatching { grant("A1B2", "HW-1", "OS-1") }.isSuccess)
+    }
+
     @Test fun sessionControlAndTesterPresentValidatePositiveResponses() = runBlocking {
         val transport = FakeTransport(listOf(response(0x50, 0x02, 0x00, 0x32), response(0x7E, 0x00)))
         val client = UdsClient(transport, 0x7E0, 0x7E8, policy = verifiedPolicy())
