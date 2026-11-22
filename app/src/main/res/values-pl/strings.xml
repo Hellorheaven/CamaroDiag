@@ -739,8 +739,8 @@
     <string name="module_note_ecm_obd_missing">Nie zaobserwowano standardowej odpowiedzi OBD 7E8. ECM pozostaje niezweryfikowany do czasu rzeczywistego skanowania funkcjonalnego.</string>
     <string name="module_note_tcm_gen5">Obecność, adres i obsługiwane dane należy ustalić na pojeździe.</string>
     <string name="module_note_tcm_gen6">Adres modułu i obsługiwane usługi należy ustalić na pojeździe, a nie zakładać na podstawie topologii generacji 5.</string>
-    <string name="module_note_bcm_gen5">Biuletyn GM 07-08-49-020I wskazuje BCM jako moduł przechowujący przebieg Camaro z lat 2010–2015. Dokładny adres diagnostyczny i DID odczytu nie są zakładane.</string>
-    <string name="module_note_bcm_gen6_to2018">Biuletyn GM 07-08-49-020M wskazuje BCM jako moduł przechowujący przebieg Camaro do 2018 roku włącznie. Adres diagnostyczny i DID odczytu nadal wymagają weryfikacji dla danego VIN.</string>
+    <string name="module_note_bcm_gen5" tools:ignore="TypographyDashes">Biuletyn GM 07-08-49-020I wskazuje BCM jako moduł przechowujący przebieg Camaro z lat 2010–2015. Dokładny adres diagnostyczny i DID odczytu nie są zakładane.</string>
+    <string name="module_note_bcm_gen6_to2018" tools:ignore="TypographyDashes">Biuletyn GM 07-08-49-020M wskazuje BCM jako moduł przechowujący przebieg Camaro do 2018 roku włącznie. Adres diagnostyczny i DID odczytu nadal wymagają weryfikacji dla danego VIN.</string>
     <string name="module_note_bcm_2019">Dla lat 2019–2024 przed odczytem potwierdź architekturę przechowywania przebiegu i identyfikatory diagnostyczne właściwe dla VIN.</string>
     <string name="module_note_ipc_gen5">Informacje serwisowe Camaro 2012 opisują IPC jako dodatkowe miejsce przechowywania przebiegu. Dokładne dane odczytu i adres wymagają weryfikacji.</string>
     <string name="module_note_ipc_gen6">Informacje serwisowe Camaro 2012 opisują dodatkowe miejsce przechowywania przebiegu. Przed porównaniem sprawdź dokładne dane modułu i powiązanie z VIN.</string>
