@@ -57,6 +57,8 @@ Le diagnostic OBD-II standard concerne principalement le groupe motopropulseur. 
 
 CamaroDiag ne garantit pas actuellement un scan exhaustif de tous les calculateurs BCM, TCM, ABS/EBCM, tableau de bord (IPC), airbag (SDM) ou des autres modules GM. Les commandes de carrosserie, le codage, les procédures de sécurité, la programmation et le flashage ne sont pas proposés comme fonctions validées.
 
+Un moteur de scan UDS **en lecture seule** permet de préparer un inventaire ECM, TCM, BCM, IPC, EBCM/ABS et SDM. Chaque calculateur doit disposer d'un profil correspondant au VIN et à la calibration du véhicule, et son identité (famille, matériel, OS, calibration, CVN, VIN) doit être confirmée avant la lecture des défauts. En l'absence de ce profil ou de réponse valide, le calculateur est indiqué comme non vérifié, jamais comme sain. Une boîte manuelle n'est pas présentée comme équipée d'un TCM automatique. Ces composants logiciels ne signifient pas que le balayage physique de tous ces calculateurs est déjà qualifié sur une Camaro réelle.
+
 ## Précautions
 
 - Stationner le véhicule dans un endroit sûr avant toute opération.
