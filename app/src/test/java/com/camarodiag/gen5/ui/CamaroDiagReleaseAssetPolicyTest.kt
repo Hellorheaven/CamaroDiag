@@ -9,7 +9,7 @@ class CamaroDiagReleaseAssetPolicyTest {
 
     @Test fun officialChannelArtifactsAreAccepted() {
         for (name in listOf("CamaroDiag-debug.apk", "CamaroDiag-release.apk")) {
-            assertTrue(CamaroDiagReleaseAssetPolicy.accepts(base + name, name))
+            assertTrue(CamaroDiagReleaseAssetPolicy.accepts(base + name, name, "v1.2.3"))
         }
     }
 
@@ -49,9 +49,9 @@ class CamaroDiagReleaseAssetPolicyTest {
             "https://github.com/Hellorheaven/CamaroDiag/releases/download/v1.2.3/$name/extra",
             "http://github.com/Hellorheaven/CamaroDiag/releases/download/v1.2.3/$name",
             "https://github.com.evil.example/Hellorheaven/CamaroDiag/releases/download/v1.2.3/$name"
-        )) assertFalse(url, CamaroDiagReleaseAssetPolicy.accepts(url, name))
-        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(null, name))
-        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(base + name, "unknown.apk"))
-        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(base + name, "CamaroDiag-debug.apk"))
+        )) assertFalse(url, CamaroDiagReleaseAssetPolicy.accepts(url, name, "v1.2.3"))
+        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(null, name, "v1.2.3"))
+        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(base + name, "unknown.apk", "v1.2.3"))
+        assertFalse(CamaroDiagReleaseAssetPolicy.accepts(base + name, "CamaroDiag-debug.apk", "v1.2.3"))
     }
 }
