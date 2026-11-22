@@ -162,6 +162,12 @@ object CanConsoleIsotpFlowControlPolicy {
         CanConsoleAdapterRestorationPolicy.accepted(reply)
 }
 
+/** A silent passive bus is normal; a textual adapter failure is not. */
+object CanMonitorCompletionPolicy {
+    fun accepted(adapterOutput: String): Boolean =
+        adapterOutput.isBlank() || !CanConsoleAdapterReplyPolicy.isFailure(adapterOutput)
+}
+
 object CanMonitorProtocolPolicy {
     fun protocolCommand(can29Bit: Boolean): String = if (can29Bit) "ATSP7" else "ATSP6"
     fun clearFilter(can29Bit: Boolean): String = if (can29Bit) "00000000" else "000"
