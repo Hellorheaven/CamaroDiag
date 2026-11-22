@@ -37,6 +37,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
   group: pr-unit-tests-${{ github.event.pull_request.number || github.ref_name }}
@@ -44,6 +46,7 @@ concurrency:
 
 jobs:
   verify-revision:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Require the requested immutable revision
@@ -56,6 +59,7 @@ jobs:
           fi
 
   unit-tests:
+    if: github.event_name == 'workflow_dispatch'
     needs: verify-revision
     runs-on: ubuntu-latest
     steps:
@@ -102,6 +106,7 @@ jobs:
           retention-days: 14
 
   windows-debug:
+    if: github.event_name == 'workflow_dispatch'
     needs: verify-revision
     runs-on: windows-latest
     steps:
@@ -122,6 +127,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Debug bridge self-tests failed' }
 
   native-ecu-debug:
+    if: github.event_name == 'workflow_dispatch'
     needs: verify-revision
     runs-on: ubuntu-latest
     steps:
@@ -133,5 +139,36 @@ jobs:
         run: bash ecu-native/mpc5566/verify.sh
 
   connectors:
+    if: github.event_name == 'workflow_dispatch'
     needs: verify-revision
     uses: ./.github/workflows/connectors-ci.yml
+
+  review-gate:
+    name: Review only after successful full Debug checkpoint at exact SHA
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify completed manual Debug checkpoint
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const pr = context.payload.pull_request;
+            if (!pr || pr.draft) {
+              core.setFailed('PR must be ready for review.');
+              return;
+            }
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner, repo, workflow_id: 'pr-unit-tests.yml',
+              event: 'workflow_dispatch', branch: pr.head.ref,
+              status: 'completed', per_page: 100
+            });
+            const approved = runs.find(run =>
+              run.head_sha === pr.head.sha && run.conclusion === 'success'
+            );
+            if (!approved) {
+              core.setFailed('Full Debug checkpoint has not succeeded on PR head ' + pr.head.sha +
+                '. Return PR to Draft, complete development, run the manual checkpoint and retry review.');
+              return;
+            }
+            core.info('Full Debug checkpoint validated for exact PR head: ' + pr.head.sha);
