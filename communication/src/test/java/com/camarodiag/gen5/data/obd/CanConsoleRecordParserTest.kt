@@ -203,4 +203,13 @@ class CanConsoleRecordParserTest {
             assertFalse(reply, CanConsoleAdapterRestorationPolicy.accepted(reply))
         }
     }
+    @Test fun physicalMonitorModeSelectsExplicitFormatAndNeutralStnFilter() {
+        assertEquals("ATSP6", CanMonitorProtocolPolicy.protocolCommand(false))
+        assertEquals("ATSP7", CanMonitorProtocolPolicy.protocolCommand(true))
+        assertEquals("000", CanMonitorProtocolPolicy.clearFilter(false))
+        assertEquals("00000000", CanMonitorProtocolPolicy.clearFilter(true))
+        assertFalse(CanConsoleAdapterRestorationPolicy.accepted("?"))
+        assertTrue(CanConsoleAdapterRestorationPolicy.accepted("OK"))
+    }
+
 }
