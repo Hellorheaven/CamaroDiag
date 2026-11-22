@@ -2433,11 +2433,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Imports a second raw BIN image and compares it byte-for-byte with the loaded reference. */
     fun importComparisonCalibrationFile(uri: Uri) {
         if (!requirePremiumLicense()) return
+        val owner = authenticatedAccountUid ?: return
+        val accountGeneration = accountSessionGeneration
+        val profile = _vehicle.value
+        val snapshot = _calibrationWorkspace.value
+        val importGeneration = ++calibrationFileImportGeneration
+        fun current() = canResumeExport(accountGeneration, owner) &&
+            _vehicle.value == profile && importGeneration == calibrationFileImportGeneration &&
+            hasPremiumLicense() && _calibrationWorkspace.value.importedFilePath == snapshot.importedFilePath &&
+            _calibrationWorkspace.value.activeFilePath == snapshot.activeFilePath
         viewModelScope.launch(Dispatchers.IO) {
-            var storedFile: File? = null
+            var staged: File? = null
             try {
-                val current = _calibrationWorkspace.value
-                require(current.importedFilePath != null && current.inspectionFormat == "RAW_BINARY") {
+                if (!current()) return@launch
+                require(snapshot.importedFilePath != null && snapshot.inspectionFormat == "RAW_BINARY") {
                     "Charge d'abord une image de référence BIN brute."
                 }
                 val resolver = getApplication<Application>().contentResolver
@@ -2449,6 +2458,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val buffer = ByteArray(8192)
                     var total = 0
                     while (true) {
+                        currentCoroutineContext().ensureActive()
+                        check(current())
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
@@ -2462,15 +2473,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 require(inspection.format.name == "RAW_BINARY") {
                     "La comparaison octet par octet nécessite un second fichier BIN brut."
                 }
-                val reference = File(current.activeFilePath ?: current.importedFilePath!!)
+                val reference = File(snapshot.activeFilePath ?: snapshot.importedFilePath)
                 check(reference.isFile && reference.exists()) { "Le fichier BIN de référence est introuvable." }
                 val referenceBytes = reference.readBytes()
                 val comparison = CalibrationBinaryComparer.compare(referenceBytes, bytes)
                 val storageDir = File(getApplication<Application>().filesDir, "calibrations")
                 check(storageDir.exists() || storageDir.mkdirs()) { "Impossible de créer le dossier local des cartographies." }
                 val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(100).ifBlank { "modified.bin" }
-                storedFile = File(storageDir, "comparison_${System.currentTimeMillis()}_${safeName}")
-                storedFile!!.writeBytes(bytes)
+                val storedFile = File.createTempFile("comparison_", "_$safeName", storageDir)
+                staged = storedFile
+                storedFile.writeBytes(bytes)
                 val summary = when {
                     comparison.identical -> localizedContext.getString(R.string.cal_comparison_identical)
                     comparison.referenceSize != comparison.modifiedSize -> localizedContext.getString(
@@ -2492,9 +2504,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } + if (comparison.omittedRangeCount > 0) listOf(
                     localizedContext.getString(R.string.cal_comparison_more_ranges, comparison.omittedRangeCount)
                 ) else emptyList()
-                _calibrationWorkspace.value = current.copy(
+                withContext(Dispatchers.Main) {
+                    if (!current()) return@withContext
+                    val previous = _calibrationWorkspace.value
+                    _calibrationWorkspace.value = previous.copy(
                     comparisonFileName = displayName,
-                    comparisonFilePath = storedFile!!.absolutePath,
+                    comparisonFilePath = storedFile.absolutePath,
                     comparisonFileSize = bytes.size.toLong(),
                     comparisonSummary = summary,
                     comparisonChangedBytes = comparison.changedBytes,
@@ -2507,16 +2522,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     partialWriteSectorAddresses = emptyList(),
                     message = localizedContext.getString(R.string.msg_cal_comparison_complete)
                 )
-                current.comparisonFilePath?.let { previousPath ->
-                    if (previousPath != storedFile!!.absolutePath) runCatching { File(previousPath).delete() }
+                    staged = null
+                    previous.comparisonFilePath?.let { previousPath ->
+                        if (previousPath != storedFile.absolutePath) runCatching { File(previousPath).delete() }
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                storedFile?.let { runCatching { it.delete() } }
-                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    message = localizedContext.getString(R.string.msg_cal_comparison_failed)
-                )
+                if (current()) _calibrationWorkspace.update {
+                    it.copy(message = localizedContext.getString(R.string.msg_cal_comparison_failed))
+                }
+            } finally {
+                staged?.let { runCatching { it.delete() } }
             }
         }
     }
