@@ -92,6 +92,7 @@ internal object CamaroDiagExportStorage {
         private val digest = MessageDigest.getInstance("SHA-256")
         private var length = 0L
         private var closed = false
+        private var completedFingerprint: Fingerprint? = null
         override fun write(value: Int) = storageOperation {
             check(!closed)
             target.write(value)
@@ -110,14 +111,15 @@ internal object CamaroDiagExportStorage {
             if (closed) return
             closed = true
             storageOperation { target.close() }
+            completedFingerprint = Fingerprint(length, digest.digest().hex())
         }
-        fun fingerprint(): Fingerprint {
-            check(closed)
-            return Fingerprint(length, digest.digest().hex())
+        fun fingerprint(): Fingerprint = checkNotNull(completedFingerprint) {
+            "Output must close successfully before its fingerprint is available."
         }
     }
 
-    internal suspend fun fingerprint(input: InputStream): Fingerprint {
+    internal suspend fun fingerprint(input: InputStream, maximumBytes: Long = Long.MAX_VALUE): Fingerprint {
+        require(maximumBytes >= 0)
         val digest = MessageDigest.getInstance("SHA-256")
         var length = 0L
         val buffer = ByteArray(8192)
@@ -128,10 +130,13 @@ internal object CamaroDiagExportStorage {
             if (count == 0) {
                 val byte = storageOperation { input.read() }
                 if (byte < 0) break
+                if (length >= maximumBytes) throw ExportStorageException("Export readback exceeds expected length.")
                 digest.update(byte.toByte())
                 length++
                 continue
             }
+            if (count.toLong() > maximumBytes - length)
+                throw ExportStorageException("Export readback exceeds expected length.")
             digest.update(buffer, 0, count)
             length += count
         }
@@ -168,7 +173,7 @@ internal object CamaroDiagExportStorage {
                 // or provider acknowledgement is not evidence of complete bytes.
                 val actual = storageOperation {
                     resolver.openInputStream(temporary)
-                }?.use { fingerprint(it) }
+                }?.use { fingerprint(it, expected.length) }
                     ?: throw ExportStorageException("Could not read back export document.")
                 if (expected.length == 0L || expected != actual)
                     throw ExportStorageException("Export readback differs from written bytes.")
