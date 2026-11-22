@@ -519,4 +519,20 @@ class Obd2FeatureEngineTest {
         assertTrue("0152" !in commands)
     }
 
+    @Test
+    fun fullScanEthanolValueRequiresExactlyOneRealPayloadByte() = runBlocking {
+        val valid = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0152") "415280" else "NO DATA"
+        })
+        val actual = valid.readLiveData(setOf(0x52))
+        assertEquals(1, actual.size)
+        assertEquals(0x52, actual.single().pid)
+        assertEquals("50.20", actual.single().value)
+
+        val malformed = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
+            if (command == "0152") "41528000" else "NO DATA"
+        })
+        assertTrue(malformed.readLiveData(setOf(0x52)).isEmpty())
+    }
+
 }
