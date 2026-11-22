@@ -10,6 +10,9 @@ object CanConsoleExportPolicy {
         isCapturing: Boolean,
         archiveFailed: Boolean,
         hasHistory: Boolean,
-        hasRawData: Boolean
-    ): Boolean = !isCapturing && !archiveFailed && (hasHistory || hasRawData)
+        hasRawData: Boolean,
+        requiresRawArchive: Boolean = false,
+        hasRawArchive: Boolean = false
+    ): Boolean = !isCapturing && !archiveFailed && (hasHistory || hasRawData) &&
+        (!requiresRawArchive || hasRawArchive)
 }
