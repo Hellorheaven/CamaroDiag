@@ -12,6 +12,10 @@ import java.util.IdentityHashMap
  * must not trigger the app-wide physical disconnect flow. Timeout causes may
  * be wrapped by transport implementations, therefore inspect the full cause chain.
  */
+/** A failure of the app's local CAN archive, not an ECU or adapter link loss. */
+class CanCaptureArchiveWriteException(cause: IOException) :
+    IllegalStateException(cause)
+
 object ObdTransportFailurePolicy {
     fun isConnectionLoss(error: Throwable): Boolean {
         val visited = Collections.newSetFromMap(IdentityHashMap<Throwable, Boolean>())
@@ -22,6 +26,7 @@ object ObdTransportFailurePolicy {
             // A late failure from an already replaced connection is not a
             // failure of the currently connected physical adapter.
             if (current is ObdSupersededSessionException) return false
+            if (current is CanCaptureArchiveWriteException) return false
             if (current is SocketTimeoutException) return false
             if (current is IOException) hasIoFailure = true
             if (current is CanAdapterRestorationException) hasUnsafeAdapterState = true
