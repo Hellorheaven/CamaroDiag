@@ -116,6 +116,13 @@ object SafeObdRequestPolicy {
                 // malformed response cannot claim a valid ethanol reading.
                 if (request.service == 0x01 && request.parameter == 0x52 &&
                     bytes.length != expected.length + 2) continue
+                if (request.service in setOf(0x03, 0x07, 0x0A)) {
+                    val count = bytes.substring(2, 4).toIntOrNull(16) ?: continue
+                    if (bytes.length != 4 + count * 4) continue
+                    if ((0 until count).any { index ->
+                            bytes.substring(4 + index * 4, 8 + index * 4) == "0000"
+                        }) continue
+                }
                 return true
             }
         }
