@@ -133,6 +133,11 @@ internal sealed partial class BridgeDesktopForm
 
     private void SaveMemoryProfile()
     {
+        if (busy || memoryCancellation is not null)
+        {
+            ShowError("Terminez ou annulez la sauvegarde ECU avant de modifier son profil.");
+            return;
+        }
         if (bridgeTask is { IsCompleted: false })
         {
             ShowError("Arrêtez le pont avant de changer son profil mémoire.");
@@ -181,6 +186,11 @@ internal sealed partial class BridgeDesktopForm
 
     private void LoadMemoryProfile()
     {
+        if (busy || memoryCancellation is not null)
+        {
+            ShowError("Terminez ou annulez la sauvegarde ECU avant de charger un autre profil.");
+            return;
+        }
         if (bridgeTask is { IsCompleted: false })
         {
             ShowError("Arrêtez le pont avant de remplacer le profil de lecture.");
@@ -342,6 +352,9 @@ internal sealed partial class BridgeDesktopForm
         var cancellation = memoryCancellation;
         memoryCancel.Enabled = true;
         memoryCapture.Enabled = false;
+        memoryCreateProfile.Enabled = false;
+        memoryLoadProfile.Enabled = false;
+        memoryVerifyArchive.Enabled = false;
         var progressActive = true;
         var progress = new Progress<(int Pass, int BytesRead, int TotalBytes)>(state =>
         {
@@ -446,6 +459,9 @@ internal sealed partial class BridgeDesktopForm
             progressActive = false;
             memoryCancel.Enabled = false;
             memoryCapture.Enabled = true;
+            memoryCreateProfile.Enabled = true;
+            memoryLoadProfile.Enabled = true;
+            memoryVerifyArchive.Enabled = true;
             memoryCancellation = null;
             cancellation.Dispose();
         }
