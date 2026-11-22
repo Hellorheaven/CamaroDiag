@@ -89,6 +89,8 @@ object EcuWriteTransaction {
             normalized in setOf("unknown", "n/a", "none", "null", "demo", "sample",
                 "simulated", "simulation", "mock", "fake", "pending",
                 "not available", "no response", "unavailable") ||
+            Regex("(?:^|[^a-z0-9])(?:unknown|demo|sample|simulated|simulation|mock|fake|pending|placeholder)(?:$|[^a-z0-9])")
+                .containsMatchIn(normalized) ||
             normalized.removePrefix("0x").replace(Regex("[\\s:_-]"), "")
                 .let { it.isNotEmpty() && it.all { ch -> ch == '0' || ch == 'f' } }
     }
