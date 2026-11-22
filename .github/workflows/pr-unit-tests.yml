@@ -12,7 +12,6 @@ on:
       - 'app/**'
       - 'tools/admin/**'
       - 'functions/**'
-      - 'functions/**'
       - 'firebase.json'
       - 'firestore.rules'
       - 'communication/**'
