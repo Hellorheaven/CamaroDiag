@@ -239,7 +239,7 @@ internal sealed partial class BridgeDesktopForm
                 " Région déclarée : " +
                 result.DeclaredRegion + ", origine déclarée : " + result.DeclaredOrigin + ". " +
                 (result.Firmware is { } firmware
-                    ? $"OSID GM observé : {firmware.OperatingSystemId} (DID 0x{firmware.OsDid:X2}). "
+                    ? $"OSID GM déclaré dans l'archive : {firmware.OperatingSystemId} (DID 0x{firmware.OsDid:X2}). "
                     : "OSID GM non enregistré. ") +
                 (missing.Length == 0 ? "" :
                     "Régions requises absentes de ce ZIP : " + string.Join(", ", missing) + ". ") +
@@ -254,10 +254,7 @@ internal sealed partial class BridgeDesktopForm
         finally
         {
             memoryVerifyArchive.Enabled = true;
-        }
-    }
-
-    private async Task CaptureMemoryAsync()
+      private async Task CaptureMemoryAsync()
     {
         if (busy) return;
         if (bridgeTask is { IsCompleted: false } || consoleDevice is not null)
@@ -331,6 +328,8 @@ internal sealed partial class BridgeDesktopForm
         {
             await RunBusyAsync(async () =>
             {
+                try
+                {
                 var result = await Task.Run(async () =>
                 {
                     using var device = new J2534Device(chosen.Adapter, scope);
@@ -383,7 +382,7 @@ internal sealed partial class BridgeDesktopForm
                             StringComparison.OrdinalIgnoreCase))
                         NativeScopedBackupImport.VerifyZip(destination.FileName, scope);
                 }, cancellation.Token);
-                memoryStatus.Text = "Sauvegarde physique vérifiée : " +
+                memoryStatus.Text = "Sauvegarde de plage ECU vérifiée par deux lectures : " +
                     result.Capture.Bytes.Length + " octets, SHA-256 " + result.Capture.Sha256 +
                     ". Couverture limitée à la zone demandée, pas à tout le calculateur. " +
                     (result.Firmware is { } firmware
@@ -392,6 +391,17 @@ internal sealed partial class BridgeDesktopForm
                     (Path.GetExtension(destination.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase)
                         ? "Les deux lectures sont conservées dans le ZIP."
                         : "Le BIN brut ne conserve pas la seconde acquisition ni son manifeste.");
+                }
+                catch (OperationCanceledException)
+                {
+                    memoryStatus.Text = "Lecture ECU annulée : aucune nouvelle archive validée.";
+                    throw;
+                }
+                catch (Exception)
+                {
+                    memoryStatus.Text = "Sauvegarde ECU non validée : lire l'erreur et contrôler le dossier de destination.";
+                    throw;
+                }
             });
         }
         finally
