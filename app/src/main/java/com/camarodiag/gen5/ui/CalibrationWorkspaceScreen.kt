@@ -1435,6 +1435,7 @@ fun CalibrationWorkspaceScreen(
                         Text(stringResource(if (expertExpanded) R.string.cal_expert_collapse else R.string.cal_expert_expand))
                     }
                     if (expertExpanded) {
+                        ConnectorCheckpointPanel()
                         OutlinedTextField(
                             value = expertControllerFamily,
                             onValueChange = { expertControllerFamily = it.uppercase().take(24) },

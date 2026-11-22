@@ -73,6 +73,35 @@ class CamaroDiagExportStorageTest {
         assertTrue(error?.cause is IOException)
     }
 
+    @Test fun swallowedWriteErrorCannotBecomeSuccessAfterClose() {
+        val broken = object : OutputStream() {
+            var writes = 0
+            override fun write(value: Int) {
+                writes++
+                if (writes == 2) throw IOException("partial write")
+            }
+        }
+        val output = CamaroDiagExportStorage.VerifiedOutput(broken)
+        output.write(1)
+        assertTrue(runCatching { output.write(2) }.isFailure)
+        assertTrue(runCatching { output.write(3) }.isFailure)
+        output.close()
+        assertEquals(2, broken.writes)
+        assertTrue(runCatching { output.fingerprint() }.isFailure)
+    }
+
+    @Test fun failedFlushPoisonsOutputEvenAfterSuccessfulClose() {
+        val broken = object : OutputStream() {
+            override fun write(value: Int) = Unit
+            override fun flush() { throw IOException("flush failed") }
+        }
+        val output = CamaroDiagExportStorage.VerifiedOutput(broken)
+        output.write(1)
+        assertTrue(runCatching { output.flush() }.isFailure)
+        output.close()
+        assertTrue(runCatching { output.fingerprint() }.isFailure)
+    }
+
     @Test fun fingerprintRemainsStableAfterCloseAndRepeatedAccess() {
         val output = CamaroDiagExportStorage.VerifiedOutput(ByteArrayOutputStream())
         output.write(byteArrayOf(12, 34))

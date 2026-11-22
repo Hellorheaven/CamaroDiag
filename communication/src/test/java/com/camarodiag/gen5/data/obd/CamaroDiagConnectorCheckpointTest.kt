@@ -98,4 +98,19 @@ class CamaroDiagConnectorCheckpointTest {
         assertFalse(imported.authenticated)
         assertEquals(CamaroDiagConnectorCheckpoint.Disposition.RECOVERY_REQUIRED, imported.disposition)
     }
+    @org.junit.Test fun streamInspectorRejectsTruncatedAndOverlongWithoutUnboundedRead() {
+        val huge = object : java.io.InputStream() {
+            var reads = 0
+            override fun read(): Int {
+                reads++
+                check(reads <= 65)
+                return 1
+            }
+        }
+        val oversized = CamaroDiagConnectorCheckpoint.inspectStream(huge)
+        org.junit.Assert.assertEquals(CamaroDiagConnectorCheckpoint.Disposition.UNAVAILABLE_OR_CORRUPT, oversized.disposition)
+        org.junit.Assert.assertEquals(65, huge.reads)
+        val truncated = CamaroDiagConnectorCheckpoint.inspectStream(ByteArray(63).inputStream())
+        org.junit.Assert.assertEquals(CamaroDiagConnectorCheckpoint.Disposition.UNAVAILABLE_OR_CORRUPT, truncated.disposition)
+    }
 }

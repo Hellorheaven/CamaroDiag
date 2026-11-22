@@ -40,6 +40,26 @@ object CamaroDiagConnectorCheckpoint {
         (0..3).fold(0L) { value, i -> value or (u8(bytes[offset + i]).toLong() shl (8 * i)) }
     private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(u8(it)) }
 
+    /** Read at most 65 bytes; neither huge imports nor trailing bytes are accepted.
+     *  The caller owns the stream and runs this operation off the UI thread.
+     */
+    fun inspectStream(input: java.io.InputStream): Inspection {
+        val buffer = ByteArray(RECORD_SIZE + 1)
+        var used = 0
+        while (used < buffer.size) {
+            val count = input.read(buffer, used, buffer.size - used)
+            if (count < 0) break
+            if (count == 0) {
+                val value = input.read()
+                if (value < 0) break
+                buffer[used++] = value.toByte()
+            } else {
+                used += count
+            }
+        }
+        return inspect(buffer.copyOf(used))
+    }
+
     /** Imported bytes only. A missing record must not be treated as an idle device. */
     fun inspect(
         bytes: ByteArray?,

@@ -92,29 +92,45 @@ internal object CamaroDiagExportStorage {
         private val digest = MessageDigest.getInstance("SHA-256")
         private var length = 0L
         private var closed = false
+        private var failed = false
         private var completedFingerprint: Fingerprint? = null
-        override fun write(value: Int) = storageOperation {
-            check(!closed)
+
+        // A provider can accept part of a write and then throw. Once any I/O
+        // fails, neither a subsequent successful close nor a caught exception
+        // in an export callback can make this stream a verified capture.
+        private inline fun <T> guarded(action: () -> T): T {
+            check(!closed && !failed) { "Export output is closed or failed." }
+            return try {
+                storageOperation(action)
+            } catch (error: Exception) {
+                failed = true
+                throw error
+            }
+        }
+
+        override fun write(value: Int) = guarded {
             target.write(value)
             digest.update(value.toByte())
             length++
             Unit
         }
-        override fun write(bytes: ByteArray, offset: Int, count: Int) = storageOperation {
-            check(!closed)
+        override fun write(bytes: ByteArray, offset: Int, count: Int) = guarded {
+            require(offset >= 0 && count >= 0 && offset <= bytes.size - count)
             target.write(bytes, offset, count)
             digest.update(bytes, offset, count)
             length += count
         }
-        override fun flush() = storageOperation { if (!closed) target.flush() }
+        override fun flush() {
+            if (!closed) guarded { target.flush() }
+        }
         override fun close() {
             if (closed) return
             closed = true
             storageOperation { target.close() }
-            completedFingerprint = Fingerprint(length, digest.digest().hex())
+            if (!failed) completedFingerprint = Fingerprint(length, digest.digest().hex())
         }
         fun fingerprint(): Fingerprint = checkNotNull(completedFingerprint) {
-            "Output must close successfully before its fingerprint is available."
+            "Output must write and close successfully before its fingerprint is available."
         }
     }
 

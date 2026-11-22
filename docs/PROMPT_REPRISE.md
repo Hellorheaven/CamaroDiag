@@ -682,3 +682,9 @@ Auditer à nouveau la PR #35 et la CI sur son **head SHA actuel**, comparer le c
 
 ### 22/11/2026 — Autorisation mutuelle TLS de référence
 - Connectors 4d897e4 : CA + empreinte exacte des clients autorisés et du boîtier, révocation à la prochaine connexion, rejet reprise TLS ; tests socket Python. PR70 : fondation Android IP TLS1.3 dédiée (CA provisionnée, client KeyManager, vérification nom/ALPN/empreintes locales et distantes). Tests Kotlin de la politique post-handshake. Ne pas confondre avec CD/1 USB ou appairage du pont actuel ; non connecté à l'UI ni à une route ECU. Provisionnement sécurisé et tests croisés réels restent bloquants.
+
+
+### 22/11/2026 — Finalisation PR70 : parité de récupération Android et intégrité export
+- Ajout d'une analyse locale CDJ/1 en mode Expert, choix SAF explicite, lecture plafonnée à 65 octets (record 64), rejet des données surnuméraires, aucun accès ECU ni reprise automatique, UI reprend les ressources localisées existantes. Tests de lecture bornée. Le firmware ne fournit pas encore d'export de checkpoint.
+- Exports /CamaroDiag : flux empoisonné après toute écriture/flush échoué, aucune empreinte de succès même si appelant intercepte l'erreur et fermeture réussie. Deux tests.
+- CI 21cc16a : tests unitaires, Windows et natifs verts, build APK et lint Android sans warnings confirmés ; instrumentation encore en cours au moment du changement. Revalider le dernier SHA. Les issues Connectors #11 à #14 (interop OEM, TuneECU et packs) sont des dépendances séparées ; aucune implémentation firmware dans PR70. Ne pas fusionner avant recette requise et CI du dernier HEAD.
