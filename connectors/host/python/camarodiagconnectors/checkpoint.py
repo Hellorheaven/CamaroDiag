@@ -1,6 +1,7 @@
 """Isolated CDJ/1 NVS export. Read only; this is not an authorization protocol."""
 import os
 import re
+import tempfile
 import zlib
 from time import monotonic
 
@@ -68,9 +69,16 @@ def _read_checkpoint(port, command, deadline, clock):
 
 def save_checkpoint(path, record):
     frozen = validate(bytes(record))
-    # Never overwrite existing evidence; preserve incomplete output on failure.
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "wb") as output:
-        output.write(frozen)
-        output.flush()
-        os.fsync(output.fileno())
+    # Publish only after a durable complete write. A hard-link publication is
+    # atomic and fails rather than overwriting an existing evidence file.
+    destination = os.fspath(path)
+    directory = os.path.dirname(os.path.abspath(destination))
+    fd, staged = tempfile.mkstemp(prefix=".cdj-", suffix=".partial", dir=directory)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            output.write(frozen)
+            output.flush()
+            os.fsync(output.fileno())
+        os.link(staged, destination)
+    finally:
+        os.unlink(staged)
