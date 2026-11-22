@@ -112,7 +112,8 @@ class RawCanFrameParserTest {
             "7E0 02 31 01", "7E0 02 34 00", "7E0 02 36 01",
             "7E0 02 11 01", "7DF 02 14 01", "7E0 02 85 01",
             "7E0 10 14 34 00", "7E0 21 00 00", "7E0 02 01 FF",
-            "7E0 02 01 0C FF", "18DA10F1 03 2E F1 90"
+            "7E0 02 01 0C FF", "18DA10F1 03 2E F1 90",
+            "7E8 02 01 0C", "18DAF110 03 22 F1 90"
         )) {
             assertFalse(unsafe, SafeRawCanTransmitPolicy.allows(
                 requireNotNull(RawCanFrameParser.parse(unsafe))))
