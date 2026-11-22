@@ -39,12 +39,15 @@ internal static class NativeScopedBackupImport
         if (manifestBytes.Any(b => b is not (10 or >= 32 and <= 126)))
             throw new InvalidDataException("Non-ASCII backup manifest.");
         string properties = Encoding.ASCII.GetString(manifestBytes);
-        var lines = properties.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        if (!properties.EndsWith('\n') || lines.Length != 12 ||
-            lines.Any(line => line.Count(c => c == '=') != 1))
+        var lines = properties.Split('\n');
+        // Exactly twelve nonblank records and one final line terminator:
+        // do not silently ignore blank, duplicated or appended records.
+        if (!properties.EndsWith('\n') || lines.Length != 13 ||
+            lines[^1] != "" || lines.Take(12).Any(line =>
+                line.Length == 0 || line.Count(c => c == '=') != 1))
             throw new InvalidDataException("Invalid backup manifest schema.");
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string line in lines)
+        foreach (string line in lines.Take(12))
         {
             var parts = line.Split('=', 2);
             if (!values.TryAdd(parts[0], parts[1]))
