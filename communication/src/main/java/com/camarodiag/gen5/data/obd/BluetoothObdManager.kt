@@ -191,11 +191,7 @@ class BluetoothObdManager(context: Context) {
                     override fun write(bytes: ByteArray) = usbTransport.write(bytes)
                     override fun read(buffer: ByteArray, timeoutMs: Int) = usbTransport.read(buffer, timeoutMs)
                 }) { context.ensureActive() }
-                Result.success(AdapterCapabilities(
-                    deviceName = "CamaroDiagConnectors",
-                    firmwareId = report.firmware,
-                    rawProbeLog = report.lines
-                ))
+                Result.success(report.toAdapterCapabilities())
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -208,6 +204,11 @@ class BluetoothObdManager(context: Context) {
     suspend fun connectUsb(deviceId: Int, baudRate: Int = 38400): Result<AdapterCapabilities> = withContext(Dispatchers.IO) {
         disconnect()
         try {
+            // Re-check the currently enumerated USB device at the manager boundary.
+            // Neither a legacy UI entry nor a saved ELM profile may bypass discovery.
+            if (CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(deviceId, usbTransport.availableDevices())) {
+                return@withContext Result.failure(IllegalStateException("CamaroDiagConnectors requires dedicated USB discovery"))
+            }
             val connected = usbTransport.connect(deviceId, baudRate)
             if (connected.isFailure) {
                 disconnect()
