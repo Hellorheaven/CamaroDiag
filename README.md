@@ -55,8 +55,10 @@ Pour la version prototype 0.1.0, la seule fonction disponible est la découverte
 
 1. Relier le prototype USB au téléphone compatible USB Host/OTG.
 2. Ouvrir Adaptateurs et actualiser les périphériques USB.
-3. Sélectionner le bouton **CamaroDiagConnectors • USB** associé à la carte. Autoriser l'accès USB dans Android ; si nécessaire, sélectionner de nouveau le bouton.
-4. Consulter la version et les capacités retournées. Le diagnostic doit rester indisponible : la liaison de découverte est refermée à la fin de cette opération.
+3. Sélectionner **CamaroDiagConnectors • USB ASCII** pour le firmware normal, ou **CamaroDiagConnectors • USB CD/1** uniquement pour la variante binaire expérimentale. Autoriser l'accès USB dans Android ; si nécessaire, sélectionner de nouveau le bouton.
+4. Consulter la version et les capacités retournées. En mode CD/1, une erreur de CRC, version ou séquence arrête la découverte sans repli ASCII. Le CRC ne constitue pas une authentification. Le diagnostic doit rester indisponible : la liaison de découverte est refermée à la fin de cette opération.
+
+Le mode CD/1 est prévu pour les essais sur carte isolée, conformément au [guide USB binaire](https://github.com/Hellorheaven/CamaroDiagConnectors/blob/e8593d29c711e7d09f3bb00b69f467f529f75647/docs/user/usb-binary-discovery.md). Aucun mode ne permet de communiquer avec un ECU via ce prototype.
 
 Les futurs modes CAN, BENCH, BOOT/BAM, BDM, JTAG/Nexus, SWD et EEPROM ISP/chip-off nécessitent un firmware et du matériel réellement compatibles et qualifiés. Voir les [exigences du connecteur](https://github.com/Hellorheaven/CamaroDiagConnectors/issues/7). Aucun mode de programmation n'est activé à partir d'une réponse de découverte.
 
