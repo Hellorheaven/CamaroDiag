@@ -395,7 +395,9 @@ class UdsClient private constructor(
         // ISO 14229 lengthFormatIdentifier: upper nibble declares block-length bytes.
         val lengthBytes = lengthFormat ushr 4
         require(lengthFormat and 0x0F == 0) { "Reserved LFI bits must be zero." }
-        require(lengthBytes in 1..4 && response.size >= 2 + lengthBytes)
+        require(lengthBytes in 1..4 && response.size == 2 + lengthBytes) {
+            "ECU transfer block length response is truncated or contains unexpected bytes."
+        }
         val maxBlockLength = readUnsigned(response, 2, lengthBytes)
         require(maxBlockLength in 3L..4095L) { "ECU block length exceeds supported UDS framing." }
         downloadMaxBlockLength = maxBlockLength.toInt()
@@ -434,7 +436,9 @@ class UdsClient private constructor(
         val lengthFormat = response[1].toInt() and 0xFF
         val lengthBytes = lengthFormat ushr 4
         require(lengthFormat and 0x0F == 0) { "Reserved LFI bits must be zero." }
-        require(lengthBytes in 1..4 && response.size >= 2 + lengthBytes)
+        require(lengthBytes in 1..4 && response.size == 2 + lengthBytes) {
+            "ECU transfer block length response is truncated or contains unexpected bytes."
+        }
         val maxBlockLength = readUnsigned(response, 2, lengthBytes)
         require(maxBlockLength in 3L..4095L) { "ECU block length exceeds supported UDS framing." }
         downloadMaxBlockLength = maxBlockLength.toInt()
