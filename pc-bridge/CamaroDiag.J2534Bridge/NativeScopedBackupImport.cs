@@ -47,15 +47,20 @@ internal static class NativeScopedBackupImport
         if (manifestBytes.Any(b => b is not (10 or >= 32 and <= 126)))
             throw new InvalidDataException("Non-ASCII backup manifest.");
         string properties = Encoding.ASCII.GetString(manifestBytes);
-        var lines = properties.Split('\n');
-        // Exactly twelve nonblank records and one final line terminator:
-        // do not silently ignore blank, duplicated or appended records.
-        if (!properties.EndsWith('\n') || lines.Length != 13 ||
-            lines[^1] != "" || lines.Take(12).Any(line =>
-                line.Length == 0 || line.Count(c => c == '=') != 1))
+        // Android's Java Properties.store() prepends two comment lines.
+        // Accept these comments, but reject blank entries, duplicates and
+        // any noncanonical data line to keep ZIP metadata unambiguous.
+        var allLines = properties.Split('\n');
+        var lines = allLines.Take(allLines.Length - 1)
+            .Select(line => line.TrimEnd('\r'))
+            .Where(line => !line.StartsWith('#'))
+            .ToArray();
+        if (!properties.EndsWith('\n') || allLines[^1] != "" ||
+            lines.Length != 12 ||
+            lines.Any(line => line.Length == 0 || line.Count(c => c == '=') != 1))
             throw new InvalidDataException("Invalid backup manifest schema.");
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string line in lines.Take(12))
+        foreach (string line in lines)
         {
             var parts = line.Split('=', 2);
             if (!values.TryAdd(parts[0], parts[1]))
