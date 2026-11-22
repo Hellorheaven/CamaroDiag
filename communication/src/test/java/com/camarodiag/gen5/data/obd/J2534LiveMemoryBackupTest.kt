@@ -345,4 +345,33 @@ class J2534LiveMemoryBackupTest {
         assertTrue(ecu.sent.isEmpty())
     }
 
+    @Test fun emptyOversizedAndOverflowingReadRangesNeverContactEcu() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val invalidRequests = listOf(
+            request(length = 0),
+            request(length = 4 * 1024 * 1024 + 1),
+            request().copy(address = -1L),
+            request().copy(address = 0x1_0000_0000L),
+            request().copy(address = 0xFFFF_FFFFL),
+            request().copy(chunkBytes = 0),
+            request().copy(chunkBytes = 257),
+            request().copy(diagnosticSession = 0)
+        )
+        for (invalid in invalidRequests) {
+            assertTrue("Invalid memory scope must fail before contacting ECU",
+                runCatching { J2534LiveMemoryBackup.captureForTest(ecu, invalid) }.isFailure)
+        }
+        assertTrue(ecu.sent.isEmpty())
+    }
+
+    @Test fun invalidVinIsRejectedBeforeAnyMemoryOrIdentificationTraffic() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        for (invalid in listOf("", "INVALID", "2G1I0000000000001")) {
+            assertTrue(runCatching {
+                J2534LiveMemoryBackup.captureForTest(ecu, request(vinOverride = invalid))
+            }.isFailure)
+        }
+        assertTrue(ecu.sent.isEmpty())
+    }
+
 }
