@@ -2077,7 +2077,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val response = obdManager.sendReadOnlyConsoleCommand(request)
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
-                    val hasEcuResponse = SafeObdRequestPolicy.hasPositiveResponse(request, response)
+                    val hasEcuResponse = SafeObdRequestPolicy.hasUnambiguousPositiveResponse(request, response)
                     val hasNegativeEcuResponse = SafeObdRequestPolicy.hasNegativeResponse(request, response)
                     val isEcuTraffic = hasEcuResponse || hasNegativeEcuResponse
                     val responseEvent = CanConsoleHistoryEntry(
