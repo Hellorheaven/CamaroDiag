@@ -246,6 +246,7 @@ internal static class NativeScopedBackupArchiveSelfTests
             Check(NativeScopedBackupImportCli.Run([
                 NativeScopedBackupImportCli.Command, zipPath, profilePath
             ]) == 8, "Offline verification CLI rejects an incomplete profile");
+            File.Delete(missingPath);
             File.Delete(profilePath);
 
             var raw = Path.Combine(directory, "original.bin");

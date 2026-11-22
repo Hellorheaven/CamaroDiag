@@ -49,7 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          keytool -genkeypair -keystore app/release.jks -storetype JKS \
+          keytool -genkeypair -keystore app/release.jks -storetype PKCS12 \
             -storepass "$SIGNING_STORE_PASSWORD" -keypass "$SIGNING_KEY_PASSWORD" \
             -alias "$SIGNING_KEY_ALIAS" -keyalg RSA -keysize 2048 \
             -dname 'CN=CamaroDiag CI checkpoint' -validity 1 -noprompt
