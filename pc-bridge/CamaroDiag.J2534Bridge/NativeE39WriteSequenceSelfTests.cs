@@ -28,6 +28,7 @@ internal static class NativeE39WriteSequenceSelfTests
         internal int VoltageReads;
         internal int ByteReads;
         internal bool CorruptEarlierSectorOnSecondErase;
+        internal bool CorruptNextSectorOnFirstErase;
         internal bool WrongOriginalReadback;
         internal bool WrongWrittenReadback;
         internal bool TruncatedWrittenReadback;
@@ -76,6 +77,8 @@ internal static class NativeE39WriteSequenceSelfTests
             {
                 address = (request[2] << 16) | (request[3] << 8) | request[4];
                 Erases++;
+                if (CorruptNextSectorOnFirstErase && Erases == 1)
+                    Memory[16] ^= 0x01;
                 if (CorruptEarlierSectorOnSecondErase && Erases == 2)
                     Memory[0] ^= 0x01;
                 Array.Fill(Memory, (byte)0xFF, address - 0x20000, 16);
@@ -134,7 +137,7 @@ internal static class NativeE39WriteSequenceSelfTests
         Assert(journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.WrittenCrcVerified) == 2 &&
                journal.Events[^1].Phase == NativeE39WriteSequence.Phase.Completed,
             "Every sector has a verification event before completed status");
-        Assert(ecu.ByteReads == 6 &&
+        Assert(ecu.ByteReads == 8 &&
                journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.OriginalBytesVerified) == 2 &&
                journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.WrittenBytesVerified) == 2 &&
                journal.Events.Count(x => x.Phase == NativeE39WriteSequence.Phase.FinalBytesVerified) == 2,
@@ -257,6 +260,16 @@ internal static class NativeE39WriteSequenceSelfTests
                disturbedJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
                disturbedJournal.Events.All(e => e.Phase != NativeE39WriteSequence.Phase.Completed),
             "Final pass catches corruption of a previously verified sector");
+
+        var changedNext = new TestEcu(origin) { CorruptNextSectorOnFirstErase = true };
+        var changedNextJournal = new TestJournal();
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteSequence.RunBenchSequenceAsync(changedNext, changedNextJournal,
+                plan, opts, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(changedNext.Erases == 1 &&
+               changedNextJournal.Events[^1].Phase == NativeE39WriteSequence.Phase.RecoveryRequired &&
+               changedNextJournal.Events.Count(e => e.Phase == NativeE39WriteSequence.Phase.EraseStarted) == 1,
+            "A sector changed since all-sector preflight must not be erased");
 
         var duplicate = plan with { Sectors = new[] { plan.Sectors[0], plan.Sectors[0] } };
         var overlapEcu = new TestEcu(origin);
