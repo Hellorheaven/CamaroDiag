@@ -589,9 +589,8 @@ class BluetoothObdManager(context: Context) {
             try {
                 for (command in listOf("ATE0", "ATL0", "ATS1", "ATH1")) {
                     val answer = boundCommand(command, 1_000L)
-                    check(CanConsoleAdapterRestorationPolicy.accepted(answer)) {
-                        "CAN adapter did not confirm the requested monitor configuration."
-                    }
+                    if (!CanConsoleAdapterRestorationPolicy.accepted(answer))
+                        throw CanAdapterRestorationException()
                 }
                 val formattingResponse = boundCommand("ATCAF0", 1_000L)
                 check(CanConsoleAdapterRestorationPolicy.accepted(formattingResponse)) {
