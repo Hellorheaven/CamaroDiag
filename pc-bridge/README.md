@@ -176,7 +176,7 @@ Le précontrôle natif `NativeE39ImagePreflight` compare séparément l'image or
 
 Le séquenceur `NativeE39WriteSequence`, testable hors matériel, vérifie **tous les secteurs avant le premier effacement** : CRC de l'original lu via le kernel, écriture d'essai sans programmation, journalisation persistante avant effacement et écriture, programmation par blocs, puis comparaison CRC indépendante après chaque secteur. Sur perte de liaison ou échec après effacement, il enregistre `RecoveryRequired` et **ne recommence jamais aveuglément**. `NativeE39FileWriteJournal` utilise un fichier JSONL nouveau, en ajout uniquement et avec vidage forcé des données, sans écraser un journal précédent.
 
-Ces composants sont des parties concrètes du futur pilote : **ils ne sont pas encore raccordés à une opération destructive du pont**. Ils exigent un kernel RAM original, une géométrie de flash attestée, un ECU de banc et une procédure de récupération matériellement démontrée.
+Ces composants sont des parties concrètes du futur pilote : **ils ne sont pas exposés par le pont réseau ni par Android**. Ils exigent un kernel RAM original, une géométrie de flash attestée, un ECU de banc et une procédure de récupération matériellement démontrée.
 
 ### Identification physique GMLAN en lecture seule
 
@@ -211,3 +211,16 @@ CamaroDiag.J2534Bridge.exe --probe-gmlan-ecu --adapter-index 0 --request-can-id 
 L'indice d'adaptateur, les identifiants CAN et le profil de liaison doivent être ceux du matériel réellement relié. Les valeurs ci-dessus sont seulement un **exemple courant de CAN haute vitesse 11 bits**, pas une adresse universellement validée pour chaque calculateur. Le programme refuse les paramètres manquants, incompatibles ou ambigus, puis lit deux fois le VIN et l'identifiant du logiciel ECU pour vérifier leur concordance. Il affiche la tension fournie par le pilote J2534 lorsque celui-ci le permet.
 
 Cette commande utilise la DLL du fabricant de l'interface, **sans PCM Hammer ni outil de flash tiers**. Elle n'active pas la session de programmation et ne demande ni déverrouillage, ni effacement, ni écriture. Une identité stable n'est **pas** une validation de programmation : la récupération et le programme de flash natif restent à qualifier sur banc.
+
+
+### Sauvegardes mémoire et récupération sur Windows
+
+La lecture mémoire sur Windows propose un ZIP vérifiable dans CamaroDiag Android, contenant les deux acquisitions séparées et leurs informations d'intégrité. Le fichier définitif est publié après relecture indépendante sur disque. Un BIN brut reste disponible, mais ne contient pas cette preuve de double lecture. Les archives Windows indiquent une couverture partielle lorsqu'une cartographie complète n'a pas été attestée.
+
+L'écran Récupération ECU permet de consulter un journal de programmation hors ligne : secteurs préparés, écrits, vérifiés, dernière phase et adresse d'un secteur potentiellement incomplet lorsque disponible. L'ouverture du journal ne contacte pas le calculateur et ne relance aucune écriture.
+
+### Écriture locale E39/E39A
+
+Une entrée locale réservée au banc indépendant a été intégrée. Elle refuse les profils non qualifiés avant même de découvrir les interfaces J2534. Pour cette version, aucune autorité de qualification ni aucun noyau de flash physiquement approuvé n'est fourni : **la programmation physique reste fermée**. Un certificat généré pour un test logiciel ne donne aucun droit d'écriture.
+
+Les tests logiciels ne remplacent ni la validation de la révision matérielle, ni la preuve de récupération sur banc. Le pont TLS et la console Android n'exposent aucune commande de programmation.
