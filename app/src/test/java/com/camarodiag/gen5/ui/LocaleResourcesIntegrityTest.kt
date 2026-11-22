@@ -155,14 +155,17 @@ class LocaleResourcesIntegrityTest {
      */
     @Test fun allAdvertisedLocalesCoverEveryStringKey() {
         val source = strings("en").keys
-        for (locale in locales.filterNot { it == "en" }) {
-            val missing = source - strings(locale).keys
-            assertTrue(
-                "Incomplete translations for $locale: ${missing.size} missing keys, " +
-                    missing.sorted().take(20).joinToString(", "),
-                missing.isEmpty()
-            )
+        val missingByLocale = locales.filterNot { it == "en" }
+            .associateWith { locale -> (source - strings(locale).keys).sorted() }
+            .filterValues { it.isNotEmpty() }
+        val missingTotal = missingByLocale.values.sumOf { it.size }
+        val details = missingByLocale.entries.joinToString("\n") { (locale, missing) ->
+            "$locale: ${missing.size} missing keys: ${missing.joinToString(", ")}"
         }
+        assertTrue(
+            "Incomplete translations: $missingTotal missing keys in ${missingByLocale.size} locales\n$details",
+            missingByLocale.isEmpty()
+        )
     }
 
     @Test fun everyLocaleContainsAllLiveSensorLabelsAndPluralResources() {
