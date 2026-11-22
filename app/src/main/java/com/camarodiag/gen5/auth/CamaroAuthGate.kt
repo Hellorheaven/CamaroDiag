@@ -100,6 +100,8 @@ fun CamaroAuthGate(
                     if (verificationRequired) {
                         // Keep the signed-in Firebase session for verification only. Do not expose
                         // diagnostics, previous account state, owner access or offline grace.
+                        licenseChecked = null
+                        licenseSource = null
                         accessLevel = LicenseLevel.FREE
                         validationPrefs.edit { remove("verified_$targetUid"); remove("verified_email_$targetUid") }
                         validatedAccountUid = targetUid
@@ -122,9 +124,14 @@ fun CamaroAuthGate(
                         signedClaims = verifiedClaims,
                         license = null
                     )
-                    if (LicenseRolloutConfig.ENABLED && accessLevel != LicenseLevel.OWNER) {
-                        // Entitlement is issued and checked by Firebase Admin on
-                        // each server call, never by a local preference or claim.
+                    if (accessLevel == LicenseLevel.OWNER) {
+                        licenseChecked = true
+                        licenseSource = "owner"
+                    } else if (LicenseRolloutConfig.ENABLED) {
+                        // One server entitlement read per startup, account change,
+                        // or explicit refresh. Never re-query just to show My Account.
+                        licenseChecked = null
+                        licenseSource = null
                         FirebaseFunctions.getInstance("europe-west1")
                             .getHttpsCallable("getMyLicenseStatus").call()
                             .addOnCompleteListener { licenseTask ->
@@ -133,9 +140,13 @@ fun CamaroAuthGate(
                                 ) return@addOnCompleteListener
                                 val data = if (licenseTask.isSuccessful)
                                     licenseTask.result?.data as? Map<*, *> else null
-                                accessLevel = if (data?.get("verified") == true &&
-                                    data["licensed"] == true
-                                ) LicenseLevel.PREMIUM else LicenseLevel.FREE
+                                val confirmed = data?.get("verified") == true &&
+                                    data["licensed"] is Boolean
+                                licenseChecked = confirmed
+                                licenseSource = if (confirmed)
+                                    data?.get("source") as? String else null
+                                accessLevel = if (confirmed && data?.get("licensed") == true)
+                                    LicenseLevel.PREMIUM else LicenseLevel.FREE
                             }
                     }
                     validationPrefs.edit {
@@ -147,7 +158,9 @@ fun CamaroAuthGate(
                     validatedUser = user
                     latestOnAccountChanged(targetUid)
                 } else {
-                    // An offline grace period can allow ordinary diagnostics, never owner tests.
+                    // Failed validation: never retain a previously granted Premium entitlement.
+                    licenseChecked = false
+                    licenseSource = null
                     accessLevel = LicenseLevel.FREE
                     val lastValidated = validationPrefs.getLong("verified_$targetUid", 0L)
                     val previousEmail = validationPrefs.getString("verified_email_$targetUid", null)
