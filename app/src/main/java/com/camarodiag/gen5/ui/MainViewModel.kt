@@ -1878,7 +1878,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = error.message ?: failureMessage,
+                        content = failureMessage,
                         succeeded = false
                     )
                     _liveCanMonitorState.value = current.copy(
@@ -2062,7 +2062,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = error.message ?: localizedContext.getString(R.string.can_sniffer_request_failed),
+                        content = localizedContext.getString(R.string.can_sniffer_request_failed),
                         succeeded = false
                     )
                     _liveCanMonitorState.value = current.copy(
