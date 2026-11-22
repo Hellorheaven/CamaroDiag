@@ -48,6 +48,7 @@ import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
 import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
 import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
+import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
 import com.camarodiag.gen5.data.obd.ObservedCanId
 import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.mileageaudit.MileageAuditEngine
@@ -100,6 +101,7 @@ data class LiveCanMonitorState(
     val isSendingRequest: Boolean = false,
     val consoleHistory: List<CanConsoleHistoryEntry> = emptyList(),
     val observedCanIds: Set<ObservedCanId> = emptySet(),
+    val rawArchiveFailed: Boolean = false,
     val message: String? = null
 )
 
@@ -1763,6 +1765,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         _liveCanMonitorState.value = previousState.copy(
             isCapturing = true,
+            rawArchiveFailed = false,
             rawText = "",
             report = null,
             message = null,
@@ -1901,6 +1904,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isCapturing = false,
                         rawText = raw,
                         message = failureMessage,
+                        rawArchiveFailed = error is CanCaptureArchiveWriteException,
                         consoleHistory = (current.consoleHistory + trailingEvents + failureEvent).takeLast(300),
                         observedCanIds = retainObservedCanIds(current.observedCanIds, trailingEvents)
                     )
@@ -1954,7 +1958,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             rawText = "",
             report = null,
             consoleHistory = emptyList(),
-            observedCanIds = emptySet()
+            observedCanIds = emptySet(),
+            rawArchiveFailed = false
         )
     }
 
@@ -2218,9 +2223,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 if (!current()) return@launch
                 val archive = selectedArchive?.takeIf { it.isFile }
-                require(history.isNotEmpty() || snapshot.rawText.isNotBlank() ||
-                    (archive?.length() ?: 0L) > 0L) {
-                    "No CAN console history is available to export."
+                check(CanConsoleExportPolicy.canExport(
+                    isCapturing = snapshot.isCapturing,
+                    archiveFailed = snapshot.rawArchiveFailed,
+                    hasHistory = history.isNotEmpty(),
+                    hasRawData = snapshot.rawText.isNotBlank() || (archive?.length() ?: 0L) > 0L
+                )) {
+                    "CAN capture export is not available."
                 }
                 val outputText = buildString {
                     appendLine("# CamaroDiag unified CAN console")
