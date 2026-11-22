@@ -41,6 +41,7 @@ import com.camarodiag.gen5.data.obd.SafeObdRequestPolicy
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
+import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
 import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
