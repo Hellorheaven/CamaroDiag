@@ -69,6 +69,7 @@ object EcuBackupIntegrity {
                 problems += Problem.DIGEST_MISMATCH
             }
             val identical = capture.independentRead != null &&
+                capture.firstRead !== capture.independentRead &&
                 EcuBenchExpertPlan.verifiedReadback(capture.firstRead, capture.independentRead)
             if (entry.readsIdentical != identical) {
                 problems += Problem.INDEPENDENT_READ_MISMATCH
