@@ -117,6 +117,10 @@ internal static class NativeScopedBackupArchiveSelfTests
                 using var writer = new StreamWriter(converted.CreateEntry("manifest.properties").Open());
                 writer.Write("#CamaroDiag ECU offline archive v2\n#Sun Nov 22 2026\n");
                 writer.Write(androidManifest.Replace("controller=\n", "controller=E39A\n")
+                    .Replace("capture.0.region=OTHER\n", "capture.0.region=CALIBRATION\n")
+                    .Replace("capture.0.origin=REPORTED_HARDWARE_READ\n",
+                        "capture.0.origin=IMPORTED_FILE\n")
+                    .Replace("required=\n", "required=CALIBRATION,EXTERNAL_EEPROM\n")
                     .Replace("capture.0.sha256=" + sha,
                         "capture.0.sha256=" + sha.ToLowerInvariant()));
             }
