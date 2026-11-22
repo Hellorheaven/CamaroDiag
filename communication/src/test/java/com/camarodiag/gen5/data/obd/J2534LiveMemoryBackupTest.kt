@@ -374,4 +374,13 @@ class J2534LiveMemoryBackupTest {
         assertTrue(ecu.sent.isEmpty())
     }
 
+    @Test fun scopedReadRevocationAfterSecondPassStillRejectsCapture() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(
+                ecu, request(), liveLinkValid = { ecu.reads < 6 })
+        }.isFailure)
+        assertEquals(6, ecu.reads)
+    }
+
 }
