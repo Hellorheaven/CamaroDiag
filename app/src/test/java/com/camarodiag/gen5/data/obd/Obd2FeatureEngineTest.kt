@@ -619,7 +619,7 @@ class Obd2FeatureEngineTest {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             commands += command
             when (command) {
-                "03" -> "7E8 04 43 01 03 00\r7E9 04 43 01 71 00"
+                "03" -> "7E8 04 43 01 03 00\r7E9 04 43 01 01 71"
                 "07" -> "18DAF110 04 47 01 01 33\r18DAF111 02 47 00"
                 "0A" -> "NO DATA"
                 else -> "NO DATA"
@@ -649,7 +649,7 @@ class Obd2FeatureEngineTest {
     fun compactCanResponderHeadersCannotBeDecodedAsFaultData() = runBlocking {
         val engine = Obd2FeatureEngine(ObdCommandChannel { command, _ ->
             when (command) {
-                "03" -> "7E80443010300\r18DAF1100443017100"
+                "03" -> "7E80443010300\r18DAF1100443010171"
                 else -> "NO DATA"
             }
         })
