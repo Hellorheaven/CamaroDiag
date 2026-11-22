@@ -177,7 +177,7 @@ object CamaroUdsProtocol {
             val line = sourceLine.trim().uppercase(Locale.ROOT)
             if (line.isEmpty()) continue
             val parts = line.split(Regex("\\s+"))
-            var data = when {
+            val data = when {
                 parts.size > 1 && canHeader.matches(parts[0]) ->
                     parts.drop(1).joinToString("")
                 // 11-bit CAN ID prepended without spaces (e.g. 7E8410C1AF8).
