@@ -1,11 +1,12 @@
 name: Release validation (no publication)
 on:
   workflow_dispatch:
-  workflow_call:
+# Release-specific manual verification only on main. Not used by PR checks.
 permissions:
   contents: read
 jobs:
   windows-release:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -24,6 +25,7 @@ jobs:
           dotnet run --project .\pc-bridge\CamaroDiag.J2534Bridge\CamaroDiag.J2534Bridge.csproj --configuration Release --no-build -- --self-test
           if ($LASTEXITCODE -ne 0) { throw 'Release bridge self-test failed' }
   android-release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
