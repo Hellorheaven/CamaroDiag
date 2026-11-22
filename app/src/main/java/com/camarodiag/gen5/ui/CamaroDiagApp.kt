@@ -1739,7 +1739,13 @@ fun CanSnifferScreen(
                         }
                     }
                     if (!isAvailable) {
-                        Text(stringResource(R.string.can_sniffer_unavailable), color = WarnRed, fontSize = 11.sp)
+                        Text(
+                            stringResource(if (canReadObdAvailable)
+                                R.string.can_console_read_only_available
+                            else R.string.can_sniffer_unavailable),
+                            color = if (canReadObdAvailable) TextMuted else WarnRed,
+                            fontSize = 11.sp
+                        )
                     }
                     state.message?.takeIf { it.isNotBlank() }?.let {
                         Text(it, color = TextMuted, fontSize = 11.sp)
