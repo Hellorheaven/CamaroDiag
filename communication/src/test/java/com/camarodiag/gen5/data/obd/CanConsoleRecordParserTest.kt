@@ -266,4 +266,29 @@ class CanConsoleRecordParserTest {
         )
     }
 
+
+    @Test fun diagnosticReplyStatusDistinguishesPositiveNegativeAndAdapterOnly() {
+        val physical = requireNotNull(RawCanFrameParser.parse("7E0 03 22 F1 90"))
+        assertEquals(CanConsoleDiagnosticStatus.NONE,
+            CanConsoleAdapterReplyPolicy.diagnosticStatus("OK", physical))
+        assertEquals(CanConsoleDiagnosticStatus.NONE,
+            CanConsoleAdapterReplyPolicy.diagnosticStatus("7E9 04 03 7F 22 31", physical))
+        assertEquals(CanConsoleDiagnosticStatus.NEGATIVE,
+            CanConsoleAdapterReplyPolicy.diagnosticStatus("7E8 04 03 7F 22 31", physical))
+        assertEquals(CanConsoleDiagnosticStatus.NONE,
+            CanConsoleAdapterReplyPolicy.diagnosticStatus("7E8 04 03 7F 22 78", physical))
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE,
+            CanConsoleAdapterReplyPolicy.diagnosticStatus("7E8 04 03 62 F1 90", physical))
+        val functional = requireNotNull(RawCanFrameParser.parse("7DF 03 22 F1 90"))
+        assertEquals(CanConsoleDiagnosticStatus.NEGATIVE,
+            CanConsoleAdapterReplyPolicy.diagnosticStatus("7E9 04 03 7F 22 31", functional))
+        assertEquals(CanConsoleDiagnosticStatus.POSITIVE,
+            CanConsoleAdapterReplyPolicy.diagnosticStatus(
+                "7E9 04 03 7F 22 31\r\n7E8 04 03 62 F1 90", functional
+            ))
+        assertEquals(listOf("RX", "RX"),
+            CanConsoleRecordParser.parse(
+                "7E9 04 03 7F 22 31\r\n7E8 04 03 62 F1 90"
+            ).map { it.direction })
+    }
 }
