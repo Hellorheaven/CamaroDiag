@@ -158,4 +158,14 @@ class SafeObdRequestPolicyTest {
         }
     }
 
+    @Test
+    fun conflictingPositiveAndNegativeLinesCannotConfirmConsoleSuccess() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0152"))
+        val mixed = "41 52 80\n7F 01 11"
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(request, mixed))
+        assertEquals(true, SafeObdRequestPolicy.hasNegativeResponse(request, mixed))
+        assertEquals(false, SafeObdRequestPolicy.hasUnambiguousPositiveResponse(request, mixed))
+        assertEquals(true, SafeObdRequestPolicy.hasUnambiguousPositiveResponse(request, "41 52 80"))
+    }
+
 }
