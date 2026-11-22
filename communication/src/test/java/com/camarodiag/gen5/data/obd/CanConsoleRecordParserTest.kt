@@ -103,13 +103,13 @@ class CanConsoleRecordParserTest {
         for (response in listOf(
             "OK", "ok>", "7E8 03 41 0C 1A",
             "18DAF110 03 7F 22 31",
-            "SEARCHING...\\r\\n7E8 03 41 0C 1A"
+            "SEARCHING...\r\n7E8 03 41 0C 1A"
         )) {
             assertTrue(response, CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(response))
         }
         for (response in listOf(
             "", "?", "SEARCHING...", "ATSP6", "7E8 03 41 0C",
-            "NO DATA", "OK\\r\\nCAN ERROR", "7E8 03 41 0C 1A\\nBUS ERROR"
+            "NO DATA", "OK\r\nCAN ERROR", "7E8 03 41 0C 1A\nBUS ERROR"
         )) {
             assertFalse(response, CanConsoleAdapterReplyPolicy.hasConfirmedTransmission(response))
         }
@@ -120,7 +120,7 @@ class CanConsoleRecordParserTest {
         val request = requireNotNull(RawCanFrameParser.parse("7E0 02 01 0C"))
         assertEquals(0x7E8L, CanConsoleEcuRouting.expectedResponder(request))
         val records = CanConsoleRecordParser.parse(
-            "7E9 03 41 0C FF\\r\\n7E8 03 41 0C 1A", request
+            "7E9 03 41 0C FF\r\n7E8 03 41 0C 1A", request
         )
         assertEquals(listOf("SYSTEM", "RX"), records.map { it.direction })
         assertFalse(records[0].succeeded)
@@ -133,7 +133,7 @@ class CanConsoleRecordParserTest {
         val request = requireNotNull(RawCanFrameParser.parse("18DA10F1 03 22 F1 90"))
         assertEquals(0x18DAF110L, CanConsoleEcuRouting.expectedResponder(request))
         val records = CanConsoleRecordParser.parse(
-            "18DAF111 03 62 F1 90\\r\\n7E8 03 62 F1 90\\r\\n18DAF110 03 62 F1 90",
+            "18DAF111 03 62 F1 90\r\n7E8 03 62 F1 90\r\n18DAF110 03 62 F1 90",
             request
         )
         assertEquals(listOf("SYSTEM", "SYSTEM", "RX"), records.map { it.direction })
@@ -154,7 +154,7 @@ class CanConsoleRecordParserTest {
 
     @Test fun passiveMonitorPreservesMultipleEcUsWithoutAttribution() {
         val records = CanConsoleRecordParser.parse(
-            "7E8 03 41 0C 1A\\r\\n7E9 03 41 0C 1B"
+            "7E8 03 41 0C 1A\r\n7E9 03 41 0C 1B"
         )
         assertEquals(listOf("RX", "RX"), records.map { it.direction })
         assertTrue(records[0].content.contains("ID=7E8"))
