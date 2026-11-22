@@ -519,7 +519,8 @@ fun CamaroDiagApp(
                             text = {
                                 Text(
                                     (if (!premiumAllowed && tab in premiumTabs) "🔒 " else "") +
-                                        stringResource(tab.labelResourceId)
+                                        stringResource(tab.labelResourceId),
+                                    color = if (!premiumAllowed && tab in premiumTabs) TextMuted else TextPrimary
                                 )
                             },
                             onClick = {
