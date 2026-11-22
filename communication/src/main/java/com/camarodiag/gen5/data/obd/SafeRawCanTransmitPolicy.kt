@@ -9,6 +9,11 @@ package com.camarodiag.gen5.data.obd
 object SafeRawCanTransmitPolicy {
     fun allows(frame: RawCanFrame): Boolean {
         if (frame.data.size !in 1..8) return false
+        // CAN IDs reserved for ECU replies must never be used to impersonate
+        // the responder on the physical vehicle bus.
+        if (!frame.isExtended && frame.canId in 0x7E8L..0x7EFL) return false
+        if (frame.isExtended && (frame.canId and 0x1FFFFF00L) == 0x18DAF100L)
+            return false
         val diagnosticAddress = if (frame.isExtended) {
             (frame.canId and 0x1FFF00FFL) == 0x18DA00F1L
         } else {
