@@ -78,6 +78,12 @@ internal sealed class J2534MemoryReadScope
 
     public static J2534MemoryReadScope Load(string path)
     {
+        // A memory read policy is a small operator-supplied JSON document.
+        // Refuse oversized input before allocating parser buffers.
+        const long MaximumProfileBytes = 16 * 1024;
+        var size = new FileInfo(path).Length;
+        if (size is <= 0 or > MaximumProfileBytes)
+            throw new ArgumentException("Invalid or oversized J2534 memory read profile.");
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
         var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
