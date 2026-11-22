@@ -234,7 +234,8 @@ internal sealed partial class BridgeDesktopForm
                 "Cette vérification ne prouve ni la couverture ECU complète ni la restaurabilité.";
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or
-            UnauthorizedAccessException or OverflowException or JsonException or NotSupportedException)
+            UnauthorizedAccessException or OverflowException or JsonException or
+            NotSupportedException or InvalidOperationException)
         {
             memoryStatus.Text = "Archive refusée : " + ex.Message;
         }
