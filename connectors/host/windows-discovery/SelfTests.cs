@@ -4,10 +4,15 @@ namespace CamaroDiagConnectors.Windows;
 
 internal static class SelfTests
 {
-    private sealed class Simulation(bool corrupt, bool wrongSequence) : Stream
+    private sealed class Simulation(bool corrupt, bool wrongSequence, bool zeroRead = false, bool timeoutException = false) : Stream
     {
         private byte[] reply=[];
         private int cursor;
+        private bool gapUsed;
+        private int readTimeout = 1500, writeTimeout = 1500;
+        public override bool CanTimeout => zeroRead || timeoutException;
+        public override int ReadTimeout { get => readTimeout; set => readTimeout = value; }
+        public override int WriteTimeout { get => writeTimeout; set => writeTimeout = value; }
         internal int Commands {get;private set;}
         public override bool CanRead=>true;
         public override bool CanWrite=>true;
@@ -32,6 +37,12 @@ internal static class SelfTests
         }
         public override int Read(byte[] buffer,int offset,int count)
         {
+            if(!gapUsed && (zeroRead || timeoutException))
+            {
+                gapUsed=true;
+                if(timeoutException)throw new TimeoutException("Transient serial read gap");
+                return 0;
+            }
             int n=Math.Min(3,Math.Min(count,reply.Length-cursor));
             Array.Copy(reply,cursor,buffer,offset,n);cursor+=n;return n;
         }
@@ -55,6 +66,13 @@ internal static class SelfTests
             var client=new BinaryDiscovery(link);
             Require(client.Verify().Length==3&&link.Commands==3);
             ExpectFailure(()=>client.Verify());
+        }
+        foreach(var gap in new[]{(true,false),(false,true)})
+        {
+            using var link=new Simulation(false,false,gap.Item1,gap.Item2);
+            var client=new BinaryDiscovery(link);
+            Require(client.Verify().Length==3 && link.Commands==3);
+            Require(link.ReadTimeout > 0 && link.WriteTimeout > 0);
         }
         foreach(var bad in new[]{(true,false),(false,true)})
         {
