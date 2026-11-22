@@ -424,11 +424,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
-        discardCanMonitor()
+        val interruptedCapture = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
+        discardCanMonitor(deleteArchive = false)
         detachCanRequest()
         _liveCanMonitorState.value = _liveCanMonitorState.value.copy(
             isCapturing = false,
-            isSendingRequest = false
+            isSendingRequest = false,
+            rawArchiveFailed = _liveCanMonitorState.value.rawArchiveFailed || interruptedCapture
         )
         _isStreamingLive.value = false
         _livePids.value = emptyList()
