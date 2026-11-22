@@ -6,6 +6,10 @@ package com.camarodiag.gen5.data.obd
  * in-memory RX window and be presented as the entire capture.
  */
 object CanConsoleExportPolicy {
+    /** A disconnected in-progress capture is incomplete; a finished archive stays intact. */
+    fun archiveFailedAfterDisconnect(alreadyFailed: Boolean, wasCapturing: Boolean): Boolean =
+        alreadyFailed || wasCapturing
+
     fun canExport(
         isCapturing: Boolean,
         archiveFailed: Boolean,
