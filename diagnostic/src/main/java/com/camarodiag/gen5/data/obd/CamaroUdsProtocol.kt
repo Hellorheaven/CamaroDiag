@@ -64,7 +64,7 @@ object CamaroUdsProtocol {
 
     /** STN status must be a real firmware banner, never an arbitrary substring. */
     private fun hasStnFirmwareBanner(response: String): Boolean {
-        val banner = Regex("^STN[0-9]{4}(?:$|[ ._-].*)", RegexOption.IGNORE_CASE)
+        val banner = Regex("^STN[0-9]{4}(?:\\s+v[0-9]+(?:\\.[0-9]+){1,3})?$", RegexOption.IGNORE_CASE)
         return response.lineSequence().any { banner.matches(it.trim()) }
     }
 
