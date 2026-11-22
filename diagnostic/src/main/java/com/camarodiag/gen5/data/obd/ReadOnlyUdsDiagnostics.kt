@@ -537,12 +537,23 @@ class ProfiledUdsReadSession private constructor(
         ): String {
             val encoding = definitions.single { it.field == field }.encoding
             return when (encoding) {
-                UdsIdentityEncoding.ASCII -> bytes.toString(Charsets.US_ASCII)
-                    .trim()
-                    .trim('\u0000')
-                    .uppercase(Locale.ROOT)
-                UdsIdentityEncoding.HEX -> bytes.joinToString("") {
-                    "%02X".format(Locale.ROOT, it.toInt() and 0xFF)
+                UdsIdentityEncoding.ASCII -> {
+                    require(bytes.isNotEmpty() && bytes.all { byte ->
+                        val value = byte.toInt() and 0xFF
+                        value == 0 || value in 0x20..0x7E
+                    }) {
+                        "ECU identity contains control or non-ASCII bytes."
+                    }
+                    bytes.toString(Charsets.US_ASCII)
+                        .trim()
+                        .trim('\u0000')
+                        .uppercase(Locale.ROOT)
+                }
+                UdsIdentityEncoding.HEX -> {
+                    require(bytes.isNotEmpty()) { "ECU identity hex field is empty." }
+                    bytes.joinToString("") {
+                        "%02X".format(Locale.ROOT, it.toInt() and 0xFF)
+                    }
                 }
             }
         }
