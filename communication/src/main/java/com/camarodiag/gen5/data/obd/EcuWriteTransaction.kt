@@ -339,7 +339,12 @@ internal class EcuWriteExecutionEngine(
                     driver.write(unit, sector.patchedBytes.copyOfRange(offset, offset + unitBytes))
                 }
                 currentAddress = sector.absoluteAddress
-                if (!driver.independentReadback(region).contentEquals(sector.patchedBytes)) {
+                // Last unit of a sector has no subsequent write preflight.
+                // Check power and live identity before starting readback too.
+                if (!powerMonitor.isStable() ||
+                    driver.identify() != request.expectedIdentity ||
+                    !driver.independentReadback(region).contentEquals(sector.patchedBytes)
+                ) {
                     return EcuWriteTransaction.Outcome(
                         EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
                         verifiedSectors = verified, failedAddress = currentAddress
