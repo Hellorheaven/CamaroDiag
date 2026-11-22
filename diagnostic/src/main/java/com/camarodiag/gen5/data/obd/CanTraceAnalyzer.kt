@@ -270,10 +270,12 @@ object CanTraceAnalyzer {
                 val matchingIndexes = pending.indices.filter { index ->
                     val request = pending[index].request
                     request.direction != message.direction &&
-                        // This correlation helper covers conventional *11-bit* OBD.
-                        // Extended IDs with the same numerical value are not OBD 7E0/7E8.
-                        request.extendedId == false && message.extendedId == false &&
-                        isCompatibleObdCanResponseId(request.canId, message.canId) &&
+                        // Respect the CAN format: 11-bit SAE OBD IDs and
+                        // 29-bit physical 18DA[target]F1 channels never overlap.
+                        request.extendedId != null && request.extendedId == message.extendedId &&
+                        isCompatibleObdCanResponseId(
+                            request.canId, message.canId, request.extendedId == true
+                        ) &&
                         // A physical ECU may send several NRC 0x78 responses before its final reply.
                         // For functional requests, also allow that same ECU to complete a pending
                         // exchange, but do not count duplicate terminal replies from one responder.
@@ -346,7 +348,15 @@ object CanTraceAnalyzer {
      * functional request 7DF may be answered by 7E8..7EF.
      * Unknown/29-bit addressing is deliberately left unpaired.
      */
-    private fun isCompatibleObdCanResponseId(requestId: Int, responseId: Int): Boolean {
+    private fun isCompatibleObdCanResponseId(
+        requestId: Int, responseId: Int, extended: Boolean
+    ): Boolean {
+        if (extended) {
+            // 29-bit normal fixed physical addressing: request 18DA[target]F1,
+            // responder 18DAF1[target]. No generalized functional mapping.
+            if ((requestId.toLong() and 0xFFFF00FFL) != 0x18DA00F1L) return false
+            return responseId == (0x18DAF100L or ((requestId.toLong() shr 8) and 0xFFL)).toInt()
+        }
         if (requestId == 0x7DF) return responseId in 0x7E8..0x7EF
         if (requestId in 0x7E0..0x7E7) return responseId == requestId + 0x08
         return false
