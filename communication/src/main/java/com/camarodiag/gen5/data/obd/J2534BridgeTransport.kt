@@ -247,7 +247,8 @@ class J2534BridgeTransport(
                 }
                 0x09 -> {
                     require(SafeObdRequestPolicy.hasUnambiguousPositiveResponse(
-                        command, reply.toHex()
+                        command,
+                        reply.joinToString("") { "%02X".format(Locale.ROOT, it.toInt() and 0xFF) }
                     )) { "Physical Mode 09 identification is incomplete or invalid." }
                 }
                 else -> throw IllegalArgumentException("Not a read-only OBD console service.")
