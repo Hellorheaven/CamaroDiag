@@ -13,6 +13,8 @@ import java.util.UUID
 
 /** User-authorized public internal-storage folder. Never requests broad storage permissions. */
 internal object CamaroDiagExportStorage {
+    internal class ExportStorageException(message: String, cause: Throwable? = null) :
+        java.io.IOException(message, cause)
     const val AUTHORITY = "com.android.externalstorage.documents"
     const val DOCUMENT_ID = "primary:CamaroDiag"
     const val DISPLAY_PATH = "/storage/emulated/0/CamaroDiag/"
@@ -30,6 +32,26 @@ internal object CamaroDiagExportStorage {
 
     fun authorizedTree(context: Context): Uri? = context.contentResolver.persistedUriPermissions
         .firstOrNull { it.isReadPermission && it.isWritePermission && isExpectedTree(it.uri) }?.uri
+
+    private fun rootExists(context: Context, tree: Uri): Boolean = runCatching {
+        val root = DocumentsContract.buildDocumentUriUsingTree(tree, DOCUMENT_ID)
+        context.contentResolver.query(root,
+            arrayOf(DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)
+            ?.use { it.moveToFirst() && it.getString(0) == DocumentsContract.Document.MIME_TYPE_DIR } == true
+    }.getOrDefault(false)
+
+    /** Called off the main thread: release obsolete grants after deletion or revocation. */
+    suspend fun availableTree(context: Context): Uri? = withContext(Dispatchers.IO) {
+        val tree = authorizedTree(context) ?: return@withContext null
+        if (rootExists(context, tree)) tree
+        else {
+            runCatching { context.contentResolver.releasePersistableUriPermission(tree, FLAGS) }
+            null
+        }
+    }
+
+    internal fun temporaryFileName(finalName: String): String = ".camarodiag-" + finalName + ".partial"
+
 
     fun authorize(context: Context, uri: Uri): Boolean {
         if (!isExpectedTree(uri)) return false
@@ -58,17 +80,15 @@ internal object CamaroDiagExportStorage {
     suspend fun write(context: Context, requested: String, mimeType: String,
         beforePublish: () -> Unit = {}, writeBytes: suspend (OutputStream) -> Unit) =
         withContext(Dispatchers.IO) {
+            require(mimeType.isNotBlank())
             val resolver = context.contentResolver
-            val tree = authorizedTree(context) ?: error("CamaroDiag folder access is required.")
+            val tree = availableTree(context) ?: throw ExportStorageException("CamaroDiag folder access is required.")
             val root = DocumentsContract.buildDocumentUriUsingTree(tree, DOCUMENT_ID)
-            val available = resolver.query(root, arrayOf(DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)
-                ?.use { it.moveToFirst() && it.getString(0) == DocumentsContract.Document.MIME_TYPE_DIR } == true
-            if (!available) {
-                runCatching { resolver.releasePersistableUriPermission(tree, FLAGS) }
-                error("CamaroDiag folder no longer exists.")
-            }
             val finalName = uniqueFileName(requested)
-            val temporary = DocumentsContract.createDocument(resolver, root, mimeType, ".${finalName}.partial")
+            // Use a generic MIME until publication: Android's file provider
+            // otherwise may append the target extension to the partial name.
+            val temporary = DocumentsContract.createDocument(resolver, root,
+                "application/octet-stream", temporaryFileName(finalName))
                 ?: error("Could not create export document.")
             var published = false
             try {
