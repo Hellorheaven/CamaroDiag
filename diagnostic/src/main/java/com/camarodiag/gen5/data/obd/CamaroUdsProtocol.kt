@@ -69,7 +69,7 @@ object CamaroUdsProtocol {
      */
     private fun hasPositiveMode01Pid00Response(response: String): Boolean {
         val responseLine = Regex(
-            "^(?:(?:[0-9A-F]{3}|[0-9A-F]{8}))?(?:06)?4100[0-9A-F]{8}$"
+            "^(?:(?:7E[8-F]|18DAF1[0-9A-F]{2}))?(?:06)?4100[0-9A-F]{8}$"
         )
         return response.lineSequence().any { line ->
             val compact = line.uppercase(Locale.ROOT).replace(Regex("[^0-9A-F]"), "")
