@@ -131,9 +131,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
-    private var accountSessionGeneration: Long = 0L
+    @Volatile private var accountSessionGeneration: Long = 0L
     private fun isCurrentAccountGeneration(started: Long): Boolean =
         started == accountSessionGeneration && authenticatedAccountUid != null
+
+    /** A pending folder-picker action is valid only in the original login session. */
+    internal fun exportAccountGeneration(): Long = accountSessionGeneration
+    internal fun canResumeExport(started: Long, owner: String): Boolean =
+        isCurrentAccountGeneration(started) && authenticatedAccountUid == owner &&
+            FirebaseAuth.getInstance().currentUser?.uid == owner
 
     private val _activeAccountUid = MutableStateFlow(authenticatedAccountUid)
     val activeAccountUid: StateFlow<String?> = _activeAccountUid.asStateFlow()
