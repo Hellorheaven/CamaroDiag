@@ -557,28 +557,24 @@ class Obd2FeatureEngine(private val channel: ObdCommandChannel) {
             )
         )
 
-        if (pid in 0x24..0x2B) {
-            if (data.size < 4) return emptyList()
-            val sensorIndex = pid - 0x24
-            val bank = if (sensorIndex < 4) 1 else 2
-            val sensor = sensorIndex % 4 + 1
+        if (pid in 0x24..0x2B || pid in 0x34..0x3B) {
+            if (data.size != 4) return emptyList()
+            // Camaro uses a two-bank layout; the 3/4-bank PID-to-sensor
+            // arrangement is a different SAE table and needs explicit detection.
+            val currentFamily = pid in 0x34..0x3B
+            val index = pid - if (currentFamily) 0x34 else 0x24
+            val bank = if (index < 4) 1 else 2
+            val sensor = index % 4 + 1
             val sensorLabel = "Bank $bank sensor $sensor"
-            val equivalenceRatio = ((data[0] shl 8) or data[1]) * 2.0 / 65536.0
-            val voltage = ((data[2] shl 8) or data[3]) * 8.0 / 65536.0
-            return value("O2 $sensorLabel equivalence ratio", equivalenceRatio, "lambda") +
-                value("O2 $sensorLabel voltage", voltage, "V")
-        }
-
-        if (pid in 0x34..0x3B) {
-            if (data.size < 4) return emptyList()
-            val sensorIndex = pid - 0x34
-            val bank = if (sensorIndex < 4) 1 else 2
-            val sensor = sensorIndex % 4 + 1
-            val sensorLabel = "Bank $bank sensor $sensor"
-            val equivalenceRatio = ((data[0] shl 8) or data[1]) * 2.0 / 65536.0
-            val current = ((data[2] shl 8) or data[3]) / 256.0 - 128.0
-            return value("O2 $sensorLabel equivalence ratio", equivalenceRatio, "lambda") +
-                value("O2 $sensorLabel current", current, "mA")
+            val four = data.toIntArray()
+            val ratio = CamaroUdsProtocol.decodeWidebandLambda(four) ?: return emptyList()
+            val secondary = if (currentFamily)
+                CamaroUdsProtocol.decodeWidebandCurrent(four)
+            else CamaroUdsProtocol.decodeWidebandVoltage(four)
+            val reading = secondary ?: return emptyList()
+            return value("O2 $sensorLabel equivalence ratio", ratio, "lambda") +
+                value("O2 $sensorLabel " + if (currentFamily) "current" else "voltage",
+                    reading, if (currentFamily) "mA" else "V")
         }
 
         val decoded: Pair<String, Pair<Double, String>> = when (pid) {
