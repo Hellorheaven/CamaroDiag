@@ -1931,6 +1931,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Do not detach: a later request must not overtake the adapter cleanup.
     }
 
+    /** Standard OBD read availability is distinct from raw CAN monitor/transmit support. */
+    fun canConsoleReadObd(): Boolean = obdManager.isStandardObdReadAvailable()
+
     /** Dispatches raw CAN frames and whitelisted OBD requests through the same console input. */
     fun sendCanConsoleInput(input: String) {
         if (!requirePremiumLicense()) return
