@@ -47,6 +47,16 @@ class EcuBackupArchiveTest {
         assertEquals(0, archive.size())
     }
 
+    @Test fun identicalBufferReferenceIsRejectedBeforeAnyArchiveOutput() {
+        val primary = capture()
+        val output = ByteArrayOutputStream()
+        assertTrue(runCatching {
+            EcuBackupArchive.export(output, listOf(primary.copy(independentRead = primary.firstRead)),
+                setOf(primary.region))
+        }.isFailure)
+        assertEquals(0, output.size())
+    }
+
     @Test fun conflictingIndependentReadIsRejected() {
         val archive = ByteArrayOutputStream()
         val failure = runCatching {
