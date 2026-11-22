@@ -168,6 +168,31 @@ object CanMonitorCompletionPolicy {
         adapterOutput.isBlank() || !CanConsoleAdapterReplyPolicy.isFailure(adapterOutput)
 }
 
+/**
+ * Checks the entire physical monitor stream, including text beyond the
+ * adapter's small command-response buffer and CR/LF split across USB/BLE reads.
+ * A late adapter error must never be disguised as a successful capture.
+ */
+class CanMonitorErrorTracker {
+    private val framer = CanConsoleStreamFramer()
+    private var failed = false
+
+    fun append(chunk: String) {
+        observe(framer.append(chunk).completeLines)
+    }
+
+    fun hasFailureAtEnd(): Boolean {
+        observe(framer.drainTrailing().completeLines)
+        return failed
+    }
+
+    private fun observe(lines: String) {
+        if (failed || lines.isEmpty()) return
+        failed = CanConsoleRecordParser.parse(lines)
+            .any { it.direction == "SYSTEM" && !it.succeeded }
+    }
+}
+
 object CanMonitorProtocolPolicy {
     fun protocolCommand(can29Bit: Boolean): String = if (can29Bit) "ATSP7" else "ATSP6"
     fun clearFilter(can29Bit: Boolean): String = if (can29Bit) "00000000" else "000"
