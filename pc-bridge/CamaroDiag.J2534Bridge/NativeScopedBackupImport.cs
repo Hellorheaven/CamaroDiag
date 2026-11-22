@@ -10,6 +10,15 @@ namespace CamaroDiag.J2534Bridge;
 /// </summary>
 internal static class NativeScopedBackupImport
 {
+    private static readonly HashSet<string> KnownRegions = new(StringComparer.Ordinal)
+    {
+        "CALIBRATION", "PROGRAM_FLASH", "DATA_FLASH", "EXTERNAL_EEPROM", "OTHER"
+    };
+    private static readonly HashSet<string> KnownOrigins = new(StringComparer.Ordinal)
+    {
+        "IMPORTED_FILE", "SIMULATION", "REPORTED_HARDWARE_READ"
+    };
+
     internal static NativeScopedMemoryReader.VerifiedCapture VerifyZip(
         string source, J2534MemoryReadScope scope)
     {
@@ -75,15 +84,25 @@ internal static class NativeScopedBackupImport
         // The writer emits twelve fields; reject additions or omissions.
         if (values.Count != keys.Count || values.Keys.Any(k => !keys.Contains(k)))
             throw new InvalidDataException("Unrecognized backup manifest field.");
+        // Android can capture other qualified regions and declare missing
+        // required regions. These labels are evidence only, never permission
+        // to restore or to access an ECU.
+        var requiredValue = values["required"];
+        var requiredRegions = requiredValue.Length == 0
+            ? Array.Empty<string>() : requiredValue.Split(',');
+        if (requiredRegions.Any(region => !KnownRegions.Contains(region)) ||
+            requiredRegions.Distinct(StringComparer.Ordinal).Count() != requiredRegions.Length)
+            throw new InvalidDataException("Invalid required ECU region metadata.");
         if (values["format"] != NativeScopedBackupArchive.Format ||
             values["vin"] != scope.ExpectedVin || values["controller"].Length > 128 ||
-            values["count"] != "1" || values["required"] != "" ||
-            values["capture.0.region"] != "OTHER" ||
+            values["count"] != "1" ||
+            !KnownRegions.Contains(values["capture.0.region"]) ||
             values["capture.0.start"] != scope.StartAddress.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
             values["capture.0.expected"] != scope.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
-            values["capture.0.origin"] != "REPORTED_HARDWARE_READ" ||
+            !KnownOrigins.Contains(values["capture.0.origin"]) ||
             values["capture.0.second"] != "true" ||
-            !long.TryParse(values["created"], out long created) || created <= 0)
+            !long.TryParse(values["created"], System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out long created) || created <= 0)
             throw new InvalidDataException("Backup scope, provenance or metadata differs.");
         var digest = values["capture.0.sha256"];
         // Android writes lowercase SHA-256; the Windows exporter uses uppercase.
