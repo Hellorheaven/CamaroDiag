@@ -756,7 +756,7 @@
     <string name="can_console_rx">RX • RECEIVED</string>
     <string name="can_console_system">SYSTEM</string>
     <string name="can_console_input_label">Frame or OBD command</string>
-    <string name="can_console_input_hint">CAN frame: 7E0 02 01 0C • OBD request: 01 0C</string>
+    <string name="can_console_input_hint">Raw CAN: 7E0 02 01 0C • OBD read: 010C, 0152 (if supported), 0902</string>
     <string name="can_console_sending">Sending…</string>
 
     <string name="can_console_adapter_ack">Adapter response (not an ECU RX frame): %1$s</string>
