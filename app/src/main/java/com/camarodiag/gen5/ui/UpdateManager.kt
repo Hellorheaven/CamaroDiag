@@ -188,7 +188,9 @@ private object CamaroDiagUpdateChecker {
                 }
                 manager.openDownloadedFile(downloadId).use { descriptor ->
                     FileInputStream(descriptor.fileDescriptor).use { input ->
-                        file.outputStream().use { output -> input.copyTo(output) }
+                        file.outputStream().use { output ->
+                            CamaroDiagReleaseAssetPolicy.copyBounded(input, output)
+                        }
                     }
                 }
                 check(signatureMatches(context, file, version)) {
