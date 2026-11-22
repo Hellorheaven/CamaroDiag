@@ -8,7 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.io.InputStream
 import java.io.OutputStream
+import java.io.IOException
+import java.security.MessageDigest
 import java.util.UUID
 
 /** User-authorized public internal-storage folder. Never requests broad storage permissions. */
@@ -72,6 +75,69 @@ internal object CamaroDiagExportStorage {
         return stem + "_" + suffix + extension
     }
 
+    internal data class Fingerprint(val length: Long, val sha256: String)
+
+    private fun ByteArray.hex(): String = joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
+    // Distinguish filesystem errors from communication failures in ECU capture.
+    private inline fun <T> storageOperation(action: () -> T): T =
+        try { action() } catch (error: IOException) {
+            if (error is ExportStorageException) throw error
+            throw ExportStorageException("CamaroDiag storage I/O failed.", error)
+        } catch (error: SecurityException) {
+            throw ExportStorageException("CamaroDiag folder access was denied.", error)
+        }
+
+    internal class VerifiedOutput(private val target: OutputStream) : OutputStream() {
+        private val digest = MessageDigest.getInstance("SHA-256")
+        private var length = 0L
+        private var closed = false
+        override fun write(value: Int) = storageOperation {
+            check(!closed)
+            target.write(value)
+            digest.update(value.toByte())
+            length++
+            Unit
+        }
+        override fun write(bytes: ByteArray, offset: Int, count: Int) = storageOperation {
+            check(!closed)
+            target.write(bytes, offset, count)
+            digest.update(bytes, offset, count)
+            length += count
+        }
+        override fun flush() = storageOperation { if (!closed) target.flush() }
+        override fun close() {
+            if (closed) return
+            closed = true
+            storageOperation { target.close() }
+        }
+        fun fingerprint(): Fingerprint {
+            check(closed)
+            return Fingerprint(length, digest.digest().hex())
+        }
+    }
+
+    internal suspend fun fingerprint(input: InputStream): Fingerprint {
+        val digest = MessageDigest.getInstance("SHA-256")
+        var length = 0L
+        val buffer = ByteArray(8192)
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val count = storageOperation { input.read(buffer) }
+            if (count < 0) break
+            if (count == 0) {
+                val byte = storageOperation { input.read() }
+                if (byte < 0) break
+                digest.update(byte.toByte())
+                length++
+                continue
+            }
+            digest.update(buffer, 0, count)
+            length += count
+        }
+        return Fingerprint(length, digest.digest().hex())
+    }
+
     /**
      * Create a uniquely named temporary document inside the approved folder.
      * Publish the final name only after successful completion; cancel or failure deletes the temp.
@@ -87,18 +153,29 @@ internal object CamaroDiagExportStorage {
             val finalName = uniqueFileName(requested)
             // Use a generic MIME until publication: Android's file provider
             // otherwise may append the target extension to the partial name.
-            val temporary = DocumentsContract.createDocument(resolver, root,
-                "application/octet-stream", temporaryFileName(finalName))
-                ?: error("Could not create export document.")
+            val temporary = storageOperation {
+                DocumentsContract.createDocument(resolver, root,
+                    "application/octet-stream", temporaryFileName(finalName))
+            } ?: throw ExportStorageException("Could not create export document.")
             var published = false
             try {
-                val output = resolver.openOutputStream(temporary, "w") ?: error("Could not open export document.")
+                val output = VerifiedOutput(storageOperation {
+                    resolver.openOutputStream(temporary, "w")
+                } ?: throw ExportStorageException("Could not open export document."))
                 output.use { writeBytes(it) }
+                val expected = output.fingerprint()
+                // Independently reopen the staged document. A successful close
+                // or provider acknowledgement is not evidence of complete bytes.
+                val actual = storageOperation {
+                    resolver.openInputStream(temporary)
+                }?.use { fingerprint(it) }
+                    ?: throw ExportStorageException("Could not read back export document.")
+                if (expected.length == 0L || expected != actual)
+                    throw ExportStorageException("Export readback differs from written bytes.")
                 currentCoroutineContext().ensureActive()
                 beforePublish()
-                checkNotNull(DocumentsContract.renameDocument(resolver, temporary, finalName)) {
-                    "Could not publish completed export."
-                }
+                storageOperation { DocumentsContract.renameDocument(resolver, temporary, finalName) }
+                    ?: throw ExportStorageException("Could not publish completed export.")
                 published = true
             } finally {
                 if (!published) runCatching { DocumentsContract.deleteDocument(resolver, temporary) }
