@@ -33,6 +33,7 @@ internal sealed partial class BridgeDesktopForm
         { Dock = DockStyle.Fill, AutoSize = true, Text = "Profil non défini." };
     private readonly Button memoryCreateProfile = Button("Créer le profil JSON");
     private readonly Button memoryLoadProfile = Button("Ouvrir un profil existant");
+    private readonly Button memoryVerifyArchive = Button("Vérifier une sauvegarde ZIP");
     private readonly Button memoryCapture = Button("Lire deux fois et sauvegarder");
     private readonly Button memoryCancel = Button("Annuler la lecture");
     private CancellationTokenSource? memoryCancellation;
@@ -65,6 +66,8 @@ internal sealed partial class BridgeDesktopForm
         WideRow(fields, profileButtons, 48);
         var acquisitionButtons = new FlowLayoutPanel { Dock = DockStyle.Fill };
         acquisitionButtons.Controls.Add(memoryCapture);
+        acquisitionButtons.Controls.Add(memoryVerifyArchive);
+        memoryVerifyArchive.Click += async (_, _) => await VerifyMemoryArchiveAsync();
         acquisitionButtons.Controls.Add(memoryCancel);
         memoryCancel.Enabled = false;
         memoryCapture.Click += async (_, _) => await CaptureMemoryAsync();
@@ -197,6 +200,47 @@ internal sealed partial class BridgeDesktopForm
             UnauthorizedAccessException or JsonException or KeyNotFoundException or OverflowException)
         {
             ShowError("Profil invalide : " + ex.Message);
+        }
+    }
+
+    private async Task VerifyMemoryArchiveAsync()
+    {
+        if (busy || memoryCancellation is not null) return;
+        if (!File.Exists(memoryProfile.Text))
+        {
+            ShowError("Chargez d'abord le profil JSON correspondant à la sauvegarde.");
+            return;
+        }
+        using var picker = new OpenFileDialog
+        {
+            Title = "Vérifier l'intégrité d'une sauvegarde ECU ZIP existante",
+            Filter = "Archive ECU ZIP (*.zip)|*.zip",
+            CheckFileExists = true
+        };
+        if (picker.ShowDialog(this) != DialogResult.OK) return;
+        memoryVerifyArchive.Enabled = false;
+        try
+        {
+            var profilePath = memoryProfile.Text;
+            var archivePath = picker.FileName;
+            var result = await Task.Run(() =>
+            {
+                var scope = J2534MemoryReadScope.Load(profilePath);
+                return NativeScopedBackupImport.VerifyZip(archivePath, scope);
+            });
+            memoryStatus.Text = "Archive vérifiée sans contacter l'ECU : " +
+                result.Bytes.Length + " octets, SHA-256 " + result.Sha256 +
+                ". Deux acquisitions identiques et VIN lié au profil. " +
+                "Cette vérification ne prouve ni la couverture ECU complète ni la restaurabilité.";
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or
+            UnauthorizedAccessException or OverflowException or JsonException)
+        {
+            memoryStatus.Text = "Archive refusée : " + ex.Message;
+        }
+        finally
+        {
+            memoryVerifyArchive.Enabled = true;
         }
     }
 
