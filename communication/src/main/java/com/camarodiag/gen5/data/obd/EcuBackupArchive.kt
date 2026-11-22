@@ -110,7 +110,10 @@ object EcuBackupArchive {
         require(maxUncompressedBytes in 1..MAX_ARCHIVE_BYTES) { "Invalid archive size limit" }
         val files = linkedMapOf<String, ByteArray>()
         var total = 0L
-        ZipInputStream(input).use { zip ->
+        // A stream containing intact local entries but no ZIP footer must
+        // never be reported as a complete ECU archive.
+        val compressed = EcuZipCompletionGuard(input, MAX_ARCHIVE_BYTES + 4L * 1024 * 1024)
+        ZipInputStream(compressed).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 require(!entry.isDirectory) { "Unexpected archive directory" }
@@ -135,6 +138,7 @@ object EcuBackupArchive {
                 files[entry.name] = data.toByteArray()
                 zip.closeEntry()
             }
+            compressed.requireCompletedArchive(files.keys.toList())
         }
         val metadata = files.remove("manifest.properties")
             ?: throw IllegalArgumentException("Missing archive manifest")
