@@ -325,4 +325,24 @@ class J2534LiveMemoryBackupTest {
         assertEquals(6, ecu.reads)
     }
 
+    @Test fun connectionLossDuringMemoryReadStopsBeforeNextHardwareCommand() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        val failure = runCatching {
+            J2534LiveMemoryBackup.captureForTest(
+                ecu, request(), liveLinkValid = { ecu.reads < 1 })
+        }
+        assertTrue(failure.isFailure)
+        assertEquals(1, ecu.reads)
+        assertFalse(ecu.sent.any { it[0] == 0x10.toByte() })
+    }
+
+    @Test fun disabledReadScopePreventsAnyMemoryOrVinRequest() = runBlocking {
+        val ecu = ScriptedEcu(baseline, vin)
+        assertTrue(runCatching {
+            J2534LiveMemoryBackup.captureForTest(
+                ecu, request(), liveLinkValid = { false })
+        }.isFailure)
+        assertTrue(ecu.sent.isEmpty())
+    }
+
 }
