@@ -111,7 +111,7 @@ La fonction est en cours de validation sur la PR de développement ; la compatib
 
 Dans l'onglet **Lecture mémoire ECU**, ouvrez le profil JSON utilisé pour la sauvegarde, puis cliquez sur **Vérifier une sauvegarde ZIP**. Le contrôle fonctionne sans boîtier connecté et refuse les fichiers altérés, les lectures différentes ou un VIN et une plage mémoire incompatibles avec ce profil.
 
-Pour vérifier sans interface graphique : `CamaroDiag.J2534Bridge.exe --verify-ecu-archive sauvegarde.zip profil.json`. Cette opération n'écrit rien sur le calculateur et **ne démontre pas que la sauvegarde est complète ou restaurable**. Le fichier BIN brut n'inclut pas les deux acquisitions et ne peut pas être vérifié de la même manière.
+Pour vérifier sans interface graphique : `CamaroDiag.J2534Bridge.exe --verify-ecu-archive sauvegarde.zip profil.json`. Cette opération n'écrit rien sur le calculateur et **ne démontre pas que la sauvegarde est complète ou restaurable**. La vérification retourne uniquement un rapport (VIN, région, taille, origine déclarée, empreinte) : elle ne fournit aucune image prête à programmer un ECU. Les archives Android v2 à région unique peuvent aussi être contrôlées avec le profil correspondant ; l'origine indiquée dans leur manifeste reste une déclaration non certifiée. Le fichier BIN brut n'inclut pas les deux acquisitions et ne peut pas être vérifié de la même manière.
 
 ### Sauvegarde d’une plage mémoire
 
