@@ -292,4 +292,19 @@ class SafeObdRequestPolicyTest {
             vin, "18DAF110 $payload"))
     }
 
+    @Test
+    fun consoleAcceptsOnlyCompleteNumberedElmVinFrames() {
+        val request = requireNotNull(SafeObdRequestPolicy.parse("0902"))
+        val complete = "014\r0: 490201314731\r1: 46413152585852\r2: 30313233343536"
+        assertEquals(true, SafeObdRequestPolicy.hasPositiveResponse(request, complete))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            complete.replace("1:", "2:")))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            complete.dropLast(2)))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            complete.replace("014", "013")))
+        assertEquals(false, SafeObdRequestPolicy.hasPositiveResponse(request,
+            complete.replace("490201", "490401")))
+    }
+
 }
