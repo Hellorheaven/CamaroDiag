@@ -36,7 +36,7 @@ class CanConsoleDisplayFilterTest {
 
     @Test fun selectedIdDoesNotConfuseStandardAndExtendedWithSameNumericValue() {
         assertEquals(
-            listOf(traffic[0], traffic[4]),
+            listOf(traffic[0], traffic[4], traffic[5]),
             traffic.filter { CanConsoleDisplayFilter.visible(it, standard) }
         )
         assertEquals(
@@ -52,6 +52,21 @@ class CanConsoleDisplayFilterTest {
     @Test fun untypedTraceDoesNotInventElevenBitEcuAddress() {
         assertEquals(emptyList<ObservedCanId>(), CanConsoleDisplayFilter.observedIds(
             emptyList(), listOf(0x7E8, 0x7E9)
+        ))
+    }
+
+    @Test fun physicalTxFramesFollowTheSelectedEcuWithoutClaimingBroadcastTraffic() {
+        val physical11 = ParsedCanConsoleRecord("TX", "7E0 02 01 0C")
+        val physical29 = ParsedCanConsoleRecord("TX", "18DA10F1 03 22 F1 90")
+        val broadcast = ParsedCanConsoleRecord("TX", "7DF 02 01 0C")
+        assertTrue(CanConsoleDisplayFilter.visible(physical11, standard))
+        assertFalse(CanConsoleDisplayFilter.visible(physical11, extendedSameNumber))
+        assertTrue(CanConsoleDisplayFilter.visible(physical29, extended))
+        assertFalse(CanConsoleDisplayFilter.visible(physical29, standard))
+        assertFalse(CanConsoleDisplayFilter.visible(broadcast, standard))
+        assertTrue(CanConsoleDisplayFilter.visible(broadcast, null))
+        assertTrue(CanConsoleDisplayFilter.visible(
+            ParsedCanConsoleRecord("SYSTEM", "CAN ERROR", succeeded = false), extended
         ))
     }
 
