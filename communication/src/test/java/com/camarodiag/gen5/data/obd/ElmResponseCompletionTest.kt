@@ -24,6 +24,28 @@ class ElmResponseCompletionTest {
     }
 
     @Test
+    fun receiveCallbackOnPhysicalTxDoesNotWaiveTheElmPrompt() {
+        org.junit.Assert.assertTrue(
+            ElmResponseCompletion.isUnterminatedMonitorCommand("STM", true)
+        )
+        org.junit.Assert.assertTrue(
+            ElmResponseCompletion.isUnterminatedMonitorCommand("ATMA", true)
+        )
+        for (command in listOf("03 22 F1 90", "ATSP6", "010C", "STPX")) {
+            org.junit.Assert.assertFalse(
+                ElmResponseCompletion.isUnterminatedMonitorCommand(command, true)
+            )
+            assertThrows(SocketTimeoutException::class.java) {
+                ElmResponseCompletion.requirePrompt(
+                    command,
+                    streaming = ElmResponseCompletion.isUnterminatedMonitorCommand(command, true),
+                    promptReceived = false
+                )
+            }
+        }
+    }
+
+    @Test
     fun allowsStreamingCaptureWithoutNormalPrompt() {
         ElmResponseCompletion.requirePrompt("ATMA", streaming = true, promptReceived = false)
     }
