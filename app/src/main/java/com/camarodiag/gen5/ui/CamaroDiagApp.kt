@@ -697,6 +697,7 @@ fun CamaroDiagApp(
                     isAvailable = viewModel.canMonitorAvailable(),
                     canReadObdAvailable = viewModel.canConsoleReadObd(),
                     canTransmitAvailable = adapter.supportsCanTransmit,
+                    canExportAvailable = viewModel.canExportCanCapture(),
                     knownModules = modules,
                     onStart = { can29Bit -> viewModel.startCanMonitor(can29Bit = can29Bit) },
                     onStop = { viewModel.stopCanMonitor() },
@@ -1683,6 +1684,7 @@ fun CanSnifferScreen(
     isAvailable: Boolean,
     canReadObdAvailable: Boolean,
     canTransmitAvailable: Boolean,
+    canExportAvailable: Boolean,
     knownModules: List<EcuModule>,
     onStart: (Boolean) -> Unit,
     onStop: () -> Unit,
@@ -1851,12 +1853,7 @@ fun CanSnifferScreen(
                         Text(stringResource(R.string.can_console_history), color = CamaroAmber, fontWeight = FontWeight.Bold)
                         TextButton(
                             onClick = onExport,
-                            enabled = CanConsoleExportPolicy.canExport(
-                                isCapturing = state.isCapturing,
-                                archiveFailed = state.rawArchiveFailed,
-                                hasHistory = state.consoleHistory.isNotEmpty(),
-                                hasRawData = state.rawText.isNotBlank()
-                            )
+                            enabled = canExportAvailable
                         ) {
                             Text(stringResource(R.string.can_sniffer_export_raw), color = CamaroBlue)
                         }
