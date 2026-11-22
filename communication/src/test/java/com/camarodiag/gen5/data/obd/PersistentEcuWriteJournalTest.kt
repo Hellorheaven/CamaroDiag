@@ -123,6 +123,20 @@ class PersistentEcuWriteJournalTest {
         assertTrue(journal.inspect().valid)
     }
 
+    @Test fun journalCannotMixMemoryRegionsWithinOneWriteTransaction() = runBlocking {
+        val (_, journal) = newJournal()
+        journal.append(record)
+        val other = record.copy(region = EcuBackupCoverage.Region.DATA_FLASH, address = 0x2000)
+        assertTrue(runCatching { journal.append(other) }.isFailure)
+        assertEquals(1, journal.inspect().baselineSectors)
+        assertTrue(journal.inspect().valid)
+        journal.append(record.copy(stage = EcuWriteTransaction.Stage.BEFORE_ERASE))
+        assertTrue(runCatching {
+            journal.append(other.copy(stage = EcuWriteTransaction.Stage.VERIFIED_AFTER_WRITE))
+        }.isFailure)
+        assertEquals(record.region, journal.inspect().uncertainRegion)
+    }
+
     @Test fun verificationCannotBeAppendedBeforeAnyBaseline() = runBlocking {
         val (_, journal) = newJournal()
         for (stage in listOf(

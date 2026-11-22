@@ -190,7 +190,8 @@ class PersistentEcuWriteJournal private constructor(
             )
             return when (record.stage) {
                 EcuWriteTransaction.Stage.BASELINE_CHECKED -> {
-                    if (erasePhase || inFlight != null || baseline.any {
+                    if (erasePhase || inFlight != null ||
+                        baseline.firstOrNull()?.region?.let { sector.region != it } == true || baseline.any {
                         it.region == sector.region && it.address == sector.address
                     } || baseline.lastOrNull()?.address?.let { sector.address <= it } == true) {
                         false
