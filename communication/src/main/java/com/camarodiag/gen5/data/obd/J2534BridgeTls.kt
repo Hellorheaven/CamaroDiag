@@ -99,9 +99,10 @@ internal class J2534BridgeTlsPairing private constructor(
         }
         val parts = host.split('.').map { part ->
             val octet = part.toIntOrNull()
-            require((part.length == 1 || part[0] != '0') &&
-                octet != null && octet in 0..255
-            ) { "Noncanonical local bridge IPv4 address." }
+                ?: throw IllegalArgumentException("Noncanonical local bridge IPv4 address.")
+            require((part.length == 1 || part[0] != '0') && octet in 0..255) {
+                "Noncanonical local bridge IPv4 address."
+            }
             octet
         }
         val allowed = parts[0] == 10 ||
