@@ -384,6 +384,49 @@ internal static class J1939ClassicTpSelfTests
             J1939PgnRequest.Decode([0xCA, 0xFE]),
             "Request PGN requires all three bytes.");
 
+        var acknowledgement = J1939PgnAcknowledgement.Decode(
+            [1, 0xFF, 0xFF, 0xFF, 0xF1, 0xCA, 0xFE, 0x00],
+            J1939DmDiagnostics.Dm1Pgn);
+        Check(acknowledgement.Control == 1 && !acknowledgement.Positive &&
+            acknowledgement.RequestedPgn == J1939DmDiagnostics.Dm1Pgn &&
+            acknowledgement.AcknowledgedAddress == 0xF1,
+            "J1939 ACKM identifies a negative response for the requested PGN.");
+        Reject<InvalidDataException>(() =>
+            J1939PgnAcknowledgement.Decode(
+                [0, 0xFF, 0xFF, 0xFF, 0xF1, 0xCA, 0xFE, 0x00],
+                J1939DmDiagnostics.Dm2Pgn),
+            "ACKM of a different PGN cannot satisfy the active request.");
+
+        var ackOptions = o with {
+            Pgn = J1939DmDiagnostics.Dm1Pgn,
+            AcceptAcknowledgement = true
+        };
+        var ackRx = new FakeCan();
+        ackRx.Incoming.Enqueue(new(
+            J1939ClassicTpSession.ArbitrationId(
+                J1939PgnAcknowledgement.AcknowledgementPgn, 6,
+                o.RemoteAddress, o.LocalAddress), false,
+            [1, 0xFF, 0xFF, 0xFF, o.LocalAddress, 0xCB, 0xFE, 0]));
+        ackRx.Incoming.Enqueue(new(
+            J1939ClassicTpSession.ArbitrationId(
+                J1939PgnAcknowledgement.AcknowledgementPgn, 6,
+                o.RemoteAddress, o.LocalAddress), false,
+            [1, 0xFF, 0xFF, 0xFF, o.LocalAddress, 0xCA, 0xFE, 0]));
+        var receivedAck = Receive(ackRx, ackOptions);
+        Check(receivedAck.Pgn == J1939PgnAcknowledgement.AcknowledgementPgn &&
+            J1939PgnAcknowledgement.Decode(receivedAck.Payload,
+                J1939DmDiagnostics.Dm1Pgn).Control == 1,
+            "Receive skips another PGN acknowledgement and delivers correlated NACK.");
+        var normalAckRx = new FakeCan();
+        normalAckRx.Incoming.Enqueue(new(
+            J1939ClassicTpSession.ArbitrationId(
+                J1939PgnAcknowledgement.AcknowledgementPgn, 6,
+                o.RemoteAddress, o.LocalAddress), false,
+            [1, 0xFF, 0xFF, 0xFF, o.LocalAddress, 0xCA, 0xFE, 0]));
+        Reject<TimeoutException>(() => Receive(normalAckRx,
+            ackOptions with { AcceptAcknowledgement = false }),
+            "Ordinary J1939 receiving does not treat ACKM as requested data.");
+
         var requestCli = StandardProtocolCli.ParseJ1939([
             StandardProtocolCli.J1939Command, "--adapter-index", "0",
             "--baud", "250000", "--source", "0xF1", "--target", "0x10",
