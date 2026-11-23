@@ -21,7 +21,7 @@ internal static class J1939FdMultiPgCliParser
         foreach (var entry in entries)
         {
             var colon = entry.IndexOf(':');
-            if (colon <= 0 || colon == entry.Length - 1 ||
+            if (colon <= 0 ||
                 entry.LastIndexOf(':') != colon)
                 throw new ArgumentException(
                     "Each J1939-22 group must be PGN:HEX without additional separators.");
@@ -32,9 +32,9 @@ internal static class J1939FdMultiPgCliParser
                 throw new ArgumentException("Contained PGN must be explicit 0x-prefixed hex.");
             var pgn = Convert.ToInt32(pgnText[2..], 16);
             var hex = entry[(colon + 1)..];
-            if (hex.Length is < 2 or > 120 || hex.Length % 2 != 0 ||
+            if (hex.Length > 120 || hex.Length % 2 != 0 ||
                 !hex.All(Uri.IsHexDigit))
-                throw new ArgumentException("Contained C-PG payload must contain 1–60 bytes.");
+                throw new ArgumentException("Contained C-PG payload must contain 0–60 bytes.");
             groups.Add(new J1939FdMultiPg.ContainedGroup(
                 pgn, Convert.FromHexString(hex)));
         }
