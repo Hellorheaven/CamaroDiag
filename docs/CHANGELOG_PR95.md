@@ -160,3 +160,5 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Parseur de trame physique ISO 14230 : source, destination, longueur 1–255, checksum additif ; tests pour payloads 1/63/64/255, altération et troncature.
 - Vérification RX KWP optionnelle côté Windows quand le fabricant fournit des trames brutes complètes. Mode `--mode receive` sans émission diagnostique pour les canaux J2534 (K-Line/J1850 inclus), distinct du mode `exchange` avec double consentement.
 - Tests de CLI ajoutés, aucune exécution/qualification matérielle à ce stade.
+
+- DoIP : une réponse d'identification ciblée par VIN ou EID doit maintenant correspondre exactement à l'identifiant demandé, en découverte unicast comme broadcast. Tests de rejet des autres identifiants ajoutés (non exécutés).
