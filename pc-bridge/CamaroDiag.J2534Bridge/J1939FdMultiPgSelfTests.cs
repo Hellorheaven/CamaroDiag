@@ -124,6 +124,7 @@ internal static class J1939FdMultiPgSelfTests
             "--mode", "send", "--fbff", "true",
             "--pgn", "0xF004", "--payload", "112233"]);
         Check(fbffCli.FastBroadcast && fbffCli.Priority == 0 &&
+            fbffCli.J2534ConnectFlags == 0 &&
             fbffCli.Mode == "send" && fbffCli.Target == 0xFF,
             "CLI requests FBFF using priority-0 standard CAN FD broadcast.");
         var fbffReceive = StandardProtocolCli.ParseJ1939Fd([
@@ -190,6 +191,7 @@ internal static class J1939FdMultiPgSelfTests
             "--priority", "6", "--pgn", "0xF004",
             "--mode", "send", "--payload", "01020304"]);
         Check(transmit.Mode == "send" && transmit.Brs &&
+            transmit.J2534ConnectFlags == 0x100u &&
             transmit.DataBaud == 2000000 &&
             transmit.Pgn == 0xF004 && transmit.Target == 0xFF &&
             transmit.Payload.SequenceEqual(new byte[] {1, 2, 3, 4}),
