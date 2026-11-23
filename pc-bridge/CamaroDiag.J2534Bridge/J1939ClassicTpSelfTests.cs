@@ -197,6 +197,31 @@ internal static class J1939ClassicTpSelfTests
         Reject<IOException>(() => Send(negative, o, Data(20)),
             "Standard abort stops transport.");
 
+        var unrelatedAbort = new FakeCan();
+        unrelatedAbort.Incoming.Enqueue(J1939ClassicTpSession.MakeControl(o,
+            J1939ClassicTpSession.Rts, 13, 2, 2, false, false));
+        // Same source, but unrelated PGN: must not interrupt active TP.DT.
+        var otherPgnAbort = new IsoTpCanFdSession.CanFrame(
+            J1939ClassicTpSession.ArbitrationId(
+                J1939ClassicTpSession.TpCmPgn, 6, o.RemoteAddress,
+                o.LocalAddress), false,
+            [J1939ClassicTpSession.Abort, 0, 0, 0, 0, 0x05, 0xF0, 0]);
+        unrelatedAbort.Incoming.Enqueue(otherPgnAbort);
+        unrelatedAbort.Incoming.Enqueue(J1939ClassicTpSession.MakeData(o,
+            o.RemoteAddress, o.LocalAddress, 1, Data(7)));
+        unrelatedAbort.Incoming.Enqueue(J1939ClassicTpSession.MakeData(o,
+            o.RemoteAddress, o.LocalAddress, 2, Data(13).AsSpan(7, 6)));
+        Check(Receive(unrelatedAbort, o).Payload.SequenceEqual(Data(13)),
+            "Unrelated J1939 TP.CM abort must not interrupt another PGN.");
+
+        var activeAbort = new FakeCan();
+        activeAbort.Incoming.Enqueue(J1939ClassicTpSession.MakeControl(o,
+            J1939ClassicTpSession.Rts, 13, 2, 2, false, false));
+        activeAbort.Incoming.Enqueue(PeerCm(
+            J1939ClassicTpSession.Abort, 0, 0, 0, 0, 0x04, 0xF0, 0));
+        Reject<IOException>(() => Receive(activeAbort, o),
+            "Matching J1939 TP.CM abort terminates active transfer.");
+
         var badPacket = new FakeCan();
         badPacket.Incoming.Enqueue(J1939ClassicTpSession.MakeControl(o,
             J1939ClassicTpSession.Rts, 20, 3, 2, false, false));
