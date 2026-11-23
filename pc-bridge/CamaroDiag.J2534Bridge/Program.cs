@@ -31,6 +31,15 @@ internal static class Program
             return 2;
         }
 
+        // Explicit bidirectional ISO/SAE exchanges. No default startup
+        // programming and no network-listener fallback on malformed CLI.
+        if (args.Contains(StandardProtocolCli.DoIpCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunDoIpAsync(args);
+        if (args.Contains(StandardProtocolCli.PassThruCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return StandardProtocolCli.RunJ2534(args);
+
         // Explicit public CD/1 discovery. Never falls through to a vendor
         // driver, network listener, updater or ECU operation.
         if (args.Contains(ConnectorDiscoveryCli.Command, StringComparer.OrdinalIgnoreCase))
