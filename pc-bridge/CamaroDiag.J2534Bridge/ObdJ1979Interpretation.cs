@@ -44,7 +44,7 @@ internal static class ObdJ1979Interpretation
 
         if (request.Length == 1 && request[0] is 0x03 or 0x07 or 0x0A)
         {
-            var codes = ObdJ1979Dtc.DecodePairs(reply.Data);
+            var codes = ObdJ1979Dtc.DecodeCanCounted(reply.Data);
             return new Result(
                 $"SAE J1979 DTC mode=0x{reply.Service:X2} " +
                 $"count={codes.Count} codes={string.Join(",", codes.Select(x => x.Display))}",
