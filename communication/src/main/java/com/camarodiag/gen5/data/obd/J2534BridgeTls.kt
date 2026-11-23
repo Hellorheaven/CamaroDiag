@@ -98,16 +98,19 @@ internal class J2534BridgeTlsPairing private constructor(
             "The Windows J2534 bridge requires the numeric private IPv4 shown on the PC."
         }
         val parts = host.split('.').map { part ->
-            require((part.length == 1 || part[0] != '0') && part.toIntOrNull() in 0..255) {
-                "Noncanonical local bridge IPv4 address."
-            }
-            part.toInt()
+            val octet = part.toIntOrNull()
+            require((part.length == 1 || part[0] != '0') &&
+                octet != null && octet in 0..255
+            ) { "Noncanonical local bridge IPv4 address." }
+            octet
         }
         val allowed = parts[0] == 10 ||
             (parts[0] == 172 && parts[1] in 16..31) ||
             (parts[0] == 192 && parts[1] == 168) ||
             (parts[0] == 169 && parts[1] == 254)
-        require(allowed && parts[3] !in setOf(0, 255)) {
+        // Never guess the network mask from the last octet: .0 and .255
+        // may be legitimate host addresses on non-/24 private subnets.
+        require(allowed) {
             "The J2534 bridge must use a private LAN address, not a public or loopback target."
         }
         return InetAddress.getByAddress(parts.map(Int::toByte).toByteArray())
