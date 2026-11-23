@@ -49,9 +49,10 @@ internal static class StandardVehicleProtocolsSelfTests
             "--mode", "receive", "--j1850-wire-crc", "true"]),
             "J1850 wire CRC cannot be interpreted on ISO-TP/CAN frames.");
 
-        Check(StandardVehicleProtocols.Catalog.Count == 13 &&
-            StandardVehicleProtocols.Catalog.All(p => !p.PhysicalWriteQualified),
-            "No transport silently certifies physical flash/rollback.");
+        Check(StandardVehicleProtocols.Catalog.Count == 14 &&
+            StandardVehicleProtocols.Catalog.All(p => !p.PhysicalWriteQualified) &&
+            StandardVehicleProtocols.Find("J1939 CAN FD").TransportPresent,
+            "Fourteen standard protocol entries are tracked; no transport silently certifies physical flash/rollback.");
         Check(StandardVehicleProtocols.Find("K-Line KWP2000").J2534ProtocolId == 4 &&
             !StandardVehicleProtocols.Find("K-Line KWP2000").TransportPresent,
             "J2534 K-Line ID is recognized, initialization not invented.");
