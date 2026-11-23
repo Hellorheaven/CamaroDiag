@@ -125,3 +125,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - ISO-TP : les transferts partageant un même identifiant CAN restent distinguables par des adresses logiques TX/RX différentes ; un identifiant et des adresses identiques pour les deux directions sont refusés comme ambigus. Scénarios ajoutés pour CAN-FD, FlowControl et identifiant partagé.
 - J1939-21 : messages RTS/BAM/CTS/EOM de PGN concurrents ignorés pendant une autre session ; corrélation stricte de l'abandon en cours, sans rejeter tout le bus partagé.
 - Tests de non-régression ajoutés et enregistrés, **non exécutés** à ce stade ; validation du compilateur et essais hardware en attente. Aucun support J1939-22 revendiqué.
+
+## C1 / C4 — correction des états périmés et finalisation des exports (suite)
+- **C1 :** sur arrêt manuel, archive brute non fermée correctement = erreur visible, export interdit. L'export déjà lancé revérifie le contexte de console et la santé de l'archive juste avant publication, afin de refuser une capture interrompue entre-temps.
+- **C4 :** un changement de compte ou de connexion efface immédiatement les mesures carburant et leur synthèse ; l'enregistrement de relevés valides se fait sur le dispatcher UI après contrôle de la génération active. Plages min/max des corrections STFT/LTFT des deux bancs ajoutées à l'écran en FR/EN, sans convertir les données manquantes en valeurs.
+- **Régressions :** correction des véritables caractères de contrôle dans le test CSV ; tests de Stop, fermeture d'archive, génération de session et horodatages étendus.
+- **C8 :** demande groupée C4 soumise ; **résultat non confirmé**, ne pas déduire un build vert de la demande de CI. Le HEAD stable et les composants physiques restent à qualifier.
