@@ -26,8 +26,8 @@ class CanConsoleEventJournalWriterTest {
         assertTrue(journal.isComplete)
         val lines = output.toString().lines().filter(String::isNotEmpty)
         assertEquals(601, lines.size)
-        assertEquals("1,0,TX,true,\"event-0\"", lines[1])
-        assertEquals("600,599,SYSTEM,false,\"event-599\"", lines.last())
+        assertEquals("1,0,TX,PENDING,\"event-0\"", lines[1])
+        assertEquals("600,599,SYSTEM,FAILED,\"event-599\"", lines.last())
     }
 
     @Test fun quotedAndMultilinePayloadsCannotInsertFakeJournalRows() {
@@ -37,7 +37,7 @@ class CanConsoleEventJournalWriterTest {
         journal.close()
         val lines = output.toString().lines().filter(String::isNotEmpty)
         assertEquals(2, lines.size)
-        assertEquals("1,42,RX,true,\"line1\\n\"\"line2\"\"\\r\"", lines[1])
+        assertEquals("1,42,RX,OK,\"line1\\n\"\"line2\"\"\\r\"", lines[1])
     }
 
     @Test fun spreadsheetFormulaPayloadIsStoredAsPlainText() {
