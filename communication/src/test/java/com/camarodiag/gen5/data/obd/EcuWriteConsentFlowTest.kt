@@ -19,6 +19,25 @@ class EcuWriteConsentFlowTest {
         assertEquals(null, EcuWriteConsentFlow.approval(confirmation, true, false))
     }
 
+    @Test fun warningAndYesMustReferToTheSameConnectionGeneration() {
+        val warningEpoch = 42L
+        assertEquals(null, EcuWriteConsentFlow.approvalForConnection(
+            EcuWriteConsentFlow.Step.WARNING, true, warningEpoch, warningEpoch
+        ))
+        assertEquals(null, EcuWriteConsentFlow.approvalForConnection(
+            EcuWriteConsentFlow.Step.CONFIRMATION, false, warningEpoch, warningEpoch
+        ))
+        assertEquals(null, EcuWriteConsentFlow.approvalForConnection(
+            EcuWriteConsentFlow.Step.CONFIRMATION, true, warningEpoch, warningEpoch + 1
+        ))
+        assertEquals(null, EcuWriteConsentFlow.approvalForConnection(
+            EcuWriteConsentFlow.Step.CONFIRMATION, true, null, warningEpoch
+        ))
+        assertTrue(EcuWriteConsentFlow.approvalForConnection(
+            EcuWriteConsentFlow.Step.CONFIRMATION, true, warningEpoch, warningEpoch
+        ) != null)
+    }
+
     @Test fun closeOrNoOrChangedPhysicalConnectionNeverWrites() {
         val confirmation = EcuWriteConsentFlow.Step.CONFIRMATION
         assertFalse(EcuWriteConsentFlow.permitsWrite(confirmation, false, false))
