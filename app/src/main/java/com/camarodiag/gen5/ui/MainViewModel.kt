@@ -2043,6 +2043,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     }
                 }
+                // Publication of a complete CAN capture requires successful
+                // final flush and close, not merely a returned transport string.
+                check(archiveStream.isComplete) {
+                    "CAN capture archive did not finish writing successfully"
+                }
                 if (canMonitorJob === monitorJob) {
                     val raw = captured.takeLast(131_072)
                     val currentBeforeReport = _liveCanMonitorState.value
