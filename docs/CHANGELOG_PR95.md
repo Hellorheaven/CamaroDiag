@@ -97,3 +97,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Le raccordement C1 impose désormais `CanConsoleRawArchiveWriter.isComplete` avant de publier le succès de la capture CAN.
 - Une modification concurrente a été détectée sur la branche pendant l'ajout des ressources ; le fichier français a été relu puis modifié sans réécrire les changements de l'autre chat.
 - **Aucune nouvelle compilation ou exécution des tests sur ce HEAD** : vérification C1/C4 et intégration protocoles restent à valider après stabilisation.
+
+## C4 — extraction du tampon d'historique et documentation utilisateur
+- La gestion des 512 relevés conservés, de la réinitialisation par véhicule/session/source et des horodatages non croissants est isolée dans `Lfx2012FuelHistoryWindow.kt`, indépendamment du ViewModel et des protocoles ECU. `MainViewModel` utilise ce composant pour la synthèse de l'atelier et l'export CSV.
+- Tests unitaires dédiés : fenêtre circulaire après 513 relevés, réinitialisation de session, retour arrière d'horodatage, absence de réponse préservée et copie indépendante du jeu d'observations.
+- Documentation d'utilisation des relevés et de l'export CSV mise à jour en français et anglais. L'historique est **en mémoire**, non un enregistreur en continu ; aucune commande ECU ajoutée.
+- **Qualification :** code et tests écrits sur la branche ; aucun build ni nouvelle exécution des tests du HEAD par cette intervention, ni validation physique.
