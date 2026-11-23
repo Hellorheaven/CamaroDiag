@@ -260,6 +260,32 @@ internal static class IsoTpCanFdSelfTests
             wait.Separations[0] == TimeSpan.FromTicks(2000),
             "FC/WAIT then CTS microsecond STmin decoded correctly.");
 
+        var boundedWait = new QueueLink();
+        boundedWait.Replies.Enqueue(RX(false, 0x31, 0, 0, 0, 0, 0, 0, 0));
+        boundedWait.Replies.Enqueue(RX(false, 0x31, 0, 0, 0, 0, 0, 0, 0));
+        boundedWait.Replies.Enqueue(RX(false, 0x30, 0, 0, 0, 0, 0, 0, 0));
+        Send(boundedWait, classic with { MaxWaitFrames = 2 }, Fill(14));
+        Check(boundedWait.Sent.Count == 3,
+            "Configured WFTmax=2 accepts two FC WAIT responses before CTS.");
+
+        var tooManyWaits = new QueueLink();
+        tooManyWaits.Replies.Enqueue(RX(false, 0x31, 0, 0, 0, 0, 0, 0, 0));
+        Reject<TimeoutException>(() => Send(tooManyWaits,
+            classic with { MaxWaitFrames = 0 }, Fill(14)),
+            "WFTmax=0 rejects the first peer FC WAIT.");
+        Check(tooManyWaits.Sent.Count == 1,
+            "No consecutive frames after exceeding configured WFTmax.");
+        Reject<ArgumentOutOfRangeException>(() => Send(new QueueLink(),
+            classic with { MaxWaitFrames = 256 }, [0x22]),
+            "WFTmax outside supported 0..255 is rejected.");
+
+        var configurableWait = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--wftmax", "7", "--payload", "22F190"]);
+        Check(configurableWait.Settings.MaxWaitFrames == 7,
+            "ISO-TP CLI exposes FC WAIT-frame tolerance.");
+
         var overflow = new QueueLink();
         overflow.Replies.Enqueue(RX(false, 0x32, 0, 0, 0, 0, 0, 0, 0));
         Reject<IOException>(() => Send(overflow, classic, Fill(16)),
