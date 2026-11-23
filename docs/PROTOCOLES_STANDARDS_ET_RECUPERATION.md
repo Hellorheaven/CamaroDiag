@@ -417,3 +417,37 @@ La commande Windows explicite `--obd-auto-detect-can --adapter-index 0 --baud 50
 **ISO 15765-2 / ISO-TP, CAN et CAN-FD** : le timeout d'un échange complet n'est plus réinitialisé à chaque trame CAN, à chaque FlowControl/WAIT ni lors du filtrage de trafic d'autres IDs. Les contrôles de temps sont appliqués avant et après les opérations du lien. Le filtrage d'identité de trame continue jusqu'au délai total, sans perte de réponse après le 64e paquet étranger. Ajout de tests simulant lien très lent, fenêtre FC expirée et bus chargé de 96 trames sans lien avant la réponse. Ces modifications ne qualifient pas le comportement temps réel d'un pilote J2534 donné.
 
 **Niveau de validation** : tests écrits et enregistrés mais **non exécutés** ; aucune campagne de compilation Windows/CI ni essai CAN/CAN-FD physique sur ce lot. Les estimations de couverture logicielle restent **J1979-2 ~45 %, ISO-TP CAN ~72 %, ISO-TP CAN-FD ~62 %**, indicatives uniquement, pas des mesures de conformité. L'ensemble des protocoles et leurs écarts figurent dans la matrice précédente ; la prise en charge de l'écriture ECU reste conditionnée aux vrais droits constructeur, aux sauvegardes des secteurs et au profil matériel qualifié, sans verrou artificiel.
+
+
+## Checkpoint protocole par protocole — lot de 20 h du 23 novembre 2026
+
+Cette tranche a traité successivement **SAE J1979-2 / OBDonUDS**, **ISO 15765-2 / ISO-TP CAN et FD**, **ISO 14229 / UDS**, puis **ISO 14230 / KWP2000** sur la PR #95 existante, sans aucune nouvelle branche/PR. Toutes les modifications sont sur le chemin PC/J2534 ou DoIP et les tests offline. Aucun essai sur matériel n'a été ajouté.
+
+- **J1979-2** : requête `19 01 [statusMask]` pour obtenir le nombre de DTC correspondant au masque ; réponse positive `59 01 [availability][format][countHi][countLo]` vérifiée en longueur et conservant le format. Le constructeur et le décodeur sont branchés aux CLI **DoIP et ISO-TP** par `--obd-dtc-count-mask`.
+- **ISO-TP CAN/FD** : timeout global par appel `SendAsync` et `ReceiveAsync`, y compris bruit sur le bus, FC/WAIT et trames de continuation ; rejet explicite des réponses livrées par des drivers après expiration. Les échanges Windows `--isotp-exchange` partagent désormais le budget entre la phase TX et la phase RX. Le moteur ne rejette plus une réponse corrélée seulement parce que plus de 64 trames étrangères ont été observées dans le délai. Tests d'horloge et de trafic (>96 trames) ajoutés.
+- **UDS ISO 14229** : `UdsResponseSequence` vérifie l'expiration et l'annulation **après** réception également ; une réponse positive tardive ou tardive après NRC `0x78` n'est pas déclarée réussie. Les clés OEM restent à fournir selon la famille ECU : aucune clé, désactivation de protections constructeur ou récupération universelle n'est simulée.
+- **KWP2000 ISO 14230** : décodeur applicatif `Kwp2000Transaction` distinguant SID positif, NRC négatif et `0x78` en attente après vérification de l'entête/adresses/checksum KWP existant. Mode opt-in J2534 `--kwp-validate true` avec adresse RX explicite et lecture d'au moins une trame ; absence de réponse finale = transmission non confirmée. Les SID arbitraires ne sont **pas** bloqués ; la corrélation est volontairement indépendante de l'autorisation ECU. Ne pas déclarer le timing physique K-Line ou l'initialisation constructeur qualifiés.
+
+### Matrice d'avancement au checkpoint (estimation du code hôte uniquement)
+
+**Ce ne sont ni des taux de conformité normative ni des qualifications sur adaptateur, ECU ou véhicule.** Valeurs indicatives établies à partir des modules connus ; revérification exhaustive des exigences ISO/SAE encore nécessaire.
+
+| Protocole | Avancement estimé | Reste le plus important |
+|---|---:|---|
+| SAE J1979 OBD-II classique | 60 % | Tous les PID et moniteurs J1979DA, modes 05/08, autres transports et versions |
+| SAE J1979-2 OBDonUDS | **45 %** | Mapping complet DID/mesures, conformité, matériel |
+| ISO 15765-2 ISO-TP CAN classique | **75 %** | Timings/erreurs J2534 réels, tests banc et conformité |
+| ISO 15765-2 ISO-TP CAN-FD | **65 %** | Driver J2534-2 FD, BRS/STmin précis, banc |
+| ISO 14229 UDS | **63 %** | P2/P2* validés, profils OEM, routines, accès constructeur, reprise |
+| ISO 13400 DoIP | 60 % | Passerelles/certificats OEM et tests réels |
+| ISO 9141-2 K-Line | 35 % | Init 5 bauds et échanges électriques testés |
+| ISO 14230 KWP2000 | **45 %** | Temporisations physiques, sessions longues, multi-ECU, OEM |
+| SAE J1850 VPW/PWM | 25 % | Transceiver, timings, trames réelles |
+| SAE J2534-1/-2 | 60 % | Tests sur DLL fournisseurs / FD |
+| SAE J1939-21 | 60 % | Sessions multiples et tests physiques |
+| SAE J1939-81 | 35 % | Address claiming persistant et conflits réels |
+| SAE J1939-22 | 55 % | Variantes FD.TP/Multi-PG et banc |
+| SAE J2411 SW-CAN/GMLAN | 25 % | Transceiver / wake-up et qualification |
+| LIN, J1708/J1587, TP2.0, KWP1281, RP1210, D-PDU | 0–10 % | Couverture standard et matériel à développer |
+
+**Validation :** les nouvelles suites de tests sont écrites et référencées dans `BridgeSelfTests`, mais **pas exécutées** sur ce lot. Aucune compilation Windows, CI finale ni essai banc n'a été exécuté ; ne pas déduire « build OK », « ECU flash OK » ou taux de conformité de cette matrice. Selon AGENTS.md, tests/CI regroupés à la clôture du chantier et maintien de la PR #95 sans merge.
