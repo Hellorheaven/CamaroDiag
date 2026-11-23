@@ -665,6 +665,70 @@ internal static class IsoTpCanFdSelfTests
             vendorClassic.RequestedTimeouts.SequenceEqual(new[] { 230 }),
             "Classic J2534 unpacks one real-shape RX and honors timeout milliseconds.");
 
+        // Exercise the complete classic CAN ISO-TP state machine through
+        // the J2534 raw adapter rather than connecting the assembler directly
+        // to QueueLink. This is a deterministic fake-DLL test, NOT an ECU test.
+        var segmentedVendor = new FakeRawJ2534();
+        var segmentedLink = new IsoTpJ2534RawCanLink(segmentedVendor,
+            canFd: false, extendedId: false, bitRateSwitch: false);
+        var segmentedSettings = classic with { BlockSize = 1 };
+        void EnqueueSegmented(uint id, byte[] frame) =>
+            segmentedVendor.Incoming.Enqueue(new(J2534StandardChannel.Can,
+                0, 0, IsoTpJ2534RawCanLink.Pack(id, frame, false)));
+        // One CTS for each CF: the sender must obey the ECU's BS=1
+        // even when the tester advertises a different local block size.
+        EnqueueSegmented(0x7E8, [0x30, 1, 0, 0, 0, 0, 0, 0]);
+        EnqueueSegmented(0x7E8, [0x30, 1, 0, 0, 0, 0, 0, 0]);
+        var segmentedRequest = Fill(20);
+        IsoTpCanFdSession.SendAsync(segmentedLink, segmentedSettings,
+            segmentedRequest, TimeSpan.FromSeconds(2),
+            CancellationToken.None).GetAwaiter().GetResult();
+        var rawTx = segmentedVendor.Transmitted.Select(item =>
+            IsoTpJ2534RawCanLink.Unpack(item.Data, 0, false, false)).ToArray();
+        var reassembledTx = rawTx[0].Data.AsSpan(2, 6).ToArray()
+            .Concat(rawTx.Skip(1).SelectMany(item => item.Data.Skip(1)))
+            .Take(segmentedRequest.Length).ToArray();
+        Check(rawTx.Length == 3 &&
+            rawTx.All(item => item.Id == 0x7E0 && !item.IsFd) &&
+            rawTx[0].Data[0] == 0x10 && rawTx[0].Data[1] == 20 &&
+            rawTx[1].Data[0] == 0x21 && rawTx[2].Data[0] == 0x22 &&
+            reassembledTx.SequenceEqual(segmentedRequest),
+            "Classic CAN full-stack segmented TX/RX via fake J2534: FF and BS=1 CFs.");
+
+        var segmentedReply = Fill(20);
+        EnqueueSegmented(0x7E9, [3, 0x62, 0xF1, 0x90, 0, 0, 0, 0]);
+        EnqueueSegmented(0x7E8, new byte[] { 0x10, 20 }
+            .Concat(segmentedReply.Take(6)).ToArray());
+        EnqueueSegmented(0x7E9, [3, 0x62, 0xF1, 0x90, 0, 0, 0, 0]);
+        EnqueueSegmented(0x7E8, new byte[] { 0x21 }
+            .Concat(segmentedReply.Skip(6).Take(7)).ToArray());
+        EnqueueSegmented(0x7E8, new byte[] { 0x22 }
+            .Concat(segmentedReply.Skip(13).Take(7)).ToArray());
+        var segmentedRead = IsoTpCanFdSession.ReceiveAsync(
+            segmentedLink, segmentedSettings, TimeSpan.FromSeconds(2),
+            CancellationToken.None).GetAwaiter().GetResult();
+        var allTx = segmentedVendor.Transmitted.Select(item =>
+            IsoTpJ2534RawCanLink.Unpack(item.Data, 0, false, false)).ToArray();
+        Check(segmentedRead.SequenceEqual(segmentedReply) &&
+            allTx.Length == 5 &&
+            allTx.Skip(3).All(item => item.Id == 0x7E0 &&
+                item.Data[0] == 0x30 && item.Data[1] == 1),
+            "Classic CAN fake J2534 RX filters unrelated IDs and issues FC per BS=1.");
+
+        var overflowVendor = new FakeRawJ2534();
+        var overflowLink = new IsoTpJ2534RawCanLink(overflowVendor,
+            canFd: false, extendedId: false, bitRateSwitch: false);
+        overflowVendor.Incoming.Enqueue(new(J2534StandardChannel.Can,
+            0, 0, IsoTpJ2534RawCanLink.Pack(0x7E8,
+                [0x32, 0, 0, 0, 0, 0, 0, 0], false)));
+        Reject<IOException>(() => IsoTpCanFdSession.SendAsync(
+            overflowLink, classic, Fill(20), TimeSpan.FromSeconds(2),
+            CancellationToken.None).GetAwaiter().GetResult(),
+            "Classic CAN J2534 fake ECU FC/OVFLW prevents further CF transmission.");
+        Check(overflowVendor.Transmitted.Count == 1 &&
+            overflowVendor.Transmitted[0].Data[4] == 0x10,
+            "Classic CAN J2534 overflow path emits only the initial FF.");
+
         // Vendor status messages and TX echoes are not ISO-TP frames,
         // even if their CAN ID/data happen to resemble a positive reply.
         var statusVendor = new FakeRawJ2534();
