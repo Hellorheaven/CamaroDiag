@@ -54,6 +54,40 @@ internal static class Kwp2000TransactionSelfTests
         Reject<ArgumentException>(() =>
             Kwp2000Transaction.Decode([], [0x50, 1]),
             "No transmitted SID means no meaningful correlation.");
+        var parsed = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0",
+            "--protocol-id", J2534StandardChannel.Iso14230.ToString(),
+            "--baud", "10400",
+            "--kwp-service", "1A90",
+            "--kwp-tx-target", "16", "--kwp-tx-source", "241",
+            "--kwp-rx-target", "241", "--kwp-rx-source", "16",
+            "--kwp-validate", "true", "--read-frames", "3"
+        ]);
+        Check(parsed.KwpRequest is not null &&
+            parsed.KwpRequest.SequenceEqual(new byte[] { 0x1A, 0x90 }) &&
+            parsed.KwpRxTarget == 241 && parsed.KwpRxSource == 16,
+            "J2534 CLI correlates KWP application SID after physical RX framing.");
+
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseJ2534([
+                StandardProtocolCli.PassThruCommand,
+                "--adapter-index", "0",
+                "--protocol-id", J2534StandardChannel.Iso14230.ToString(),
+                "--baud", "10400", "--data", "1A90",
+                "--kwp-validate", "true"
+            ]), "Cannot validate application SID without KWP framing and target.");
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseJ2534([
+                StandardProtocolCli.PassThruCommand,
+                "--adapter-index", "0",
+                "--protocol-id", J2534StandardChannel.Iso14230.ToString(),
+                "--baud", "10400",
+                "--kwp-service", "1A90",
+                "--kwp-tx-target", "16", "--kwp-tx-source", "241",
+                "--kwp-validate", "true"
+            ]), "Missing RX address cannot claim KWP response correlation.");
+
         return checks;
     }
 }
