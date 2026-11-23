@@ -60,6 +60,46 @@ internal static class StandardVehicleProtocolsSelfTests
             StandardVehicleProtocols.BuildKwpPhysicalFrame(0x33, 0x33, [0x22]),
             "KWP refuses equal source and target.");
 
+        var identificationRequest = DoIpCodec.Decode(
+            DoIpVehicleDiscovery.BuildRequest());
+        Check(identificationRequest.Type == DoIpCodec.VehicleIdentificationRequest &&
+            identificationRequest.Payload.Length == 0,
+            "DoIP UDP identification request has 0x0001 and empty payload.");
+        var identityBytes = new byte[33];
+        System.Text.Encoding.ASCII.GetBytes("12345678901234567").CopyTo(identityBytes, 0);
+        identityBytes[17] = 0x12;
+        identityBytes[18] = 0x34;
+        for (int i = 0; i < 6; i++)
+        {
+            identityBytes[19 + i] = (byte)(i + 1);
+            identityBytes[25 + i] = (byte)(i + 11);
+        }
+        identityBytes[31] = 0x10;
+        identityBytes[32] = 0x00;
+        var discoveryAddress = System.Net.IPAddress.Parse("192.0.2.10");
+        var vehicleIdentity = DoIpVehicleDiscovery.ParseAnnouncement(
+            DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
+                identityBytes), discoveryAddress);
+        Check(vehicleIdentity.Vin == "12345678901234567" &&
+            vehicleIdentity.LogicalAddress == 0x1234 &&
+            vehicleIdentity.Eid.SequenceEqual(new byte[] {1, 2, 3, 4, 5, 6}) &&
+            vehicleIdentity.Gid.SequenceEqual(new byte[] {11, 12, 13, 14, 15, 16}) &&
+            vehicleIdentity.FurtherAction == 0x10 &&
+            vehicleIdentity.VinGidStatus == 0,
+            "DoIP UDP response parses VIN, logical address, EID, GID and status.");
+        var withoutStatus = DoIpVehicleDiscovery.ParseAnnouncement(
+            DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
+                identityBytes[..32]), discoveryAddress);
+        Check(withoutStatus.VinGidStatus is null,
+            "Older DoIP announcement supports optional VIN/GID status byte.");
+        Reject<InvalidDataException>(() => DoIpVehicleDiscovery.ParseAnnouncement(
+            DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
+                identityBytes[..31]), discoveryAddress),
+            "Truncated DoIP UDP vehicle identification is rejected.");
+        Reject<InvalidDataException>(() => DoIpVehicleDiscovery.ParseAnnouncement(
+            DoIpCodec.Encode(DoIpCodec.DiagnosticMessage, identityBytes),
+            discoveryAddress), "Diagnostic DoIP packet cannot masquerade as discovery.");
+
         var route = DoIpCodec.Decode(DoIpCodec.RoutingActivation(0x0E80));
         Check(route.Type == DoIpCodec.RoutingActivationRequest &&
               route.Payload.Length == 7, "ISO 13400 route request.");
