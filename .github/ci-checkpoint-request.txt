@@ -106,3 +106,11 @@ même si des FC ultérieurs demandent STmin 0 ; tests déterministes,
 banc de qualification documenté. Demander une seule suite Debug de
 compilation/tests (Windows bridge -warnaserror, Android, kernel,
 connecteurs) sur le SHA de ce marqueur. Ne pas fusionner ni Release.
+
+23/11/2026 — ISO-TP CAN : trace hôte explicitement optionnelle (#110)
+Checkpoint logiciel de la tranche : 7fc2a5b88a50f2cc95e5b7f8225b2abedba426c5.
+Option --trace-file sur --isotp-exchange; CSV TX_REQUEST/TX_QUEUED/RX
+avec temps hôte (jamais temps de bus), fichier CreateNew, pas d'écrasement,
+pas d'envoi après erreur de journal initiale, tests offline, mode réception
+sans TX. Demander UNE suite Debug groupée de compilation/tests sur le SHA
+de ce commit marqueur. Ne pas certifier de timing réel ECU ni fusionner PR.
