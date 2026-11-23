@@ -57,6 +57,7 @@ import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
 import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
 import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
 import com.camarodiag.gen5.data.obd.UsbPermissionPendingException
+import com.camarodiag.gen5.data.obd.J2534BridgeConnectionForm
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeException
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeCancelled
 import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
@@ -1148,6 +1149,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         protocolNumberText: String
     ) {
         if (!requirePremiumLicense()) return
+        // Validate all form fields BEFORE invalidating an active OBD/J2534
+        // session; malformed input must not disconnect a working adapter.
+        val connectionForm = try {
+            J2534BridgeConnectionForm.parse(
+                host, portText, pairingToken,
+                requestCanIdHex, responseCanIdHex, protocolNumberText
+            )
+        } catch (_: IllegalArgumentException) {
+            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                j2534BridgeMessage = localizedContext.getString(
+                    R.string.msg_j2534_bridge_invalid_form
+                )
+            )
+            return
+        }
         val attempt = ++connectionAttemptGeneration
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
@@ -1176,36 +1192,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 j2534BridgeMessage = ""
             )
             try {
-                fun parseCanId(value: String): Pair<Int, String> {
-                    val normalized = value.trim().removePrefix("0x").removePrefix("0X").uppercase()
-                    require(normalized.length in setOf(3, 8) &&
-                        normalized.all { it.digitToIntOrNull(16) != null }) {
-                        "CAN ID doit contenir 3 chiffres hexadécimaux (11 bits) ou 8 (29 bits)."
-                    }
-                    return normalized.toInt(16) to normalized
-                }
-                val (requestId, requestText) = parseCanId(requestCanIdHex)
-                val (responseId, responseText) = parseCanId(responseCanIdHex)
-                require(requestText.length == responseText.length) {
-                    "Les deux identifiants CAN doivent utiliser le même format 11 ou 29 bits."
-                }
-                require(requestId != responseId) { "Les CAN ID de requête et de réponse doivent être différents." }
-                val can29Bit = requestText.length == 8
-                val protocolNumber = protocolNumberText.toIntOrNull()
-                    ?: error("Profil CAN invalide.")
-                require(protocolNumber in setOf(33, 34, 35, 36, 63, 64)) { "Profil CAN non pris en charge." }
-                require(can29Bit == (protocolNumber in setOf(34, 36, 64))) {
-                    "Le profil CAN sélectionné ne correspond pas à la longueur des identifiants CAN."
-                }
-                val port = portText.toIntOrNull() ?: error("Port TCP invalide.")
                 val result = obdManager.connectJ2534Bridge(
-                    host = host.trim(),
-                    port = port,
-                    pairingToken = pairingToken.trim(),
-                    requestCanId = requestId,
-                    responseCanId = responseId,
-                    can29Bit = can29Bit,
-                    protocolNumber = protocolNumber
+                    host = connectionForm.host,
+                    port = connectionForm.port,
+                    pairingToken = connectionForm.pairingCode,
+                    requestCanId = connectionForm.requestCanId,
+                    responseCanId = connectionForm.responseCanId,
+                    can29Bit = connectionForm.can29Bit,
+                    protocolNumber = connectionForm.protocolNumber
                 ).getOrThrow()
                 if (attempt != connectionAttemptGeneration) {
                     obdManager.disconnect()
