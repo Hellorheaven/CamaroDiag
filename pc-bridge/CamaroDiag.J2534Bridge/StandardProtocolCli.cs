@@ -107,7 +107,7 @@ internal static class StandardProtocolCli
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or
-            IOException or TimeoutException or DllNotFoundException or
+            IOException or InvalidDataException or TimeoutException or DllNotFoundException or
             BadImageFormatException or EntryPointNotFoundException or OverflowException)
         {
             Console.Error.WriteLine("SAE J1979 PID discovery failed: " + ex.Message);
@@ -140,7 +140,7 @@ internal static class StandardProtocolCli
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or
-            InvalidOperationException or IOException or TimeoutException or
+            InvalidOperationException or IOException or InvalidDataException or TimeoutException or
             DllNotFoundException or BadImageFormatException or
             EntryPointNotFoundException or OverflowException)
         {
@@ -177,7 +177,7 @@ internal static class StandardProtocolCli
                 ? 7 : 0;
         }
         catch (Exception ex) when (ex is ArgumentException or
-            InvalidOperationException or IOException or TimeoutException or
+            InvalidOperationException or IOException or InvalidDataException or TimeoutException or
             DllNotFoundException or BadImageFormatException or
             EntryPointNotFoundException or OverflowException)
         {
@@ -233,7 +233,7 @@ internal static class StandardProtocolCli
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or
-            InvalidOperationException or IOException or TimeoutException or
+            InvalidOperationException or IOException or InvalidDataException or TimeoutException or
             DllNotFoundException or BadImageFormatException or
             EntryPointNotFoundException or OverflowException)
         {
