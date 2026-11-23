@@ -20,6 +20,22 @@ internal static class DoIpVehicleDiscovery
     internal static byte[] BuildRequest() =>
         DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequest, []);
 
+    internal static byte[] BuildVinRequest(string vin)
+    {
+        if (vin is null || vin.Length != 17 ||
+            vin.Any(c => c < 0x20 || c > 0x7E))
+            throw new ArgumentException("DoIP VIN request requires 17 printable ASCII characters.");
+        return DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequestVin,
+            Encoding.ASCII.GetBytes(vin));
+    }
+
+    internal static byte[] BuildEidRequest(byte[] eid)
+    {
+        if (eid is null || eid.Length != 6)
+            throw new ArgumentException("DoIP EID request requires exactly 6 bytes.");
+        return DoIpCodec.Encode(DoIpCodec.VehicleIdentificationRequestEid, eid);
+    }
+
     internal static Identity ParseAnnouncement(byte[] packet, IPAddress source)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -46,7 +62,8 @@ internal static class DoIpVehicleDiscovery
     }
 
     internal static async Task<Identity> DiscoverAsync(string host,
-        TimeSpan timeout, CancellationToken cancellationToken)
+        TimeSpan timeout, CancellationToken cancellationToken,
+        string? vin = null, byte[]? eid = null)
     {
         if (!IPAddress.TryParse(host, out var address) ||
             address.AddressFamily != AddressFamily.InterNetwork ||
@@ -55,11 +72,14 @@ internal static class DoIpVehicleDiscovery
             timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
             throw new ArgumentException(
                 "Provide an explicit unicast IPv4 gateway and a bounded timeout.");
+        if (vin is not null && eid is not null)
+            throw new ArgumentException("Use either VIN or EID identification, not both.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         using var socket = new UdpClient(AddressFamily.InterNetwork);
         var destination = new IPEndPoint(address, 13400);
-        var request = BuildRequest();
+        var request = vin is not null ? BuildVinRequest(vin) :
+            eid is not null ? BuildEidRequest(eid) : BuildRequest();
         await socket.SendAsync(request.AsMemory(), destination, deadline.Token);
         while (true)
         {
