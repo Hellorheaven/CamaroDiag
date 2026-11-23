@@ -193,12 +193,14 @@ class BluetoothObdManager(context: Context) {
             report.toAdapterCapabilities()
         }
 
-    /** Dedicated service firmware only, after explicit local consent. Never auto-probe. */
+    /** Offline CDJ inspection remains; physical USB checkpoint capture is deferred to C5. */
     suspend fun captureConnectorCheckpoint(deviceId: Int, isolatedConfirmed: Boolean): Result<ByteArray?> {
         if (!isolatedConfirmed) return Result.failure(IllegalArgumentException("Isolated board confirmation required"))
-        return isolatedConnectorUsb(deviceId, true) { channel, ensureCurrent ->
-            CamaroDiagConnectorCheckpointUsb.capture(channel, ensureCurrent)
-        }
+        // Do not reference the removed experimental CDJ/USB physical reader or
+        // mistake an offline checkpoint for a verified board acquisition.
+        return Result.failure(UnsupportedOperationException(
+            "Physical CDJ/USB checkpoint capture on device $deviceId is deferred to C5."
+        ))
     }
 
     private suspend fun <T> isolatedConnectorUsb(
