@@ -162,7 +162,8 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                     message, testerAddress), deadline.Token);
                 continue;
             }
-            if (DoIpCodec.IsCorrelatedDiagnosticAck(message, testerAddress, ecuAddress))
+            if (DoIpCodec.IsCorrelatedDiagnosticAck(
+                message, testerAddress, ecuAddress, request))
                 continue;
             var uds = DoIpCodec.RequireDiagnosticResponse(message, testerAddress, ecuAddress);
             // The UDS server may report a negative response. Do not mistake
