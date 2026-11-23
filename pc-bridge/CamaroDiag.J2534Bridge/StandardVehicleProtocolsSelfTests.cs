@@ -203,6 +203,23 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<InvalidDataException>(() =>
             DoIpCodec.RequireDiagnosticResponse(reply, 0x0E81, 0x1234),
             "DoIP wrong tester address.");
+        var positiveAck = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.DiagnosticPositiveAck,
+            [0x12, 0x34, 0x0E, 0x80, 0x00]));
+        Check(DoIpCodec.IsCorrelatedDiagnosticAck(
+            positiveAck, 0x0E80, 0x1234),
+            "DoIP positive ACK code zero is accepted for the active ECU.");
+        var corruptAck = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.DiagnosticPositiveAck,
+            [0x12, 0x34, 0x0E, 0x80, 0x7F]));
+        Reject<InvalidDataException>(() => DoIpCodec.IsCorrelatedDiagnosticAck(
+            corruptAck, 0x0E80, 0x1234),
+            "Unexpected non-zero DoIP positive ACK code must not pass.");
+        Reject<InvalidDataException>(() => DoIpCodec.RequireRoutingActive(
+            DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.RoutingActivationResponse,
+                [0x0E, 0x80, 0x12, 0x34, 0x10, 0, 0, 0, 0, 1])),
+            0x0E80), "DoIP routing activation forbids invalid payload length.");
         var nack = DoIpCodec.Decode(DoIpCodec.Encode(0x8003,
             [0x12, 0x34, 0x0E, 0x80, 0x02]));
         Reject<IOException>(() => DoIpCodec.IsCorrelatedDiagnosticAck(
