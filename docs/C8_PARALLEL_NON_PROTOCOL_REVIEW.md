@@ -81,3 +81,12 @@
 - **C2 :** l'export d'un paquet de restauration contrôlé hors ligne ne peut pas annoncer une réussite lorsque des fichiers sources changent pendant la copie. Il compare les digests lors de la copie puis le contenu des images vérifiées, par région, avec un pic mémoire borné plutôt que de rouvrir le paquet entier en une deuxième collection d'images.
 - **Limite :** tous ces contrôles sont sur fichiers locaux ; aucun write/erase, protocole constructeur, plan mémoire exhaustif ou récupération d'ECU physique n'a été validé.
 - **Tests** : tests de troncature du journal et de mutation de l'index/région pendant export ajoutés. Résultats GitHub Actions sur le dernier HEAD toujours à vérifier. Les travaux standards transport restent à l'autre chat.
+
+## C7/C8 — intégration des liaisons Android, USB et pont Windows hors protocoles (23/11/2026)
+
+- **Routage USB :** CamaroDiagConnectors est reconnu en sélection uniquement à partir du nom de périphérique énuméré. La liste UI est contrôlée avant de remplacer une session fonctionnelle, puis le périphérique est revérifié par le gestionnaire USB. Les équipements KKL et USB génériques ne reçoivent pas les probes ASCII ou CD/1. La découverte est publique et non authentifiée ; elle ne confère aucun droit ECU.
+- **UI :** les boutons de découverte ne sont plus affichés pour chaque adaptateur USB. L'action CDJ/1 physique non implémentée a été retirée plutôt que d'afficher un export trompeur.
+- **Autorisations Android :** la demande d'autorisation USB est distinguée des vrais échecs de transport avec message FR/EN et nécessité de confirmer le dialogue Android avant reconnexion.
+- **J2534 :** configuration IPv4 LAN, TCP, appairage TLS avec empreinte et paires CAN 11/29 bits validée avant de déconnecter l'ancien adaptateur ; le transport refait ses vérifications sécurisées. Les indicateurs de lecture mémoire se réinitialisent à la déconnexion ; le handshake est intégré au compteur global busy.
+- **Autres transports :** saisies Wi-Fi et MAC Bluetooth refusées en amont si elles sont malformées.
+- **Validation attendue :** compilation et suites unitaires Android/communication/Windows au HEAD stable ; essai matériel USB permission/discovery sur matériel identifié, PC J2534 TLS réels et transitions déconnexion/reconnexion ; aucun succès matériel n'est revendiqué. L'autre chat conserve les protocoles et firmwares.
