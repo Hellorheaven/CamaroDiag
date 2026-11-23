@@ -40,8 +40,15 @@ internal static class J1939AddressClaim
             throw new ArgumentException("Invalid claimed source, NAME or priority.");
         var bytes = new byte[8];
         BinaryPrimitives.WriteUInt64LittleEndian(bytes, name);
-        return new(J1939ClassicTpSession.ArbitrationId(
-            AddressClaimPgn, priority, sourceAddress, 0xFF), false, bytes);
+        // SAE J1939-81 reserves source 0xFE for "Cannot Claim Address".
+        // The ordinary J1939 TP builder deliberately refuses that source;
+        // only this special management frame is allowed to use it.
+        var id = sourceAddress == CannotClaimAddress ?
+            ((uint)priority << 26) | ((uint)AddressClaimPgn << 8) |
+                (0xFFu << 8) | sourceAddress :
+            J1939ClassicTpSession.ArbitrationId(
+                AddressClaimPgn, priority, sourceAddress, 0xFF);
+        return new(id, false, bytes);
     }
 
     /// <summary>
