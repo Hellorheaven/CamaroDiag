@@ -22,7 +22,7 @@ class Lfx2012FuelHistoryCsvTest {
         )
         val bytes = pids.associateWith { pid ->
             when (pid) {
-                Lfx2012FuelReadOnly.ETHANOL -> ethanol?.let(::intArrayOf)
+                Lfx2012FuelReadOnly.ETHANOL -> ethanol?.let { intArrayOf(it) }
                 else -> intArrayOf(128)
             }
         }
