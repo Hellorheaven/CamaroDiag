@@ -38,8 +38,15 @@ object EcuRestorePackage {
             it.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ
         }) { "Offline or simulated captures cannot be labelled physical ECU images" }
         require(map.size in 1..MAX_REGIONS) { "Invalid region count" }
-        require(map.sumOf { it.length } <= MAX_TOTAL_IMAGE_BYTES) {
-            "Total ECU restoration image data exceeds the archive budget"
+        // Check bounds without summing untrusted Long values (which can overflow).
+        // Reject before assembling/copying any bytes or creating the package folder.
+        var requestedBytes = 0L
+        for (region in map) {
+            require(region.length <= 64L * 1024 * 1024 &&
+                region.length <= MAX_TOTAL_IMAGE_BYTES - requestedBytes) {
+                "ECU restoration image map exceeds the supported archive budget"
+            }
+            requestedBytes += region.length
         }
         val images = EcuRestoreImage.assemble(archive, map)
         check(directory.mkdir()) { "ECU image package directory must be new" }
