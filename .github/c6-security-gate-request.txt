@@ -1,6 +1,7 @@
-C6/C2 non-OEM gate cleanup — grouped validation checkpoint
-Source HEAD before checkpoint: 1dcd9dc5c8919b29466d1a1c28d27d998129cc66
-Expect: native local E39 bench gate enabled; no TrustedKeys/profile signature; driver fingerprint optional;
-physical UDS F190 or GM GMLAN 1A/90 exact VIN; remote network bridge remains read-only.
-One grouped run: Android communication/diagnostic/app unit tests; Windows Debug -warnaserror and self-tests;
-no Release build, no physical ECU test, no merge.
+C6/C2 non-OEM gate cleanup — final grouped correction validation
+Code HEAD before marker commit: 9bb57ecb0a8b72849a25e5e027bc57794a93fe73
+Local E39 bench enabled; TrustedKeys and .sig removed; optional J2534 DLL pin;
+physical VIN check via F190 or GM GMLAN 1A/90 with per-connection dialect cache;
+C8 dangling CDJ/USB reference fixed; remote bridge remains read-only.
+Expected: Windows Debug -warnaserror plus 607+ hardware-free self-tests; Android communication/diagnostic/app tests.
+No physical ECU or restoration qualification, no Release build, no merge.
