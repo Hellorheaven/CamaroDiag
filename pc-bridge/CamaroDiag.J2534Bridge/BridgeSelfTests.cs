@@ -155,6 +155,39 @@ internal static class BridgeSelfTests
             Assert(!BridgeServer.HasValidRequestToken(json.RootElement, ""),
                 "A bridge with an empty expected token never authorizes operations");
 
+        // A correct bearer token must never make an ambiguously decoded
+        // operation safe. The full command schema is checked before J2534.
+        foreach (var validRequest in new[] {
+            "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"responseCanId\":\"7E8\",\"can29Bit\":false,\"protocolNumber\":33}",
+            "{\"token\":\"x\",\"op\":\"identify\"}",
+            "{\"token\":\"x\",\"op\":\"identifyGmlan\"}",
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":3000}",
+            "{\"token\":\"x\",\"op\":\"sendOnly\",\"payloadHex\":\"3E80\"}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"close\"}"
+        }) {
+            using var json = JsonDocument.Parse(validRequest);
+            Assert(BridgeServer.HasCanonicalRequestShape(json.RootElement),
+                "Known J2534 operation has exactly its expected fields");
+        }
+        foreach (var forged in new[] {
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"payloadHex\":\"27AA\"}",
+            "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"requestCanId\":\"7DF\",\"responseCanId\":\"7E8\"}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"confirmed\":false}",
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":1000,\"timeoutMs\":9999}",
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"confirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"close\",\"payloadHex\":\"27AA\"}",
+            "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\"}",
+            "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"responseCanId\":\"7E8\",\"can29Bit\":1}",
+            "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":1.5}",
+            "{\"token\":\"x\",\"op\":\"unknown\"}",
+            "[]"
+        }) {
+            using var json = JsonDocument.Parse(forged);
+            Assert(!BridgeServer.HasCanonicalRequestShape(json.RootElement),
+                "Duplicate, unknown and mistyped CAN requests are denied before native I/O");
+        }
+
         // Request framing must reject oversized and truncated client data
         // before JSON parsing or J2534 device access.
         static string? ReadWire(string input)

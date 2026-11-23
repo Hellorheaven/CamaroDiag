@@ -136,9 +136,16 @@ internal sealed class BridgeServer
                     break;
                 }
 
-                var operation = root.TryGetProperty("op", out var opElement) &&
-                    opElement.ValueKind == JsonValueKind.String
-                    ? opElement.GetString() : null;
+                // Authentication alone is not request authorization. Reject
+                // duplicate or unexpected fields before parsing CAN identifiers,
+                // payloads, privileges or opening the native driver.
+                if (!HasCanonicalRequestShape(root))
+                {
+                    await WriteErrorAsync(writer, "Noncanonical bridge request.");
+                    break;
+                }
+
+                var operation = root.GetProperty("op").GetString();
                 switch (operation)
                 {
                     case "open":
@@ -365,6 +372,60 @@ internal sealed class BridgeServer
         var actual = Encoding.UTF8.GetBytes(supplied);
         return expected.Length == actual.Length &&
             CryptographicOperations.FixedTimeEquals(expected, actual);
+    }
+
+    /// <summary>
+    /// Closed schema for the current JSON-lines J2534 protocol. In particular,
+    /// duplicate payloadHex, confirmed, CAN ID or timeout fields are rejected:
+    /// "last key wins" cannot reinterpret an authenticated CAN operation.
+    /// Legacy clients may omit optional open defaults or timeoutMs.
+    /// </summary>
+    internal static bool HasCanonicalRequestShape(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("op", out var operation) ||
+            operation.ValueKind != JsonValueKind.String)
+            return false;
+        var op = operation.GetString();
+        string[] required = op switch
+        {
+            "open" => ["token", "op", "requestCanId", "responseCanId"],
+            "identify" or "identifyGmlan" or "close" => ["token", "op"],
+            "clearStandardObdDtcs" => ["token", "op", "confirmed"],
+            "exchange" or "sendOnly" => ["token", "op", "payloadHex"],
+            _ => []
+        };
+        if (required.Length == 0) return false;
+        string[] allowedExtra = op switch
+        {
+            "open" => ["can29Bit", "protocolNumber"],
+            "exchange" or "sendOnly" => ["timeoutMs"],
+            _ => []
+        };
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in root.EnumerateObject())
+        {
+            if (!names.Add(field.Name) ||
+                (!required.Contains(field.Name, StringComparer.Ordinal) &&
+                 !allowedExtra.Contains(field.Name, StringComparer.Ordinal)))
+                return false;
+            switch (field.Name)
+            {
+                case "token" or "op" or "requestCanId" or "responseCanId" or "payloadHex":
+                    if (field.Value.ValueKind != JsonValueKind.String) return false;
+                    break;
+                case "can29Bit" or "confirmed":
+                    if (field.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                        return false;
+                    break;
+                case "protocolNumber" or "timeoutMs":
+                    if (field.Value.ValueKind != JsonValueKind.Number ||
+                        !field.Value.TryGetInt32(out _))
+                        return false;
+                    break;
+            }
+        }
+        return required.All(names.Contains);
     }
 
     internal static int ParseHexId(JsonElement root, string property)
