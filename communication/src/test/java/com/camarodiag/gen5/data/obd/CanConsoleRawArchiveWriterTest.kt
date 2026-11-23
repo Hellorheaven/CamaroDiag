@@ -101,4 +101,22 @@ class CanConsoleRawArchiveWriterTest {
         assertEquals(false, archive.isComplete)
     }
 
+    @Test fun flushFailureDuringCloseStillClosesSinkAndReportsIncomplete() {
+        var actualCloses = 0
+        val sink = object : Writer() {
+            override fun write(cbuf: CharArray, off: Int, len: Int) = Unit
+            override fun flush() { throw IOException("flush failed on close") }
+            override fun close() { actualCloses++ }
+        }
+        val archive = CanConsoleRawArchiveWriter(sink)
+        archive.append("7E8 01 41")
+        val error = assertThrows(CanCaptureArchiveWriteException::class.java) {
+            archive.close()
+        }
+        assertEquals("flush failed on close", error.cause?.message)
+        assertEquals(1, actualCloses)
+        assertEquals(true, archive.hasFailed)
+        assertEquals(false, archive.isComplete)
+    }
+
 }
