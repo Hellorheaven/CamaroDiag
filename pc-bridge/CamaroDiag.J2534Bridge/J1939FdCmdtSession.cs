@@ -113,12 +113,24 @@ internal static class J1939FdCmdtSession
                 {
                     var segment = await ReadDtAsync(link, o, timeout, token);
                     if (segment.Number != next)
-                        throw new InvalidDataException("FD.TP.DT segment sequence changed.");
+                    {
+                        if (!token.IsCancellationRequested)
+                            await link.SendAsync(MakeAbort(
+                                o, fromLocal: true, reason: 7), token);
+                        throw new InvalidDataException(
+                            "FD.TP.DT segment sequence changed; CMDT session aborted.");
+                    }
                     var offset = (next - 1) * 60;
                     var useful = Math.Min(60, result.Length - offset);
                     if (segment.Data.Length < useful ||
                         (next < count && segment.Data.Length != 60))
-                        throw new InvalidDataException("Truncated directed FD.TP.DT.");
+                    {
+                        if (!token.IsCancellationRequested)
+                            await link.SendAsync(MakeAbort(
+                                o, fromLocal: true, reason: 7), token);
+                        throw new InvalidDataException(
+                            "Truncated directed FD.TP.DT; CMDT session aborted.");
+                    }
                     segment.Data.AsSpan(0, useful).CopyTo(result.AsSpan(offset));
                     next++;
                 }
