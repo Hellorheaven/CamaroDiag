@@ -1,5 +1,7 @@
-using System.Buffers.Binary;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -8,26 +10,29 @@ namespace CamaroDiag.J2534Bridge;
 /// The transport never invents a service blacklist or OEM seed/key.
 /// Mutating transactions require the caller's existing OK then Oui/Non consent.
 /// OEM programming/session requirements remain the responsibility of the caller.
-/// Secure DoIP/TLS variants require a separately configured secure connection.
+/// TLS uses the secured DoIP port and the operating-system trust store.
+/// OEM client certificates or private OEM authorities may require additional
+/// configuration not represented by this minimal transport.
 /// </summary>
 internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
 {
     private readonly TcpClient socket;
-    private readonly NetworkStream stream;
+    private readonly Stream stream;
     private readonly ushort testerAddress;
     private readonly ushort ecuAddress;
 
-    private DoIpDiagnosticTransport(TcpClient socket, ushort tester, ushort ecu)
+    private DoIpDiagnosticTransport(TcpClient socket, Stream dataStream,
+        ushort tester, ushort ecu)
     {
         this.socket = socket;
-        stream = socket.GetStream();
+        stream = dataStream;
         testerAddress = tester;
         ecuAddress = ecu;
     }
 
     internal static async Task<DoIpDiagnosticTransport> ConnectAsync(
         string host, ushort tester, ushort ecu, TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool useTls = false)
     {
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
@@ -37,8 +42,23 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         var socket = new TcpClient();
         try
         {
-            await socket.ConnectAsync(host, 13400, deadline.Token);
-            var session = new DoIpDiagnosticTransport(socket, tester, ecu);
+            await socket.ConnectAsync(host, useTls ? 3496 : 13400, deadline.Token);
+            Stream dataStream = socket.GetStream();
+            if (useTls)
+            {
+                // Never downgrade to TCP or bypass certificate/hostname
+                // verification when an OEM gateway requires secure DoIP.
+                var tls = new SslStream(dataStream, leaveInnerStreamOpen: false);
+                await tls.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+                {
+                    TargetHost = host,
+                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                    CertificateRevocationCheckMode = X509RevocationMode.Online
+                }, deadline.Token);
+                dataStream = tls;
+            }
+            var session = new DoIpDiagnosticTransport(socket, dataStream,
+                tester, ecu);
             await session.SendAsync(DoIpCodec.RoutingActivation(tester), deadline.Token);
             DoIpCodec.Message routing;
             do
