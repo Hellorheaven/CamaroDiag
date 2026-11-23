@@ -1946,6 +1946,12 @@ fun CanSnifferScreen(
                         stringResource(R.string.can_console_filter_observed_note),
                         color = TextMuted, fontSize = 10.sp
                     )
+                    if (state.consoleHistory.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.can_console_history_recent_scope),
+                            color = TextMuted, fontSize = 10.sp
+                        )
+                    }
                     val visibleConsoleHistory = state.consoleHistory.filter { entry ->
                         CanConsoleDisplayFilter.visible(
                             ParsedCanConsoleRecord(entry.direction, entry.content, entry.succeeded),
