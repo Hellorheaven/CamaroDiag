@@ -84,13 +84,18 @@ internal static class StandardProtocolCli
         var broadcast = bool.Parse(Optional(args, "--broadcast") ?? "false");
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
-        var data = mode == "send" ? Hex(Required(args, "--payload")) : [];
+        var payloadHex = Optional(args, "--payload");
+        if (mode == "send" && payloadHex is null ||
+            mode is "receive" or "request" && payloadHex is not null)
+            throw new ArgumentException("J1939 send requires payload, receive/request forbid it.");
+        byte[] data = mode == "send" ? Hex(payloadHex!) :
+            mode == "request" ? J1939PgnRequest.Encode(pgn) : [];
         var options = new J1939ClassicTpSession.Options(source, target, pgn,
             priority, window);
         options.Validate();
         if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
-            mode is not ("send" or "receive") ||
-            (mode == "receive" && broadcast) ||
+            mode is not ("send" or "receive" or "request") ||
+            (mode is "receive" or "request" && broadcast) ||
             data.Length > J1939ClassicTpSession.MaxPayload)
             throw new ArgumentException("Invalid J1939 transport or operating mode.");
         return new(index, baud, options, mode, broadcast, data, timeout);
@@ -104,8 +109,9 @@ internal static class StandardProtocolCli
             var adapters = J2534Registry.Discover();
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
-            if (o.Mode == "send" &&
-                !Confirm($"SAE J1939-21 PGN=0x{o.Settings.Pgn:X} " +
+            if (o.Mode != "receive" &&
+                !Confirm($"SAE J1939-21 {(o.Mode == "request" ? "request" : "transmit")} " +
+                    $"PGN=0x{o.Settings.Pgn:X} " +
                     $"source=0x{o.Settings.LocalAddress:X2} " +
                     $"destination=0x{(o.Broadcast ? 0xFF : o.Settings.RemoteAddress):X2} " +
                     $"payload={Convert.ToHexString(o.Request)}"))
@@ -129,6 +135,13 @@ internal static class StandardProtocolCli
             }
             else
             {
+                if (o.Mode == "request")
+                {
+                    var requestSettings = o.Settings with { Pgn = J1939PgnRequest.RequestPgn };
+                    await J1939ClassicTpSession.SendAsync(link,
+                        requestSettings, o.Request, broadcast: false,
+                        window, CancellationToken.None);
+                }
                 var response = await J1939ClassicTpSession.ReceiveAsync(
                     link, o.Settings, window, CancellationToken.None);
                 Console.WriteLine($"J1939 RX PGN=0x{response.Pgn:X} " +
