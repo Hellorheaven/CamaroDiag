@@ -397,8 +397,8 @@ fun CalibrationWorkspaceScreen(
                                 stringResource(
                                     R.string.flexfuel_lfx2012_history_range,
                                     ethanolHistory.reportedCount,
-                                    ethanolHistory.minimum,
-                                    ethanolHistory.maximum
+                                    requireNotNull(ethanolHistory.minimum),
+                                    requireNotNull(ethanolHistory.maximum)
                                 ),
                                 color = TextMuted, fontSize = 11.sp
                             )
