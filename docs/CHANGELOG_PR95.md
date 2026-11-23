@@ -141,3 +141,7 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 ## ISO-TP — tolérance FlowControl WAIT (23/11/2026)
 - Ajout de `MaxWaitFrames` paramétrable (CLI `--wftmax`, 0 à 255, 4 par défaut) pour les réponses FC/WAIT avant CTS. Le dépassement arrête les nouvelles CF.
 - Tests de limites et de reprise après deux WAIT ajoutés, non encore exécutés ; pas de validation ECU physique.
+
+## DoIP — identification UDP unicast (23/11/2026)
+- Découverte ciblée d'une passerelle connue avec message 0x0001 et réponse 0x0004, extraction VIN/adresse logique/EID/GID et statut facultatif.
+- Commande `--doip-discover --host <IPv4>` ; aucune émission UDS ni basculement vers une autre fonction. Tests codec ajoutés, non exécutés ; broadcast, TLS et banc physique restent ouverts.
