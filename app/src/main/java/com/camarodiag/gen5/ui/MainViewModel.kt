@@ -2584,8 +2584,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     "CAN capture export is not available."
                 }
                 val outputText = buildString {
-                    appendLine("# CamaroDiag unified CAN console")
-                    appendLine("# TX = transmitted • RX = received • SYSTEM = application event")
+                    appendLine(localizedContext.getString(R.string.can_console_export_header))
+                    appendLine(localizedContext.getString(R.string.can_console_export_events_limited))
+                    appendLine(localizedContext.getString(R.string.can_console_export_direction_legend))
                     history.sortedBy { it.timestampMillis }.forEach { entry ->
                         val timestamp = java.text.SimpleDateFormat(
                             "yyyy-MM-dd HH:mm:ss.SSS",
@@ -2600,7 +2601,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     if (archive != null || snapshot.rawText.isNotBlank()) {
                         appendLine()
-                        appendLine("# RX RAW — received adapter stream (unmodified)")
+                        appendLine(localizedContext.getString(
+                            if (archive != null) R.string.can_console_export_full_raw_rx
+                            else R.string.can_console_export_recent_raw_rx
+                        ))
                     }
                 }
                 val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
