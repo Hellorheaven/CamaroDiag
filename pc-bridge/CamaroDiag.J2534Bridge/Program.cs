@@ -144,7 +144,7 @@ internal static class Program
         Console.WriteLine($"Port: {port}");
         Console.WriteLine("Available: physical standard OBD data/diagnostic reads, Mode 09 identity, UDS reads and TesterPresent.");
         if (allowObdClear) Console.WriteLine("Explicit emissions DTC reset enabled; engine off and stationary required. Readiness data will be reset.");
-        Console.WriteLine("ECU writes, security access, actuator controls and flash programming are blocked.");
+        Console.WriteLine("Standard background diagnostics remain read-only. Explicit paired raw UDS exchanges can send ECU services; actual ECU protocol restrictions apply.");
         if (memoryReadScope != null)
             Console.WriteLine("Memory read profile enabled: every 0x23 read is restricted to the configured " +
                 "range and requires an exact live ECU VIN match. No write privileges are granted.");

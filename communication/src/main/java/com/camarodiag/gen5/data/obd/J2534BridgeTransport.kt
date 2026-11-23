@@ -40,6 +40,11 @@ class J2534BridgeTransport(
     @Volatile private var approvedMemoryReadScope: J2534ApprovedMemoryScope? = null
     @Volatile private var standardObdPhysicalReadEnabled = false
     @Volatile private var standardObdClearEnabled = false
+    @Volatile private var rawUdsConsoleAvailable = false
+
+    /** Explicit raw ECU requests on the paired J2534 ISO-TP channel. */
+    val isRawUdsConsoleAvailable: Boolean
+        get() = isConnected && rawUdsConsoleAvailable
     val isStandardObdClearEnabled: Boolean
         get() = isStandardObdPhysicalReadEnabled && standardObdClearEnabled
     val isStandardObdPhysicalReadEnabled: Boolean
@@ -104,6 +109,7 @@ class J2534BridgeTransport(
                     response.optInt("protocolNumber", -1) == protocolNumber
                 ) { "The PC bridge did not confirm the selected read-only CAN channel." }
                 connectedResponseCanId = responseLabel
+                rawUdsConsoleAvailable = response.opt("rawUdsConsoleAvailable") == true
                 val memoryAllowed = response.opt("scopedPhysicalMemoryRead") == true
                 approvedMemoryReadScope = if (memoryAllowed) runCatching {
                     // Older or malformed PC bridges may not supply physical
@@ -433,6 +439,53 @@ class J2534BridgeTransport(
         }
     }
 
+    /** An explicitly requested ECU service, without a CamaroDiag-specific
+     * service allowlist. The existing TLS pairing and J2534 channel still apply.
+     */
+    suspend fun exchangeOperatorUds(payload: ByteArray, timeoutMs: Long): ByteArray =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                ensureOpen()
+                check(rawUdsConsoleAvailable) {
+                    "The connected PC bridge does not implement raw UDS exchange."
+                }
+                require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES)
+                val boundedTimeout = J2534BridgeProtocol.boundedTimeoutMs(timeoutMs)
+                val response = request(
+                    JSONObject().put("op", "exchangeRaw")
+                        .put("token", tlsPairing.token)
+                        .put("payloadHex", payload.toHex())
+                        .put("timeoutMs", boundedTimeout),
+                    boundedTimeout + 3000
+                )
+                val hex = response.optString("payloadHex")
+                if (hex.isBlank() || hex.length % 2 != 0 ||
+                    hex.length > J2534BridgeProtocol.MAX_PAYLOAD_BYTES * 2 ||
+                    !hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }) {
+                    closeInternal()
+                    throw IllegalStateException("Invalid physical ECU response from J2534.")
+                }
+                hex.hexToBytes()
+            }
+        }
+
+    suspend fun sendOperatorUdsOnly(payload: ByteArray) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureOpen()
+            check(rawUdsConsoleAvailable) {
+                "The connected PC bridge does not implement raw UDS send."
+            }
+            require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES)
+            request(
+                JSONObject().put("op", "sendRaw")
+                    .put("token", tlsPairing.token)
+                    .put("payloadHex", payload.toHex()),
+                13_000
+            )
+            Unit
+        }
+    }
+
     private fun request(json: JSONObject, timeoutMs: Int): JSONObject {
         val activeSocket = socket ?: error("Pont PC J2534 non connecté.")
         activeSocket.soTimeout = timeoutMs.coerceIn(1000, 15_000)
@@ -496,6 +549,7 @@ class J2534BridgeTransport(
         approvedMemoryReadScope = null
         standardObdPhysicalReadEnabled = false
         standardObdClearEnabled = false
+        rawUdsConsoleAvailable = false
     }
 
     private fun ByteArray.toHex(): String =

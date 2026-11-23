@@ -1199,6 +1199,32 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
+    /** Explicit low-level ECU UDS over a paired Windows J2534 adapter.
+     *  The operator selects CAN addressing and payload; no extra CamaroDiag
+     *  key, license or invented service-level write filter is inserted here.
+     *  App feature entitlements remain enforced by its presentation layer.
+     */
+    suspend fun exchangeJ2534OperatorUds(payload: ByteArray, timeoutMs: Long = 3000L): ByteArray {
+        val epoch = transportSessionEpoch.capture()
+        return commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534BridgeConnected()) { "Connect a physical Windows J2534 bridge." }
+            val reply = checkNotNull(j2534BridgeTransport).exchangeOperatorUds(payload, timeoutMs)
+            transportSessionEpoch.requireCurrent(epoch)
+            reply
+        }
+    }
+
+    suspend fun sendJ2534OperatorUdsOnly(payload: ByteArray) {
+        val epoch = transportSessionEpoch.capture()
+        commandSessionMutex.withLock {
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            check(isJ2534BridgeConnected()) { "Connect a physical Windows J2534 bridge." }
+            checkNotNull(j2534BridgeTransport).sendOperatorUdsOnly(payload)
+            transportSessionEpoch.requireCurrent(epoch)
+        }
+    }
+
     suspend fun readCalibrationIdentification(): ObdEcuIdentification {
         if (!isJ2534BridgeConnected()) return withObdCommandSession { it.readEcuIdentification() }
         val epoch = transportSessionEpoch.capture()

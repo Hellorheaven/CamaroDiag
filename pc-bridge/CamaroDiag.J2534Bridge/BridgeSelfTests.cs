@@ -169,6 +169,8 @@ internal static class BridgeSelfTests
             "{\"token\":\"x\",\"op\":\"identifyGmlan\"}",
             "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":3000}",
             "{\"token\":\"x\",\"op\":\"sendOnly\",\"payloadHex\":\"3E80\"}",
+            "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF19000\",\"timeoutMs\":3000}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\"}",
             "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true}",
             "{\"token\":\"x\",\"op\":\"close\"}"
         }) {
@@ -178,6 +180,8 @@ internal static class BridgeSelfTests
         }
         foreach (var forged in new[] {
             "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"payloadHex\":\"27AA\"}",
+            "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF190\",\"payloadHex\":\"27AA\"}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"3601\",\"unexpectedFlag\":true}",
             "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"requestCanId\":\"7DF\",\"responseCanId\":\"7E8\"}",
             "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"confirmed\":false}",
             "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":1000,\"timeoutMs\":9999}",

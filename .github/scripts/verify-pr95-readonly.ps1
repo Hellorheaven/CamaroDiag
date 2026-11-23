@@ -1,6 +1,7 @@
 # Historical filename retained for the C6 workflow.
 # Prevent reintroducing a general physical-programming hard stop.
-# Only the dedicated local E39 bench may write; the network bridge stays read-only.
+# Raw UDS over the paired TLS bridge is explicitly available without a
+# service allowlist. The native E39 bench workflow remains local-only.
 $ErrorActionPreference = 'Stop'
 $prefix = 'pc-bridge/CamaroDiag.J2534Bridge/'
 $gate = Get-Content -LiteralPath ($prefix + 'NativeEcuWriteAvailability.cs') -Raw
@@ -29,6 +30,10 @@ foreach ($entry in @(
     }
 }
 if ($server -match 'RunQualifiedNativeE39BenchAsync|NativeE39QualifiedBenchCli') {
-    throw 'Physical bench writer was exposed through the Android network bridge.'
+    throw 'Native E39 destructive bench workflow was exposed through the bridge.'
 }
-Write-Output 'PASS: local E39 bench is available; network bridge remains read-only.'
+if ($server -notmatch 'case "exchangeRaw"' -or $server -notmatch 'case "sendRaw"' -or
+    $server -notmatch 'HasValidRequestToken') {
+    throw 'C6 regression: explicit authenticated raw UDS transport is missing.'
+}
+Write-Output 'PASS: local E39 bench and paired raw UDS transport are available without artificial ECU keys.'

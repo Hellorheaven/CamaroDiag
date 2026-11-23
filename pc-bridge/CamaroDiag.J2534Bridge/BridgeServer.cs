@@ -200,7 +200,8 @@ internal sealed class BridgeServer
                             requestCanId = requestId.ToString(can29 ? "X8" : "X3"),
                             responseCanId = responseId.ToString(can29 ? "X8" : "X3"),
                             batteryMillivolts = device.ReadBatteryMillivolts(),
-                            readOnly = true,
+                            readOnly = true, // Legacy exchange remains diagnostic only.
+                            rawUdsConsoleAvailable = true, // Paired, explicit operator raw route.
                             scopedPhysicalMemoryRead = device.IsMemoryReadEnabled,
                             // The actual Windows read allowlist is the sole authority for
                             // region identity, session and memory boundaries. Android
@@ -288,6 +289,29 @@ internal sealed class BridgeServer
                     {
                         var payload = ParseHexPayload(root);
                         await Task.Run(() => device.SendOnly(payload), cancellationToken);
+                        await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = true }));
+                        break;
+                    }
+                    // Explicit operator UDS route, on the already authenticated
+                    // TLS/J2534 session. Do not impose a second CamaroDiag key
+                    // or a read-only service allowlist: the ECU's actual protocol
+                    // controls SecurityAccess and acknowledges each request.
+                    // Keep this separate from background diagnostic exchanges.
+                    case "exchangeRaw":
+                    {
+                        var payload = ParseHexPayload(root);
+                        var timeout = root.TryGetProperty("timeoutMs", out var timeoutElement)
+                            ? timeoutElement.GetInt32() : 3000;
+                        var response = await Task.Run(
+                            () => device.ExchangeConsole(payload, timeout), cancellationToken);
+                        await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                            { ok = true, payloadHex = Convert.ToHexString(response) }));
+                        break;
+                    }
+                    case "sendRaw":
+                    {
+                        var payload = ParseHexPayload(root);
+                        await Task.Run(() => device.SendConsoleOnly(payload), cancellationToken);
                         await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = true }));
                         break;
                     }
@@ -430,14 +454,14 @@ internal sealed class BridgeServer
             "open" => ["token", "op", "requestCanId", "responseCanId"],
             "identify" or "identifyGmlan" or "close" => ["token", "op"],
             "clearStandardObdDtcs" => ["token", "op", "confirmed"],
-            "exchange" or "sendOnly" => ["token", "op", "payloadHex"],
+            "exchange" or "sendOnly" or "exchangeRaw" or "sendRaw" => ["token", "op", "payloadHex"],
             _ => []
         };
         if (required.Length == 0) return false;
         string[] allowedExtra = op switch
         {
             "open" => ["can29Bit", "protocolNumber"],
-            "exchange" or "sendOnly" => ["timeoutMs"],
+            "exchange" or "sendOnly" or "exchangeRaw" or "sendRaw" => ["timeoutMs"],
             _ => []
         };
         var names = new HashSet<string>(StringComparer.Ordinal);
