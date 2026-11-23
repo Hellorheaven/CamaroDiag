@@ -56,6 +56,14 @@ internal static class ObdJ1979InterpretationSelfTests
             "Unknown units and scaling are not invented.");
 
         Reject<InvalidDataException>(() =>
+            ObdJ1979Interpretation.Interpret([0x01, 0x0C],
+                [0x41, 0x0D, 0x00]),
+            "Wrong PID on same service cannot be reported as success.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979Interpretation.Interpret([0x06, 0x01],
+                [0x46, 0x02, 0x00]),
+            "Wrong monitor identifier rejected.");
+        Reject<InvalidDataException>(() =>
             ObdJ1979Interpretation.Interpret([0x09, 0x02], [0x49, 0x02, 0x01]),
             "Incomplete VIN rejected.");
         Reject<InvalidDataException>(() =>
