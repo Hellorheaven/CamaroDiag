@@ -72,3 +72,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Une erreur d'écriture ou de vidage disque marque l'archive comme incomplète ; l'enregistrement ne peut plus reprendre silencieusement dans ce même objet. Une archive n'est annoncée complète qu'après fermeture sans erreur.
 - La fermeture tente un vidage final puis ferme systématiquement le flux, même si ce vidage échoue. Tests ajoutés : archive intacte, écriture refusée après fermeture, échec persistant, échec de vidage, libération des ressources.
 - **Chantier C1 non encore validé sur ce HEAD** : nouveaux tests commitées mais non exécutés ; intégration de l'indicateur `isComplete` au parcours d'export et essais matériels à contrôler avant annonce de disponibilité.
+
+## C4 — export des historiques carburant sans modification ECU
+- Ajout de `Lfx2012FuelHistoryCsv.kt` : export CSV des échantillons d'une session préalablement validée, avec VIN, session, source, horodatage, PID, statut réel de disponibilité, pourcentage et octet brut.
+- Les cellules numériques absentes restent vides (pas de substitution par 0 %) ; les identifiants de session sont échappés pour le format CSV et les préfixes de formules tableur neutralisés.
+- Tests ajoutés pour 0 % déclaré, mesure absente, CSV et rejet de sessions mélangées avant écriture dans le fichier.
+- Module de génération hors ligne **non encore relié à un bouton d'export utilisateur** ; aucun protocole ni commande ECU modifié. Nouveaux tests **non exécutés** avant la campagne du chantier.
