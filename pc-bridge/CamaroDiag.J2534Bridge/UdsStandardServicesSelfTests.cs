@@ -25,6 +25,33 @@ internal static class UdsStandardServicesSelfTests
         Equal(UdsStandardServices.TesterPresent(true), "3E80",
             "Tester present suppress positive");
         Equal(UdsStandardServices.ReadDid(0xF190), "22F190", "Read DID");
+        Equal(UdsStandardServices.ReadScalingDid(0xF190),
+            "24F190", "ReadScalingDataByIdentifier standard wire payload.");
+        Equal(UdsStandardServices.ControlIo(0x1234, [0x03, 0x42]),
+            "2F12340342", "InputOutputControlByIdentifier exact DID and OEM bytes.");
+        Equal(UdsStandardServices.CommunicationControl(0x01, 0x03),
+            "280103", "CommunicationControl subfunction and communicationType.");
+        Equal(UdsStandardServices.CommunicationControl(0x81, 0x03, [0x12]),
+            "28810312", "CommunicationControl preserves suppress-positive and OEM bytes.");
+        Equal(UdsStandardServices.ControlDtcSetting(0x01, [0xAA]),
+            "8501AA", "ControlDTCSetting ON with optional OEM data.");
+        Equal(UdsStandardServices.ControlDtcSetting(0x82),
+            "8582", "ControlDTCSetting suppress positive responses preserved.");
+        Equal(UdsStandardServices.ReadPeriodicData(0x02, [0x10, 0x20]),
+            "2A021020", "ReadDataByPeriodicIdentifier preserves requested periodic IDs.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.ControlIo(0x1234, []),
+            "IO control cannot omit its control option byte.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.ControlDtcSetting(0x00),
+            "DTC setting requires a standard control subfunction.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.CommunicationControl(0x07, 0x03),
+            "CommunicationControl unknown subfunction rejected.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.ReadPeriodicData(0x02, []),
+            "Periodic read requires a periodic DID.");
+
         Equal(UdsStandardServices.WriteDid(0xF190, [0x43, 0x44]),
             "2EF1904344", "Write DID full wire bytes");
         Equal(UdsStandardServices.ReadMemory(0x80001000, 0x20),
