@@ -324,14 +324,22 @@ internal static class StandardProtocolCli
             var adapters = J2534Registry.Discover();
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
+            var txPreview = o.Groups is null ? o.Payload :
+                (o.FastBroadcast ?
+                    J1939FdMultiPg.EncodeFastBroadcast(o.Source, o.Groups).Data :
+                    J1939FdMultiPg.Encode(
+                        o.Source, o.Target, o.Priority, o.Groups).Data);
+            var groupNames = o.Groups is null ?
+                $"0x{o.Pgn:X}" :
+                string.Join(",", o.Groups.Select(g => $"0x{g.Pgn:X}"));
             if ((o.Mode == "send" || o.Name.HasValue) &&
                 !Confirm($"SAE J1939-22 {(o.Bam ? "FD.TP BAM" : o.Cmdt ? "FD.TP CMDT" :
                         o.FastBroadcast ? "FBFF Multi-PG" : "FEFF Multi-PG")} " +
                     $"TX source=0x{o.Source:X2} destination=0x{o.Target:X2} " +
                     $"NAME={(o.Name.HasValue ? $"0x{o.Name.Value:X16} CLAIM" : "not claimed here")} " +
-                    $"PGN=0x{o.Pgn:X} length={o.Payload.Length} " +
+                    $"PGNs={groupNames} frame-or-payload-bytes={txPreview.Length} " +
                     $"SHA256={Convert.ToHexString(
-                        System.Security.Cryptography.SHA256.HashData(o.Payload))}"))
+                        System.Security.Cryptography.SHA256.HashData(txPreview))}"))
                 return 2;
 
             // J1939-22 FEFF Multi-PG uses RAW FD_CAN, not classical
