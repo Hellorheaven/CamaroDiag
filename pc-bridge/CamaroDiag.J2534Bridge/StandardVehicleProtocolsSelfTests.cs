@@ -495,6 +495,33 @@ internal static class StandardVehicleProtocolsSelfTests
             "--obd-extended-record", "0x90", "--obd-did", "0xF810"]),
             "DoIP does not accept extended record selector without a DTC.");
 
+        var multiDidDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--uds-dids", "0xF190:17,0xF187:4"]);
+        Check(multiDidDoIp.Request.SequenceEqual(
+            new byte[] {0x22, 0xF1, 0x90, 0xF1, 0x87}),
+            "DoIP multi-DID uses the same ISO14229 request as ISO-TP.");
+        var selectors = UdsMultiDidCli.Parse("0xF190:2,0xF187:3");
+        var fields = UdsMultiDidCli.Decode(selectors,
+            [0x22, 0xF1, 0x90, 0xF1, 0x87],
+            [0x62, 0xF1, 0x90, 0x41, 0x42,
+             0xF1, 0x87, 0x11, 0x22, 0x33]);
+        Check(fields.Count == 2 &&
+            fields[0].Data.SequenceEqual(new byte[] {0x41, 0x42}),
+            "DoIP multi-DID output uses configured data lengths.");
+        Reject<ArgumentException>(() =>
+            UdsMultiDidCli.Parse("0xF190:17,0xF190:4"),
+            "Duplicate response DIDs fail parsing before network transmission.");
+        Reject<ArgumentException>(() =>
+            UdsMultiDidCli.Parse("F190:17,0xF187:4"),
+            "UDS multi-DID selection rejects ambiguous decimal/hex identifiers.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--uds-dids", "0xF190:17,0xF187:4", "--payload", "22F190"]),
+            "DoIP refuses competing UDS payload selectors.");
+
         var obdDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
