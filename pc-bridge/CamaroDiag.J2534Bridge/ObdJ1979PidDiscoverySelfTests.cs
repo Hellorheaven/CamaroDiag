@@ -64,6 +64,34 @@ internal static class ObdJ1979PidDiscoverySelfTests
                 mode, freezeFrame, TimeSpan.FromSeconds(2),
                 CancellationToken.None).GetAwaiter().GetResult();
 
+        var cli = new[]
+        {
+            StandardProtocolCli.J1979PidDiscoveryCommand,
+            "--adapter-index", "0", "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--j1979-mode", "2",
+            "--freeze-frame", "1", "--timeout-ms", "2000"
+        };
+        var options = StandardProtocolCli.ParseJ1979PidDiscovery(cli);
+        Check(options.AdapterIndex == 0 && options.Settings.TxId == 0x7E0 &&
+            options.Settings.RxId == 0x7E8 && options.Mode == 2 &&
+            options.FreezeFrame == 1 && !options.Extended,
+            "Explicit physical CAN options parsed without driver.");
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseJ1979PidDiscovery(
+                cli.Concat(new[] { "--payload", "04" }).ToArray()),
+            "PID discovery cannot smuggle a mutating raw payload.");
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseJ1979PidDiscovery(
+                new[] { StandardProtocolCli.J1979PidDiscoveryCommand, "--adapter-index", "0", "--tx-id", "FFFFFFFF", "--rx-id", "7E8", "--baud", "500000" }),
+            "Out of range CAN ID rejected.");
+        var modeOne = new[] {
+            StandardProtocolCli.J1979PidDiscoveryCommand,
+            "--adapter-index", "0", "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--freeze-frame", "1"
+        };
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseJ1979PidDiscovery(modeOne),
+            "Mode 01 cannot request a freeze frame.");
         var twoPages = new FakeLink();
         twoPages.AddResponse(0x41, 0x00, 0x80, 0, 0, 1);
         twoPages.AddResponse(0x41, 0x20, 0x80, 0, 0, 0);
