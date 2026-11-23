@@ -370,3 +370,16 @@ Le décodeur logiciel Mode 01/02 de la voie ISO-TP CAN dispose de 10 formules su
 En Mode 06 ISO 15765-4 CAN, `ObdJ1979Mode06` sait distinguer les réponses de disponibilité des moniteurs (MID 00/20/.../E0, bitmap 32 bits) des résultats de test (enregistrements de 9 octets : MID, TID, UASID, mesure/minimum/maximum 16 bits). Les résultats restent bruts : les facteurs de conversion signés/non signés, unités et conclusions PASS/FAIL dépendant du UASID et de l'édition SAE J1979DA ne sont **pas** présumés. Les variantes hors CAN ne sont pas couvertes par ce décodage.
 
 Des tests offline sont enregistrés dans `BridgeSelfTests`. Ils n'ont **pas encore été exécutés** sur un build du HEAD courant et n'impliquent aucune validation physique. L'intégration exhaustive de J1979 reste ouverte dans #110 : modes 05/08, catalogues complets de PID, données d'in-use performance, échelles UASID et variantes de réponse par transport.
+
+
+## Tranche SAE J1979-2 — détection protocole CAN et VIN F802 (23/11/2026)
+
+La première tranche OBDonUDS / SAE J1979-2 possède désormais une détection de protocole ISO 15765-4 en **deux étapes** sur CAN classique 11 bits :
+1. Envoyer **une requête fonctionnelle** UDS `22 F8 10` à `0x7DF`, corréler les réponses physiques `0x7E8..0x7EF`, et ne déclarer OBDonUDS que si le DID F810 indique `01`. Des réponses F810 contradictoires du même ID CAN sont une erreur.
+2. **Seulement si aucun ECU ne confirme OBDonUDS**, demander le bitmap OBD classique `01 00`. Sans réponse positive conforme, retourner « protocole non confirmé », jamais « OBD classique » par défaut.
+
+La commande Windows explicite `--obd-auto-detect-can --adapter-index 0 --baud 500000 --timeout-ms 2500` passe par le pilote **J2534 CAN brut** et utilise cette procédure. Les adresses sont standard pour la découverte CAN 11 bits ; les profils 29 bits, CAN-FD et autres bus ne sont pas automatiquement inférés.
+
+`ObdOnUdsVehicleIdentification` construit `22 F8 02` et décode la réponse positive `62 F8 02` + VIN ASCII 17 caractères. Cette structure UDS **ne doit pas** être décodée par le parser CAN OBD-II classique `49 02`. Le contrôle est relié à la sortie des échanges physiques `--isotp-exchange` et `--doip-exchange` existants, sans signifier que les réseaux DoIP ou F802 sont pris en charge par un ECU donné.
+
+**Tests** : scénarios de protocole UDS prioritaire, fallback classique, silence, réponses contradictoires, annulation, et réponses VIN invalides écrits dans `BridgeSelfTests` ; **pas encore exécutés sur le HEAD actuel**. Ceci ne garantit ni l'exhaustivité du SAE J1979-2 ni le transport effectif avec CamaroDiagConnectors. Les tableaux J1979DA et les services restants du standard restent à couvrir. Les transmissions génériques UDS, y compris celles permettant une action lorsque l'ECU l'autorise, ne sont pas supprimées ; leur consentement opérateur et les exigences OEM réelles demeurent obligatoires.
