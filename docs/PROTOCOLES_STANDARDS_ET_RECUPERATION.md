@@ -383,3 +383,28 @@ La commande Windows explicite `--obd-auto-detect-can --adapter-index 0 --baud 50
 `ObdOnUdsVehicleIdentification` construit `22 F8 02` et décode la réponse positive `62 F8 02` + VIN ASCII 17 caractères. Cette structure UDS **ne doit pas** être décodée par le parser CAN OBD-II classique `49 02`. Le contrôle est relié à la sortie des échanges physiques `--isotp-exchange` et `--doip-exchange` existants, sans signifier que les réseaux DoIP ou F802 sont pris en charge par un ECU donné.
 
 **Tests** : scénarios de protocole UDS prioritaire, fallback classique, silence, réponses contradictoires, annulation, et réponses VIN invalides écrits dans `BridgeSelfTests` ; **pas encore exécutés sur le HEAD actuel**. Ceci ne garantit ni l'exhaustivité du SAE J1979-2 ni le transport effectif avec CamaroDiagConnectors. Les tableaux J1979DA et les services restants du standard restent à couvrir. Les transmissions génériques UDS, y compris celles permettant une action lorsque l'ECU l'autorise, ne sont pas supprimées ; leur consentement opérateur et les exigences OEM réelles demeurent obligatoires.
+
+
+## Matrice indicative d'avancement logiciel par protocole — 23/11/2026 (lot J1979/J1979-2)
+
+**Lecture obligatoire : ces pourcentages sont des estimations de maturité du code hôte, PAS un audit de conformité aux éditions ISO/SAE, ni un niveau de qualification VCI/ECU.** Ils ne sont pas calculés à partir d'un inventaire exhaustif de cas normatifs. Pour les transports matériels réels, utiliser #112 et les comptes rendus de banc (aucune preuve complète sur toutes les Camaro Gen5/Gen6 à ce stade).
+
+| Protocole | Logiciel estimé | Preuves présentes dans le dépôt | Points bloquants |
+|---|---:|---|---|
+| SAE J1979 OBD classique | **60 %** | Modes 01/02 (PID sélectionnés), mode 03/07/0A DTC CAN, mode 06 MID/records bruts, mode 09 VIN/CALID/CVN, encodage services 01..0A, CLI CAN | Catalogues exhaustifs J1979DA, modes 05/08, UASID, versions, J1850/K-Line et essais réels |
+| SAE J1979-2 OBDonUDS | **40 %** | Identification F810/fallback classic CAN, lecture F802 VIN, plages DID, reports WWH DTC, CLI UDS | Tables DID et mapping réglementaire complets, décodage F8xx avancé, qualification |
+| ISO 15765-2 ISO-TP CAN | 70 % | SF/FF/CF/FC, RX/TX, adressages classiques/étendus via J2534 | Temps réel pilotes, contre-essais banc, profil d'erreurs |
+| ISO 15765-2 CAN-FD | 60 % | Trames FD, offsets longs, DLC/BRS, pont J2534 FD | VCI/driver FD et timmings microsecondes, essais |
+| ISO 14229 UDS | 60 % | Services et séquences diagnostiques/programmation brutes via transport | Routine OEM, sécurité constructeur, chargeur, recette/recovery |
+| ISO 13400 DoIP | 60 % | Découverte, activation routage, TCP/TLS, UDS RX/TX | Passerelles/certificats OEM, conformité et matériel |
+| ISO 9141-2 K-Line | 35 % | Init 5 bauds et TX/RX pilote J2534 | Séquencement/temporisation/faisceau validés |
+| ISO 14230 KWP2000 | 40 % | Formats trame/checksum, fast init J2534 et échanges | Transactions, sessions/timings véhicule |
+| SAE J1850 VPW/PWM | 25 % | Codes CRC, canaux J2534 bidirectionnels | Lignes/PHY réels, timing et filtrage |
+| SAE J2534-1/-2 | 60 % | PassThru et extensions CAN-FD logiciel | Validations DLL/versions, PDU, pilotes |
+| SAE J1939-21 | 60 % | PGN, TP BAM/RTS/CTS et ACK, bus brut | Multiplexage, tests multi-pairs/banc |
+| SAE J1939-81 | 35 % | NAME et address claim logiciel | Gestion persistante/collisions réelles |
+| SAE J1939-22 | 55 % | Multi-PG et FD.TP BAM/CMDT | Variantes TOS/TF, multiplexage, bus FD réel |
+| SAE J2411 SW-CAN / GMLAN | 25 % | Transport J2534 et identité GM | Tranceiver/wake-up, qualification SW-CAN |
+| LIN, J1708/J1587, KWP1281, TP2.0, RP1210, D-PDU | 0–10 % | Backlog/architecture, sans pile bout en bout qualifiée | Code transport et matériel/profil à livrer |
+
+**État des validations du lot actuel :** nouveaux tests unitaires ajoutés au lanceur `BridgeSelfTests` mais **non exécutés**, aucune CI finale du HEAD ni banc ECU. Les pourcentages ne doivent pas être utilisés pour déduire que l'écriture d'un calculateur ou sa restauration seraient opérationnelles.
