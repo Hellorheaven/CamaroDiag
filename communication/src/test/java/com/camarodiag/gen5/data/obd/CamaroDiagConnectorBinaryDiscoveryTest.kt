@@ -97,6 +97,54 @@ class CamaroDiagConnectorBinaryDiscoveryTest {
         assertEquals(1, concatenated.requests.size)
     }
 
+    @Test fun stalledUsbWriteConsumesDiscoveryDeadlineWithoutReadingOrRetrying() {
+        var now = 0L
+        var writes = 0
+        var reads = 0
+        val channel = object : CamaroDiagConnectorDiscovery.Channel {
+            override fun write(bytes: ByteArray) {
+                writes++
+                now += 3_100_000_000L
+            }
+            override fun read(buffer: ByteArray, timeoutMs: Int): Int {
+                reads++
+                return -1
+            }
+        }
+        val error = runCatching {
+            CamaroDiagConnectorBinaryDiscovery.inspectWithClock(
+                channel, clock = { now }
+            )
+        }.exceptionOrNull()
+        assertTrue(error is IOException)
+        assertEquals(1, writes)
+        assertEquals(0, reads)
+    }
+
+    @Test fun cancellationImmediatelyAfterUsbWritePreventsAnyReadOrNextCommand() {
+        var active = true
+        var writes = 0
+        var reads = 0
+        val channel = object : CamaroDiagConnectorDiscovery.Channel {
+            override fun write(bytes: ByteArray) {
+                writes++
+                active = false
+            }
+            override fun read(buffer: ByteArray, timeoutMs: Int): Int {
+                reads++
+                return -1
+            }
+        }
+        val error = runCatching {
+            CamaroDiagConnectorBinaryDiscovery.inspect(channel) {
+                if (!active) throw java.util.concurrent.CancellationException()
+            }
+        }.exceptionOrNull()
+        assertTrue(error is java.util.concurrent.CancellationException)
+        assertEquals(1, writes)
+        assertEquals(0, reads)
+    }
+
     @Test fun cancellationDoesNotSendAnyRequest() {
         val c = Channel(emptyList())
         val error = runCatching {
