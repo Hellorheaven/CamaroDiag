@@ -1,7 +1,9 @@
-C6 final clean validation — user-requested ECU programming unblock 2026-11-23
-Implementation HEAD before CI marker: a94c58c0018730a83e04881939f36aff30428602
-Software changes already validated on predecessor run 45126220384 (Android and Windows SUCCESS).
-This run also validates the small Kotlin boxed-Boolean warning correction in J2534BridgeTransport.
-Expected C6: J2534 Windows Debug build warnings-as-errors + 607+ selftests;
-Android communication, diagnostic, app unit tests; CI regression script.
-No claim of actual ECU flash, no fictitious driver, no merge.
+C6 group validation: two-stage user confirmation before any potentially modifying ECU command
+Source HEAD before marker: 4dd761c8f2d93483cc364d8ebe5212e1a0c14346
+Android CAN UI: risk + CamaroDiag responsibility warning with OK, then distinct Yes/No; NO or dismiss never sends.
+Windows local J2534 console: two dialogs; cancellation before physical driver calls; changed channel cancels.
+Native E39 bench CLI: warning OK followed by explicit OUI; no/rejection/EOF cancels before opening ECU.
+Paired Android/Windows J2534 raw exchange: requires both warningAcknowledged and writeConfirmed per request;
+Android API accepts only approval from the consent flow; standard diagnostic paths unchanged.
+OEM seed/key and CamaroDiag product licenses unchanged. No physical flash tests.
+Run grouped Windows J2534 Debug warnings-as-errors and self-tests, Android communication/diagnostic/app unit tests.
