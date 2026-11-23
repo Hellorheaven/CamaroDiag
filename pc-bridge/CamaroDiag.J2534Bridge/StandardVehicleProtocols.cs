@@ -30,7 +30,7 @@ internal static class StandardVehicleProtocols
         new("DoIP", "ISO 13400-2 / ISO 14229-5", "network/transport", null, true, false),
         new("OBD-II", "SAE J1979 / ISO 15031-5", "application", null, true, false),
         new("OBDonUDS", "SAE J1979-2", "application", null, true, false,
-            "F810 identification, emissions DIDs and UDS DTC 0x19/0x02 only; full service mapping pending"),
+            "F810 direct/functional multi-ECU CAN detection, emissions DIDs and UDS DTC 0x19/0x02; full service mapping pending"),
         new("J1939 classical CAN", "SAE J1939-21 / J1939-73", "network/application", null, true, false,
             "J1939-21 BAM/RTS/CTS, Request, DM1/DM2, initial NAME claim; hardware unverified"),
         new("J1939 CAN FD", "SAE J1939-22", "network/transport", null, true, false,
