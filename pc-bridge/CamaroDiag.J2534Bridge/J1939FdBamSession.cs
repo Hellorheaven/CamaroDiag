@@ -92,11 +92,13 @@ internal static class J1939FdBamSession
         var result = new byte[announced];
         for (var next = 1; next <= count; next++)
         {
+            var segmentClock = System.Diagnostics.Stopwatch.StartNew();
             J1939FdTransportFrames.Segment? segment = null;
             for (var tries = 0; tries < 128; tries++)
             {
                 var frame = await ReceiveUntilAsync(
-                link, timeout, stopwatch, token);
+                    link, timeout, stopwatch, token,
+                    segmentClock, TimeSpan.FromMilliseconds(750));
                 if (!Matches(frame, remoteSource, 0xFF,
                         J1939FdTransportFrames.DataPgn))
                     continue;
@@ -118,10 +120,12 @@ internal static class J1939FdBamSession
             segment.Data.AsSpan(0, useful).CopyTo(result.AsSpan(offset));
         }
 
+        var statusClock = System.Diagnostics.Stopwatch.StartNew();
         for (var attempts = 0; attempts < 128; attempts++)
         {
             var frame = await ReceiveUntilAsync(
-                link, timeout, stopwatch, token);
+                link, timeout, stopwatch, token,
+                statusClock, TimeSpan.FromMilliseconds(750));
             if (!Matches(frame, remoteSource, 0xFF,
                     J1939FdTransportFrames.ControlPgn))
                 continue;
@@ -139,9 +143,16 @@ internal static class J1939FdBamSession
 
     private static Task<IsoTpCanFdSession.CanFrame> ReceiveUntilAsync(
         IsoTpCanFdSession.ICanLink link, TimeSpan limit,
-        System.Diagnostics.Stopwatch clock, CancellationToken token)
+        System.Diagnostics.Stopwatch clock, CancellationToken token,
+        System.Diagnostics.Stopwatch? phaseClock = null,
+        TimeSpan? phaseLimit = null)
     {
         var remaining = limit - clock.Elapsed;
+        if (phaseClock is not null && phaseLimit.HasValue)
+        {
+            var phaseRemaining = phaseLimit.Value - phaseClock.Elapsed;
+            if (phaseRemaining < remaining) remaining = phaseRemaining;
+        }
         if (remaining <= TimeSpan.Zero)
             throw new TimeoutException(
                 "J1939-22 BAM overall receive deadline expired.");
