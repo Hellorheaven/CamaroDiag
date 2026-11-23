@@ -61,3 +61,10 @@ Correctif de compilation regroupé au SHA 277d5a8d2cdb7806cd098602dbc3cca8060d29
 Relancer UNE campagne complète Debug de validation de ce lot,
 Windows -warnaserror + selftests, Android, native ECU, connecteurs.
 Pas de tests par commit; aucune Release, aucun merge, aucune preuve ECU physique.
+
+23/11/2026 — ISO-TP software checkpoint correction round 2 (#110)
+Run #45266918219 built Windows Debug with 0 warnings and 0 errors,
+but aborted bridge self-tests before ISO-TP on an earlier UDS upload
+memory-range regression. Added address-space boundary guard and tests in
+53b07df0ca06bd1e024e61823383fa847f0c2315. Re-run single grouped Debug after this fix.
+No per-commit tests, no Release/merge, and no physical ECU claim.
