@@ -242,3 +242,10 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Correctifs CAN : ignorer les trames J1939 non corrélées malformées avant le parseur, refuser les trames ISO-TP CF plus grandes que le RX_DL du FF et les FF sous-dimensionnées. Tests de régression ajoutés.
 - J1939-81 : construction de la trame Address Claimed et comparaison NAME prioritaire hors ligne, sans revendication réelle sur le bus.
 - **Tests ajoutés mais non exécutés** ; CI du lot et qualification matérielle toujours en attente.
+
+
+## SAE J1939-22 — FEFF Multi-PG (23/11/2026)
+- Nouveau codec CAN-FD FEFF Multi-PG PGN 2500 : émission et réception de plusieurs C-PG avec TOS 2, TF 0, en-tête de 4 octets et DLC CAN-FD canoniques, sans prétendre décoder les autres formats d'assurance.
+- Commande Windows `--j1939-fd-multipg` bidirectionnelle, canal J2534 FD_CAN brut, BRS et data baud optionnels (négociés via pilote), confirmation double en émission, filtrage de groupe dans les réponses.
+- Tests offline du codec, des trames malformées, PDU1/PDU2, CLI, modes passifs et BRS enregistrés dans `J1939FdMultiPgSelfTests`, exécutables depuis `BridgeSelfTests` mais **non encore exécutés**.
+- FD.TP des messages longs, FBFF, assurance data OEM, adresse réseau J1939-81 et validation physique restent incomplets.
