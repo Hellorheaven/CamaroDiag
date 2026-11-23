@@ -1170,6 +1170,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
+            beginBusyOperation()
+            try {
             try {
                 previousAttempt?.join()
                 if (attempt != connectionAttemptGeneration) return@launch
@@ -1230,6 +1232,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (attempt == connectionAttemptGeneration) {
                     connectionAttemptJob = null
                 }
+            }
+            } finally {
+                endBusyOperation()
             }
         }
     }
