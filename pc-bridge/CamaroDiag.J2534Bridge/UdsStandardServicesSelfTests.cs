@@ -157,6 +157,31 @@ internal static class UdsStandardServicesSelfTests
             "194233FF08", "OBDonUDS confirmed emission DTCs use WWH 0x42.");
         Equal(ObdOnUdsServices.ReadWwhEmissionsDtcs(0x04, 0x80),
             "1942338004", "WWH DTC requests retain explicit severity and pending masks.");
+        Equal(ObdOnUdsServices.ReadDtcExtendedData(0x123456, 0xFE),
+            "1906123456FE", "UDS 19/06 reads all regulated emissions extended records.");
+        Equal(ObdOnUdsServices.ReadDtcExtendedData(0x123456, 0x90),
+            "190612345690", "UDS 19/06 can select a legislated extended record.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            ObdOnUdsServices.ReadDtcExtendedData(0x123456, 0),
+            "Extended-data record zero is reserved.");
+        var extendedData = ObdOnUdsServices.DecodeDtcExtendedData(0x123456,
+            [0x59, 0x06, 0x12, 0x34, 0x56, 0x08,
+             0x90, 0xAB, 0xCD]);
+        Check(extendedData.Dtc == 0x123456 &&
+            extendedData.Status == 0x08 &&
+            extendedData.RawExtendedDataRecords.SequenceEqual(
+                new byte[] {0x90, 0xAB, 0xCD}),
+            "UDS extended DTC records preserve their actual raw bytes.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeDtcExtendedData(0x123456,
+                [0x59, 0x06, 0x12, 0x34, 0x57, 0x08]),
+            "Extended DTC reply cannot belong to a different fault.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse(
+                [0x19, 0x06, 0x12, 0x34, 0x56, 0xFE],
+                [0x59, 0x06, 0x12, 0x34, 0x57, 0x08]),
+            "Shared UDS correlation rejects stale 0x19/0x06 DTC response.");
+
         Equal(ObdOnUdsServices.ReadDtcSnapshot(0x123456, 0x01),
             "190412345601", "UDS snapshot reads selected 24-bit DTC and record 1.");
         Equal(ObdOnUdsServices.ReadDtcSnapshot(0xABCDEF, 0xFF),
