@@ -33,7 +33,7 @@ object EcuRestoreCoveragePreview {
     ): Report {
         require(archive.verification.consistent) { "ECU archive is inconsistent" }
         require(suppliedMap.size in 1..128) { "Missing or excessive ECU memory regions" }
-        val ordered = suppliedMap.sortedWith(compareBy(
+        val ordered = suppliedMap.sortedWith(compareBy<EcuRestoreImage.MemoryRegion>(
             { it.region.ordinal }, { it.startAddress }
         ))
         ordered.zipWithNext().forEach { (a, b) ->
