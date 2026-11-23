@@ -143,3 +143,7 @@ La session DoIP traite désormais les requêtes `Alive Check` TCP de la passerel
 ### ISO-TP 29 bits : adressage mixte
 
 Le moteur traite également le format mixte à un octet N_AE : **identifiants CAN TX/RX distincts** et **même N_AE dans les deux directions**, en lecture et en écriture de trames de transport. La CLI utilise `--extended true --mixed-address 0xA7` avec `--tx-id` et `--rx-id` 29 bits. Ne pas confondre avec `--tx-address` / `--rx-address` du format étendu (octets logiques éventuellement distincts). Exemple de syntaxe : `--isotp-exchange --adapter-index 0 --tx-id 18DA10F1 --rx-id 18DAF110 --baud 500000 --fd false --extended true --mixed-address 0xA7 --payload 22F190`. Les identifiants et N_AE sont illustratifs ; leur pertinence pour le calculateur reste à confirmer. Tests ajoutés, non exécutés.
+
+### J1939-81 — identification passive NAME
+
+Le décodeur `J1939AddressClaim` lit le PGN 0xEE00 diffusé sur CAN 29 bits, exige huit octets de NAME, expose identité, code fabricant, instance ECU, fonction, système véhicule et capacité d'adresse arbitraire. La CLI de réception peut afficher ce NAME pour l'adresse source ciblée. **Il n'effectue ni revendication d'adresse, ni résolution des conflits NAME, ni sélection automatique d'une adresse source**, prérequis restant à implémenter/qualifier avant émission J1939 sur bus réel. Tests ajoutés et non exécutés.
