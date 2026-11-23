@@ -42,6 +42,38 @@ class CanConsoleEventJournalStoreTest {
         }
     }
 
+    @Test fun disappearingArchiveInvalidatesSnapshotAndPreventsExport() {
+        val directory = Files.createTempDirectory("console-lost").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            store.append(listOf(event(0)))
+            val original = requireNotNull(store.snapshot())
+            assertTrue(original.file.delete())
+            assertNull(store.snapshot())
+            assertTrue(store.hasFailed())
+            assertFalse(store.isCurrent(original))
+            assertTrue(runCatching { store.append(listOf(event(1))) }.isFailure)
+            store.reset()
+            assertFalse(store.hasFailed())
+            store.append(listOf(event(2)))
+            assertEquals(1L, requireNotNull(store.snapshot()).eventCount)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test fun invalidStorageDirectoryDoesNotLeakAnExportableJournal() {
+        val directory = Files.createTempFile("console-invalid-dir", ".tmp").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            assertTrue(runCatching { store.append(listOf(event(1))) }.isFailure)
+            assertTrue(store.hasFailed())
+            assertNull(store.snapshot())
+        } finally {
+            directory.delete()
+        }
+    }
+
     @Test fun resetSeparatesSessionsAndTheirTemporaryFiles() {
         val directory = Files.createTempDirectory("console-sessions").toFile()
         try {
