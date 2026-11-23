@@ -212,7 +212,8 @@ internal static class StandardProtocolCli
         uint? DataBaud, bool Brs, byte Source, byte Target, byte Priority,
         int? Pgn, string Mode, byte[] Payload, int TimeoutMs,
         bool Bam, byte Session, bool Cmdt, byte Window,
-        ulong? Name = null, bool FastBroadcast = false);
+        ulong? Name = null, bool FastBroadcast = false,
+        IReadOnlyList<J1939FdMultiPg.ContainedGroup>? Groups = null);
 
     internal static J1939FdOptions ParseJ1939Fd(string[] args)
     {
@@ -241,12 +242,18 @@ internal static class StandardProtocolCli
         var priority = checked((byte)Number(Optional(args, "--priority") ??
             (fbff ? "0" : bam || cmdt ? "7" : "6")));
         var pgnText = Optional(args, "--pgn");
+        var groupText = Optional(args, "--groups");
+        var groups = groupText is null ? null :
+            J1939FdMultiPgCliParser.Parse(groupText);
         int? pgn = pgnText is null ? null : checked((int)Number(pgnText));
         var mode = Required(args, "--mode").ToLowerInvariant();
         var payloadText = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
-        if (payloadText is not null && payloadFile is not null)
-            throw new ArgumentException("Provide payload hex or file, never both.");
+        if ((payloadText is null ? 0 : 1) +
+            (payloadFile is null ? 0 : 1) +
+            (groups is null ? 0 : 1) > 1)
+            throw new ArgumentException(
+                "Choose exactly one J1939-22 payload source, file or grouped C-PGs.");
         if (payloadFile is not null)
         {
             var fileBytes = new FileInfo(payloadFile).Length;
@@ -265,10 +272,13 @@ internal static class StandardProtocolCli
             source >= 0xFE || target == 0xFE || source == target ||
             (mode == "receive" && target >= 0xFE) ||
             priority > 7 || mode is not ("send" or "receive") ||
-            (mode == "send" && (pgn is null ||
-                (bam || cmdt ?
-                    payload.Length is <= 60 or > J1939FdBamSession.MaximumPayload :
-                    payload.Length is < 1 or > 60))) ||
+            (mode == "send" && (groups is null &&
+                (pgn is null ||
+                    (bam || cmdt ?
+                        payload.Length is <= 60 or > J1939FdBamSession.MaximumPayload :
+                        payload.Length is < 1 or > 60)))) ||
+            (groups is not null && (mode != "send" || !multiPg ||
+                pgn is not null || payload.Length != 0)) ||
             (mode == "receive" && (payloadText is not null || payloadFile is not null)) ||
             (bam && (pgn is null || session > 3 ||
                 (mode == "send" && target != 0xFF))) ||
@@ -292,9 +302,18 @@ internal static class StandardProtocolCli
             throw new ArgumentException("J1939-22 broadcast TP requires a PDU2 PGN.");
         if (cmdt && pgn.HasValue && ((pgn.Value >> 8) & 0xFF) >= 240)
             throw new ArgumentException("J1939-22 directed FD.TP requires a PDU1 PGN.");
+        // Build the final CAN-FD payload before connecting to a vendor
+        // adapter, so an oversized group collection cannot send anything.
+        if (groups is not null)
+        {
+            if (fbff)
+                _ = J1939FdMultiPg.EncodeFastBroadcast(source, groups);
+            else
+                _ = J1939FdMultiPg.Encode(source, target, priority, groups);
+        }
         return new(index, baud, dataBaud, brs, source, target,
             priority, pgn, mode, payload, timeout, bam, session, cmdt, window,
-            name, fbff);
+            name, fbff, groups);
     }
 
     internal static async Task<int> RunJ1939FdAsync(string[] args)
@@ -358,7 +377,7 @@ internal static class StandardProtocolCli
                 }
                 else
                 {
-                    var groups = new[]
+                    var groups = o.Groups ?? new[]
                     {
                         new J1939FdMultiPg.ContainedGroup(
                             o.Pgn!.Value, o.Payload)
