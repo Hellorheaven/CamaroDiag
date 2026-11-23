@@ -45,10 +45,15 @@ class CanConsoleRawArchiveWriter(private val writer: Writer) : Closeable {
         if (closed) return
         closed = true
         var storageError: IOException? = null
-        try {
-            writer.flush()
-        } catch (error: IOException) {
-            storageError = error
+        // A previous failed flush already made the archive incomplete.
+        // Never try flushing that failed writer again during close; still
+        // release its resource, preserving the original failure state.
+        if (!failed) {
+            try {
+                writer.flush()
+            } catch (error: IOException) {
+                storageError = error
+            }
         }
         try {
             writer.close()
