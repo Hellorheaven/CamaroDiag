@@ -77,6 +77,31 @@ internal static class ObdOnUdsCanDiscoverySelfTests
                 .GetAwaiter().GetResult().Count == 0 &&
             noResponse.Sent.Count == 1,
             "No positive replies never invent protocol compliance.");
+        var canOptions = StandardProtocolCli.ParseObdCanDiscovery([
+            StandardProtocolCli.ObdCanDiscoverCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--timeout-ms", "1800"]);
+        Check(canOptions.AdapterIndex == 0 && canOptions.Baud == 500000 &&
+            canOptions.TimeoutMs == 1800,
+            "Functional OBDonUDS CLI selects vendor CAN channel and bounded timeout.");
+        void Reject<T>(Action action, string label) where T : Exception
+        {
+            var denied = false;
+            try { action(); }
+            catch (T) { denied = true; }
+            Check(denied, label);
+        }
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseObdCanDiscovery([
+            StandardProtocolCli.ObdCanDiscoverCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--payload", "14FFFFFF"]),
+            "Fixed F810 discovery cannot be repurposed for a mutating UDS service.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseObdCanDiscovery([
+            StandardProtocolCli.ObdCanDiscoverCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--timeout-ms", "30001"]),
+            "Functional CAN discovery always has a bounded observation interval.");
+
         return checks;
     }
 }
