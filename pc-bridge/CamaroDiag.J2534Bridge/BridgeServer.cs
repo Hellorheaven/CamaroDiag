@@ -143,7 +143,7 @@ internal sealed class BridgeServer
             }
             catch (InvalidDataException)
             {
-                await WriteErrorAsync(writer, "Request exceeds the 64 KiB bridge limit.");
+                await WriteErrorAsync(writer, "Invalid bridge request framing or size.", sessionTerminated: true);
                 break;
             }
             catch (IOException) { break; }
@@ -158,7 +158,7 @@ internal sealed class BridgeServer
                     // Reject the first unauthorized frame and close its TLS
                     // session. A local client must not keep trying passwords
                     // against one device-owning session or probe ECU operations.
-                    await WriteErrorAsync(writer, "Bridge pairing authorization failed.");
+                    await WriteErrorAsync(writer, "Bridge pairing authorization failed.", sessionTerminated: true);
                     break;
                 }
 
@@ -167,7 +167,7 @@ internal sealed class BridgeServer
                 // payloads, privileges or opening the native driver.
                 if (!HasCanonicalRequestShape(root))
                 {
-                    await WriteErrorAsync(writer, "Noncanonical bridge request.");
+                    await WriteErrorAsync(writer, "Noncanonical bridge request.", sessionTerminated: true);
                     break;
                 }
 
@@ -303,7 +303,7 @@ internal sealed class BridgeServer
             {
                 // Malformed protocol or duplicate security field attempts must
                 // not keep an authenticated transport session alive.
-                await WriteErrorAsync(writer, "Malformed bridge request.");
+                await WriteErrorAsync(writer, "Malformed bridge request.", sessionTerminated: true);
                 break;
             }
             catch (Exception ex) when (RequiresSessionTermination(ex))
@@ -311,7 +311,7 @@ internal sealed class BridgeServer
                 // Authorization failures and uncertain physical I/O invalidate
                 // the device-owning TLS session. Do not let the same client
                 // retry privileged services or reuse a questionable ECU state.
-                await WriteErrorAsync(writer, "J2534 operation denied or physical channel failed; reconnect and requalify.");
+                await WriteErrorAsync(writer, "J2534 operation denied or physical channel failed; reconnect and requalify.", sessionTerminated: true);
                 break;
             }
             catch (Exception ex)
@@ -500,6 +500,10 @@ internal sealed class BridgeServer
         catch (FormatException) { throw new ArgumentException("payloadHex contains non-hexadecimal characters."); }
     }
 
-    private static Task WriteErrorAsync(StreamWriter writer, string message) =>
-        writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = false, error = message }));
+    internal static string SerializeErrorResponse(string message, bool sessionTerminated) =>
+        JsonSerializer.Serialize(new { ok = false, error = message, sessionTerminated });
+
+    private static Task WriteErrorAsync(StreamWriter writer, string message,
+        bool sessionTerminated = false) =>
+        writer.WriteLineAsync(SerializeErrorResponse(message, sessionTerminated));
 }

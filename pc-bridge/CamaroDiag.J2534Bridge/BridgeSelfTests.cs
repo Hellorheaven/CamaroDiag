@@ -199,6 +199,17 @@ internal static class BridgeSelfTests
         Assert(!BridgeServer.RequiresSessionTermination(new ArgumentException()),
             "Bad local field syntax is rejected without reusing a privileged request");
 
+        // The peer is told when its authorized TLS session is revoked.
+        using (var fatal = JsonDocument.Parse(BridgeServer.SerializeErrorResponse(
+            "Unqualified ECU operation.", true)))
+            Assert(fatal.RootElement.GetProperty("sessionTerminated").GetBoolean() &&
+                !fatal.RootElement.GetProperty("ok").GetBoolean(),
+                "Fatal security errors explicitly revoke the client's bridge session");
+        using (var ordinary = JsonDocument.Parse(BridgeServer.SerializeErrorResponse(
+            "A recoverable ECU timeout.", false)))
+            Assert(!ordinary.RootElement.GetProperty("sessionTerminated").GetBoolean(),
+                "Recoverable errors do not falsely report a terminated session");
+
         // Request framing must reject oversized and truncated client data
         // before JSON parsing or J2534 device access.
         static string? ReadWire(string input)

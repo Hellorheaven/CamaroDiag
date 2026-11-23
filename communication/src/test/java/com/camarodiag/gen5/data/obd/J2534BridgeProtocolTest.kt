@@ -9,6 +9,14 @@ import java.io.StringReader
 
 class J2534BridgeProtocolTest {
     @Test
+    fun onlyLiteralBooleanTrueRevokesAnAuthenticatedJ2534Session() {
+        org.junit.Assert.assertTrue(J2534BridgeProtocol.isTerminalFailureFlag(true))
+        for (other in listOf<Any?>(false, null, "true", 1)) {
+            org.junit.Assert.assertFalse(J2534BridgeProtocol.isTerminalFailureFlag(other))
+        }
+    }
+
+    @Test
     fun readsOneJsonLineAndLeavesFollowingResponseAvailable() {
         val input = BufferedReader(StringReader("{\"ok\":true}\n{\"ok\":false}\n"))
 

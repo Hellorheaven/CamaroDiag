@@ -16,6 +16,9 @@ import java.util.Locale
 internal class GmlanIdentityUnavailableException :
     IllegalStateException("The ECU does not expose a supported legacy GM VIN/OSID.")
 
+/** The authenticated Windows J2534 bridge revoked its physical session. */
+internal class J2534SessionRevokedException(message: String) : java.io.IOException(message)
+
 /**
  * Certificate-pinned TLS (JSON lines) client for the Windows J2534 bridge.
  * J2534 performs ISO-TP framing on the PC; this class exchanges complete UDS payloads.
@@ -456,7 +459,12 @@ class J2534BridgeTransport(
             throw IllegalStateException("Le pont J2534 a retourné une réponse JSON invalide.", error)
         }
         if (!response.optBoolean("ok", false)) {
-            throw IllegalStateException(response.optString("error", "Erreur inconnue du pont J2534."))
+            val reason = response.optString("error", "Erreur inconnue du pont J2534.")
+            if (J2534BridgeProtocol.isTerminalFailureFlag(response.opt("sessionTerminated"))) {
+                closeInternal()
+                throw J2534SessionRevokedException(reason)
+            }
+            throw IllegalStateException(reason)
         }
         return response
     }
@@ -500,6 +508,8 @@ class J2534BridgeTransport(
 /** Bounded framing helpers for the untrusted JSON-lines PC bridge stream. */
 internal object J2534BridgeProtocol {
     const val MAX_PAYLOAD_BYTES = 4091
+
+    fun isTerminalFailureFlag(value: Any?): Boolean = value === true
     private const val MAX_RESPONSE_LINE_CHARS = 32 * 1024
 
     fun boundedTimeoutMs(timeoutMs: Long): Int = timeoutMs.coerceIn(100L, 10_000L).toInt()
