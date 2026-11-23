@@ -55,3 +55,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Tests ajoutés pour aller-retour des octets, adresses physiques et VIN, ZIP incomplet et chemins non attendus.
 - Cette archive reste **une sauvegarde portable hors ligne**, et non une image certifiée complète et restaurable sur le véhicule : la cartographie intégrale et le pilote OEM de programmation/récupération physique demeurent à qualifier.
 - Tests de ces modifications **non encore exécutés**, conformément à la règle de validation par chantier.
+
+## C4 — historique des lectures carburant LFX, hors protocoles
+- Nouveau calculateur d'historique en mémoire (`Lfx2012FuelSessionHistory`) pour les PID éthanol et corrections de carburant déjà décodés en lecture : valeur initiale/finale, minimum/maximum, évolution si au moins deux mesures valides, nombre de mesures absentes/non supportées.
+- Liaison stricte des échantillons à un VIN, une session et une source uniques, horodatages croissants, historique borné ; le 0 % déclaré n'est pas une absence de réponse.
+- Aucun PID supplémentaire, aucune commande ECU, aucune activation E85 ni affirmation de capteur/firmware FlexFuel réellement validé.
+- Régressions écrites dans `Lfx2012FuelSessionHistoryTest.kt`. **Pas de tests exécutés sur le nouveau HEAD et pas d'intégration écran annoncée.**
