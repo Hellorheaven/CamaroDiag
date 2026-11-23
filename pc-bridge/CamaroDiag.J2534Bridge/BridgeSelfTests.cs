@@ -566,6 +566,7 @@ internal static class BridgeSelfTests
         checks += ObdOnUdsVehicleIdentificationSelfTests.Run();
         checks += ObdOnUdsDtcCountSelfTests.Run();
         checks += IsoTpCanFdSelfTests.Run();
+        checks += IsoTpDeadlineSelfTests.Run();
         checks += J1939ClassicTpSelfTests.Run();
         checks += J1939AddressClaimSessionSelfTests.Run();
         checks += J1939FdMultiPgSelfTests.Run();
