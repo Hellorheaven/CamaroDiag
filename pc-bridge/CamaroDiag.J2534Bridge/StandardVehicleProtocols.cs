@@ -125,6 +125,8 @@ internal static class DoIpCodec
     internal const ushort VehicleIdentificationResponse = 0x0004;
     internal const ushort RoutingActivationRequest = 0x0005;
     internal const ushort RoutingActivationResponse = 0x0006;
+    internal const ushort AliveCheckRequest = 0x0007;
+    internal const ushort AliveCheckResponse = 0x0008;
     internal const ushort DiagnosticMessage = 0x8001;
     internal const ushort DiagnosticPositiveAck = 0x8002;
     internal const ushort DiagnosticNegativeAck = 0x8003;
@@ -181,6 +183,15 @@ internal static class DoIpCodec
             BinaryPrimitives.ReadUInt16BigEndian(response.Payload) != testerAddress ||
             response.Payload[4] != 0x10)
             throw new InvalidDataException("DoIP routing activation not positively acknowledged.");
+    }
+
+    internal static byte[] ReplyToAliveCheck(Message request, ushort testerAddress)
+    {
+        if (request.Type != AliveCheckRequest || request.Payload.Length != 0)
+            throw new InvalidDataException("DoIP alive-check request requires empty payload.");
+        var payload = new byte[2];
+        BinaryPrimitives.WriteUInt16BigEndian(payload, testerAddress);
+        return Encode(AliveCheckResponse, payload, request.Version);
     }
 
     internal static byte[] Diagnostic(ushort testerAddress, ushort ecuAddress, byte[] uds)
