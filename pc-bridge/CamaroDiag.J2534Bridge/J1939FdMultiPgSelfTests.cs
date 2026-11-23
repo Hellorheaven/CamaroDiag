@@ -98,6 +98,52 @@ internal static class J1939FdMultiPgSelfTests
             J1939FdMultiPg.Decode(new(packed.Id, true,
                 packed.Data.AsSpan(0, 9).ToArray())),
             "Noncanonical CAN FD DLC is rejected.");
+        var transmit = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--data-baud", "2000000", "--brs", "true",
+            "--source", "0xF1", "--target", "0xFF",
+            "--priority", "6", "--pgn", "0xF004",
+            "--mode", "send", "--payload", "01020304"]);
+        Check(transmit.Mode == "send" && transmit.Brs &&
+            transmit.DataBaud == 2000000 &&
+            transmit.Pgn == 0xF004 && transmit.Target == 0xFF &&
+            transmit.Payload.SequenceEqual(new byte[] {1, 2, 3, 4}),
+            "J1939-22 CLI negotiates raw FD_CAN plus data bit rate.");
+        var receive = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--mode", "receive", "--pgn", "0xEF00"]);
+        Check(receive.Mode == "receive" &&
+            receive.Payload.Length == 0 && receive.Pgn == 0xEF00,
+            "J1939-22 CLI receive never injects a data payload.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--mode", "receive", "--payload", "22F190"]),
+            "J1939-22 passive receive cannot transmit unexpected payload.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--mode", "send", "--pgn", "0xF004", "--payload", "01"]),
+            "J1939-22 PDU2 send requires global destination.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0xFF",
+            "--brs", "true", "--mode", "send",
+            "--pgn", "0xF004", "--payload", "01"]),
+            "J1939-22 BRS cannot be advertised without negotiated data bitrate.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0xFF",
+            "--mode", "receive"]),
+            "J1939-22 receive cannot use broadcast target as peer address.");
+
         return checks;
     }
 }
