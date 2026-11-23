@@ -140,9 +140,9 @@ Le moteur peut afficher les messages diagnostiques normalisés **DM1 (PGN 0xFECA
 
 La session DoIP traite désormais les requêtes `Alive Check` TCP de la passerelle (type `0x0007`, charge utile vide), tant durant l'activation de routage que pendant un échange UDS, par une réponse `0x0008` contenant **l'adresse logique réelle du testeur** sur 2 octets, avec la même version DoIP que la requête. Le codec refuse les charges utiles non conformes. Cette réponse de gestion de session **n'est pas** une opération UDS ni une autorisation de programmation. Tests ajoutés mais non exécutés ; ni TLS ni essais réseau physique certifiés.
 
-### ISO-TP 29 bits : adressage mixte
+### ISO-TP : adressage mixte CAN 11/29 bits
 
-Le moteur traite également le format mixte à un octet N_AE : **identifiants CAN TX/RX distincts** et **même N_AE dans les deux directions**, en lecture et en écriture de trames de transport. La CLI utilise `--extended true --mixed-address 0xA7` avec `--tx-id` et `--rx-id` 29 bits. Ne pas confondre avec `--tx-address` / `--rx-address` du format étendu (octets logiques éventuellement distincts). Exemple de syntaxe : `--isotp-exchange --adapter-index 0 --tx-id 18DA10F1 --rx-id 18DAF110 --baud 500000 --fd false --extended true --mixed-address 0xA7 --payload 22F190`. Les identifiants et N_AE sont illustratifs ; leur pertinence pour le calculateur reste à confirmer. Tests ajoutés, non exécutés.
+Le moteur traite également le format mixte à un octet N_AE : **identifiants CAN TX/RX distincts, sur 11 ou 29 bits** et **même N_AE dans les deux directions**, en lecture et en écriture de trames de transport. La CLI utilise `--mixed-address 0xA7` avec `--tx-id` et `--rx-id` (11 bits par défaut, ou 29 bits avec `--extended true`). Ne pas confondre avec `--tx-address` / `--rx-address` du format étendu (octets logiques éventuellement distincts). Exemple de syntaxe : `--isotp-exchange --adapter-index 0 --tx-id 18DA10F1 --rx-id 18DAF110 --baud 500000 --fd false --extended true --mixed-address 0xA7 --payload 22F190`. Les identifiants et N_AE sont illustratifs ; leur pertinence pour le calculateur reste à confirmer. Tests ajoutés, non exécutés.
 
 ### J1939-81 — identification passive NAME
 
@@ -165,3 +165,5 @@ Les requêtes PGN peuvent recevoir une réponse standard **ACKM** (PGN 0xE800) p
 ### Invariant du mode J2534 sans émission
 
 La commande `--j2534-standard --mode receive` interdit également `--kline-init` : `FIVE_BAUD_INIT` et `FAST_INIT` sont des actions de signalisation physique qui pourraient transmettre malgré l'absence de `--data`. Pour initialiser K-Line, sélectionner explicitement une transaction avec consentement opérateur ; ne pas assimiler l'ouverture d'un canal passif à la création d'une session K-Line prête à diagnostiquer.
+
+La prise en charge du format mixte sur identifiants CAN **11 bits** a été confirmée dans les tableaux de cadrage ISO 15765-2 puis ajoutée aux paramètres et aux tests CLI. Le moteur applique le même N_AE sur SF/FF/CF/FC ; il ne présume aucune cartographie d'identifiants constructeur.
