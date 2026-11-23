@@ -419,6 +419,20 @@ internal static class IsoTpCanFdSelfTests
                 [1, 2, 3], extended: false),
             "J2534 11-bit arbitration ID overflow rejected.");
 
+        var protocolIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--fd", "false", "--obd-identify"]);
+        Check(protocolIsoTp.Request.SequenceEqual(
+            new byte[] {0x22, 0xF8, 0x10}),
+            "ISO-TP OBDonUDS detection composes SAE J1979-2 F810 request.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--fd", "false",
+            "--mode", "receive", "--obd-identify"]),
+            "Passive ISO-TP reception cannot perform protocol detection TX.");
+
         var obdIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
