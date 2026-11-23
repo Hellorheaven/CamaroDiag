@@ -198,6 +198,27 @@ internal static class StandardProtocolCli
                     "(physical units and availability require SAE J1979DA).");
             }
         }
+        else if (request.Length == 5 && request[0] == 0x19 &&
+            request[1] == 0x42 && response.Length > 0 && response[0] == 0x59)
+        {
+            var report = ObdOnUdsServices.DecodeWwhEmissionsDtcs(response);
+            Console.WriteLine($"WWH-OBD emissions DTC 0x42 " +
+                $"statusMask=0x{report.StatusAvailabilityMask:X2} " +
+                $"severityMask=0x{report.SeverityAvailabilityMask:X2} " +
+                $"format=0x{report.DtcFormatIdentifier:X2} count={report.Codes.Count}");
+            foreach (var dtc in report.Codes)
+                Console.WriteLine($"DTC=0x{dtc.Code:X6} " +
+                    $"severity=0x{dtc.Severity:X2} status=0x{dtc.Status:X2}");
+        }
+        else if (request.Length == 3 && request[0] == 0x19 &&
+            request[1] == 0x55 && response.Length > 0 && response[0] == 0x59)
+        {
+            var report = ObdOnUdsServices.DecodeWwhPermanentEmissionsDtcs(response);
+            Console.WriteLine($"WWH-OBD permanent emissions DTC 0x55 " +
+                $"format=0x{report.DtcFormatIdentifier:X2} count={report.Codes.Count}");
+            foreach (var dtc in report.Codes)
+                Console.WriteLine($"DTC=0x{dtc.Code:X6} status=0x{dtc.Status:X2}");
+        }
         else if (request.Length == 3 && request[0] == 0x19 &&
             request[1] == 0x02 && response.Length > 0 && response[0] == 0x59)
         {
@@ -723,7 +744,8 @@ internal static class StandardProtocolCli
             throw new ArgumentException("Invalid ISO-TP physical address or J2534 option.");
         return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud,
             mode, udsValidate || obdDid is not null ||
-                obdDtcMask is not null || obdIdentify);
+                obdDtcMask is not null || wwhStatus is not null ||
+                wwhPermanent || obdIdentify);
     }
 
     internal static async Task<int> RunIsoTpAsync(string[] args)
