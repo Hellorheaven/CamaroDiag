@@ -61,3 +61,8 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Liaison stricte des échantillons à un VIN, une session et une source uniques, horodatages croissants, historique borné ; le 0 % déclaré n'est pas une absence de réponse.
 - Aucun PID supplémentaire, aucune commande ECU, aucune activation E85 ni affirmation de capteur/firmware FlexFuel réellement validé.
 - Régressions écrites dans `Lfx2012FuelSessionHistoryTest.kt`. **Pas de tests exécutés sur le nouveau HEAD et pas d'intégration écran annoncée.**
+
+## C8 — inventaire non-protocole pendant le chantier parallèle (23/11/2026)
+- Revue documentaire du diff de la PR #95 (253 fichiers lors de l'inventaire) et séparation **provisoire** entre C1/C2/C4/C6, protocoles standard gérés par l'autre chat, évolutions C3/C5/C7 à reporter et modifications à justifier avant fusion.
+- Résultat dans `docs/C8_PARALLEL_NON_PROTOCOL_REVIEW.md` ; les choix de report nécessitent encore examen au niveau des fichiers/commits, sans suppression ni revert aveugle.
+- **Pas de CI du HEAD courant** et aucune qualification matérielle revendiquée. La validation finale C8 attend la stabilisation des chantiers et le contrôle de tous les jobs sur une révision figée.
