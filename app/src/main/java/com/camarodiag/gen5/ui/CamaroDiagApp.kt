@@ -2625,9 +2625,10 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                             // Acknowledging the warning never clears DTCs.
                             clearConsentStep = EcuWriteConsentFlow.afterWarningOk(clearConsentStep)
                         } else {
-                            val approval = EcuWriteConsentFlow.approval(
+                            val approval = EcuWriteConsentFlow.approvalForConnection(
                                 clearConsentStep, confirmedYes = true,
-                                sameConnection = pendingClearGeneration == connectionGeneration
+                                warningConnection = pendingClearGeneration,
+                                currentConnection = connectionGeneration
                             )
                             val epoch = pendingClearGeneration
                             confirmClear = false
