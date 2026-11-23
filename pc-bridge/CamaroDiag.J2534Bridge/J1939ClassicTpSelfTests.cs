@@ -331,6 +331,9 @@ internal static class J1939ClassicTpSelfTests
              0x64, 0x00, 0x01, 0x02]);
         Check(dm2.Codes.Count == 2 &&
             dm2.Codes[0].AlternativeSpnConversion &&
+            dm2.Codes[0].Spn is null &&
+            dm2.Codes[0].RawBytes.SequenceEqual(
+                new byte[] {0x6E, 0x00, 0x05, 0x83}) &&
             dm2.Codes[1].Spn == 100 && dm2.Codes[1].Fmi == 1,
             "DM2 supports reassembled multiple DTCs and alternate CM flag.");
         Check(J1939DmDiagnostics.Decode(J1939DmDiagnostics.Dm1Pgn,
