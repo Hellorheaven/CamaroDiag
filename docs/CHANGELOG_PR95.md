@@ -277,3 +277,12 @@ Les événements TX sont enregistrés au moment de leur émission avec le statut
 - Transport CMDT `J1939FdCmdtSession` : RTS, CTS par fenêtres, segments DT, EOM_STATUS/EOM_ACK et Abort sur expiration. Tests d'envoi/réception avec faux CAN et réponses contradictoires.
 - CLI Windows : `--j1939-fd-bam` et `--j1939-fd-cmdt`, `--mode send|receive`, paramètres FD_CAN/BRS, session et fenêtre, fichier binaire borné, consentement avant émission.
 - Suites de régression enregistrées dans `BridgeSelfTests`. **Pas de build/CI encore exécuté sur le HEAD, ni validation d'adaptateur ou d'ECU réel.** Les variantes J1939-22 non couvertes, concurrence réelle et SAE J1939-81 actif restent ouverts.
+
+### C2 — publication atomique logique de l'index du paquet restaurable hors ligne
+
+- L'import ZIP conserve `index.ecu-package` en mémoire (limité à 64 Kio) tant que toutes les entrées et le footer ZIP n'ont pas été vérifiés ; les régions extraites sont synchronisées sur disque. L'index n'est créé/synchronisé qu'à la fin, puis le paquet entier est relu et validé.
+- En cas d'erreur après la publication de l'index, il est supprimé afin que le dossier ne soit pas reconnu comme un paquet de restauration complet. Une archive tronquée ou prolongée n'est donc pas autoritaire même si ses fichiers région avaient déjà été extraits.
+- Tests : ZIP tronqué, ZIP avec octets superflus, index corrompu et index placé en première entrée.
+- Commits : `05adb73`, `39882bd`, `4e7b766`.
+- **Limitation inchangée :** contrôle d'intégrité du paquet hors ligne uniquement ; aucun flash/rollback matériel ni carte mémoire constructeur attestée.
+- **Validation** : tests ajoutés, résultat CI du HEAD courant non encore confirmé.
