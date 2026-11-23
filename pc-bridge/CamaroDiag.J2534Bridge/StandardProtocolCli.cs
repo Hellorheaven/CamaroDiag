@@ -237,9 +237,10 @@ internal static class StandardProtocolCli
             var adapters = J2534Registry.Discover();
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
-            if (o.Mode == "send" &&
+            if ((o.Mode == "send" || o.Name.HasValue) &&
                 !Confirm($"SAE J1939-22 {(o.Bam ? "FD.TP BAM" : o.Cmdt ? "FD.TP CMDT" : "FEFF Multi-PG")} " +
                     $"TX source=0x{o.Source:X2} destination=0x{o.Target:X2} " +
+                    $"NAME={(o.Name.HasValue ? $"0x{o.Name.Value:X16} CLAIM" : "not claimed here")} " +
                     $"PGN=0x{o.Pgn:X} length={o.Payload.Length} " +
                     $"SHA256={Convert.ToHexString(
                         System.Security.Cryptography.SHA256.HashData(o.Payload))}"))
@@ -255,6 +256,17 @@ internal static class StandardProtocolCli
             driver.ConfigureFilter(new byte[4], new byte[4]);
             var link = new IsoTpJ2534RawCanLink(driver, canFd: true,
                 extendedId: true, bitRateSwitch: o.Brs);
+            if (o.Name.HasValue)
+            {
+                var claim = await J1939AddressClaimSession.ClaimAsync(
+                    link, o.Source, o.Name.Value, canFd: true,
+                    CancellationToken.None);
+                if (claim != J1939AddressClaimSession.Outcome.Claimed)
+                    throw new IOException(
+                        "J1939-81 NAME lost address arbitration; no application PGN sent.");
+                Console.WriteLine($"J1939-81 CAN FD claim accepted for 0x{o.Source:X2} " +
+                    $"during the initial observation interval.");
+            }
 
             if (o.Mode == "send")
             {
@@ -387,10 +399,11 @@ internal static class StandardProtocolCli
             var adapters = J2534Registry.Discover();
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
-            if (o.Mode != "receive" &&
+            if ((o.Mode != "receive" || o.Name.HasValue) &&
                 !Confirm($"SAE J1939-21 {(o.Mode == "request" ? "request" : "transmit")} " +
                     $"PGN=0x{o.Settings.Pgn:X} " +
                     $"source=0x{o.Settings.LocalAddress:X2} " +
+                    $"NAME={(o.Name.HasValue ? $"0x{o.Name.Value:X16} CLAIM" : "not claimed here")} " +
                     $"destination=0x{(o.Broadcast ? 0xFF : o.Settings.RemoteAddress):X2} " +
                     $"payload={Convert.ToHexString(o.Request)}"))
                 return 2;
@@ -404,6 +417,17 @@ internal static class StandardProtocolCli
             driver.ConfigureFilter(new byte[4], new byte[4]);
             var link = new IsoTpJ2534RawCanLink(driver, canFd: false,
                 extendedId: true, bitRateSwitch: false);
+            if (o.Name.HasValue)
+            {
+                var claim = await J1939AddressClaimSession.ClaimAsync(
+                    link, o.Settings.LocalAddress, o.Name.Value, canFd: false,
+                    CancellationToken.None);
+                if (claim != J1939AddressClaimSession.Outcome.Claimed)
+                    throw new IOException(
+                        "J1939-81 NAME lost address arbitration; no application PGN sent.");
+                Console.WriteLine($"J1939-81 classic CAN claim accepted for " +
+                    $"0x{o.Settings.LocalAddress:X2} during initial observation.");
+            }
             var window = TimeSpan.FromMilliseconds(o.TimeoutMs);
             if (o.Mode == "send")
             {
