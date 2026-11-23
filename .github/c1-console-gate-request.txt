@@ -39,3 +39,8 @@ Final grouped non-protocol C1/C2/C4/C6 connector and bridge checkpoint, 2026-11-
 Source HEAD before request: 72bab814d622871624e78db17970bfe891afb24a
 Check all Android communication/diagnostic/app unit tests and Windows J2534 Debug self-test. Includes DTC consent adapter/VIN, portable restore finalization, and J2534 UI credential redaction.
 No per-commit CI, no physical ECU qualification, no merge or Release.
+
+Group C1/C4/C6 + connector integration checkpoint — 2026-11-23 evening.
+Target HEAD before marker 1c23cb08e6498e83f403b0719ad486847d27cb9a
+Run Android communication/diagnostic/app unit tests including UsbPermissionReconnectPolicy, EcuWriteConsentFlow, SafeRawCanTransmitPolicy, Lfx2012FuelSessionHistory, CanConsoleEventJournalStore; Windows J2534 Debug self-test.
+This is an integration checkpoint only: no physical ECU validation, no release, no merge.
