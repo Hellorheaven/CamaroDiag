@@ -343,6 +343,39 @@ internal static class StandardVehicleProtocolsSelfTests
             diagnosticV3.Payload[4] == 0x22,
             "DoIP diagnostic message uses the selected TCP header version.");
 
+        var tempDir = Path.Combine(Path.GetTempPath(),
+            "camaro-doip-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var source = Path.Combine(tempDir, "uds-request.bin");
+            var capture = Path.Combine(tempDir, "uds-reply.bin");
+            var original = Enumerable.Range(0, 6000)
+                .Select(i => (byte)(i & 0xFF)).ToArray();
+            File.WriteAllBytes(source, original);
+            var fromFile = StandardProtocolCli.ParseDoIp([
+                StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+                "--tester", "0E80", "--ecu", "1234",
+                "--payload-file", source, "--rx-file", capture]);
+            Check(fromFile.Request.SequenceEqual(original) &&
+                fromFile.ReceiveFile == capture,
+                "DoIP reads exact binary diagnostic request bytes from file.");
+            StandardProtocolCli.SaveDoIpReplyAsync(capture,
+                original).GetAwaiter().GetResult();
+            Check(File.ReadAllBytes(capture).SequenceEqual(original),
+                "DoIP binary response is saved and read back without modifications.");
+            Reject<IOException>(() =>
+                StandardProtocolCli.SaveDoIpReplyAsync(capture,
+                    new byte[] {0x62}).GetAwaiter().GetResult(),
+                "DoIP cannot overwrite an already saved raw diagnostic response.");
+            Check(File.ReadAllBytes(capture).SequenceEqual(original),
+                "An existing diagnostic file stays unmodified after refused overwrite.");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+
         var largeUds = Enumerable.Repeat((byte)0xAB, 6000).ToArray();
         var largeDoIp = DoIpCodec.Decode(DoIpCodec.Diagnostic(
             0x0E80, 0x1234, largeUds));
