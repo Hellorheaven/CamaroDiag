@@ -95,6 +95,17 @@ internal static class J1939ClassicTpSession
                 (byte)o.Pgn, (byte)(o.Pgn >> 8), (byte)(o.Pgn >> 16)]);
     }
 
+    internal static IsoTpCanFdSession.CanFrame MakeAbort(Options o, byte reason)
+    {
+        o.Validate();
+        if (reason is not (3 or 7))
+            throw new ArgumentOutOfRangeException(nameof(reason));
+        return new(ArbitrationId(TpCmPgn, o.Priority,
+            o.LocalAddress, o.RemoteAddress), false,
+            [Abort, reason, 0xFF, 0xFF, 0xFF,
+             (byte)o.Pgn, (byte)(o.Pgn >> 8), (byte)(o.Pgn >> 16)]);
+    }
+
     internal static IsoTpCanFdSession.CanFrame MakeAck(Options o, int length)
     {
         var total = (length + 6) / 7;
@@ -205,10 +216,23 @@ internal static class J1939ClassicTpSession
                 await link.SendAsync(MakeCts(o, window, sequence), token);
             for (var part = 0; part < window; part++)
             {
-                var frame = await ReadDataAsync(link, o, timeout, token,
-                    broadcast);
+                IsoTpCanFdSession.CanFrame frame;
+                try
+                {
+                    frame = await ReadDataAsync(link, o, timeout, token, broadcast);
+                }
+                catch (TimeoutException)
+                {
+                    if (!broadcast && !token.IsCancellationRequested)
+                        await link.SendAsync(MakeAbort(o, 3), token);
+                    throw;
+                }
                 if (frame.Data[0] != sequence)
+                {
+                    if (!broadcast && !token.IsCancellationRequested)
+                        await link.SendAsync(MakeAbort(o, 7), token);
                     throw new InvalidDataException("J1939 TP.DT sequence number changed.");
+                }
                 var offset = (sequence - 1) * 7;
                 var take = Math.Min(7, length - offset);
                 frame.Data.AsSpan(1, take).CopyTo(result.AsSpan(offset));
