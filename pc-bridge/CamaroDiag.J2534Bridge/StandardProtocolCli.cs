@@ -908,7 +908,8 @@ internal static class StandardProtocolCli
         if (mode is not ("exchange" or "receive") ||
             (mode == "exchange" && payloadSources != 1) ||
             (mode == "receive" && (payloadSources != 0 || udsValidate || interpretJ1979)) ||
-            (interpretJ1979 && udsValidate))
+            (interpretJ1979 && (udsValidate || fd ||
+                (hexPayload is null && payloadFile is null))))
             throw new ArgumentException(
                 "Exchange needs exactly one payload, file, OBD DID or DTC mask; receive mode accepts none.");
         byte[] bytes = mode == "receive" ? Array.Empty<byte>() :
@@ -934,6 +935,14 @@ internal static class StandardProtocolCli
                     (byte)0xFE : checked((byte)Number(extendedRecord))) :
             payloadFile is not null ? File.ReadAllBytes(payloadFile) :
             Convert.FromHexString(hexPayload!);
+        // SAE J1979 classic and SAE J1979-2 OBDonUDS are different
+        // application protocols. A decoder flag must not reinterpret a UDS
+        // selector as a legacy emissions mode or silently invent support.
+        if (interpretJ1979 && (bytes.Length == 0 ||
+            bytes[0] is < 0x01 or > 0x0A))
+            throw new ArgumentException(
+                "Classic SAE J1979 decoding requires a service 01..0A payload.");
+
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
             bs, stMin, TxAddress: txAddress, RxAddress: rxAddress,
             MaxWaitFrames: maxWaitFrames, MixedAddressing: mixedAddressing);
