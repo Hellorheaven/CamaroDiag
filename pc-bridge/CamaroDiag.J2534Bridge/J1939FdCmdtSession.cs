@@ -56,7 +56,8 @@ internal static class J1939FdCmdtSession
             await link.SendAsync(MakeCm(o, fromLocal: true,
                 J1939FdTransportFrames.EndOfMessageStatus,
                 payload.Length, count, 0, 0), token);
-            var ack = await ReadCmAsync(link, o, timeout, clock, token);
+            var ack = await ReadCmAsync(link, o, timeout, clock, token,
+                phaseLimit: TimeSpan.FromSeconds(3));
             if (ack.Type == J1939FdTransportFrames.ConnectionAbort)
                 throw new IOException("J1939-22 peer aborted the transfer after EOM_STATUS.");
             if (ack.Type != J1939FdTransportFrames.EndOfMessageAck ||
@@ -113,7 +114,8 @@ internal static class J1939FdCmdtSession
                     next, (byte)window, 0), token);
                 for (var i = 0; i < window; i++)
                 {
-                    var segment = await ReadDtAsync(link, o, timeout, clock, token);
+                    var segment = await ReadDtAsync(link, o, timeout, clock, token,
+                        phaseLimit: TimeSpan.FromMilliseconds(1250));
                     if (segment.Number != next)
                     {
                         if (!token.IsCancellationRequested)
@@ -137,7 +139,8 @@ internal static class J1939FdCmdtSession
                     next++;
                 }
             }
-            var eom = await ReadCmAsync(link, o, timeout, clock, token);
+            var eom = await ReadCmAsync(link, o, timeout, clock, token,
+                phaseLimit: TimeSpan.FromMilliseconds(750));
             if (eom.Type != J1939FdTransportFrames.EndOfMessageStatus ||
                 eom.MessageLength != result.Length || eom.SegmentCount != count ||
                 eom.Aux7 != 0 || eom.Aux8 != 0)
@@ -161,7 +164,8 @@ internal static class J1939FdCmdtSession
     {
         for (var holds = 0; holds < 5; holds++)
         {
-            var cm = await ReadCmAsync(link, o, timeout, clock, token);
+            var cm = await ReadCmAsync(link, o, timeout, clock, token,
+                phaseLimit: TimeSpan.FromMilliseconds(1250));
             if (cm.Type == J1939FdTransportFrames.ConnectionAbort)
                 throw new IOException("J1939-22 peer aborted RTS/CTS.");
             if (cm.Type != J1939FdTransportFrames.ClearToSend ||
@@ -179,12 +183,13 @@ internal static class J1939FdCmdtSession
     private static async Task<J1939FdTransportFrames.Control> ReadCmAsync(
         IsoTpCanFdSession.ICanLink link, Options o,
         TimeSpan timeout, System.Diagnostics.Stopwatch clock,
-        CancellationToken token)
+        CancellationToken token, TimeSpan? phaseLimit = null)
     {
+        var phaseClock = System.Diagnostics.Stopwatch.StartNew();
         for (var tries = 0; tries < 128; tries++)
         {
             var frame = await link.ReceiveAsync(
-                Remaining(timeout, clock), token);
+                Remaining(timeout, clock, phaseLimit, phaseClock), token);
             if (!Matches(frame, o.Peer, o.Local,
                 J1939FdTransportFrames.ControlPgn)) continue;
             var cm = J1939FdTransportFrames.DecodeControl(frame);
@@ -197,12 +202,13 @@ internal static class J1939FdCmdtSession
     private static async Task<J1939FdTransportFrames.Segment> ReadDtAsync(
         IsoTpCanFdSession.ICanLink link, Options o,
         TimeSpan timeout, System.Diagnostics.Stopwatch clock,
-        CancellationToken token)
+        CancellationToken token, TimeSpan? phaseLimit = null)
     {
+        var phaseClock = System.Diagnostics.Stopwatch.StartNew();
         for (var tries = 0; tries < 128; tries++)
         {
             var frame = await link.ReceiveAsync(
-                Remaining(timeout, clock), token);
+                Remaining(timeout, clock, phaseLimit, phaseClock), token);
             if (!Matches(frame, o.Peer, o.Local,
                 J1939FdTransportFrames.DataPgn)) continue;
             var segment = J1939FdTransportFrames.DecodeData(frame);
@@ -236,11 +242,18 @@ internal static class J1939FdCmdtSession
     }
 
     private static TimeSpan Remaining(TimeSpan limit,
-        System.Diagnostics.Stopwatch clock)
+        System.Diagnostics.Stopwatch clock, TimeSpan? phaseLimit,
+        System.Diagnostics.Stopwatch phaseClock)
     {
         var left = limit - clock.Elapsed;
+        if (phaseLimit.HasValue)
+        {
+            var phaseLeft = phaseLimit.Value - phaseClock.Elapsed;
+            if (phaseLeft < left) left = phaseLeft;
+        }
         if (left <= TimeSpan.Zero)
-            throw new TimeoutException("J1939-22 FD.TP CMDT overall deadline exceeded.");
+            throw new TimeoutException(
+                "J1939-22 CMDT overall or standards-phase deadline exceeded.");
         return left > TimeSpan.FromSeconds(30) ?
             TimeSpan.FromSeconds(30) : left;
     }
