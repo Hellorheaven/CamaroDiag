@@ -120,3 +120,10 @@ C6 **reste ouvert** sur PR #95, il n'a pas été supprimé ni transféré au cha
 - **C2 :** aucun pilote réel de restauration ni géométrie OEM globale qualifiée par ce lot ; conservation des exigences de sauvegarde vérifiée avant effacement.
 - **C8 :** tests ajoutés, pas de build Android/Windows ni de résultat matériel revendiqué avant la campagne regroupée de ce lot. Le chat parallèle peut déplacer le HEAD entre deux vérifications. Documenter le SHA réellement validé, sans fusion de PR ni Release.
 
+
+## C2 — audit des lacunes dans une carte mémoire fournie (23/11/2026, soir)
+
+- Nouvelle vérification hors ligne `EcuRestoreCoveragePreview` : pour chaque région/adresse/longueur connue, elle indique les plages manquantes et celles qui ne proviennent pas de deux lectures déclarées matériellement et concordantes. Les captures hors carte sont comptabilisées séparément ; les cartes qui débordent le budget ou se chevauchent sont rejetées.
+- `EcuRestorePackage.createNew` refuse de créer le dossier final lorsque la carte **fournie** contient des trous ou des captures non vérifiables. Les tests couvrent couverture continue, trou interne, capture hors carte, origine fichier importé et carte excessive.
+- `coversSuppliedMap` n'est **pas** une attestation que la carte fournie décrit **tout l'ECU**. L'exhaustivité OEM, l'accès physique, les zones protégées, les checksums et la vraie restauration restent à implémenter et qualifier. Aucun verrou général de programmation ajouté à C6.
+
