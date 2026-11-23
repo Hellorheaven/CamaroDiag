@@ -81,8 +81,10 @@ CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-i
 - `--mode receive` attend un message ECU sans requête diagnostique sortante. Une réception multipaquet déclenche uniquement les réponses FlowControl nécessaires ; ne remplace pas une opération de diagnostic requête/réponse.
 - `--mode exchange` est le comportement par défaut, avec requête et réponse ; il exige la confirmation opérateur avant émission.
 - `--payload-file` transmet exactement les octets du fichier dans la limite de 1 Mio pour le moteur logiciel (plafond d'allocation, **pas** promesse de capacité de l'ECU) ; les adresses/secteurs nécessaires à un flash réel restent définis par le pilote ECU. L'acceptation de la trame seule ne prouve pas l'écriture flash.
+- `--wftmax` configure le nombre de réponses FlowControl WAIT consécutives acceptées avant abandon (défaut 4 ; bornes 0–255) ; cette valeur n'élimine pas les temporisations de session.
 - `--block-size` et `--stmin` contrôlent les réponses FlowControl produites ; le moteur respecte celles du pair, y compris les valeurs sub-millisecondes. Une programmation avec timing précis ne sera considérée matériellement qualifiée qu'après preuve sur le matériel ciblé.
 - `--extended true` sélectionne un identifiant CAN 29 bits (et non l'adressage ISO-TP étendu, accessible par --tx-address/--rx-address).
+- La réception multi-trame utilise `RX_DL` issu du `CAN_DL` de la première trame envoyée par l'ECU, indépendamment du DLC de nos trames TX/FC ; les CF non terminaux incohérents sont rejetés.
 - Les réponses CAN sont corrélées à l'identifiant attendu. Les transactions susceptibles de modifier l'ECU demandent un nouvel avertissement OK puis confirmation OUI/NON.
 
 L'adressage ISO-TP étendu à un octet est implémenté dans le moteur SF/FF/CF/FC et accessible par `--tx-address 0xF1 --rx-address 0x10` (octets illustratifs). Ce mode n'implique pas des identifiants CAN 29 bits. Les deux adresses logiques sont requises ensemble. Tests unitaires ajoutés mais non exécutés ; prise en charge matérielle et adressage mixte non qualifiés.
