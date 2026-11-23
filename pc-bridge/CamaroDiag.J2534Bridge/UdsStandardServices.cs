@@ -152,9 +152,10 @@ internal static class UdsStandardServices
         // request. This does not assert that the ECU memory was programmed.
         var echoed = request[0] switch
         {
-            0x22 or 0x2E => 2,
+            0x22 or 0x2E or 0x2F => 2,
             0x31 => 3,
-            0x10 or 0x11 or 0x27 or 0x36 or 0x19 => 1,
+            0x10 or 0x11 or 0x27 or 0x36 or 0x19 or
+                0x28 or 0x3E or 0x85 => 1,
             _ => 0
         };
         if (echoed != 0 && (request.Length < echoed + 1 ||
@@ -162,7 +163,8 @@ internal static class UdsStandardServices
             throw new InvalidDataException("Missing UDS echoed identifier.");
         for (int i = 1; i <= echoed; i++)
         {
-            var expected = (request[0] is 0x10 or 0x11 or 0x31 or 0x27 or 0x19)
+            var expected = (request[0] is 0x10 or 0x11 or 0x31 or 0x27 or
+                    0x19 or 0x28 or 0x3E or 0x85)
                 && i == 1 ? (byte)(request[i] & 0x7F) : request[i];
             if (response[i] != expected)
                 throw new InvalidDataException("Stale/misdirected UDS reply identifier.");
