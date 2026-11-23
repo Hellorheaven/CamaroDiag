@@ -419,6 +419,32 @@ internal static class IsoTpCanFdSelfTests
                 [1, 2, 3], extended: false),
             "J2534 11-bit arbitration ID overflow rejected.");
 
+        var obdIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-did", "0xF40C"]);
+        Check(obdIsoTp.Request.SequenceEqual(
+            new byte[] {0x22, 0xF4, 0x0C}),
+            "ISO-TP OBDonUDS emissions DID selector composes read request.");
+        var obdDtcIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-dtc-mask", "0xFF"]);
+        Check(obdDtcIsoTp.Request.SequenceEqual(
+            new byte[] {0x19, 0x02, 0xFF}),
+            "ISO-TP OBDonUDS DTC mask selector composes request.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive", "--obd-did", "F40C"]),
+            "Passive ISO-TP cannot silently transmit OBDonUDS DID request.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--payload", "22F40C",
+            "--obd-did", "F40C"]),
+            "ISO-TP request selectors cannot combine raw and OBD payloads.");
+
         var fdCommand = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8",
