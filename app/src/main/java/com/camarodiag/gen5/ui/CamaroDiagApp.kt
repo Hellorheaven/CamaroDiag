@@ -1034,33 +1034,8 @@ fun AdapterScreen(
     onConnectUsb: (String) -> Unit,
     onConnectWifi: (String, Int) -> Unit,
     onDiscoverConnector: ((String) -> Unit)? = null,
-    onDiscoverBinaryConnector: ((String) -> Unit)? = null,
-    onCaptureConnectorCheckpoint: ((String) -> Unit)? = null
+    onDiscoverBinaryConnector: ((String) -> Unit)? = null
 ) {
-    var pendingCheckpoint by remember { mutableStateOf<String?>(null) }
-    pendingCheckpoint?.let { label ->
-        AlertDialog(
-            onDismissRequest = { pendingCheckpoint = null },
-            title = { Text("CamaroDiagConnectors • CDJ/1") },
-            text = {
-                Column {
-                    Text(label)
-                    Text("esp32s3-journal-export")
-                    Text("Isolated USB service board only. Confirm ECU, vehicle and memory are disconnected.")
-                    Text(stringResource(R.string.cal_no_calibration_write))
-                }
-            },
-            confirmButton = {
-                TextButton(enabled = !isBusy && label in usbDevices, onClick = {
-                    pendingCheckpoint = null
-                    onCaptureConnectorCheckpoint?.invoke(label)
-                }) { Text(stringResource(R.string.obd_confirmed)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingCheckpoint = null }) { Text(stringResource(R.string.common_cancel)) }
-            }
-        )
-    }
     var wifiHost by remember { mutableStateOf("192.168.0.10") }
     var wifiPort by remember { mutableStateOf("35000") }
     val vxdiagProfiles = remember { VxdiagProfiles.all() }
@@ -1160,16 +1135,6 @@ fun AdapterScreen(
                                     Text("CamaroDiagConnectors • USB CD/1")
                                     Text(label, fontSize = 11.sp)
                                     Text(stringResource(R.string.adapter_discovery_only), fontSize = 11.sp, color = TextMuted)
-                                }
-                            }
-                        }
-                        if (!kklOnly && label.contains("CamaroDiagConnectors", ignoreCase = true) && onCaptureConnectorCheckpoint != null) {
-                            OutlinedButton(onClick = { pendingCheckpoint = label }, enabled = !isBusy,
-                                modifier = Modifier.fillMaxWidth()) {
-                                Column {
-                                    Text("CamaroDiagConnectors • USB CDJ/1")
-                                    Text(label, fontSize = 11.sp)
-                                    Text(stringResource(R.string.cal_export_file), fontSize = 11.sp)
                                 }
                             }
                         }
