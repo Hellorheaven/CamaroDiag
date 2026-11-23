@@ -18,6 +18,7 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
     private var failed = false
     private var disposed = false
     private var generation = 0L
+    private var committedSizeBytes = 0L
 
     @Synchronized
     fun append(events: List<CanConsoleHistoryEntry>) {
@@ -28,8 +29,9 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
             // A deleted/renamed file can still accept writes through an open
             // descriptor on some filesystems; never keep an unexportable journal.
             if (writer != null) {
-                check(archive?.isFile == true) {
-                    "Console event journal file disappeared during capture"
+                check(archive?.isFile == true &&
+                    archive?.length() == committedSizeBytes) {
+                    "Console event journal file changed during capture"
                 }
             }
             if (writer == null) {
@@ -49,6 +51,8 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
             }
             // Do not retain the only event copy in a volatile in-memory writer buffer.
             target.flush()
+            committedSizeBytes = checkNotNull(archive).length()
+            check(committedSizeBytes > 0L) { "Console journal flush produced an empty file" }
             generation++
         } catch (error: Exception) {
             failed = true
@@ -70,19 +74,25 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
             failed = true
             return null
         }
-        return Snapshot(file, generation, target.eventCount, file.length())
+        if (committedSizeBytes <= 0L || file.length() != committedSizeBytes) {
+            failed = true
+            return null
+        }
+        return Snapshot(file, generation, target.eventCount, committedSizeBytes)
     }
 
     @Synchronized
     fun isCurrent(snapshot: Snapshot): Boolean =
         !failed && !disposed && archive == snapshot.file && generation == snapshot.generation &&
             writer?.eventCount == snapshot.eventCount && snapshot.file.isFile &&
-            snapshot.sizeBytes > 0L && snapshot.file.length() == snapshot.sizeBytes
+            snapshot.sizeBytes > 0L && snapshot.sizeBytes == committedSizeBytes &&
+            snapshot.file.length() == snapshot.sizeBytes
 
     /** Cheap UI capability check; snapshot() performs the final file flush. */
     @Synchronized
     fun isAvailable(): Boolean =
-        !failed && !disposed && writer != null && archive?.isFile == true
+        !failed && !disposed && writer != null && committedSizeBytes > 0L &&
+            archive?.isFile == true && archive?.length() == committedSizeBytes
 
     @Synchronized
     fun hasFailed(): Boolean = failed || disposed
@@ -111,6 +121,7 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
         } finally {
             writer = null
             archive = null
+            committedSizeBytes = 0L
             failed = false
             generation++
             old?.delete()
