@@ -142,8 +142,21 @@ internal static class StandardProtocolCli
                         requestSettings, o.Request, broadcast: false,
                         timeout: window, token: CancellationToken.None);
                 }
+                var rxSettings = o.Mode == "request" ?
+                    o.Settings with { AcceptAcknowledgement = true } : o.Settings;
                 var response = await J1939ClassicTpSession.ReceiveAsync(
-                    link, o.Settings, window, CancellationToken.None);
+                    link, rxSettings, window, CancellationToken.None);
+                if (response.Pgn == J1939PgnAcknowledgement.AcknowledgementPgn)
+                {
+                    var ack = J1939PgnAcknowledgement.Decode(
+                        response.Payload, o.Settings.Pgn);
+                    Console.WriteLine($"J1939 request PGN 0x{ack.RequestedPgn:X} " +
+                        $"ACKM control={ack.Control} " +
+                        $"groupFunction=0x{ack.GroupFunction:X2} " +
+                        $"address=0x{ack.AcknowledgedAddress:X2}; " +
+                        "no requested PGN payload was received.");
+                    return ack.Positive ? 0 : 6;
+                }
                 Console.WriteLine($"J1939 RX PGN=0x{response.Pgn:X} " +
                     $"broadcast={response.Broadcast}: {Convert.ToHexString(response.Payload)}");
                 if (response.Pgn == J1939AddressClaim.AddressClaimPgn)
