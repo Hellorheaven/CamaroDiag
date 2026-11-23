@@ -917,6 +917,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isFuelSnapshotReading = false,
             fuelReadOnlySnapshot = null,
             fuelHistoryCount = 0,
+            fuelHistorySummary = null,
             fuelSnapshotError = "",
             gmlanIdentity = null,
             gmlanIdentityFailed = false,
@@ -1626,7 +1627,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (current()) {
                     val validVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
                         .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
-                    val historySize = synchronized(fuelHistoryLock) {
+                    val historySummary = synchronized(fuelHistoryLock) {
                         if (validVin != null) {
                             val identity = Lfx2012FuelSessionHistory.SessionIdentity(
                                 validVin, "account-$account-connection-$connection",
@@ -1642,12 +1643,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                             fuelHistory += Lfx2012FuelSessionHistory.Sample(identity, captured)
                         }
-                        fuelHistory.size
+                        if (fuelHistory.isEmpty()) null
+                        else Lfx2012FuelSessionHistory.summarize(fuelHistory.toList())
                     }
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         isFuelSnapshotReading = false,
                         fuelReadOnlySnapshot = captured,
-                        fuelHistoryCount = historySize,
+                        fuelHistoryCount = historySummary?.count ?: 0,
+                        fuelHistorySummary = historySummary,
                         fuelSnapshotError = ""
                     )
                 }
