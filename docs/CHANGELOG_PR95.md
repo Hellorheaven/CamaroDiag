@@ -218,3 +218,5 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Option `--doip-discover --listen true` : écoute UDP 13400, collecte bornée des annonces sans émission. Port disponible et pare-feu nécessaires ; aucun essai réel confirmé ni CI exécutée.
 
 - Correctif de réception strictement passive J2534 : `--mode receive` refuse désormais `--kline-init`, car une initialisation 5 bauds/rapide émet physiquement sur le bus. Test de garde ajouté ; non exécuté.
+
+- Correction de conformité ISO-TP : l'adressage mixte N_AE n'est pas limité aux CAN 29 bits ; la CLI autorise désormais aussi les identifiants 11 bits. Tests de mode 11 bits et refus de mélange avec l'adressage logique étendu ajoutés, non exécutés.
