@@ -2,6 +2,7 @@ package com.camarodiag.gen5.ui
 
 import com.camarodiag.gen5.data.obd.CanConsoleEventJournalWriter
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * Private, per-console-session on-disk event journal.
@@ -11,7 +12,13 @@ import java.io.File
  * both before publishing an output. Clear/account/vehicle changes discard it.
  */
 internal class CanConsoleEventJournalStore(private val directory: File) {
-    data class Snapshot(val file: File, val generation: Long, val eventCount: Long, val sizeBytes: Long)
+    data class Snapshot(
+        val file: File,
+        val generation: Long,
+        val eventCount: Long,
+        val sizeBytes: Long,
+        val sha256: String
+    )
 
     private var archive: File? = null
     private var writer: CanConsoleEventJournalWriter? = null
@@ -78,15 +85,48 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
             failed = true
             return null
         }
-        return Snapshot(file, generation, target.eventCount, committedSizeBytes)
+        return try {
+            Snapshot(file, generation, target.eventCount, committedSizeBytes, sha256(file))
+        } catch (_: Exception) {
+            failed = true
+            null
+        }
     }
 
+    /** The export checks exact bytes, not only file size and event count.
+     * A same-size external mutation invalidates the journal permanently.
+     */
     @Synchronized
-    fun isCurrent(snapshot: Snapshot): Boolean =
-        !failed && !disposed && archive == snapshot.file && generation == snapshot.generation &&
-            writer?.eventCount == snapshot.eventCount && snapshot.file.isFile &&
-            snapshot.sizeBytes > 0L && snapshot.sizeBytes == committedSizeBytes &&
-            snapshot.file.length() == snapshot.sizeBytes
+    fun isCurrent(snapshot: Snapshot): Boolean {
+        if (failed || disposed || archive != snapshot.file ||
+            generation != snapshot.generation ||
+            writer?.eventCount != snapshot.eventCount ||
+            !snapshot.file.isFile || snapshot.sizeBytes <= 0L ||
+            snapshot.sizeBytes != committedSizeBytes ||
+            snapshot.file.length() != snapshot.sizeBytes
+        ) return false
+        return try {
+            val valid = sha256(snapshot.file) == snapshot.sha256
+            if (!valid) failed = true
+            valid
+        } catch (_: Exception) {
+            failed = true
+            false
+        }
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().buffered().use { input ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count > 0) digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
 
     /** Cheap UI capability check; snapshot() performs the final file flush. */
     @Synchronized
