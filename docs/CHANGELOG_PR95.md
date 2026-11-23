@@ -147,3 +147,5 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Commande `--doip-discover --host <IPv4>` ; aucune émission UDS ni basculement vers une autre fonction. Tests codec ajoutés, non exécutés ; broadcast, TLS et banc physique restent ouverts.
 
 - DoIP UDP : ajout des requêtes d'identification par VIN (0x0003) ou EID (0x0002) et du traitement explicite des annonces sans VIN disponible. Tests de codecs et de longueurs ajoutés ; non exécutés.
+
+- DoIP : diffusion UDP explicite vers l'adresse indiquée via `--broadcast-ip`, réception bornée à 32 identités, séparation des réponses par adresse source et logique. Aucun UDS envoyé. Tests matériels et intégration réseau non exécutés.
