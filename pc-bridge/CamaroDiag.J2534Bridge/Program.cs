@@ -39,6 +39,9 @@ internal static class Program
         if (args.Contains(StandardProtocolCli.RawIsoTpCommand,
             StringComparer.OrdinalIgnoreCase))
             return await StandardProtocolCli.RunIsoTpAsync(args);
+        if (args.Contains(StandardProtocolCli.DoIpDiscoverCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunDoIpDiscoveryAsync(args);
         if (args.Contains(StandardProtocolCli.DoIpCommand,
             StringComparer.OrdinalIgnoreCase))
             return await StandardProtocolCli.RunDoIpAsync(args);
