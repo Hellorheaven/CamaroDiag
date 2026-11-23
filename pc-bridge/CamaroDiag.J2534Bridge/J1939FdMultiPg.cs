@@ -62,8 +62,8 @@ internal static class J1939FdMultiPg
     internal static Received Decode(IsoTpCanFdSession.CanFrame frame)
     {
         if (!frame.IsFd || frame.Id > 0x1FFFFFFF ||
-            frame.Data is null || frame.Data.Length is < 8 or > 64 ||
-            StandardVehicleProtocols.CanFdLengthToDlc(frame.Data.Length) < 0)
+            frame.Data is null || frame.Data.Length is not
+                (8 or 12 or 16 or 20 or 24 or 32 or 48 or 64))
             throw new InvalidDataException("Invalid J1939-22 Multi-PG CAN-FD frame.");
         var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
         if (id.Pgn != MultiPgPgn || id.Destination is not int destination ||
