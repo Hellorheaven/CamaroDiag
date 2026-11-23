@@ -85,6 +85,44 @@ internal static class NativeUdsUploadSelfTests
         Check(wrongWidth.Sent == 0,
             "Invalid 64-bit upload mapping rejected before opening a transport.");
 
+        var doubleRead = new FakeExchange();
+        for (var acquisition = 0; acquisition < 2; acquisition++)
+        {
+            doubleRead.Enqueue(UploadRequest(0x1000, 3),
+                [0x75, 0x10, 0x05]);
+            doubleRead.Enqueue([0x36, 0x01],
+                [0x76, 0x01, 0x10, 0x20, 0x30]);
+            doubleRead.Enqueue([0x37], [0x77]);
+        }
+        var matched = NativeUdsUploadProtocol.UploadTwiceAsync(
+            doubleRead, 0x1000UL, 3, 4, 4, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Check(matched.Image.SequenceEqual(new byte[] {0x10, 0x20, 0x30}) &&
+            matched.FirstTransferBlocks == 1 &&
+            matched.SecondTransferBlocks == 1 &&
+            matched.Sha256 == Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(
+                    new byte[] {0x10, 0x20, 0x30})) &&
+            doubleRead.Sent == 6,
+            "Double UDS upload compares two real transactions and hashes exact bytes.");
+
+        var changedRead = new FakeExchange();
+        changedRead.Enqueue(UploadRequest(0x1000, 3),
+            [0x75, 0x10, 0x05]);
+        changedRead.Enqueue([0x36, 0x01],
+            [0x76, 0x01, 0x10, 0x20, 0x30]);
+        changedRead.Enqueue([0x37], [0x77]);
+        changedRead.Enqueue(UploadRequest(0x1000, 3),
+            [0x75, 0x10, 0x05]);
+        changedRead.Enqueue([0x36, 0x01],
+            [0x76, 0x01, 0x10, 0x20, 0x31]);
+        changedRead.Enqueue([0x37], [0x77]);
+        Reject<InvalidDataException>(() =>
+            NativeUdsUploadProtocol.UploadTwiceAsync(
+                changedRead, 0x1000UL, 3, 4, 4, CancellationToken.None)
+                .GetAwaiter().GetResult(),
+            "Different bytes in second acquisition cannot be exported as verified backup.");
+
         var wrongCounter = new FakeExchange();
         wrongCounter.Enqueue(UploadRequest(0x80001000, 7),
             [0x75, 0x10, 0x05]);
