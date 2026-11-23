@@ -80,6 +80,7 @@
     <string name="common_refresh">Actualiser</string>
     <string name="adapter_none_detected">Aucun adaptateur détecté. Les OBDLink MX+, MX, LX et autres Bluetooth classiques doivent être appairés ; le CX est recherché en BLE à proximité.</string>
     <string name="common_connect">Connecter</string>
+    <string name="adapter_j2534_bridge_connected">Pont Windows J2534 appairé (connexion PC)</string>
     <string name="adapter_disconnect_label">Déconnecter l’adaptateur</string>
     <string name="usb_connection_title">Connexion USB (OBDLink EX / SX, ELM327 et interfaces série)</string>
     <string name="usb_devices_detected">Périphériques USB détectés</string>
