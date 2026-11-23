@@ -194,6 +194,47 @@ internal static class UdsStandardServices
             (byte)(length >> 24), (byte)(length >> 16), (byte)(length >> 8), (byte)length];
     }
 
+    internal sealed record NegotiatedTransferSize(
+        byte PositiveService, byte LengthFieldBytes,
+        ulong MaxNumberOfBlockLength)
+    {
+        /// <summary>0x36 SID + blockSequenceCounter occupy two bytes.</summary>
+        internal ulong MaxDataBytes =>
+            MaxNumberOfBlockLength >= 2 ? MaxNumberOfBlockLength - 2 : 0;
+    }
+
+    /// <summary>
+    /// ISO 14229 RequestDownload (0x74) and RequestUpload (0x75)
+    /// positive responses expose maxNumberOfBlockLength. The high nibble
+    /// of LFI specifies its big-endian byte width; the low nibble is
+    /// reserved. Block size includes TransferData SID and block counter.
+    /// Parsing does not authorize or start any ECU memory operation.
+    /// </summary>
+    internal static NegotiatedTransferSize DecodeTransferParameters(
+        byte requestService, ReadOnlySpan<byte> response)
+    {
+        if (requestService is not (0x34 or 0x35))
+            throw new ArgumentOutOfRangeException(nameof(requestService));
+        var expectedSid = (byte)(requestService + 0x40);
+        if (response.Length < 3 || response[0] != expectedSid)
+            throw new InvalidDataException(
+                "UDS transfer response must match RequestDownload or RequestUpload.");
+        var lengthFormatIdentifier = response[1];
+        var width = lengthFormatIdentifier >> 4;
+        if (width is < 1 or > 8 ||
+            (lengthFormatIdentifier & 0x0F) != 0 ||
+            response.Length != 2 + width)
+            throw new InvalidDataException(
+                "UDS transfer maxNumberOfBlockLength has invalid LFI or byte length.");
+        ulong size = 0;
+        for (var i = 0; i < width; i++)
+            size = (size << 8) | response[2 + i];
+        if (size < 3)
+            throw new InvalidDataException(
+                "UDS TransferData block maximum cannot hold SID, counter and data.");
+        return new(expectedSid, (byte)width, size);
+    }
+
     internal static byte[] TransferData(byte counter, ReadOnlySpan<byte> data)
     {
         if (data.Length > 4089) throw new ArgumentOutOfRangeException(nameof(data));
