@@ -184,3 +184,7 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Ajout du composant `CanConsoleEventJournalWriter` pour consigner dans l'ordre TX/RX/SYSTEM, sans limite mémoire de 300 événements, avec en-tête CSV, numéro de séquence, horodatage et état de réponse.
 - Tests ajoutés pour 600 événements, échappement des contenus multilignes, refus après erreur disque et échec de fermeture.
 - Commits : `f493b97`, `03daf32` ; **tests non exécutés** à ce stade. Composant **non raccordé à l'interface ni à la sauvegarde persistante** : ne pas présenter l'archivage intégral TX/RX/SYSTEM comme livré. Les protocoles restent pris en charge par l'autre chantier.
+
+## DoIP — réponse Alive Check (23/11/2026)
+- Réponse standard `0x0008` aux requêtes passerelle `0x0007` pendant l'activation de routage et pendant les échanges UDS, avec adresse du testeur et contrôle de format/version.
+- Régressions codec ajoutées, non exécutées ; session réelle non qualifiée.
