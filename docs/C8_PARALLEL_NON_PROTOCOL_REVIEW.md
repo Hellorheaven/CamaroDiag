@@ -109,3 +109,14 @@ C6 **reste ouvert** sur PR #95, il n'a pas été supprimé ni transféré au cha
 - C2 : le constructeur de paquet de restauration local efface l'index si la vérification finale n'aboutit pas. Il ne certifie toujours ni la carte mémoire constructeur exhaustive ni le rollback physique.
 - La couverture de tests Android/communication/Windows au SHA final reste à confirmer, et C6 ne peut être clôturé sans essai matériel de programmation + sauvegarde restaurable. La prise en charge des protocoles reste au chat parallèle.
 
+
+## Reprise des chantiers hors protocoles — 23 novembre 2026 (soir)
+
+- **Connexions USB/Android :** après l'autorisation USB, le BroadcastReceiver vérifie l'autorisation réellement accordée par Android puis signale le résultat au ViewModel. Seuls le périphérique explicitement choisi, le même mode de découverte (ASCII ou binaire) et la même génération de connexion peuvent être repris. Un refus, un retrait, une nouvelle session ou un changement d'adaptateur empêchent toute reprise automatique. Tests `UsbPermissionReconnectPolicyTest`, ressources FR/EN pour le refus.
+- **Pont J2534 / déconnexions :** un changement d'adaptateur annule proprement la sonde ELM ; le bouton de déconnexion J2534 et la déconnexion générale suivent désormais la même transition suivie/joinable. Une reconnexion attend son nettoyage, sans changer le protocole J2534.
+- **C1 :** l'instantané CSV de la console garde la taille et l'empreinte SHA-256 de tous les événements ; une modification à taille constante est détectée avant l'export. Un test simule cette modification.
+- **C4 :** le résumé carburant distingue la dernière valeur historiquement reçue d'une valeur réellement présente dans la dernière enquête PID. Une absence de réponse éthanol reste absente, jamais « donnée actuelle » ni E85 activé.
+- **C6 :** tests confirmant que les charges utiles CAN OEM valides restent transmissibles après la double confirmation utilisateur. Ne jamais recréer une liste artificielle de services ou un mode lecture seule général. Les vrais échanges seed/key et permissions OEM restent nécessaires lorsqu'exigés par l'ECU.
+- **C2 :** aucun pilote réel de restauration ni géométrie OEM globale qualifiée par ce lot ; conservation des exigences de sauvegarde vérifiée avant effacement.
+- **C8 :** tests ajoutés, pas de build Android/Windows ni de résultat matériel revendiqué avant la campagne regroupée de ce lot. Le chat parallèle peut déplacer le HEAD entre deux vérifications. Documenter le SHA réellement validé, sans fusion de PR ni Release.
+
