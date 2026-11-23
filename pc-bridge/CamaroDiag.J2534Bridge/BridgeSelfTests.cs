@@ -549,6 +549,9 @@ internal static class BridgeSelfTests
 
         checks += BridgeTlsSelfTests.Run();
         checks += NativeUdsDownloadSelfTests.Run();
+        checks += StandardVehicleProtocolsSelfTests.Run();
+        checks += UdsStandardServicesSelfTests.Run();
+        checks += EcuPostFlashAssessmentSelfTests.Run();
         checks += NativeEcuSectorSelfTests.Run();
         checks += NativeMpc5566FlashMapSelfTests.Run();
         checks += NativeE39RamLoaderSelfTests.Run();
