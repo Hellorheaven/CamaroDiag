@@ -90,6 +90,7 @@ data class CalibrationWorkspaceState(
     val isGmlanReading: Boolean = false,
     val isFuelSnapshotReading: Boolean = false,
     val fuelReadOnlySnapshot: Lfx2012FuelReadOnly.Snapshot? = null,
+    val fuelHistoryCount: Int = 0,
     val fuelSnapshotError: String = "",
     val gmlanIdentity: GmlanIdentityEvidence? = null,
     val gmlanIdentityFailed: Boolean = false,
@@ -238,6 +239,7 @@ fun CalibrationWorkspaceScreen(
     onReadIdentification: () -> Unit,
     onReadGmlanIdentification: () -> Unit,
     onReadLfx2012FuelSnapshot: () -> Unit,
+    onExportLfx2012FuelHistory: () -> Unit,
     onExportIdentification: () -> Unit,
     onCreateVehicleFromEcuVin: (String) -> Unit,
     onSyncVehicleVinFromEcu: (String) -> Unit,
@@ -381,6 +383,17 @@ fun CalibrationWorkspaceScreen(
                                 !state.isFuelSnapshotReading
                         ) {
                             Text(stringResource(R.string.flexfuel_lfx2012_read_fuel))
+                        }
+                        if (state.fuelHistoryCount > 0) {
+                            OutlinedButton(
+                                onClick = onExportLfx2012FuelHistory,
+                                enabled = !state.isFuelSnapshotReading
+                            ) {
+                                Text(stringResource(
+                                    R.string.flexfuel_lfx2012_export_history,
+                                    state.fuelHistoryCount
+                                ))
+                            }
                         }
                         if (state.isFuelSnapshotReading) {
                             CircularProgressIndicator()
