@@ -1190,7 +1190,7 @@ internal static class StandardProtocolCli
         catch (Exception ex) when (ex is ArgumentException or
             IOException or SocketException or OperationCanceledException or
             InvalidDataException or TimeoutException or
-            System.Security.Authentication.AuthenticationException)
+            System.Security.Authentication.AuthenticationException or FormatException or OverflowException)
         {
             Console.Error.WriteLine("DoIP exchange failed: " + ex.Message);
             return 6;
@@ -1263,7 +1263,7 @@ internal static class StandardProtocolCli
         }
         catch (Exception ex) when (ex is ArgumentException or
             IOException or InvalidOperationException or InvalidDataException or
-            DllNotFoundException or BadImageFormatException or EntryPointNotFoundException)
+            DllNotFoundException or BadImageFormatException or EntryPointNotFoundException or OverflowException)
         {
             Console.Error.WriteLine("J2534 exchange failed: " + ex.Message);
             return 6;
