@@ -39,6 +39,13 @@ internal static class StandardVehicleProtocolsSelfTests
             StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
             "--protocol-id", "1", "--baud", "10400",
             "--mode", "receive", "--j1850-wire-crc", "true"]);
+        Check(StandardProtocolCli.ShouldValidateJ1850WireCrc(true, 0) &&
+            !StandardProtocolCli.ShouldValidateJ1850WireCrc(
+                true, J2534StandardChannel.RxTxEcho) &&
+            !StandardProtocolCli.ShouldValidateJ1850WireCrc(
+                true, J2534StandardChannel.RxStartOfMessage) &&
+            !StandardProtocolCli.ShouldValidateJ1850WireCrc(false, 0),
+            "Only raw J1850 data frames with preserved CRC require CRC checking.");
         Check(j1850WireCheck.J1850WireCrc &&
             j1850WireCheck.ProtocolId == J2534StandardChannel.J1850Vpw &&
             j1850WireCheck.Data.Length == 0,
