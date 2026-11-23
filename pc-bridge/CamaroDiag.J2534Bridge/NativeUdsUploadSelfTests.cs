@@ -63,6 +63,28 @@ internal static class NativeUdsUploadSelfTests
             good.Sent == 5 && good.Frames.Count == 0,
             "Read-only ISO 14229 upload transfers exact physical request length.");
 
+        var wideAddress = new FakeExchange();
+        const ulong address64 = 0x1122334455667788UL;
+        wideAddress.Enqueue(UdsStandardServices.RequestUpload(
+            address64, 3, 8, 1), [0x75, 0x10, 0x05]);
+        wideAddress.Enqueue([0x36, 0x01], [0x76, 0x01, 0xAA, 0xBB, 0xCC]);
+        wideAddress.Enqueue([0x37], [0x77]);
+        var wide = NativeUdsUploadProtocol.UploadAsync(wideAddress,
+            address64, 3, 8, 1, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Check(wide.Address == address64 &&
+            wide.Image.SequenceEqual(new byte[] {0xAA, 0xBB, 0xCC}) &&
+            wide.Blocks == 1,
+            "ISO 14229 upload 64-bit address and one-byte length use exact ALFI.");
+        var wrongWidth = new FakeExchange();
+        Reject<ArgumentOutOfRangeException>(() =>
+            NativeUdsUploadProtocol.UploadAsync(
+                wrongWidth, address64, 3, 4, 1, CancellationToken.None)
+                .GetAwaiter().GetResult(),
+            "Physical upload cannot truncate 64-bit address into four ALFI bytes.");
+        Check(wrongWidth.Sent == 0,
+            "Invalid 64-bit upload mapping rejected before opening a transport.");
+
         var wrongCounter = new FakeExchange();
         wrongCounter.Enqueue(UploadRequest(0x80001000, 7),
             [0x75, 0x10, 0x05]);
