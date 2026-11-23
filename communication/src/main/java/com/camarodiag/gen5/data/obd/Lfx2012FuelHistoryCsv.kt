@@ -28,21 +28,21 @@ object Lfx2012FuelHistoryCsv {
             val identity = sample.identity
             for (reading in sample.snapshot.readings) {
                 output.write(csv(identity.vin))
-                output.write(',')
+                output.write(','.code)
                 output.write(csv(identity.sessionId))
-                output.write(',')
+                output.write(','.code)
                 output.write(identity.source.name)
-                output.write(',')
+                output.write(','.code)
                 output.write(sample.snapshot.observedAtUtcMillis.toString())
-                output.write(',')
+                output.write(','.code)
                 output.write(String.format(Locale.ROOT, "%02X", reading.pid))
-                output.write(',')
+                output.write(','.code)
                 output.write(reading.availability.name)
-                output.write(',')
+                output.write(','.code)
                 if (reading.percent != null) {
                     output.write(String.format(Locale.ROOT, "%.8f", reading.percent))
                 }
-                output.write(',')
+                output.write(','.code)
                 if (reading.raw != null) output.write(reading.raw.toString())
                 output.write('\n'.code)
             }
