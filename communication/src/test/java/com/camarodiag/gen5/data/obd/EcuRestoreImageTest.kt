@@ -121,4 +121,18 @@ class EcuRestoreImageTest {
         }.isFailure)
     }
 
+    @Test fun directImageCannotClaimMoreOrFewerBytesThanItsPhysicalRegion() {
+        val geometry = EcuRestoreImage.MemoryRegion(region, 0x1000, 4)
+        assertTrue(runCatching {
+            EcuRestoreImage.RegionImage(geometry, byteArrayOf(1, 2, 3))
+        }.isFailure)
+        assertTrue(runCatching {
+            EcuRestoreImage.RegionImage(geometry, byteArrayOf(1, 2, 3, 4, 5))
+        }.isFailure)
+        assertArrayEquals(
+            byteArrayOf(1, 2, 3, 4),
+            EcuRestoreImage.RegionImage(geometry, byteArrayOf(1, 2, 3, 4)).bytes()
+        )
+    }
+
 }
