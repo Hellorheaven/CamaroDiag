@@ -214,9 +214,11 @@ internal static class StandardProtocolCli
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
             if (o.Mode == "send" &&
-                !Confirm($"SAE J1939-22 FEFF TX source=0x{o.Source:X2} " +
-                    $"destination=0x{o.Target:X2} PGN=0x{o.Pgn:X} " +
-                    $"payload={Convert.ToHexString(o.Payload)}"))
+                !Confirm($"SAE J1939-22 {(o.Bam ? "FD.TP BAM" : "FEFF Multi-PG")} " +
+                    $"TX source=0x{o.Source:X2} destination=0x{o.Target:X2} " +
+                    $"PGN=0x{o.Pgn:X} length={o.Payload.Length} " +
+                    $"SHA256={Convert.ToHexString(
+                        System.Security.Cryptography.SHA256.HashData(o.Payload))}"))
                 return 2;
 
             // J1939-22 FEFF Multi-PG uses RAW FD_CAN, not classical
@@ -232,15 +234,33 @@ internal static class StandardProtocolCli
 
             if (o.Mode == "send")
             {
-                var packet = J1939FdMultiPg.Encode(
-                    o.Source, o.Target, o.Priority,
-                    [new J1939FdMultiPg.ContainedGroup(o.Pgn!.Value, o.Payload)]);
-                await link.SendAsync(packet, CancellationToken.None);
-                Console.WriteLine("J1939-22 Multi-PG frame queued; ECU processing not verified.");
+                if (o.Bam)
+                {
+                    await J1939FdBamSession.SendAsync(link, o.Source,
+                        o.Pgn!.Value, o.Session, o.Payload,
+                        CancellationToken.None, o.Priority);
+                    Console.WriteLine("J1939-22 broadcast FD.TP sent; ECU processing not verified.");
+                }
+                else
+                {
+                    var packet = J1939FdMultiPg.Encode(
+                        o.Source, o.Target, o.Priority,
+                        [new J1939FdMultiPg.ContainedGroup(o.Pgn!.Value, o.Payload)]);
+                    await link.SendAsync(packet, CancellationToken.None);
+                    Console.WriteLine("J1939-22 Multi-PG frame queued; ECU processing not verified.");
+                }
                 return 0;
             }
 
             var limit = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            if (o.Bam)
+            {
+                var payload = await J1939FdBamSession.ReceiveAsync(link,
+                    o.Target, o.Pgn!.Value, limit, CancellationToken.None);
+                Console.WriteLine($"J1939-22 BAM RX PGN=0x{o.Pgn:X} " +
+                    $"length={payload.Length} raw={Convert.ToHexString(payload)}");
+                return 0;
+            }
             var clock = System.Diagnostics.Stopwatch.StartNew();
             for (var frameCount = 0; frameCount < 128; frameCount++)
             {
@@ -271,7 +291,7 @@ internal static class StandardProtocolCli
             DllNotFoundException or BadImageFormatException or
             EntryPointNotFoundException or NotSupportedException or OverflowException)
         {
-            Console.Error.WriteLine("J1939-22 Multi-PG failed: " + ex.Message);
+            Console.Error.WriteLine("J1939-22 CAN FD transport failed: " + ex.Message);
             return 6;
         }
     }
