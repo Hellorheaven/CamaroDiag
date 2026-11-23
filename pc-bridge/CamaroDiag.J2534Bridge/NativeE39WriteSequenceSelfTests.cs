@@ -125,6 +125,38 @@ internal static class NativeE39WriteSequenceSelfTests
             0x20000, 32, 16, 2, [], true);
         var plan = NativeEcuSectorPlanner.Preview(layout, origin, updated);
         var opts = new NativeE39WriteSequence.Options(8, 2, true, true, 12000, 15000);
+        // An embedded ECU address, payload, count or packet checksum that
+        // does not describe the requested block must NEVER reach ExchangeAsync.
+        var firstSector = plan.Sectors[0];
+        var correctFrame = NativeE39FlashCommands.BuildWriteBlock(
+            firstSector.Address, firstSector.Updated[..8], dryRun: false);
+        Assert(NativeE39WriteBlockVerifier.RequireExactFrame(
+            firstSector, correctFrame, 0, dryRun: false) == 8,
+            "Correct wire packet matches the exact target sector bytes");
+        foreach (var byteIndex in new[] { 1, 2, 3, 4, 5, 6, 7, correctFrame.Length - 1 })
+        {
+            var altered = correctFrame.ToArray();
+            altered[byteIndex] ^= 1;
+            Expect<InvalidDataException>(() =>
+                NativeE39WriteBlockVerifier.RequireExactFrame(
+                    firstSector, altered, 0, dryRun: false));
+            count++;
+        }
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteBlockVerifier.RequireExactFrame(
+                firstSector, correctFrame, 8, dryRun: false));
+        count++;
+        Expect<InvalidDataException>(() =>
+            NativeE39WriteBlockVerifier.RequireCompleteBatch(
+                firstSector, [correctFrame], dryRun: false));
+        count++;
+        var completeFrames = new[] {
+            correctFrame, NativeE39FlashCommands.BuildWriteBlock(
+                firstSector.Address + 8, firstSector.Updated[8..16], dryRun: false)
+        };
+        NativeE39WriteBlockVerifier.RequireCompleteBatch(
+            firstSector, completeFrames, dryRun: false);
+        count++;
         var ecu = new TestEcu(origin);
         var journal = new TestJournal();
         var result = NativeE39WriteSequence.RunBenchSequenceAsync(

@@ -209,6 +209,16 @@ internal class EcuWriteExecutionEngine(
         val original = request.originalImage
         val updated = request.updatedImage
         val preview = EcuPartialWritePlanner.preview(request.layout, original, updated)
+        // Bind the planned delta to ABSOLUTE ECU memory coordinates and its
+        // exact target bytes before any physical reads or destructive commands.
+        for (sector in preview.affectedSectors) {
+            val region = EcuProgrammingDriverContract.RegionRequest(
+                request.region, sector.absoluteAddress, sector.patchedBytes.size.toLong()
+            )
+            EcuWriteBlockVerifier.requireExactSector(
+                request.layout, request.region, original, updated, sector, region
+            )
+        }
         if (!driver.descriptor.supportsWrite(request.firmwareTarget, request.transport, request.region, request.accessMethod)) {
             return EcuWriteTransaction.Outcome(
                 EcuWriteTransaction.Status.BLOCKED,
@@ -315,6 +325,12 @@ internal class EcuWriteExecutionEngine(
                         verifiedSectors = verified, failedAddress = currentAddress
                     )
                 }
+                // Rebind every erase request to the exact original/target sector
+                // immediately before the irreversible operation, not just when
+                // the offline plan was created.
+                EcuWriteBlockVerifier.requireExactSector(
+                    request.layout, request.region, original, updated, sector, region
+                )
                 // Journal must accept the irreversible step before any erase.
                 journal.append(
                     EcuWriteTransaction.Record(
@@ -350,7 +366,11 @@ internal class EcuWriteExecutionEngine(
                     val unit = EcuProgrammingDriverContract.RegionRequest(
                         request.region, unitAddress, unitBytes.toLong()
                     )
-                    driver.write(unit, sector.patchedBytes.copyOfRange(offset, offset + unitBytes))
+                    val outgoing = sector.patchedBytes.copyOfRange(offset, offset + unitBytes)
+                    EcuWriteBlockVerifier.requireExactUnit(
+                        request.layout, request.region, updated, sector, unit, offset, outgoing
+                    )
+                    driver.write(unit, outgoing)
                 }
                 currentAddress = sector.absoluteAddress
                 // Last unit of a sector has no subsequent write preflight.
