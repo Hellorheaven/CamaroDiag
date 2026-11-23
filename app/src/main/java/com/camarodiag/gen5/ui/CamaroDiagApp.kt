@@ -2629,11 +2629,12 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                             clearConsentStep = EcuWriteConsentFlow.afterWarningOk(clearConsentStep)
                         } else {
                             val expectedVehicle = pendingClearVehicle
-                            val approval = EcuWriteConsentFlow.approvalForConnection(
+                            val approval = EcuWriteConsentFlow.approvalForContext(
                                 clearConsentStep, confirmedYes = true,
                                 warningConnection = pendingClearGeneration,
-                                currentConnection = connectionGeneration
-                            ).takeIf { expectedVehicle == vehicle }
+                                currentConnection = connectionGeneration,
+                                sameVehicle = expectedVehicle != null && expectedVehicle == vehicle
+                            )
                             val epoch = pendingClearGeneration
                             confirmClear = false
                             pendingClearGeneration = null
