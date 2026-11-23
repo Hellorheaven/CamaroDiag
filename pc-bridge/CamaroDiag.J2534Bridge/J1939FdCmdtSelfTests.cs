@@ -219,6 +219,13 @@ internal static class J1939FdCmdtSelfTests
             "--pgn", "0xF004", "--mode", "send",
             "--payload", Convert.ToHexString(Fill(131))]),
             "CMDT refuses broadcast-only PDU2 PGNs.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCmdtCommand,
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xEF00", "--mode", "receive"]),
+            "Conflicting J1939 FD.TP transport options fail before opening driver.");
         return checks;
     }
 }
