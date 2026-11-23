@@ -8,34 +8,40 @@ namespace CamaroDiag.J2534Bridge;
 internal static class ObdJ1979PidSupport
 {
     internal sealed record Page(byte Mode, byte RequestedBase,
-        IReadOnlyList<byte> SupportedPids, bool HasNextPage);
+        IReadOnlyList<byte> SupportedPids, bool HasNextPage,
+        byte? FreezeFrameNumber);
 
-    internal static byte[] BuildRequest(byte mode, byte pageBase)
+    internal static byte[] BuildRequest(byte mode, byte pageBase,
+        byte freezeFrameNumber = 0)
     {
         ValidatePage(mode, pageBase);
-        return ObdJ1979Transaction.Request(mode, [pageBase]);
+        return mode == 0x02 ?
+            ObdJ1979Transaction.Request(mode, [pageBase, freezeFrameNumber]) :
+            ObdJ1979Transaction.Request(mode, [pageBase]);
     }
 
     internal static Page Decode(ReadOnlySpan<byte> request,
         ReadOnlySpan<byte> response)
     {
-        if (request.Length != 2)
-            throw new ArgumentException("Support page query requires exactly one PID.", nameof(request));
+        if (request.Length != (request.Length > 0 && request[0] == 0x02 ? 3 : 2))
+            throw new ArgumentException("Invalid support PID/frame request length.", nameof(request));
         ValidatePage(request[0], request[1]);
         var result = ObdJ1979Transaction.Decode(request, response,
             expectIdentifierEcho: true);
         if (result.Kind != ObdJ1979Transaction.ReplyKind.Positive)
             throw new InvalidDataException(
                 "ECU did not positively acknowledge the requested PID support page.");
-        if (result.Data.Length != 5)
+        var bitmapOffset = request[0] == 0x02 ? 2 : 1;
+        if (result.Data.Length != bitmapOffset + 4 ||
+            (request[0] == 0x02 && result.Data[1] != request[2]))
             throw new InvalidDataException(
-                "OBD PID support response must contain echoed base and four bitmap bytes.");
+                "OBD support reply must echo PID/frame and contain four bitmap bytes.");
 
         var basePid = request[1];
         var supported = new List<byte>(32);
         for (var bit = 0; bit < 32; bit++)
         {
-            if ((result.Data[1 + bit / 8] & (0x80 >> (bit % 8))) == 0)
+            if ((result.Data[bitmapOffset + bit / 8] & (0x80 >> (bit % 8))) == 0)
                 continue;
             var pid = basePid + bit + 1;
             if (pid > byte.MaxValue)
@@ -44,7 +50,8 @@ internal static class ObdJ1979PidSupport
         }
         var nextPage = basePid < 0xE0 &&
             supported.Contains((byte)(basePid + 0x20));
-        return new Page(request[0], basePid, supported, nextPage);
+        return new Page(request[0], basePid, supported, nextPage,
+            request[0] == 0x02 ? request[2] : null);
     }
 
     private static void ValidatePage(byte mode, byte pageBase)
