@@ -3,9 +3,8 @@ using System.Security.Cryptography;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// A bench qualification applies to an exact installed J2534 DLL and CAN
-/// channel, not every adapter which advertises the PassThru API. No qualified
-/// channel records are bundled with the application.
+/// Local J2534 bench admission checks the DLL path, channel and architecture.
+/// Driver SHA-256 pinning is optional, never an OEM key or a license.
 /// </summary>
 internal static class NativeE39PhysicalAdmission
 {
@@ -40,7 +39,8 @@ internal static class NativeE39PhysicalAdmission
         try
         {
             var digest = Convert.ToHexString(SHA256.HashData(stream));
-            if (!string.Equals(digest, channel.DriverSha256, StringComparison.Ordinal))
+            if (channel.DriverSha256.Length != 0 &&
+                !string.Equals(digest, channel.DriverSha256, StringComparison.Ordinal))
                 throw new UnauthorizedAccessException("Installed J2534 DLL differs from the independently qualified driver version.");
             return stream;
         }

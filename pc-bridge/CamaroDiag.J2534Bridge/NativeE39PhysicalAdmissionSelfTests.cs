@@ -57,7 +57,9 @@ internal static class NativeE39PhysicalAdmissionSelfTests
                 FunctionLibrary = @"\\?\C:\vendor\driver.dll"
             }, channel)), "Windows device-path DLL refused");
             File.WriteAllBytes(path,[1,2,3,5]);
-            Check(Rejected(() => Match(adapter,channel)),"Driver update requires bench requalification");
+            Check(Rejected(() => Match(adapter,channel)),"Operator-pinned driver mismatch rejected");
+            Match(adapter,channel with { DriverSha256 = "" });
+            Check(true,"Unpinned J2534 DLL update requires no external signing key");
         }
         finally { File.Delete(path); }
         Console.WriteLine($"PASS: {checks} qualified J2534 channel checks.");

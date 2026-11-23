@@ -6,6 +6,13 @@ $prefix = 'pc-bridge/CamaroDiag.J2534Bridge/'
 $gate = Get-Content -LiteralPath ($prefix + 'NativeEcuWriteAvailability.cs') -Raw
 $cli = Get-Content -LiteralPath ($prefix + 'NativeE39QualifiedBenchCli.cs') -Raw
 $driver = Get-Content -LiteralPath ($prefix + 'J2534Device.NativeBench.cs') -Raw
+$profile = Get-Content -LiteralPath ($prefix + 'NativeE39QualifiedBenchProfile.cs') -Raw
+if ($profile -match 'TrustedKeys|signaturePath|Unknown qualification signing authority') {
+    throw 'C6 regression: artificial signature key reintroduced for E39 bench.'
+}
+if ($cli -notmatch 'NativeE39QualifiedBenchProfile.Load\(args\[2\]\)') {
+    throw 'C6 regression: E39 bench does not accept an ordinary local profile.'
+}
 $server = Get-Content -LiteralPath ($prefix + 'BridgeServer.cs') -Raw
 $guardName = 'NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled()'
 if ($gate -notmatch 'PhysicalEcuProgrammingEnabled\s*=>\s*true\s*;') {

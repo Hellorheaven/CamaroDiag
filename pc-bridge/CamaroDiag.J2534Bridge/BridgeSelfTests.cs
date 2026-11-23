@@ -63,11 +63,11 @@ internal static class BridgeSelfTests
             "Dedicated local E39 bench hardware test route is enabled");
         NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
         var deniedBenchCli = NativeE39QualifiedBenchCli.RunAsync(new[] {
-            "--program-e39-bench", "0", "not-present.json", "not-present.sig",
+            "--program-e39-bench", "0", "not-present.json",
             "original.bin", "target.bin", "kernel.bin", "new-journal.jsonl"
         }).GetAwaiter().GetResult();
         Assert(deniedBenchCli == 8,
-            "Even a syntactically valid bench CLI is denied before loading files or J2534 drivers");
+            "Missing local bench profile is rejected before opening J2534 drivers");
 
         const string memoryVin = "1G1FA1RXXR0123456";
         var memoryVinReply = new byte[] { 0x62, 0xF1, 0x90 }
