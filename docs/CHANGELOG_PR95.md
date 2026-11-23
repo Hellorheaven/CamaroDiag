@@ -188,3 +188,6 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 ## DoIP — réponse Alive Check (23/11/2026)
 - Réponse standard `0x0008` aux requêtes passerelle `0x0007` pendant l'activation de routage et pendant les échanges UDS, avec adresse du testeur et contrôle de format/version.
 - Régressions codec ajoutées, non exécutées ; session réelle non qualifiée.
+
+## ISO-TP : adressage mixte explicite (23/11/2026)
+- Mode N_AE partagé entre TX et RX avec identifiants CAN 29 bits distincts, `--extended true --mixed-address` ; tests de cohérence, réception et refus des paramètres incohérents ajoutés. Pas de qualification physique ni de CI sur ce commit.
