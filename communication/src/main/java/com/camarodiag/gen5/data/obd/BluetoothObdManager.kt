@@ -713,7 +713,10 @@ class BluetoothObdManager(context: Context) {
     suspend fun sendRawCanFrame(frame: RawCanFrame): String =
         sendRawCanFrameWithStatus(frame).adapterOutput
 
-    suspend fun sendRawCanFrameWithStatus(frame: RawCanFrame): CanConsoleRawTransmissionResult =
+    suspend fun sendRawCanFrameWithStatus(
+        frame: RawCanFrame,
+        beforePayloadTransmit: () -> Unit = {}
+    ): CanConsoleRawTransmissionResult =
         withContext(Dispatchers.IO) {
         val requestedEpoch = transportSessionEpoch.capture()
         check(isObdCommandChannelAvailable && !isDemoMode && !isSimulationActive) {
@@ -742,9 +745,13 @@ class BluetoothObdManager(context: Context) {
             transportSessionEpoch.requireQueuedCurrent(requestedEpoch)
             check(isObdCommandChannelAvailable) { "CAN transmission connection changed while waiting." }
             suspend fun boundCommand(
-                command: String, timeoutMs: Long, onChunk: ((String) -> Unit)? = null
+                command: String,
+                timeoutMs: Long,
+                onChunk: ((String) -> Unit)? = null,
+                beforeTransmit: () -> Unit = {}
             ): String = sendAtCommandInternal(
-                command, timeoutMs, expectedEpoch = requestedEpoch, onChunk = onChunk
+                command, timeoutMs, expectedEpoch = requestedEpoch,
+                onChunk = onChunk, beforeTransmit = beforeTransmit
             )
             val protocol = if (frame.isExtended) "7" else "6"
             val header = if (frame.isExtended) {
@@ -787,11 +794,18 @@ class BluetoothObdManager(context: Context) {
                     "%02X".format(java.util.Locale.ROOT, it.toInt() and 0xFF)
                 }
                 timedCorrelation.beginRequest(System.nanoTime() / 1_000_000L)
-                val frameResponse = boundCommand(payload, 4_000L) { chunk ->
-                    timedCorrelation.append(
-                        chunk, System.nanoTime() / 1_000_000L, System.currentTimeMillis()
-                    )
-                }
+                // AT configuration may be queued, but the ECU payload itself
+                // must still belong to the originally confirmed account,
+                // vehicle and adapter at the exact physical TX boundary.
+                val frameResponse = boundCommand(
+                    payload, 4_000L,
+                    onChunk = { chunk ->
+                        timedCorrelation.append(
+                            chunk, System.nanoTime() / 1_000_000L, System.currentTimeMillis()
+                        )
+                    },
+                    beforeTransmit = beforePayloadTransmit
+                )
                 val diagnosticStatus = timedCorrelation.complete(
                     System.nanoTime() / 1_000_000L, System.currentTimeMillis()
                 )
