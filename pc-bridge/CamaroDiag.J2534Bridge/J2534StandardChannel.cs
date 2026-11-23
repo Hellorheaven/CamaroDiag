@@ -171,22 +171,38 @@ internal sealed class J2534StandardChannel : IDisposable
         EnsureConnected();
         if (timeoutMs is < 1 or > 30000)
             throw new ArgumentOutOfRangeException(nameof(timeoutMs));
-        var received = new[] { MakeMsg([], 0) };
-        uint count = 1;
-        var result = read!(channelId, received, ref count, (uint)timeoutMs);
-        if (result is 0x09 or 0x10 || (result == 0 && count == 0)) return null;
-        Require(result, "PassThruReadMsgs");
-        if (count != 1) return null;
-        var frame = received[0];
-        if (frame.ProtocolId != protocolId || frame.DataSize > MaxData ||
-            frame.DataSize > frame.Data.Length ||
-            frame.ExtraDataIndex is not 0 && frame.ExtraDataIndex != frame.DataSize)
-            throw new InvalidDataException("Inconsistent J2534 receive frame.");
-        // Ignore driver echo / start / break / TX indication / padding errors.
-        if ((frame.RxStatus & (RxTxEcho | RxStartOfMessage | RxBreak |
-            RxTxIndication | RxPaddingError)) != 0) return null;
-        return new Frame(frame.ProtocolId, frame.RxStatus, frame.Timestamp,
-            frame.Data.AsSpan(0, (int)frame.DataSize).ToArray());
+        // PassThruReadMsgs may yield TX echoes, START_OF_MESSAGE or vendor
+        // status indications before the ECU's actual RX. Keep reading
+        // under one bounded deadline instead of confusing those with a
+        // genuine receive timeout.
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (clock.ElapsedMilliseconds < timeoutMs)
+        {
+            var received = new[] { MakeMsg([], 0) };
+            uint count = 1;
+            var remaining = (uint)Math.Max(1,
+                timeoutMs - clock.ElapsedMilliseconds);
+            var result = read!(channelId, received, ref count, remaining);
+            if (result is 0x09 or 0x10 ||
+                (result == 0 && count == 0))
+                return null;
+            Require(result, "PassThruReadMsgs");
+            if (count != 1) continue;
+            var frame = received[0];
+            if ((frame.RxStatus & (RxTxEcho | RxStartOfMessage |
+                RxBreak | RxTxIndication | RxPaddingError)) != 0)
+                continue;
+            if (frame.ProtocolId != protocolId ||
+                frame.Data is null || frame.DataSize > MaxData ||
+                frame.DataSize > frame.Data.Length ||
+                (frame.ExtraDataIndex != 0 &&
+                 frame.ExtraDataIndex != frame.DataSize))
+                throw new InvalidDataException("Inconsistent J2534 receive frame.");
+            return new Frame(frame.ProtocolId, frame.RxStatus,
+                frame.Timestamp,
+                frame.Data.AsSpan(0, (int)frame.DataSize).ToArray());
+        }
+        return null;
     }
 
     /// <summary>Install native filter; flowControlData is required for ISO-TP.</summary>
