@@ -41,3 +41,10 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Ajout d'une comparaison indépendante des octets et des adresses physiques après restauration, incluant toutes les régions attendues et l'adresse exacte du premier écart. Ce composant est **hors ligne**, ne commande aucune écriture et ne remplace pas la validation physique d'un pilote.
 - Tests de régression ajoutés pour modification des deux lectures après vérification, mauvaise adresse, longueur, octets différents, régions manquantes ou dupliquées.
 - **Validation de ce complément : non encore exécutée**, chantier C2 non clôturé ; qualification et carte mémoire réelles toujours à établir. Aucune modification des protocoles gérés par l'autre chat.
+
+## C2 — couverture explicite des régions de sauvegarde (suite)
+- Les objets image refusent à la construction une différence entre la taille de leur région mémoire et le nombre réel d'octets conservés.
+- Ajout d'un rapport de couverture du plan mémoire fourni : statut « carte inconnue », « invalide », « partielle » ou « couvre le plan fourni », avec adresses et longueurs exactes des lacunes.
+- Les limites physiques et l'exhaustivité du plan constructeur ne sont jamais déduites du simple contenu d'une archive. Une couverture du plan fourni n'est **pas** une image garantie complète ECU.
+- Tests ajoutés pour les tailles fausses, les cartes mémoire inconnues, les trous et les captures hors périmètre.
+- **Code commité, validations non lancées sur ces commits** ; aucune qualification de restauration réelle annoncée.
