@@ -1,5 +1,6 @@
-C2 ECU backup corrective validation after the first grouped compile diagnostics.
-Corrected development HEAD: d1da9c10c7b6788999fa0acefdab30fdb8ebd3ef
-First run #45114532519: Windows missing braces/status punctuation; Android JUnit import and cross-module visibility. Corrections grouped before this validation.
-Targets: Android communication and app Debug unit suites; Windows J2534 Debug -warnaserror and --self-test.
-No hardware ECU qualification or release build is implied.
+C2 corrective grouped validation on e101e41bc17a79af4abaac81b01035e65c5ee41e.
+Prior run #45114797774:
+- Windows CS0509: cannot derive from sealed InvalidDataException; corrected custom identity exception.
+- Android 466 tests: 464 passed, 2 failed (Java Properties contains checked values instead of keys for optional firmware OSID); corrected.
+- Android app compilation succeeded at preceding run; full targeted Android/Windows suites rechecked here.
+One grouped validation, no tests on individual commits, no ECU hardware qualification.
