@@ -54,6 +54,13 @@ object CamaroDiagConnectorDiscovery {
                 Regex("#(\\d+)").find(label)?.groupValues?.get(1)?.toIntOrNull() == deviceId
         }
 
+    /** USB routing gate: a product-name match is necessary for discovery,
+     * but never grants a diagnostic session or proves device authentication.
+     * KKL isolation wins even if a label also contains CamaroDiagConnectors. */
+    fun allowsDedicatedUsbDiscovery(deviceId: Int, deviceLabels: List<String>): Boolean =
+        !requiresLegacyKklIsolation(deviceId, deviceLabels) &&
+            requiresDedicatedUsbDiscovery(deviceId, deviceLabels)
+
     fun inspect(channel: Channel, ensureActive: () -> Unit = {}): Report =
         inspectWithClock(channel, ensureActive, System::nanoTime)
 
