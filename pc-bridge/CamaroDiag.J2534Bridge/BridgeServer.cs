@@ -57,7 +57,31 @@ internal sealed class BridgeServer
                     continue;
                 }
                 Console.WriteLine($"Local client connected: {client.Client.RemoteEndPoint}");
-                await HandleClientAsync(client, cancellationToken);
+                try
+                {
+                    await HandleClientAsync(client, cancellationToken);
+                }
+                catch (IOException)
+                {
+                    // A TLS peer closing its socket while the bridge writes a
+                    // reply must never terminate the LAN listener.
+                }
+                catch (System.Net.Sockets.SocketException)
+                {
+                    // Network interruptions are scoped to the current client.
+                }
+                catch (AuthenticationException)
+                {
+                    // Per-peer handshake/record failure; no ECU operation.
+                }
+                catch (ObjectDisposedException)
+                {
+                    // A peer may close between socket acceptance and handling.
+                }
+                catch (DecoderFallbackException)
+                {
+                    // Invalid UTF-8 in a single request is not a server fault.
+                }
                 Console.WriteLine("Client disconnected; J2534 channel released.");
             }
         }
@@ -100,7 +124,9 @@ internal sealed class BridgeServer
             // A plaintext peer may simply close the socket on TLS failure.
             return;
         }
-        using var reader = new StreamReader(stream, new UTF8Encoding(false), false, 4096, leaveOpen: true);
+        using var reader = new StreamReader(
+            stream, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: false,
+            bufferSize: 4096, leaveOpen: true);
         await using var writer = new StreamWriter(stream, new UTF8Encoding(false), 4096, leaveOpen: true) { AutoFlush = true };
         using var device = new J2534Device(_adapter, _memoryReadScope);
 

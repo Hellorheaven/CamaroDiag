@@ -210,6 +210,22 @@ internal static class BridgeSelfTests
             Assert(refused, "A malformed bridge line must not be silently canonicalized");
         }
         Assert(ReadWire("") is null, "Clean EOF on empty client");
+        // A malicious LAN peer can complete TLS before knowing the bearer
+        // token; malformed UTF-8 must never be silently replaced or parsed.
+        using (var malformed = new MemoryStream(new byte[] {
+            (byte)'{', (byte)'"', 0xC3, 0x28, (byte)'"', (byte)'}', (byte)'\n'
+        }))
+        using (var strictReader = new StreamReader(
+            malformed, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: false))
+        {
+            var rejectedUtf8 = false;
+            try {
+                BridgeServer.ReadBoundedLineAsync(strictReader, CancellationToken.None)
+                    .GetAwaiter().GetResult();
+            }
+            catch (DecoderFallbackException) { rejectedUtf8 = true; }
+            Assert(rejectedUtf8, "Bridge must reject invalid UTF-8 before parsing credentials");
+        }
         Assert(ReadWire(new string('A', 64 * 1024) + "\n")?.Length == 64 * 1024,
             "Maximum request accepted");
         var tooLongRejected = false;
