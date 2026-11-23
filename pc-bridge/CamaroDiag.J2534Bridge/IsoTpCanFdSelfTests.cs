@@ -476,7 +476,7 @@ internal static class IsoTpCanFdSelfTests
             "--obd-wwh-severity", "0x40"]);
         Check(wwhIsoTp.Request.SequenceEqual(
             new byte[] {0x19, 0x42, 0x33, 0x40, 0x08}) &&
-            wwhIsoTp.ValidateUdsResponse,
+            wwhIsoTp.ValidateUds,
             "ISO-TP WWH status DTC request is correlated to UDS response.");
         var wwhPermanentIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
