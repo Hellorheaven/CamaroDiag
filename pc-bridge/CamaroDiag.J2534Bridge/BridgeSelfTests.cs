@@ -188,6 +188,17 @@ internal static class BridgeSelfTests
                 "Duplicate, unknown and mistyped CAN requests are denied before native I/O");
         }
 
+        Assert(BridgeServer.RequiresSessionTermination(new UnauthorizedAccessException()),
+            "Denied ECU service revokes the current PC bridge session");
+        Assert(BridgeServer.RequiresSessionTermination(new IOException()),
+            "Uncertain native J2534 transport ends its owner session");
+        Assert(BridgeServer.RequiresSessionTermination(new InvalidDataException()),
+            "Malformed physical reply invalidates the session");
+        Assert(!BridgeServer.RequiresSessionTermination(new TimeoutException()),
+            "Ordinary ECU silence is not independently a disconnected adapter");
+        Assert(!BridgeServer.RequiresSessionTermination(new ArgumentException()),
+            "Bad local field syntax is rejected without reusing a privileged request");
+
         // Request framing must reject oversized and truncated client data
         // before JSON parsing or J2534 device access.
         static string? ReadWire(string input)

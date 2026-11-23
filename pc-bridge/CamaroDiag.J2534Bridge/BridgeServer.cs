@@ -306,6 +306,14 @@ internal sealed class BridgeServer
                 await WriteErrorAsync(writer, "Malformed bridge request.");
                 break;
             }
+            catch (Exception ex) when (RequiresSessionTermination(ex))
+            {
+                // Authorization failures and uncertain physical I/O invalidate
+                // the device-owning TLS session. Do not let the same client
+                // retry privileged services or reuse a questionable ECU state.
+                await WriteErrorAsync(writer, "J2534 operation denied or physical channel failed; reconnect and requalify.");
+                break;
+            }
             catch (Exception ex)
             {
                 await WriteErrorAsync(writer, ex.Message);
@@ -457,6 +465,14 @@ internal sealed class BridgeServer
         }
         return required.All(names.Contains);
     }
+
+    /// <summary>
+    /// Unsafe requests and uncertain native driver state terminate the entire
+    /// bridge session. An ordinary ECU silence (TimeoutException) is not
+    /// independently proof of a lost CAN device and may remain recoverable.
+    /// </summary>
+    internal static bool RequiresSessionTermination(Exception failure) =>
+        failure is UnauthorizedAccessException or InvalidDataException or IOException;
 
     internal static int ParseHexId(JsonElement root, string property)
     {
