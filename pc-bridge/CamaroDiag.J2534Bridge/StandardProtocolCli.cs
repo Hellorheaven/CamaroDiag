@@ -876,7 +876,12 @@ internal static class StandardProtocolCli
         int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
         byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs, uint? DataBaud,
         string Mode, bool ValidateUds = false, bool InterpretJ1979 = false,
-        string? TraceFile = null);
+        string? TraceFile = null)
+    {
+        // SAE J2534-1 CAN pass-filter mask/pattern TxFlags must indicate
+        // whether the RX arbitration identifier uses 29-bit formatting.
+        internal uint FilterTxFlags => ExtendedId ? 0x100u : 0u;
+    }
 
     internal static IsoTpOptions ParseIsoTp(string[] args)
     {
@@ -1070,7 +1075,9 @@ internal static class StandardProtocolCli
                 mask, o.ExtendedId ? 0x1FFF_FFFFu : 0x7FFu);
             System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(
                 pattern, o.Settings.RxId);
-            driver.ConfigureFilter(mask, pattern);
+            // CAN_29BIT_ID applies to both J2534 filter mask and pattern.
+            // Omitting it on a 29-bit channel can silently drop ECU replies.
+            driver.ConfigureFilter(mask, pattern, txFlags: o.FilterTxFlags);
             var rawLink = new IsoTpJ2534RawCanLink(driver, o.Settings.CanFd,
                 o.ExtendedId, o.Brs);
             // Opt-in local trace; CreateNew preserves older bench evidence.

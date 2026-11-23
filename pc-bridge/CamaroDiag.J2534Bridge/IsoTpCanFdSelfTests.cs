@@ -330,8 +330,9 @@ internal static class IsoTpCanFdSelfTests
             "--mixed-address", "0xA7", "--payload", "22F190"]);
         Check(mixedCli.ExtendedId && mixedCli.Settings.MixedAddressing &&
             mixedCli.Settings.TxAddress == 0xA7 &&
-            mixedCli.Settings.RxAddress == 0xA7,
-            "CLI uses mixed 29-bit ISO-TP address extension explicitly.");
+            mixedCli.Settings.RxAddress == 0xA7 &&
+            mixedCli.FilterTxFlags == 0x100u,
+            "CLI sets 29-bit CAN filter TxFlags alongside mixed ISO-TP address.");
         var mixed11Bit = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8",
@@ -339,8 +340,9 @@ internal static class IsoTpCanFdSelfTests
             "--mixed-address", "0xA7", "--payload", "22F190"]);
         Check(mixed11Bit.Settings.MixedAddressing &&
             !mixed11Bit.ExtendedId &&
+            mixed11Bit.FilterTxFlags == 0u &&
             mixed11Bit.Settings.TxAddress == 0xA7,
-            "ISO-TP mixed N_AE also supports CAN 11-bit identifiers.");
+            "ISO-TP mixed N_AE retains 11-bit J2534 filter flags.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
