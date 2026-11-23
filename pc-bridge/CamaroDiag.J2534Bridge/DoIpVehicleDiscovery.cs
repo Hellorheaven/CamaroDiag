@@ -130,6 +130,46 @@ internal static class DoIpVehicleDiscovery
         return identified.Values.ToArray();
     }
 
+    /// <summary>
+    /// Listen for spontaneous DoIP UDP identification announcements, without
+    /// sending even a vehicle-identification request. Requires permission to
+    /// bind local UDP port 13400; this is not ECU authentication.
+    /// </summary>
+    internal static async Task<IReadOnlyList<Identity>> ListenAsync(
+        TimeSpan duration, CancellationToken cancellationToken)
+    {
+        if (duration <= TimeSpan.Zero || duration > TimeSpan.FromSeconds(30))
+            throw new ArgumentOutOfRangeException(nameof(duration));
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(duration);
+        using var receiver = new UdpClient(new IPEndPoint(IPAddress.Any, 13400));
+        var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
+        while (identified.Count < 32)
+        {
+            UdpReceiveResult received;
+            try
+            {
+                received = await receiver.ReceiveAsync(deadline.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            try
+            {
+                var found = ParseAnnouncement(received.Buffer,
+                    received.RemoteEndPoint.Address);
+                var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
+                identified[key] = found;
+            }
+            catch (InvalidDataException)
+            {
+                // Ignore non-identification and malformed network traffic.
+            }
+        }
+        return identified.Values.ToArray();
+    }
+
     internal static async Task<Identity> DiscoverAsync(string host,
         TimeSpan timeout, CancellationToken cancellationToken,
         string? vin = null, byte[]? eid = null)
