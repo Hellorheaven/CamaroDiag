@@ -155,6 +155,43 @@ internal static class IsoTpCanFdSelfTests
             RxAddress: 0xF1).Validate(),
             "Shared CAN ID cannot use identical TX and RX logical address.");
 
+        var mixed = new IsoTpCanFdSession.Settings(0x18DA10F1, 0x18DAF110,
+            8, false, TxAddress: 0xA7, RxAddress: 0xA7,
+            MixedAddressing: true);
+        var mixedTx = new QueueLink();
+        Send(mixedTx, mixed, [0x22, 0xF1, 0x90]);
+        Check(mixedTx.Sent.Count == 1 && mixedTx.Sent[0].Id == mixed.TxId &&
+            mixedTx.Sent[0].Data[0] == 0xA7 &&
+            mixedTx.Sent[0].Data[1] == 3,
+            "Mixed ISO-TP keeps one N_AE in the first data byte.");
+        var mixedRx = new QueueLink();
+        mixedRx.Replies.Enqueue(new(mixed.RxId, false,
+            [0xA7, 3, 0x62, 0xF1, 0x90, 0xCC, 0xCC, 0xCC]));
+        Check(Receive(mixedRx, mixed).SequenceEqual(
+            new byte[] {0x62, 0xF1, 0x90}),
+            "Mixed ISO-TP correlates response by RX CAN ID and N_AE.");
+        Reject<ArgumentException>(() =>
+            (mixed with { RxAddress = 0xA8 }).Validate(),
+            "Mixed ISO-TP rejects different TX/RX address extensions.");
+        Reject<ArgumentException>(() =>
+            (mixed with { RxId = mixed.TxId }).Validate(),
+            "Mixed ISO-TP requires different CAN IDs.");
+        var mixedCli = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "18DA10F1", "--rx-id", "18DAF110",
+            "--baud", "500000", "--extended", "true", "--fd", "false",
+            "--mixed-address", "0xA7", "--payload", "22F190"]);
+        Check(mixedCli.ExtendedId && mixedCli.Settings.MixedAddressing &&
+            mixedCli.Settings.TxAddress == 0xA7 &&
+            mixedCli.Settings.RxAddress == 0xA7,
+            "CLI uses mixed 29-bit ISO-TP address extension explicitly.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--fd", "false",
+            "--mixed-address", "0xA7", "--payload", "22F190"]),
+            "Mixed ISO-TP CLI rejects 11-bit mode.");
+
         var fdExtended = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8,
             12, true, BlockSize: 0, TxAddress: 0xF1, RxAddress: 0x10);
         var fdAddressedSingle = new QueueLink();
