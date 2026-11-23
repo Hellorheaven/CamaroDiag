@@ -24,4 +24,19 @@ object EcuWriteConsentFlow {
 
     fun approval(step: Step, confirmedYes: Boolean, sameConnection: Boolean): Approval? =
         if (permitsWrite(step, confirmedYes, sameConnection)) Approval(true, true) else null
+
+    /** A consent starts with one physical/adapter session. An adapter switch,
+     * logout or disconnection invalidates its YES even if another channel is
+     * already connected by the time the user presses the button.
+     */
+    fun approvalForConnection(
+        step: Step,
+        confirmedYes: Boolean,
+        warningConnection: Long?,
+        currentConnection: Long
+    ): Approval? = approval(
+        step, confirmedYes,
+        sameConnection = warningConnection != null &&
+            warningConnection == currentConnection
+    )
 }
