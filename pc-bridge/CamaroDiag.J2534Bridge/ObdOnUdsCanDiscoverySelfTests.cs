@@ -71,6 +71,21 @@ internal static class ObdOnUdsCanDiscoverySelfTests
             found[0].ResponseId == 0x7E8 &&
             found[1].ResponseId == 0x7E9,
             "One functional request discovers multiple distinct ECUs without duplicates.");
+        var contradictory = new FakeCan();
+        contradictory.Incoming.Enqueue(Rx(0x7E8,
+            4, 0x62, 0xF8, 0x10, 1, 0, 0, 0));
+        contradictory.Incoming.Enqueue(Rx(0x7E8,
+            4, 0x62, 0xF8, 0x10, 0, 0, 0, 0));
+        var rejectedConflict = false;
+        try
+        {
+            _ = ObdOnUdsCanDiscovery.DiscoverAsync(contradictory,
+                TimeSpan.FromSeconds(1), CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        catch (InvalidDataException) { rejectedConflict = true; }
+        Check(rejectedConflict,
+            "One CAN ECU cannot silently change its F810 protocol identity.");
         var noResponse = new FakeCan();
         Check(ObdOnUdsCanDiscovery.DiscoverAsync(noResponse,
                 TimeSpan.FromSeconds(1), CancellationToken.None)
