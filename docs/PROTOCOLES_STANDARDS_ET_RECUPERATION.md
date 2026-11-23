@@ -344,3 +344,13 @@ CamaroDiag.J2534Bridge.exe --j1979-discover-can --adapter-index 0 --baud 500000 
 ```
 
 La commande s'appuie sur le pilote fournisseur SAE J2534 et sur CAN brut classique, pas CAN-FD et pas sur une simulation ; elle n'a cependant **pas été qualifiée sur adaptateur ni véhicule**. Les preuves tests sont pour le moment uniquement des vecteurs offline écrits, non exécutés. Pour lire les pages suivantes d'un ECU ayant répondu, utiliser ensuite la commande `--j1979-pids` avec une paire TX/RX physique explicitement vérifiée.
+
+
+## SAE J1979 — corrections d'identification et DTC CAN (23/11/2026)
+
+- Après réassemblage ISO-TP, les réponses CAN des modes **03, 07 et 0A** comportent le nombre de codes défaut avant les paires SAE J2012. Le traitement `ObdJ1979Dtc.DecodeCanCounted` vérifie ce nombre, distingue les paires de remplissage nulles et refuse les codes surnuméraires ou tronqués. Cette interprétation est réservée au chemin CAN ; les variantes historiques ISO 9141, KWP2000 et J1850 ne sont pas traitées comme des trames CAN.
+- En **mode 09**, les InfoTypes disponibles (00), le numéro de calibration CALID (04, 16 caractères ASCII par valeur), le CVN (06, quatre octets par valeur) et le VIN (02) disposent de décodeurs typés pour le flux applicatif CAN déjà réassemblé. Le nombre d'éléments rapporté dans les réponses est contrôlé. Un CVN n'est pas une preuve d'authenticité ou de conformité constructeur de la programmation.
+- Le sélecteur `--j1979-decode true` n'interprète plus une commande UDS/J1979-2 comme une commande OBD-II classique. Les commandes arbitraires de lecture/écriture UDS restent disponibles via les modes de transport standards avec le consentement explicite requis ; le décodage ne constitue pas une nouvelle interdiction d'écriture.
+- **Qualification** : tests unitaires ajoutés, pas encore exécutés dans cette tranche. La couverture SAE J1979 n'est pas complète (versions SAE J1979DA, tous les PID/monitor IDs et services, transports J1850/K-Line, expérience véhicule). La conformité logicielle ou matérielle ne peut pas être déclarée sur ces seuls codecs.
+
+Référence de format : SAE J1979 (éditions historiques) et documentation de la procédure d'essai des modes OBD-II ; l'adaptation aux éditions récentes doit être validée séparément.
