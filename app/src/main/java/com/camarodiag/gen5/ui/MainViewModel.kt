@@ -1624,24 +1624,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val captured = Lfx2012FuelReadOnly.inspect(
                     survey, raw, System.currentTimeMillis()
                 )
-                if (current()) {
-                    val validVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
-                        .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
-                    val historySummary = if (validVin != null) {
-                        fuelHistory.append(
-                            Lfx2012FuelSessionHistory.SessionIdentity(
-                                validVin, "account-$account-connection-$connection",
-                                captured.source
-                            ), captured
+                // Serialize publishing a completed physical read with vehicle/
+                // connection changes on the UI dispatcher. Otherwise the VIN
+                // could change between the IO-thread guard and history append.
+                withContext(Dispatchers.Main) {
+                    if (current()) {
+                        val validVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
+                            .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                        val historySummary = if (validVin != null) {
+                            fuelHistory.append(
+                                Lfx2012FuelSessionHistory.SessionIdentity(
+                                    validVin, "account-$account-connection-$connection",
+                                    captured.source
+                                ), captured
+                            )
+                        } else null
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            isFuelSnapshotReading = false,
+                            fuelReadOnlySnapshot = captured,
+                            fuelHistoryCount = historySummary?.count ?: 0,
+                            fuelHistorySummary = historySummary,
+                            fuelSnapshotError = ""
                         )
-                    } else null
-                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                        isFuelSnapshotReading = false,
-                        fuelReadOnlySnapshot = captured,
-                        fuelHistoryCount = historySummary?.count ?: 0,
-                        fuelHistorySummary = historySummary,
-                        fuelSnapshotError = ""
-                    )
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
