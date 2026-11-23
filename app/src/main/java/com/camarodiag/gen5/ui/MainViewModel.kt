@@ -59,6 +59,8 @@ import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
 import com.camarodiag.gen5.data.obd.J2534BridgeConnectionForm
 import com.camarodiag.gen5.data.obd.AdapterEndpointPreflight
 import com.camarodiag.gen5.data.obd.AdapterConnectionFailurePolicy
+import com.camarodiag.gen5.data.obd.UsbPermissionResultBus
+import com.camarodiag.gen5.data.obd.UsbPermissionReconnectPolicy
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeException
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeCancelled
 import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
@@ -547,6 +549,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     sessionDao.observeSessionsForOwner(uid).collect { rows ->
                         if (authenticatedAccountUid == uid) _savedSessions.value = rows
                     }
+                }
+            }
+        }
+        viewModelScope.launch {
+            UsbPermissionResultBus.results.collect { outcome ->
+                val pending = pendingUsbPermissionRetry ?: return@collect
+                if (pending.deviceId != outcome.deviceId) return@collect
+                // Wait for the original USB handshake to release its handle.
+                connectionAttemptJob?.join()
+                if (pendingUsbPermissionRetry != pending) return@collect
+                if (!outcome.granted) {
+                    pendingUsbPermissionRetry = null
+                    if (pending.generation == connectionAttemptGeneration) {
+                        _connectionMessage.value = localizedContext.getString(R.string.msg_usb_permission_denied)
+                    }
+                    return@collect
+                }
+                val devices = runCatching { obdManager.getUsbDevices() }.getOrDefault(emptyList())
+                _usbDevices.value = devices
+                val mayResume = UsbPermissionReconnectPolicy.mayResume(
+                    pending, outcome.deviceId, outcome.granted, connectionAttemptGeneration, devices
+                )
+                pendingUsbPermissionRetry = null
+                if (!mayResume) {
+                    if (pending.generation == connectionAttemptGeneration) {
+                        _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
+                    }
+                    return@collect
+                }
+                when (pending.transport) {
+                    "usb" -> connectUsb(pending.endpoint)
+                    "connector_usb" -> discoverCamaroDiagConnector(pending.endpoint)
+                    "connector_usb_binary" -> discoverCamaroDiagConnector(pending.endpoint, binary = true)
                 }
             }
         }
@@ -3495,6 +3530,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     @Volatile private var connectionAttemptGeneration: Long = 0L
     private val _connectionGeneration = MutableStateFlow(0L)
+    private var pendingUsbPermissionRetry: UsbPermissionReconnectPolicy.Pending? = null
     val connectionGeneration: StateFlow<Long> = _connectionGeneration.asStateFlow()
 
     /** Shared revision for all physical/simulated adapter transitions.
@@ -3502,6 +3538,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun nextConnectionGeneration(): Long {
         val next = ++connectionAttemptGeneration
+        pendingUsbPermissionRetry = null
         _connectionGeneration.value = next
         return next
     }
@@ -3515,6 +3552,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         discoveryOnly: Boolean = false
     ) {
         val attempt = nextConnectionGeneration()
+        pendingUsbPermissionRetry = UsbPermissionReconnectPolicy.forSelection(
+            transport, endpoint, attempt
+        )
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
@@ -3539,6 +3579,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 connect()
                     .onSuccess { capabilities ->
                         if (attempt == connectionAttemptGeneration) {
+                            pendingUsbPermissionRetry = null
                             _adapter.value = capabilities
                             if (!discoveryOnly) {
                                 rememberConnectionProfile(transport, capabilities, endpoint)
@@ -3548,17 +3589,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     .onFailure { error ->
                         if (attempt == connectionAttemptGeneration) {
-                            _connectionMessage.value =
-                                if (AdapterConnectionFailurePolicy.classify(error) ==
-                                    AdapterConnectionFailurePolicy.Kind.USB_PERMISSION_REQUIRED) {
-                                    localizedContext.getString(R.string.msg_usb_permission_pending)
-                                } else fallbackMessage
+                            val permissionRequired = AdapterConnectionFailurePolicy.classify(error) ==
+                                AdapterConnectionFailurePolicy.Kind.USB_PERMISSION_REQUIRED
+                            if (!permissionRequired) pendingUsbPermissionRetry = null
+                            _connectionMessage.value = if (permissionRequired) {
+                                localizedContext.getString(R.string.msg_usb_permission_pending)
+                            } else fallbackMessage
                         }
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 if (attempt == connectionAttemptGeneration) {
+                    pendingUsbPermissionRetry = null
                     _connectionMessage.value = fallbackMessage
                 }
             } finally {
@@ -3631,7 +3674,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         connectWithResult(
             connect = { obdManager.discoverCamaroDiagConnector(id, binary) },
             fallbackMessage = localizedContext.getString(R.string.msg_usb_connection_failed),
-            transport = "connector_usb",
+            transport = if (binary) "connector_usb_binary" else "connector_usb",
             endpoint = deviceLabel,
             discoveryOnly = true
         )
