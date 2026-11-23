@@ -20,7 +20,8 @@ internal static class J1939ClassicTpSession
     internal const byte Abort = 0xFF;
 
     internal sealed record Options(byte LocalAddress, byte RemoteAddress, int Pgn,
-        byte Priority = 6, byte ReceiveWindow = 16)
+        byte Priority = 6, byte ReceiveWindow = 16,
+        bool AcceptAcknowledgement = false)
     {
         internal void Validate()
         {
@@ -193,8 +194,10 @@ internal static class J1939ClassicTpSession
             throw new ArgumentOutOfRangeException(nameof(timeout));
         var start = await ReadStartAsync(link, o, timeout, token);
         var physical = StandardVehicleProtocols.ParseJ1939Id(start.Id);
-        if (physical.Pgn == o.Pgn)
-            return new(o.Pgn, start.Data.ToArray(),
+        if (physical.Pgn == o.Pgn ||
+            (o.AcceptAcknowledgement &&
+             physical.Pgn == J1939PgnAcknowledgement.AcknowledgementPgn))
+            return new(physical.Pgn, start.Data.ToArray(),
                 physical.Destination is null or 0xFF);
         if (start.Data[0] == Abort)
             throw new IOException("J1939 peer aborted transport before data.");
@@ -264,9 +267,11 @@ internal static class J1939ClassicTpSession
             if (frame.IsFd || frame.Data.Length != 8) continue;
             var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
             if (id.Source != o.RemoteAddress) continue;
-            if (id.Pgn == o.Pgn)
+            if (id.Pgn == o.Pgn ||
+                (o.AcceptAcknowledgement &&
+                 id.Pgn == J1939PgnAcknowledgement.AcknowledgementPgn))
             {
-                var pf = (o.Pgn >> 8) & 0xFF;
+                var pf = (id.Pgn >> 8) & 0xFF;
                 if (pf < 240 && id.Destination != o.LocalAddress &&
                     id.Destination != 0xFF)
                     continue;
