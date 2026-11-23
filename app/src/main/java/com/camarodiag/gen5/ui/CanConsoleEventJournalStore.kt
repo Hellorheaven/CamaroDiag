@@ -11,7 +11,7 @@ import java.io.File
  * both before publishing an output. Clear/account/vehicle changes discard it.
  */
 internal class CanConsoleEventJournalStore(private val directory: File) {
-    data class Snapshot(val file: File, val generation: Long, val eventCount: Long)
+    data class Snapshot(val file: File, val generation: Long, val eventCount: Long, val sizeBytes: Long)
 
     private var archive: File? = null
     private var writer: CanConsoleEventJournalWriter? = null
@@ -70,13 +70,14 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
             failed = true
             return null
         }
-        return Snapshot(file, generation, target.eventCount)
+        return Snapshot(file, generation, target.eventCount, file.length())
     }
 
     @Synchronized
     fun isCurrent(snapshot: Snapshot): Boolean =
         !failed && !disposed && archive == snapshot.file && generation == snapshot.generation &&
-            writer?.eventCount == snapshot.eventCount && snapshot.file.isFile
+            writer?.eventCount == snapshot.eventCount && snapshot.file.isFile &&
+            snapshot.sizeBytes > 0L && snapshot.file.length() == snapshot.sizeBytes
 
     /** Cheap UI capability check; snapshot() performs the final file flush. */
     @Synchronized
