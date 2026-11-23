@@ -29,6 +29,19 @@ internal static class StandardVehicleProtocolsSelfTests
             "SAE J1850 J2534 IDs.");
         Check(StandardVehicleProtocols.Find("CAN FD + ISO-TP").J2534ProtocolId is null,
             "CAN FD vendor capability must be negotiated.");
+        Check(!J2534StandardChannel.IsAuxiliaryReceiveStatus(0) &&
+            J2534StandardChannel.IsAuxiliaryReceiveStatus(
+                J2534StandardChannel.RxTxEcho) &&
+            J2534StandardChannel.IsAuxiliaryReceiveStatus(
+                J2534StandardChannel.RxStartOfMessage) &&
+            J2534StandardChannel.IsAuxiliaryReceiveStatus(
+                J2534StandardChannel.RxTxIndication) &&
+            J2534StandardChannel.IsAuxiliaryReceiveStatus(
+                J2534StandardChannel.RxPaddingError),
+            "J2534 RX classifier separates physical receive from vendor status reports.");
+        Check(!J2534StandardChannel.IsAuxiliaryReceiveStatus(0x80000000),
+            "J2534 unknown status bits alone do not falsely hide ECU RX data.");
+
         Check(StandardVehicleProtocols.Find("J1939 CAN FD").TransportPresent &&
             !StandardVehicleProtocols.Find("J1939 CAN FD").PhysicalWriteQualified &&
             StandardVehicleProtocols.Find("J1939 CAN FD").Scope
