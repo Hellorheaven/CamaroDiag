@@ -403,6 +403,14 @@ fun CalibrationWorkspaceScreen(
                                 color = TextMuted, fontSize = 11.sp
                             )
                         }
+                        if (ethanolHistory != null && ethanolHistory.reportedCount > 0 &&
+                            ethanolHistory.currentSnapshotPercent == null
+                        ) {
+                            Text(
+                                stringResource(R.string.flexfuel_lfx2012_ethanol_no_current_measurement),
+                                color = WarnRed, fontSize = 11.sp
+                            )
+                        }
                         state.fuelHistorySummary?.readings
                             ?.filter { it.pid != Lfx2012FuelReadOnly.ETHANOL &&
                                 it.reportedCount > 0 &&
