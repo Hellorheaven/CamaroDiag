@@ -137,3 +137,7 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Tests ajoutés : émetteur local FD 64 octets, pair à 12 octets, et CF non terminal tronqué rejeté.
 - CLI ISO-TP : mode `receive` sans requête diagnostique sortante, avec FlowControl uniquement si une trame FF exige un échange multipaquet. Contrôle du mode/payload complété.
 - Tests écrits et commités, **validation CI non exécutée** sur ces changements ; pas de preuve sur adaptateur ou ECU réel.
+
+## ISO-TP — tolérance FlowControl WAIT (23/11/2026)
+- Ajout de `MaxWaitFrames` paramétrable (CLI `--wftmax`, 0 à 255, 4 par défaut) pour les réponses FC/WAIT avant CTS. Le dépassement arrête les nouvelles CF.
+- Tests de limites et de reprise après deux WAIT ajoutés, non encore exécutés ; pas de validation ECU physique.
