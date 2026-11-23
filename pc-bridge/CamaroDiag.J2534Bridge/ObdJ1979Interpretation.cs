@@ -12,7 +12,12 @@ internal static class ObdJ1979Interpretation
     internal static Result Interpret(ReadOnlySpan<byte> request,
         ReadOnlySpan<byte> response)
     {
-        var reply = ObdJ1979Transaction.Decode(request, response);
+        // A positive reply for a different PID/monitor/test is not proof
+        // of success even when the service byte itself matches.
+        var echoesIdentifier = request.Length >= 2 &&
+            request[0] is 0x01 or 0x02 or 0x06 or 0x08 or 0x09;
+        var reply = ObdJ1979Transaction.Decode(request, response,
+            expectIdentifierEcho: echoesIdentifier);
         if (reply.Kind == ObdJ1979Transaction.ReplyKind.Negative)
             return new Result(
                 $"SAE J1979 service 0x{reply.Service:X2} negative response NRC=0x{reply.NegativeResponseCode:X2}",
