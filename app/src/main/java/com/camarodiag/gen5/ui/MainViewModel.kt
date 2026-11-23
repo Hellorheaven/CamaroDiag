@@ -3984,7 +3984,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_demo_cleared)
                 } else if (obdManager.isJ2534StandardObdClearAvailable()) {
-                    obdManager.clearJ2534StandardDtcs(approval)
+                    obdManager.clearJ2534StandardDtcs(approval) {
+                        check(current()) {
+                            "ECU clear cancelled: account, adapter or vehicle changed before transmission."
+                        }
+                    }
                     if (!current()) return@launch
                     // Mode 04 does not erase permanent emissions DTCs. Preserve
                     // all other module records and require a new scan to refresh.
@@ -4002,7 +4006,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else -> localizedContext.getString(R.string.msg_dtc_clear_adapter_required)
                     }
                 } else {
-                    val response = obdManager.sendAtCommand("04", 2500L)
+                    val response = obdManager.sendAtCommand("04", 2500L) {
+                        check(current()) {
+                            "ECU clear cancelled: account, adapter or vehicle changed before transmission."
+                        }
+                    }
                     if (!current()) return@launch
                     if (com.camarodiag.gen5.data.obd.StandardObdClearEvidence.acknowledged(response)) {
                         // SAE Mode 04 clears standardized emissions DTCs only.
