@@ -21,7 +21,7 @@ class CanConsoleEventJournalWriter(private val destination: Writer) : Closeable 
     val eventCount: Long @Synchronized get() = count
 
     init {
-        writeOrFail { destination.write("sequence,utc_millis,direction,succeeded,content\n") }
+        writeOrFail { destination.write("sequence,utc_millis,direction,status,content\n") }
     }
 
     @Synchronized
@@ -39,8 +39,12 @@ class CanConsoleEventJournalWriter(private val destination: Writer) : Closeable 
         val safeContent = if (formula) "'$content" else content
         val escaped = safeContent.replace("\r", "\\r").replace("\n", "\\n")
             .replace("\"", "\"\"")
+        // TX is recorded when submitted, before a real adapter/ECU outcome exists.
+        // A later RX/SYSTEM record describes the outcome; do not label TX failed.
+        val status = if (direction == Direction.TX) "PENDING"
+            else if (succeeded) "OK" else "FAILED"
         writeOrFail {
-            destination.write("$next,$utcMillis,${direction.name},$succeeded,\"$escaped\"\n")
+            destination.write("$next,$utcMillis,${direction.name},$status,\"$escaped\"\n")
         }
         count = next
     }
