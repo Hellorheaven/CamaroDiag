@@ -1235,13 +1235,16 @@ class BluetoothObdManager(context: Context) {
             j2534BridgeTransport?.isConnected == true
 
     /**
-     * Read-only UDS transaction over a physically connected OBDLink STN adapter.
+     * UDS transaction over a physically connected OBDLink STN adapter.
      * STPX's hardware identification (STI + STDI) is still checked by the transport.
      *
      * Keep the adapter configuration and all UDS requests under one exclusive
      * command session. This prevents telemetry, a CAN console or a queued OBD
      * command from changing STP/filters between ISO-TP request and response.
-     * Only the documented UDS/ISO-TP transport is used; this is not ECU flashing.
+     * A target-specific UdsAccessPolicy enables exactly the ECU operations
+     * the operator's profile describes. Do not impose a global read-only
+     * command filter or an additional CamaroDiag key requirement.
+     * Unconfigured callers retain a non-destructive default.
      */
     suspend fun <T> withStnUdsSession(
         requestCanId: Int,
@@ -1249,6 +1252,7 @@ class BluetoothObdManager(context: Context) {
         protocolNumber: Int = 33,
         timeoutMs: Long = 3000L,
         readDids: Set<Int> = emptySet(),
+        policy: UdsAccessPolicy? = null,
         block: suspend (UdsClient) -> T
     ): T {
         val requestedEpoch = transportSessionEpoch.capture()
@@ -1268,7 +1272,7 @@ class BluetoothObdManager(context: Context) {
                 sendAtCommandInternal(command, commandTimeout, expectedEpoch = requestedEpoch)
             }
             val result = try {
-                block(UdsClient(transport, UdsAccessPolicy.readOnly(readDids), timeoutMs))
+                block(UdsClient(transport, policy ?: UdsAccessPolicy.readOnly(readDids), timeoutMs))
             } finally {
                 // STPX changes the adapter's CAN filter, protocol and ISO-TP
                 // segmentation settings. Always restore functional OBD mode

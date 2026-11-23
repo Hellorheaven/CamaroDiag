@@ -5,9 +5,10 @@ import java.util.Locale
 /**
  * Explicit UDS permissions. The default policy is read-only.
  *
- * A write/programming grant must be created by the trusted profile-validation path after
- * vehicle VIN, ECU identity, CAL ID/CVN and documentary evidence have been checked.
- * No GM write profile is bundled until those values and procedures are documented.
+ * For a documented write service, callers supply the actual ECU profile and
+ * observed identity. No CamaroDiag signing authority or mandatory seed/key
+ * is inserted when the ECU protocol does not require one. In the absence
+ * of any verified write profile the default remains diagnostic read-only.
  */
 @ConsistentCopyVisibility
 data class UdsAccessPolicy internal constructor(
@@ -75,7 +76,7 @@ data class UdsAccessPolicy internal constructor(
             evidenceReference = "Built-in read-only policy"
         )
 
-        internal fun verified(
+        fun verified(
             vehicleVin: String,
             identity: UdsEcuIdentity,
             expectedVin: String,
