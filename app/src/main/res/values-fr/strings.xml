@@ -984,4 +984,5 @@
     <string name="can_console_export_full_raw_rx"># RX BRUT - flux complet archivé de l’adaptateur (texte non modifié)</string>
     <string name="can_console_export_recent_raw_rx"># RX BRUT - extrait mémoire récent uniquement, capture non exhaustive</string>
     <string name="can_console_export_failed_marker"> ÉCHEC</string>
+    <string name="can_console_history_recent_scope">Historique à l’écran : 300 événements récents au maximum. Le flux RX brut peut être archivé séparément ; les anciens TX ne sont pas conservés.</string>
 </resources>
