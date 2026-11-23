@@ -506,6 +506,14 @@ class LocaleResourcesIntegrityTest {
         assertFalse(english == french)
     }
 
+    @Test fun usbPermissionDeniedIsClearlyLocalized() {
+        val en = strings("en").getValue("msg_usb_permission_denied")
+        val fr = strings("fr").getValue("msg_usb_permission_denied")
+        assertTrue(en.contains("denied") && en.contains("again"))
+        assertTrue(fr.contains("refusé") && fr.contains("nouveau"))
+        assertFalse(en == fr)
+    }
+
     @Test fun usbPermissionPromptHasActionableFrenchAndEnglishGuidance() {
         val english = strings("en").getValue("msg_usb_permission_pending")
         val french = strings("fr").getValue("msg_usb_permission_pending")
