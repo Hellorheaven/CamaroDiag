@@ -211,3 +211,5 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 ## J1939 — requête standard de PGN (23/11/2026)
 - Codec PGN Request 0xEA00, sérialisation little-endian sur trois octets ; commande `--mode request` pour transmettre la requête dirigée sous double confirmation, puis attendre le PGN demandé. Tests codec/CLI ajoutés, non exécutés.
 - Réponses ACK/NACK PGN 0xE800 et revendication d'adresse physique J1939-81 restent non traitées/qualifiées.
+
+- J1939-21 : traitement des réponses ACKM PGN E800 en mode requête, y compris NACK, accès refusé et corrélation au PGN attendu. Tests de sessions concurrentes ajoutés, non exécutés ; un ACK ne certifie pas l'exécution d'une commande ECU.
