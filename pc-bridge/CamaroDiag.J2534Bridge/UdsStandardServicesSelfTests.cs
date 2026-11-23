@@ -49,6 +49,44 @@ internal static class UdsStandardServicesSelfTests
             "14FFFFFF", "Clear DTC group");
         Equal(UdsStandardServices.ReadDtc(0x02, [0xFF]),
             "1902FF", "Read DTC by mask");
+        Equal(ObdOnUdsServices.ReadEmissionsData(0xF40C),
+            "22F40C", "OBDonUDS current emissions DID maps to ISO 14229 0x22.");
+        Equal(ObdOnUdsServices.ReadEmissionsData(0xF701),
+            "22F701", "OBDonUDS additional current-data DID range.");
+        Check(ObdOnUdsServices.IsEmissionsDataDid(0xF5FF) &&
+            !ObdOnUdsServices.IsEmissionsDataDid(0xF600),
+            "OBDonUDS helper distinguishes standardized current-data ranges.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            ObdOnUdsServices.ReadEmissionsData(0xF190),
+            "OBDonUDS convenience DID scope does not mislabel OEM DID.");
+        Check(ObdOnUdsServices.DecodeReadDid(0xF40C,
+            [0x62, 0xF4, 0x0C, 0x12, 0x34])
+                .SequenceEqual(new byte[] {0x12, 0x34}),
+            "OBDonUDS DID response preserves uninterpreted emissions bytes.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeReadDid(0xF40C,
+                [0x62, 0xF4, 0x0D, 0x12]),
+            "OBDonUDS DID response cannot be confused with another DID.");
+
+        Equal(ObdOnUdsServices.ReadDtcByStatusMask(0xFF),
+            "1902FF", "OBDonUDS DTC status-mask diagnostic request.");
+        var obdCodes = ObdOnUdsServices.DecodeDtcByStatusMask(
+            [0x59, 0x02, 0xAF, 0x12, 0x34, 0x56, 0x08,
+             0xAB, 0xCD, 0xEF, 0x04]);
+        Check(obdCodes.AvailabilityMask == 0xAF &&
+            obdCodes.Codes.Count == 2 &&
+            obdCodes.Codes[0].Code == 0x123456 &&
+            obdCodes.Codes[0].Status == 0x08 &&
+            obdCodes.Codes[1].Code == 0xABCDEF,
+            "UDS DTC status report reads 24-bit DTCs and status separately.");
+        Check(ObdOnUdsServices.DecodeDtcByStatusMask(
+            [0x59, 0x02, 0xAF]).Codes.Count == 0,
+            "Empty OBDonUDS DTC report is not a fabricated fault.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeDtcByStatusMask(
+                [0x59, 0x02, 0xAF, 0x12, 0x34, 0x56]),
+            "Partial UDS DTC status record rejected.");
+
         Check(UdsStandardServices.RequireResponse([0x2E, 0xF1, 0x90, 0x01],
             [0x6E, 0xF1, 0x90]).SequenceEqual(new byte[] {0x6E, 0xF1, 0x90}),
             "UDS write DID positive acknowledgement correlated");
