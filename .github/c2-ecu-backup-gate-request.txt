@@ -1,0 +1,5 @@
+C2 ECU backup code frozen for one targeted validation.
+Development HEAD: 35c3014f25a0e5fbf5ab9a65ebdc65af4b9aed28
+Android: :communication:testDebugUnitTest :app:testDebugUnitTest (warnings fail)
+Windows: J2534 bridge Debug -warnaserror + --self-test
+No vehicle/ECU hardware qualification is implied.
