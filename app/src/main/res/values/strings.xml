@@ -970,4 +970,7 @@
     <string name="ecu_write_yes">Yes</string>
     <string name="ecu_write_no">No</string>
     <string name="ecu_write_cancel">Cancel</string>
+    <string name="flexfuel_lfx2012_export_history">Export %1$d fuel readings (CSV)</string>
+    <string name="flexfuel_lfx2012_history_saved">Read-only fuel history exported.</string>
+    <string name="flexfuel_lfx2012_history_failed">Could not export fuel history.</string>
 </resources>
