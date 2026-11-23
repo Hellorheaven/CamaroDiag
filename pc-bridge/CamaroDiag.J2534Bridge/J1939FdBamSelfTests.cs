@@ -81,9 +81,10 @@ internal static class J1939FdBamSelfTests
         Check(Receive(receiver).SequenceEqual(Fill(131)) &&
             receiver.Outgoing.Count == 0,
             "FD.TP broadcast round-trip retains exact data and requires no CTS.");
-        Check(receiver.ReceiveTimeouts.Count == 5 &&
-            receiver.ReceiveTimeouts[0] <= TimeSpan.FromSeconds(1) &&
-            receiver.ReceiveTimeouts.Skip(1).All(t =>
+        Check(receiver.ReceiveTimeouts.Count == 6 &&
+            receiver.ReceiveTimeouts.Take(2).All(t =>
+                t > TimeSpan.Zero && t <= TimeSpan.FromSeconds(1)) &&
+            receiver.ReceiveTimeouts.Skip(2).All(t =>
                 t > TimeSpan.Zero && t <= TimeSpan.FromMilliseconds(750)),
             "BAM receive sends a bounded 750ms phase timeout to the CAN adapter.");
 
