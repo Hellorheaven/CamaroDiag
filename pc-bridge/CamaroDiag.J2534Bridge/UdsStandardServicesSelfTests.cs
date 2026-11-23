@@ -94,6 +94,22 @@ internal static class UdsStandardServicesSelfTests
                 [0x62, 0xF8, 0x10]),
             "Truncated F810 protocol identification is rejected.");
 
+        Check(ObdOnUdsServices.ClassifyDid(0xF40C) ==
+                ObdOnUdsServices.DataGroup.CurrentPowertrain &&
+            ObdOnUdsServices.ClassifyDid(0xF600) ==
+                ObdOnUdsServices.DataGroup.LegacyMonitor &&
+            ObdOnUdsServices.ClassifyDid(0xF810) ==
+                ObdOnUdsServices.DataGroup.VehicleInformation &&
+            ObdOnUdsServices.ClassifyDid(0xF190) ==
+                ObdOnUdsServices.DataGroup.NotLegislated,
+            "OBDonUDS differentiates current, legacy-monitor and vehicle DID groups.");
+        Equal(ObdOnUdsServices.ReadObdDid(0xF600),
+            "22F600", "OBDonUDS legacy monitor DID still uses ISO 14229 ReadDID.");
+        Equal(ObdOnUdsServices.ReadObdDid(0xF810),
+            "22F810", "OBDonUDS protocol info DID is available through named CLI.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            ObdOnUdsServices.ReadObdDid(0xF190),
+            "OBDonUDS named path does not mislabel generic OEM/ISO identifier.");
         Equal(ObdOnUdsServices.ReadEmissionsData(0xF40C),
             "22F40C", "OBDonUDS current emissions DID maps to ISO 14229 0x22.");
         Equal(ObdOnUdsServices.ReadEmissionsData(0xF701),
