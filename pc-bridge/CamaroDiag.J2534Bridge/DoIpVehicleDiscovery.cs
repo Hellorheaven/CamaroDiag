@@ -6,8 +6,8 @@ using System.Text;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// ISO 13400-2 UDP vehicle identification, limited to an explicitly selected
-/// IPv4 gateway. No diagnostic service or vehicle write is transmitted.
+/// ISO 13400-2 UDP vehicle identification using explicitly selected
+/// unicast gateways or operator-provided IPv4 broadcast destinations. No diagnostic service or vehicle write is transmitted.
 /// An identity announcement is NOT authentication of the ECU or evidence of
 /// support for routing activation, TLS, programming or recovery.
 /// </summary>
@@ -59,6 +59,56 @@ internal static class DoIpVehicleDiscovery
             payload.AsSpan(19, 6).ToArray(),
             payload.AsSpan(25, 6).ToArray(),
             payload[31], payload.Length == 33 ? payload[32] : null, source);
+    }
+
+    /// <summary>
+    /// Explicit UDP broadcast vehicle-identification request. Collects responses
+    /// only for the bounded discovery window; never probes another network or
+    /// sends any UDS service. Identities are announced, not authenticated.
+    /// </summary>
+    internal static async Task<IReadOnlyList<Identity>> DiscoverBroadcastAsync(
+        string broadcastIp, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        if (!IPAddress.TryParse(broadcastIp, out var address) ||
+            address.AddressFamily != AddressFamily.InterNetwork ||
+            address.Equals(IPAddress.Any) ||
+            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
+            throw new ArgumentException(
+                "Explicit IPv4 broadcast destination and bounded timeout required.");
+
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+        using var socket = new UdpClient(AddressFamily.InterNetwork)
+        {
+            EnableBroadcast = true
+        };
+        await socket.SendAsync(BuildRequest().AsMemory(),
+            new IPEndPoint(address, 13400), deadline.Token);
+        var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
+        while (identified.Count < 32)
+        {
+            UdpReceiveResult received;
+            try
+            {
+                received = await socket.ReceiveAsync(deadline.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                break; // Discovery window elapsed, return only observed identities.
+            }
+            try
+            {
+                var found = ParseAnnouncement(received.Buffer,
+                    received.RemoteEndPoint.Address);
+                var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
+                identified[key] = found;
+            }
+            catch (InvalidDataException)
+            {
+                // Unrelated or malformed UDP announcements are not discoveries.
+            }
+        }
+        return identified.Values.ToArray();
     }
 
     internal static async Task<Identity> DiscoverAsync(string host,
