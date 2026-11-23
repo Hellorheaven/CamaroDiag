@@ -167,6 +167,42 @@ internal static class IsoTpCanFdSelfTests
             "Cancelled ISO-TP send never emits a frame.");
         Check(none.Sent.Count == 0, "No TX after cancellation.");
 
+        var raw = IsoTpJ2534RawCanLink.Pack(0x7E0,
+            [0x03, 0x22, 0xF1, 0x90, 0, 0, 0, 0], extended: false);
+        Check(Convert.ToHexString(raw) == "000007E00322F19000000000",
+            "J2534 raw CAN frame prepends big-endian physical arbitration ID.");
+        Check(IsoTpJ2534RawCanLink.Unpack(raw, 0, false, false).Id == 0x7E0,
+            "Classic J2534 CAN frame reconstructed without ISO-TP double wrapping.");
+        var rawFd = IsoTpJ2534RawCanLink.Pack(0x7E0,
+            Enumerable.Repeat((byte)0xF0, 64).ToArray(), extended: false);
+        Check(IsoTpJ2534RawCanLink.Unpack(rawFd, 0x0010_0000,
+            true, false).Data.Length == 64,
+            "FD_CAN_FORMAT flag and raw DLC 64 accepted.");
+        Reject<InvalidDataException>(() =>
+            IsoTpJ2534RawCanLink.Unpack(rawFd, 0, true, false),
+            "Classical frame presented as CAN-FD without vendor FD flag refused.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            IsoTpJ2534RawCanLink.Pack(0x800,
+                [1, 2, 3], extended: false),
+            "J2534 11-bit arbitration ID overflow rejected.");
+
+        var fdCommand = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--fd", "true", "--tx-dl", "64",
+            "--brs", "true", "--data-baud", "2000000",
+            "--payload", "2EF19001"]);
+        Check(fdCommand.Settings.TxFrameLength == 64 &&
+            fdCommand.Settings.CanFd && fdCommand.Brs &&
+            fdCommand.DataBaud == 2000000 &&
+            fdCommand.Request.SequenceEqual(new byte[] {0x2E, 0xF1, 0x90, 1}),
+            "CLI negotiates FD bit-rate switching and accepts write UDS SID.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--brs", "true", "--payload", "22F190"]),
+            "BRS without actual vendor data-phase bitrate is not presented as operational.");
+
         return checkedCount;
     }
 }
