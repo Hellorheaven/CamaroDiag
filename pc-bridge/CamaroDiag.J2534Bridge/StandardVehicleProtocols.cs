@@ -327,12 +327,21 @@ internal static class DoIpCodec
     }
 
     internal static bool IsCorrelatedDiagnosticAck(Message response,
-        ushort testerAddress, ushort ecuAddress)
+        ushort testerAddress, ushort ecuAddress,
+        ReadOnlySpan<byte> request = default)
     {
         if (response.Type is not (DiagnosticPositiveAck or DiagnosticNegativeAck) ||
             response.Payload.Length < 5 ||
             BinaryPrimitives.ReadUInt16BigEndian(response.Payload) != ecuAddress ||
             BinaryPrimitives.ReadUInt16BigEndian(response.Payload.AsSpan(2)) != testerAddress)
+            return false;
+        // ISO 13400 may echo a prefix of the previous diagnostic user
+        // message after the ACK code. On a reused socket, do not accept an
+        // acknowledgement for a different outstanding diagnostic request.
+        var echoed = response.Payload.AsSpan(5);
+        if (request.Length != 0 &&
+            (echoed.Length > request.Length ||
+             !request.StartsWith(echoed)))
             return false;
         if (response.Type == DiagnosticNegativeAck)
             throw new IOException($"DoIP gateway negative ACK code 0x{response.Payload[4]:X2}.");
