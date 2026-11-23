@@ -16,6 +16,66 @@ internal static class UdsStandardServices
         [0x3E, suppressPositive ? (byte)0x80 : (byte)0x00];
     internal static byte[] ReadDid(ushort did) => [0x22, (byte)(did >> 8), (byte)did];
 
+    /// <summary>
+    /// ISO 14229 ReadDataByIdentifier supports several DIDs per request.
+    /// Response items contain no general-purpose length field, so use
+    /// DecodeDids with known per-DID payload lengths to correlate them.
+    /// </summary>
+    internal static byte[] ReadDids(IReadOnlyList<ushort> identifiers)
+    {
+        ArgumentNullException.ThrowIfNull(identifiers);
+        if (identifiers.Count is < 1 or > 2047 ||
+            identifiers.Distinct().Count() != identifiers.Count)
+            throw new ArgumentException(
+                "UDS multi-DID request needs 1–2047 distinct identifiers.");
+        var request = new byte[1 + identifiers.Count * 2];
+        request[0] = 0x22;
+        for (var i = 0; i < identifiers.Count; i++)
+            BinaryPrimitives.WriteUInt16BigEndian(
+                request.AsSpan(1 + i * 2, 2), identifiers[i]);
+        return request;
+    }
+
+    /// <summary>
+    /// Strict ISO 14229 0x62 multi-DID response parsing with caller-supplied
+    /// lengths. Rejects reordered, truncated and additional DID records.
+    /// Lengths are data bytes after the two-byte DID, not total record sizes.
+    /// </summary>
+    internal static IReadOnlyList<(ushort Did, byte[] Data)> DecodeDids(
+        ReadOnlySpan<byte> request, ReadOnlySpan<byte> response,
+        IReadOnlyList<int> dataLengths)
+    {
+        ArgumentNullException.ThrowIfNull(dataLengths);
+        if (request.Length < 3 || request[0] != 0x22 ||
+            (request.Length - 1) % 2 != 0 ||
+            dataLengths.Count != (request.Length - 1) / 2 ||
+            dataLengths.Any(length => length < 0 || length > 4095))
+            throw new ArgumentException(
+                "UDS response decoding needs a valid multi-DID request and lengths.");
+        if (response.Length < 3 || response[0] != 0x62)
+            throw new InvalidDataException("Wrong UDS multi-DID positive response.");
+        var offset = 1;
+        var decoded = new List<(ushort Did, byte[] Data)>(dataLengths.Count);
+        for (var i = 0; i < dataLengths.Count; i++)
+        {
+            var expectedDid = BinaryPrimitives.ReadUInt16BigEndian(
+                request.Slice(1 + 2 * i, 2));
+            var length = dataLengths[i];
+            if (response.Length - offset < 2 + length ||
+                BinaryPrimitives.ReadUInt16BigEndian(
+                    response.Slice(offset, 2)) != expectedDid)
+                throw new InvalidDataException(
+                    "UDS multi-DID response is truncated, reordered or belongs to another request.");
+            decoded.Add((expectedDid,
+                response.Slice(offset + 2, length).ToArray()));
+            offset += 2 + length;
+        }
+        if (offset != response.Length)
+            throw new InvalidDataException(
+                "UDS multi-DID response contains unexpected trailing records.");
+        return decoded;
+    }
+
     /// <summary>ISO 14229 ReadScalingDataByIdentifier, SID 0x24.</summary>
     internal static byte[] ReadScalingDid(ushort did) =>
         [0x24, (byte)(did >> 8), (byte)did];
