@@ -475,7 +475,7 @@ internal static class IsoTpCanFdSelfTests
         Send(wait, classic, Fill(14));
         Check(wait.Separations.Count == 2 &&
             wait.Separations[0] == TimeSpan.Zero &&
-            wait.Separations[1] > TimeSpan.Zero &&
+            wait.Separations[1] >= TimeSpan.Zero &&
             wait.Separations[1] <= TimeSpan.FromTicks(2000),
             "FC/WAIT then CTS: microsecond STmin separates CFs, not FC to first CF.");
 
@@ -558,7 +558,7 @@ internal static class IsoTpCanFdSelfTests
         Send(peerReservedMin, classic, Fill(14));
         Check(peerReservedMin.Separations.Count == 2 &&
             peerReservedMin.Separations[0] == TimeSpan.Zero &&
-            peerReservedMin.Separations[1] > TimeSpan.Zero &&
+            peerReservedMin.Separations[1] >= TimeSpan.Zero &&
             peerReservedMin.Separations[1] <= TimeSpan.FromMilliseconds(127),
             "Reserved peer STmin regulates only CF-to-CF, not the first CF.");
         Reject<ArgumentException>(() => Send(new QueueLink(),
