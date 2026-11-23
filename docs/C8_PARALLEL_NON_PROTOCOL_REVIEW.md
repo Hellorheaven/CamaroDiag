@@ -44,3 +44,11 @@
 **Validation :** une demande unique de campagne C4 Debug ciblée a été commitée sur le chemin prévu par GitHub Actions ; **aucun rapport d'exécution n'a pu être confirmé ici**. Le HEAD a encore changé depuis cette demande du fait des corrections et des travaux parallèles. Ces commits ne sont donc pas considérés comme validés par le simple dépôt de la demande. Une validation de l'exact HEAD stabilisé reste obligatoire avant fusion.
 
 **Dépendances non résolues :** la restauration physique C2, les transports standard de l'autre chat et la recette véhicule restent séparés de ces correctifs. Aucun merge, nouvelle branche ou écriture ECU physique.
+
+## C1 — audit d'exhaustivité de l'historique de console
+
+- La console **affiche actuellement les 300 derniers événements TX/RX/SYSTEM**, tandis que la capture brute RX peut être conservée intégralement dans un fichier distinct. L'ancien historique de transmission TX dépassant 300 entrées **n'est pas encore archivé**.
+- Les exports et l'écran l'indiquent désormais explicitement en FR/EN ; le type d'en-tête RX distingue un flux archivé intégral d'un simple extrait de la fenêtre mémoire. Contrôle spécifique des chaînes ajouté à `LocaleResourcesIntegrityTest`.
+- Test C1 supplémentaire : 6 000 lignes de capture divisées arbitrairement en fragments, soit plus que 128 Kio, restent intégralement écrites dans l'archive.
+- **Point bloquant de clôture de #59 :** journal chronologique persistant de tous les événements TX/RX/SYSTEM (sans dépendance aux protocoles standard), puis export de l'intégralité de ce journal avec le flux RX brut, avec contrôles d'erreurs d'E/S, tests longs et qualification physique.
+- Aucun test nouvellement commité n'est déclaré réussi à ce stade. La campagne C4 demandée auparavant ne prouve pas la validation des modifications suivantes du HEAD.
