@@ -4,3 +4,7 @@ Prior run #45114797774:
 - Android 466 tests: 464 passed, 2 failed (Java Properties contains checked values instead of keys for optional firmware OSID); corrected.
 - Android app compilation succeeded at preceding run; full targeted Android/Windows suites rechecked here.
 One grouped validation, no tests on individual commits, no ECU hardware qualification.
+
+Grouped completion checkpoint — C2 offline image size overflow correction
+Source before checkpoint: 6788763f95182bb853e8883d2be7c6d1f9ba40e3
+No physical ECU qualification, no merge.
