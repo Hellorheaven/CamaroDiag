@@ -16,6 +16,79 @@ internal static class UdsStandardServices
         [0x3E, suppressPositive ? (byte)0x80 : (byte)0x00];
     internal static byte[] ReadDid(ushort did) => [0x22, (byte)(did >> 8), (byte)did];
 
+    /// <summary>ISO 14229 ReadScalingDataByIdentifier, SID 0x24.</summary>
+    internal static byte[] ReadScalingDid(ushort did) =>
+        [0x24, (byte)(did >> 8), (byte)did];
+
+    /// <summary>
+    /// InputOutputControlByIdentifier SID 0x2F. Only the DID and the
+    /// caller-supplied standard/OEM controlOptionRecord are assembled here.
+    /// A write-like I/O control requires the full operator approval process.
+    /// </summary>
+    internal static byte[] ControlIo(ushort did,
+        ReadOnlySpan<byte> controlOptionRecord)
+    {
+        if (controlOptionRecord.Length is < 1 or > 4088)
+            throw new ArgumentOutOfRangeException(nameof(controlOptionRecord));
+        var frame = new byte[3 + controlOptionRecord.Length];
+        frame[0] = 0x2F;
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(1), did);
+        controlOptionRecord.CopyTo(frame.AsSpan(3));
+        return frame;
+    }
+
+    /// <summary>
+    /// ISO 14229 CommunicationControl SID 0x28, subfunction and
+    /// communicationType. Suppress-positive bit is preserved in the
+    /// requested subfunction exactly as supplied.
+    /// </summary>
+    internal static byte[] CommunicationControl(byte subFunction,
+        byte communicationType, ReadOnlySpan<byte> extraParameters = default)
+    {
+        if ((subFunction & 0x7F) > 3 ||
+            extraParameters.Length > 4088)
+            throw new ArgumentOutOfRangeException(nameof(subFunction));
+        var bytes = new byte[3 + extraParameters.Length];
+        bytes[0] = 0x28;
+        bytes[1] = subFunction;
+        bytes[2] = communicationType;
+        extraParameters.CopyTo(bytes.AsSpan(3));
+        return bytes;
+    }
+
+    /// <summary>
+    /// ISO 14229 ControlDTCSetting SID 0x85. OEM-defined records are
+    /// passed through unchanged, with no presumed authorization.
+    /// </summary>
+    internal static byte[] ControlDtcSetting(byte settingType,
+        ReadOnlySpan<byte> settingRecord = default)
+    {
+        if ((settingType & 0x7F) is not (1 or 2) ||
+            settingRecord.Length > 4090)
+            throw new ArgumentOutOfRangeException(nameof(settingType));
+        var frame = new byte[2 + settingRecord.Length];
+        frame[0] = 0x85;
+        frame[1] = settingType;
+        settingRecord.CopyTo(frame.AsSpan(2));
+        return frame;
+    }
+
+    /// <summary>
+    /// ReadDataByPeriodicIdentifier SID 0x2A. The caller must supply a
+    /// standardized transmission mode and at least one periodic DID byte.
+    /// </summary>
+    internal static byte[] ReadPeriodicData(byte transmissionMode,
+        ReadOnlySpan<byte> periodicIdentifiers)
+    {
+        if (periodicIdentifiers.Length is < 1 or > 4089)
+            throw new ArgumentOutOfRangeException(nameof(periodicIdentifiers));
+        var frame = new byte[2 + periodicIdentifiers.Length];
+        frame[0] = 0x2A;
+        frame[1] = transmissionMode;
+        periodicIdentifiers.CopyTo(frame.AsSpan(2));
+        return frame;
+    }
+
     internal static byte[] WriteDid(ushort did, ReadOnlySpan<byte> value)
     {
         if (value.Length is < 1 or > 4091 - 3)
