@@ -82,7 +82,9 @@ object EcuRestoreImage {
                 "Region image exceeds the in-memory assembler capacity"
             }
             val relevant = archive.captures
-                .filter { it.region == geometry.region }
+                .filter { it.region == geometry.region &&
+                    it.startAddress >= geometry.startAddress &&
+                    it.startAddress < geometry.startAddress + geometry.length }
                 .sortedBy { it.startAddress }
             require(relevant.isNotEmpty()) { "No ECU capture for requested memory region" }
             // Archive entries are bounded to 64 MiB; reject an oversized supplied map
