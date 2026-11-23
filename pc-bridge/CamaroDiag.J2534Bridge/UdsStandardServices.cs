@@ -242,6 +242,23 @@ internal static class UdsStandardServices
             if (response[i] != expected)
                 throw new InvalidDataException("Stale/misdirected UDS reply identifier.");
         }
+        if (request[0] == 0x19)
+        {
+            // ISO 14229 WWH-OBD subfunctions echo the functional group
+            // immediately after the subfunction. Ignoring it can attribute
+            // a safety/legislated group DTC to an emissions request.
+            if (request.Length >= 3 && request[1] is 0x42 or 0x55 or 0x56)
+            {
+                if (response.Length < 3 || response[2] != request[2])
+                    throw new InvalidDataException(
+                        "WWH-OBD response functional group does not match the request.");
+                if (request[1] == 0x56 &&
+                    (request.Length < 4 || response.Length < 6 ||
+                     response[5] != request[3]))
+                    throw new InvalidDataException(
+                        "WWH-OBD readiness group response is not correlated.");
+            }
+        }
         return response.ToArray();
     }
 }
