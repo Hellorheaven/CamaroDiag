@@ -127,6 +127,10 @@ internal static class DoIpCodec
     internal const ushort RoutingActivationResponse = 0x0006;
     internal const ushort AliveCheckRequest = 0x0007;
     internal const ushort AliveCheckResponse = 0x0008;
+    internal const ushort EntityStatusRequest = 0x4001;
+    internal const ushort EntityStatusResponse = 0x4002;
+    internal const ushort PowerModeRequest = 0x4003;
+    internal const ushort PowerModeResponse = 0x4004;
     internal const ushort DiagnosticMessage = 0x8001;
     internal const ushort DiagnosticPositiveAck = 0x8002;
     internal const ushort DiagnosticNegativeAck = 0x8003;
@@ -167,6 +171,29 @@ internal static class DoIpCodec
             throw new InvalidDataException("DoIP declared payload size is not the physical frame size.");
         return new Message(frame[0], BinaryPrimitives.ReadUInt16BigEndian(frame.AsSpan(2, 2)),
             frame.AsSpan(8).ToArray());
+    }
+
+    internal sealed record EntityStatus(byte NodeType, byte MaxSockets,
+        byte CurrentSockets, uint? MaxDataSize);
+
+    internal static EntityStatus ParseEntityStatus(Message response)
+    {
+        if (response.Type != EntityStatusResponse ||
+            response.Payload.Length is not (3 or 7) ||
+            response.Payload[0] > 1)
+            throw new InvalidDataException("Invalid DoIP entity status response.");
+        return new EntityStatus(response.Payload[0], response.Payload[1],
+            response.Payload[2], response.Payload.Length == 7 ?
+                BinaryPrimitives.ReadUInt32BigEndian(response.Payload.AsSpan(3, 4)) :
+                null);
+    }
+
+    internal static byte ParseDiagnosticPowerMode(Message response)
+    {
+        if (response.Type != PowerModeResponse ||
+            response.Payload.Length != 1 || response.Payload[0] > 2)
+            throw new InvalidDataException("Invalid DoIP diagnostic power mode response.");
+        return response.Payload[0]; // 0=not ready, 1=ready, 2=not supported
     }
 
     internal static byte[] RoutingActivation(ushort testerAddress, byte activationType = 0x00)
