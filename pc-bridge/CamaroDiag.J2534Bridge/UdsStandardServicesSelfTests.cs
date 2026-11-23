@@ -95,6 +95,34 @@ internal static class UdsStandardServicesSelfTests
             "3400448000100000000020", "RequestDownload");
         Equal(UdsStandardServices.RequestUpload(0x80001000, 0x20),
             "3500448000100000000020", "RequestUpload");
+        var downloadLimit = UdsStandardServices.DecodeTransferParameters(
+            0x34, [0x74, 0x20, 0x10, 0x02]);
+        Check(downloadLimit.MaxNumberOfBlockLength == 4098 &&
+            downloadLimit.LengthFieldBytes == 2 &&
+            downloadLimit.MaxDataBytes == 4096,
+            "UDS RequestDownload 0x74 interprets LFI big-endian block capacity.");
+        var uploadLimit = UdsStandardServices.DecodeTransferParameters(
+            0x35, [0x75, 0x10, 0x81]);
+        Check(uploadLimit.MaxNumberOfBlockLength == 129 &&
+            uploadLimit.MaxDataBytes == 127,
+            "UDS RequestUpload 0x75 uses same negotiated block-width semantics.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.DecodeTransferParameters(
+                0x34, [0x75, 0x10, 0x81]),
+            "Upload reply cannot be attributed to a pending download.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.DecodeTransferParameters(
+                0x34, [0x74, 0x21, 0x10, 0x02]),
+            "Reserved low nibble in UDS lengthFormatIdentifier rejected.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.DecodeTransferParameters(
+                0x34, [0x74, 0x20, 0x10]),
+            "Truncated maxNumberOfBlockLength cannot initiate block transfer.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.DecodeTransferParameters(
+                0x34, [0x74, 0x10, 0x02]),
+            "TransferData maximum must exceed its SID/counter overhead.");
+
         Equal(UdsStandardServices.TransferData(3, [0x10, 0x20]),
             "36031020", "TransferData block counter & payload");
         Equal(UdsStandardServices.TransferExit([0xAA, 0xBB]),
