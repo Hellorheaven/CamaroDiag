@@ -119,6 +119,12 @@ internal static class StandardProtocolCli
         var stMin = byte.Parse(Optional(args, "--stmin") ?? "0",
             CultureInfo.InvariantCulture);
         var extended = bool.Parse(Optional(args, "--extended") ?? "false");
+        // --extended selects 29-bit CAN IDs. These separate options select
+        // ISO 15765-2 extended addressing with a one-byte address prefix.
+        var txAddress = Optional(args, "--tx-address") is string txAddressText ?
+            checked((byte)Number(txAddressText)) : (byte?)null;
+        var rxAddress = Optional(args, "--rx-address") is string rxAddressText ?
+            checked((byte)Number(rxAddressText)) : (byte?)null;
         var brs = bool.Parse(Optional(args, "--brs") ?? "false");
         var dataBaud = Optional(args, "--data-baud") is string rate ?
             Number(rate) : (uint?)null;
@@ -130,7 +136,8 @@ internal static class StandardProtocolCli
             throw new ArgumentException("Supply exactly one of --payload or --payload-file.");
         var bytes = payloadFile is null ?
             Convert.FromHexString(hexPayload!) : File.ReadAllBytes(payloadFile);
-        var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd, bs, stMin);
+        var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
+            bs, stMin, TxAddress: txAddress, RxAddress: rxAddress);
         setting.Validate();
         if (index < 0 || bitrate == 0 || timeout is < 100 or > 30000 ||
             bytes.Length is < 1 or > IsoTpCanFdSession.MaximumPayloadBytes ||
@@ -153,6 +160,8 @@ internal static class StandardProtocolCli
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
             if (!Confirm($"ISO-TP {(o.Settings.CanFd ? "CAN FD" : "CAN")} " +
                 $"TX=0x{o.Settings.TxId:X} RX=0x{o.Settings.RxId:X}, " +
+                $"TX address={o.Settings.TxAddress?.ToString("X2") ?? "normal"} " +
+                $"RX address={o.Settings.RxAddress?.ToString("X2") ?? "normal"}, " +
                 $"payload={Convert.ToHexString(o.Request)}"))
                 return 2;
             // The RAW CAN/FD_CAN channel is required: J2534 ISO15765 already
