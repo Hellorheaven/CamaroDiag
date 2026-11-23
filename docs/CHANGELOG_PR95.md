@@ -389,3 +389,6 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 
 
 - ISO 14229 / OBDonUDS : lecture standard d'instantanés DTC `19 04`, avec DTC 24 bits et numéro de record explicites, octets DID conservés bruts, refus des réponses d'un autre DTC et tests sur ISO-TP / DoIP. Aucune écriture induite ; tests non exécutés.
+
+
+- Complément ISO 14229 / SAE J1979-2 : sous-fonction DTC étendue `0x19/0x06`, numéro d'enregistrement explicite ou `FE` pour les enregistrements législatifs, conservation de la charge utile non interprétée, validation de DTC et tests ISO-TP/DoIP (non exécutés).
