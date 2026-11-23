@@ -1281,17 +1281,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnectSelectedAdapter() {
         val attempt = nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
-        val pendingConnection = connectionAttemptJob
-        pendingConnection?.cancel()
-        viewModelScope.launch {
+        val previousAttempt = connectionAttemptJob
+        previousAttempt?.cancel()
+        // Register the disconnect itself as the active transition. A subsequent
+        // connection must cancel/join this cleanup before opening new hardware.
+        connectionAttemptJob = viewModelScope.launch {
             beginBusyOperation()
             try {
+                previousAttempt?.join()
+                if (attempt != connectionAttemptGeneration) return@launch
                 val activeMonitor = canMonitorJob
                 val activeRequest = detachCanRequest()
                 stopCanMonitor()
                 val detachedMonitor = detachedCanMonitorJob
                 val detachedRequest = detachedCanRequestJob
-                pendingConnection?.join()
                 activeMonitor?.join()
                 activeRequest?.join()
                 detachedMonitor?.join()
@@ -1315,35 +1318,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun disconnectJ2534Bridge() {
-        val attempt = nextConnectionGeneration()
-        invalidateFuelHistoryForConnectionChange()
-        val pendingConnection = connectionAttemptJob
-        pendingConnection?.cancel()
-        // Keep the cancelled handshake joinable by a subsequent connection.
-        viewModelScope.launch {
-            val activeMonitor = canMonitorJob
-            val activeRequest = detachCanRequest()
-            stopCanMonitor()
-            val detachedMonitor = detachedCanMonitorJob
-            val detachedRequest = detachedCanRequestJob
-            pendingConnection?.join()
-            activeMonitor?.join()
-            activeRequest?.join()
-            detachedMonitor?.join()
-            detachedRequest?.join()
-            // A replacement adapter may have been requested while we waited.
-            if (attempt != connectionAttemptGeneration) return@launch
-            obdManager.disconnect()
-            markAdapterDisconnected()
-            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                isJ2534BridgeConnecting = false,
-                isJ2534BridgeConnected = false,
-                isJ2534MemoryReadAvailable = false,
-                j2534BridgeMessage = localizedContext.getString(R.string.vm_pc_bridge_disconnected)
-            )
-        }
-    }
+    /** The bridge uses the same serialized teardown as USB, BLE and Wi-Fi. */
+    fun disconnectJ2534Bridge() = disconnectSelectedAdapter()
 
     /**
      * Runs two REAL ECU memory reads through a connected J2534 PC bridge, then
