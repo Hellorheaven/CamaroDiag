@@ -122,7 +122,15 @@ internal static class StandardProtocolCli
         if (request.Length == 3 && request[0] == 0x22)
         {
             var did = (ushort)(request[1] << 8 | request[2]);
-            if (ObdOnUdsServices.IsEmissionsDataDid(did) &&
+            if (did == ObdOnUdsServices.ProtocolIdentificationDid &&
+                response.Length > 0 && response[0] == 0x62)
+            {
+                var identification =
+                    ObdOnUdsServices.DecodeProtocolIdentification(response);
+                Console.WriteLine($"OBDonUDS protocol F810=0x{identification.Value:X2} " +
+                    $"OBDonUDS={(identification.IsObdOnUds ? "identified" : "not confirmed")}");
+            }
+            else if (ObdOnUdsServices.IsEmissionsDataDid(did) &&
                 response.Length > 0 && response[0] == 0x62)
             {
                 var raw = ObdOnUdsServices.DecodeReadDid(did, response);
@@ -554,16 +562,20 @@ internal static class StandardProtocolCli
         var payloadFile = Optional(args, "--payload-file");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
+        var obdIdentify = args.Contains("--obd-identify",
+            StringComparer.OrdinalIgnoreCase);
         var payloadSources = (hexPayload is null ? 0 : 1) +
             (payloadFile is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
-            (obdDtcMask is null ? 0 : 1);
+            (obdDtcMask is null ? 0 : 1) +
+            (obdIdentify ? 1 : 0);
         if (mode is not ("exchange" or "receive") ||
             (mode == "exchange" && payloadSources != 1) ||
             (mode == "receive" && payloadSources != 0))
             throw new ArgumentException(
                 "Exchange needs exactly one payload, file, OBD DID or DTC mask; receive mode accepts none.");
         byte[] bytes = mode == "receive" ? Array.Empty<byte>() :
+            obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
             obdDid is not null ? ObdOnUdsServices.ReadEmissionsData(
                 checked((ushort)ParseCanId(obdDid))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
@@ -709,11 +721,15 @@ internal static class StandardProtocolCli
         var hexPayload = Optional(args, "--payload");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
+        var obdIdentify = args.Contains("--obd-identify",
+            StringComparer.OrdinalIgnoreCase);
         if ((hexPayload is null ? 0 : 1) + (obdDid is null ? 0 : 1) +
-            (obdDtcMask is null ? 0 : 1) != 1)
+            (obdDtcMask is null ? 0 : 1) +
+            (obdIdentify ? 1 : 0) != 1)
             throw new ArgumentException(
                 "Supply exactly one of --payload, --obd-did or --obd-dtc-mask.");
-        var bytes = obdDid is not null ? ObdOnUdsServices.ReadEmissionsData(
+        var bytes = obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
+            obdDid is not null ? ObdOnUdsServices.ReadEmissionsData(
                 checked((ushort)uint.Parse(
                     obdDid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
                         obdDid[2..] : obdDid,
