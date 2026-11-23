@@ -457,3 +457,10 @@ L'interface n'affiche déjà plus le bouton de capture physique CDJ/1 non implé
 - **C6 toujours actif :** préservation de la double confirmation d'écriture et des contrôles constructeurs, sans blocage arbitraire de commandes CAN valides.
 - Tests ajoutés ; fonctionnement matériel et compilation au HEAD final encore à confirmer.
 
+
+## Sauvegarde ECU et affichage des mesures — 23 novembre 2026 (soir)
+
+- La préparation d'une image ECU signale maintenant les adresses absentes ou non confirmées par une double lecture avant de produire un paquet hors ligne. Cela concerne la **carte fournie**, pas encore la totalité démontrée d'un ECU réel.
+- Un relevé d'éthanol ancien est clairement distingué d'une mesure actuellement disponible ; avertissement FR/EN dans l'atelier et tests associés.
+- C6 reste ouvert sans verrouillage artificiel d'écriture. Les validations matérielles, le calcul Seed/Key selon les familles ECU et la vraie récupération après flash restent à qualifier.
+
