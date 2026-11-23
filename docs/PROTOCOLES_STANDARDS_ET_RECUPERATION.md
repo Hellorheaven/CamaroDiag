@@ -161,3 +161,7 @@ Les requêtes PGN peuvent recevoir une réponse standard **ACKM** (PGN 0xE800) p
 ### DoIP — écoute passive des annonces
 
 `CamaroDiag.J2534Bridge.exe --doip-discover --listen true --timeout-ms 5000` écoute les annonces ISO 13400 UDP sur le port local 13400, pour une durée bornée, **sans émettre de paquet de découverte ni commande diagnostique**. L'écoute accepte jusqu'à 32 identités distinctes, ignore les paquets malformés, et exige que ce port UDP soit libre et autorisé par le pare-feu. L'absence de réponse ne signifie pas qu'aucun véhicule DoIP n'existe : toutes les passerelles n'annoncent pas spontanément leur présence. Les annonces restent non authentifiées et les essais réseau réels restent à faire.
+
+### Invariant du mode J2534 sans émission
+
+La commande `--j2534-standard --mode receive` interdit également `--kline-init` : `FIVE_BAUD_INIT` et `FAST_INIT` sont des actions de signalisation physique qui pourraient transmettre malgré l'absence de `--data`. Pour initialiser K-Line, sélectionner explicitement une transaction avec consentement opérateur ; ne pas assimiler l'ouverture d'un canal passif à la création d'une session K-Line prête à diagnostiquer.
