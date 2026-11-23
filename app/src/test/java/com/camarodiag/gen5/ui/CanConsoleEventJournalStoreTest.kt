@@ -113,6 +113,31 @@ class CanConsoleEventJournalStoreTest {
         }
     }
 
+    @Test fun sameSizeJournalTamperingInvalidatesChecksumAndDisablesExport() {
+        val directory = Files.createTempDirectory("console-same-size-tamper").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            store.append(listOf(event(0), event(1)))
+            val snapshot = requireNotNull(store.snapshot())
+            assertEquals(64, snapshot.sha256.length)
+            assertTrue(store.isCurrent(snapshot))
+            java.io.RandomAccessFile(snapshot.file, "rw").use { file ->
+                val originalSize = file.length()
+                file.seek(10L)
+                val previous = file.readUnsignedByte()
+                file.seek(10L)
+                file.writeByte(previous xor 0x01)
+                assertEquals(originalSize, file.length())
+            }
+            assertFalse(store.isCurrent(snapshot))
+            assertTrue(store.hasFailed())
+            assertNull(store.snapshot())
+            assertTrue(runCatching { store.append(listOf(event(2))) }.isFailure)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun deletedFileFailsNextAppendWithoutCreatingSilentHistory() {
         val directory = Files.createTempDirectory("console-deleted-on-append").toFile()
         try {
