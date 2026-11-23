@@ -74,20 +74,34 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 tester, ecu, protocolVersion);
             await session.SendAsync(DoIpCodec.RoutingActivation(
                 tester, version: protocolVersion), deadline.Token);
-            DoIpCodec.Message routing;
-            do
+            // Code 0x11 is a pending vehicle-side confirmation, not a
+            // registered diagnostic routing state. Keep waiting within
+            // the original connection deadline for code 0x10.
+            var pendingConfirmation = false;
+            while (true)
             {
-                routing = await session.ReceiveAsync(deadline.Token);
+                var routing = await session.ReceiveAsync(deadline.Token);
+                DoIpCodec.RequireNoGenericNack(routing);
+                if (routing.Version != protocolVersion)
+                    throw new InvalidDataException(
+                        "DoIP gateway routing response changed protocol version.");
                 if (routing.Type == DoIpCodec.AliveCheckRequest)
+                {
                     await session.SendAsync(DoIpCodec.ReplyToAliveCheck(
                         routing, tester), deadline.Token);
+                    continue;
+                }
+                var status = DoIpCodec.ReadRoutingActivationCode(routing, tester);
+                if (status == 0x11)
+                {
+                    pendingConfirmation = true;
+                    continue;
+                }
+                DoIpCodec.RequireRoutingActive(routing, tester);
+                if (pendingConfirmation)
+                    Console.WriteLine("DoIP vehicle confirmation received; routing is now active.");
+                break;
             }
-            while (routing.Type == DoIpCodec.AliveCheckRequest);
-            DoIpCodec.RequireNoGenericNack(routing);
-            if (routing.Version != protocolVersion)
-                throw new InvalidDataException(
-                    "DoIP gateway routing response used an unexpected protocol version.");
-            DoIpCodec.RequireRoutingActive(routing, tester);
             return session;
         }
         catch
