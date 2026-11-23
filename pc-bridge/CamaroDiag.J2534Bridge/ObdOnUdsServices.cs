@@ -127,6 +127,41 @@ internal static class ObdOnUdsServices
         UdsStandardServices.ReadDtc(0x56,
             [EmissionsFunctionalGroup, readinessGroup]);
 
+    /// <summary>
+    /// ISO 14229 0x19/0x04 DTC snapshot. Snapshot DID payload lengths
+    /// require the specific ECU data definitions and are kept raw.
+    /// </summary>
+    internal static byte[] ReadDtcSnapshot(uint dtc, byte recordNumber)
+    {
+        if (dtc > 0xFFFFFF || recordNumber == 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(dtc), "DTC must fit 24 bits and record must be 1..255.");
+        return UdsStandardServices.ReadDtc(0x04,
+            [(byte)(dtc >> 16), (byte)(dtc >> 8),
+             (byte)dtc, recordNumber]);
+    }
+
+    internal sealed record SnapshotReply(uint Dtc, byte Status,
+        byte[] RawSnapshotRecords);
+
+    internal static SnapshotReply DecodeDtcSnapshot(
+        uint expectedDtc, ReadOnlySpan<byte> reply)
+    {
+        if (expectedDtc > 0xFFFFFF || reply.Length < 6 ||
+            reply[0] != 0x59 || reply[1] != 0x04)
+            throw new InvalidDataException(
+                "Invalid UDS DTC snapshot response header.");
+        var dtc = (uint)reply[2] << 16 |
+            (uint)reply[3] << 8 | reply[4];
+        if (dtc != expectedDtc)
+            throw new InvalidDataException(
+                "DTC snapshot response belongs to another fault code.");
+        return new SnapshotReply(dtc, reply[5],
+            reply[6..].ToArray());
+    }
+
+
+
     internal sealed record WwhReadinessReport(byte ReadinessGroup,
         WwhDtcReport DtcReport);
 
