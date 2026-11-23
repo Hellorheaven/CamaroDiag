@@ -27,6 +27,7 @@ object EcuRestorePortableBundle {
 
     fun export(packageDirectory: File, output: OutputStream) {
         val verified = EcuRestorePackage.open(packageDirectory)
+        val originalIndex = File(packageDirectory, "index.ecu-package").readBytes()
         val names = verified.regions.indices.map { "region-$it.ecu-image" } +
             "index.ecu-package"
         ZipOutputStream(output).use { zip ->
@@ -60,16 +61,22 @@ object EcuRestorePortableBundle {
                     "ECU restore package source changed during ZIP export"
                 }
             }
-            // Re-read signed-by-content metadata and each region image after
-            // export, comparing with the independent pre-export verification.
-            val reopened = EcuRestorePackage.open(packageDirectory)
-            check(reopened.identity == verified.identity &&
-                reopened.regions.size == verified.regions.size &&
-                reopened.regions.zip(verified.regions).all { (now, before) ->
-                    now.geometry == before.geometry &&
-                        now.bytes().contentEquals(before.bytes())
-                }) {
-                "ECU restore package changed after initial verification"
+            // Revalidate one region at a time: two complete 256 MiB image
+            // collections could otherwise exhaust mobile application memory.
+            check(File(packageDirectory, "index.ecu-package")
+                .readBytes().contentEquals(originalIndex)) {
+                "ECU restore package index changed after initial verification"
+            }
+            verified.regions.forEachIndexed { index, expected ->
+                val now = EcuRestoreImageFile.load(
+                    File(packageDirectory, "region-$index.ecu-image")
+                )
+                check(now.identity == verified.identity &&
+                    now.image.geometry == expected.geometry &&
+                    now.image.sha256 == expected.sha256 &&
+                    now.image.bytes().contentEquals(expected.bytes())) {
+                    "ECU restore package region changed after initial verification"
+                }
             }
         }
     }
