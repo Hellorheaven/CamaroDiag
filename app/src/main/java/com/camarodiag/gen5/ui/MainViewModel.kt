@@ -2372,6 +2372,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             )
                         ))
                     }
+                    recordConsoleEvents(displayedReceivedEvents)
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
@@ -2399,6 +2400,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 succeeded = timed.record.succeeded
                             )
                         }
+                    recordConsoleEvents(receivedEvents)
                     // A cancelled TX stays pending/unsuccessful. Old vehicle jobs
                     // cannot reach this branch after detachCanRequest().
                     _liveCanMonitorState.value = current.copy(
@@ -2435,6 +2437,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         content = errorMessage,
                         succeeded = false
                     )
+                    recordConsoleEvents(receivedEvents + errorEvent)
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
@@ -2519,6 +2522,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         },
                         succeeded = hasEcuResponse
                     )
+                    recordConsoleEvents(listOf(responseEvent))
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (
@@ -2547,6 +2551,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         content = localizedContext.getString(R.string.can_sniffer_request_failed),
                         succeeded = false
                     )
+                    recordConsoleEvents(listOf(errorEvent))
                     _liveCanMonitorState.value = current.copy(
                         isSendingRequest = false,
                         consoleHistory = (current.consoleHistory.map { if (it.id == txEvent.id) it.copy(succeeded = false) else it } + errorEvent).takeLast(300),
@@ -2565,7 +2570,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun canExportCanCapture(): Boolean {
         val state = _liveCanMonitorState.value
         val archive = activeCanCaptureFile?.takeIf { it.isFile }
-        return CanConsoleExportPolicy.canExport(
+        return !consoleEventJournalFailed &&
+            CanConsoleExportPolicy.canExport(
             isCapturing = state.isCapturing,
             archiveFailed = state.rawArchiveFailed,
             hasHistory = state.consoleHistory.isNotEmpty(),
