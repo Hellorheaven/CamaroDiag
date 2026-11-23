@@ -75,4 +75,30 @@ class EcuRestoreImageTest {
             )
         }.isFailure)
     }
+    @Test fun disjointRegionsOfSameMemoryTypeCanBeAssembledIndependently() {
+        val archive = verifiedArchive(listOf(
+            segment(0x1000, 1, 2), segment(0x2000, 3, 4)
+        ))
+        val images = EcuRestoreImage.assemble(
+            archive, listOf(
+                EcuRestoreImage.MemoryRegion(region, 0x1000, 2),
+                EcuRestoreImage.MemoryRegion(region, 0x2000, 2)
+            )
+        )
+        assertEquals(2, images.size)
+        assertArrayEquals(byteArrayOf(1, 2), images[0].bytes())
+        assertArrayEquals(byteArrayOf(3, 4), images[1].bytes())
+    }
+
+    @Test fun validSubregionCannotSilentlyDiscardCapturedBytes() {
+        val archive = verifiedArchive(listOf(
+            segment(0x1000, 1, 2), segment(0x2000, 3, 4)
+        ))
+        assertTrue(runCatching {
+            EcuRestoreImage.assemble(
+                archive, listOf(EcuRestoreImage.MemoryRegion(region, 0x1000, 2))
+            )
+        }.isFailure)
+    }
+
 }
