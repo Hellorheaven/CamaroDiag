@@ -1,3 +1,14 @@
+# Résultat de la campagne C6 regroupée — 23/11/2026
+
+- **HEAD de code testé :** `690180812c38e7f324df7715a9427132a5c5fb60`, [GitHub Actions #45275140467](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45275140467), **success** sur les 2 jobs.
+- **Windows/J2534 :** Debug `-warnaserror`, garde C6 anti-verrou artificiel et autotests du pont **réussis**, **1 618 self-tests hardware-free** recensés dans le journal.
+- **Android :** `:communication:testDebugUnitTest :diagnostic:testDebugUnitTest :app:testDebugUnitTest --warning-mode=fail` **réussi**. Les deux défauts révélés dans le run précédent sont corrigés : compteur de contexte C6 et libération du writer d'archive CAN après `flush` échoué C1.
+- **Écriture et console :** double consentement OK puis Oui/Non, revalidation utilisateur/compte/adaptateur/véhicule juste avant émission DTC et CAN brute, y compris pont TLS J2534. Aucune restriction OEM artificielle.
+- **Limites :** pas de preuve d'essai physique de trame CAN, d'écriture sur ECU réel, de sauvegarde/restauration intégralement qualifiée ni de programmation d'un boîtier prototype. C2/C6 restent ouverts côté matériel et récupération, C4 lecture seule, C8 global/merge encore ouvert. Ce checkpoint **n'est pas une qualification complète Release ni un merge**.
+- Cette mise à jour documentaire ultérieure à `6901808` ne change aucun code exécuté dans la campagne. Garder la **PR #95** unique et la branche `chore/unified-ci`; l'autre chat traite les protocoles. Pont Linux : future issue #115.
+
+---
+
 # Correctifs C1/C6 après le premier checkpoint C6 du 23/11/2026
 
 - Premier checkpoint [#45274227208](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45274227208), SHA `d2ac70f` : **Windows/J2534 success**, Android compilé mais `:communication:testDebugUnitTest` a échoué **2/574 tests**, sur `EcuWriteConsentFlowTest.operatorAuthorizationIsRecheckedWhenQueuedWriteActuallyStarts` et `CanConsoleRawArchiveWriterTest.failedFlushMakesArchivePermanentlyIncomplete`. **Aucun statut vert global** sur cette campagne.
