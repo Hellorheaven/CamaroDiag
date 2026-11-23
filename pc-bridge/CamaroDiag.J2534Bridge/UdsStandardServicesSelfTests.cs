@@ -157,6 +157,26 @@ internal static class UdsStandardServicesSelfTests
             "194233FF08", "OBDonUDS confirmed emission DTCs use WWH 0x42.");
         Equal(ObdOnUdsServices.ReadWwhEmissionsDtcs(0x04, 0x80),
             "1942338004", "WWH DTC requests retain explicit severity and pending masks.");
+        Equal(ObdOnUdsServices.ReadWwhReadinessGroup(0x06),
+            "19563306", "OBDonUDS readiness-group query uses UDS 0x19 0x56.");
+        var readiness = ObdOnUdsServices.DecodeWwhReadinessGroup(
+            [0x59, 0x56, 0x33, 0xFF, 0x04, 0x06,
+             0x12, 0x34, 0x56, 0x08]);
+        Check(readiness.ReadinessGroup == 0x06 &&
+            readiness.DtcReport.FunctionalGroup == 0x33 &&
+            readiness.DtcReport.DtcFormatIdentifier == 4 &&
+            readiness.DtcReport.Codes.Count == 1 &&
+            readiness.DtcReport.Codes[0].Code == 0x123456 &&
+            readiness.DtcReport.Codes[0].Status == 0x08,
+            "WWH readiness DTC reply decodes 24-bit code and status.");
+        Check(ObdOnUdsServices.DecodeWwhReadinessGroup(
+            [0x59, 0x56, 0x33, 0xFF, 0x04, 0x06])
+                .DtcReport.Codes.Count == 0,
+            "WWH readiness report with no DTC does not fabricate a fault.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeWwhReadinessGroup(
+                [0x59, 0x56, 0x33, 0xFF, 0x04, 0x06, 0x12]),
+            "Partial WWH readiness DTC record rejected.");
         Equal(ObdOnUdsServices.ReadWwhPermanentEmissionsDtcs(),
             "195533", "Permanent WWH emission DTC request uses 0x55 and group 0x33.");
         var wwh = ObdOnUdsServices.DecodeWwhEmissionsDtcs(
