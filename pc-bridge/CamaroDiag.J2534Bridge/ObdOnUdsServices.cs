@@ -285,6 +285,34 @@ internal static class ObdOnUdsServices
         UdsStandardServices.ReadDtc(0x02, [statusMask]);
 
     /// <summary>
+    /// Correlate a 0x19/0x02 reply with the exact status mask sent by this
+    /// client. ISO 14229 matches any selected status bit supported by the
+    /// ECU; codes with no matching bit are not evidence for the requested
+    /// query. This does not infer DTC semantics or approve ECU operations.
+    /// </summary>
+    internal static DtcStatusReport DecodeDtcByStatusMask(
+        byte requestedStatusMask, ReadOnlySpan<byte> reply)
+    {
+        var report = DecodeDtcByStatusMask(reply);
+        var effectiveMask = (byte)(requestedStatusMask & report.AvailabilityMask);
+        var seen = new HashSet<uint>();
+        foreach (var code in report.Codes)
+        {
+            if ((code.Status & effectiveMask) == 0)
+                throw new InvalidDataException(
+                    "UDS DTC response contains a code outside the requested available status mask.");
+            if ((code.Status & ~report.AvailabilityMask) != 0)
+                throw new InvalidDataException(
+                    "UDS DTC response uses a status bit the ECU reports unavailable.");
+            if (!seen.Add(code.Code))
+                throw new InvalidDataException(
+                    "UDS DTC response repeats the same DTC in one result.");
+        }
+        return report;
+    }
+
+
+    /// <summary>
     /// ISO 14229 ReadDTCInformation reportDTCByStatusMask positive response:
     /// 0x59 0x02 availability-mask then repeated 3-byte DTC + status.
     /// Do not interpret manufacturer-specific DTC numbers as known faults.

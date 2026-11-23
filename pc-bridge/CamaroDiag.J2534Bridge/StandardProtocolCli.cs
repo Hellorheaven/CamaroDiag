@@ -451,7 +451,7 @@ internal static class StandardProtocolCli
         else if (request.Length == 3 && request[0] == 0x19 &&
             request[1] == 0x02 && response.Length > 0 && response[0] == 0x59)
         {
-            var report = ObdOnUdsServices.DecodeDtcByStatusMask(response);
+            var report = ObdOnUdsServices.DecodeDtcByStatusMask(request[2], response);
             Console.WriteLine($"UDS DTC available-mask=0x{report.AvailabilityMask:X2} " +
                 $"count={report.Codes.Count}");
             foreach (var dtc in report.Codes)

@@ -1,3 +1,7 @@
+# Tranche J1979-2 / OBDonUDS DTC — 23/11/2026
+
+Ajout d'une validation de corrélation sur réponse ISO 14229 19/02 avec masque de statut effectivement demandé, filtrage des entrées incohérentes et doublons, branchement CLI CAN/DoIP et tests offline `ObdOnUdsDtcStatusSelfTests` (non lancés). Même branche PR #95, aucune CI ni essai ECU, aucun merge. Garder distinctions pile logicielle / VCI / flash physique.
+
 # Tranche protocoles SAE J1979 classique — 23/11/2026
 
 PR #95 / branche `chore/unified-ci` / chantier #110 : extension offline du décodeur PID Mode 01/02 avec 35 nouvelles formules standard (pressions, évaporation signée, EGR, charge, catalyseurs, ratio, couple et temporisations), tests négatifs de taille et de freeze-frame. Aucune CI, compilation, essai véhicule ou validation matérielle sur cette tranche ; ne pas confondre décodeur et ECU pris en charge. Le chantier reste ouvert, matrice et protocole suivant à établir après revue. Ne pas merger/créer d'autre branche ou PR.
