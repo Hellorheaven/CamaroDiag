@@ -2000,6 +2000,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     succeeded = false
                 )
             }
+            var captureArchive: CanConsoleRawArchiveWriter? = null
             try {
                 // A quickly cancelled or superseded session must not create or claim a new archive.
                 if (canMonitorJob !== monitorJob || !currentCoroutineContext().isActive) return@launch
@@ -2016,6 +2017,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (error: java.io.IOException) {
                     throw CanCaptureArchiveWriteException(error)
                 }
+                captureArchive = archiveStream
                 val captured = archiveStream.use { writer ->
                     obdManager.captureCanMonitor(durationMs, can29Bit) { chunk ->
                     if (canMonitorJob === monitorJob) {
@@ -2094,6 +2096,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         rawText = raw,
                         report = report,
                         message = stoppedEvent.content,
+                        rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterStop(
+                            current.rawArchiveFailed,
+                            captureArchive?.isComplete == true
+                        ),
                         consoleHistory = (current.consoleHistory + trailingEvents + stoppedEvent).takeLast(300),
                         observedCanIds = retainObservedCanIds(current.observedCanIds, trailingEvents)
                     )
