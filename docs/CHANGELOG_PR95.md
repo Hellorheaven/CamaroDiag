@@ -178,3 +178,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Tests sur trame directe rembourrée, deux DTC multipaquets et absence de codes ajoutés ; **non exécutés**.
 
 - Correction J1939 DM : lorsque le bit CM indique une méthode ancienne, conserver le DTC brut (4 octets) et afficher SPN « undecoded » au lieu de calculer un SPN selon la méthode moderne ; test de régression ajouté. La méthode ancienne doit encore être qualifiée selon l'ECU et la documentation SAE.
+
+## C1 — journal persistant unifié (travail en cours, 23/11/2026)
+
+- Ajout du composant `CanConsoleEventJournalWriter` pour consigner dans l'ordre TX/RX/SYSTEM, sans limite mémoire de 300 événements, avec en-tête CSV, numéro de séquence, horodatage et état de réponse.
+- Tests ajoutés pour 600 événements, échappement des contenus multilignes, refus après erreur disque et échec de fermeture.
+- Commits : `f493b97`, `03daf32` ; **tests non exécutés** à ce stade. Composant **non raccordé à l'interface ni à la sauvegarde persistante** : ne pas présenter l'archivage intégral TX/RX/SYSTEM comme livré. Les protocoles restent pris en charge par l'autre chantier.
