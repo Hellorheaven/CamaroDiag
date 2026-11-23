@@ -440,6 +440,7 @@
     <string name="msg_live_recording_stopped">Recording stopped because OBD communication failed. Recent samples remain exportable.</string>
     <string name="msg_live_recording_started">Recording in progress. Sample count: %1$d.</string>
     <string name="msg_wifi_connection_failed">Wi-Fi OBD connection failed</string>
+    <string name="msg_usb_permission_pending">USB access requested. Allow permission in the Android dialog, then tap Connect again.</string>
     <string name="msg_usb_connection_failed">USB OBD connection failed</string>
     <string name="msg_bluetooth_connection_failed">Bluetooth SPP connection failed</string>
     <string name="mileage_audit_not_run">Audit not run</string>
