@@ -162,6 +162,32 @@ internal static class StandardVehicleProtocolsSelfTests
             DoIpCodec.Encode(DoIpCodec.DiagnosticMessage, identityBytes),
             discoveryAddress), "Diagnostic DoIP packet cannot masquerade as discovery.");
 
+        var statusRequest = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.EntityStatusRequest, []));
+        Check(statusRequest.Type == 0x4001 &&
+            statusRequest.Payload.Length == 0,
+            "DoIP UDP entity status request has no payload.");
+        var entityResponse = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.EntityStatusResponse, [0x00, 0x04, 0x02, 0, 0, 0x10, 0x00]));
+        var entity = DoIpCodec.ParseEntityStatus(entityResponse);
+        Check(entity.NodeType == 0 && entity.MaxSockets == 4 &&
+            entity.CurrentSockets == 2 && entity.MaxDataSize == 4096,
+            "DoIP entity status exposes gateway type and socket/data limits.");
+        Check(DoIpCodec.ParseEntityStatus(DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.EntityStatusResponse, [1, 2, 1]))).MaxDataSize is null,
+            "DoIP entity status supports optional max-data-size field.");
+        Reject<InvalidDataException>(() => DoIpCodec.ParseEntityStatus(
+            DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.EntityStatusResponse, [0, 4, 2, 1]))),
+            "DoIP malformed entity status size refused.");
+        Check(DoIpCodec.ParseDiagnosticPowerMode(DoIpCodec.Decode(
+            DoIpCodec.Encode(DoIpCodec.PowerModeResponse, [1]))) == 1,
+            "DoIP diagnostic power-mode ready state decoded.");
+        Reject<InvalidDataException>(() => DoIpCodec.ParseDiagnosticPowerMode(
+            DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.PowerModeResponse, [3]))),
+            "DoIP unknown diagnostic power-mode code is not reported ready.");
+
         var aliveRequest = DoIpCodec.Decode(DoIpCodec.Encode(
             DoIpCodec.AliveCheckRequest, [], version: 0x03));
         var aliveReply = DoIpCodec.Decode(
