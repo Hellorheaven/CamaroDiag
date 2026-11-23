@@ -69,4 +69,26 @@ class Lfx2012FuelHistoryWindowTest {
         assertEquals(1, snapshot.size)
         assertTrue(window.copySamples().isEmpty())
     }
+    @Test fun differentAdapterSourceIsRejectedWithoutCorruptingPriorHistory() {
+        val window = Lfx2012FuelHistoryWindow()
+        window.append(identity, observation(1L, 0))
+        val wrongSource = identity.copy(source = Lfx2012FuelReadOnly.Source.J2534)
+        assertTrue(runCatching {
+            window.append(wrongSource, observation(2L, 128))
+        }.isFailure)
+        assertEquals(1, window.reportOrNull()!!.count)
+        assertEquals(identity, window.reportOrNull()!!.session)
+    }
+
+    @Test fun repeatedTimestampStartsNewSeriesRatherThanMergingSamples() {
+        val window = Lfx2012FuelHistoryWindow()
+        window.append(identity, observation(100L, 0))
+        val report = window.append(identity, observation(100L, 255))
+        assertEquals(1, report.count)
+        assertEquals(100.0, report.readings.first {
+            it.pid == Lfx2012FuelReadOnly.ETHANOL
+        }.maximum!!, 0.0)
+        assertEquals(1, window.copySamples().size)
+    }
+
 }
