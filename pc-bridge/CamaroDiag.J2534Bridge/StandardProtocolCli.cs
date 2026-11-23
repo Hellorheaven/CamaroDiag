@@ -1244,6 +1244,7 @@ internal static class StandardProtocolCli
                 // confirms that this vendor J2534 DLL preserves it. Many
                 // compliant drivers have already stripped it on receipt.
                 if (o.J1850WireCrc &&
+                    !J2534StandardChannel.IsAuxiliaryReceiveStatus(received.RxStatus) &&
                     !J1850Crc.VerifyRawFrame(received.Data))
                     throw new InvalidDataException(
                         "Captured J1850 frame has an invalid on-wire CRC.");
