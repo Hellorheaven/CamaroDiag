@@ -454,6 +454,21 @@ internal static class IsoTpCanFdSelfTests
             "--baud", "500000", "--fd", "false",
             "--mode", "receive", "--uds-validate", "true"]),
             "Passive ISO-TP cannot claim an active UDS request/response correlation.");
+        var monitorIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-did", "0xF600"]);
+        Check(monitorIsoTp.Request.SequenceEqual(
+            new byte[] {0x22, 0xF6, 0x00}),
+            "ISO-TP OBDonUDS monitoring DID request is standardized.");
+        var vehicleIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-did", "0xF810"]);
+        Check(vehicleIsoTp.Request.SequenceEqual(
+            new byte[] {0x22, 0xF8, 0x10}),
+            "ISO-TP OBDonUDS F810 protocol information DID can be queried.");
+
         var obdIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
