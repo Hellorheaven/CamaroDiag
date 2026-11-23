@@ -34,6 +34,8 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
                 val direction = CanConsoleEventJournalWriter.Direction.valueOf(event.direction)
                 target.append(event.timestampMillis, direction, event.succeeded, event.content)
             }
+            // Do not retain the only event copy in a volatile in-memory writer buffer.
+            target.flush()
             generation++
         } catch (error: Exception) {
             failed = true
