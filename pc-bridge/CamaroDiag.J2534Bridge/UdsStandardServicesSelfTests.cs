@@ -95,6 +95,25 @@ internal static class UdsStandardServicesSelfTests
             "3400448000100000000020", "RequestDownload");
         Equal(UdsStandardServices.RequestUpload(0x80001000, 0x20),
             "3500448000100000000020", "RequestUpload");
+        Equal(UdsStandardServices.RequestUpload(
+                0x1234UL, 0x45UL, 2, 1),
+            "350012123445", "UDS upload ALFI 0x12 uses 2-byte address and 1-byte length.");
+        Equal(UdsStandardServices.RequestDownload(
+                0x1122334455667788UL, 0x100UL, 8, 2),
+            "34002811223344556677880100",
+            "UDS 64-bit address and 16-bit size respect ALFI 0x28.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.RequestUpload(
+                0x10000UL, 0x20UL, 2, 1),
+            "UDS address overflow cannot be silently truncated by ALFI.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.RequestDownload(
+                0x1234UL, 0x100UL, 2, 1),
+            "UDS length exceeding declared one-byte field rejected.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.RequestDownload(
+                0x1234UL, 0x20UL, 9, 1),
+            "UDS ALFI address width greater than eight rejected.");
         var downloadLimit = UdsStandardServices.DecodeTransferParameters(
             0x34, [0x74, 0x20, 0x10, 0x02]);
         Check(downloadLimit.MaxNumberOfBlockLength == 4098 &&
