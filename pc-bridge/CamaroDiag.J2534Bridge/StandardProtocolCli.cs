@@ -17,6 +17,7 @@ internal static class StandardProtocolCli
     internal const string PassThruCommand = "--j2534-standard";
     internal const string RawIsoTpCommand = "--isotp-exchange";
     internal const string J1939Command = "--j1939-transport";
+    internal const string J1939FdCommand = "--j1939-fd-multipg";
 
     internal static async Task<int> RunDoIpStatusAsync(string[] args)
     {
@@ -137,6 +138,118 @@ internal static class StandardProtocolCli
             foreach (var dtc in report.Codes)
                 Console.WriteLine($"DTC=0x{dtc.Code:X6} " +
                     $"status=0x{dtc.Status:X2}");
+        }
+    }
+
+    internal sealed record J1939FdOptions(int AdapterIndex, uint Bitrate,
+        uint? DataBaud, bool Brs, byte Source, byte Target, byte Priority,
+        int? Pgn, string Mode, byte[] Payload, int TimeoutMs);
+
+    internal static J1939FdOptions ParseJ1939Fd(string[] args)
+    {
+        var index = int.Parse(Required(args, "--adapter-index"),
+            CultureInfo.InvariantCulture);
+        var baud = Number(Required(args, "--baud"));
+        var dataBaudText = Optional(args, "--data-baud");
+        uint? dataBaud = dataBaudText is null ? null : Number(dataBaudText);
+        var brs = bool.Parse(Optional(args, "--brs") ?? "false");
+        var source = checked((byte)Number(Required(args, "--source")));
+        var target = checked((byte)Number(Required(args, "--target")));
+        var priority = checked((byte)Number(Optional(args, "--priority") ?? "6"));
+        var pgnText = Optional(args, "--pgn");
+        int? pgn = pgnText is null ? null : checked((int)Number(pgnText));
+        var mode = Required(args, "--mode").ToLowerInvariant();
+        var payloadText = Optional(args, "--payload");
+        byte[] payload = payloadText is null ? [] : Hex(payloadText);
+        var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
+            CultureInfo.InvariantCulture);
+        if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
+            source >= 0xFE || target == 0xFE || source == target ||
+            priority > 7 || mode is not ("send" or "receive") ||
+            (mode == "send" && (pgn is null || payload.Length is < 1 or > 60)) ||
+            (mode == "receive" && payloadText is not null) ||
+            pgn is < 0 or > 0x3FFFF ||
+            (brs && (dataBaud is null or 0)) ||
+            (dataBaud.HasValue && dataBaud.Value == 0))
+            throw new ArgumentException("Invalid SAE J1939-22 FEFF Multi-PG options.");
+        if (pgn.HasValue && ((pgn.Value >> 8) & 0xFF) < 240 &&
+            (pgn.Value & 0xFF) != 0)
+            throw new ArgumentException("Invalid J1939 PDU1 contained PGN.");
+        if (mode == "send" && pgn.HasValue &&
+            ((pgn.Value >> 8) & 0xFF) >= 240 && target != 0xFF)
+            throw new ArgumentException("J1939-22 PDU2 contained PGN must be broadcast.");
+        return new(index, baud, dataBaud, brs, source, target,
+            priority, pgn, mode, payload, timeout);
+    }
+
+    internal static async Task<int> RunJ1939FdAsync(string[] args)
+    {
+        try
+        {
+            var o = ParseJ1939Fd(args);
+            var adapters = J2534Registry.Discover();
+            if (o.AdapterIndex >= adapters.Count)
+                throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
+            if (o.Mode == "send" &&
+                !Confirm($"SAE J1939-22 FEFF TX source=0x{o.Source:X2} " +
+                    $"destination=0x{o.Target:X2} PGN=0x{o.Pgn:X} " +
+                    $"payload={Convert.ToHexString(o.Payload)}"))
+                return 2;
+
+            // J1939-22 FEFF Multi-PG uses RAW FD_CAN, not classical
+            // J1939-21 TP or ISO15765 pre-segmented channels.
+            using var driver = J2534StandardChannel.Connect(
+                adapters[o.AdapterIndex], J2534StandardChannel.FdCan,
+                o.Bitrate, flags: 0x100u);
+            if (o.DataBaud.HasValue)
+                driver.SetCanFdDataPhaseRate(o.DataBaud.Value);
+            driver.ConfigureFilter(new byte[4], new byte[4]);
+            var link = new IsoTpJ2534RawCanLink(driver, canFd: true,
+                extendedId: true, bitRateSwitch: o.Brs);
+
+            if (o.Mode == "send")
+            {
+                var packet = J1939FdMultiPg.Encode(
+                    o.Source, o.Target, o.Priority,
+                    [new J1939FdMultiPg.ContainedGroup(o.Pgn!.Value, o.Payload)]);
+                await link.SendAsync(packet, CancellationToken.None);
+                Console.WriteLine("J1939-22 Multi-PG frame queued; ECU processing not verified.");
+                return 0;
+            }
+
+            var limit = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            for (var frameCount = 0; frameCount < 128; frameCount++)
+            {
+                var remaining = limit - clock.Elapsed;
+                if (remaining <= TimeSpan.Zero)
+                    break;
+                var frame = await link.ReceiveAsync(remaining, CancellationToken.None);
+                if (frame.Id > 0x1FFFFFFF) continue;
+                var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+                if (id.Pgn != J1939FdMultiPg.MultiPgPgn ||
+                    id.Source != o.Target ||
+                    (id.Destination != o.Source && id.Destination != 0xFF))
+                    continue;
+                var received = J1939FdMultiPg.Decode(frame);
+                var groups = o.Pgn.HasValue ?
+                    received.Groups.Where(g => g.Pgn == o.Pgn.Value).ToArray() :
+                    received.Groups.ToArray();
+                if (groups.Length == 0) continue;
+                foreach (var group in groups)
+                    Console.WriteLine($"J1939-22 RX source=0x{received.SourceAddress:X2} " +
+                        $"PGN=0x{group.Pgn:X} payload={Convert.ToHexString(group.Payload)}");
+                return 0;
+            }
+            throw new TimeoutException("No correlated SAE J1939-22 Multi-PG frame.");
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or
+            InvalidOperationException or TimeoutException or
+            DllNotFoundException or BadImageFormatException or
+            EntryPointNotFoundException or NotSupportedException or OverflowException)
+        {
+            Console.Error.WriteLine("J1939-22 Multi-PG failed: " + ex.Message);
+            return 6;
         }
     }
 
