@@ -160,7 +160,14 @@ object EcuWriteTransaction {
         } catch (_: Exception) {
             return Outcome(Status.STOPPED_REQUIRES_ASSESSMENT)
         }
-        return EcuWriteExecutionEngine(driver, journal, powerMonitor).run(snapshot)
+        val physicalBackup = try {
+            PersistentEcuPhysicalBlockBackup(
+                journalFile, snapshot.firmwareTarget, requireNotNull(snapshot.expectedIdentity.vin)
+            )
+        } catch (_: Exception) {
+            return Outcome(Status.STOPPED_REQUIRES_ASSESSMENT)
+        }
+        return EcuWriteExecutionEngine(driver, journal, powerMonitor, physicalBackup).run(snapshot)
     }
 
     /**
@@ -192,7 +199,10 @@ object EcuWriteTransaction {
 internal class EcuWriteExecutionEngine(
     private val driver: EcuProgrammingDriverContract,
     private val journal: EcuWriteTransaction.Journal,
-    private val powerMonitor: EcuWriteTransaction.PowerMonitor
+    private val powerMonitor: EcuWriteTransaction.PowerMonitor,
+    // Internal tests use in-memory capture; public physical execute() always
+    // injects a durable, file-backed store that fsyncs live ECU bytes.
+    private val physicalBlockBackup: EcuPhysicalBlockBackup = InMemoryEcuPhysicalBlockBackup()
 ) {
     suspend fun run(input: EcuWriteTransaction.Request): EcuWriteTransaction.Outcome {
         val request = input.frozen()
@@ -279,8 +289,17 @@ internal class EcuWriteExecutionEngine(
                 val region = EcuProgrammingDriverContract.RegionRequest(
                     request.region, sector.absoluteAddress, sector.originalBytes.size.toLong()
                 )
-                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
-                    !driver.read(region).contentEquals(sector.originalBytes) ||
+                if (!powerMonitor.isStable() || driver.identify() != request.expectedIdentity) {
+                    return EcuWriteTransaction.Outcome(
+                        EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT,
+                        verifiedSectors = verified, failedAddress = currentAddress
+                    )
+                }
+                // Physical bytes captured from ECU itself, distinct from the
+                // input BIN. Both acquisitions must match before backup is saved.
+                val physicalBytes = driver.read(region)
+                if (!physicalBytes.contentEquals(sector.originalBytes) ||
+                    !powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
                     !powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
                     !driver.independentReadback(region).contentEquals(sector.originalBytes) ||
                     !powerMonitor.isStable() ||
@@ -292,6 +311,7 @@ internal class EcuWriteExecutionEngine(
                         failedAddress = currentAddress
                     )
                 }
+                physicalBlockBackup.preserve(region, physicalBytes, sector.originalSha256)
                 journal.append(
                     EcuWriteTransaction.Record(
                         EcuWriteTransaction.Stage.BASELINE_CHECKED,
