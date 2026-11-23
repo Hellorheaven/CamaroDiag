@@ -44,7 +44,7 @@ La CLI demande volontairement les **deux confirmations opérateur** avant tout �
 
 L'option `--trace-file isotp-essai-01.csv` ajoutée à la commande `--isotp-exchange` enregistre dans un **nouveau fichier seulement** (`CreateNew`) les intentions d'émission (`TX_REQUEST`), les confirmations de mise en file J2534 (`TX_QUEUED`) et les trames reçues (`RX`) avec un horodatage **côté PC**, en microsecondes relatives. Aucun fichier n'est créé sans cette option. Les journaux peuvent contenir VIN et données ECU : les conserver localement.
 
-**Attention :** les durées de ces traces ne sont pas des horodatages physiques du bus. `TX_QUEUED` n'est pas un ACK de l'ECU ; la capture CAN indépendante reste obligatoire pour qualifier STmin. Si l'écriture du journal échoue après une transmission, **ne jamais relancer automatiquement**.
+**Attention :** les durées de ces traces ne sont pas des horodatages physiques du bus. `TX_QUEUED` n'est pas un ACK de l'ECU ; la capture CAN indépendante reste obligatoire pour qualifier STmin. Une annulation pendant l'appel synchrone au pilote J2534 ne peut pas retirer une trame déjà mise en file ; CamaroDiag remonte alors l'annulation et n'envoie pas les trames ISO-TP suivantes. Si l'écriture du journal échoue après une transmission, **ne jamais relancer automatiquement**.
 
 ## Attestation et critères de clôture
 

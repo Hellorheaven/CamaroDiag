@@ -156,6 +156,7 @@ internal static class IsoTpCanFdSession
             payload.CopyTo(sf, pci + header);
             await link.SendAsync(new(settings.TxId, settings.CanFd, sf), token);
             _ = Remaining(timeout, clock);
+            token.ThrowIfCancellationRequested();
             return;
         }
 
@@ -176,6 +177,7 @@ internal static class IsoTpCanFdSession
         var offset = Math.Min(payload.Length, ff.Length - prefixSize - addressWidth);
         payload.AsSpan(0, offset).CopyTo(ff.AsSpan(prefixSize + addressWidth));
         await link.SendAsync(new(settings.TxId, settings.CanFd, ff), token);
+        token.ThrowIfCancellationRequested();
 
         var nextSequence = 1;
         var sentInBlock = 0;
@@ -208,6 +210,7 @@ internal static class IsoTpCanFdSession
             var separationToWait = RemainingCfSeparation(
                 effectiveSeparation, sincePreviousCf);
             await link.WaitMinimumSeparationAsync(separationToWait, token);
+            token.ThrowIfCancellationRequested();
             _ = Remaining(timeout, clock);
             var cf = Pad(settings);
             SetAddress(cf, settings);
@@ -215,12 +218,14 @@ internal static class IsoTpCanFdSession
             var take = Math.Min(payload.Length - offset, cf.Length - 1 - addressWidth);
             payload.AsSpan(offset, take).CopyTo(cf.AsSpan(1 + addressWidth));
             await link.SendAsync(new(settings.TxId, settings.CanFd, cf), token);
+            token.ThrowIfCancellationRequested();
             previousCfCompletedAt = Stopwatch.GetTimestamp();
             offset += take;
             nextSequence = (nextSequence + 1) & 0x0F;
             sentInBlock++;
         }
         _ = Remaining(timeout, clock);
+        token.ThrowIfCancellationRequested();
     }
 
     internal static async Task<byte[]> ReceiveAsync(
@@ -252,6 +257,7 @@ internal static class IsoTpCanFdSession
             if (singleLength == 0 || singleLength > data.Length - header - addressWidth)
                 throw new InvalidDataException("ISO-TP single-frame size mismatch.");
             _ = Remaining(timeout, clock);
+            token.ThrowIfCancellationRequested();
             return data.AsSpan(header + addressWidth, singleLength).ToArray();
         }
 
@@ -329,6 +335,7 @@ internal static class IsoTpCanFdSession
             }
         }
         _ = Remaining(timeout, clock);
+        token.ThrowIfCancellationRequested();
         return output;
     }
 
@@ -367,6 +374,7 @@ internal static class IsoTpCanFdSession
         {
             token.ThrowIfCancellationRequested();
             var frame = await link.ReceiveAsync(Remaining(timeout, clock), token);
+            token.ThrowIfCancellationRequested();
             _ = Remaining(timeout, clock);
             if (frame.Id != config.RxId) continue; // Ignore unrelated bus traffic
             if (frame.IsFd != config.CanFd ||

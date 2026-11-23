@@ -88,6 +88,8 @@ internal sealed class IsoTpJ2534RawCanLink : IsoTpCanFdSession.ICanLink
                 "CAN_29BIT_ID receive status does not match the selected arbitration format.");
         if ((rxStatus & FdCanFormat) != (requiredFd ? FdCanFormat : 0u))
             throw new InvalidDataException("FD_CAN_FORMAT receive status disagrees with channel.");
+        if (!requiredFd && (rxStatus & FdCanBrs) != 0)
+            throw new InvalidDataException("Classic CAN frame cannot carry FD bit-rate-switch status.");
         var data = bytes.AsSpan(4).ToArray();
         if (requiredFd)
         {
@@ -109,6 +111,9 @@ internal sealed class IsoTpJ2534RawCanLink : IsoTpCanFdSession.ICanLink
                     (fd ? FdCanFormat : 0u) |
                     (brs ? FdCanBrs : 0u);
         channel.Transmit(Pack(frame.Id, frame.Data, extendedId), flags);
+        // A synchronous vendor call may have queued the frame before a
+        // cancellation; do not report success or dispatch further ISO-TP CFs.
+        token.ThrowIfCancellationRequested();
         return Task.CompletedTask;
     }
 

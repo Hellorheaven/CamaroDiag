@@ -38,12 +38,14 @@ internal static class IsoTpCanFdSelfTests
         internal readonly Queue<J2534StandardChannel.Frame?> Incoming = new();
         internal readonly List<int> RequestedTimeouts = [];
         internal bool FailTransmit;
+        internal Action? AfterTransmit;
         internal Action? AfterReceive;
         public uint ProtocolId { get; init; } = J2534StandardChannel.Can;
         public void Transmit(byte[] bytes, uint flags)
         {
             if (FailTransmit) throw new IOException("Simulated vendor write failure.");
             Transmitted.Add((bytes.ToArray(), flags));
+            AfterTransmit?.Invoke();
         }
         public J2534StandardChannel.Frame? Receive(int timeoutMs)
         {
@@ -636,6 +638,9 @@ internal static class IsoTpCanFdSelfTests
         Reject<InvalidDataException>(() =>
             IsoTpJ2534RawCanLink.Unpack(rawFd, 0, true, false),
             "Classical frame presented as CAN-FD without vendor FD flag refused.");
+        Reject<InvalidDataException>(() =>
+            IsoTpJ2534RawCanLink.Unpack(raw, 0x0008_0000, false, false),
+            "Classic CAN RX cannot masquerade as a CAN-FD BRS frame.");
         Reject<ArgumentOutOfRangeException>(() =>
             IsoTpJ2534RawCanLink.Pack(0x800,
                 [1, 2, 3], extended: false),
@@ -846,6 +851,36 @@ internal static class IsoTpCanFdSelfTests
             "11-bit J2534 link rejects arbitration ID 0x800.");
         Check(vendorClassic.Transmitted.Count == 1,
             "Invalid CAN frames do not reach vendor PassThruWriteMsgs.");
+
+        using var cancelledDuringVendorTx = new CancellationTokenSource();
+        var vendorCancelsAfterQueuing = new FakeRawJ2534
+        {
+            AfterTransmit = cancelledDuringVendorTx.Cancel
+        };
+        var lateCancelLink = new IsoTpJ2534RawCanLink(
+            vendorCancelsAfterQueuing, false, false, false);
+        Reject<OperationCanceledException>(() =>
+            IsoTpCanFdSession.SendAsync(lateCancelLink, classic, [0x22],
+                TimeSpan.FromSeconds(1), cancelledDuringVendorTx.Token)
+                .GetAwaiter().GetResult(),
+            "Late cancellation during vendor single-frame TX is not reported as success.");
+        Check(vendorCancelsAfterQueuing.Transmitted.Count == 1,
+            "A canceled vendor send may already be queued and must never be retried automatically.");
+        using var cancelledDuringFirstFrame = new CancellationTokenSource();
+        var vendorCancelsOnFirstFrame = new FakeRawJ2534
+        {
+            AfterTransmit = cancelledDuringFirstFrame.Cancel
+        };
+        var segmentedCancelLink = new IsoTpJ2534RawCanLink(
+            vendorCancelsOnFirstFrame, false, false, false);
+        Reject<OperationCanceledException>(() =>
+            IsoTpCanFdSession.SendAsync(segmentedCancelLink, classic, Fill(20),
+                TimeSpan.FromSeconds(1), cancelledDuringFirstFrame.Token)
+                .GetAwaiter().GetResult(),
+            "Late cancellation during vendor FF transmit prevents remaining CFs.");
+        Check(vendorCancelsOnFirstFrame.Transmitted.Count == 1 &&
+            vendorCancelsOnFirstFrame.Transmitted[0].Data[4] == 0x10,
+            "No consecutive frames are dispatched after synchronous vendor cancellation.");
 
         var vendorFailure = new FakeRawJ2534 { FailTransmit = true };
         var failingLink = new IsoTpJ2534RawCanLink(vendorFailure,
