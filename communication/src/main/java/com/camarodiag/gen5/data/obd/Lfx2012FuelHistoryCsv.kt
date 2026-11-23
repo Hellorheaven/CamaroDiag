@@ -53,9 +53,10 @@ object Lfx2012FuelHistoryCsv {
     private fun csv(value: String): String {
         // Prevent CSV formulas in arbitrary session IDs without altering the
         // underlying stored identity. Double-quote escaping is standard CSV.
-        val unsafeFormula = value.startsWith('=') ||
-            value.startsWith('+') || value.startsWith('-') ||
-            value.startsWith('@')
+        val firstNonSpace = value.trimStart()
+        val unsafeFormula = firstNonSpace.startsWith('=') ||
+            firstNonSpace.startsWith('+') || firstNonSpace.startsWith('-') ||
+            firstNonSpace.startsWith('@')
         val sanitized = if (unsafeFormula) "'$value" else value
         return "\"" + sanitized.replace("\"", "\"\"") + "\""
     }
