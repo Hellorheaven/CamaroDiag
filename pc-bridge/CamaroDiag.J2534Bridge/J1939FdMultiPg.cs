@@ -1,7 +1,7 @@
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// SAE J1939-22 FEFF Multi-PG (PGN 0x2500) on 29-bit CAN FD.
+/// SAE J1939-22 FEFF (29-bit) and FBFF (11-bit) Multi-PG on CAN FD.
 /// Only TOS=2 (SAE J1939 without assurance data), TF=0 is supported.
 /// This is NOT J1939-22 FD.TP for messages larger than one CAN FD frame.
 /// The caller must arrange any J1939-81 address claim and qualified FD link.
@@ -14,7 +14,7 @@ internal static class J1939FdMultiPg
     internal sealed record ContainedGroup(int Pgn, byte[] Payload);
 
     internal sealed record Received(byte SourceAddress, byte DestinationAddress,
-        byte Priority, IReadOnlyList<ContainedGroup> Groups);
+        byte Priority, IReadOnlyList<ContainedGroup> Groups, bool FastBroadcast = false);
 
     internal static IsoTpCanFdSession.CanFrame Encode(
         byte source, byte destination, byte priority,
@@ -61,16 +61,48 @@ internal static class J1939FdMultiPg
             true, bytes.ToArray());
     }
 
+    /// <summary>
+    /// J1939-22 FBFF broadcast uses an 11-bit CAN identifier equal to the
+    /// claimed source address and fixed arbitration priority (no CAN extended
+    /// ID). All C-PGs are global broadcast. It is never a directed reply.
+    /// </summary>
+    internal static IsoTpCanFdSession.CanFrame EncodeFastBroadcast(
+        byte source, IReadOnlyList<ContainedGroup> groups)
+    {
+        var feff = Encode(source, 0xFF, 0, groups);
+        return new(source, true, feff.Data);
+    }
+
     internal static Received Decode(IsoTpCanFdSession.CanFrame frame)
     {
         if (!frame.IsFd || frame.Id > 0x1FFFFFFF ||
             frame.Data is null || frame.Data.Length is not
                 (8 or 12 or 16 or 20 or 24 or 32 or 48 or 64))
             throw new InvalidDataException("Invalid J1939-22 Multi-PG CAN-FD frame.");
-        var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
-        if (id.Pgn != MultiPgPgn || id.Destination is not int destination ||
-            id.Source >= 0xFE)
-            throw new InvalidDataException("Unexpected J1939-22 Multi-PG arbitration identifier.");
+        var fbff = frame.Id <= 0x7FF;
+        int source;
+        int destination;
+        int priority;
+        if (fbff)
+        {
+            if (frame.Id >= 0xFE)
+                throw new InvalidDataException(
+                    "J1939-22 FBFF CAN ID must be a claimed source address.");
+            source = (int)frame.Id;
+            destination = 0xFF;
+            priority = 0;
+        }
+        else
+        {
+            var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+            if (id.Pgn != MultiPgPgn ||
+                id.Destination is not int dest || id.Source >= 0xFE)
+                throw new InvalidDataException(
+                    "Unexpected J1939-22 FEFF Multi-PG arbitration identifier.");
+            source = id.Source;
+            destination = dest;
+            priority = id.Priority;
+        }
 
         var groups = new List<ContainedGroup>();
         var offset = 0;
@@ -105,8 +137,8 @@ internal static class J1939FdMultiPg
         }
         if (groups.Count == 0)
             throw new InvalidDataException("Empty J1939-22 Multi-PG frame.");
-        return new Received((byte)id.Source, (byte)destination,
-            (byte)id.Priority, groups);
+        return new Received((byte)source, (byte)destination,
+            (byte)priority, groups, fbff);
     }
 
     private static bool IsPadding(ReadOnlySpan<byte> bytes)
