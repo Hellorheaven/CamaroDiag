@@ -38,6 +38,7 @@ internal static class IsoTpCanFdSelfTests
         internal readonly Queue<J2534StandardChannel.Frame?> Incoming = new();
         internal readonly List<int> RequestedTimeouts = [];
         internal bool FailTransmit;
+        internal Action? AfterReceive;
         public uint ProtocolId { get; init; } = J2534StandardChannel.Can;
         public void Transmit(byte[] bytes, uint flags)
         {
@@ -47,7 +48,9 @@ internal static class IsoTpCanFdSelfTests
         public J2534StandardChannel.Frame? Receive(int timeoutMs)
         {
             RequestedTimeouts.Add(timeoutMs);
-            return Incoming.Count == 0 ? null : Incoming.Dequeue();
+            var result = Incoming.Count == 0 ? null : Incoming.Dequeue();
+            AfterReceive?.Invoke();
+            return result;
         }
     }
 
@@ -659,6 +662,52 @@ internal static class IsoTpCanFdSelfTests
             classicRead.Data[1] == 0x62 &&
             vendorClassic.RequestedTimeouts.SequenceEqual(new[] { 230 }),
             "Classic J2534 unpacks one real-shape RX and honors timeout milliseconds.");
+
+        // Vendor status messages and TX echoes are not ISO-TP frames,
+        // even if their CAN ID/data happen to resemble a positive reply.
+        var statusVendor = new FakeRawJ2534();
+        var statusLink = new IsoTpJ2534RawCanLink(statusVendor,
+            canFd: false, extendedId: false, bitRateSwitch: false);
+        statusVendor.Incoming.Enqueue(new(J2534StandardChannel.Can,
+            J2534StandardChannel.RxTxEcho, 0,
+            IsoTpJ2534RawCanLink.Pack(0x7E8,
+                [3, 0x62, 0xF1, 0x90, 0, 0, 0, 0], false)));
+        statusVendor.Incoming.Enqueue(new(J2534StandardChannel.Can,
+            0, 0, IsoTpJ2534RawCanLink.Pack(0x7E8,
+                [3, 0x7F, 0x22, 0x31, 0, 0, 0, 0], false)));
+        var actualReply = statusLink.ReceiveAsync(
+            TimeSpan.FromMilliseconds(500), CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Check(actualReply.Data[1] == 0x7F &&
+            statusVendor.RequestedTimeouts.Count == 2 &&
+            statusVendor.RequestedTimeouts[1] <=
+                statusVendor.RequestedTimeouts[0],
+            "J2534 raw RX skips TX echo and retains one receive deadline.");
+
+        var wrongProtocolVendor = new FakeRawJ2534();
+        var wrongProtocolLink = new IsoTpJ2534RawCanLink(wrongProtocolVendor,
+            false, false, false);
+        wrongProtocolVendor.Incoming.Enqueue(new(J2534StandardChannel.Iso15765,
+            0, 0, IsoTpJ2534RawCanLink.Pack(0x7E8, Fill(8), false)));
+        Reject<InvalidDataException>(() =>
+            wrongProtocolLink.ReceiveAsync(TimeSpan.FromMilliseconds(500),
+                CancellationToken.None).GetAwaiter().GetResult(),
+            "Unsegmented J2534 CAN RX cannot accept another channel protocol.");
+
+        using var lateCancellation = new CancellationTokenSource();
+        var cancellationVendor = new FakeRawJ2534
+        {
+            AfterReceive = lateCancellation.Cancel
+        };
+        cancellationVendor.Incoming.Enqueue(new(J2534StandardChannel.Can,
+            0, 0, IsoTpJ2534RawCanLink.Pack(0x7E8,
+                [3, 0x62, 0xF1, 0x90, 0, 0, 0, 0], false)));
+        var cancellationLink = new IsoTpJ2534RawCanLink(cancellationVendor,
+            false, false, false);
+        Reject<OperationCanceledException>(() =>
+            cancellationLink.ReceiveAsync(TimeSpan.FromMilliseconds(500),
+                lateCancellation.Token).GetAwaiter().GetResult(),
+            "Cancellation during vendor receive discards late ECU responses.");
 
         var vendorFdExtended = new FakeRawJ2534
         {

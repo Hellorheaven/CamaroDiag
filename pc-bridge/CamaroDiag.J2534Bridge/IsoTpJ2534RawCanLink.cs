@@ -120,9 +120,33 @@ internal sealed class IsoTpJ2534RawCanLink : IsoTpCanFdSession.ICanLink
             throw new ArgumentOutOfRangeException(nameof(timeout));
         // Vendor queues may contain status reports or unrelated bus traffic.
         // Correlation with a particular ECU is enforced by ISO-TP settings.
-        var frame = channel.Receive((int)Math.Clamp(timeout.TotalMilliseconds, 1, 30000));
-        if (frame is null) throw new TimeoutException("No J2534 raw CAN frame.");
-        return Task.FromResult(Unpack(frame.Data, frame.RxStatus, fd, extendedId));
+        // The real J2534 channel filters vendor indications, but the raw
+        // adapter must also enforce this contract at its own boundary.
+        // A TX echo/status event can never satisfy an ECU ISO-TP receive.
+        var clock = Stopwatch.StartNew();
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            var remaining = timeout - clock.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+                throw new TimeoutException("J2534 raw CAN receive deadline exceeded.");
+            var timeoutMs = (int)Math.Clamp(
+                Math.Ceiling(remaining.TotalMilliseconds), 1, 30000);
+            var frame = channel.Receive(timeoutMs);
+            // The synchronous vendor call may have outlived cancellation:
+            // do not deliver its stale result to the ISO-TP state machine.
+            token.ThrowIfCancellationRequested();
+            if (frame is null)
+                throw new TimeoutException("No J2534 raw CAN frame.");
+            if (clock.Elapsed >= timeout)
+                throw new TimeoutException("J2534 raw CAN receive deadline exceeded.");
+            if (J2534StandardChannel.IsAuxiliaryReceiveStatus(frame.RxStatus))
+                continue;
+            if (frame.ProtocolId != channel.ProtocolId)
+                throw new InvalidDataException(
+                    "J2534 raw receive protocol differs from the connected channel.");
+            return Task.FromResult(Unpack(frame.Data, frame.RxStatus, fd, extendedId));
+        }
     }
 
     public async Task WaitMinimumSeparationAsync(TimeSpan minimum, CancellationToken token)
