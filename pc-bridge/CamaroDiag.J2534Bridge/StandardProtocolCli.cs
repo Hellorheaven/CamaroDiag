@@ -666,7 +666,7 @@ internal static class StandardProtocolCli
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
         byte? KwpRxTarget, byte? KwpRxSource, string Mode,
-        bool KwpFunctionalRx = false);
+        bool KwpFunctionalRx = false, uint? SwCanHighSpeedBaud = null);
 
     private static string Required(IReadOnlyList<string> args, string option)
     {
@@ -821,6 +821,8 @@ internal static class StandardProtocolCli
         var pattern = Optional(args, "--pattern") is string p ? Hex(p) : null;
         var flow = Optional(args, "--flow-control") is string f ? Hex(f) : null;
         var init = Optional(args, "--kline-init");
+        var hsBaudText = Optional(args, "--sw-can-hs-baud");
+        uint? hsBaud = hsBaudText is null ? null : Number(hsBaudText);
         var kwpRxTarget = Optional(args, "--kwp-rx-target") is string targetText ?
             checked((byte)Number(targetText)) : (byte?)null;
         var kwpRxSource = Optional(args, "--kwp-rx-source") is string sourceText ?
@@ -835,7 +837,11 @@ internal static class StandardProtocolCli
             data.Length > J2534StandardChannel.MaxData ||
             (mask == null) != (pattern == null) ||
             (flow != null && mask == null) ||
-            (mode == "receive" && (init != null || flow != null)) ||
+            (mode == "receive" &&
+                (init != null || flow != null || hsBaud.HasValue)) ||
+            (hsBaud.HasValue &&
+                (protocol != J2534StandardChannel.SwCan ||
+                 hsBaud.Value == 0)) ||
             (kwpRxTarget.HasValue != kwpRxSource.HasValue) ||
             (kwpFunctionalRx && !kwpRxTarget.HasValue) ||
             (kwpRxTarget.HasValue && protocol != J2534StandardChannel.Iso14230) ||
@@ -846,7 +852,8 @@ internal static class StandardProtocolCli
             throw new ArgumentException("Invalid standard J2534 channel configuration.");
         return new(index, protocol, baud, flags, data,
             mask, pattern, flow, init, timeout, count,
-            kwpRxTarget, kwpRxSource, mode, kwpFunctionalRx);
+            kwpRxTarget, kwpRxSource, mode, kwpFunctionalRx,
+            hsBaud);
     }
 
     internal static async Task SaveDoIpReplyAsync(
@@ -920,10 +927,14 @@ internal static class StandardProtocolCli
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
             if (o.Mode == "exchange" && !Confirm($"SAE J2534 {adapters[o.AdapterIndex].Name}, " +
-                $"protocol=0x{o.ProtocolId:X} TX={Convert.ToHexString(o.Data)}"))
+                $"protocol=0x{o.ProtocolId:X} " +
+                $"SW-CAN-HS={(o.SwCanHighSpeedBaud?.ToString() ?? "unchanged")} " +
+                $"TX={Convert.ToHexString(o.Data)}"))
                 return 2;
             using var driver = J2534StandardChannel.Connect(adapters[o.AdapterIndex],
                 o.ProtocolId, o.Baud, o.Flags);
+            if (o.SwCanHighSpeedBaud.HasValue)
+                driver.SetSwCanHighSpeedRate(o.SwCanHighSpeedBaud.Value);
             if (o.KlineInit is string init)
             {
                 var tokens = init.Split(':', 2);
