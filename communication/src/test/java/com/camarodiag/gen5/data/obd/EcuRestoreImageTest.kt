@@ -101,4 +101,24 @@ class EcuRestoreImageTest {
         }.isFailure)
     }
 
+    @Test fun mutationOfImportedCaptureAfterVerificationIsRejected() {
+        val archive = verifiedArchive(listOf(segment(0x1000, 1, 2, 3, 4)))
+        archive.captures.single().firstRead[0] = 99
+        assertTrue(runCatching {
+            EcuRestoreImage.assemble(
+                archive, listOf(EcuRestoreImage.MemoryRegion(region, 0x1000, 4))
+            )
+        }.isFailure)
+    }
+
+    @Test fun mutationOfSecondPassAfterVerificationIsRejected() {
+        val archive = verifiedArchive(listOf(segment(0x1000, 1, 2, 3, 4)))
+        archive.captures.single().independentRead!![2] = 99
+        assertTrue(runCatching {
+            EcuRestoreImage.assemble(
+                archive, listOf(EcuRestoreImage.MemoryRegion(region, 0x1000, 4))
+            )
+        }.isFailure)
+    }
+
 }
