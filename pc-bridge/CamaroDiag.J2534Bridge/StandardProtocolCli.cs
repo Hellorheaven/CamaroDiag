@@ -1113,7 +1113,7 @@ internal static class StandardProtocolCli
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
         byte? KwpRxTarget, byte? KwpRxSource, string Mode,
         bool KwpFunctionalRx = false, uint? SwCanHighSpeedBaud = null,
-        bool J1850WireCrc = false);
+        bool J1850WireCrc = false, byte[]? KwpRequest = null);
 
     private static string Required(IReadOnlyList<string> args, string option)
     {
@@ -1279,6 +1279,7 @@ internal static class StandardProtocolCli
         var j1850WireCrc = bool.Parse(
             Optional(args, "--j1850-wire-crc") ?? "false");
         var kwpService = Optional(args, "--kwp-service");
+        var kwpValidate = bool.Parse(Optional(args, "--kwp-validate") ?? "false");
         var kwpTxTargetText = Optional(args, "--kwp-tx-target");
         var kwpTxSourceText = Optional(args, "--kwp-tx-source");
         var kwpFunctional = bool.Parse(Optional(args, "--kwp-functional") ?? "false");
@@ -1344,6 +1345,8 @@ internal static class StandardProtocolCli
             (kwpRxTarget.HasValue != kwpRxSource.HasValue) ||
             (kwpFunctionalRx && !kwpRxTarget.HasValue) ||
             (kwpRxTarget.HasValue && protocol != J2534StandardChannel.Iso14230) ||
+            (kwpValidate && (kwpService is null || mode != "exchange" ||
+                kwpRxTarget is null || kwpRxSource is null)) ||
             (init != null && protocol is not (J2534StandardChannel.Iso9141
                                              or J2534StandardChannel.Iso14230)) ||
             (init != null && !init.StartsWith("five:", StringComparison.OrdinalIgnoreCase) &&
@@ -1352,7 +1355,8 @@ internal static class StandardProtocolCli
         return new(index, protocol, baud, flags, data,
             mask, pattern, flow, init, timeout, count,
             kwpRxTarget, kwpRxSource, mode, kwpFunctionalRx,
-            hsBaud, j1850WireCrc);
+            hsBaud, j1850WireCrc,
+            kwpValidate ? Hex(kwpService!) : null);
     }
 
     internal static async Task SaveDoIpReplyAsync(
