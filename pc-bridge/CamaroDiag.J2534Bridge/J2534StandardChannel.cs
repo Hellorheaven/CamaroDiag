@@ -49,6 +49,22 @@ internal sealed class J2534StandardChannel : IDisposable
         public IntPtr BytePtr;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SConfig
+    {
+        public uint Parameter, Value;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SConfigList
+    {
+        public uint NumOfParams;
+        public IntPtr ConfigPtr;
+    }
+
+    internal const uint SetConfigIoctl = 0x02;
+    internal const uint FdCanDataPhaseRate = 0x805C;
+
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate uint OpenFn(IntPtr name, out uint device);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -210,6 +226,36 @@ internal sealed class J2534StandardChannel : IDisposable
                 Marshal.DestroyStructure<Msg>(flowPtr);
                 Marshal.FreeHGlobal(flowPtr);
             }
+        }
+    }
+
+    /// <summary>
+    /// Standard J2534-2 SET_CONFIG(FD_CAN_DATA_PHASE_RATE), required by
+    /// adapters that perform CAN FD bit-rate switching. The driver decides
+    /// which rates its actual transceiver supports. Call BEFORE filters.
+    /// </summary>
+    internal void SetCanFdDataPhaseRate(uint bitRate)
+    {
+        EnsureConnected();
+        if (protocolId is not (FdCan or FdIso15765) || bitRate == 0)
+            throw new ArgumentException("CAN FD channel and positive data bitrate required.");
+        var config = Marshal.AllocHGlobal(Marshal.SizeOf<SConfig>());
+        var list = Marshal.AllocHGlobal(Marshal.SizeOf<SConfigList>());
+        try
+        {
+            Marshal.StructureToPtr(new SConfig {
+                Parameter = FdCanDataPhaseRate, Value = bitRate
+            }, config, false);
+            Marshal.StructureToPtr(new SConfigList {
+                NumOfParams = 1, ConfigPtr = config
+            }, list, false);
+            Require(ioctl!(channelId, SetConfigIoctl, list, IntPtr.Zero),
+                "PassThruIoctl(SET_CONFIG FD_CAN_DATA_PHASE_RATE)");
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(list);
+            Marshal.FreeHGlobal(config);
         }
     }
 
