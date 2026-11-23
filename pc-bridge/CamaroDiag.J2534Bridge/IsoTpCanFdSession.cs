@@ -21,7 +21,9 @@ internal static class IsoTpCanFdSession
     {
         internal void Validate()
         {
-            if (TxId > 0x1FFFFFFF || RxId > 0x1FFFFFFF || TxId == RxId ||
+            if (TxId > 0x1FFFFFFF || RxId > 0x1FFFFFFF ||
+                (TxId == RxId && (!TxAddress.HasValue ||
+                    !RxAddress.HasValue || TxAddress == RxAddress)) ||
                 TxFrameLength is < 8 or > 64 ||
                 (!CanFd && TxFrameLength != 8) ||
                 (CanFd && StandardVehicleProtocols.CanFdLengthToDlc(TxFrameLength) < 0))
