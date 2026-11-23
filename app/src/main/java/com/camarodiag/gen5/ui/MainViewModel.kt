@@ -4797,7 +4797,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         detachedCanRequestJob = null
         connectionAttemptJob = null
         activeJobs.forEach(Job::cancel)
-        resetConsoleEventJournal()
+        consoleEventJournal.dispose()
+        consoleEventJournalFailed = true
         if (activeJobs.isEmpty()) {
             obdManager.disconnect()
         } else {
