@@ -34,6 +34,7 @@ internal static class J1939AddressClaimSession
         await link.SendAsync(frame, token);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var reasserted = false;
+        var answeredAddressRequests = 0;
         while (stopwatch.ElapsedMilliseconds < ClaimObservationMilliseconds)
         {
             token.ThrowIfCancellationRequested();
@@ -61,9 +62,23 @@ internal static class J1939AddressClaimSession
                 continue; // Unrelated/malformed traffic is not a claim.
             }
             if (observed.IsFd != canFd || observed.Id > 0x1FFFFFFF ||
-                observed.Data is null || observed.Data.Length != 8)
+                observed.Data is null ||
+                observed.Data.Length is not (3 or 8))
                 continue;
             var id = StandardVehicleProtocols.ParseJ1939Id(observed.Id);
+            if (id.Pgn == J1939PgnRequest.RequestPgn &&
+                (id.Destination == 0xFF ||
+                 id.Destination == desiredAddress) &&
+                (observed.Data.Length == 3 ||
+                 (observed.Data.Length == 8 &&
+                  observed.Data.AsSpan(3).IndexOfAnyExcept((byte)0xFF) < 0)) &&
+                (observed.Data[0] | observed.Data[1] << 8 |
+                 observed.Data[2] << 16) == J1939AddressClaim.AddressClaimPgn)
+            {
+                if (answeredAddressRequests++ < 4)
+                    await link.SendAsync(frame, token);
+                continue;
+            }
             if (id.Pgn != J1939AddressClaim.AddressClaimPgn ||
                 id.Destination != 0xFF || id.Source != desiredAddress)
                 continue;
