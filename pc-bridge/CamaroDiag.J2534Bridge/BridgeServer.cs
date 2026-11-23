@@ -127,10 +127,18 @@ internal sealed class BridgeServer
             {
                 using var json = JsonDocument.Parse(line);
                 var root = json.RootElement;
-                if (!TokenMatches(root.TryGetProperty("token", out var tokenElement) ? tokenElement.GetString() : null))
-                    throw new UnauthorizedAccessException("Invalid pairing token.");
+                if (!HasValidRequestToken(root, _token))
+                {
+                    // Reject the first unauthorized frame and close its TLS
+                    // session. A local client must not keep trying passwords
+                    // against one device-owning session or probe ECU operations.
+                    await WriteErrorAsync(writer, "Bridge pairing authorization failed.");
+                    break;
+                }
 
-                var operation = root.TryGetProperty("op", out var opElement) ? opElement.GetString() : null;
+                var operation = root.TryGetProperty("op", out var opElement) &&
+                    opElement.ValueKind == JsonValueKind.String
+                    ? opElement.GetString() : null;
                 switch (operation)
                 {
                     case "open":
@@ -308,12 +316,24 @@ internal sealed class BridgeServer
         return false;
     }
 
-    private bool TokenMatches(string? supplied)
+    /// <summary>
+    /// Authentication precedes operation decoding, driver access and CAN I/O.
+    /// A non-object root, missing/malformed bearer token or mismatched token
+    /// denies the entire TLS session, not merely the individual operation.
+    /// </summary>
+    internal static bool HasValidRequestToken(JsonElement root, string expectedToken)
     {
-        if (string.IsNullOrEmpty(supplied)) return false;
-        var expected = Encoding.UTF8.GetBytes(_token);
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("token", out var token) ||
+            token.ValueKind != JsonValueKind.String)
+            return false;
+        var supplied = token.GetString();
+        if (string.IsNullOrEmpty(supplied) || string.IsNullOrEmpty(expectedToken))
+            return false;
+        var expected = Encoding.UTF8.GetBytes(expectedToken);
         var actual = Encoding.UTF8.GetBytes(supplied);
-        return expected.Length == actual.Length && CryptographicOperations.FixedTimeEquals(expected, actual);
+        return expected.Length == actual.Length &&
+            CryptographicOperations.FixedTimeEquals(expected, actual);
     }
 
     internal static int ParseHexId(JsonElement root, string property)

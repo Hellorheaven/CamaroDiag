@@ -110,6 +110,33 @@ internal static class BridgeSelfTests
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("100.64.0.10")), "Carrier-grade NAT denied");
         Assert(!BridgeServer.IsPrivateNetworkAddress(IPAddress.Parse("2001:4860:4860::8888")), "Public IPv6 denied");
 
+        const string samplePairingToken = "authenticated-bridge-token";
+        foreach (var valid in new[] {
+            "{\"token\":\"authenticated-bridge-token\",\"op\":\"open\"}",
+            "{\"op\":\"close\",\"token\":\"authenticated-bridge-token\"}"
+        })
+        {
+            using var json = JsonDocument.Parse(valid);
+            Assert(BridgeServer.HasValidRequestToken(json.RootElement, samplePairingToken),
+                "Correct bearer token is required on every J2534 operation");
+        }
+        foreach (var denied in new[] {
+            "{}", "null", "[]", "true",
+            "{\"token\":null}", "{\"token\":42}",
+            "{\"token\":[]}", "{\"token\":{}}",
+            "{\"token\":\"\"}",
+            "{\"token\":\"authenticated-bridge-TOKEN\"}",
+            "{\"token\":\"authenticated-bridge-token-extra\"}"
+        })
+        {
+            using var json = JsonDocument.Parse(denied);
+            Assert(!BridgeServer.HasValidRequestToken(json.RootElement, samplePairingToken),
+                "Malformed or missing bearer token must end the bridge session");
+        }
+        using (var json = JsonDocument.Parse("{\"token\":\"authenticated-bridge-token\"}"))
+            Assert(!BridgeServer.HasValidRequestToken(json.RootElement, ""),
+                "A bridge with an empty expected token never authorizes operations");
+
         // Request framing must reject oversized and truncated client data
         // before JSON parsing or J2534 device access.
         static string? ReadWire(string input)
