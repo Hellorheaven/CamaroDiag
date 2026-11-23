@@ -3637,45 +3637,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    /** CDJ/1 physical acquisition is not implemented in the connector
+     * firmware. Do not switch transports or produce a placeholder backup.
+     */
+    @Suppress("UNUSED_PARAMETER")
     fun captureConnectorCheckpoint(deviceLabel: String) {
-        if (!requirePremiumLicense()) return
-        val id = com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.deviceIdFromLabel(deviceLabel)
-        if (id == null || com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel(deviceLabel)) {
-            _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
-            return
-        }
-        val owner = authenticatedAccountUid ?: return
-        val generation = accountSessionGeneration
-        val profile = _vehicle.value
-        fun current() = canResumeExport(generation, owner) && _vehicle.value == profile && hasPremiumLicense()
-        connectWithResult(
-            connect = {
-                check(current())
-                val bytes = obdManager.captureConnectorCheckpoint(id, isolatedConfirmed = true).getOrThrow()
-                check(current())
-                val lines = mutableListOf("CDJ/1", localizedContext.getString(R.string.status_not_verified))
-                if (bytes != null) {
-                    val inspection = com.camarodiag.gen5.data.obd.CamaroDiagConnectorCheckpoint.inspect(bytes)
-                    val record = checkNotNull(inspection.record)
-                    val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), "CamaroDiag_checkpoint.cdj",
-                        "application/octet-stream", category = CamaroDiagExportStorage.Category.RECOVERY, beforePublish = { check(current()) }
-                    ) { it.write(bytes) }
-                    check(current())
-                    lines += inspection.disposition.name
-                    lines += record.stage.name + " #" + record.sequence
-                    lines += localizedContext.getString(R.string.export_folder_success)
-                    lines += savedPath
-                } else {
-                    lines += "CDJ/1 NONE"
-                }
-                lines += localizedContext.getString(R.string.cal_no_calibration_write)
-                Result.success(AdapterCapabilities(deviceName = "CamaroDiagConnectors", rawProbeLog = lines))
-            },
-            fallbackMessage = localizedContext.getString(R.string.msg_usb_connection_failed),
-            transport = "connector_checkpoint_usb",
-            endpoint = deviceLabel,
-            discoveryOnly = true
-        )
+        _connectionMessage.value = localizedContext.getString(R.string.status_not_verified)
     }
 
     fun connectUsb(deviceLabel: String) {
