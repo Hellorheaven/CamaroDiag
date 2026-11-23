@@ -98,6 +98,10 @@ internal static class IsoTpCanFdSession
     internal static bool IsReservedStMin(byte value) =>
         value > 0x7F && (value < 0xF1 || value > 0xF9);
 
+    internal static TimeSpan EffectiveTransferStMin(
+        TimeSpan current, bool reservedStMinSeen) =>
+        reservedStMinSeen ? TimeSpan.FromMilliseconds(127) : current;
+
     private static void ValidateAdvertisedStMin(byte value)
     {
         if (IsReservedStMin(value))
@@ -199,8 +203,8 @@ internal static class IsoTpCanFdSession
             _ = Remaining(timeout, clock);
             var sincePreviousCf = previousCfCompletedAt is long previous ?
                 Stopwatch.GetElapsedTime(previous) : flow.Separation;
-            var effectiveSeparation = reservedStMinSeen ?
-                TimeSpan.FromMilliseconds(127) : flow.Separation;
+            var effectiveSeparation = EffectiveTransferStMin(
+                flow.Separation, reservedStMinSeen);
             var separationToWait = RemainingCfSeparation(
                 effectiveSeparation, sincePreviousCf);
             await link.WaitMinimumSeparationAsync(separationToWait, token);

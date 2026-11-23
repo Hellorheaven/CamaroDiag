@@ -500,6 +500,14 @@ internal static class IsoTpCanFdSelfTests
             !IsoTpCanFdSession.IsReservedStMin(0xF1) &&
             !IsoTpCanFdSession.IsReservedStMin(0xF9),
             "Reserved ISO-TP STmin ranges are classified without rounding valid codes.");
+        Check(IsoTpCanFdSession.EffectiveTransferStMin(
+                TimeSpan.Zero, true) == TimeSpan.FromMilliseconds(127) &&
+            IsoTpCanFdSession.EffectiveTransferStMin(
+                TimeSpan.FromTicks(1000), true) == TimeSpan.FromMilliseconds(127) &&
+            IsoTpCanFdSession.EffectiveTransferStMin(
+                TimeSpan.FromMilliseconds(5), false) ==
+                    TimeSpan.FromMilliseconds(5),
+            "Reserved STmin remains latched across a later FC with STmin zero.");
         var reservedThenClear = new QueueLink();
         reservedThenClear.Replies.Enqueue(RX(false,
             0x30, 1, 0x80, 0, 0, 0, 0, 0));

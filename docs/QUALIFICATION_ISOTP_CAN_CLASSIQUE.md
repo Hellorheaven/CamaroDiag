@@ -33,7 +33,7 @@ La CLI demande volontairement les **deux confirmations opérateur** avant tout �
 | J2534 CAN 29 bits et adressages étendu/mixte | Simulateur ECU compatible + capture | Adresses logiques / N_AE et identifiants 29 bits correctement différenciés |
 | Segmentation 7/8 et 4095/4096 octets | Simulateur ISO-TP uniquement | FF_DL, CF, compteur modulo 16 et taille finale exacts |
 | Plusieurs fenêtres BS et FC WAIT/OVFLW | Simulateur avec scénarios contrôlés | Aucune CF après Overflow ou expiration, FC et numéros conformes |
-| STmin 0, 5 ms, 100 µs et valeur réservée | Analyseur CAN horodaté | Intervalle **entre CF réellement émises** compatible avec le délai choisi ; les limites de l'OS/VCI sont mesurées et signalées |
+| STmin 0, 5 ms, 100 µs et valeur réservée conservée jusqu'à la fin du transfert | Analyseur CAN horodaté | Intervalle **entre CF réellement émises** compatible avec le délai choisi ; les limites de l'OS/VCI sont mesurées et signalées |
 | Délais N_Bs, N_Cr et budget total | Simulateur induisant pertes et retards | Timeout correct, aucun faux succès et aucune émission après annulation |
 | CAN étranger, DLC/ID erroné, trame dupliquée | Simulateur et journal d'erreurs | Trames ignorées/rejetées sans réassemblage incorrect |
 | Coupure VCI, panne de driver, bus-off | Banc isolé | Erreur explicite, pas de poursuite silencieuse ; reconnexion exige une nouvelle session |
