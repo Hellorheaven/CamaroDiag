@@ -23,6 +23,27 @@ internal static class ObdJ1979Interpretation
                 $"SAE J1979 service 0x{reply.Service:X2} negative response NRC=0x{reply.NegativeResponseCode:X2}",
                 false, reply.Service);
 
+        if (request.Length == 2 && request[0] == 0x06)
+        {
+            if (request[1] % 0x20 == 0)
+            {
+                var page = ObdJ1979Mode06.DecodeAvailability(request, response);
+                return new Result(
+                    $"SAE J1979 Mode 06 MID page=0x{page.BaseId:X2} " +
+                    $"supported={string.Join(",", page.MonitorIds.Select(x => x.ToString("X2")))} " +
+                    $"next={page.HasNextPage}", true, reply.Service);
+            }
+            var tests = ObdJ1979Mode06.DecodeTests(request, response);
+            return new Result(
+                $"SAE J1979 Mode 06 MID=0x{request[1]:X2} " +
+                $"tests={tests.Count} " +
+                string.Join("; ", tests.Select(t =>
+                    $"TID=0x{t.TestId:X2} UASID=0x{t.UnitScalingId:X2} " +
+                    $"raw={t.Value} min={t.Minimum} max={t.Maximum}")) +
+                " (raw values; no UASID conversion or pass verdict)",
+                true, reply.Service);
+        }
+
         if (request.Length == 2 && request[0] == 0x01 && request[1] == 0x01)
         {
             var status = ObdJ1979MonitorStatus.Decode(response);
