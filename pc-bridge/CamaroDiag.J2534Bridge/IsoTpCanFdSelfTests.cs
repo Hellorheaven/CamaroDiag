@@ -306,6 +306,17 @@ internal static class IsoTpCanFdSelfTests
             fdCommand.DataBaud == 2000000 &&
             fdCommand.Request.SequenceEqual(new byte[] {0x2E, 0xF1, 0x90, 1}),
             "CLI negotiates FD bit-rate switching and accepts write UDS SID.");
+        var receiveOnly = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive"]);
+        Check(receiveOnly.Mode == "receive" && receiveOnly.Request.Length == 0,
+            "CLI receives ISO-TP without constructing a diagnostic request.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive", "--payload", "22F190"]),
+            "Receive-only CLI rejects an outgoing diagnostic payload.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8",
