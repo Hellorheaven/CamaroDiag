@@ -295,7 +295,10 @@ internal sealed partial class BridgeDesktopForm
         finally
         {
             memoryVerifyArchive.Enabled = true;
-      private async Task CaptureMemoryAsync()
+        }
+    }
+
+    private async Task CaptureMemoryAsync()
     {
         if (busy) return;
         if (bridgeTask is { IsCompleted: false } || consoleDevice is not null)
@@ -443,7 +446,7 @@ internal sealed partial class BridgeDesktopForm
                     (result.Firmware is { } firmware
                         ? $"OSID GM lu deux fois : {firmware.OperatingSystemId} (DID 0x{firmware.OsDid:X2}). "
                         : "OSID GM non disponible sur ce chemin de lecture. ") +
-                    "Les deux lectures et le manifeste sont conservés dans le ZIP.");
+                    "Les deux lectures et le manifeste sont conservés dans le ZIP.";
                 }
                 catch (OperationCanceledException)
                 {
