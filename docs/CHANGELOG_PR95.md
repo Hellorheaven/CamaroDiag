@@ -90,3 +90,10 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - La fin d'une capture CAN dans `MainViewModel` n'annonce le succès qu'après la fermeture et le vidage effectif du flux brut et une vérification explicite de `CanConsoleRawArchiveWriter.isComplete`. Une archive déclarée incomplète passe par le chemin d'échec au lieu d'être présentée comme un enregistrement terminé.
 - Modification de l'intégration applicative uniquement, sans changement de protocole ni de trames.
 - **Validation de ce correctif sur le HEAD : non encore exécutée**, chantier C1 non clôturé ; ne pas annoncer d'essai de capture physique.
+
+## C4 — synthèse visible des mesures éthanol
+- L'écran LFX 2012 affiche le nombre de mesures éthanol **réellement rapportées** et les valeurs min/max extraites de l'historique de la session, sans transformer l'absence de réponse en 0 %.
+- `MainViewModel` recalcule la synthèse à chaque relevé accepté et l'efface lors de la remise à zéro du contexte véhicule. Les chaînes IHM utilisent les ressources FR/EN ; la synthèse n'atteste ni capteur physique ni activation d'une calibration E85.
+- Le raccordement C1 impose désormais `CanConsoleRawArchiveWriter.isComplete` avant de publier le succès de la capture CAN.
+- Une modification concurrente a été détectée sur la branche pendant l'ajout des ressources ; le fichier français a été relu puis modifié sans réécrire les changements de l'autre chat.
+- **Aucune nouvelle compilation ou exécution des tests sur ce HEAD** : vérification C1/C4 et intégration protocoles restent à valider après stabilisation.
