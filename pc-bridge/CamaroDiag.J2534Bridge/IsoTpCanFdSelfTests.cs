@@ -215,6 +215,25 @@ internal static class IsoTpCanFdSelfTests
             reconstruct.Sent.Count == 3,
             "Fully round-tripped CAN FD PDU and repeated CTS per receiver BS=1.");
 
+        // Local TX/FC DLC may be 64 while the ECU sends RX FF/CF
+        // with DLC 12. ISO 15765-2 derives RX_DL from the peer's FF.
+        var differingDl = new QueueLink();
+        foreach (var frame in multi.Sent)
+            differingDl.Replies.Enqueue(new(0x7E8, true, frame.Data));
+        var local64 = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8,
+            64, true, BlockSize: 0);
+        Check(Receive(differingDl, local64).SequenceEqual(Fill(35)) &&
+            differingDl.Sent.Count == 1 &&
+            differingDl.Sent[0].Data.Length == 64,
+            "Peer RX_DL=12 is accepted independently of local FC TX_DL=64.");
+
+        var corruptedPeerDl = new QueueLink();
+        corruptedPeerDl.Replies.Enqueue(new(0x7E8, true, multi.Sent[0].Data));
+        corruptedPeerDl.Replies.Enqueue(new(0x7E8, true,
+            multi.Sent[1].Data.AsSpan(0, 8).ToArray()));
+        Reject<InvalidDataException>(() => Receive(corruptedPeerDl, local64),
+            "Premature short peer CF rejected using RX_DL from its FF.");
+
         var longTx = new QueueLink();
         longTx.Replies.Enqueue(RX(true, 0x30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         var fd64 = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8, 64, true,
