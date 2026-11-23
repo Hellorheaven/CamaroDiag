@@ -1077,11 +1077,18 @@ fun AdapterScreen(
                             Text(stringResource(R.string.adapter_disconnect_label))
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
-                        BadgeChip("CAN TX", adapter.supportsCanTransmit)
-                        BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
-                        BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
+                    if (isJ2534BridgeConnected) {
+                        Text(
+                            stringResource(R.string.adapter_j2534_capabilities_guidance),
+                            fontSize = 12.sp, color = TextMuted
+                        )
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
+                            BadgeChip("CAN TX", adapter.supportsCanTransmit)
+                            BadgeChip(stringResource(R.string.swcan_wiring_verified), adapter.supportsSwCan)
+                            BadgeChip(stringResource(R.string.long_response_mode), adapter.supportsLongFrames)
+                        }
                     }
                     if (adapter.rawProbeLog.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
