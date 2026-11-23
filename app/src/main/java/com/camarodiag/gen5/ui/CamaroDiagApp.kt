@@ -187,6 +187,7 @@ fun CamaroDiagApp(
     val legacyVehicleImportAvailable by viewModel.legacyVehicleImportAvailable.collectAsState()
     val selectedSavedVehicleId by viewModel.selectedSavedVehicleId.collectAsState()
     val adapter by viewModel.adapter.collectAsState()
+    val connectionGeneration by viewModel.connectionGeneration.collectAsState()
     val lastConnectionProfile by viewModel.lastConnectionProfile.collectAsState()
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val usbDevices by viewModel.usbDevices.collectAsState()
@@ -710,7 +711,7 @@ fun CamaroDiagApp(
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
                     onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { approval -> viewModel.clearDtcs(approval) })
+                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, connectionGeneration, { viewModel.scanDtcs() }, { approval, epoch -> viewModel.clearDtcs(approval, epoch) })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { withExportFolder { viewModel.saveCurrentSession() } })
                 DiagTab.ABOUT -> LazyColumn {
                     item { AboutUpdateCard() }
@@ -2459,11 +2460,13 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, onScan: () -> Unit, onClear: (EcuWriteConsentFlow.Approval) -> Unit) {
+fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, connectionGeneration: Long, onScan: () -> Unit, onClear: (EcuWriteConsentFlow.Approval, Long) -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
+    var pendingClearGeneration by remember { mutableStateOf<Long?>(null) }
     var clearConsentStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
-    LaunchedEffect(vehicle.vin, vehicle.modelYear) {
+    LaunchedEffect(vehicle.vin, vehicle.modelYear, connectionGeneration) {
         confirmClear = false
+        pendingClearGeneration = null
         clearConsentStep = EcuWriteConsentFlow.Step.WARNING
     }
     val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
@@ -2539,6 +2542,7 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                     OutlinedButton(onClick = onScan) { Text(stringResource(R.string.dtc_scan)) }
                     Button(onClick = {
                         clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+                        pendingClearGeneration = connectionGeneration
                         confirmClear = true
                     }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
                         Text(stringResource(R.string.dtc_clear), color = Color.White)
@@ -2622,11 +2626,14 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                             clearConsentStep = EcuWriteConsentFlow.afterWarningOk(clearConsentStep)
                         } else {
                             val approval = EcuWriteConsentFlow.approval(
-                                clearConsentStep, confirmedYes = true, sameConnection = true
+                                clearConsentStep, confirmedYes = true,
+                                sameConnection = pendingClearGeneration == connectionGeneration
                             )
+                            val epoch = pendingClearGeneration
                             confirmClear = false
+                            pendingClearGeneration = null
                             clearConsentStep = EcuWriteConsentFlow.Step.WARNING
-                            if (approval != null) onClear(approval)
+                            if (approval != null && epoch != null) onClear(approval, epoch)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = WarnRed)
