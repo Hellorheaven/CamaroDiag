@@ -25,11 +25,11 @@ internal static class StandardProtocolCli
         var index = int.Parse(Required(args, "--adapter-index"),
             CultureInfo.InvariantCulture);
         var baud = Number(Required(args, "--baud"));
-        var source = (byte)Number(Required(args, "--source"));
-        var target = (byte)Number(Required(args, "--target"));
-        var pgn = (int)Number(Required(args, "--pgn"));
-        var priority = (byte)Number(Optional(args, "--priority") ?? "6");
-        var window = (byte)Number(Optional(args, "--receive-window") ?? "16");
+        var source = checked((byte)Number(Required(args, "--source")));
+        var target = checked((byte)Number(Required(args, "--target")));
+        var pgn = checked((int)Number(Required(args, "--pgn")));
+        var priority = checked((byte)Number(Optional(args, "--priority") ?? "6"));
+        var window = checked((byte)Number(Optional(args, "--receive-window") ?? "16"));
         var mode = Required(args, "--mode").ToLowerInvariant();
         var broadcast = bool.Parse(Optional(args, "--broadcast") ?? "false");
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
