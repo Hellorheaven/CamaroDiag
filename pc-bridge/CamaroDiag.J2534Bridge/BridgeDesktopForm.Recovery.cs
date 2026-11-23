@@ -49,6 +49,8 @@ internal sealed partial class BridgeDesktopForm
                 {
                     var report = await Task.Run(() =>
                         NativeE39FileWriteJournal.InspectDetailed(dialog.FileName));
+                    var savedBlocks = await Task.Run(() =>
+                        NativeE39SavedBlockAssessment.Inspect(dialog.FileName));
                     var lines = new List<string>
                     {
                         "Fichier : " + Path.GetFileName(dialog.FileName),
@@ -67,6 +69,17 @@ internal sealed partial class BridgeDesktopForm
                         lines.Add("Séquence non validée : les compteurs ne constituent pas une preuve.");
                     if (report.PossiblyIncompleteAddress is uint address)
                         lines.Add($"Secteur potentiellement incomplet : 0x{address:X8}");
+                    lines.Add("");
+                    lines.Add("Sauvegardes PHYSIQUES des secteurs originaux : " +
+                        (savedBlocks.Verified ? "INTÈGRES" : "NON VÉRIFIÉES"));
+                    lines.Add($"Secteurs originaux contrôlés : {savedBlocks.Blocks.Count}/{savedBlocks.ExpectedSectors}");
+                    if (!savedBlocks.Verified)
+                        lines.Add("Anomalie sauvegarde : " + savedBlocks.Problem);
+                    lines.Add("Aucun secteur ne sera restauré automatiquement.");
+                    lines.Add("Recette véhicule après écriture : identité ECU, checksum OEM, DTC avant/après, " +
+                        "démarrage, ralenti, contrôles statiques, essai conduit par l'opérateur.");
+                    lines.Add("Avant restauration : confirmer l'état physique, les blocs, l'outil, " +
+                        "le mode récupération et une NOUVELLE autorisation OK puis Oui/Non.");
                     lines.Add("");
                     lines.Add(report.RequiresAssessment
                         ? "Évaluation manuelle nécessaire : conserver les preuves, vérifier l'alimentation, " +
