@@ -13,6 +13,90 @@ internal static class StandardProtocolCli
 {
     internal const string DoIpCommand = "--doip-exchange";
     internal const string PassThruCommand = "--j2534-standard";
+    internal const string RawIsoTpCommand = "--isotp-exchange";
+
+    internal sealed record IsoTpOptions(
+        int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
+        byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs);
+
+    internal static IsoTpOptions ParseIsoTp(string[] args)
+    {
+        var index = int.Parse(Required(args, "--adapter-index"),
+            CultureInfo.InvariantCulture);
+        var bitrate = Number(Required(args, "--baud"));
+        static uint ParseCanId(string input) => uint.Parse(
+            input.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
+                input[2..] : input,
+            NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
+        var tx = ParseCanId(Required(args, "--tx-id"));
+        var rx = ParseCanId(Required(args, "--rx-id"));
+        var fd = bool.Parse(Optional(args, "--fd") ?? "true");
+        var length = int.Parse(Optional(args, "--tx-dl") ?? (fd ? "64" : "8"),
+            CultureInfo.InvariantCulture);
+        var bs = byte.Parse(Optional(args, "--block-size") ?? "8",
+            CultureInfo.InvariantCulture);
+        var stMin = byte.Parse(Optional(args, "--stmin") ?? "0",
+            CultureInfo.InvariantCulture);
+        var extended = bool.Parse(Optional(args, "--extended") ?? "false");
+        var brs = bool.Parse(Optional(args, "--brs") ?? "false");
+        var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
+            CultureInfo.InvariantCulture);
+        var bytes = Hex(Required(args, "--payload"));
+        var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd, bs, stMin);
+        setting.Validate();
+        if (index < 0 || bitrate == 0 || timeout is < 100 or > 30000 ||
+            bytes.Length > IsoTpCanFdSession.MaximumPayloadBytes ||
+            tx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
+            rx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
+            (!fd && brs))
+            throw new ArgumentException("Invalid ISO-TP physical address or J2534 option.");
+        return new(index, bitrate, setting, bytes, timeout, extended, brs);
+    }
+
+    internal static async Task<int> RunIsoTpAsync(string[] args)
+    {
+        try
+        {
+            var o = ParseIsoTp(args);
+            var adapters = J2534Registry.Discover();
+            if (o.AdapterIndex >= adapters.Count)
+                throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
+            if (!Confirm($"ISO-TP {(o.Settings.CanFd ? "CAN FD" : "CAN")} " +
+                $"TX=0x{o.Settings.TxId:X} RX=0x{o.Settings.RxId:X}, " +
+                $"payload={Convert.ToHexString(o.Request)}"))
+                return 2;
+            // The RAW CAN/FD_CAN channel is required: J2534 ISO15765 already
+            // performs its own ISO-TP segmentation and must not be double-framed.
+            using var driver = J2534StandardChannel.Connect(adapters[o.AdapterIndex],
+                o.Settings.CanFd ? J2534StandardChannel.FdCan :
+                J2534StandardChannel.Can, o.Bitrate,
+                o.ExtendedId ? 0x100u : 0u);
+            var mask = new byte[4];
+            var pattern = new byte[4];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(
+                mask, o.ExtendedId ? 0x1FFF_FFFFu : 0x7FFu);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(
+                pattern, o.Settings.RxId);
+            driver.ConfigureFilter(mask, pattern);
+            var link = new IsoTpJ2534RawCanLink(driver, o.Settings.CanFd,
+                o.ExtendedId, o.Brs);
+            var limit = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            await IsoTpCanFdSession.SendAsync(link, o.Settings, o.Request,
+                limit, CancellationToken.None);
+            var reply = await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
+                limit, CancellationToken.None);
+            Console.WriteLine("ISO-TP ECU RX: " + Convert.ToHexString(reply));
+            return 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or
+            InvalidOperationException or TimeoutException or
+            DllNotFoundException or BadImageFormatException or
+            EntryPointNotFoundException)
+        {
+            Console.Error.WriteLine("ISO-TP exchange failed: " + ex.Message);
+            return 6;
+        }
+    }
 
     internal sealed record DoIpOptions(string Host, ushort Tester, ushort Ecu,
         byte[] Request, int TimeoutMs);
