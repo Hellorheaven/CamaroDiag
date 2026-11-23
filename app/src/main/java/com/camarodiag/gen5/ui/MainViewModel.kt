@@ -3974,16 +3974,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return if (isFr) entry.second else entry.first
     }
 
-    fun clearDtcs(approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long) {
+    fun clearDtcs(
+        approval: EcuWriteConsentFlow.Approval,
+        confirmedConnection: Long,
+        confirmedVehicle: VehicleProfile
+    ) {
         require(approval.warningAcknowledged && approval.confirmedYes) {
             "The ECU write warning OK and subsequent YES are required."
         }
-        // The two UI confirmations must refer to the same physical session,
-        // not merely the adapter that happens to be connected at click time.
-        if (confirmedConnection != connectionAttemptGeneration) return
+        // The warning, YES and eventual command must refer to exactly the
+        // same connection and vehicle identity, including VIN/profile changes.
+        if (confirmedConnection != connectionAttemptGeneration ||
+            confirmedVehicle != _vehicle.value) return
         val account = accountSessionGeneration
         val connection = confirmedConnection
-        fun current() = isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration
+        fun current() = isCurrentAccountGeneration(account) &&
+            connection == connectionAttemptGeneration &&
+            confirmedVehicle == _vehicle.value
         viewModelScope.launch {
             if (!current()) return@launch
             beginBusyOperation()
