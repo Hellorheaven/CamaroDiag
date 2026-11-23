@@ -119,6 +119,7 @@ internal static class StandardVehicleProtocols
 internal static class DoIpCodec
 {
     internal const byte Version = 0x02;
+    internal const ushort GenericNegativeAck = 0x0000;
     internal const ushort VehicleIdentificationRequest = 0x0001;
     internal const ushort VehicleIdentificationRequestEid = 0x0002;
     internal const ushort VehicleIdentificationRequestVin = 0x0003;
@@ -151,6 +152,29 @@ internal static class DoIpCodec
         BinaryPrimitives.WriteUInt32BigEndian(frame.AsSpan(4), (uint)payload.Length);
         payload.CopyTo(frame.AsSpan(8));
         return frame;
+    }
+
+    /// <summary>
+    /// ISO 13400 generic header NACK is independent of diagnostic
+    /// acknowledgement (0x8003). Do not report it as an unrelated UDS
+    /// response or pretend the requested command succeeded.
+    /// </summary>
+    internal static void RequireNoGenericNack(Message message)
+    {
+        if (message.Type != GenericNegativeAck) return;
+        if (message.Payload.Length != 1 || message.Payload[0] > 4)
+            throw new InvalidDataException("Malformed DoIP generic header NACK.");
+        var reason = message.Payload[0] switch
+        {
+            0 => "invalid header pattern",
+            1 => "unsupported payload type",
+            2 => "payload too large",
+            3 => "out of buffer memory",
+            4 => "invalid payload length",
+            _ => "unknown"
+        };
+        throw new IOException(
+            $"DoIP generic header NACK 0x{message.Payload[0]:X2} ({reason}).");
     }
 
     internal static int ReadPayloadLength(ReadOnlySpan<byte> header)
