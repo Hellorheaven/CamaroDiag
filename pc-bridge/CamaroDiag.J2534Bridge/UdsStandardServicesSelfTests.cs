@@ -129,6 +129,30 @@ internal static class UdsStandardServicesSelfTests
                 [0x62, 0xF4, 0x0D, 0x12]),
             "OBDonUDS DID response cannot be confused with another DID.");
 
+        Check(UdsStandardServices.RequireResponse(
+                [0x19, 0x42, 0x33, 0xFF, 0x08],
+                [0x59, 0x42, 0x33, 0xAF, 0x80, 0x04]).Length == 6,
+            "Correlated WWH emissions DTC response accepts exact group 0x33.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse(
+                [0x19, 0x42, 0x33, 0xFF, 0x08],
+                [0x59, 0x42, 0xD0, 0xAF, 0x80, 0x04]),
+            "UDS must not attribute a safety-system response to emissions DTCs.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse(
+                [0x19, 0x55, 0x33],
+                [0x59, 0x55, 0xD0, 0xFF, 0x04]),
+            "Permanent WWH DTC group must match the requested group.");
+        Check(UdsStandardServices.RequireResponse(
+                [0x19, 0x56, 0x33, 0x06],
+                [0x59, 0x56, 0x33, 0xFF, 0x04, 0x06]).Length == 6,
+            "WWH DTC readiness-group ID is echoed at its specified offset.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse(
+                [0x19, 0x56, 0x33, 0x06],
+                [0x59, 0x56, 0x33, 0xFF, 0x04, 0x07]),
+            "Reply for a different readiness group cannot pass UDS validation.");
+
         Equal(ObdOnUdsServices.ReadWwhEmissionsDtcs(0x08),
             "194233FF08", "OBDonUDS confirmed emission DTCs use WWH 0x42.");
         Equal(ObdOnUdsServices.ReadWwhEmissionsDtcs(0x04, 0x80),
