@@ -213,3 +213,6 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Réponses ACK/NACK PGN 0xE800 et revendication d'adresse physique J1939-81 restent non traitées/qualifiées.
 
 - J1939-21 : traitement des réponses ACKM PGN E800 en mode requête, y compris NACK, accès refusé et corrélation au PGN attendu. Tests de sessions concurrentes ajoutés, non exécutés ; un ACK ne certifie pas l'exécution d'une commande ECU.
+
+## DoIP — réception passive des annonces (23/11/2026)
+- Option `--doip-discover --listen true` : écoute UDP 13400, collecte bornée des annonces sans émission. Port disponible et pare-feu nécessaires ; aucun essai réel confirmé ni CI exécutée.
