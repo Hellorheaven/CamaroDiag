@@ -330,6 +330,22 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(DoIpCodec.IsCorrelatedDiagnosticAck(
             positiveAck, 0x0E80, 0x1234),
             "DoIP positive ACK code zero is accepted for the active ECU.");
+        var echoedAck = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.DiagnosticPositiveAck,
+            [0x12, 0x34, 0x0E, 0x80, 0x00, 0x22, 0xF1]));
+        Check(DoIpCodec.IsCorrelatedDiagnosticAck(
+                echoedAck, 0x0E80, 0x1234, [0x22, 0xF1, 0x90]),
+            "DoIP ACK echoed prefix must belong to active UDS request.");
+        Check(!DoIpCodec.IsCorrelatedDiagnosticAck(
+                echoedAck, 0x0E80, 0x1234, [0x2E, 0xF1, 0x90]),
+            "Stale DoIP ACK for another UDS service is not correlated.");
+        var overlongAck = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.DiagnosticPositiveAck,
+            [0x12, 0x34, 0x0E, 0x80, 0x00, 0x22, 0xF1, 0x90, 0x41]));
+        Check(!DoIpCodec.IsCorrelatedDiagnosticAck(
+                overlongAck, 0x0E80, 0x1234, [0x22, 0xF1, 0x90]),
+            "DoIP ACK cannot contain more echoed data than the active request.");
+
         var corruptAck = DoIpCodec.Decode(DoIpCodec.Encode(
             DoIpCodec.DiagnosticPositiveAck,
             [0x12, 0x34, 0x0E, 0x80, 0x7F]));
