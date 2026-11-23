@@ -233,6 +233,24 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(kwpWireCli.KwpRxTarget == 0xF1 &&
             kwpWireCli.KwpRxSource == 0x33,
             "KWP opt-in physical response framing selects expected addresses.");
+        var passiveKline = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0x04", "--baud", "10400",
+            "--mode", "receive", "--read-frames", "3"]);
+        Check(passiveKline.Mode == "receive" && passiveKline.Data.Length == 0 &&
+            passiveKline.ReadFrames == 3,
+            "J2534 K-Line receive mode never builds an outgoing diagnostic payload.");
+        var passiveVpw = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0x01", "--baud", "10400",
+            "--mode", "receive"]);
+        Check(passiveVpw.Mode == "receive" && passiveVpw.Data.Length == 0,
+            "J2534 J1850 receive-only mode uses vendor RX channel.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0x04", "--baud", "10400",
+            "--mode", "receive", "--data", "22F190"]),
+            "J2534 passive receive refuses hidden TX payload.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
             StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
             "--protocol-id", "0x04", "--baud", "10400",
