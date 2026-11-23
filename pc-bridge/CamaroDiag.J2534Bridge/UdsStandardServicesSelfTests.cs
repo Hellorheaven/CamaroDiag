@@ -137,6 +137,17 @@ internal static class UdsStandardServicesSelfTests
             UdsStandardServices.DecodeTransferParameters(
                 0x34, [0x75, 0x10, 0x81]),
             "Upload reply cannot be attributed to a pending download.");
+        var wideTransfer = UdsStandardServices.DecodeTransferParameters(
+            0x34, [0x74, 0x80,
+                0, 0, 0, 1, 0, 0, 0, 0]);
+        Check(wideTransfer.LengthFieldBytes == 8 &&
+            wideTransfer.MaxNumberOfBlockLength == 0x1_0000_0000UL &&
+            wideTransfer.MaxDataBytes == 0xFFFF_FFFEUL,
+            "ISO 14229 eight-byte transfer limit is parsed without int overflow.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.DecodeTransferParameters(
+                0x35, [0x75, 0x80, 0, 0, 0, 1, 0, 0, 0]),
+            "Truncated eight-byte UDS upload block size is rejected.");
         Reject<InvalidDataException>(() =>
             UdsStandardServices.DecodeTransferParameters(
                 0x34, [0x74, 0x21, 0x10, 0x02]),
