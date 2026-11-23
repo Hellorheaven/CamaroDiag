@@ -167,3 +167,7 @@ Les requêtes PGN peuvent recevoir une réponse standard **ACKM** (PGN 0xE800) p
 La commande `--j2534-standard --mode receive` interdit également `--kline-init` : `FIVE_BAUD_INIT` et `FAST_INIT` sont des actions de signalisation physique qui pourraient transmettre malgré l'absence de `--data`. Pour initialiser K-Line, sélectionner explicitement une transaction avec consentement opérateur ; ne pas assimiler l'ouverture d'un canal passif à la création d'une session K-Line prête à diagnostiquer.
 
 La prise en charge du format mixte sur identifiants CAN **11 bits** a été confirmée dans les tableaux de cadrage ISO 15765-2 puis ajoutée aux paramètres et aux tests CLI. Le moteur applique le même N_AE sur SF/FF/CF/FC ; il ne présume aucune cartographie d'identifiants constructeur.
+
+### DoIP — requêtes UDP d'état
+
+`CamaroDiag.J2534Bridge.exe --doip-status --host 192.0.2.10 --timeout-ms 2000` consulte le statut de l'entité (requête 0x4001, réponse 0x4002), incluant type de nœud, nombre de sockets ouvertes/maximales et taille de message maximale facultative. Ajouter `--power-mode true` pour la requête 0x4003 / réponse 0x4004 : 0=pas prêt, 1=prêt, 2=non pris en charge. Il s'agit de messages **UDP de contrôle/observation**, sans service UDS ni écriture ECU ; le « mode prêt » annoncé ne valide ni l'autorisation de programmation ni l'état réel de la tension. Tests des formats ajoutés, non exécutés ; essais sur passerelle réelle non réalisés.
