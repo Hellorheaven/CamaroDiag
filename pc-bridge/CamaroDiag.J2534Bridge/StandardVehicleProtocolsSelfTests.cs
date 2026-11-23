@@ -423,6 +423,17 @@ internal static class StandardVehicleProtocolsSelfTests
             "--obd-identify", "--payload", "22F810"]),
             "Protocol identification cannot be combined with raw DoIP payload.");
 
+        var monitorDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234", "--obd-did", "0xF600"]);
+        Check(monitorDoIp.Request.SequenceEqual(new byte[] {0x22, 0xF6, 0x00}),
+            "DoIP OBDonUDS legacy monitor DID uses ReadDataByIdentifier.");
+        var informationDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234", "--obd-did", "0xF810"]);
+        Check(informationDoIp.Request.SequenceEqual(new byte[] {0x22, 0xF8, 0x10}),
+            "DoIP OBDonUDS protocol information F810 can be selected.");
+
         var obdDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
