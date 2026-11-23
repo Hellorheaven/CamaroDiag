@@ -696,7 +696,7 @@ internal static class StandardProtocolCli
     internal sealed record IsoTpOptions(
         int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
         byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs, uint? DataBaud,
-        string Mode, bool ValidateUds = false);
+        string Mode, bool ValidateUds = false, bool InterpretJ1979 = false);
 
     internal static IsoTpOptions ParseIsoTp(string[] args)
     {
@@ -742,6 +742,7 @@ internal static class StandardProtocolCli
             CultureInfo.InvariantCulture);
         var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
         var udsValidate = bool.Parse(Optional(args, "--uds-validate") ?? "false");
+        var interpretJ1979 = bool.Parse(Optional(args, "--j1979-decode") ?? "false");
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
         var udsDids = Optional(args, "--uds-dids");
@@ -780,7 +781,8 @@ internal static class StandardProtocolCli
             (obdIdentify ? 1 : 0);
         if (mode is not ("exchange" or "receive") ||
             (mode == "exchange" && payloadSources != 1) ||
-            (mode == "receive" && (payloadSources != 0 || udsValidate)))
+            (mode == "receive" && (payloadSources != 0 || udsValidate || interpretJ1979)) ||
+            (interpretJ1979 && udsValidate))
             throw new ArgumentException(
                 "Exchange needs exactly one payload, file, OBD DID or DTC mask; receive mode accepts none.");
         byte[] bytes = mode == "receive" ? Array.Empty<byte>() :
@@ -823,7 +825,7 @@ internal static class StandardProtocolCli
                 udsDids is not null || obdDtcMask is not null || wwhStatus is not null ||
                 wwhPermanent || wwhReadiness is not null ||
                 snapshotDtc is not null || extendedDtc is not null ||
-                obdIdentify);
+                obdIdentify, interpretJ1979);
     }
 
     internal static async Task<int> RunIsoTpAsync(string[] args)
@@ -870,6 +872,12 @@ internal static class StandardProtocolCli
                 await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
                     limit, CancellationToken.None);
             Console.WriteLine("ISO-TP ECU RX: " + Convert.ToHexString(reply));
+            if (o.InterpretJ1979)
+            {
+                var decoded = ObdJ1979Interpretation.Interpret(o.Request, reply);
+                Console.WriteLine(decoded.Description);
+                if (!decoded.Positive) return 7;
+            }
             if (o.Mode == "exchange")
             {
                 PrintMultiDidResponse(args, o.Request, reply);
