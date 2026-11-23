@@ -5,6 +5,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -31,11 +32,44 @@ object EcuRestorePortableBundle {
         ZipOutputStream(output).use { zip ->
             names.forEach { name ->
                 val source = File(packageDirectory, name)
+                val duringCopy = MessageDigest.getInstance("SHA-256")
                 zip.putNextEntry(ZipEntry(name))
                 source.inputStream().buffered().use { input ->
-                    input.copyTo(zip, 8192)
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (count == 0) continue
+                        duringCopy.update(buffer, 0, count)
+                        zip.write(buffer, 0, count)
+                    }
                 }
                 zip.closeEntry()
+                // An offline package is a mutable directory. Detect files that
+                // change while being copied rather than publishing a torn ZIP.
+                val afterCopy = MessageDigest.getInstance("SHA-256")
+                source.inputStream().buffered().use { input ->
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (count > 0) afterCopy.update(buffer, 0, count)
+                    }
+                }
+                check(duringCopy.digest().contentEquals(afterCopy.digest())) {
+                    "ECU restore package source changed during ZIP export"
+                }
+            }
+            // Re-read signed-by-content metadata and each region image after
+            // export, comparing with the independent pre-export verification.
+            val reopened = EcuRestorePackage.open(packageDirectory)
+            check(reopened.identity == verified.identity &&
+                reopened.regions.size == verified.regions.size &&
+                reopened.regions.zip(verified.regions).all { (now, before) ->
+                    now.geometry == before.geometry &&
+                        now.bytes().contentEquals(before.bytes())
+                }) {
+                "ECU restore package changed after initial verification"
             }
         }
     }
