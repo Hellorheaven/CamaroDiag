@@ -973,4 +973,7 @@
     <string name="ecu_write_yes">Oui</string>
     <string name="ecu_write_no">Non</string>
     <string name="ecu_write_cancel">Annuler</string>
+    <string name="flexfuel_lfx2012_export_history">Exporter %1$d relevés carburant (CSV)</string>
+    <string name="flexfuel_lfx2012_history_saved">Historique carburant exporté en lecture seule.</string>
+    <string name="flexfuel_lfx2012_history_failed">Impossible d’exporter l’historique carburant.</string>
 </resources>
