@@ -3,3 +3,6 @@ Branch: chore/unified-ci
 C1 implementation baseline: d56e1363c853bcb19b48c498e6d6e3514846f3f4
 Scope: communication, diagnostic, Android app unit tests; Windows J2534 Debug compilation/self-tests.
 Full PR Debug validation stays reserved for C8. No vehicle write, no Release, no merge.
+
+C1 integrated console event journal follow-up: 45756aa779759d1abb29c59fa04fbe1f967df9ad
+Validation scope: complete TX/RX/SYSTEM journal, app/communication tests; once per finished lot only.
