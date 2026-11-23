@@ -1,5 +1,6 @@
 package com.camarodiag.gen5.data.obd
 
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -48,6 +49,7 @@ object EcuRestorePortableBundle {
         val names = mutableListOf<String>()
         val source = EcuZipCompletionGuard(input, MAX_TOTAL_BYTES + 1024L * 1024)
         var uncompressed = 0L
+        var indexBytes: ByteArray? = null
         ZipInputStream(source).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
@@ -59,9 +61,7 @@ object EcuRestorePortableBundle {
                 val limit = if (name == "index.ecu-package") MAX_INDEX_BYTES
                     else MAX_REGION_FILE_BYTES
                 var written = 0L
-                val target = File(directory, name)
-                check(target.createNewFile()) { "ECU image archive member already exists" }
-                FileOutputStream(target).use { file ->
+                fun copyEntry(consume: (ByteArray, Int) -> Unit) {
                     val buffer = ByteArray(8192)
                     while (true) {
                         val count = zip.read(buffer)
@@ -72,15 +72,44 @@ object EcuRestorePortableBundle {
                         require(written <= limit && uncompressed <= MAX_TOTAL_BYTES) {
                             "ECU image archive decompressed size limit exceeded"
                         }
-                        file.write(buffer, 0, count)
+                        consume(buffer, count)
                     }
-                    file.fd.sync()
+                }
+                if (name == "index.ecu-package") {
+                    // Do NOT publish the authoritative index before the ZIP footer
+                    // and all member checks have completed successfully.
+                    val buffered = ByteArrayOutputStream()
+                    copyEntry { buffer, count -> buffered.write(buffer, 0, count) }
+                    indexBytes = buffered.toByteArray()
+                } else {
+                    val target = File(directory, name)
+                    check(target.createNewFile()) { "ECU image archive member already exists" }
+                    FileOutputStream(target).use { file ->
+                        copyEntry { buffer, count -> file.write(buffer, 0, count) }
+                        file.fd.sync()
+                    }
                 }
                 names += name
                 zip.closeEntry()
             }
             source.requireCompletedArchive(names)
         }
-        return EcuRestorePackage.open(directory)
+        val verifiedIndex = requireNotNull(indexBytes) {
+            "Incomplete ECU image archive: missing package index"
+        }
+        val publishedIndex = File(directory, "index.ecu-package")
+        check(publishedIndex.createNewFile()) { "ECU image package index already exists" }
+        try {
+            FileOutputStream(publishedIndex).use { file ->
+                file.write(verifiedIndex)
+                file.fd.sync()
+            }
+            return EcuRestorePackage.open(directory)
+        } catch (error: Exception) {
+            // Even a plausible but invalid index must not remain as a package
+            // marker after a failed verification.
+            publishedIndex.delete()
+            throw error
+        }
     }
 }
