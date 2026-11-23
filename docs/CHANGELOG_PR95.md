@@ -386,3 +386,6 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 - C2 : suppression de l'index d'un paquet d'image local si la finalisation ou la vérification échoue.
 - Commits supplémentaires : `761d654`, `7832580`, `088116f`, `d773078`, `0d65063`, `92adbdd`, `50d266b`, `28ed4a7`, `673dd18`, `d960a0d`, `fc71a73`. La compilation et le comportement sur matériel réel restent à confirmer.
 
+
+
+- ISO 14229 / OBDonUDS : lecture standard d'instantanés DTC `19 04`, avec DTC 24 bits et numéro de record explicites, octets DID conservés bruts, refus des réponses d'un autre DTC et tests sur ISO-TP / DoIP. Aucune écriture induite ; tests non exécutés.
