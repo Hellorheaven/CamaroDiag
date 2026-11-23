@@ -189,7 +189,11 @@ internal static class StandardProtocolCli
             payloadFile is not null ? File.ReadAllBytes(payloadFile) : [];
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
-        if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
+        // Large FD.TP transfers require more than 30 seconds when BAM is
+        // paced. Single-frame FEFF remains limited to short operations.
+        var maxTimeout = bam || cmdt ? 600000 : 30000;
+        if (index < 0 || baud == 0 || timeout < 100 ||
+            timeout > maxTimeout ||
             source >= 0xFE || target == 0xFE || source == target ||
             (mode == "receive" && target >= 0xFE) ||
             priority > 7 || mode is not ("send" or "receive") ||
