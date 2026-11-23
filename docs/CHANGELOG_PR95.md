@@ -145,3 +145,5 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 ## DoIP — identification UDP unicast (23/11/2026)
 - Découverte ciblée d'une passerelle connue avec message 0x0001 et réponse 0x0004, extraction VIN/adresse logique/EID/GID et statut facultatif.
 - Commande `--doip-discover --host <IPv4>` ; aucune émission UDS ni basculement vers une autre fonction. Tests codec ajoutés, non exécutés ; broadcast, TLS et banc physique restent ouverts.
+
+- DoIP UDP : ajout des requêtes d'identification par VIN (0x0003) ou EID (0x0002) et du traitement explicite des annonces sans VIN disponible. Tests de codecs et de longueurs ajoutés ; non exécutés.
