@@ -176,3 +176,5 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 ## J1939-73 — DM1/DM2 (23/11/2026)
 - Décodeur DTC/état des voyants pour les PGN FECA/FECB, extraction SPN 19 bits, FMI, occurrences et bit CM après assemblage J1939-21. Affichage CLI en réception, avec trame brute conservée.
 - Tests sur trame directe rembourrée, deux DTC multipaquets et absence de codes ajoutés ; **non exécutés**.
+
+- Correction J1939 DM : lorsque le bit CM indique une méthode ancienne, conserver le DTC brut (4 octets) et afficher SPN « undecoded » au lieu de calculer un SPN selon la méthode moderne ; test de régression ajouté. La méthode ancienne doit encore être qualifiée selon l'ECU et la documentation SAE.
