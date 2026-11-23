@@ -1,5 +1,11 @@
 # PR #95 — Évolutions utilisateur
 
+## Stabilisation des protocoles et diagnostics normalisés (23 novembre 2026 — soir)
+- Comptage des codes défaut OBDonUDS accessible sur CAN/ISO-TP et DoIP.
+- Meilleure gestion des délais de transfert CAN/CAN-FD et des réponses UDS tardives.
+- Corrélation des réponses KWP2000 : réponses positives, négatives et en attente distinguées.
+- Tests logiciels ajoutés ; qualification avec adaptateur et calculateur à poursuivre.
+
 ## J1979/J1979-2 — extension diagnostic standard (23 novembre 2026)
 - Prise en charge de nouveaux paramètres OBD-II normalisés et des résultats de moniteurs (sans interprétation inventée).
 - Détection automatique CAN entre OBDonUDS et OBD-II classique, avec indication lorsque le protocole ne peut pas être confirmé.
