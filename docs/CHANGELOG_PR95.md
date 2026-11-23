@@ -392,3 +392,7 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 
 
 - Complément ISO 14229 / SAE J1979-2 : sous-fonction DTC étendue `0x19/0x06`, numéro d'enregistrement explicite ou `FE` pour les enregistrements législatifs, conservation de la charge utile non interprétée, validation de DTC et tests ISO-TP/DoIP (non exécutés).
+
+### Connecteurs CDJ/1 — ancien point d'entrée désactivé sans coupure de liaison
+
+L'interface n'affiche déjà plus le bouton de capture physique CDJ/1 non implémentée. Le point d'entrée restant du ViewModel se limite maintenant à un état « non vérifié », **sans appel au gestionnaire des transports ni désactivation d'un adaptateur actif**. Aucun faux fichier de récupération n'est créé. Commit `86f3647`. La vraie capture matérielle est toujours reportée au chantier firmware/connecteurs.
