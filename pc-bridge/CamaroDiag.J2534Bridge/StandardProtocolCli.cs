@@ -139,7 +139,7 @@ internal static class StandardProtocolCli
             (mode == "receive" && (hexPayload is not null || payloadFile is not null)))
             throw new ArgumentException(
                 "Exchange needs exactly one payload source; receive mode accepts no payload.");
-        var bytes = mode == "receive" ? [] : payloadFile is null ?
+        byte[] bytes = mode == "receive" ? Array.Empty<byte>() : payloadFile is null ?
             Convert.FromHexString(hexPayload!) : File.ReadAllBytes(payloadFile);
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
             bs, stMin, TxAddress: txAddress, RxAddress: rxAddress);
