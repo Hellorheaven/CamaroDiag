@@ -301,3 +301,9 @@ Les événements TX sont enregistrés au moment de leur émission avec le statut
 - Commit `e27343e`. Tests du correctif non exécutés à la rédaction.
 
 - Renforcement final J1939-22 FD.TP : RTS/CTS dirigé connecté à `--j1939-fd-cmdt`, refus des combinaisons de commandes contradictoires, vérification des champs EOM_ACK/EOM_STATUS, non-régression des sessions CMDT/BAM concurrentes et fenêtres de CTS du pair. Tests écrits, **non exécutés**. Aucune CI par commit ni qualification du pilote J2534 FD_CAN.
+
+## C1/C2 — vérifications d'intégrité supplémentaires, hors protocoles (23/11/2026)
+
+- **C1 :** l'instantané d'export conserve aussi la longueur physique du fichier de journal et l'export est invalidé si celui-ci est tronqué ou grossit après l'instantané sans changement reconnu de génération. Test de troncature externe ajouté. Commits `c5ecc21`, `0bcbe59`.
+- **C2 :** l'export ZIP d'un paquet de restauration hors ligne détecte les modifications du contenu source entre copie et relecture. La vérification finale du paquet compare l'index d'origine et les régions une par une, afin d'éviter de charger deux fois en mémoire un paquet potentiellement volumineux. Tests sur index et région modifiés pendant l'export. Commits `4fbe65a`, `d076af6`, `c31637b`, `e191eb3`.
+- Ces contrôles n'apportent pas de pilote de restauration, de cartographie constructeur, de preuve de sauvegarde physique exhaustive ni de qualification ECU ; aucune CI du nouveau SHA ni essai véhicule confirmés à la rédaction.
