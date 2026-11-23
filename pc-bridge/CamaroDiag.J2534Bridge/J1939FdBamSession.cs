@@ -117,6 +117,12 @@ internal static class J1939FdBamSession
             if (segment.Data.Length < useful ||
                 (next < count && segment.Data.Length != SegmentBytes))
                 throw new InvalidDataException("Truncated J1939-22 FD.TP.DT segment.");
+            // Preserve legitimate trailing 0xFF payload bytes but require
+            // canonical padding after the announced final useful byte.
+            if (next == count && segment.Data.AsSpan(useful)
+                .IndexOfAnyExcept((byte)0xFF) >= 0)
+                throw new InvalidDataException(
+                    "J1939-22 BAM final segment has non-FF padding.");
             segment.Data.AsSpan(0, useful).CopyTo(result.AsSpan(offset));
         }
 
