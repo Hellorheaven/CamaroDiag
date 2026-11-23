@@ -190,6 +190,42 @@ internal static class UdsStandardServicesSelfTests
         Reject<ArgumentOutOfRangeException>(() =>
             UdsStandardServices.SecurityAccess(0, []),
             "Invalid security subfunction rejected");
+        static byte[] AwaitUds(params byte[][] frames)
+        {
+            var pending = new Queue<byte[]>(frames);
+            return UdsResponseSequence.AwaitFinalAsync(
+                [0x22, 0xF1, 0x90],
+                (remaining, token) =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (remaining <= TimeSpan.Zero ||
+                        pending.Count == 0)
+                        throw new TimeoutException("No more fake UDS messages.");
+                    return Task.FromResult(pending.Dequeue());
+                },
+                TimeSpan.FromSeconds(1), CancellationToken.None)
+                .GetAwaiter().GetResult();
+        }
+        Check(AwaitUds([0x7F, 0x22, 0x78],
+                [0x7F, 0x22, 0x78],
+                [0x62, 0xF1, 0x90, 0x41])
+                .SequenceEqual(new byte[] {0x62, 0xF1, 0x90, 0x41}),
+            "UDS ResponsePending messages never masquerade as final DID data.");
+        Reject<TimeoutException>(() =>
+            AwaitUds([0x7F, 0x22, 0x78]),
+            "UDS receive fails if no final answer follows ResponsePending.");
+        Reject<IOException>(() =>
+            AwaitUds([0x7F, 0x22, 0x33]),
+            "UDS genuine SecurityAccessDenied does not trigger another wait.");
+        Reject<InvalidDataException>(() =>
+            AwaitUds([0x7F, 0x31, 0x78]),
+            "UDS pending for another service is rejected.");
+        Reject<InvalidDataException>(() =>
+            AwaitUds([0x7F, 0x22]),
+            "UDS malformed incomplete NRC is rejected.");
+        Reject<InvalidDataException>(() =>
+            AwaitUds([0x62, 0xF1, 0x91]),
+            "UDS final response must echo the requested DID.");
         return checks;
     }
 }
