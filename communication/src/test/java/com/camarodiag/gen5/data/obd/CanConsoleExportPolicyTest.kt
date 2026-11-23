@@ -92,4 +92,22 @@ class CanConsoleExportPolicyTest {
             hasHistory = false, hasRawData = false
         ))
     }
+    @Test fun operatorStopExportsOnlyWhenArchiveClosedCleanly() {
+        assertFalse(CanConsoleExportPolicy.archiveFailedAfterStop(
+            alreadyFailed = false, writerCompleted = true
+        ))
+        assertTrue(CanConsoleExportPolicy.archiveFailedAfterStop(
+            alreadyFailed = false, writerCompleted = false
+        ))
+        assertTrue(CanConsoleExportPolicy.archiveFailedAfterStop(
+            alreadyFailed = true, writerCompleted = true
+        ))
+        assertFalse(CanConsoleExportPolicy.canExport(
+            isCapturing = false, archiveFailed =
+                CanConsoleExportPolicy.archiveFailedAfterStop(false, false),
+            hasHistory = true, hasRawData = true,
+            requiresRawArchive = true, hasRawArchive = true
+        ))
+    }
+
 }
