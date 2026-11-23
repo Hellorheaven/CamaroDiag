@@ -24,6 +24,7 @@ internal sealed class J2534StandardChannel : IDisposable
     internal const uint FdIso15765 = 0x8012;
     internal const uint FiveBaudInitIoctl = 0x04;
     internal const uint FastInitIoctl = 0x05;
+    internal const uint KlineChecksumDisabled = 0x0000_0200; // J2534 ISO9141_NO_CHECKSUM / CHECKSUM_DISABLED
     internal const uint PassFilter = 0x01;
     internal const uint FlowControlFilter = 0x03;
     internal const uint RxTxEcho = 0x01;
