@@ -11,6 +11,13 @@ internal static class NativeScopedMemoryReader
 {
     internal const int MaximumUiCaptureBytes = 16 * 1024 * 1024;
 
+    // A 16 MiB capture with small read blocks can issue hundreds of thousands
+    // of successful requests. Posting one WinForms Progress<T> callback per
+    // request exhausts the UI message queue without changing any ECU data.
+    internal static bool ShouldReportProgress(int blocks, int completed, int total) =>
+        blocks > 0 && completed > 0 && completed <= total &&
+            (blocks % 32 == 0 || completed == total);
+
     internal sealed class LiveVinMismatchException :
         UnauthorizedAccessException
     {
@@ -204,7 +211,8 @@ internal static class NativeScopedMemoryReader
                 data.CopyTo(output, offset);
                 offset += length;
                 blocks++;
-                progress?.Report((pass, offset, size));
+                if (ShouldReportProgress(blocks, offset, size))
+                    progress?.Report((pass, offset, size));
             }
             if (pass == 1)
             {

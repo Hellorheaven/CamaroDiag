@@ -111,10 +111,30 @@ internal static class NativeScopedMemoryReaderSelfTests
                verified.StartAddress == 0x80001000 &&
                verified.ExpectedVin == "1G1FA1RXXR0123456",
             "Verified memory captures retain scoped VIN, address and SHA256");
-        Assert(progress.Reports.Count == 6 &&
-               progress.Reports[0] == (1, 128, 300) &&
+        Assert(progress.Reports.Count == 2 &&
+               progress.Reports[0] == (1, 300, 300) &&
                progress.Reports[^1] == (2, 300, 300),
-            "Independent passes emit monotonic progress");
+            "Short independent passes always report their final progress");
+        Assert(!NativeScopedMemoryReader.ShouldReportProgress(1, 64, 5000) &&
+               !NativeScopedMemoryReader.ShouldReportProgress(31, 1984, 5000) &&
+               NativeScopedMemoryReader.ShouldReportProgress(32, 2048, 5000) &&
+               NativeScopedMemoryReader.ShouldReportProgress(79, 5000, 5000),
+            "Progress is throttled to every 32 blocks and the end of each pass");
+        var larger = new J2534MemoryReadScope(
+            "1G1FA1RXXR0123456", 0x7E0, 0x7E8, 33,
+            0x80001000, 5000, 64, 1);
+        var largeEcu = new FakeEcu(larger.StartAddress,
+            Enumerable.Range(0, 5000).Select(i => (byte)i).ToArray());
+        var largeProgress = new ProgressCount();
+        var largerRead = NativeScopedMemoryReader.ReadTwiceAsync(
+            largeEcu, larger, largeProgress, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(largerRead.BlocksPerPass == 79 && largeEcu.Calls == 158 &&
+               largeProgress.Reports.Count == 6 &&
+               largeProgress.Reports[0] == (1, 2048, 5000) &&
+               largeProgress.Reports[1] == (1, 4096, 5000) &&
+               largeProgress.Reports[2] == (1, 5000, 5000) &&
+               largeProgress.Reports[^1] == (2, 5000, 5000),
+            "Two long passes preserve all reads without flooding the Windows UI");
         Assert(Convert.ToHexString(NativeScopedMemoryReader.BuildReadRequest(
                scope, 0x80001080, 128)) == "23148000108080",
             "UDS 23 ALFI address and one-byte size framing");
