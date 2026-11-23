@@ -48,3 +48,10 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Les limites physiques et l'exhaustivité du plan constructeur ne sont jamais déduites du simple contenu d'une archive. Une couverture du plan fourni n'est **pas** une image garantie complète ECU.
 - Tests ajoutés pour les tailles fausses, les cartes mémoire inconnues, les trous et les captures hors périmètre.
 - **Code commité, validations non lancées sur ces commits** ; aucune qualification de restauration réelle annoncée.
+
+## C2 — paquet transportable de sauvegarde des images ECU
+- Export des régions d'image déjà vérifiées dans **un fichier ZIP unique**, contenant index et données binaires, sans changer les protocoles de communication.
+- Réimport dans un nouveau dossier uniquement ; vérification des noms attendus, limites de volume, fin effective de ZIP, index de couverture et SHA-256 des régions. Rejet des ZIP tronqués, altérés, avec fichiers inattendus ou membres non conformes.
+- Tests ajoutés pour aller-retour des octets, adresses physiques et VIN, ZIP incomplet et chemins non attendus.
+- Cette archive reste **une sauvegarde portable hors ligne**, et non une image certifiée complète et restaurable sur le véhicule : la cartographie intégrale et le pilote OEM de programmation/récupération physique demeurent à qualifier.
+- Tests de ces modifications **non encore exécutés**, conformément à la règle de validation par chantier.
