@@ -506,6 +506,14 @@ class LocaleResourcesIntegrityTest {
         assertFalse(english == french)
     }
 
+    @Test fun missingCurrentEthanolValueIsNotPresentedAsFresh() {
+        val en = strings("en").getValue("flexfuel_lfx2012_ethanol_no_current_measurement")
+        val fr = strings("fr").getValue("flexfuel_lfx2012_ethanol_no_current_measurement")
+        assertTrue(en.contains("historical") && en.contains("current"))
+        assertTrue(fr.contains("historique") && fr.contains("actuelle"))
+        assertFalse(en == fr)
+    }
+
     @Test fun usbPermissionDeniedIsClearlyLocalized() {
         val en = strings("en").getValue("msg_usb_permission_denied")
         val fr = strings("fr").getValue("msg_usb_permission_denied")
