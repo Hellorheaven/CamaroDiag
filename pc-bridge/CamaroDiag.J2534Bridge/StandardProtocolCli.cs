@@ -651,7 +651,8 @@ internal static class StandardProtocolCli
     }
 
     internal sealed record DoIpOptions(string Host, ushort Tester, ushort Ecu,
-        byte[] Request, int TimeoutMs, bool UseTls);
+        byte[] Request, int TimeoutMs, bool UseTls, byte Version = 0x02,
+        string? ReceiveFile = null);
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
@@ -719,15 +720,22 @@ internal static class StandardProtocolCli
         var tester = Address(Required(args, "--tester"));
         var ecu = Address(Required(args, "--ecu"));
         var hexPayload = Optional(args, "--payload");
+        var payloadFile = Optional(args, "--payload-file");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var obdIdentify = args.Contains("--obd-identify",
             StringComparer.OrdinalIgnoreCase);
-        if ((hexPayload is null ? 0 : 1) + (obdDid is null ? 0 : 1) +
+        if ((hexPayload is null ? 0 : 1) +
+            (payloadFile is null ? 0 : 1) +
+            (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
             (obdIdentify ? 1 : 0) != 1)
             throw new ArgumentException(
                 "Supply exactly one of --payload, --obd-did or --obd-dtc-mask.");
+        if (payloadFile is not null &&
+            new FileInfo(payloadFile).Length > DoIpCodec.MaxPayload - 4)
+            throw new ArgumentException(
+                "DoIP file payload exceeds the bounded in-memory PDU capacity.");
         var bytes = obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
             obdDid is not null ? ObdOnUdsServices.ReadEmissionsData(
                 checked((ushort)uint.Parse(
@@ -735,14 +743,21 @@ internal static class StandardProtocolCli
                         obdDid[2..] : obdDid,
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
-                checked((byte)Number(obdDtcMask))) : Hex(hexPayload!);
+                checked((byte)Number(obdDtcMask))) :
+            payloadFile is not null ? File.ReadAllBytes(payloadFile) :
+            Hex(hexPayload!);
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
         var useTls = bool.Parse(Optional(args, "--tls") ?? "false");
+        var version = checked((byte)Number(
+            Optional(args, "--doip-version") ?? "2"));
+        var receiveFile = Optional(args, "--rx-file");
         if (host.Length is < 1 or > 253 || timeout is < 100 or > 30000 ||
-            tester == ecu || bytes.Length > DoIpCodec.MaxPayload - 4)
+            tester == ecu || bytes.Length is < 1 or > DoIpCodec.MaxPayload - 4 ||
+            version is not (0x02 or 0x03))
             throw new ArgumentException("DoIP target or diagnostic PDU is invalid.");
-        return new(host, tester, ecu, bytes, timeout, useTls);
+        return new(host, tester, ecu, bytes, timeout, useTls,
+            version, receiveFile);
     }
 
     internal static PassThruOptions ParseJ2534(string[] args)
@@ -797,12 +812,14 @@ internal static class StandardProtocolCli
             var o = ParseDoIp(args);
             if (!Confirm($"DoIP {(o.UseTls ? "TLS" : "TCP")} " +
                 $"{o.Host}:{(o.UseTls ? 3496 : 13400)} ECU=0x{o.Ecu:X4} " +
-                $"UDS={Convert.ToHexString(o.Request)}"))
+                $"v=0x{o.Version:X2} UDS length={o.Request.Length} " +
+                $"SHA256={Convert.ToHexString(
+                    System.Security.Cryptography.SHA256.HashData(o.Request))}"))
                 return 2;
             await using var link = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
-                useTls: o.UseTls);
+                useTls: o.UseTls, protocolVersion: o.Version);
             var reply = await link.ExchangeUdsAsync(o.Request,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None);
             Console.WriteLine("DoIP ECU RX: " + Convert.ToHexString(reply));
