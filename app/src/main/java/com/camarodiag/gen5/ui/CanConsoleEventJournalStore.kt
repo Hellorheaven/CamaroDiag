@@ -17,11 +17,13 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
     private var archive: File? = null
     private var writer: CanConsoleEventJournalWriter? = null
     private var failed = false
+    private var disposed = false
     private var generation = 0L
 
     @Synchronized
     fun append(events: List<CanConsoleHistoryEntry>) {
         if (events.isEmpty()) return
+        check(!disposed) { "Console event journal already disposed" }
         check(!failed) { "Console event journal previously failed" }
         try {
             if (writer == null) {
@@ -50,7 +52,7 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
 
     @Synchronized
     fun snapshot(): Snapshot? {
-        if (failed) return null
+        if (failed || disposed) return null
         val target = writer ?: return null
         try {
             target.flush()
@@ -67,19 +69,32 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
 
     @Synchronized
     fun isCurrent(snapshot: Snapshot): Boolean =
-        !failed && archive == snapshot.file && generation == snapshot.generation &&
+        !failed && !disposed && archive == snapshot.file && generation == snapshot.generation &&
             writer?.eventCount == snapshot.eventCount && snapshot.file.isFile
 
     /** Cheap UI capability check; snapshot() performs the final file flush. */
     @Synchronized
     fun isAvailable(): Boolean =
-        !failed && writer != null && archive?.isFile == true
+        !failed && !disposed && writer != null && archive?.isFile == true
 
     @Synchronized
-    fun hasFailed(): Boolean = failed
+    fun hasFailed(): Boolean = failed || disposed
 
     @Synchronized
     fun reset() {
+        if (disposed) return
+        releaseFile()
+    }
+
+    /** Irreversible on ViewModel destruction: canceled workers cannot resurrect a file. */
+    @Synchronized
+    fun dispose() {
+        if (disposed) return
+        disposed = true
+        releaseFile()
+    }
+
+    private fun releaseFile() {
         val old = archive
         try {
             writer?.close()
