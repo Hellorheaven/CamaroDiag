@@ -369,3 +369,10 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 - Commits principaux : `bbf4a58`, `4080bca`, `511f621`, `8f56400`, `e4918fd`, `866e859`, `a621e28`, `fdbc5ad`, `dd75d80`, `0bc30a9`, `357820c`, `c391c9d`.
 - La conformité complète de C6 **n'est pas acquise** : essais de programmation, sauvegarde réellement restaurable et vérification des blocs ECU sur matériel manquants ; tests du HEAD final non confirmés. Aucune modification des protocoles standards ni nouvelle restriction artificielle d'écriture.
 
+
+
+## SAE J1979-2 / WWH-OBD (23/11/2026)
+- DIDs réglementés F4/F5, F6, F7, F8 exposés sur ISO-TP et DoIP, y compris F810 identification protocolaire. Nouvelles catégories sans décodage d'unités arbitraires.
+- Requêtes/parseurs `0x19/0x42` DTC WWH d'émissions (masques statut/sévérité), `0x19/0x55` DTC permanents, `0x19/0x56` DTC par groupe de readiness, avec tests des réponses vides, trames tronquées et groupes fonctionnels.
+- Contrôle des réponses UDS renforcé contre l'attribution d'une réponse WWH de groupe différent. Commandes CLI exclusives, aucune requête sortante depuis le mode ISO-TP `receive`.
+- Les tests sont écrits et commités, sans exécution CI ni validation physique. Les données constructeur, la cartographie complète J1979DA et les autres sous-fonctions restent à qualifier.
