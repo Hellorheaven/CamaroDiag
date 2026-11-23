@@ -34,3 +34,10 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Raccordement logiciel de la double capture J2534 vérifiée à l'export d'une image de région, sans modifier les couches de protocole.
 - Tests ajoutés pour interruptions, altération, VIN différent, provenance simulée, carte mémoire incomplète et deux régions disjointes.
 - **Pas d'affirmation de sauvegarde complète de l'ECU ni de restauration physique** : cartes mémoire et pilote réel par firmware encore manquants. Les tests de ces commits ne sont pas encore exécutés afin de respecter la campagne regroupée par chantier et l'autre intervention prioritaire sur les protocoles.
+
+## C2 — contrôle d'intégrité des images et vérification de restauration (session suivante)
+- Revalidation des octets importés contre le manifeste au moment même de l'assemblage de l'image : une capture modifiée après import ne peut plus être publiée sans être détectée.
+- Limitation explicite de la taille de chaque image et de la somme des images, et vérification de la forme des identifiants ECU dans les métadonnées.
+- Ajout d'une comparaison indépendante des octets et des adresses physiques après restauration, incluant toutes les régions attendues et l'adresse exacte du premier écart. Ce composant est **hors ligne**, ne commande aucune écriture et ne remplace pas la validation physique d'un pilote.
+- Tests de régression ajoutés pour modification des deux lectures après vérification, mauvaise adresse, longueur, octets différents, régions manquantes ou dupliquées.
+- **Validation de ce complément : non encore exécutée**, chantier C2 non clôturé ; qualification et carte mémoire réelles toujours à établir. Aucune modification des protocoles gérés par l'autre chat.
