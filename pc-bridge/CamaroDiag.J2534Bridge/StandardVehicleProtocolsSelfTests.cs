@@ -455,6 +455,19 @@ internal static class StandardVehicleProtocolsSelfTests
             "--obd-wwh-permanent", "--obd-wwh-status", "0x08"]),
             "Mutually exclusive DoIP WWH permanent and status-filtered requests.");
 
+        var readinessDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-readiness-group", "0x06"]);
+        Check(readinessDoIp.Request.SequenceEqual(
+            new byte[] {0x19, 0x56, 0x33, 0x06}),
+            "DoIP OBDonUDS readiness group uses standard 0x19/0x56.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-readiness-group", "0x06", "--obd-wwh-permanent"]),
+            "DoIP readiness and permanent DTC queries are exclusive.");
+
         var obdDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
