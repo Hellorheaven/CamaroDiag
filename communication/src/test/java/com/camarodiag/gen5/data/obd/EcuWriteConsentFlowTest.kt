@@ -38,6 +38,22 @@ class EcuWriteConsentFlowTest {
         ) != null)
     }
 
+    @Test fun changedVinOrVehicleProfileInvalidatesConsentBeforeDtcClear() {
+        val step = EcuWriteConsentFlow.Step.CONFIRMATION
+        assertEquals(null, EcuWriteConsentFlow.approvalForContext(
+            step, true, 17L, 17L, sameVehicle = false
+        ))
+        assertEquals(null, EcuWriteConsentFlow.approvalForContext(
+            step, true, 17L, 18L, sameVehicle = true
+        ))
+        assertEquals(null, EcuWriteConsentFlow.approvalForContext(
+            EcuWriteConsentFlow.Step.WARNING, true, 17L, 17L, sameVehicle = true
+        ))
+        assertTrue(EcuWriteConsentFlow.approvalForContext(
+            step, true, 17L, 17L, sameVehicle = true
+        ) != null)
+    }
+
     @Test fun closeOrNoOrChangedPhysicalConnectionNeverWrites() {
         val confirmation = EcuWriteConsentFlow.Step.CONFIRMATION
         assertFalse(EcuWriteConsentFlow.permitsWrite(confirmation, false, false))
