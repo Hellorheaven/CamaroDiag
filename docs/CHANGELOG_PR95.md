@@ -131,3 +131,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - **C4 :** un changement de compte ou de connexion efface immédiatement les mesures carburant et leur synthèse ; l'enregistrement de relevés valides se fait sur le dispatcher UI après contrôle de la génération active. Plages min/max des corrections STFT/LTFT des deux bancs ajoutées à l'écran en FR/EN, sans convertir les données manquantes en valeurs.
 - **Régressions :** correction des véritables caractères de contrôle dans le test CSV ; tests de Stop, fermeture d'archive, génération de session et horodatages étendus.
 - **C8 :** demande groupée C4 soumise ; **résultat non confirmé**, ne pas déduire un build vert de la demande de CI. Le HEAD stable et les composants physiques restent à qualifier.
+
+## ISO-TP — DLC de réception indépendant (23/11/2026)
+- Alignement avec ISO 15765-2:2024 : la taille `RX_DL` est établie depuis la première trame reçue du pair ; la taille d'émission locale ne sert pas à valider les trames CF reçues.
+- Tests ajoutés : émetteur local FD 64 octets, pair à 12 octets, et CF non terminal tronqué rejeté.
+- CLI ISO-TP : mode `receive` sans requête diagnostique sortante, avec FlowControl uniquement si une trame FF exige un échange multipaquet. Contrôle du mode/payload complété.
+- Tests écrits et commités, **validation CI non exécutée** sur ces changements ; pas de preuve sur adaptateur ou ECU réel.
