@@ -399,3 +399,6 @@ L'interface n'affiche déjà plus le bouton de capture physique CDJ/1 non implé
 
 
 - Garde-fous protocoles : drapeau J2534 11 bits pour FBFF, 29 bits pour FEFF/FD.TP ; C-PG de longueur zéro autorisé explicitement ; contrôle du remplissage de fin FD.TP ; contrôle des numéros de record DTC `19 04` / `19 06` avec exception `FE`/`FF` pour la sélection multi-records. Tests enregistrés, non exécutés.
+
+
+- FD.TP BAM/CMDT : l'attente initiale d'une annonce BAM ou d'un RTS dirigé respecte désormais un délai global pouvant dépasser 30 secondes, malgré le plafond de chaque réception J2534. Les phases CTS/DT/EOM conservent leurs délais courts. Tests simulant une expiration pilote intermédiaire ajoutés, non exécutés.
