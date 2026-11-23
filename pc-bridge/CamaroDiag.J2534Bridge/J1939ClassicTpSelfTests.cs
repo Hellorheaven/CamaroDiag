@@ -319,6 +319,28 @@ internal static class J1939ClassicTpSelfTests
             "Cancelled transfer cannot send any PGN.");
         Check(noTx.Outgoing.Count == 0, "No J1939 frames sent after cancellation.");
 
+        var dm1 = J1939DmDiagnostics.Decode(J1939DmDiagnostics.Dm1Pgn,
+            [0xC7, 0xFF, 0x6E, 0x00, 0x05, 0x03, 0xFF, 0xFF]);
+        Check(dm1.LampStatus == 0xC7 && dm1.LampFlashStatus == 0xFF &&
+            dm1.Codes.Count == 1 && dm1.Codes[0].Spn == 110 &&
+            dm1.Codes[0].Fmi == 5 && dm1.Codes[0].OccurrenceCount == 3 &&
+            !dm1.Codes[0].AlternativeSpnConversion,
+            "DM1 decodes lamp bytes, SPN, FMI and occurrence count.");
+        var dm2 = J1939DmDiagnostics.Decode(J1939DmDiagnostics.Dm2Pgn,
+            [0x00, 0x00, 0x6E, 0x00, 0x05, 0x83,
+             0x64, 0x00, 0x01, 0x02]);
+        Check(dm2.Codes.Count == 2 &&
+            dm2.Codes[0].AlternativeSpnConversion &&
+            dm2.Codes[1].Spn == 100 && dm2.Codes[1].Fmi == 1,
+            "DM2 supports reassembled multiple DTCs and alternate CM flag.");
+        Check(J1939DmDiagnostics.Decode(J1939DmDiagnostics.Dm1Pgn,
+            [0, 0, 0, 0, 0, 0, 0xFF, 0xFF]).Codes.Count == 0,
+            "DM1 zero-code sentinel does not invent an active DTC.");
+        Reject<InvalidDataException>(() =>
+            J1939DmDiagnostics.Decode(J1939DmDiagnostics.Dm1Pgn,
+                [0, 0, 1, 2, 3]),
+            "Malformed DM1 diagnostic code length is rejected.");
+
         var CLI = StandardProtocolCli.ParseJ1939([
             StandardProtocolCli.J1939Command,
             "--adapter-index", "0", "--baud", "250000",
