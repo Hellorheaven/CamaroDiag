@@ -92,6 +92,20 @@ internal static class StandardVehicleProtocolsSelfTests
                 identityBytes[..32]), discoveryAddress);
         Check(withoutStatus.VinGidStatus is null,
             "Older DoIP announcement supports optional VIN/GID status byte.");
+        var unknownVin = identityBytes.ToArray();
+        Array.Clear(unknownVin, 0, 17);
+        var announcedWithoutVin = DoIpVehicleDiscovery.ParseAnnouncement(
+            DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
+                unknownVin), discoveryAddress);
+        Check(announcedWithoutVin.Vin is null &&
+            announcedWithoutVin.LogicalAddress == 0x1234,
+            "DoIP unavailable VIN does not fabricate a vehicle identifier.");
+        Array.Fill(unknownVin, (byte)0xFF, 0, 17);
+        Check(DoIpVehicleDiscovery.ParseAnnouncement(
+            DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
+                unknownVin), discoveryAddress).Vin is null,
+            "DoIP all-FF VIN invalidity pattern remains unavailable.");
+
         Reject<InvalidDataException>(() => DoIpVehicleDiscovery.ParseAnnouncement(
             DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
                 identityBytes[..31]), discoveryAddress),
