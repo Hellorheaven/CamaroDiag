@@ -41,19 +41,31 @@ object CamaroDiagConnectorBinaryDiscovery {
     fun inspect(
         channel: CamaroDiagConnectorDiscovery.Channel,
         ensureActive: () -> Unit = {}
+    ): CamaroDiagConnectorDiscovery.Report =
+        inspectWithClock(channel, ensureActive, System::nanoTime)
+
+    /** Fixed clock for USB timeout tests; discovery never enables vehicle access. */
+    internal fun inspectWithClock(
+        channel: CamaroDiagConnectorDiscovery.Channel,
+        ensureActive: () -> Unit = {},
+        clock: () -> Long
     ): CamaroDiagConnectorDiscovery.Report {
         var seq = 0
         fun exchange(op: Int): String {
             ensureActive()
+            // The 3-second limit includes the USB write. A blocked or stalled
+            // bulk transfer must not silently grant a fresh response deadline.
+            val deadline = clock() + TIMEOUT_NANOS
             channel.write(request(op, seq))
-            val deadline = System.nanoTime() + TIMEOUT_NANOS
+            ensureActive()
+            if (clock() - deadline >= 0) throw IOException("Connector USB write timed out")
             // Read complete USB packets into a large buffer; a short header-sized
             // USB bulk transfer can otherwise lose the remainder of a packet.
             val buffer = ByteArray(512)
             val frame = ByteArray(HEADER_BYTES + MAX_REPLY_PAYLOAD + TRAILER_BYTES)
             var used = 0
             var expectedLength = -1
-            while (System.nanoTime() - deadline < 0) {
+            while (clock() - deadline < 0) {
                 ensureActive()
                 val count = channel.read(buffer, 100)
                 if (count < 0 || count > buffer.size || count > frame.size - used)
@@ -73,7 +85,7 @@ object CamaroDiagConnectorBinaryDiscovery {
                     if (used == expectedLength) break
                 }
             }
-            if (System.nanoTime() - deadline >= 0 || expectedLength == -1 || used != expectedLength)
+            if (clock() - deadline >= 0 || expectedLength == -1 || used != expectedLength)
                 throw IOException("Incomplete binary USB reply")
             val wire = frame.copyOf(used)
             val length = u16(wire, 6)
