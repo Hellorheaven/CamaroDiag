@@ -189,12 +189,18 @@ internal static class J1939ClassicTpSession
             (broadcast && start.Data[4] != 0xFF) ||
             (!broadcast && start.Data[4] == 0))
             throw new InvalidDataException("Inconsistent J1939 TP session size/window.");
+        // For a peer-to-peer RTS, byte 4 advertises the maximum number of
+        // TP.DT packets the sender permits per CTS. Never grant a larger
+        // window, even if our local receive buffer supports more packets.
+        // BAM byte 4 is reserved (0xFF), not an RTS window.
+        var peerWindow = broadcast ? count : start.Data[4];
         var result = new byte[length];
         var sequence = 1;
         while (sequence <= count)
         {
             var window = broadcast ? count - sequence + 1 :
-                Math.Min(o.ReceiveWindow, count - sequence + 1);
+                Math.Min(Math.Min(o.ReceiveWindow, peerWindow),
+                    count - sequence + 1);
             if (!broadcast)
                 await link.SendAsync(MakeCts(o, window, sequence), token);
             for (var part = 0; part < window; part++)
