@@ -411,6 +411,17 @@ internal static class IsoTpCanFdSelfTests
         Check(IsoTpJ2534RawCanLink.Unpack(rawFd, 0x0010_0000,
             true, false).Data.Length == 64,
             "FD_CAN_FORMAT flag and raw DLC 64 accepted.");
+        var extendedRaw = IsoTpJ2534RawCanLink.Pack(
+            0x18DA10F1, [0x03, 0x22, 0xF1, 0x90], extended: true);
+        Check(IsoTpJ2534RawCanLink.Unpack(
+            extendedRaw, 0x100, false, true).Id == 0x18DA10F1,
+            "29-bit J2534 CAN requires explicit CAN_29BIT_ID receive flag.");
+        Reject<InvalidDataException>(() =>
+            IsoTpJ2534RawCanLink.Unpack(extendedRaw, 0, false, true),
+            "29-bit J2534 frame missing CAN_29BIT_ID cannot be misattributed.");
+        Reject<InvalidDataException>(() =>
+            IsoTpJ2534RawCanLink.Unpack(raw, 0x100, false, false),
+            "11-bit J2534 frame cannot masquerade as 29-bit extended arbitration.");
         Reject<InvalidDataException>(() =>
             IsoTpJ2534RawCanLink.Unpack(rawFd, 0, true, false),
             "Classical frame presented as CAN-FD without vendor FD flag refused.");
