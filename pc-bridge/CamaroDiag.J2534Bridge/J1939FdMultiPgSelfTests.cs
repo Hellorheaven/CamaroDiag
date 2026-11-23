@@ -145,6 +145,14 @@ internal static class J1939FdMultiPgSelfTests
             "--mode", "send", "--fbff", "true", "--pgn", "0xF004",
             "--payload", Convert.ToHexString(new byte[100])]),
             "FBFF is not an alias for FD.TP BAM.");
+        var zeroLengthGroups = J1939FdMultiPgCliParser.Parse(
+            "0xEF00:;0xFECA:11");
+        Check(zeroLengthGroups.Count == 2 &&
+            zeroLengthGroups[0].Payload.Length == 0 &&
+            J1939FdMultiPg.Decode(J1939FdMultiPg.Encode(
+                0x80, 0xFF, 6, zeroLengthGroups))
+                .Groups[0].Payload.Length == 0,
+            "Multi-PG explicit empty C-PG remains representable without false data.");
         var groupList = J1939FdMultiPgCliParser.Parse(
             "0xF004:010203;0xFECA:C7FF");
         Check(groupList.Count == 2 &&
