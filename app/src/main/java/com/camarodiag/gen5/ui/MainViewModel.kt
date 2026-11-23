@@ -2571,9 +2571,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun canExportCanCapture(): Boolean {
         val state = _liveCanMonitorState.value
         val archive = activeCanCaptureFile?.takeIf { it.isFile }
-        val journal = consoleEventJournal.snapshot()
         return !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
-            (state.consoleHistory.isEmpty() || journal != null) &&
+            (state.consoleHistory.isEmpty() || consoleEventJournal.isAvailable()) &&
             CanConsoleExportPolicy.canExport(
             isCapturing = state.isCapturing,
             archiveFailed = state.rawArchiveFailed,
