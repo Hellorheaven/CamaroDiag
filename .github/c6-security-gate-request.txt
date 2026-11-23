@@ -1,12 +1,10 @@
-C6 protocol/transport user policy — grouped software validation (23 November 2026)
-Source code HEAD: 11e55d498f093d3a05338d77e11e39ceaabb085b
-Changes tested: optional OEM SecurityAccess; default session permitted where ECU specifies;
-no fabricated documentation/signature key; explicitly entered raw CAN and local J2534
-commands no longer limited to a CamaroDiag read-only service allowlist;
-ELM/STN transport no blanket writer ban when a real compatible driver exists;
-bench planning accepts any identified ECU family when the matching hardware driver exists;
-Android STN UDS sessions accept an ECU-specific write policy.
-Preserve: CamaroDiag license gates, OEM seed/key where necessary, exact identity/firmware,
-image integrity, actual voltage and power, backup/readback, physically supported routes.
-One grouped Android communication+diagnostic+app tests and Windows Debug bridge self-tests.
-No fictitious driver, no firmware capability claim, no hardware flashing, no merge.
+C6 FINAL per-protocol writer access validation — 2026-11-23
+Implementation HEAD before this grouped run: 034c2b67be3156ecd563fa016ed82f713e276cfa
+Expected: C6 Windows .NET Debug with warnings-as-errors + J2534 self-tests;
+Android communication, diagnostic and app unit tests.
+Corrections: optional ECU SecurityAccess/default session; explicit RAW CAN and J2534 desktop
+console services; explicit TLS-paired Android J2534 raw UDS; Android STN verified UDS policy;
+no blanket ELM label block; ECU-family agnostic bench plan; no extra bench challenge/metadata key.
+No changes to Firebase license ownership, OEM security seed/key, physical driver capability
+or ECU image/power/backup/readback conditions.
+No physical ECU test and no merge.
