@@ -125,6 +125,30 @@ class EcuRestorePackageTest {
         }
     }
 
+    @Test fun finalVerificationFailureDoesNotLeaveAnAuthoritativeIndex() {
+        val root = Files.createTempDirectory("c2-final-verification").toFile()
+        try {
+            // The package is written successfully, but directory enumeration
+            // fails at the final verification step (e.g. media I/O failure).
+            // This deterministically exercises cleanup after index publication.
+            val target = object : File(root, "failed-final-check") {
+                override fun listFiles(): Array<File>? = null
+            }
+            val original = archive(capture(flash, 0x1000, byteArrayOf(1, 2, 3)))
+            val map = listOf(EcuRestoreImage.MemoryRegion(flash, 0x1000, 3))
+            assertTrue(runCatching {
+                EcuRestorePackage.createNew(target, original, map, identity)
+            }.isFailure)
+            assertTrue(target.isDirectory)
+            assertTrue(!File(target, "index.ecu-package").exists())
+            assertTrue(runCatching {
+                EcuRestorePackage.open(File(root, "failed-final-check"))
+            }.isFailure)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun incompletePackageNeverPassesReopen() {
         val root = Files.createTempDirectory("c2-incomplete").toFile()
         try {
