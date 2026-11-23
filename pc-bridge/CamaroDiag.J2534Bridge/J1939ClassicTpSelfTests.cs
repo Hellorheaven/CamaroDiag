@@ -371,6 +371,33 @@ internal static class J1939ClassicTpSelfTests
                 [0, 0, 1, 2, 3]),
             "Malformed DM1 diagnostic code length is rejected.");
 
+        Check(J1939PgnRequest.RequestPgn == 0xEA00 &&
+            J1939PgnRequest.Encode(J1939DmDiagnostics.Dm1Pgn)
+                .SequenceEqual(new byte[] {0xCA, 0xFE, 0x00}) &&
+            J1939PgnRequest.Decode([0xCB, 0xFE, 0x00]) ==
+                J1939DmDiagnostics.Dm2Pgn,
+            "J1939-21 Request PGN EA00 uses three little-endian bytes.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            J1939PgnRequest.Encode(0xEF42),
+            "Request codec rejects PGNs with invalid PDU1 group extension.");
+        Reject<InvalidDataException>(() =>
+            J1939PgnRequest.Decode([0xCA, 0xFE]),
+            "Request PGN requires all three bytes.");
+
+        var requestCli = StandardProtocolCli.ParseJ1939([
+            StandardProtocolCli.J1939Command, "--adapter-index", "0",
+            "--baud", "250000", "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xFECA", "--mode", "request"]);
+        Check(requestCli.Mode == "request" &&
+            requestCli.Settings.Pgn == J1939DmDiagnostics.Dm1Pgn &&
+            requestCli.Request.SequenceEqual(new byte[] {0xCA, 0xFE, 0x00}),
+            "J1939 CLI creates standard directed DM1 request without raw hex.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939([
+            StandardProtocolCli.J1939Command, "--adapter-index", "0",
+            "--baud", "250000", "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xFECA", "--mode", "request", "--payload", "AA"]),
+            "J1939 request mode forbids additional arbitrary TX payload.");
+
         var CLI = StandardProtocolCli.ParseJ1939([
             StandardProtocolCli.J1939Command,
             "--adapter-index", "0", "--baud", "250000",
