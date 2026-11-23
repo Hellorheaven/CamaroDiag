@@ -429,6 +429,9 @@ fun CamaroDiagApp(
                             adapter.deviceName.contains("Simulated", ignoreCase = true) -> {
                             Text("DEMO", color = CamaroAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
+                        calibrationWorkspace.isJ2534BridgeConnected -> {
+                            Text("PC J2534", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
                         adapter.tier != AdapterTier.DISCONNECTED -> {
                             Text("OBD", color = OkGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
@@ -627,6 +630,7 @@ fun CamaroDiagApp(
                 )
                 DiagTab.ADAPTER -> AdapterScreen(
                     adapter = adapter,
+                    isJ2534BridgeConnected = calibrationWorkspace.isJ2534BridgeConnected,
                     isBusy = isBusy || isObdScanning || calibrationWorkspace.isReading,
                     pairedDevices = pairedDevices,
                     errorMsg = connError,
@@ -1025,6 +1029,7 @@ fun VehicleSetupScreen(
 @Composable
 fun AdapterScreen(
     adapter: AdapterCapabilities,
+    isJ2534BridgeConnected: Boolean,
     isBusy: Boolean,
     pairedDevices: List<Pair<String, String>>,
     errorMsg: String?,
@@ -1055,9 +1060,15 @@ fun AdapterScreen(
         item {
             Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
-                    Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
-                    if (adapter.tier != AdapterTier.DISCONNECTED) {
+                    Text(
+                        if (isJ2534BridgeConnected) stringResource(R.string.adapter_j2534_bridge_connected)
+                        else adapter.deviceName,
+                        fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp
+                    )
+                    if (!isJ2534BridgeConnected) {
+                        Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
+                    }
+                    if (isJ2534BridgeConnected || adapter.tier != AdapterTier.DISCONNECTED) {
                         OutlinedButton(
                             onClick = onDisconnectAdapter,
                             enabled = !isBusy,
