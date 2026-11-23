@@ -297,6 +297,13 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(passiveKline.Mode == "receive" && passiveKline.Data.Length == 0 &&
             passiveKline.ReadFrames == 3,
             "J2534 K-Line receive mode never builds an outgoing diagnostic payload.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0x04", "--baud", "10400",
+            "--mode", "receive", "--read-frames", "1",
+            "--kline-init", "five:33"]),
+            "Passive J2534 receive mode cannot initiate K-Line signalling.");
+
         var passiveVpw = StandardProtocolCli.ParseJ2534([
             StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
             "--protocol-id", "0x01", "--baud", "10400",
