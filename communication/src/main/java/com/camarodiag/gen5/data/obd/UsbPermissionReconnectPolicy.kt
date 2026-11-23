@@ -13,7 +13,7 @@ object UsbPermissionReconnectPolicy {
     )
 
     fun forSelection(transport: String, endpoint: String, generation: Long): Pending? {
-        if (transport !in setOf("usb", "connector_usb")) return null
+        if (transport !in setOf("usb", "connector_usb", "connector_usb_binary")) return null
         val id = CamaroDiagConnectorDiscovery.deviceIdFromLabel(endpoint) ?: return null
         return Pending(transport, endpoint, id, generation)
     }
@@ -29,6 +29,6 @@ object UsbPermissionReconnectPolicy {
         pending.generation == currentGeneration &&
         pending.endpoint in enumerated &&
         CamaroDiagConnectorDiscovery.deviceIdFromLabel(pending.endpoint) == deviceId &&
-        (pending.transport != "connector_usb" ||
+        (!pending.transport.startsWith("connector_usb") ||
             CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(deviceId, enumerated))
 }
