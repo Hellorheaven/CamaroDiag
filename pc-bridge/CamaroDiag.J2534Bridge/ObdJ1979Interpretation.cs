@@ -51,6 +51,15 @@ internal static class ObdJ1979Interpretation
                 true, reply.Service);
         }
 
+        if (request[0] is 0x01 or 0x02 &&
+            request.Length == (request[0] == 0x02 ? 3 : 2))
+        {
+            var value = ObdJ1979PidValues.Decode(request, response);
+            if (value is not null)
+                return new Result(ObdJ1979PidValues.Format(value),
+                    true, reply.Service);
+        }
+
         // Unknown PID value remains raw. Refrain from manufacturing units,
         // defaulting an absent value to zero, or treating a positive answer
         // as proof that the requested actuation/programming took effect.
