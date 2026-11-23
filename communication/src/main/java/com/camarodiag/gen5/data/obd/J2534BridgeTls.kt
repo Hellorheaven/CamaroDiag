@@ -1,6 +1,8 @@
 package com.camarodiag.gen5.data.obd
 
 import android.annotation.SuppressLint
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -86,14 +88,41 @@ internal class J2534BridgeTlsPairing private constructor(
                 verifyCertificate(chain)
             }
         }
+    /** The Windows bridge binds the pairing code to a LAN IPv4 address.
+     * Parse it locally; no hostname lookup, public IP or DNS rebinding is
+     * allowed to redirect an ECU session to an unexpected remote network.
+     * This does not substitute for the mandatory out-of-band TLS pin.
+     */
+    internal fun localBridgeIpv4(host: String): InetAddress {
+        require(host.matches(Regex("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}"))) {
+            "The Windows J2534 bridge requires the numeric private IPv4 shown on the PC."
+        }
+        val parts = host.split('.').map { part ->
+            require((part.length == 1 || part[0] != '0') && part.toIntOrNull() in 0..255) {
+                "Noncanonical local bridge IPv4 address."
+            }
+            part.toInt()
+        }
+        val allowed = parts[0] == 10 ||
+            (parts[0] == 172 && parts[1] in 16..31) ||
+            (parts[0] == 192 && parts[1] == 168) ||
+            (parts[0] == 169 && parts[1] == 254)
+        require(allowed && parts[3] !in setOf(0, 255)) {
+            "The J2534 bridge must use a private LAN address, not a public or loopback target."
+        }
+        return InetAddress.getByAddress(parts.map(Int::toByte).toByteArray())
+    }
+
     fun openSocket(host: String, port: Int): SSLSocket {
+        require(port in 1024..65535) { "Invalid private J2534 bridge port." }
+        val target = localBridgeIpv4(host)
         val context = SSLContext.getInstance("TLS")
         context.init(null, arrayOf<TrustManager>(pinnedTrustManager()), SecureRandom())
 
         val plain = Socket()
         try {
             plain.tcpNoDelay = true
-            plain.connect(java.net.InetSocketAddress(host, port), 5000)
+            plain.connect(InetSocketAddress(target, port), 5000)
             plain.soTimeout = 12_000
 
             // The plain socket transports only encrypted TLS handshake records:
