@@ -198,3 +198,12 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 ## DoIP — connexion TLS certifiée (23/11/2026)
 - Option CLI `--tls true` ; transport TCP 3496 sous TLS 1.2/1.3, validation système du certificat, nom d'hôte et révocation ; pas de mode « accepter tout » ou de repli implicite sur TCP 13400.
 - Tests de parsing CLI ajoutés (non exécutés) ; certificats clients et autorités OEM privées non intégrés, essais matériels absents.
+
+## C1 — journal complet de la console Android (23/11/2026, suite)
+
+- Le journal CSV chronologique TX/RX/SYSTEM est maintenant raccordé aux événements de la console Android : capture monitor avec trames RX, requêtes TX OBD et CAN, réponses physiques, erreurs et arrêts.
+- Les 300 entrées restent uniquement une fenêtre d'affichage ; l'export lit désormais les événements dans le fichier privé complet puis ajoute la capture RX brute lorsqu'elle existe. L'export contrôle la génération du journal pour ne pas publier une capture périmée et refuse les archives en erreur.
+- Les fichiers sont isolés par réinitialisation du contexte/compte/véhicule, nettoyage explicite et destruction du ViewModel ; les caractères multilignes et les formules CSV injectées sont neutralisés.
+- Tests ajoutés : chronologie sur 600/620 événements, séparation des sessions, invalidation après nouvelle écriture, erreurs disque/fermeture et neutralisation de formule.
+- Commits de cette suite : `5b0d909`, `e26931f`, `bd07e6d`, `a2299dd`, `0455d68`, `ca997eb`, `ac5dcc4`, `56bf77b`, `01ece43`, `a70c250`, `347e6e5`, `0cbbb66`.
+- **Validation à réaliser** : aucune campagne CI lancée pour ces commits ; l'exact HEAD est susceptible de changer avec l'autre chantier protocoles. Exiger une campagne C1 Android ciblée sur le code figé et ensuite la validation C8 au HEAD final. Les acquittements TX sont journalisés à l'instant de leur émission (état initial pending) ; la suite RX/SYSTEM donne leur résultat, sans inventer de réponse ECU. Aucun essai matériel.
