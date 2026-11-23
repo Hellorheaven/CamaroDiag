@@ -1113,7 +1113,8 @@ internal static class StandardProtocolCli
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
         byte? KwpRxTarget, byte? KwpRxSource, string Mode,
         bool KwpFunctionalRx = false, uint? SwCanHighSpeedBaud = null,
-        bool J1850WireCrc = false, byte[]? KwpRequest = null);
+        bool J1850WireCrc = false, byte[]? KwpRequest = null,
+        int KwpEchoBytes = 0);
 
     private static string Required(IReadOnlyList<string> args, string option)
     {
@@ -1280,6 +1281,8 @@ internal static class StandardProtocolCli
             Optional(args, "--j1850-wire-crc") ?? "false");
         var kwpService = Optional(args, "--kwp-service");
         var kwpValidate = bool.Parse(Optional(args, "--kwp-validate") ?? "false");
+        var kwpEchoBytes = int.Parse(Optional(args, "--kwp-echo-bytes") ?? "0",
+            CultureInfo.InvariantCulture);
         var kwpTxTargetText = Optional(args, "--kwp-tx-target");
         var kwpTxSourceText = Optional(args, "--kwp-tx-source");
         var kwpFunctional = bool.Parse(Optional(args, "--kwp-functional") ?? "false");
@@ -1347,6 +1350,10 @@ internal static class StandardProtocolCli
             (kwpRxTarget.HasValue && protocol != J2534StandardChannel.Iso14230) ||
             (kwpValidate && (kwpService is null || mode != "exchange" ||
                 kwpRxTarget is null || kwpRxSource is null || count == 0)) ||
+            (kwpEchoBytes < 0 || kwpEchoBytes > 4095 ||
+                (kwpEchoBytes > 0 &&
+                 (!kwpValidate || kwpService is null ||
+                  kwpEchoBytes >= Hex(kwpService).Length))) ||
             (init != null && protocol is not (J2534StandardChannel.Iso9141
                                              or J2534StandardChannel.Iso14230)) ||
             (init != null && !init.StartsWith("five:", StringComparison.OrdinalIgnoreCase) &&
@@ -1356,7 +1363,7 @@ internal static class StandardProtocolCli
             mask, pattern, flow, init, timeout, count,
             kwpRxTarget, kwpRxSource, mode, kwpFunctionalRx,
             hsBaud, j1850WireCrc,
-            kwpValidate ? Hex(kwpService!) : null);
+            kwpValidate ? Hex(kwpService!) : null, kwpEchoBytes);
     }
 
     internal static async Task SaveDoIpReplyAsync(
@@ -1490,7 +1497,8 @@ internal static class StandardProtocolCli
                         Convert.ToHexString(payload));
                     if (o.KwpRequest is not null)
                     {
-                        var reply = Kwp2000Transaction.Decode(o.KwpRequest, payload);
+                        var reply = Kwp2000Transaction.Decode(
+                            o.KwpRequest, payload, o.KwpEchoBytes);
                         Console.WriteLine($"KWP service=0x{reply.Service:X2} " +
                             $"status={reply.Status} " +
                             $"NRC={(reply.NegativeResponseCode is byte code ? $"0x{code:X2}" : "none")}");

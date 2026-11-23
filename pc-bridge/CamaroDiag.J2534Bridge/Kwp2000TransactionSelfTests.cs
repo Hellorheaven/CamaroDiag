@@ -94,6 +94,68 @@ internal static class Kwp2000TransactionSelfTests
                 "--kwp-validate", "true"
             ]), "Missing RX address cannot claim KWP response correlation.");
 
+
+        var echoed = Kwp2000Transaction.Decode(
+            [0x1A, 0x90], [0x5A, 0x90, 0x41], echoedRequestBytes: 1);
+        Check(echoed.Status == Kwp2000Transaction.Kind.Positive &&
+            echoed.Data.SequenceEqual(new byte[] { 0x90, 0x41 }),
+            "Explicit KWP identifier echo is correlated on a positive reply.");
+        Reject<InvalidDataException>(() =>
+            Kwp2000Transaction.Decode(
+                [0x1A, 0x90], [0x5A, 0x91, 0x41], echoedRequestBytes: 1),
+            "A different local identifier may not complete an active KWP request.");
+        Reject<InvalidDataException>(() =>
+            Kwp2000Transaction.Decode(
+                [0x1A, 0x90], [0x5A], echoedRequestBytes: 1),
+            "Truncated echoed KWP identifier is not a final success.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            Kwp2000Transaction.Decode(
+                [0x1A, 0x90], [0x5A, 0x90], echoedRequestBytes: 2),
+            "Echo cannot exceed number of outgoing request parameters.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            Kwp2000Transaction.Decode(
+                [0x1A, 0x90], [0x5A, 0x90], echoedRequestBytes: -1),
+            "Negative echoed-byte count rejected.");
+        Check(Kwp2000Transaction.Decode(
+                [0x27, 0x01], [0x7F, 0x27, 0x78], echoedRequestBytes: 1).Status ==
+                Kwp2000Transaction.Kind.ResponsePending,
+            "NRC ResponsePending remains valid without a positive echo.");
+
+        var echoOptions = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0",
+            "--protocol-id", J2534StandardChannel.Iso14230.ToString(),
+            "--baud", "10400",
+            "--kwp-service", "1A90", "--kwp-tx-target", "16",
+            "--kwp-tx-source", "241", "--kwp-rx-target", "241",
+            "--kwp-rx-source", "16", "--kwp-validate", "true",
+            "--kwp-echo-bytes", "1", "--read-frames", "3"
+        ]);
+        Check(echoOptions.KwpEchoBytes == 1 &&
+            echoOptions.KwpRequest!.SequenceEqual([0x1A, 0x90]),
+            "Explicit echo option reaches the real J2534 KWP reply handler.");
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseJ2534([
+                StandardProtocolCli.PassThruCommand,
+                "--adapter-index", "0",
+                "--protocol-id", J2534StandardChannel.Iso14230.ToString(),
+                "--baud", "10400", "--data", "1A90",
+                "--kwp-echo-bytes", "1"
+            ]),
+            "Raw frames cannot claim a KWP request-parameter echo.");
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseJ2534([
+                StandardProtocolCli.PassThruCommand,
+                "--adapter-index", "0",
+                "--protocol-id", J2534StandardChannel.Iso14230.ToString(),
+                "--baud", "10400", "--kwp-service", "1A90",
+                "--kwp-tx-target", "16", "--kwp-tx-source", "241",
+                "--kwp-rx-target", "241", "--kwp-rx-source", "16",
+                "--kwp-validate", "true", "--kwp-echo-bytes", "2",
+                "--read-frames", "3"
+            ]),
+            "KWP echo count cannot exceed number of request parameters.");
+
         return checks;
     }
 }

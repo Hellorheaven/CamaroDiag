@@ -463,3 +463,8 @@ Tests offline positifs et négatifs ajoutés à `ObdJ1979PidValuesSelfTests`, **
 ## SAE J1979-2 / ISO 14229 — corrélation DTC 0x19/0x02 (23/11/2026)
 
 Le rapport `59 02` est maintenant validé avec le **masque 0x19/0x02 réellement demandé** sur les chemins CAN ISO-TP et DoIP. Le bitmask effectif est l'intersection masque demandé/masque déclaré disponible ; un DTC dont aucun bit ne correspond, un statut non disponible, une entrée dupliquée ou un enregistrement incomplet ne deviennent pas un résultat positif interprété. Le codec conserve les codes 24 bits et les octets de statut sans inventer de correspondance constructeur ni déclarer une émission/réparation réalisée. Test offline spécifique `ObdOnUdsDtcStatusSelfTests` enregistré dans le lanceur mais **non exécuté** ; matériel et conformité normative restent à valider.
+
+
+## ISO 14230 KWP2000 — corrélation des identifiants de réponse (23/11/2026)
+
+Le chemin J2534 ISO 14230 propose désormais un contrôle **facultatif et explicite** des octets de paramètre que le service KWP est censé renvoyer : `--kwp-echo-bytes 1` vérifie le premier octet après le SID positif pour une requête compatible (exemple : `1A90` / `5A90...`). Pour une opération constructeur qui n'écho pas de paramètre, laisser `0` (défaut). Le contrôle s'applique après validation de la trame, des adresses et du checksum ; les NRC, dont `78` attente, restent reconnus sans exiger d'écho. Une réponse avec SID correct mais identifiant différent n'est pas acceptée. Aucune liste de SID autorisés et aucun blocage d'écriture supplémentaires. Tests `Kwp2000TransactionSelfTests` enrichis mais **non exécutés** ; initialisation et timing K-Line matériels non qualifiés.
