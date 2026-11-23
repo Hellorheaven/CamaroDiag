@@ -30,6 +30,13 @@ internal static class UdsResponseSequence
             var response = await receive(
                 remaining > TimeSpan.FromSeconds(30) ?
                     TimeSpan.FromSeconds(30) : remaining, token);
+            // Even if a vendor driver ignores the supplied receive timeout,
+            // its late positive reply cannot retroactively complete the
+            // earlier diagnostic transaction or an ECU programming step.
+            token.ThrowIfCancellationRequested();
+            if (elapsed.Elapsed >= totalTimeout)
+                throw new TimeoutException(
+                    "UDS final diagnostic response arrived after the overall deadline.");
             if (response is null || response.Length == 0)
                 throw new InvalidDataException("Empty UDS diagnostic response.");
             if (response[0] == 0x7F)
