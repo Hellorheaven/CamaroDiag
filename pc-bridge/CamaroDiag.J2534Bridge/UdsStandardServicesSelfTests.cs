@@ -111,6 +111,14 @@ internal static class UdsStandardServicesSelfTests
                 0x1234UL, 0x100UL, 2, 1),
             "UDS length exceeding declared one-byte field rejected.");
         Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.RequestUpload(
+                0xFFFFFFFEu, 3u),
+            "Legacy 32-bit upload cannot wrap 0xFFFFFFFF without explicit 64-bit ALFI.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.RequestDownload(
+                0xFFFFFFFEu, 3u),
+            "Legacy 32-bit download cannot address beyond the selected memory space.");
+        Reject<ArgumentOutOfRangeException>(() =>
             UdsStandardServices.RequestDownload(
                 0x1234UL, 0x20UL, 9, 1),
             "UDS ALFI address width greater than eight rejected.");
