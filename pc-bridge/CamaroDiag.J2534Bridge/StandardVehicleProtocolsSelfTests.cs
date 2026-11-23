@@ -18,6 +18,23 @@ internal static class StandardVehicleProtocolsSelfTests
             Check(rejected, description);
         }
 
+        Check(J1850Crc.Compute(
+                System.Text.Encoding.ASCII.GetBytes("123456789")) == 0x4B,
+            "SAE J1850 CRC-8 polynomial/reference check is 0x4B.");
+        var j1850Raw = J1850Crc.AppendForRawFraming(
+            new byte[] {0x68, 0x6A, 0xF1, 0x01, 0x0C});
+        Check(j1850Raw.Length == 6 &&
+            J1850Crc.VerifyRawFrame(j1850Raw),
+            "Raw J1850 frame gains exactly one CRC and round-trips.");
+        var corruptedJ1850 = j1850Raw.ToArray();
+        corruptedJ1850[2] ^= 1;
+        Check(!J1850Crc.VerifyRawFrame(corruptedJ1850) &&
+            !J1850Crc.VerifyRawFrame(new byte[] {0x68}),
+            "J1850 CRC corruption or missing CRC cannot be silently accepted.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            J1850Crc.AppendForRawFraming(new byte[] {0x68}),
+            "Raw J1850 CRC helper requires a complete header and data.");
+
         Check(StandardVehicleProtocols.Catalog.Count == 13 &&
             StandardVehicleProtocols.Catalog.All(p => !p.PhysicalWriteQualified),
             "No transport silently certifies physical flash/rollback.");
