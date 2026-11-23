@@ -12,9 +12,38 @@ namespace CamaroDiag.J2534Bridge;
 internal static class StandardProtocolCli
 {
     internal const string DoIpCommand = "--doip-exchange";
+    internal const string DoIpDiscoverCommand = "--doip-discover";
     internal const string PassThruCommand = "--j2534-standard";
     internal const string RawIsoTpCommand = "--isotp-exchange";
     internal const string J1939Command = "--j1939-transport";
+
+    internal static async Task<int> RunDoIpDiscoveryAsync(string[] args)
+    {
+        try
+        {
+            var host = Required(args, "--host");
+            var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
+                CultureInfo.InvariantCulture);
+            var identity = await DoIpVehicleDiscovery.DiscoverAsync(
+                host, TimeSpan.FromMilliseconds(timeoutMs), CancellationToken.None);
+            Console.WriteLine($"DoIP gateway={identity.Source} " +
+                $"VIN={identity.Vin} logical=0x{identity.LogicalAddress:X4} " +
+                $"EID={Convert.ToHexString(identity.Eid)} " +
+                $"GID={Convert.ToHexString(identity.Gid)} " +
+                $"further=0x{identity.FurtherAction:X2} " +
+                $"sync={(identity.VinGidStatus.HasValue ?
+                    $"0x{identity.VinGidStatus.Value:X2}" : "unspecified")}");
+            Console.WriteLine("Discovery is not ECU authentication or programming qualification.");
+            return 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or
+            InvalidDataException or TimeoutException or SocketException or
+            OperationCanceledException or OverflowException)
+        {
+            Console.Error.WriteLine("DoIP vehicle discovery failed: " + ex.Message);
+            return 6;
+        }
+    }
 
     internal sealed record J1939Options(
         int AdapterIndex, uint Bitrate, J1939ClassicTpSession.Options Settings,
