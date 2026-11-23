@@ -42,9 +42,14 @@ object EcuRestoreCoveragePreview {
                 "Overlapping supplied ECU memory map"
             }
         }
-        val requested = ordered.sumOf { it.length }
-        require(requested in 1L..(256L * 1024 * 1024)) {
-            "Memory map exceeds the supported restore package budget"
+        var requested = 0L
+        val maxBudget = 256L * 1024 * 1024
+        for (region in ordered) {
+            require(region.length <= 64L * 1024 * 1024 &&
+                region.length <= maxBudget - requested) {
+                "Memory map exceeds the supported restore package budget"
+            }
+            requested += region.length
         }
 
         val validCaptures = archive.captures.map { capture ->
