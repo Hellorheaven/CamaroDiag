@@ -572,7 +572,7 @@ internal static class StandardVehicleProtocolsSelfTests
             "--kwp-rx-target", "0xF1", "--kwp-rx-source", "0x33"]);
         Check(functionalCli.Data.SequenceEqual(
                 StandardVehicleProtocols.BuildKwpFunctionalFrame(
-                    0x33, 0xF1, [0x81])) &&
+                    0x33, 0xF1, [0x81])[..^1]) &&
             functionalCli.Mode == "exchange",
             "KWP ISO14230 functional TX constructor generates full wire message.");
         var physicalCli = StandardProtocolCli.ParseJ2534([
@@ -582,8 +582,40 @@ internal static class StandardVehicleProtocolsSelfTests
             "--kwp-tx-target", "0x33", "--kwp-tx-source", "0xF1"]);
         Check(physicalCli.Data.SequenceEqual(
                 StandardVehicleProtocols.BuildKwpPhysicalFrame(
-                    0x33, 0xF1, [0x22, 0xF1, 0x90])),
+                    0x33, 0xF1, [0x22, 0xF1, 0x90])[..^1]),
             "KWP ISO14230 physical TX constructor builds addressed frame.");
+        var manualChecksum = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x04",
+            "--baud", "10400", "--flags", "0x200",
+            "--kwp-service", "22F190",
+            "--kwp-tx-target", "0x33", "--kwp-tx-source", "0xF1"]);
+        Check(manualChecksum.Data.SequenceEqual(
+                StandardVehicleProtocols.BuildKwpPhysicalFrame(
+                    0x33, 0xF1, [0x22, 0xF1, 0x90])) &&
+            (manualChecksum.Flags &
+                J2534StandardChannel.KlineChecksumDisabled) != 0,
+            "Manual J2534 checksum mode supplies the complete KWP wire checksum.");
+        var receiveWire = StandardVehicleProtocols.BuildKwpPhysicalFrame(
+            0xF1, 0x33, [0x62, 0xF1, 0x90]);
+        Check(StandardVehicleProtocols.ParseKwpJ2534(
+                receiveWire[..^1], 0xF1, 0x33,
+                functional: false, checksumDisabled: false)
+                .SequenceEqual(new byte[] {0x62, 0xF1, 0x90}),
+            "Auto-checksum J2534 strips the received KWP checksum before app RX.");
+        Check(StandardVehicleProtocols.ParseKwpJ2534(
+                receiveWire, 0xF1, 0x33,
+                functional: false, checksumDisabled: true)
+                .SequenceEqual(new byte[] {0x62, 0xF1, 0x90}),
+            "Manual checksum mode verifies the exact received full wire checksum.");
+        var badManualWire = receiveWire.ToArray();
+        badManualWire[^1] ^= 1;
+        Reject<InvalidDataException>(() =>
+            StandardVehicleProtocols.ParseKwpJ2534(
+                badManualWire, 0xF1, 0x33,
+                functional: false, checksumDisabled: true),
+            "Manual KWP checksum mismatch must fail physical response verification.");
+
         Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
             StandardProtocolCli.PassThruCommand,
             "--adapter-index", "0", "--protocol-id", "0x04",
