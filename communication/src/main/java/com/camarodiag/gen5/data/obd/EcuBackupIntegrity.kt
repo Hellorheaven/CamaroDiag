@@ -25,6 +25,7 @@ object EcuBackupIntegrity {
         PHYSICAL_ORIGIN_MISSING_VIN,
         PHYSICAL_CHANNEL_MISSING_VIN,
         FIRMWARE_EVIDENCE_WITHOUT_CHANNEL,
+        FIRMWARE_EVIDENCE_WITHOUT_REPORTED_HARDWARE_READ,
         ROUTED_SCOPE_INVALID,
         INVALID_CAPTURE_TIMESTAMP
     }
@@ -58,6 +59,11 @@ object EcuBackupIntegrity {
         }
         if (manifest.firmwareEvidence != null && manifest.channel == null) {
             problems += Problem.FIRMWARE_EVIDENCE_WITHOUT_CHANNEL
+        }
+        if (manifest.firmwareEvidence != null &&
+            captures.any { it.origin != EcuBackupManifest.Origin.REPORTED_HARDWARE_READ }
+        ) {
+            problems += Problem.FIRMWARE_EVIDENCE_WITHOUT_REPORTED_HARDWARE_READ
         }
         if (manifest.channel != null && (
             captures.size != 1 || requiredRegions.isNotEmpty() ||

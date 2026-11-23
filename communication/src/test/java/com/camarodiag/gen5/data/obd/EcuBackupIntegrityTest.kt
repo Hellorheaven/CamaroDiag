@@ -50,6 +50,14 @@ class EcuBackupIntegrityTest {
             correct.copy(channel = null), read, emptySet()
         ).problems
         assertTrue(EcuBackupIntegrity.Problem.FIRMWARE_EVIDENCE_WITHOUT_CHANNEL in unbound)
+        val simulated = listOf(sample.copy(origin = EcuBackupManifest.Origin.SIMULATION))
+        val spoofed = EcuBackupManifest.inspect(
+            "ECU", 1L, simulated, emptySet(), vin, channel, firmware
+        )
+        assertTrue(
+            EcuBackupIntegrity.Problem.FIRMWARE_EVIDENCE_WITHOUT_REPORTED_HARDWARE_READ in
+                EcuBackupIntegrity.verify(spoofed, simulated, emptySet()).problems
+        )
 
         val secondScope = read + sample.copy(startAddress = 0x1000L)
         val twoScopes = EcuBackupManifest.inspect(
