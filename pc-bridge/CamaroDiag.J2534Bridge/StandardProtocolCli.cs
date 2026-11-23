@@ -135,7 +135,7 @@ internal static class StandardProtocolCli
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
         if (mode is not ("exchange" or "receive") ||
-            (mode == "exchange" && (hexPayload is null) == (payloadFile is null)) ||
+            (mode == "exchange" && ((hexPayload is null) == (payloadFile is null))) ||
             (mode == "receive" && (hexPayload is not null || payloadFile is not null)))
             throw new ArgumentException(
                 "Exchange needs exactly one payload source; receive mode accepts no payload.");
