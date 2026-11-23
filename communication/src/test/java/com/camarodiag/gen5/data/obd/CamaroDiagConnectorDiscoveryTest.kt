@@ -123,6 +123,23 @@ class CamaroDiagConnectorDiscoveryTest {
         assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(7, emptyList()))
     }
 
+    @Test fun onlyEnumeratedNamedNonKklUsbBoardCanBeDiscovered() {
+        val labels = listOf(
+            "CamaroDiagConnectors (#17)",
+            "FT232R generic ELM327 (#18)",
+            "CamaroDiagConnectors K-Line (#19)",
+            "FTDI KKL (#20)"
+        )
+        assertTrue(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(17, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(18, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(19, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(20, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(21, labels))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(17, emptyList()))
+        // Legacy routing cannot grant ECU permission even after a valid discovery.
+        assertFalse(CamaroDiagConnectorDiscovery.Report("0.1.0", emptyList()).vehicleAccessAllowed)
+    }
+
     @Test fun unknownIdentityAndFutureVersionsCannotEnterLegacyDiscovery() {
         for (response in listOf("ELM327 v1.5", "PONG CamaroDiagConnectors 1.0.0", "PONG Other 0.1.0")) {
             val c = FakeChannel(listOf("$response\n"))
