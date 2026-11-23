@@ -98,3 +98,11 @@ UNE campagne Debug groupée sur le SHA de ce commit : Windows -warnaserror,
 --self-test, Android, noyau natif, Connectors. Ne pas conclure qualification
 physique ECU/VCI sur une CI verte, ni exécuter d'écriture destructrice.
 Conserver PR #95 Draft, ne pas fusionner, pas de Release.
+
+23/11/2026 — ISO-TP CAN classique : recheck grouped final STmin reserved latch (#110)
+Implémentation avant checkpoint 9923b13c899af25b1698dd4b02d64b806cc50285.
+Les STmin réservés restent fixés à 127 ms pour toute la séquence,
+même si des FC ultérieurs demandent STmin 0 ; tests déterministes,
+banc de qualification documenté. Demander une seule suite Debug de
+compilation/tests (Windows bridge -warnaserror, Android, kernel,
+connecteurs) sur le SHA de ce marqueur. Ne pas fusionner ni Release.
