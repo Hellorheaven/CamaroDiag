@@ -92,11 +92,14 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(!J2534StandardChannel.IsAuxiliaryReceiveStatus(0x80000000),
             "J2534 unknown status bits alone do not falsely hide ECU RX data.");
 
-        Check(StandardVehicleProtocols.Find("J1939 CAN FD").TransportPresent &&
-            !StandardVehicleProtocols.Find("J1939 CAN FD").PhysicalWriteQualified &&
-            StandardVehicleProtocols.Find("J1939 CAN FD").Scope
-                .Contains("FBFF/security/concurrency pending", StringComparison.Ordinal),
-            "J1939-22 software transport capability is listed without physical flash claim.");
+        var j1939FdCapability = StandardVehicleProtocols.Find("J1939 CAN FD");
+        Check(j1939FdCapability.TransportPresent &&
+            !j1939FdCapability.PhysicalWriteQualified &&
+            j1939FdCapability.Scope.Contains("FBFF 11-bit", StringComparison.Ordinal) &&
+            j1939FdCapability.Scope.Contains("TOS2/TF0 only", StringComparison.Ordinal) &&
+            j1939FdCapability.Scope.Contains("concurrent sessions unqualified",
+                StringComparison.Ordinal),
+            "J1939-22 software transport capability is described precisely without physical flash claim.");
         Check(StandardVehicleProtocols.Find("J1939 classical CAN").TransportPresent &&
             !StandardVehicleProtocols.Find("J1939 classical CAN").PhysicalWriteQualified,
             "J1939-21 bidirectional codec presence does not imply ECU write qualification.");
