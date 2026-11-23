@@ -14,17 +14,27 @@ import java.io.FileOutputStream
  */
 object EcuRestoreImageFile {
     private const val MAGIC = "CAMARODIAG-ECU-RESTORE-REGION-V1"
+    private const val MAX_REGION_BYTES = 64 * 1024 * 1024
 
     data class Identity(val vin: String, val controllerId: String, val firmwareId: String) {
         init {
             require(vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))
-            require(controllerId.isNotBlank() && firmwareId.isNotBlank())
+            require(controllerId.isNotBlank() && firmwareId.isNotBlank() &&
+                controllerId.length <= 256 && firmwareId.length <= 256 &&
+                controllerId.none(Char::isISOControl) &&
+                firmwareId.none(Char::isISOControl)) {
+                "Invalid ECU image identity metadata"
+            }
         }
     }
 
     data class Opened(val identity: Identity, val image: EcuRestoreImage.RegionImage)
 
     fun saveNew(file: File, identity: Identity, image: EcuRestoreImage.RegionImage) {
+        require(image.geometry.length == image.byteCount.toLong() &&
+            image.byteCount in 1..MAX_REGION_BYTES) {
+            "ECU region image has an invalid length"
+        }
         val parent = file.absoluteFile.parentFile
         require(parent?.isDirectory == true) { "Restore image destination does not exist" }
         check(file.createNewFile()) { "Refusing to replace an ECU restoration image" }
@@ -71,7 +81,7 @@ object EcuRestoreImageFile {
                 "Invalid restoration image checksum"
             }
             val byteCount = data.readInt()
-            require(length in 1L..Int.MAX_VALUE.toLong() &&
+            require(length in 1L..MAX_REGION_BYTES.toLong() &&
                 byteCount.toLong() == length) { "Invalid restoration image size" }
             val bytes = ByteArray(byteCount)
             data.readFully(bytes)
