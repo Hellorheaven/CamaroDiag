@@ -66,3 +66,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Revue documentaire du diff de la PR #95 (253 fichiers lors de l'inventaire) et séparation **provisoire** entre C1/C2/C4/C6, protocoles standard gérés par l'autre chat, évolutions C3/C5/C7 à reporter et modifications à justifier avant fusion.
 - Résultat dans `docs/C8_PARALLEL_NON_PROTOCOL_REVIEW.md` ; les choix de report nécessitent encore examen au niveau des fichiers/commits, sans suppression ni revert aveugle.
 - **Pas de CI du HEAD courant** et aucune qualification matérielle revendiquée. La validation finale C8 attend la stabilisation des chantiers et le contrôle de tous les jobs sur une révision figée.
+
+## C1 — intégrité de l'archive brute CAN pendant une capture longue (suite)
+- `CanConsoleRawArchiveWriter` conserve les octets reçus tels quels et distingue les erreurs de stockage des déconnexions du transport.
+- Une erreur d'écriture ou de vidage disque marque l'archive comme incomplète ; l'enregistrement ne peut plus reprendre silencieusement dans ce même objet. Une archive n'est annoncée complète qu'après fermeture sans erreur.
+- La fermeture tente un vidage final puis ferme systématiquement le flux, même si ce vidage échoue. Tests ajoutés : archive intacte, écriture refusée après fermeture, échec persistant, échec de vidage, libération des ressources.
+- **Chantier C1 non encore validé sur ce HEAD** : nouveaux tests commitées mais non exécutés ; intégration de l'indicateur `isComplete` au parcours d'export et essais matériels à contrôler avant annonce de disponibilité.
