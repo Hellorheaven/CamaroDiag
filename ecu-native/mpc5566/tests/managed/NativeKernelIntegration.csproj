@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39KernelLink.cs" Link="NativeE39KernelLink.cs" />
     <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39WriteSequence.cs" Link="NativeE39WriteSequence.cs" />
+    <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39WriteBlockVerifier.cs" Link="NativeE39WriteBlockVerifier.cs" />
     <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39FileWriteJournal.cs" Link="NativeE39FileWriteJournal.cs" />
     <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39FlashCommands.cs" Link="NativeE39FlashCommands.cs" />
     <Compile Include="../../../../pc-bridge/CamaroDiag.J2534Bridge/NativeE39ImageInspector.cs" Link="NativeE39ImageInspector.cs" />
