@@ -66,3 +66,11 @@
 - Couverture unitaire écrite : 600/620 événements, ordre, échappement, échec de stockage et nettoyage inter-session. Chaînes d'export FR/EN ajoutées.
 - Une demande de campagne C1 regroupée a été déclenchée par la modification de `.github/c1-console-gate-request.txt` (commit `9bdc221`). **Résultat de CI non encore vérifié : ne pas déclarer C1 validé au nouveau HEAD.**
 - Toujours à qualifier : endurance sur matériel réel, correspondance fiable TX/ACK/réponse ECU, comportement en déconnexion et volumétrie, puis recette de fermeture de #59. Aucun transport ISO/SAE supplémentaire modifié par cette intervention.
+
+## C8 — contrôles indépendants des protocoles, session du 23 novembre 2026
+
+- **C1 :** CSV d'événements séquentiel non limité à la fenêtre UI de 300 événements ; `TX/PENDING` séparé des résultats `RX/SYSTEM`. Le magasin de fichier est définitivement désactivé à la fermeture du ViewModel et refuse la perte du fichier entre deux événements.
+- **C2 :** les régions du paquet de restauration hors ligne sont limitées à 64 Mio chacune / 256 Mio au total sans dépassement numérique ; l'index de l'archive portable n'est publié qu'après validation des membres et du footer ZIP, puis relecture du paquet. Cela ne démontre ni programmation ni restauration de l'ECU.
+- **C4 :** l'export de l'historique de mesures carburant exige une série complète et inchangée, hors acquisition, sans interpréter les PID absents comme 0 % ni présumer de l'activation éthanol.
+- **Tests :** suites unitaires dédiées ajoutées ; requêtes C1/C2/C4 déclenchées via les fichiers de contrôle des workflows. Aucune conclusion sur la réussite des jobs pour le nouveau HEAD n'est permise sans consultation explicite de GitHub Actions ; la compilation globale C8 reste à faire après fin de l'autre intervention protocoles.
+- **Périmètre :** aucune modification des transports ISO/SAE, J2534, DoIP, K-Line, CAN-FD, J1939 ni des firmwares connecteurs par cette intervention. PR #95 reste Draft ; aucun merge/Release.
