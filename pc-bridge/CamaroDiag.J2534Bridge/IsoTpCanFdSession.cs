@@ -184,8 +184,10 @@ internal static class IsoTpCanFdSession
             return data.AsSpan(header + addressWidth, singleLength).ToArray();
         }
 
-        if (kind != 0x10 || data.Length < addressWidth + 3)
-            throw new InvalidDataException("Expected single or first ISO-TP frame.");
+        if (kind != 0x10 || data.Length < 8 ||
+            data.Length < addressWidth + 3)
+            throw new InvalidDataException(
+                "ISO-TP FirstFrame needs at least eight CAN data bytes.");
 
         var size12 = (data[addressWidth] & 0x0F) << 8 |
             data[addressWidth + 1];
@@ -218,7 +220,7 @@ internal static class IsoTpCanFdSession
         {
             var next = await ReceiveCorrelatedAsync(link, settings, timeout, token);
             var cf = next.Data;
-            if (cf.Length < addressWidth + 2 ||
+            if (cf.Length < addressWidth + 2 || cf.Length > rxDl ||
                 (cf[addressWidth] & 0xF0) != 0x20 ||
                 (cf[addressWidth] & 0x0F) != (nextSequence & 0x0F))
                 throw new InvalidDataException("ISO-TP CF sequence/control mismatch.");
