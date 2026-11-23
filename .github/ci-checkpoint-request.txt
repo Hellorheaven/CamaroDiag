@@ -1,5 +1,10 @@
-CamaroDiag PR #95 - explicit full Debug CI checkpoint
-Branch: chore/unified-ci
-Requested after final C1 raw CAN TX confirmation bypass closure: 1988ac0ff38be2377a513f4e3bc13df004a782eb
-Scope: C1 CAN/OBD unit tests; Android Debug; Windows J2534 Debug; native ECU; connectors
-Safety: no Release build, no ECU write, no merge.
+C8 FINAL full Debug checkpoint — 23 November 2026
+Source HEAD: 0768d20066bed8ab6ccd92a2010326262c950a0a
+Revision includes exact address/sector/length/target bytes/checksum validation before every
+planned ECU write in Kotlin and native E39 Windows, with deliberately corrupted-packet tests.
+Persistent cross-chat rules: AGENTS.md, .github/copilot-instructions.md and docs/PROMPT_REPRISE.md.
+Audit PR95 C1 C2 C4 C6 C8 and updated changelog included.
+FULL single run: Android unit tests+lintDebug+assembleDebug, Firebase account/license offline tests,
+Windows J2534 Debug -warnaserror and selftests, native ECU C toolchain,
+Connectors CI. No Release build and no merge.
+This software check does not claim physical ECU backup/restore/flash.
