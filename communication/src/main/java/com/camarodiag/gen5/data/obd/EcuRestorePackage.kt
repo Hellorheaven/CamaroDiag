@@ -13,6 +13,7 @@ import java.io.FileOutputStream
 object EcuRestorePackage {
     private const val MAGIC = "CAMARODIAG-ECU-RESTORE-PACKAGE-V1"
     private const val MAX_REGIONS = 128
+    private const val MAX_TOTAL_IMAGE_BYTES = 256L * 1024 * 1024
 
     data class Contents(
         val identity: EcuRestoreImageFile.Identity,
@@ -37,6 +38,9 @@ object EcuRestorePackage {
             it.origin == EcuBackupManifest.Origin.REPORTED_HARDWARE_READ
         }) { "Offline or simulated captures cannot be labelled physical ECU images" }
         require(map.size in 1..MAX_REGIONS) { "Invalid region count" }
+        require(map.sumOf { it.length } <= MAX_TOTAL_IMAGE_BYTES) {
+            "Total ECU restoration image data exceeds the archive budget"
+        }
         val images = EcuRestoreImage.assemble(archive, map)
         check(directory.mkdir()) { "ECU image package directory must be new" }
         images.forEachIndexed { index, image ->
@@ -84,12 +88,18 @@ object EcuRestorePackage {
             )
             val count = data.readInt()
             require(count in 1..MAX_REGIONS) { "Invalid ECU image package region count" }
+            var totalBytes = 0L
             val results = (0 until count).map { indexNumber ->
                 val name = data.readUTF()
                 require(name == fileName(indexNumber)) { "Unexpected ECU region filename" }
                 val region = EcuBackupCoverage.Region.valueOf(data.readUTF())
                 val address = data.readLong()
                 val length = data.readLong()
+                require(length in 1L..64L * 1024 * 1024 &&
+                    totalBytes <= MAX_TOTAL_IMAGE_BYTES - length) {
+                    "ECU restoration image package exceeds the supported data budget"
+                }
+                totalBytes += length
                 val hash = data.readUTF()
                 val saved = EcuRestoreImageFile.load(File(directory, name))
                 require(saved.identity == identity &&
