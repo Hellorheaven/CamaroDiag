@@ -201,7 +201,9 @@ internal static class BridgeSelfTests
         foreach (var invalidFrame in new[] {
             "{\"op\":\"cl\rose\"}\n",
             "{\"op\":\"open\"}\r\r\n",
-            "{\"op\":\"open\"}\0\n"
+            "{\"op\":\"open\"}\0\n",
+            "{\"op\":\"open\"}\t\n",
+            "{\"op\":\"identité\"}\n"
         })
         {
             var refused = false;
@@ -243,6 +245,16 @@ internal static class BridgeSelfTests
             var root = valid.RootElement;
             Assert(Convert.ToHexString(BridgeServer.ParseHexPayload(root)) == "22F190", "Hex payload");
             Assert(BridgeServer.ParseHexId(root, "requestCanId") == 0x7E0, "CAN identifier");
+        }
+        foreach (string malformedCanId in new[] { "70xE0", "0x0x7E0", "7E0-",
+            "0x", "0000000007E0", "7 E0", "0x-7E0" })
+        {
+            using var input = JsonDocument.Parse(
+                JsonSerializer.Serialize(new { requestCanId = malformedCanId }));
+            var rejected = false;
+            try { BridgeServer.ParseHexId(input.RootElement, "requestCanId"); }
+            catch (ArgumentException) { rejected = true; }
+            Assert(rejected, "CAN target ID is never repaired by stripping embedded markers");
         }
 
         using (var invalid = JsonDocument.Parse("{\"payloadHex\":\"22F1Z0\"}"))

@@ -340,8 +340,12 @@ internal sealed class BridgeServer
                 endingCarriageReturn = true;
                 continue;
             }
-            if (endingCarriageReturn || character[0] == '\0')
-                throw new InvalidDataException("Malformed bridge request framing.");
+            // All wire keys, hex payloads, token and command values in this
+            // protocol use printable ASCII. Reject other raw characters,
+            // including UTF-8 multibyte data, to enforce the 64 KiB budget
+            // in BYTES as well as characters and prevent parser ambiguities.
+            if (endingCarriageReturn || character[0] < ' ' || character[0] > '~')
+                throw new InvalidDataException("Noncanonical bridge request framing.");
             line.Append(character[0]);
         }
     }
@@ -457,8 +461,14 @@ internal sealed class BridgeServer
     internal static int ParseHexId(JsonElement root, string property)
     {
         if (!root.TryGetProperty(property, out var element)) throw new ArgumentException($"Missing {property}.");
-        var text = element.GetString()?.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase);
-        if (string.IsNullOrWhiteSpace(text) || !int.TryParse(text, System.Globalization.NumberStyles.HexNumber,
+        var text = element.GetString()?.Trim();
+        if (text != null && text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            text = text[2..];
+        // Only a single, leading 0x marker may be omitted. Never silently
+        // rewrite malformed input like "70xE0" into a different CAN target.
+        if (string.IsNullOrWhiteSpace(text) || text.Length > 8 ||
+            !text.All(Uri.IsHexDigit) ||
+            !int.TryParse(text, System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var value))
             throw new ArgumentException($"Invalid hexadecimal CAN ID in {property}.");
         return value;
