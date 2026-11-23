@@ -142,6 +142,44 @@ internal static class IsoTpCanFdSelfTests
             !extendedCommand.ExtendedId,
             "CLI ISO-TP logical addresses do not imply 29-bit CAN IDs.");
 
+        var fdExtended = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8,
+            12, true, BlockSize: 0, TxAddress: 0xF1, RxAddress: 0x10);
+        var fdAddressedSingle = new QueueLink();
+        Send(fdAddressedSingle, fdExtended, Fill(9));
+        Check(fdAddressedSingle.Sent.Count == 1 &&
+            fdAddressedSingle.Sent[0].Data[0] == 0xF1 &&
+            fdAddressedSingle.Sent[0].Data[1] == 0 &&
+            fdAddressedSingle.Sent[0].Data[2] == 9,
+            "CAN FD extended addressing uses escaped SF and adjusted capacity.");
+        var fdAddressedMulti = new QueueLink();
+        fdAddressedMulti.Replies.Enqueue(RX(true,
+            0x10, 0x30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        Send(fdAddressedMulti, fdExtended, Fill(20));
+        Check(fdAddressedMulti.Sent.Count == 3 &&
+            fdAddressedMulti.Sent[0].Data[0] == 0xF1 &&
+            fdAddressedMulti.Sent[0].Data[1] == 0x10 &&
+            fdAddressedMulti.Sent[0].Data[2] == 20 &&
+            fdAddressedMulti.Sent[1].Data[1] == 0x21 &&
+            fdAddressedMulti.Sent[2].Data[1] == 0x22,
+            "CAN FD extended addressing segments first frame and CF.");
+        var fdAddressedReceive = new QueueLink();
+        foreach (var frame in fdAddressedMulti.Sent)
+            fdAddressedReceive.Replies.Enqueue(new(0x7E8, true,
+                new byte[] {0x10}.Concat(frame.Data.AsSpan(1).ToArray()).ToArray()));
+        Check(Receive(fdAddressedReceive, fdExtended).SequenceEqual(Fill(20)) &&
+            fdAddressedReceive.Sent.Count == 1 &&
+            fdAddressedReceive.Sent[0].Data[0] == 0xF1 &&
+            fdAddressedReceive.Sent[0].Data[1] == 0x30,
+            "CAN FD addressed response reassembly and FC.");
+
+        var wrongLogicalFc = new QueueLink();
+        wrongLogicalFc.Replies.Enqueue(RX(false, 0x22, 0x30, 0, 0, 0, 0, 0, 0));
+        wrongLogicalFc.Replies.Enqueue(RX(false, 0x10, 0x30, 0, 0, 0, 0, 0, 0));
+        Send(wrongLogicalFc,
+            extendedAddress with { BlockSize = 0 }, Fill(8));
+        Check(wrongLogicalFc.Sent.Count == 2,
+            "Unrelated logical FlowControl ignored on shared arbitration ID.");
+
         var multi = new QueueLink();
         multi.Replies.Enqueue(RX(true, 0x30, 1, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         multi.Replies.Enqueue(RX(true, 0x30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
