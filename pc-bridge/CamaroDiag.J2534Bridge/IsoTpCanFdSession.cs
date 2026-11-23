@@ -18,7 +18,7 @@ internal static class IsoTpCanFdSession
         uint TxId, uint RxId, int TxFrameLength, bool CanFd,
         byte BlockSize = 8, byte StMin = 0, byte Padding = 0xCC,
         byte? TxAddress = null, byte? RxAddress = null,
-        int MaxWaitFrames = 4)
+        int MaxWaitFrames = 4, bool MixedAddressing = false)
     {
         internal void Validate()
         {
@@ -32,7 +32,14 @@ internal static class IsoTpCanFdSession
             if (MaxWaitFrames is < 0 or > 255)
                 throw new ArgumentOutOfRangeException(nameof(MaxWaitFrames));
             if (TxAddress.HasValue != RxAddress.HasValue)
-                throw new ArgumentException("ISO-TP extended addressing requires both TX and RX addresses.");
+                throw new ArgumentException("ISO-TP one-byte addressing requires both TX and RX addresses.");
+            // Mixed addressing carries the same N_AE in both directions;
+            // N_SA/N_TA are instead encoded in distinct 29-bit CAN IDs.
+            if (MixedAddressing &&
+                (!TxAddress.HasValue || !RxAddress.HasValue ||
+                 TxAddress != RxAddress || TxId == RxId))
+                throw new ArgumentException(
+                    "Mixed ISO-TP requires one shared address extension and distinct CAN IDs.");
             _ = DecodeStMin(StMin);
         }
     }
