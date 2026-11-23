@@ -108,6 +108,56 @@ internal static class J1939FdBamSelfTests
             J1939FdBamSession.SendAsync(new FakeLink(), 0xF1, 0xEF00,
                 2, Fill(100), CancellationToken.None).GetAwaiter().GetResult(),
             "Broadcast-only FD.TP does not impersonate unicast PDU1.");
+        var bamCommand = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--data-baud", "2000000", "--brs", "true",
+            "--source", "0xF1", "--target", "0xFF",
+            "--pgn", "0xF004", "--session", "2",
+            "--mode", "send",
+            "--payload", Convert.ToHexString(Fill(131))]);
+        Check(bamCommand.Bam && bamCommand.Mode == "send" &&
+            bamCommand.Session == 2 && bamCommand.Payload.Length == 131 &&
+            bamCommand.Priority == 7,
+            "Explicit CLI BAM session accepts large PDU2 PGN and confirmed TX profile.");
+        var bamPassive = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "receive"]);
+        Check(bamPassive.Bam && bamPassive.Payload.Length == 0 &&
+            bamPassive.Pgn == 0xF004,
+            "J1939-22 BAM receive-only command accepts no TX data.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "receive",
+            "--payload", "AA"]),
+            "J1939-22 BAM passive mode rejects a hidden TX buffer.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "send",
+            "--payload", Convert.ToHexString(Fill(131))]),
+            "J1939-22 BAM send is broadcast, never silently unicast.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0xFF",
+            "--pgn", "0xEF00", "--mode", "send",
+            "--payload", Convert.ToHexString(Fill(131))]),
+            "J1939-22 BAM refuses directed PDU1 PGNs.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0xFF",
+            "--pgn", "0xF004", "--session", "4",
+            "--mode", "send",
+            "--payload", Convert.ToHexString(Fill(131))]),
+            "J1939-22 BAM advertises only session IDs 0 through 3.");
+
         return checkedCount;
     }
 }
