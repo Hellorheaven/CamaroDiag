@@ -8,3 +8,7 @@ One grouped validation, no tests on individual commits, no ECU hardware qualific
 Grouped completion checkpoint — C2 offline image size overflow correction
 Source before checkpoint: 6788763f95182bb853e8883d2be7c6d1f9ba40e3
 No physical ECU qualification, no merge.
+
+Grouped correction validation — C2 portable restore-export mutation and memory follow-up
+Source HEAD before grouped request: 1bd8819068385be797f5bc6f24b7bca9b25ae771
+No Release, merge or physical ECU validation.
