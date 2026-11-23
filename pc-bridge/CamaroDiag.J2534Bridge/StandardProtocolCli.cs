@@ -133,6 +133,19 @@ internal static class StandardProtocolCli
                     link, o.Settings, window, CancellationToken.None);
                 Console.WriteLine($"J1939 RX PGN=0x{response.Pgn:X} " +
                     $"broadcast={response.Broadcast}: {Convert.ToHexString(response.Payload)}");
+                if (response.Pgn is J1939DmDiagnostics.Dm1Pgn or
+                    J1939DmDiagnostics.Dm2Pgn)
+                {
+                    var report = J1939DmDiagnostics.Decode(
+                        response.Pgn, response.Payload);
+                    Console.WriteLine($"J1939 DM lamps=0x{report.LampStatus:X2} " +
+                        $"flash=0x{report.LampFlashStatus:X2}, " +
+                        $"DTC count={report.Codes.Count}");
+                    foreach (var code in report.Codes)
+                        Console.WriteLine($"SPN={code.Spn} FMI={code.Fmi} " +
+                            $"occurrences={code.OccurrenceCount} " +
+                            $"conversion={(code.AlternativeSpnConversion ? 1 : 0)}");
+                }
             }
             return 0;
         }
