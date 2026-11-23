@@ -17,7 +17,7 @@ object EcuWriteConsentFlow {
 
     // Approval is issued ONLY after the warning was acknowledged and YES was
     // selected while the original physical connection was still current.
-    data class Approval internal constructor(val warningAcknowledged: Boolean, val confirmedYes: Boolean)
+    class Approval internal constructor(val warningAcknowledged: Boolean, val confirmedYes: Boolean)
 
     fun permitsWrite(step: Step, confirmedYes: Boolean, sameConnection: Boolean): Boolean =
         step == Step.CONFIRMATION && confirmedYes && sameConnection
