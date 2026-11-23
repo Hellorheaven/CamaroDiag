@@ -84,6 +84,37 @@ class EcuRestorePortableBundleTest {
         }
     }
 
+    @Test fun modifiedRegionDuringExportIsRejectedEvenIfZipCloses() {
+        val root = Files.createTempDirectory("restore-changing-region").toFile()
+        try {
+            val original = sourcePackage(root)
+            val zipped = ByteArrayOutputStream()
+            var modified = false
+            val output = object : OutputStream() {
+                override fun write(b: Int) {
+                    if (!modified) {
+                        modified = true
+                        File(original, "region-0.ecu-image").appendBytes(byteArrayOf(99))
+                    }
+                    zipped.write(b)
+                }
+                override fun write(b: ByteArray, off: Int, len: Int) {
+                    if (!modified) {
+                        modified = true
+                        File(original, "region-0.ecu-image").appendBytes(byteArrayOf(99))
+                    }
+                    zipped.write(b, off, len)
+                }
+            }
+            assertTrue(runCatching {
+                EcuRestorePortableBundle.export(original, output)
+            }.isFailure)
+            assertTrue(modified)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun truncatedOrExtendedZipCannotBeImportedAsValidEcuImage() {
         val root = Files.createTempDirectory("restore-portable-truncated").toFile()
         try {
