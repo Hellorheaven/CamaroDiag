@@ -63,6 +63,33 @@ internal static class StandardVehicleProtocols
     }
 
     /// <summary>
+    /// Decode an ISO 14230 physically addressed full K-Line frame. This
+    /// expects the original wire header and checksum to be present; some
+    /// J2534 vendor DLLs strip these bytes before returning messages.
+    /// </summary>
+    internal static byte[] ParseKwpPhysicalFrame(ReadOnlySpan<byte> frame,
+        byte expectedTarget, byte expectedSource)
+    {
+        if (frame.Length < 5 || (frame[0] & 0xC0) != 0x80)
+            throw new InvalidDataException("Unsupported KWP physical-frame header.");
+        var length = frame[0] & 0x3F;
+        var extendedLength = length == 0;
+        var headerLength = extendedLength ? 4 : 3;
+        if (extendedLength && frame.Length >= 4)
+            length = frame[3];
+        if (length == 0 || frame.Length != headerLength + length + 1)
+            throw new InvalidDataException("KWP physical-frame length mismatch.");
+        if (frame[1] != expectedTarget || frame[2] != expectedSource)
+            throw new InvalidDataException("KWP physical-frame logical addresses mismatch.");
+        var checksum = 0;
+        for (var i = 0; i < frame.Length - 1; i++)
+            checksum = (checksum + frame[i]) & 0xFF;
+        if (checksum != frame[^1])
+            throw new InvalidDataException("KWP physical-frame checksum mismatch.");
+        return frame.Slice(headerLength, length).ToArray();
+    }
+
+    /// <summary>
     /// ISO 14230 physical-addressing long header with additive checksum.
     /// This only frames KWP messages: it does NOT perform K-Line initialization.
     /// </summary>
