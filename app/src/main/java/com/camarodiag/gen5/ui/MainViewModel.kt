@@ -28,6 +28,7 @@ import com.camarodiag.gen5.data.obd.Lfx2012FuelReadOnly
 import com.camarodiag.gen5.data.obd.Lfx2012FuelSessionHistory
 import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryWindow
 import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryCsv
+import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryExportPolicy
 import com.camarodiag.gen5.data.obd.EcuExternalDumpPair
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
@@ -1721,7 +1722,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fun current() = isCurrentAccountGeneration(account) &&
             connectionAttemptGeneration == connection &&
             fuelSnapshotGeneration == generation &&
-            _vehicle.value == vehicle && hasPremiumLicense()
+            _vehicle.value == vehicle && hasPremiumLicense() &&
+            Lfx2012FuelHistoryExportPolicy.canPublish(
+                observed, fuelHistory.copySamples(),
+                _calibrationWorkspace.value.isFuelSnapshotReading
+            )
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (!current()) return@launch
