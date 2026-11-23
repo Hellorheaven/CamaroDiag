@@ -114,21 +114,10 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 if (uds[2] == 0x78) continue; // UDS ResponsePending; stay within deadline
                 throw new IOException($"ECU negative UDS response: 0x{uds[2]:X2}.");
             }
-            if (uds.Length < 1 || uds[0] != (request[0] | 0x40))
-                throw new InvalidDataException("Uncorrelated UDS response service.");
-            if (request[0] is 0x22 or 0x2E &&
-                (request.Length < 3 || uds.Length < 3 ||
-                 uds[1] != request[1] || uds[2] != request[2]))
-                throw new InvalidDataException("DoIP ECU returned a different DID.");
-            if (request[0] == 0x31 &&
-                (request.Length < 4 || uds.Length < 4 ||
-                 uds[1] != (request[1] & 0x7F) ||
-                 uds[2] != request[2] || uds[3] != request[3]))
-                throw new InvalidDataException("DoIP ECU replied to another routine.");
-            if (request[0] == 0x36 && 
-                (request.Length < 2 || uds.Length < 2 || uds[1] != request[1]))
-                throw new InvalidDataException("DoIP UDS TransferData block-counter mismatch.");
-            return uds;
+            // One ISO 14229 correlation implementation for CAN and DoIP:
+            // SID, DID, routine ID, security/session subfunction and
+            // TransferData sequence are checked in the same place.
+            return UdsStandardServices.RequireResponse(request, uds);
         }
     }
 
