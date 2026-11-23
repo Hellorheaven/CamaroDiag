@@ -414,7 +414,10 @@ class BluetoothObdManager(context: Context) {
             "FlexFuel observations require a physical ECU connection, never demo data."
         }
         val epoch = transportSessionEpoch.capture()
-        if (isJ2534BridgeConnected()) {
+        if (activeTransport == "J2534_BRIDGE") {
+            check(isJ2534BridgeConnected()) {
+                "The selected J2534 physical fuel channel disconnected; no ELM fallback."
+            }
             return commandSessionMutex.withLock {
                 transportSessionEpoch.requireQueuedCurrent(epoch)
                 check(isJ2534StandardObdAvailable()) {

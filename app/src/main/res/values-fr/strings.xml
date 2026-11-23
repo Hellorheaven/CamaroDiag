@@ -802,6 +802,8 @@
     <string name="flexfuel_lfx2012_pid_no_response">PID annoncé, aucune réponse physique valide</string>
     <string name="flexfuel_lfx2012_observation_warning">Une teneur en éthanol déclarée ne prouve ni la présence d’un capteur, ni l’activation FlexFuel, ni la compatibilité E85. Les corrections carburant ne mesurent pas l’éthanol. Cet écran ne modifie aucun paramètre ECU.</string>
     <string name="flexfuel_lfx2012_fuel_failed">Relevé carburant en lecture seule indisponible :</string>
+    <string name="flexfuel_lfx2012_vin_unverified">Le VIN sélectionné n’a pas été comparé à une identité ECU physique récente et vérifiée pour ce relevé carburant.</string>
+    <string name="flexfuel_lfx2012_continuous_telemetry">Ceci est un relevé ponctuel. Ouvrez Télémétrie Live pour le suivi répété du PID ECU 52 lorsque le calculateur le propose.</string>
     <string name="flexfuel_lfx2012_parts">Catalogue de pièces : calculateur %1$s, référence %2$s (remplace %3$s).</string>
     <string name="flexfuel_lfx2012_parts_warning">Ces références ne prouvent pas quel calculateur équipe ce VIN et ne permettent pas de modifier sa calibration.</string>
     <string name="flexfuel_lfx2012_calid_label">Identifiant de calibration communiqué par le calculateur : %1$s</string>

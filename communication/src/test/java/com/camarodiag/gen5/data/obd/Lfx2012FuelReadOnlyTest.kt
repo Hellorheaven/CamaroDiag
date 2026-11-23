@@ -8,7 +8,8 @@ import org.junit.Test
 
 class Lfx2012FuelReadOnlyTest {
     private val pids = Lfx2012FuelReadOnly.PIDS
-    private fun responses() = pids.associateWith { "41%02X80".format(it) as String? }
+    private fun responses(): Map<Int, String?> =
+        pids.associateWith { "41%02X80".format(it) }
 
     @Test fun reportedEthanolAndBothBankTrimsAreReadOnlyEcuValues() {
         val survey = Lfx2012FuelReadOnly.Survey(
@@ -64,6 +65,23 @@ class Lfx2012FuelReadOnlyTest {
         assertEquals(Lfx2012FuelReadOnly.Availability.REPORTED,
             zero.reading(0x52).availability)
         assertFalse(zero.flexFuelCalibratedOrSensorVerified)
+    }
+
+    @Test fun badSupportedPidPayloadIsUnavailableNotAnEthanolMeasurement() {
+        val pids = Lfx2012FuelReadOnly.PIDS
+        val support = pids.toSet()
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM, support, responses()
+        )
+        for (bad in listOf(intArrayOf(), intArrayOf(-1), intArrayOf(256),
+            intArrayOf(0, 0), intArrayOf(0x41, 0x52, 0x00))) {
+            val raw = pids.associateWith { pid -> if (pid == 0x52) bad else intArrayOf(128) }
+            val snapshot = Lfx2012FuelReadOnly.inspect(survey, raw, 1L)
+            assertNull(snapshot.ethanolPercent)
+            assertEquals(Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE,
+                snapshot.reading(0x52).availability)
+            assertEquals(0.0, snapshot.reading(0x06).percent!!, 0.00001)
+        }
     }
 
     @Test fun incompleteAndForgedSurveysAreRejectedBeforeDisplay() {

@@ -426,8 +426,18 @@ fun CalibrationWorkspaceScreen(
                                     color = TextPrimary, fontSize = 12.sp
                                 )
                             }
+                            val physicalVinMatched = !state.ecuIdentityFromSimulation &&
+                                state.vinComparison?.matches == true &&
+                                state.ecuVinResponse.trim().uppercase() == vehicle.vin.trim().uppercase() &&
+                                vehicle.vin.isNotBlank()
+                            if (!physicalVinMatched) {
+                                Text(stringResource(R.string.flexfuel_lfx2012_vin_unverified),
+                                    color = WarnRed, fontSize = 11.sp)
+                            }
                             Text(stringResource(R.string.flexfuel_lfx2012_observation_warning),
                                 color = CamaroAmber, fontSize = 11.sp)
+                            Text(stringResource(R.string.flexfuel_lfx2012_continuous_telemetry),
+                                color = TextMuted, fontSize = 11.sp)
                         }
                         if (state.fuelSnapshotError.isNotBlank()) {
                             Text(
