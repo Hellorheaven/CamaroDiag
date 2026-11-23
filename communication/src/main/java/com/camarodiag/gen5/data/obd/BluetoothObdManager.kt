@@ -1204,23 +1204,29 @@ class BluetoothObdManager(context: Context) {
      *  key, license or invented service-level write filter is inserted here.
      *  App feature entitlements remain enforced by its presentation layer.
      */
-    suspend fun exchangeJ2534OperatorUds(payload: ByteArray, timeoutMs: Long = 3000L): ByteArray {
+    suspend fun exchangeJ2534OperatorUds(
+        payload: ByteArray,
+        approval: EcuWriteConsentFlow.Approval,
+        timeoutMs: Long = 3000L
+    ): ByteArray {
         val epoch = transportSessionEpoch.capture()
         return commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534BridgeConnected()) { "Connect a physical Windows J2534 bridge." }
-            val reply = checkNotNull(j2534BridgeTransport).exchangeOperatorUds(payload, timeoutMs)
+            val reply = checkNotNull(j2534BridgeTransport).exchangeOperatorUds(payload, timeoutMs, approval)
             transportSessionEpoch.requireCurrent(epoch)
             reply
         }
     }
 
-    suspend fun sendJ2534OperatorUdsOnly(payload: ByteArray) {
+    suspend fun sendJ2534OperatorUdsOnly(
+        payload: ByteArray, approval: EcuWriteConsentFlow.Approval
+    ) {
         val epoch = transportSessionEpoch.capture()
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534BridgeConnected()) { "Connect a physical Windows J2534 bridge." }
-            checkNotNull(j2534BridgeTransport).sendOperatorUdsOnly(payload)
+            checkNotNull(j2534BridgeTransport).sendOperatorUdsOnly(payload, approval)
             transportSessionEpoch.requireCurrent(epoch)
         }
     }

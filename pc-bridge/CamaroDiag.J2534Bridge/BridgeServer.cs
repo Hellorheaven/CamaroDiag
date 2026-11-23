@@ -299,6 +299,9 @@ internal sealed class BridgeServer
                     // Keep this separate from background diagnostic exchanges.
                     case "exchangeRaw":
                     {
+                        if (!HasExplicitRawWriteConsent(root))
+                            throw new UnauthorizedAccessException(
+                                "Explicit warning OK and subsequent YES are required before raw ECU transmission.");
                         var payload = ParseHexPayload(root);
                         var timeout = root.TryGetProperty("timeoutMs", out var timeoutElement)
                             ? timeoutElement.GetInt32() : 3000;
@@ -310,6 +313,9 @@ internal sealed class BridgeServer
                     }
                     case "sendRaw":
                     {
+                        if (!HasExplicitRawWriteConsent(root))
+                            throw new UnauthorizedAccessException(
+                                "Explicit warning OK and subsequent YES are required before raw ECU transmission.");
                         var payload = ParseHexPayload(root);
                         await Task.Run(() => device.SendConsoleOnly(payload), cancellationToken);
                         await writer.WriteLineAsync(JsonSerializer.Serialize(new { ok = true }));
@@ -442,6 +448,18 @@ internal sealed class BridgeServer
     /// "last key wins" cannot reinterpret an authenticated CAN operation.
     /// Legacy clients may omit optional open defaults or timeoutMs.
     /// </summary>
+    /// <summary>
+    /// Explicit UI confirmation fields for raw ECU transmissions. This is
+    /// operator acknowledgement, NOT a new ECU signing key or manufacturer
+    /// SecurityAccess replacement. Require both fields on the same request.
+    /// </summary>
+    internal static bool HasExplicitRawWriteConsent(JsonElement root) =>
+        root.ValueKind == JsonValueKind.Object &&
+        root.TryGetProperty("warningAcknowledged", out var warning) &&
+        warning.ValueKind == JsonValueKind.True &&
+        root.TryGetProperty("writeConfirmed", out var confirmation) &&
+        confirmation.ValueKind == JsonValueKind.True;
+
     internal static bool HasCanonicalRequestShape(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object ||
@@ -454,7 +472,9 @@ internal sealed class BridgeServer
             "open" => ["token", "op", "requestCanId", "responseCanId"],
             "identify" or "identifyGmlan" or "close" => ["token", "op"],
             "clearStandardObdDtcs" => ["token", "op", "confirmed"],
-            "exchange" or "sendOnly" or "exchangeRaw" or "sendRaw" => ["token", "op", "payloadHex"],
+            "exchange" or "sendOnly" => ["token", "op", "payloadHex"],
+            "exchangeRaw" or "sendRaw" => ["token", "op", "payloadHex",
+                "warningAcknowledged", "writeConfirmed"],
             _ => []
         };
         if (required.Length == 0) return false;
@@ -476,7 +496,7 @@ internal sealed class BridgeServer
                 case "token" or "op" or "requestCanId" or "responseCanId" or "payloadHex":
                     if (field.Value.ValueKind != JsonValueKind.String) return false;
                     break;
-                case "can29Bit" or "confirmed":
+                case "can29Bit" or "confirmed" or "warningAcknowledged" or "writeConfirmed":
                     if (field.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                         return false;
                     break;

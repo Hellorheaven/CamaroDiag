@@ -442,18 +442,25 @@ class J2534BridgeTransport(
     /** An explicitly requested ECU service, without a CamaroDiag-specific
      * service allowlist. The existing TLS pairing and J2534 channel still apply.
      */
-    suspend fun exchangeOperatorUds(payload: ByteArray, timeoutMs: Long): ByteArray =
+    suspend fun exchangeOperatorUds(
+        payload: ByteArray, timeoutMs: Long, approval: EcuWriteConsentFlow.Approval
+    ): ByteArray =
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureOpen()
                 check(rawUdsConsoleAvailable) {
                     "The connected PC bridge does not implement raw UDS exchange."
                 }
+                require(approval.warningAcknowledged && approval.confirmedYes) {
+                    "ECU risk warning OK and separate YES confirmation required."
+                }
                 require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES)
                 val boundedTimeout = J2534BridgeProtocol.boundedTimeoutMs(timeoutMs)
                 val response = request(
                     JSONObject().put("op", "exchangeRaw")
                         .put("token", tlsPairing.token)
+                        .put("warningAcknowledged", approval.warningAcknowledged)
+                        .put("writeConfirmed", approval.confirmedYes)
                         .put("payloadHex", payload.toHex())
                         .put("timeoutMs", boundedTimeout),
                     boundedTimeout + 3000
@@ -469,16 +476,23 @@ class J2534BridgeTransport(
             }
         }
 
-    suspend fun sendOperatorUdsOnly(payload: ByteArray) = withContext(Dispatchers.IO) {
+    suspend fun sendOperatorUdsOnly(
+        payload: ByteArray, approval: EcuWriteConsentFlow.Approval
+    ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
             check(rawUdsConsoleAvailable) {
                 "The connected PC bridge does not implement raw UDS send."
             }
+            require(approval.warningAcknowledged && approval.confirmedYes) {
+                "ECU risk warning OK and separate YES confirmation required."
+            }
             require(payload.size in 1..J2534BridgeProtocol.MAX_PAYLOAD_BYTES)
             request(
                 JSONObject().put("op", "sendRaw")
                     .put("token", tlsPairing.token)
+                    .put("warningAcknowledged", approval.warningAcknowledged)
+                    .put("writeConfirmed", approval.confirmedYes)
                     .put("payloadHex", payload.toHex()),
                 13_000
             )

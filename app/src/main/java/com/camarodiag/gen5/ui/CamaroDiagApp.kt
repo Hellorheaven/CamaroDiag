@@ -2352,10 +2352,10 @@ fun CanSnifferScreen(
                             // OK only acknowledges the risk notice: it NEVER sends.
                             writeConsentStep = EcuWriteConsentFlow.afterWarningOk(writeConsentStep)
                         } else {
-                            if (EcuWriteConsentFlow.permitsWrite(
+                            if (EcuWriteConsentFlow.approval(
                                     writeConsentStep, confirmedYes = true,
                                     sameConnection = canConfirm
-                                )) onConfirmRawFrame(frame, pendingEpoch)
+                                ) != null) onConfirmRawFrame(frame, pendingEpoch)
                             pendingRawFrameInput = null
                             writeConsentStep = EcuWriteConsentFlow.Step.WARNING
                         }

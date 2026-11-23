@@ -186,8 +186,8 @@ internal static class BridgeSelfTests
             "{\"token\":\"x\",\"op\":\"identifyGmlan\"}",
             "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":3000}",
             "{\"token\":\"x\",\"op\":\"sendOnly\",\"payloadHex\":\"3E80\"}",
-            "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF19000\",\"timeoutMs\":3000}",
-            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\"}",
+            "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF19000\",\"timeoutMs\":3000,\"warningAcknowledged\":true,\"writeConfirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":true,\"writeConfirmed\":true}",
             "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true}",
             "{\"token\":\"x\",\"op\":\"close\"}"
         }) {
@@ -195,10 +195,27 @@ internal static class BridgeSelfTests
             Assert(BridgeServer.HasCanonicalRequestShape(json.RootElement),
                 "Known J2534 operation has exactly its expected fields");
         }
+        foreach (var rawConfirmation in new[] {
+            "{\"warningAcknowledged\":true,\"writeConfirmed\":true}",
+            "{\"warningAcknowledged\":true,\"writeConfirmed\":false}",
+            "{\"warningAcknowledged\":false,\"writeConfirmed\":true}",
+            "{\"warningAcknowledged\":true}",
+            "{\"writeConfirmed\":true}",
+            "{}"
+        })
+        {
+            using var json = JsonDocument.Parse(rawConfirmation);
+            var expected = rawConfirmation == "{\"warningAcknowledged\":true,\"writeConfirmed\":true}";
+            Assert(BridgeServer.HasExplicitRawWriteConsent(json.RootElement) == expected,
+                "Only both explicit UI confirmations permit a raw ECU write");
+        }
         foreach (var forged in new[] {
             "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"payloadHex\":\"27AA\"}",
             "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF190\",\"payloadHex\":\"27AA\"}",
             "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"3601\",\"unexpectedFlag\":true}",
+            "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF19000\"}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":false,\"writeConfirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":true,\"writeConfirmed\":false}",
             "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"requestCanId\":\"7DF\",\"responseCanId\":\"7E8\"}",
             "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"confirmed\":false}",
             "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":1000,\"timeoutMs\":9999}",
