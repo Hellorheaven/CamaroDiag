@@ -35,6 +35,20 @@ internal static class StandardVehicleProtocolsSelfTests
             J1850Crc.AppendForRawFraming(new byte[] {0x68}),
             "Raw J1850 CRC helper requires a complete header and data.");
 
+        var j1850WireCheck = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "1", "--baud", "10400",
+            "--mode", "receive", "--j1850-wire-crc", "true"]);
+        Check(j1850WireCheck.J1850WireCrc &&
+            j1850WireCheck.ProtocolId == J2534StandardChannel.J1850Vpw &&
+            j1850WireCheck.Data.Length == 0,
+            "Explicit J1850 raw wire CRC checking is available in receive-only mode.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "6", "--baud", "500000",
+            "--mode", "receive", "--j1850-wire-crc", "true"]),
+            "J1850 wire CRC cannot be interpreted on ISO-TP/CAN frames.");
+
         Check(StandardVehicleProtocols.Catalog.Count == 13 &&
             StandardVehicleProtocols.Catalog.All(p => !p.PhysicalWriteQualified),
             "No transport silently certifies physical flash/rollback.");
