@@ -14,8 +14,8 @@ internal static class Kwp2000Transaction
     internal static Reply Decode(ReadOnlySpan<byte> request,
         ReadOnlySpan<byte> response)
     {
-        if (request.Length == 0 || request[0] is < 0x01 or > 0xBF)
-            throw new ArgumentException("KWP request needs a valid service byte.", nameof(request));
+        if (request.Length == 0)
+            throw new ArgumentException("KWP request needs a service byte.", nameof(request));
         if (response.Length == 0)
             throw new InvalidDataException("Missing KWP application reply.");
         var service = request[0];
@@ -28,7 +28,7 @@ internal static class Kwp2000Transaction
             var kind = response[2] == 0x78 ? Kind.ResponsePending : Kind.Negative;
             return new(kind, service, [], response[2]);
         }
-        if (response[0] != service + 0x40)
+        if (response[0] != unchecked((byte)(service + 0x40)))
             throw new InvalidDataException(
                 "KWP positive response service does not match the transmitted SID.");
         return new(Kind.Positive, service, response[1..].ToArray(), null);
