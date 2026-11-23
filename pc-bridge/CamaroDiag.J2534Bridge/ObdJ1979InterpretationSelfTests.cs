@@ -35,6 +35,22 @@ internal static class ObdJ1979InterpretationSelfTests
         Check(ObdJ1979Interpretation.Interpret([0x09, 0x02], vin)
             .Description.Contains("1G1FF1R70C0100001"), "VIN decoded after ISO-TP.");
 
+        var types = ObdJ1979Interpretation.Interpret(
+            [0x09, 0x00], [0x49, 0x00, 0x54, 0, 0, 0x01]);
+        Check(types.Positive && types.Description.Contains("02,04,06,20"),
+            "Mode 09 supported InfoTypes interpreted from actual bitmap.");
+        var calibrationId = new byte[] { 0x49, 0x04, 0x01 }
+            .Concat(Encoding.ASCII.GetBytes("ECU-CAL-ALPHA001")).ToArray();
+        var calResult = ObdJ1979Interpretation.Interpret([0x09, 0x04], calibrationId);
+        Check(calResult.Positive &&
+            calResult.Description.Contains("ECU-CAL-ALPHA001"),
+            "Calibration ID decoded without inventing ECU identity.");
+        var cvn = ObdJ1979Interpretation.Interpret(
+            [0x09, 0x06], [0x49, 0x06, 0x01, 0x12, 0x34, 0xAB, 0xCD]);
+        Check(cvn.Positive && cvn.Description.Contains("1234ABCD") &&
+            cvn.Description.Contains("not manufacturer authenticity"),
+            "CVN hexadecimal display does not imply OEM certificate.");
+
         var dtcs = ObdJ1979Interpretation.Interpret(
             [0x03], [0x43, 0x02, 0x01, 0x33, 0xC1, 0]);
         Check(dtcs.Positive && dtcs.Description.Contains("P0133,U0100") &&
