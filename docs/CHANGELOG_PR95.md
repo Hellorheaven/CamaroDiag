@@ -85,3 +85,8 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - L'export utilise le dépôt privé `CamaroDiagExportStorage`, une vérification du contexte avant publication et les données réellement issues des lectures précédentes. Aucune commande ECU supplémentaire ni programmation FlexFuel.
 - Les identifiants de session refusent les caractères de contrôle et les tailles excessives ; le CSV protège aussi les préfixes de formules précédés d'espaces. Nouveaux tests écrits.
 - **Statut : code et IHM raccordés, compilation / tests du HEAD actuel non exécutés, aucune recette matérielle.** Ne pas confondre cet export de mesures avec une preuve d'installation d'un capteur FlexFuel ou d'activation E85.
+
+## C1 — validation de l'archive au point de publication
+- La fin d'une capture CAN dans `MainViewModel` n'annonce le succès qu'après la fermeture et le vidage effectif du flux brut et une vérification explicite de `CanConsoleRawArchiveWriter.isComplete`. Une archive déclarée incomplète passe par le chemin d'échec au lieu d'être présentée comme un enregistrement terminé.
+- Modification de l'intégration applicative uniquement, sans changement de protocole ni de trames.
+- **Validation de ce correctif sur le HEAD : non encore exécutée**, chantier C1 non clôturé ; ne pas annoncer d'essai de capture physique.
