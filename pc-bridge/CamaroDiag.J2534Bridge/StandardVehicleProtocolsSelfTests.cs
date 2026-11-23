@@ -99,6 +99,48 @@ internal static class StandardVehicleProtocolsSelfTests
                     kwp, 0x34, 0xF1),
                 "KWP wrong diagnostic target rejected.");
         }
+        foreach (int size in new[] { 1, 63, 64, 255 })
+        {
+            var value = Enumerable.Range(0, size)
+                .Select(i => (byte)i).ToArray();
+            var function = StandardVehicleProtocols.BuildKwpFunctionalFrame(
+                0x33, 0xF1, value);
+            Check((function[0] & 0xC0) == 0xC0 &&
+                function.Length == size + (size <= 63 ? 4 : 5),
+                "ISO 14230 functional KWP uses format 0xC0 and valid short/extended length.");
+            Check(StandardVehicleProtocols.ParseKwpFunctionalFrame(
+                    function, 0x33, 0xF1).SequenceEqual(value),
+                "Functional KWP round trips payload with additive checksum.");
+            Reject<InvalidDataException>(() =>
+                StandardVehicleProtocols.ParseKwpPhysicalFrame(
+                    function, 0x33, 0xF1),
+                "Physical KWP parser must not silently accept functional addressing.");
+            var corrupted = function.ToArray();
+            corrupted[^1] ^= 0x01;
+            Reject<InvalidDataException>(() =>
+                StandardVehicleProtocols.ParseKwpFunctionalFrame(
+                    corrupted, 0x33, 0xF1),
+                "Functional KWP rejects corrupted checksum.");
+            Reject<InvalidDataException>(() =>
+                StandardVehicleProtocols.ParseKwpFunctionalFrame(
+                    function, 0x33, 0xF2),
+                "Functional KWP rejects mismatched source logical address.");
+        }
+        var kwpFunctional = StandardVehicleProtocols.BuildKwpFunctionalFrame(
+            0x33, 0xF1, [0x81]);
+        Check(kwpFunctional[0] == 0xC1 &&
+            kwpFunctional[1] == 0x33 &&
+            kwpFunctional[2] == 0xF1 &&
+            kwpFunctional[3] == 0x81,
+            "ISO 14230 functional StartCommunication uses standard format header.");
+        Reject<ArgumentException>(() =>
+            StandardVehicleProtocols.BuildKwpFunctionalFrame(
+                0x33, 0x33, [0x81]),
+            "Functional KWP requires distinct source and target.");
+        Reject<InvalidDataException>(() =>
+            StandardVehicleProtocols.ParseKwpFunctionalFrame(
+                kwpFunctional[..^1], 0x33, 0xF1),
+            "Functional KWP refuses a truncated checksum.");
         var kwpLength = StandardVehicleProtocols.BuildKwpPhysicalFrame(
             0x33, 0xF1, [0x22, 0xF1, 0x90]);
         Reject<InvalidDataException>(() =>
