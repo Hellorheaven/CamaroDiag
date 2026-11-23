@@ -33,7 +33,7 @@ internal static class J1939FdMultiPg
                     (group.Pgn & 0xFF) != 0 ||
                 ((group.Pgn >> 8) & 0xFF) >= 240 &&
                     destination != 0xFF ||
-                group.Payload.Length is < 1 or > 60 ||
+                group.Payload.Length > 60 ||
                 bytes.Count + 4 + group.Payload.Length > 64)
                 throw new ArgumentException(
                     "Invalid J1939-22 contained PGN, payload or 64-byte frame length.");
@@ -127,7 +127,7 @@ internal static class J1939FdMultiPg
             var pgn = ((frame.Data[offset] & 0x03) << 16) |
                 (frame.Data[offset + 1] << 8) | frame.Data[offset + 2];
             var length = frame.Data[offset + 3];
-            if (length == 0 || length > 60 || length > remaining - 4 ||
+            if (length > 60 || length > remaining - 4 ||
                 ((pgn >> 8) & 0xFF) < 240 && (pgn & 0xFF) != 0 ||
                 ((pgn >> 8) & 0xFF) >= 240 && destination != 0xFF)
                 throw new InvalidDataException("Invalid J1939-22 C-PG PGN or payload length.");
