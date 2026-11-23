@@ -7,6 +7,7 @@ internal static class J1939FdCmdtSelfTests
     {
         internal readonly Queue<IsoTpCanFdSession.CanFrame> RX = new();
         internal readonly List<IsoTpCanFdSession.CanFrame> TX = [];
+        internal readonly List<TimeSpan> ReceiveTimeouts = [];
         public Task SendAsync(IsoTpCanFdSession.CanFrame frame, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -16,6 +17,7 @@ internal static class J1939FdCmdtSelfTests
         public Task<IsoTpCanFdSession.CanFrame> ReceiveAsync(TimeSpan timeout, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            ReceiveTimeouts.Add(timeout);
             if (RX.Count == 0) throw new TimeoutException("No simulated FD.TP frame.");
             return Task.FromResult(RX.Dequeue());
         }
@@ -56,11 +58,11 @@ internal static class J1939FdCmdtSelfTests
                 opt.Pgn, opt.Priority));
         static void Send(FakeLink link, J1939FdCmdtSession.Options o, byte[] data) =>
             J1939FdCmdtSession.SendAsync(link, o, data,
-                TimeSpan.FromSeconds(1), CancellationToken.None)
+                TimeSpan.FromSeconds(5), CancellationToken.None)
                 .GetAwaiter().GetResult();
         static byte[] Receive(FakeLink link, J1939FdCmdtSession.Options o) =>
             J1939FdCmdtSession.ReceiveAsync(link, o,
-                TimeSpan.FromSeconds(1), CancellationToken.None)
+                TimeSpan.FromSeconds(5), CancellationToken.None)
                 .GetAwaiter().GetResult();
 
         var tx = new FakeLink();
@@ -82,6 +84,13 @@ internal static class J1939FdCmdtSelfTests
             J1939FdTransportFrames.DecodeData(tx.TX[3]).Number == 3,
             "Directed FD.TP data sequences are contiguous.");
 
+        Check(tx.ReceiveTimeouts.Count == 3 &&
+            tx.ReceiveTimeouts.Take(2).All(t =>
+                t > TimeSpan.Zero && t <= TimeSpan.FromMilliseconds(1250)) &&
+            tx.ReceiveTimeouts[2] > TimeSpan.Zero &&
+            tx.ReceiveTimeouts[2] <= TimeSpan.FromSeconds(3),
+            "CMDT RTS/CTS windows and EOM_ACK use bounded J1939-22 phase timers.");
+
         var rx = new FakeLink();
         foreach (var frame in tx.TX)
         {
@@ -98,6 +107,15 @@ internal static class J1939FdCmdtSelfTests
             J1939FdTransportFrames.DecodeControl(rx.TX[2]).Type ==
                 J1939FdTransportFrames.EndOfMessageAck,
             "FD.TP receiver reconstructs data and emits two CTS plus final EOM_ACK.");
+
+        Check(rx.ReceiveTimeouts.Count == 5 &&
+            rx.ReceiveTimeouts[0] > TimeSpan.Zero &&
+            rx.ReceiveTimeouts[0] <= TimeSpan.FromSeconds(5) &&
+            rx.ReceiveTimeouts.Skip(1).Take(3).All(t =>
+                t > TimeSpan.Zero && t <= TimeSpan.FromMilliseconds(1250)) &&
+            rx.ReceiveTimeouts[4] > TimeSpan.Zero &&
+            rx.ReceiveTimeouts[4] <= TimeSpan.FromMilliseconds(750),
+            "CMDT receiver bounds each DT and final EOM_STATUS wait.");
 
         var wrongCts = new FakeLink();
         wrongCts.RX.Enqueue(Control(o, true,
