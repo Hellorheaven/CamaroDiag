@@ -21,6 +21,9 @@ internal static class NativeE39QualifiedBenchCli
         Console.CancelKeyPress += Cancel;
         try
         {
+            // C6 hard-stop: no PR #95 CLI command may open a device or start
+            // any physical programming, even with a valid signed bench policy.
+            NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
             // Verify trusted qualification BEFORE discovering adapters or
             // processing operator input. There is no self-qualification switch.
             var qualified = NativeE39QualifiedBenchProfile.Load(args[2], args[3]);

@@ -34,6 +34,9 @@ internal sealed partial class J2534Device
         byte[] original, byte[] target, byte[] kernel,
         NativeE39WriteSequence.IDurableJournal journal, CancellationToken token)
     {
+        // Independently gate the actual J2534 hardware entry point so a
+        // future caller cannot bypass the disabled bench CLI.
+        NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
         ArgumentNullException.ThrowIfNull(adapter);
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(policy);

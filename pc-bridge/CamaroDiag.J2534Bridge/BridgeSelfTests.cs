@@ -60,6 +60,20 @@ internal static class BridgeSelfTests
         Assert(!J2534Device.NeedsFreshReceiveQueue(false, false),
             "Standard read-only J2534 console does not require the memory RX policy");
 
+        Assert(!NativeEcuWriteAvailability.PhysicalEcuProgrammingEnabled,
+            "No physical ECU writer is enabled in PR95");
+        var deniedProgramming = false;
+        try { NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled(); }
+        catch (UnauthorizedAccessException) { deniedProgramming = true; }
+        Assert(deniedProgramming,
+            "Non-qualified physical erase/program entry is blocked by an immutable safety gate");
+        var deniedBenchCli = NativeE39QualifiedBenchCli.RunAsync(new[] {
+            "--program-e39-bench", "0", "not-present.json", "not-present.sig",
+            "original.bin", "target.bin", "kernel.bin", "new-journal.jsonl"
+        }).GetAwaiter().GetResult();
+        Assert(deniedBenchCli == 8,
+            "Even a syntactically valid bench CLI is denied before loading files or J2534 drivers");
+
         const string memoryVin = "1G1FA1RXXR0123456";
         var memoryVinReply = new byte[] { 0x62, 0xF1, 0x90 }
             .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray();
