@@ -187,13 +187,15 @@ internal static class StandardProtocolCli
                 Console.WriteLine($"OBDonUDS protocol F810=0x{identification.Value:X2} " +
                     $"OBDonUDS={(identification.IsObdOnUds ? "identified" : "not confirmed")}");
             }
-            else if (ObdOnUdsServices.IsEmissionsDataDid(did) &&
+            else if (ObdOnUdsServices.ClassifyDid(did) !=
+                    ObdOnUdsServices.DataGroup.NotLegislated &&
                 response.Length > 0 && response[0] == 0x62)
             {
                 var raw = ObdOnUdsServices.DecodeReadDid(did, response);
-                Console.WriteLine($"OBDonUDS emissions DID=0x{did:X4} " +
+                Console.WriteLine($"OBDonUDS DID=0x{did:X4} " +
+                    $"category={ObdOnUdsServices.ClassifyDid(did)} " +
                     $"raw={Convert.ToHexString(raw)} " +
-                    "(physical units require the current SAE J1979DA definition).");
+                    "(physical units and availability require SAE J1979DA).");
             }
         }
         else if (request.Length == 3 && request[0] == 0x19 &&
@@ -687,7 +689,7 @@ internal static class StandardProtocolCli
                 "Exchange needs exactly one payload, file, OBD DID or DTC mask; receive mode accepts none.");
         byte[] bytes = mode == "receive" ? Array.Empty<byte>() :
             obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
-            obdDid is not null ? ObdOnUdsServices.ReadEmissionsData(
+            obdDid is not null ? ObdOnUdsServices.ReadObdDid(
                 checked((ushort)ParseCanId(obdDid))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(obdDtcMask))) :
@@ -857,7 +859,7 @@ internal static class StandardProtocolCli
             throw new ArgumentException(
                 "DoIP file payload exceeds the bounded in-memory PDU capacity.");
         var bytes = obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
-            obdDid is not null ? ObdOnUdsServices.ReadEmissionsData(
+            obdDid is not null ? ObdOnUdsServices.ReadObdDid(
                 checked((ushort)uint.Parse(
                     obdDid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
                         obdDid[2..] : obdDid,
