@@ -25,6 +25,35 @@ class CamaroUdsProtocolTest {
     }
 
     @Test
+    fun lfxFuelSurveyRequiresRealSingleBytePidRepliesFromPrimaryEcu() {
+        for ((pid, raw) in listOf("52" to 0x00, "06" to 0x80, "07" to 0x40,
+            "08" to 0x00, "09" to 0xFF)) {
+            val headerless = "41$pid%02X".format(raw)
+            assertArrayEquals(intArrayOf(raw),
+                CamaroUdsProtocol.parsePidBytes(
+                    headerless, pid, primaryPowertrainResponderOnly = true
+                ))
+            assertArrayEquals(intArrayOf(raw),
+                CamaroUdsProtocol.parsePidBytes(
+                    "7E8 03 41 $pid %02X".format(raw),
+                    pid, primaryPowertrainResponderOnly = true
+                ))
+            for (bad in listOf(
+                "7E9 03 41 $pid %02X".format(raw),
+                "7E8 04 41 $pid %02X 00".format(raw),
+                "7E8 03 41 $pid",
+                "7E8 03 41 53 %02X".format(raw),
+                "NO DATA"
+            )) {
+                assertNull("Invalid physical LFX fuel response: $bad",
+                    CamaroUdsProtocol.parsePidBytes(
+                        bad, pid, primaryPowertrainResponderOnly = true
+                    ))
+            }
+        }
+    }
+
+    @Test
     fun parsesOdometerPidsWithTenthKilometreResolution() {
         val pidA6 = requireNotNull(CamaroUdsProtocol.parseOdometerPidA6("41 A6 00 12 D6 87"))
         val pidD3 = requireNotNull(CamaroUdsProtocol.parseOdometerPidD3("41 D3 00 12 D6 87"))
