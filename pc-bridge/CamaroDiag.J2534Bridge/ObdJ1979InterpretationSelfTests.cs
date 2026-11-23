@@ -114,6 +114,36 @@ internal static class ObdJ1979InterpretationSelfTests
             "Actual ISO-TP CLI can request J1979 interpretation.");
 
         Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseIsoTp(new string[]
+            {
+                StandardProtocolCli.RawIsoTpCommand,
+                "--adapter-index", "0", "--tx-id", "7E0",
+                "--rx-id", "7E8", "--baud", "500000",
+                "--fd", "false", "--payload", "22F190",
+                "--j1979-decode", "true"
+            }),
+            "J1979 decode never parses classic 0x22 UDS as an emissions service.");
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseIsoTp(new string[]
+            {
+                StandardProtocolCli.RawIsoTpCommand,
+                "--adapter-index", "0", "--tx-id", "7E0",
+                "--rx-id", "7E8", "--baud", "500000",
+                "--fd", "false", "--obd-did", "F810",
+                "--j1979-decode", "true"
+            }),
+            "Classic J1979 decoder may not be combined with SAE J1979-2 UDS DID selector.");
+        Reject<ArgumentException>(() =>
+            StandardProtocolCli.ParseIsoTp(new string[]
+            {
+                StandardProtocolCli.RawIsoTpCommand,
+                "--adapter-index", "0", "--tx-id", "7E0",
+                "--rx-id", "7E8", "--baud", "500000",
+                "--fd", "true", "--payload", "0100",
+                "--j1979-decode", "true"
+            }),
+            "Classic ISO 15765-4 J1979 requires classic CAN; FD uses another profile.");
+        Reject<ArgumentException>(() =>
             StandardProtocolCli.ParseIsoTp(args.Concat(
                 new[] { "--uds-validate", "true" }).ToArray()),
             "UDS and classic J1979 validators cannot be combined.");
