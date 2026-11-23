@@ -443,6 +443,7 @@
     <string name="msg_live_recording_stopped">Enregistrement arrêté : la communication OBD a échoué. Les derniers échantillons restent exportables.</string>
     <string name="msg_live_recording_started">Enregistrement en cours. Nombre d’échantillons : %1$d.</string>
     <string name="msg_wifi_connection_failed">Échec de la connexion OBD Wi-Fi</string>
+    <string name="msg_usb_permission_denied">Accès USB refusé. Sélectionnez à nouveau l’adaptateur pour redemander l’autorisation.</string>
     <string name="msg_usb_permission_pending">Autorisation USB demandée. Acceptez la fenêtre Android, puis appuyez à nouveau sur Connexion.</string>
     <string name="msg_usb_connection_failed">Échec de la connexion OBD USB</string>
     <string name="msg_bluetooth_connection_failed">Échec de la connexion Bluetooth SPP</string>
