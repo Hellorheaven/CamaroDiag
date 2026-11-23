@@ -70,10 +70,10 @@ class Lfx2012FuelHistoryCsvTest {
 
     @Test fun sessionIdsWithLineBreaksOrTabsAreRejectedBeforeExport() {
         assertTrue(runCatching {
-            identity.copy(sessionId = "session\\nsecond")
+            identity.copy(sessionId = "session\nsecond")
         }.isFailure)
         assertTrue(runCatching {
-            identity.copy(sessionId = "session\\tsecond")
+            identity.copy(sessionId = "session\tsecond")
         }.isFailure)
         assertTrue(runCatching {
             identity.copy(sessionId = "a".repeat(129))
