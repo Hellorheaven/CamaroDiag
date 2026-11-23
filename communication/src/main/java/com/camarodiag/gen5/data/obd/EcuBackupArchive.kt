@@ -32,7 +32,7 @@ object EcuBackupArchive {
      * Include room for the manifest; an exact 32 MiB Android import cap
      * rejected Windows' largest valid two-pass archive.
      */
-    internal const val MAX_J2534_IMPORT_UNCOMPRESSED_BYTES =
+    const val MAX_J2534_IMPORT_UNCOMPRESSED_BYTES =
         2L * 16 * 1024 * 1024 + 64L * 1024
 
     /**
