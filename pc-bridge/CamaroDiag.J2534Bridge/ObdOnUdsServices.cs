@@ -94,6 +94,70 @@ internal static class ObdOnUdsServices
         return reply.Slice(3).ToArray();
     }
 
+    internal const byte EmissionsFunctionalGroup = 0x33;
+
+    internal sealed record WwhDtc(uint Code, byte Status, byte? Severity);
+
+    internal sealed record WwhDtcReport(byte FunctionalGroup,
+        byte StatusAvailabilityMask, byte? SeverityAvailabilityMask,
+        byte DtcFormatIdentifier, IReadOnlyList<WwhDtc> Codes);
+
+    /// <summary>
+    /// UDS 0x19/0x42 reportWWHOBDDTCByMaskRecord for legislated
+    /// emissions functional group 0x33. Status and severity masks
+    /// are explicitly supplied; never assume a vehicle's readiness state.
+    /// </summary>
+    internal static byte[] ReadWwhEmissionsDtcs(
+        byte statusMask, byte severityMask = 0xFF) =>
+        UdsStandardServices.ReadDtc(0x42,
+            [EmissionsFunctionalGroup, severityMask, statusMask]);
+
+    /// <summary>
+    /// UDS 0x19/0x55 reportWWHOBDDTCWithPermanentStatus, emissions group.
+    /// </summary>
+    internal static byte[] ReadWwhPermanentEmissionsDtcs() =>
+        UdsStandardServices.ReadDtc(0x55, [EmissionsFunctionalGroup]);
+
+    internal static WwhDtcReport DecodeWwhEmissionsDtcs(
+        ReadOnlySpan<byte> reply)
+    {
+        if (reply.Length < 6 || reply[0] != 0x59 ||
+            reply[1] != 0x42 || reply[2] != EmissionsFunctionalGroup ||
+            (reply.Length - 6) % 5 != 0)
+            throw new InvalidDataException(
+                "Malformed WWH-OBD 0x19 0x42 emissions DTC reply.");
+
+        var codes = new List<WwhDtc>((reply.Length - 6) / 5);
+        for (var offset = 6; offset < reply.Length; offset += 5)
+        {
+            var dtc = (uint)reply[offset + 1] << 16 |
+                (uint)reply[offset + 2] << 8 | reply[offset + 3];
+            codes.Add(new WwhDtc(dtc, reply[offset + 4], reply[offset]));
+        }
+        return new WwhDtcReport(reply[2], reply[3], reply[4],
+            reply[5], codes);
+    }
+
+    internal static WwhDtcReport DecodeWwhPermanentEmissionsDtcs(
+        ReadOnlySpan<byte> reply)
+    {
+        if (reply.Length < 5 || reply[0] != 0x59 ||
+            reply[1] != 0x55 || reply[2] != EmissionsFunctionalGroup ||
+            (reply.Length - 5) % 4 != 0)
+            throw new InvalidDataException(
+                "Malformed WWH-OBD 0x19 0x55 permanent DTC reply.");
+
+        var codes = new List<WwhDtc>((reply.Length - 5) / 4);
+        for (var offset = 5; offset < reply.Length; offset += 4)
+        {
+            var dtc = (uint)reply[offset] << 16 |
+                (uint)reply[offset + 1] << 8 | reply[offset + 2];
+            codes.Add(new WwhDtc(dtc, reply[offset + 3], null));
+        }
+        return new WwhDtcReport(reply[2], reply[3], null,
+            reply[4], codes);
+    }
+
     internal static byte[] ReadDtcByStatusMask(byte statusMask) =>
         UdsStandardServices.ReadDtc(0x02, [statusMask]);
 
