@@ -1,24 +1,6 @@
 #include <Arduino.h>
 
-#if defined(CD_JOURNAL_EXPORT)
-#include "journal_storage.h"
-#include "journal_export.h"
-
-static cd::journal::ExportRequest request;
-void setup(){Serial.begin(115200);}
-void loop(){
-  request.poll(millis());
-  for(unsigned n=0;n<64&&Serial.available()>0;++n){
-    const int b=Serial.read();
-    if(b<0||!request.feed(static_cast<uint8_t>(b),millis()))continue;
-    cd::journal::Record rec;
-    const auto state=cd::journal::inspectCheckpoint(rec);
-    char response[135]{};
-    const size_t count=cd::journal::exportLine(state,rec,response,sizeof(response));
-    if(count)Serial.write(reinterpret_cast<const uint8_t*>(response),count);
-  }
-}
-#elif defined(CD_BINARY_DISCOVERY)
+#ifdef CD_BINARY_DISCOVERY
 #include "frame_receiver.h"
 #include "discovery_session.h"
 

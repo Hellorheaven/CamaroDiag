@@ -12,7 +12,7 @@ Sous-projet logiciel de **[CamaroDiag](https://github.com/Hellorheaven/CamaroDia
 - **MCU internes** : méthodes BOOT/BDM/Nexus/JTAG distinctes des EEPROM externes ; ne pas supposer de compatibilité à partir du nom d'un ECU.
 
 ## État actuel
-Les variantes de découverte ASCII et binaire du firmware ESP32-S3 fournissent uniquement `PING`, `CAPS` et `STATUS`. La variante de service isolée exporte un point de contrôle du journal local en lecture seule. Toutes les fonctions véhicule et les commandes d’écriture restent désactivées. Le prototype STM32G474 démarre avec signaux cibles inactifs et diagnostic ST-LINK. Le client Python propose découverte USB, sauvegardes et planification de patches hors ligne, transport TLS 1.3 de référence sur socket et journal de programmation de simulation. Le client Android USB Host CDC est un prototype de découverte autonome, à qualifier sur carte réelle. Aucun accès physique ECU, SPI interprocesseur ou CAN réel n'est activé.
+Les variantes de découverte ASCII et binaire du firmware ESP32-S3 fournissent uniquement `PING`, `CAPS` et `STATUS`. L'export matériel de checkpoints CDJ/USB/1 est différé au chantier Connectors C5 ; l'inspection hors ligne reste disponible. Toutes les fonctions véhicule et les commandes d’écriture restent désactivées. Le prototype STM32G474 démarre avec signaux cibles inactifs et diagnostic ST-LINK. Le client Python propose découverte USB, sauvegardes et planification de patches hors ligne, transport TLS 1.3 de référence sur socket et journal de programmation de simulation. Le client Android USB Host CDC est un prototype de découverte autonome, à qualifier sur carte réelle. Aucun accès physique ECU, SPI interprocesseur ou CAN réel n'est activé.
 
 | Dossier | Contenu |
 |---|---|

@@ -36,9 +36,6 @@ internal static class Program
         if (args.Contains(ConnectorDiscoveryCli.Command, StringComparer.OrdinalIgnoreCase))
             return ConnectorDiscoveryCli.Run(args);
 
-        if (args.Contains(ConnectorCheckpointCapture.Command, StringComparer.OrdinalIgnoreCase))
-            return ConnectorCheckpointCapture.Run(args);
-
         // Offline verification must never load a vendor DLL, contact an ECU,
         // start the network bridge or launch the updater.
         if (args.Contains(NativeScopedBackupImportCli.Command, StringComparer.OrdinalIgnoreCase))

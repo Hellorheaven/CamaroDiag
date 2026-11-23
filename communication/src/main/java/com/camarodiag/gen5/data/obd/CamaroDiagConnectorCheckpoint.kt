@@ -4,7 +4,7 @@ import java.util.zip.CRC32
 
 /**
  * Offline inspection of the CDJ/1 checkpoint structure defined by Connectors.
- * The separate isolated CDJ/USB/1 service firmware can export this record.
+ * Import inspection only: the physical CDJ/USB/1 capture firmware is deferred to C5.
  * A valid CRC or matching imported manifest is NEVER authenticated evidence.
  * Do not use this class to clear a fault, retry, reset, or authorize ECU I/O.
  */

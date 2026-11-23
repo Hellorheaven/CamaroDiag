@@ -42,8 +42,6 @@ jobs:
           /tmp/journal_record_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/journal_writer_gate_test.cpp -o /tmp/journal_writer_gate_test
           /tmp/journal_writer_gate_test
-          g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/esp32s3/native-tests/journal_export_test.cpp -o /tmp/journal_export_test
-          /tmp/journal_export_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/interprocessor_link_test.cpp -o /tmp/interprocessor_link_test
           /tmp/interprocessor_link_test
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic connectors/firmware/shared/native-tests/isotp_observer_test.cpp -o /tmp/isotp_observer_test
