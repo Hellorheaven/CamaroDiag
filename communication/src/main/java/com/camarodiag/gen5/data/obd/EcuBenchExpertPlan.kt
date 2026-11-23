@@ -84,12 +84,11 @@ object EcuBenchExpertPlan {
         val family = target.controllerFamily?.trim().orEmpty()
         if (family.isBlank() || family.equals("unknown", ignoreCase = true))
             missing += Blocker.CONTROLLER_NOT_IDENTIFIED
-        if (target.chipMarking.isNullOrBlank() ||
-            target.chipMarking.trim().equals("unknown", ignoreCase = true)
-        ) missing += Blocker.CHIP_NOT_IDENTIFIED
+        // Chip and programmer display names are operator metadata, not
+        // proof of a hardware route and not OEM access requirements.
+        // The actual protocol driver must identify its ECU and interface.
         if (!target.accessMethod.permitsRegion(target.region))
             missing += Blocker.ACCESS_REGION_INCOMPATIBLE
-        if (target.programmerName.isNullOrBlank()) missing += Blocker.PROGRAMMER_NOT_IDENTIFIED
         if (image?.fileName.isNullOrBlank() || (image?.sizeBytes ?: 0L) <= 0L) {
             missing += Blocker.IMAGE_MISSING
         } else {

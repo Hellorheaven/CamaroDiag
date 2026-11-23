@@ -34,14 +34,18 @@ class EcuBenchExpertPlanTest {
         assertFalse(EcuBenchExpertPlan.isProgrammingEnabled(target, image, proof))
     }
 
-    @Test fun unknownControllerAndChipRequireRealIdentification() {
+    @Test fun unknownControllerIsRejectedButUserTypedChipAndProgrammerLabelsAreNotKeys() {
         val missing = EcuBenchExpertPlan.blockers(
             target.copy(controllerFamily = "unknown", chipMarking = "unknown", programmerName = ""),
             image
         )
         assertTrue(EcuBenchExpertPlan.Blocker.CONTROLLER_NOT_IDENTIFIED in missing)
-        assertTrue(EcuBenchExpertPlan.Blocker.CHIP_NOT_IDENTIFIED in missing)
-        assertTrue(EcuBenchExpertPlan.Blocker.PROGRAMMER_NOT_IDENTIFIED in missing)
+        val known = EcuBenchExpertPlan.blockers(
+            target.copy(chipMarking = null, programmerName = null), image
+        )
+        assertFalse(EcuBenchExpertPlan.Blocker.CHIP_NOT_IDENTIFIED in known)
+        assertFalse(EcuBenchExpertPlan.Blocker.PROGRAMMER_NOT_IDENTIFIED in known)
+        assertTrue(EcuBenchExpertPlan.Blocker.HARDWARE_PROGRAMMING_DRIVER_UNAVAILABLE in known)
     }
 
     @Test fun knownOtherEcuFamiliesAreNotArtificiallyRestrictedToE39() {
