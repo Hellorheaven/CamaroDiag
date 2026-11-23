@@ -21,8 +21,9 @@ internal static class NativeE39QualifiedBenchCli
         Console.CancelKeyPress += Cancel;
         try
         {
-            // C6 hard-stop: no PR #95 CLI command may open a device or start
-            // any physical programming, even with a valid signed bench policy.
+            // Enable the explicitly invoked LOCAL physical bench test path.
+            // Independent signed qualification is still required before
+            // discovering an adapter or contacting an ECU.
             NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
             // Verify trusted qualification BEFORE discovering adapters or
             // processing operator input. There is no self-qualification switch.
