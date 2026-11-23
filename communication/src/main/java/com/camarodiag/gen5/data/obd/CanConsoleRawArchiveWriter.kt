@@ -44,11 +44,21 @@ class CanConsoleRawArchiveWriter(private val writer: Writer) : Closeable {
     override fun close() {
         if (closed) return
         closed = true
+        var storageError: IOException? = null
+        try {
+            writer.flush()
+        } catch (error: IOException) {
+            storageError = error
+        }
         try {
             writer.close()
         } catch (error: IOException) {
+            if (storageError == null) storageError = error
+            else storageError.addSuppressed(error)
+        }
+        if (storageError != null) {
             failed = true
-            throw CanCaptureArchiveWriteException(error)
+            throw CanCaptureArchiveWriteException(storageError)
         }
     }
 }
