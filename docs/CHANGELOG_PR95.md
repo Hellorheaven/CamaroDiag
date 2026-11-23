@@ -249,3 +249,19 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Commande Windows `--j1939-fd-multipg` bidirectionnelle, canal J2534 FD_CAN brut, BRS et data baud optionnels (négociés via pilote), confirmation double en émission, filtrage de groupe dans les réponses.
 - Tests offline du codec, des trames malformées, PDU1/PDU2, CLI, modes passifs et BRS enregistrés dans `J1939FdMultiPgSelfTests`, exécutables depuis `BridgeSelfTests` mais **non encore exécutés**.
 - FD.TP des messages longs, FBFF, assurance data OEM, adresse réseau J1939-81 et validation physique restent incomplets.
+
+## Corrections indépendantes des protocoles — C1 et C2 (23/11/2026)
+
+**C1 — archivage des événements console :**
+- Le magasin du journal est définitivement mis hors service à la destruction du ViewModel. Un callback tardif d'une coroutine annulée ne peut plus créer une nouvelle archive après nettoyage.
+- Pendant l'enregistrement, si le fichier de journal a disparu, la capture devient incomplète et son export est refusé (y compris lorsqu'un descripteur fichier resterait ouvert).
+- Tests de régression pour destruction définitive, archive disparue entre deux événements et impossibilité d'exporter une session invalide.
+- Commits : `d45c76a`, `ad57d61`, `3beb0ee`, `de2586e`, `6855250`.
+
+**C2 — construction des images de restauration hors ligne :**
+- Contrôle strict par région (64 Mio) et global (256 Mio), sans addition de `Long` susceptible de déborder ; rejet avant assemblage des octets ou création du dossier de sortie.
+- Tests ajoutés sur une longueur `Long.MAX_VALUE` et une carte de cinq régions de 64 Mio dépassant le budget global.
+- Commits : `1a3668e`, `1240a7d`.
+- **Limitation majeure inchangée** : ces corrections portent uniquement sur la préparation hors ligne d'une image ; elles ne constituent ni une cartographie OEM complète, ni un pilote de flash, ni une récupération réelle d'ECU.
+
+**Validation** : les tests de ces correctifs ne sont pas encore confirmés par un rapport GitHub Actions au SHA final. Ne pas annoncer de compilation réussie ou de qualification véhicule pour ces changements. Aucun protocole standard n'a été modifié dans ce lot.
