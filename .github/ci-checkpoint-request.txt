@@ -75,3 +75,15 @@ self-tests interrupted before ISO-TP by stale J1939-22 scope *test text*,
 which was reconciled to actual existing catalog at 9deb193169502bf467791c04bbd2e1698489a8b0.
 Run one combined Debug Windows/Android/native/Connectors checkpoint at this
 marker commit. No new protocol begun; no hardware or ECU validation asserted.
+
+23/11/2026 — ISO-TP CAN classique, test de raccordement J2534 sans matériel (#110)
+Code HEAD avant checkpoint: 4f291dd5b7b8a1757a7d791e6e85bb6d7b61358f
+Adaptateur IRawChannel étroit autour du vrai J2534StandardChannel,
+conservation du même passage pilote. Vecteurs offline vérifiant octets
+CAN ID/payload, flags 11/29-bit FD/BRS, décodage RX, délai, annulation,
+format refusé et propagation d'erreur PassThruWriteMsgs.
+Une seule campagne Debug groupée au SHA de ce marqueur pour compiler/valider
+les nouveaux tests. Le run #45268234408 est vert Windows (1593 tests),
+Android échoue indépendamment sur Lfx2012FuelHistoryCsv.kt; déléguer sa
+correction au chantier Android, sans toucher les protocoles en parallèle.
+PAS de validation physique J2534/ECU, pas de merge/release.
