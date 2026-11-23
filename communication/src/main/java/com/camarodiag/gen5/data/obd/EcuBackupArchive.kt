@@ -230,7 +230,7 @@ object EcuBackupArchive {
             )
         } else null
         val firmwareEvidence = if (properties.getProperty("format") == FORMAT_WITH_CHANNEL &&
-            ("ecu.osId" in properties || "ecu.osDid" in properties)
+            (properties.containsKey("ecu.osId") || properties.containsKey("ecu.osDid"))
         ) {
             fun canonicalLong(name: String): Long {
                 val raw = properties.getProperty(name)
