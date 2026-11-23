@@ -68,6 +68,10 @@ internal static class ObdOnUdsCanDiscovery
             }
             var found = TryDecode(frame);
             if (found is null) continue;
+            if (identities.TryGetValue(found.ResponseId, out var previous) &&
+                previous.ProtocolValue != found.ProtocolValue)
+                throw new InvalidDataException(
+                    "Conflicting F810 protocol identification from one CAN response ID.");
             identities[found.ResponseId] = found;
         }
         return identities.Values.OrderBy(x => x.ResponseId).ToArray();
