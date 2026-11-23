@@ -123,6 +123,30 @@ class CamaroDiagConnectorDiscoveryTest {
         assertFalse(CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(7, emptyList()))
     }
 
+    @Test fun deviceIdAlwaysUsesTheFinalUsbSuffix() {
+        assertEquals(17, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors (#999 embedded) (#17)"
+        ))
+        assertEquals(17, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors #999 internal (#17)"
+        ))
+        assertEquals(17, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors #17"
+        ))
+        assertEquals(null, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors (#17) trailing"
+        ))
+        assertEquals(null, CamaroDiagConnectorDiscovery.deviceIdFromLabel(
+            "CamaroDiagConnectors (#999999999999999999999)"
+        ))
+        assertTrue(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(
+            17, listOf("CamaroDiagConnectors #999 internal (#17)")
+        ))
+        assertFalse(CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(
+            999, listOf("CamaroDiagConnectors #999 internal (#17)")
+        ))
+    }
+
     @Test fun onlyEnumeratedNamedNonKklUsbBoardCanBeDiscovered() {
         val labels = listOf(
             "CamaroDiagConnectors (#17)",
