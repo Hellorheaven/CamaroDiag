@@ -770,7 +770,7 @@ internal static class StandardProtocolCli
                 "Client certificate requires TLS and a 40-digit Windows store thumbprint.");
         if (host.Length is < 1 or > 253 || timeout is < 100 or > 30000 ||
             tester == ecu || bytes.Length is < 1 or > DoIpCodec.MaxPayload - 4 ||
-            version is not (0x02 or 0x03))
+            version is not (0x02 or 0x03 or 0x04))
             throw new ArgumentException("DoIP target or diagnostic PDU is invalid.");
         return new(host, tester, ecu, bytes, timeout, useTls,
             version, receiveFile, clientCert);
