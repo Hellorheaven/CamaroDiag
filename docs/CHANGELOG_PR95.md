@@ -103,3 +103,8 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Tests unitaires dédiés : fenêtre circulaire après 513 relevés, réinitialisation de session, retour arrière d'horodatage, absence de réponse préservée et copie indépendante du jeu d'observations.
 - Documentation d'utilisation des relevés et de l'export CSV mise à jour en français et anglais. L'historique est **en mémoire**, non un enregistreur en continu ; aucune commande ECU ajoutée.
 - **Qualification :** code et tests écrits sur la branche ; aucun build ni nouvelle exécution des tests du HEAD par cette intervention, ni validation physique.
+
+## SAE J1939-21 — fenêtres RTS/CTS (23 novembre 2026)
+- Réception multipaquets : les CTS sont limités à la fenêtre maximale déclarée dans le RTS distant, même si la fenêtre locale est plus grande ; BAM reste indépendant de cette limite.
+- Autotest ajouté avec RTS limité à un paquet, trois fenêtres CTS successives, reconstruction des octets et acquittement EOM_ACK.
+- Commits `c849df3`, `071b4c0`. Tests ajoutés **non exécutés** à ce stade ; aucune qualification matérielle ou véhicule revendiquée.
