@@ -978,4 +978,9 @@
     <string name="flexfuel_lfx2012_history_failed">Impossible d’exporter l’historique carburant.</string>
     <string name="flexfuel_lfx2012_history_range">Éthanol : %1$d relevés valides, min. %2$.2f %% / max. %3$.2f %%</string>
     <string name="flexfuel_lfx2012_history_trim_range">%1$s : %2$d relevés valides, min. %3$.2f %% / max. %4$.2f %%</string>
+    <string name="can_console_export_header"># Export console CAN CamaroDiag</string>
+    <string name="can_console_export_events_limited"># Historique : 300 derniers événements TX/RX/SYSTEM au maximum. Les émissions TX plus anciennes ne sont pas conservées ; le flux RX brut complet est archivé séparément lorsqu’il existe.</string>
+    <string name="can_console_export_direction_legend"># TX = envoyé, RX = reçu, SYSTEM = événement applicatif</string>
+    <string name="can_console_export_full_raw_rx"># RX BRUT - flux complet archivé de l’adaptateur (texte non modifié)</string>
+    <string name="can_console_export_recent_raw_rx"># RX BRUT - extrait mémoire récent uniquement, capture non exhaustive</string>
 </resources>
