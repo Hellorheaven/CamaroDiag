@@ -17,7 +17,10 @@ object Lfx2012FuelSessionHistory {
     ) {
         init {
             require(vin.matches(Regex("[A-HJ-NPR-Z0-9]{17}")))
-            require(sessionId.isNotBlank())
+            require(sessionId.isNotBlank() && sessionId.length <= 128 &&
+                sessionId.none(Char::isISOControl)) {
+                "Fuel session identifier is not a valid single-line value"
+            }
         }
     }
 
