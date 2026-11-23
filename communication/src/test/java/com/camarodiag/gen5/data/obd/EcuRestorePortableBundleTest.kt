@@ -64,11 +64,39 @@ class EcuRestorePortableBundleTest {
                     File(root, "truncated")
                 )
             }.isFailure)
+            assertTrue(!File(root, "truncated/index.ecu-package").exists())
+            assertTrue(runCatching {
+                EcuRestorePackage.open(File(root, "truncated"))
+            }.isFailure)
             assertTrue(runCatching {
                 EcuRestorePortableBundle.importNew(
                     complete + byteArrayOf(42), File(root, "appended")
                 )
             }.isFailure)
+            assertTrue(!File(root, "appended/index.ecu-package").exists())
+            assertTrue(runCatching {
+                EcuRestorePackage.open(File(root, "appended"))
+            }.isFailure)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun invalidPackageIndexIsNeverLeftAuthoritativeAfterImportFailure() {
+        val root = Files.createTempDirectory("restore-invalid-index").toFile()
+        try {
+            val zipBytes = ByteArrayOutputStream()
+            ZipOutputStream(zipBytes).use { zip ->
+                zip.putNextEntry(ZipEntry("index.ecu-package"))
+                zip.write(byteArrayOf(1, 2, 3, 4))
+                zip.closeEntry()
+            }
+            val target = File(root, "invalid")
+            assertTrue(runCatching {
+                EcuRestorePortableBundle.importNew(zipBytes.toByteArray().inputStream(), target)
+            }.isFailure)
+            assertTrue(!File(target, "index.ecu-package").exists())
+            assertTrue(runCatching { EcuRestorePackage.open(target) }.isFailure)
         } finally {
             root.deleteRecursively()
         }
