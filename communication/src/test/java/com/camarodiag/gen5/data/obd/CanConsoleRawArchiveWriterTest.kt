@@ -145,7 +145,7 @@ class CanConsoleRawArchiveWriterTest {
 
     @Test fun longCaptureKeepsOriginalChunkBoundariesAndAllRawText() {
         val sink = StringWriter()
-        val frame = "7E8 08 41 0C 1A F8 00 00 00 00\\r\\n"
+        val frame = "7E8 08 41 0C 1A F8 00 00 00 00\r\n"
         val repeatCount = 6000
         val writer = CanConsoleRawArchiveWriter(sink)
         repeat(repeatCount) {
