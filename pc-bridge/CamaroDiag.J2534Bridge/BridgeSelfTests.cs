@@ -551,6 +551,7 @@ internal static class BridgeSelfTests
         checks += NativeUdsDownloadSelfTests.Run();
         checks += NativeUdsUploadSelfTests.Run();
         checks += StandardVehicleProtocolsSelfTests.Run();
+        checks += Kwp2000TransactionSelfTests.Run();
         checks += ObdJ1979TransactionSelfTests.Run();
         checks += ObdJ1979PidSupportSelfTests.Run();
         checks += ObdJ1979VinSelfTests.Run();
