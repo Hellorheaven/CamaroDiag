@@ -155,7 +155,7 @@ internal static class J1939FdBamSession
         }
         if (remaining <= TimeSpan.Zero)
             throw new TimeoutException(
-                "J1939-22 BAM overall receive deadline expired.");
+                "J1939-22 BAM overall or segment-phase deadline expired.");
         return link.ReceiveAsync(
             remaining > TimeSpan.FromSeconds(30) ?
                 TimeSpan.FromSeconds(30) : remaining, token);
