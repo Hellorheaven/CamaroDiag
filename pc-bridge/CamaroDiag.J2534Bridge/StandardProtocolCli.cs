@@ -342,11 +342,13 @@ internal static class StandardProtocolCli
                         System.Security.Cryptography.SHA256.HashData(txPreview))}"))
                 return 2;
 
-            // J1939-22 FEFF Multi-PG uses RAW FD_CAN, not classical
-            // J1939-21 TP or ISO15765 pre-segmented channels.
+            // Raw FD_CAN: FEFF and FD.TP require 29-bit IDs; FBFF
+            // requires a genuinely standard 11-bit channel and flags.
+            // Do not open the channel in 29-bit mode then try to transmit
+            // an 11-bit FBFF data frame through it.
             using var driver = J2534StandardChannel.Connect(
                 adapters[o.AdapterIndex], J2534StandardChannel.FdCan,
-                o.Bitrate, flags: 0x100u);
+                o.Bitrate, flags: o.FastBroadcast ? 0u : 0x100u);
             if (o.DataBaud.HasValue)
                 driver.SetCanFdDataPhaseRate(o.DataBaud.Value);
             driver.ConfigureFilter(new byte[4], new byte[4]);
