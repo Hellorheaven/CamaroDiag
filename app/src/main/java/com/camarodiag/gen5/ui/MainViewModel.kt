@@ -3556,7 +3556,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun discoverCamaroDiagConnector(deviceLabel: String, binary: Boolean = false) {
         val id = Regex("#(\\d+)").find(deviceLabel)?.groupValues?.get(1)?.toIntOrNull()
-        if (id == null) {
+        if (id == null || !com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery
+                .allowsDedicatedUsbDiscovery(id, _usbDevices.value)) {
+            // Reject a mismatched/stale UI entry without switching away from
+            // an active OBD/J2534 adapter. Manager rechecks the live USB list.
             _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
             return
         }
