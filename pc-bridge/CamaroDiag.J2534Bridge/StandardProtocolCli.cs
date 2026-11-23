@@ -23,6 +23,44 @@ internal static class StandardProtocolCli
     internal const string J1939FdBamCommand = "--j1939-fd-bam";
     internal const string J1939FdCmdtCommand = "--j1939-fd-cmdt";
 
+    internal sealed record J1979PidDiscoveryOptions(
+        int AdapterIndex, uint Baud, IsoTpCanFdSession.Settings Settings,
+        byte Mode, byte FreezeFrame, bool Extended, int TimeoutMs);
+
+    internal static J1979PidDiscoveryOptions ParseJ1979PidDiscovery(string[] args)
+    {
+        var index = int.Parse(Required(args, "--adapter-index"),
+            CultureInfo.InvariantCulture);
+        static uint CanId(string input)
+        {
+            var hex = input.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
+                input[2..] : input;
+            if (hex.Length == 0 || !hex.All(Uri.IsHexDigit))
+                throw new ArgumentException("CAN arbitration IDs require hexadecimal digits.");
+            return uint.Parse(hex, NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture);
+        }
+        var tx = CanId(Required(args, "--tx-id"));
+        var rx = CanId(Required(args, "--rx-id"));
+        var baud = Number(Required(args, "--baud"));
+        var mode = checked((byte)Number(Optional(args, "--j1979-mode") ?? "1"));
+        var frame = checked((byte)Number(Optional(args, "--freeze-frame") ?? "0"));
+        var extended = bool.Parse(Optional(args, "--extended") ?? "false");
+        var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
+            CultureInfo.InvariantCulture);
+        if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
+            mode is not (0x01 or 0x02) || (mode == 1 && frame != 0) ||
+            tx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
+            rx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
+            tx == rx ||
+            Optional(args, "--payload") is not null ||
+            Optional(args, "--payload-file") is not null)
+            throw new ArgumentException("Invalid J1979 physical CAN discovery options.");
+        var settings = new IsoTpCanFdSession.Settings(tx, rx, 8, false);
+        settings.Validate();
+        return new(index, baud, settings, mode, frame, extended, timeout);
+    }
+
     /// <summary>
     /// Explicit physical J1979 discovery for one CAN ECU. No functional
     /// broadcast, mutation, or guessed defaults for the physical addresses.
@@ -31,28 +69,15 @@ internal static class StandardProtocolCli
     {
         try
         {
-            var adapterIndex = int.Parse(Required(args, "--adapter-index"),
-                CultureInfo.InvariantCulture);
-            var txId = uint.Parse(Required(args, "--tx-id").Replace("0x", "",
-                StringComparison.OrdinalIgnoreCase), NumberStyles.AllowHexSpecifier,
-                CultureInfo.InvariantCulture);
-            var rxId = uint.Parse(Required(args, "--rx-id").Replace("0x", "",
-                StringComparison.OrdinalIgnoreCase), NumberStyles.AllowHexSpecifier,
-                CultureInfo.InvariantCulture);
-            var baud = Number(Required(args, "--baud"));
-            var mode = checked((byte)Number(Optional(args, "--j1979-mode") ?? "1"));
-            var frame = checked((byte)Number(Optional(args, "--freeze-frame") ?? "0"));
-            var extended = bool.Parse(Optional(args, "--extended") ?? "false");
-            var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
-                CultureInfo.InvariantCulture);
-            if (adapterIndex < 0 || baud == 0 || timeoutMs is < 100 or > 30000 ||
-                mode is not (0x01 or 0x02) || (mode == 1 && frame != 0) ||
-                txId > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
-                rxId > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
-                txId == rxId)
-                throw new ArgumentException("Invalid J1979 CAN discovery options.");
-            var settings = new IsoTpCanFdSession.Settings(txId, rxId, 8, false);
-            settings.Validate();
+            var o = ParseJ1979PidDiscovery(args);
+            var adapterIndex = o.AdapterIndex;
+            var txId = o.Settings.TxId;
+            var rxId = o.Settings.RxId;
+            var baud = o.Baud;
+            var mode = o.Mode;
+            var frame = o.FreezeFrame;
+            var extended = o.Extended;
+            var timeoutMs = o.TimeoutMs;
             var adapters = J2534Registry.Discover();
             if (adapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(adapterIndex));
