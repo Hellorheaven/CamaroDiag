@@ -60,7 +60,8 @@ internal static class J1939FdCmdtSession
                 throw new IOException("J1939-22 peer aborted the transfer after EOM_STATUS.");
             if (ack.Type != J1939FdTransportFrames.EndOfMessageAck ||
                 ack.MessageLength != payload.Length ||
-                ack.SegmentCount != count)
+                ack.SegmentCount != count ||
+                ack.Aux7 != 0xFF || ack.Aux8 != 0xFF)
                 throw new InvalidDataException(
                     "J1939-22 EOM_ACK did not acknowledge the exact transfer.");
         }
@@ -124,7 +125,8 @@ internal static class J1939FdCmdtSession
             }
             var eom = await ReadCmAsync(link, o, timeout, token);
             if (eom.Type != J1939FdTransportFrames.EndOfMessageStatus ||
-                eom.MessageLength != result.Length || eom.SegmentCount != count)
+                eom.MessageLength != result.Length || eom.SegmentCount != count ||
+                eom.Aux7 != 0 || eom.Aux8 != 0)
                 throw new InvalidDataException("Mismatching J1939-22 EOM_STATUS.");
             await link.SendAsync(MakeCm(o, fromLocal: true,
                 J1939FdTransportFrames.EndOfMessageAck,
