@@ -74,6 +74,25 @@ class CanConsoleEventJournalStoreTest {
         }
     }
 
+    @Test fun disposedStoreCannotBeReopenedByLateCanceledTask() {
+        val directory = Files.createTempDirectory("console-disposed").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            store.append(listOf(event(10)))
+            val snapshot = requireNotNull(store.snapshot())
+            store.dispose()
+            assertFalse(snapshot.file.exists())
+            assertFalse(store.isCurrent(snapshot))
+            assertFalse(store.isAvailable())
+            assertNull(store.snapshot())
+            store.reset()
+            assertTrue(runCatching { store.append(listOf(event(11))) }.isFailure)
+            assertEquals(0, directory.listFiles().orEmpty().size)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun resetSeparatesSessionsAndTheirTemporaryFiles() {
         val directory = Files.createTempDirectory("console-sessions").toFile()
         try {
