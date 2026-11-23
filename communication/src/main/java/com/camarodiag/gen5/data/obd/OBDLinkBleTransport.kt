@@ -182,6 +182,13 @@ internal class OBDLinkBleTransport(private val context: Context) {
             gatt?.requestMtu(247)
             withTimeoutOrNull(3_000) { mtuResult?.await() }
             Result.success(Unit)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            close()
+            // A cancelled adapter switch must propagate to the ViewModel.
+            // A timeout started by this BLE handshake, however, leaves the
+            // caller job active and is a normal connection failure.
+            if (!kotlinx.coroutines.currentCoroutineContext().isActive) throw cancelled
+            Result.failure(cancelled)
         } catch (e: Exception) {
             close()
             Result.failure(e)
