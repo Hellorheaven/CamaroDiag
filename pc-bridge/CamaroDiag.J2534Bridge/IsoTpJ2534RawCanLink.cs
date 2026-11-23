@@ -53,6 +53,9 @@ internal sealed class IsoTpJ2534RawCanLink : IsoTpCanFdSession.ICanLink
         var canId = BinaryPrimitives.ReadUInt32BigEndian(bytes);
         if (canId > (extended ? 0x1FFF_FFFFu : 0x7FFu))
             throw new InvalidDataException("Unexpected 11/29-bit CAN identifier.");
+        if ((rxStatus & Can29BitId) != (extended ? Can29BitId : 0u))
+            throw new InvalidDataException(
+                "CAN_29BIT_ID receive status does not match the selected arbitration format.");
         if ((rxStatus & FdCanFormat) != (requiredFd ? FdCanFormat : 0u))
             throw new InvalidDataException("FD_CAN_FORMAT receive status disagrees with channel.");
         var data = bytes.AsSpan(4).ToArray();
