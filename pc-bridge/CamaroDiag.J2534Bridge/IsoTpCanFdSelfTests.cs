@@ -206,12 +206,21 @@ internal static class IsoTpCanFdSelfTests
             mixedCli.Settings.TxAddress == 0xA7 &&
             mixedCli.Settings.RxAddress == 0xA7,
             "CLI uses mixed 29-bit ISO-TP address extension explicitly.");
-        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+        var mixed11Bit = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8",
             "--baud", "500000", "--fd", "false",
-            "--mixed-address", "0xA7", "--payload", "22F190"]),
-            "Mixed ISO-TP CLI rejects 11-bit mode.");
+            "--mixed-address", "0xA7", "--payload", "22F190"]);
+        Check(mixed11Bit.Settings.MixedAddressing &&
+            !mixed11Bit.ExtendedId &&
+            mixed11Bit.Settings.TxAddress == 0xA7,
+            "ISO-TP mixed N_AE also supports CAN 11-bit identifiers.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mixed-address", "0xA7",
+            "--tx-address", "0xF1", "--payload", "22F190"]),
+            "Mixed N_AE cannot be combined with extended TX logical address.");
 
         var fdExtended = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8,
             12, true, BlockSize: 0, TxAddress: 0xF1, RxAddress: 0x10);
