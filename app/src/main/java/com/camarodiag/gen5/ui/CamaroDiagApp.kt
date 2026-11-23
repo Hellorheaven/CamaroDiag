@@ -709,7 +709,7 @@ fun CamaroDiagApp(
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
                     onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
                 )
-                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { viewModel.clearDtcs() })
+                DiagTab.DTCS -> DtcScreen(dtcs, vehicle, calibrationWorkspace.vinComparison, { viewModel.scanDtcs() }, { approval -> viewModel.clearDtcs(approval) })
                 DiagTab.MILEAGE -> MileageScreen(mileageReport, { viewModel.runMileageAudit() }, { withExportFolder { viewModel.saveCurrentSession() } })
                 DiagTab.ABOUT -> LazyColumn {
                     item { AboutUpdateCard() }
@@ -2472,7 +2472,7 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 }
 
 @Composable
-fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, onScan: () -> Unit, onClear: () -> Unit) {
+fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, onScan: () -> Unit, onClear: (EcuWriteConsentFlow.Approval) -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     var clearConsentStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     LaunchedEffect(vehicle.vin, vehicle.modelYear) {
@@ -2634,12 +2634,12 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                             // Acknowledging the warning never clears DTCs.
                             clearConsentStep = EcuWriteConsentFlow.afterWarningOk(clearConsentStep)
                         } else {
-                            val yes = EcuWriteConsentFlow.approval(
+                            val approval = EcuWriteConsentFlow.approval(
                                 clearConsentStep, confirmedYes = true, sameConnection = true
-                            ) != null
+                            )
                             confirmClear = false
                             clearConsentStep = EcuWriteConsentFlow.Step.WARNING
-                            if (yes) onClear()
+                            if (approval != null) onClear(approval)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = WarnRed)

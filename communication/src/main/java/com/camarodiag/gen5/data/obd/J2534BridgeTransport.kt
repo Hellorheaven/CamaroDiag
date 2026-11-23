@@ -382,12 +382,18 @@ class J2534BridgeTransport(
         }
     }
 
-    suspend fun clearStandardObdDtcs() = withContext(Dispatchers.IO) {
+    suspend fun clearStandardObdDtcs(approval: EcuWriteConsentFlow.Approval) =
+        withContext(Dispatchers.IO) {
         mutex.withLock {
+            require(approval.warningAcknowledged && approval.confirmedYes) {
+                "Risk notice OK and subsequent YES required before ECU clear."
+            }
             check(isStandardObdClearEnabled) { "Local Windows operator has not enabled OBD clear." }
             val response = request(JSONObject()
                 .put("op", "clearStandardObdDtcs")
                 .put("token", tlsPairing.token)
+                .put("warningAcknowledged", approval.warningAcknowledged)
+                .put("writeConfirmed", approval.confirmedYes)
                 .put("confirmed", true), 12_000)
             check(response.optString("payloadHex") == "44" &&
                 response.optString("responseCanId") == connectedResponseCanId &&

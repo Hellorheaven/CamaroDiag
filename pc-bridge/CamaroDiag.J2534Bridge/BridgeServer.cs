@@ -266,6 +266,7 @@ internal sealed class BridgeServer
                     case "clearStandardObdDtcs":
                     {
                         if (!_allowStandardObdClear || !device.IsStandardObdReadEnabled ||
+                            !HasExplicitEcuWriteConsent(root) ||
                             !root.TryGetProperty("confirmed", out var confirmation) ||
                             confirmation.ValueKind != JsonValueKind.True)
                             throw new UnauthorizedAccessException("Explicit emissions DTC clear consent is required.");
@@ -299,7 +300,7 @@ internal sealed class BridgeServer
                     // Keep this separate from background diagnostic exchanges.
                     case "exchangeRaw":
                     {
-                        if (!HasExplicitRawWriteConsent(root))
+                        if (!HasExplicitEcuWriteConsent(root))
                             throw new UnauthorizedAccessException(
                                 "Explicit warning OK and subsequent YES are required before raw ECU transmission.");
                         var payload = ParseHexPayload(root);
@@ -313,7 +314,7 @@ internal sealed class BridgeServer
                     }
                     case "sendRaw":
                     {
-                        if (!HasExplicitRawWriteConsent(root))
+                        if (!HasExplicitEcuWriteConsent(root))
                             throw new UnauthorizedAccessException(
                                 "Explicit warning OK and subsequent YES are required before raw ECU transmission.");
                         var payload = ParseHexPayload(root);
@@ -447,7 +448,7 @@ internal sealed class BridgeServer
     /// operator acknowledgement, NOT a new ECU signing key or manufacturer
     /// SecurityAccess replacement. Require both fields on the same request.
     /// </summary>
-    internal static bool HasExplicitRawWriteConsent(JsonElement root) =>
+    internal static bool HasExplicitEcuWriteConsent(JsonElement root) =>
         root.ValueKind == JsonValueKind.Object &&
         root.TryGetProperty("warningAcknowledged", out var warning) &&
         warning.ValueKind == JsonValueKind.True &&
@@ -470,14 +471,16 @@ internal sealed class BridgeServer
         {
             "open" => ["token", "op", "requestCanId", "responseCanId"],
             "identify" or "identifyGmlan" or "close" => ["token", "op"],
-            "clearStandardObdDtcs" => ["token", "op", "confirmed"],
+            "clearStandardObdDtcs" => ["token", "op", "confirmed",
+                "warningAcknowledged", "writeConfirmed"],
             "exchange" or "sendOnly" => ["token", "op", "payloadHex"],
             "exchangeRaw" or "sendRaw" => ["token", "op", "payloadHex",
                 "warningAcknowledged", "writeConfirmed"],
             _ => []
         };
         if (required.Length == 0) return false;
-        if ((op is "exchangeRaw" or "sendRaw") && !HasExplicitRawWriteConsent(root))
+        if ((op is "exchangeRaw" or "sendRaw" or "clearStandardObdDtcs") &&
+            !HasExplicitEcuWriteConsent(root))
             return false;
         string[] allowedExtra = op switch
         {

@@ -591,13 +591,16 @@ class BluetoothObdManager(context: Context) {
     fun isJ2534StandardObdClearAvailable(): Boolean =
         isJ2534StandardObdAvailable() && j2534BridgeTransport?.isStandardObdClearEnabled == true
 
-    suspend fun clearJ2534StandardDtcs() {
+    suspend fun clearJ2534StandardDtcs(approval: EcuWriteConsentFlow.Approval) {
+        require(approval.warningAcknowledged && approval.confirmedYes) {
+            "Risk notice OK and separate YES are required before clearing ECU DTCs."
+        }
         val epoch = transportSessionEpoch.capture()
         check(isJ2534StandardObdClearAvailable())
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534StandardObdClearAvailable())
-            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs()
+            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs(approval)
             transportSessionEpoch.requireQueuedCurrent(epoch)
         }
     }

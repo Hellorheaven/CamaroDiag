@@ -188,7 +188,7 @@ internal static class BridgeSelfTests
             "{\"token\":\"x\",\"op\":\"sendOnly\",\"payloadHex\":\"3E80\"}",
             "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF19000\",\"timeoutMs\":3000,\"warningAcknowledged\":true,\"writeConfirmed\":true}",
             "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":true,\"writeConfirmed\":true}",
-            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"warningAcknowledged\":true,\"writeConfirmed\":true}",
             "{\"token\":\"x\",\"op\":\"close\"}"
         }) {
             using var json = JsonDocument.Parse(validRequest);
@@ -206,7 +206,7 @@ internal static class BridgeSelfTests
         {
             using var json = JsonDocument.Parse(rawConfirmation);
             var expected = rawConfirmation == "{\"warningAcknowledged\":true,\"writeConfirmed\":true}";
-            Assert(BridgeServer.HasExplicitRawWriteConsent(json.RootElement) == expected,
+            Assert(BridgeServer.HasExplicitEcuWriteConsent(json.RootElement) == expected,
                 "Only both explicit UI confirmations permit a raw ECU write");
         }
         foreach (var forged in new[] {
@@ -216,6 +216,8 @@ internal static class BridgeSelfTests
             "{\"token\":\"x\",\"op\":\"exchangeRaw\",\"payloadHex\":\"2EF19000\"}",
             "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":false,\"writeConfirmed\":true}",
             "{\"token\":\"x\",\"op\":\"sendRaw\",\"payloadHex\":\"2701\",\"warningAcknowledged\":true,\"writeConfirmed\":false}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true}",
+            "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"warningAcknowledged\":true,\"writeConfirmed\":false}",
             "{\"token\":\"x\",\"op\":\"open\",\"requestCanId\":\"7E0\",\"requestCanId\":\"7DF\",\"responseCanId\":\"7E8\"}",
             "{\"token\":\"x\",\"op\":\"clearStandardObdDtcs\",\"confirmed\":true,\"confirmed\":false}",
             "{\"token\":\"x\",\"op\":\"exchange\",\"payloadHex\":\"22F190\",\"timeoutMs\":1000,\"timeoutMs\":9999}",

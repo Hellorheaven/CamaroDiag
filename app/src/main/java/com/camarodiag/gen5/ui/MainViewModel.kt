@@ -45,6 +45,7 @@ import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
 import com.camarodiag.gen5.data.obd.CanConsoleRecordParser
 import com.camarodiag.gen5.data.obd.CanConsoleCapabilityPolicy
+import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
 import com.camarodiag.gen5.data.obd.CanConsoleDiagnosticStatus
 import com.camarodiag.gen5.data.obd.CanAdapterRestorationException
 import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
@@ -3730,7 +3731,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return if (isFr) entry.second else entry.first
     }
 
-    fun clearDtcs() {
+    fun clearDtcs(approval: EcuWriteConsentFlow.Approval) {
+        require(approval.warningAcknowledged && approval.confirmedYes) {
+            "The ECU write warning OK and subsequent YES are required."
+        }
         val account = accountSessionGeneration
         val connection = connectionAttemptGeneration
         fun current() = isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration
@@ -3742,7 +3746,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _dtcs.value = emptyList()
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_demo_cleared)
                 } else if (obdManager.isJ2534StandardObdClearAvailable()) {
-                    obdManager.clearJ2534StandardDtcs()
+                    obdManager.clearJ2534StandardDtcs(approval)
                     if (!current()) return@launch
                     // Mode 04 does not erase permanent emissions DTCs. Preserve
                     // all other module records and require a new scan to refresh.
