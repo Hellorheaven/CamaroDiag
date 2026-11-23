@@ -73,6 +73,14 @@ internal static class ObdJ1979PidSupportSelfTests
             ObdJ1979PidSupport.Decode([0x01, 0x00],
                 [0x41, 0, 0, 0, 0, 0, 0]),
             "Excess bitmap bytes rejected.");
+        var lastPage = ObdJ1979PidSupport.Decode(
+            [0x01, 0xE0], [0x41, 0xE0, 0x80, 0, 0, 0]);
+        Check(lastPage.SupportedPids.SequenceEqual(new byte[] { 0xE1 }) &&
+            !lastPage.HasNextPage, "Final PID support page does not wrap to 00.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979PidSupport.Decode([0x01, 0xE0],
+                [0x41, 0xE0, 0, 0, 0, 1]),
+            "PID 100 must not silently wrap beyond FF.");
         Reject<InvalidDataException>(() =>
             ObdJ1979PidSupport.Decode([0x01, 0x00],
                 [0x7F, 0x01, 0x12]),
