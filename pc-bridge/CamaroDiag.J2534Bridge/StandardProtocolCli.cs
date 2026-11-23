@@ -1243,8 +1243,8 @@ internal static class StandardProtocolCli
                 // Only inspect the wire CRC when the operator explicitly
                 // confirms that this vendor J2534 DLL preserves it. Many
                 // compliant drivers have already stripped it on receipt.
-                if (o.J1850WireCrc &&
-                    !J2534StandardChannel.IsAuxiliaryReceiveStatus(received.RxStatus) &&
+                if (ShouldValidateJ1850WireCrc(
+                        o.J1850WireCrc, received.RxStatus) &&
                     !J1850Crc.VerifyRawFrame(received.Data))
                     throw new InvalidDataException(
                         "Captured J1850 frame has an invalid on-wire CRC.");
@@ -1269,6 +1269,15 @@ internal static class StandardProtocolCli
             return 6;
         }
     }
+
+    /// <summary>
+    /// A J2534 status/echo event is not a physical J1850 data packet.
+    /// Inspect CRC only when the driver contract says the raw wire CRC is
+    /// retained, never for auxiliary RxStatus indications.
+    /// </summary>
+    internal static bool ShouldValidateJ1850WireCrc(
+        bool enabled, uint rxStatus) =>
+        enabled && !J2534StandardChannel.IsAuxiliaryReceiveStatus(rxStatus);
 
     private static bool Confirm(string operation) =>
         EcuWriteOperatorConsent.AskBeforeProgramming(Console.ReadLine,
