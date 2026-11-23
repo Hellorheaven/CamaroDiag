@@ -452,8 +452,24 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
             "--tester", "0E80", "--ecu", "1234",
-            "--doip-version", "4", "--payload", "22F810"]),
+            "--doip-version", "5", "--payload", "22F810"]),
             "Unsupported DoIP header version rejected before TCP connection.");
+        var version4Cli = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
+            "--tester", "0E80", "--ecu", "1234", "--tls", "true",
+            "--doip-version", "4", "--payload", "22F810"]);
+        Check(version4Cli.Version == 4,
+            "Current ISO 13400-2:2025 DoIP protocol header version 4 selected.");
+        var version4Routing = DoIpCodec.RoutingActivation(
+            0x0E80, version: 0x04);
+        Check(version4Routing[0] == 0x04 &&
+            version4Routing[1] == 0xFB &&
+            DoIpCodec.Decode(version4Routing).Version == 0x04,
+            "DoIP protocol 0x04 uses bitwise inverse header byte 0xFB.");
+        Reject<InvalidDataException>(() => DoIpCodec.Decode(
+            new byte[] {0x05, 0xFA, 0, 5, 0, 0, 0, 0}),
+            "DoIP reserved protocol version 5 is not accepted.");
+
         var routingV3 = DoIpCodec.Decode(DoIpCodec.RoutingActivation(
             0x0E80, version: 0x03));
         Check(routingV3.Version == 0x03 &&
