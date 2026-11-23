@@ -214,12 +214,21 @@ internal static class UdsStandardServices
     private static byte[] UploadDownload(byte service, ulong address,
         ulong length, byte dfi, byte addressBytes, byte lengthBytes)
     {
-        if (length == 0 || length > ulong.MaxValue - address ||
+        if (length == 0 ||
             addressBytes is < 1 or > 8 || lengthBytes is < 1 or > 8 ||
-            addressBytes < 8 && (address >> (addressBytes * 8)) != 0 ||
-            lengthBytes < 8 && (length >> (lengthBytes * 8)) != 0)
+            (addressBytes < 8 && (address >> (addressBytes * 8)) != 0) ||
+            (lengthBytes < 8 && (length >> (lengthBytes * 8)) != 0) ||
+            // Include the last addressed byte, but never wrap ulong.
+            length - 1 > ulong.MaxValue - address)
             throw new ArgumentOutOfRangeException(
                 nameof(length), "UDS upload/download address or size exceeds selected ALFI width.");
+        // An ALFI of 1..7 address bytes describes a smaller memory
+        // address space than ulong. The complete requested range, not
+        // merely its starting address, must fit that space.
+        if (addressBytes < 8 &&
+            length > (1UL << (addressBytes * 8)) - address)
+            throw new ArgumentOutOfRangeException(
+                nameof(length), "UDS memory range crosses the selected ALFI address boundary.");
         var pdu = new byte[3 + addressBytes + lengthBytes];
         pdu[0] = service;
         pdu[1] = dfi;

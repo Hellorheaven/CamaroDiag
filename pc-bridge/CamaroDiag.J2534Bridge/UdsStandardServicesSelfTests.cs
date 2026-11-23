@@ -107,6 +107,23 @@ internal static class UdsStandardServicesSelfTests
                 0x10000UL, 0x20UL, 2, 1),
             "UDS address overflow cannot be silently truncated by ALFI.");
         Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.RequestUpload(
+                0xFFFFFFFCUL, 8UL, 4, 4),
+            "64-bit API with four-byte ALFI cannot upload across 32-bit boundary.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            UdsStandardServices.RequestDownload(
+                0x00FFUL, 2UL, 1, 1),
+            "One-byte ALFI cannot download across address FF.");
+        Equal(UdsStandardServices.RequestUpload(
+                0xFFFFFFFFUL, 1UL, 4, 1),
+            "350014FFFFFFFF01",
+            "Final physical byte in selected 32-bit address space is valid.");
+        Equal(UdsStandardServices.RequestUpload(
+                ulong.MaxValue, 1UL, 8, 1),
+            "350018FFFFFFFFFFFFFFFF01",
+            "Single last byte of explicit 64-bit memory space is representable.");
+
+        Reject<ArgumentOutOfRangeException>(() =>
             UdsStandardServices.RequestDownload(
                 0x1234UL, 0x100UL, 2, 1),
             "UDS length exceeding declared one-byte field rejected.");
