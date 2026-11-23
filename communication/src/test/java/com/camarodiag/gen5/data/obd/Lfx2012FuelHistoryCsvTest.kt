@@ -61,4 +61,23 @@ class Lfx2012FuelHistoryCsvTest {
         }.isFailure)
         assertEquals("", output.toString())
     }
+    @Test fun leadingSpacesCannotHideCsvFormulaPrefix() {
+        val output = StringWriter()
+        val risky = identity.copy(sessionId = "  =1+1")
+        Lfx2012FuelHistoryCsv.export(listOf(sample(100, 0, risky)), output)
+        assertTrue(output.toString().contains("\"'  =1+1\""))
+    }
+
+    @Test fun sessionIdsWithLineBreaksOrTabsAreRejectedBeforeExport() {
+        assertTrue(runCatching {
+            identity.copy(sessionId = "session\\nsecond")
+        }.isFailure)
+        assertTrue(runCatching {
+            identity.copy(sessionId = "session\\tsecond")
+        }.isFailure)
+        assertTrue(runCatching {
+            identity.copy(sessionId = "a".repeat(129))
+        }.isFailure)
+    }
+
 }
