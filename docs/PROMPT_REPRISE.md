@@ -1,3 +1,13 @@
+## ISO-TP CAN classique — tests end-to-end J2534 simulés (23/11/2026)
+
+- Périmètre exclusif : ISO 15765-2 sur CAN classique uniquement. Ne pas poursuivre avec un nouveau protocole tant que la qualification VCI/ECU du CAN classique manque. PR #95 unique (Draft), issue #110 ouverte, aucun merge/Release.
+- Nouveaux autotests sans matériel `5b910cf8` : chemin complet ISO-TP FF/FC/CF par `IsoTpJ2534RawCanLink` simulé sur 11 bits, fenêtres BS=1, filtrage des ID parasites, réponses FC et arrêt sur OVERFLOW. `c592e2a4` : CAN classique 29 bits, flag CAN_29BIT_ID et absence de FD_CAN_FORMAT/BRS à l'émission, réception SF.
+- Corrections précédentes `07621a4e` et `a0e14673` : échos/statuts et réponses après annulation écartés, filtres CAN 29 bits corrects. L'adaptateur reste dépendant d'un vrai pilote SAE J2534 dont le fonctionnement physique n'a pas été prouvé.
+- Checkpoint groupé **#45275140467 sur `69018081` : Windows/J2534 et Android réussis**. Il est antérieur aux nouveaux tests ; ne pas leur attribuer ce résultat. Vérifier le prochain checkpoint complet sur un SHA exact avant de conclure.
+- **Non terminé** : horodatages de bus STmin, qualification 11/29 bits sur équipement autorisé, erreurs VCI/bus-off, évaluation en lecture et écriture ECU selon identité/sauvegardes et consentement. Procédure : `docs/QUALIFICATION_ISOTP_CAN_CLASSIQUE.md`. Aucune preuve ECU/flash/rollback et aucun protocole suivant engagé.
+
+---
+
 # ISO-TP CAN classique — correctifs J2534 et checkpoint Windows (23/11/2026)
 
 - **Protocole exclusif actif** : ISO 15765-2 / ISO-TP CAN classique, sur PR #95 Draft et branche unique `chore/unified-ci`. Aucun passage au protocole suivant ni fusion/Release.
