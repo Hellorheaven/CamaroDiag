@@ -487,4 +487,32 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun currentCanExportAndFuelHistoryGuidanceIsTranslatedAndNotMisleading() {
+        val required = setOf(
+            "can_console_export_header",
+            "can_console_export_events_limited",
+            "can_console_export_direction_legend",
+            "can_console_export_full_raw_rx",
+            "can_console_export_recent_raw_rx",
+            "can_console_export_failed_marker",
+            "flexfuel_lfx2012_history_range",
+            "flexfuel_lfx2012_history_trim_range",
+            "flexfuel_lfx2012_export_history"
+        )
+        val english = strings("en")
+        val french = strings("fr")
+        for (key in required) {
+            assertTrue("Missing English user-facing string: $key", !english[key].isNullOrBlank())
+            assertTrue("Missing French user-facing string: $key", !french[key].isNullOrBlank())
+            assertFalse("Untranslated French output: $key", english[key] == french[key])
+        }
+        // The saved console's recent event window is NOT a complete TX archive.
+        assertTrue(english.getValue("can_console_export_events_limited").contains("300"))
+        assertTrue(french.getValue("can_console_export_events_limited").contains("300"))
+        assertFalse(
+            "Recent raw text must not be labelled as a complete capture",
+            english.getValue("can_console_export_recent_raw_rx").contains("full archived")
+        )
+    }
+
 }
