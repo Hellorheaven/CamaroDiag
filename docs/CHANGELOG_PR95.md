@@ -114,3 +114,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Trames SF, FF, CF et FlowControl avec octets d'adressage logique TX/RX pour CAN et CAN-FD ; réduction correcte des charges utiles par trame et filtrage des réponses par adresse.
 - CLI `--tx-address` / `--rx-address` distincte de `--extended` qui règle l'identifiant CAN 29 bits.
 - Tests logiciels de fragmentation, relecture et corrélation ajoutés ; **non exécutés**. Pas de preuve de prise en charge de l'adressage mixte, de matériel réel ni de programmation ECU.
+
+## C1/C4 — tests de robustesse et validation regroupée (session suivante)
+- **C1 :** arrêt manuel de la capture CAN conditionné par la fermeture réussie de son archive. Une erreur de vidage/fichier éventuellement masquée par l'annulation de coroutine produit un événement d'échec et interdit de présenter la sauvegarde comme complète. Tests pour Stop propre/incomplet et échecs simultanés de vidage/fermeture.
+- **C4 :** correction des tests d'identifiants CSV, qui vérifient maintenant de véritables caractères de contrôle au lieu des deux caractères littéraux `\\n` / `\\t`. Tests supplémentaires pour changement d'interface et horodatage identique dans l'historique de 512 relevés.
+- **C4 validation :** demande d'un **unique contrôle groupé Debug** déposée via `.github/c4-flexfuel-readonly-gate-request.txt` ; résultat du workflow non confirmé dans cette intervention. Il est interdit de conclure à des tests réussis sans consulter les étapes et le rapport du run.
+- Aucun fichier des transports K-Line/DoIP/CAN-FD/SAE n'a été édité pour ces correctifs. Aucun essai ECU réel et aucune fusion de la PR #95.
