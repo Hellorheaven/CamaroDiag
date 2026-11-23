@@ -89,8 +89,14 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         await SendAsync(DoIpCodec.Diagnostic(testerAddress, ecuAddress, request), deadline.Token);
-        for (var count = 0; count < 12; count++)
+        // UDS NRC 0x78 (ResponsePending), DoIP diagnostic ACKs and Alive
+        // Check requests are legitimate interim messages. An arbitrary
+        // count limit can terminate a valid long-running routine. The
+        // caller's bounded deadline, not the number of interim frames,
+        // controls the full exchange.
+        while (true)
         {
+            deadline.Token.ThrowIfCancellationRequested();
             var message = await ReceiveAsync(deadline.Token);
             if (message.Type == DoIpCodec.AliveCheckRequest)
             {
@@ -124,7 +130,6 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 throw new InvalidDataException("DoIP UDS TransferData block-counter mismatch.");
             return uds;
         }
-        throw new IOException("No correlated diagnostic reply within DoIP message limit.");
     }
 
     private async Task SendAsync(byte[] frame, CancellationToken token)
