@@ -318,6 +318,41 @@ internal static class StandardVehicleProtocolsSelfTests
             "--payload", "22F40C", "--obd-did", "F40C"]),
             "DoIP mutually exclusive raw and named UDS requests enforced.");
 
+        var versionedDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
+            "--tester", "0E80", "--ecu", "1234",
+            "--doip-version", "3", "--tls", "true",
+            "--rx-file", "ecu-response-new.bin", "--payload", "22F810"]);
+        Check(versionedDoIp.Version == 3 && versionedDoIp.UseTls &&
+            versionedDoIp.ReceiveFile == "ecu-response-new.bin",
+            "Secure DoIP protocol version 0x03 and unique binary reply are selectable.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
+            "--tester", "0E80", "--ecu", "1234",
+            "--doip-version", "4", "--payload", "22F810"]),
+            "Unsupported DoIP header version rejected before TCP connection.");
+        var routingV3 = DoIpCodec.Decode(DoIpCodec.RoutingActivation(
+            0x0E80, version: 0x03));
+        Check(routingV3.Version == 0x03 &&
+            routingV3.Type == DoIpCodec.RoutingActivationRequest &&
+            routingV3.Payload.Length == 7,
+            "DoIP routing activation preserves requested header version 3.");
+        var diagnosticV3 = DoIpCodec.Decode(DoIpCodec.Diagnostic(
+            0x0E80, 0x1234, [0x22, 0xF8, 0x10], version: 0x03));
+        Check(diagnosticV3.Version == 0x03 &&
+            diagnosticV3.Payload[4] == 0x22,
+            "DoIP diagnostic message uses the selected TCP header version.");
+
+        var largeUds = Enumerable.Repeat((byte)0xAB, 6000).ToArray();
+        var largeDoIp = DoIpCodec.Decode(DoIpCodec.Diagnostic(
+            0x0E80, 0x1234, largeUds));
+        Check(largeDoIp.Payload.Length == largeUds.Length + 4 &&
+            largeDoIp.Payload.AsSpan(4).SequenceEqual(largeUds),
+            "DoIP codec carries a six-kilobyte UDS payload without 4KB truncation.");
+        Reject<ArgumentOutOfRangeException>(() => DoIpCodec.Diagnostic(
+            0x0E80, 0x1234, new byte[DoIpCodec.MaxPayload]),
+            "DoIP retains an explicit in-memory payload cap.");
+
         var secureDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
             "--tester", "0E80", "--ecu", "1234", "--tls", "true",
