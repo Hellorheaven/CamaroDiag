@@ -1,3 +1,12 @@
+# ISO-TP CAN classique — correctifs J2534 et checkpoint Windows (23/11/2026)
+
+- **Protocole exclusif actif** : ISO 15765-2 / ISO-TP CAN classique, sur PR #95 Draft et branche unique `chore/unified-ci`. Aucun passage au protocole suivant ni fusion/Release.
+- **Corrections committées** : `07621a4` protège la réception RAW J2534 contre les échos/status, les ProtocolID non corrélés et les réponses arrivant après annulation ; tests d'interface hors matériel. `a0e1467` passe le TxFlags CAN_29BIT_ID (0x100) aux filtres J2534 à identifiant 29 bits, contrairement à 11 bits (0), avec régressions. La spécification SAE J2534-1 §7.3.14 confirme ce bit sur le masque ET le modèle du filtre.
+- **Checkpoint groupé** : `743fdd3b7b01d2efd7c2e7ec33d836bf04c3698e`, [Actions #45276201139](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45276201139) : **Windows Debug PASS, 0 erreur, 0 avertissement, 1621 autotests J2534 software/hardware-free PASS** ; noyau natif et connecteurs terminés PASS. Consulter le run pour le dernier statut Android/global : ne pas inférer le verdict d'un job encore actif.
+- **Blocages de clôture ISO-TP** : pilotes/VCI J2534 réels, capture indépendante CAN 11 et 29 bits avec STmin entre CF, pertes et bus-off sur banc isolé, relevés N_Bs/N_Cr et preuve sur ECU autorisé. Aucune habilitation de flash, restauration ou confirmation constructeur déduite de ces autotests. Critères et commande sans mutation dans `docs/QUALIFICATION_ISOTP_CAN_CLASSIQUE.md`. Couverture indicative historique code hôte 75 %, pas conformité normative. Issue #110.
+
+---
+
 # Résultat de la campagne C6 regroupée — 23/11/2026
 
 - **HEAD de code testé :** `690180812c38e7f324df7715a9427132a5c5fb60`, [GitHub Actions #45275140467](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45275140467), **success** sur les 2 jobs.
