@@ -243,7 +243,7 @@ internal static class J1939ClassicTpSession
                 continue;
             if ((frame.Data[5] | (frame.Data[6] << 8) |
                 frame.Data[7] << 16) != o.Pgn)
-                throw new InvalidDataException("J1939 RTS/BAM target PGN mismatch.");
+                continue; // Another concurrent PGN, not this receive session.
             return frame;
         }
         throw new TimeoutException("No J1939 transport start frame from expected ECU.");
@@ -289,7 +289,7 @@ internal static class J1939ClassicTpSession
                 (!permitBroadcast || id.Destination != 0xFF)) continue;
             if ((frame.Data[5] | (frame.Data[6] << 8) |
                 (frame.Data[7] << 16)) != o.Pgn)
-                throw new InvalidDataException("J1939 TP.CM PGN does not match active operation.");
+                continue; // Ignore TP.CM for unrelated PGNs on the bus.
             return frame;
         }
         throw new TimeoutException("No matching J1939 TP.CM frame.");
