@@ -24,6 +24,7 @@ import com.camarodiag.gen5.data.obd.CalibrationBinaryComparer
 import com.camarodiag.gen5.data.obd.EcuBackupArchive
 import com.camarodiag.gen5.data.obd.EcuBackupCoverage
 import com.camarodiag.gen5.data.obd.EcuBackupManifest
+import com.camarodiag.gen5.data.obd.Lfx2012FuelReadOnly
 import com.camarodiag.gen5.data.obd.EcuExternalDumpPair
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
@@ -868,10 +869,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var traceAnalysisJob: Job? = null
     private var calibrationIdentityGeneration = 0L
     private var gmlanIdentityGeneration = 0L
+    private var fuelSnapshotGeneration = 0L
 
     private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
+        fuelSnapshotGeneration++
         val newCanContext = ++canConsoleContextGeneration
         val interruptedCapture = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
         discardCanMonitor(deleteArchive = !preserveCanConsole)
@@ -904,6 +907,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isReading = false,
             isGmlanReading = false,
+            isFuelSnapshotReading = false,
+            fuelReadOnlySnapshot = null,
+            fuelSnapshotError = "",
             gmlanIdentity = null,
             gmlanIdentityFailed = false,
             ecuVinResponse = "",
@@ -1556,6 +1562,81 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         message = getApplication<Application>()
                             .getString(R.string.flexfuel_lfx2012_export_failed)
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * C4: one physical, read-only fuel composition/trim survey for the selected
+     * 2012 LFX. No changes to ECU calibration, adaptive fuel cells or VIN.
+     * The UI never promotes this reading to proof of an installed sensor.
+     */
+    fun readLfx2012FuelSnapshot() {
+        if (!requirePremiumLicense()) return
+        val vehicle = _vehicle.value
+        if (vehicle.modelYear != 2012 ||
+            !vehicle.engine.rpo.equals("LFX", ignoreCase = true)) return
+        if (_calibrationWorkspace.value.isFuelSnapshotReading) return
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val generation = ++fuelSnapshotGeneration
+        fun current() = isCurrentAccountGeneration(account) &&
+            generation == fuelSnapshotGeneration &&
+            connection == connectionAttemptGeneration &&
+            _vehicle.value == vehicle && hasPremiumLicense()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isFuelSnapshotReading = true, fuelReadOnlySnapshot = null,
+            fuelSnapshotError = ""
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (!current()) return@launch
+                check(!obdManager.isDemoMode && !obdManager.isSimulationActive &&
+                    obdManager.isStandardObdReadAvailable()) {
+                    "A connected physical, read-only OBD channel is required."
+                }
+                val survey = obdManager.readPhysicalFuelSurvey()
+                if (!current()) return@launch
+                val raw = Lfx2012FuelReadOnly.PIDS.associateWith { pid ->
+                    survey.responses[pid]?.let { response ->
+                        // Some adapters return NO DATA or malformed text while
+                        // still advertising the PID. Show 'no valid response',
+                        // never 0% or a simulated measurement in that case.
+                        runCatching {
+                            CamaroUdsProtocol.parsePidBytes(
+                                response, "%02X".format(java.util.Locale.ROOT, pid),
+                                primaryPowertrainResponderOnly = true
+                            )
+                        }.getOrNull()
+                    }
+                }
+                val captured = Lfx2012FuelReadOnly.inspect(
+                    survey, raw, System.currentTimeMillis()
+                )
+                if (current()) _calibrationWorkspace.value =
+                    _calibrationWorkspace.value.copy(
+                        isFuelSnapshotReading = false,
+                        fuelReadOnlySnapshot = captured,
+                        fuelSnapshotError = ""
+                    )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (current()) {
+                    reportConnectionLoss(error)
+                    if (current()) _calibrationWorkspace.value =
+                        _calibrationWorkspace.value.copy(
+                            isFuelSnapshotReading = false,
+                            fuelReadOnlySnapshot = null,
+                            fuelSnapshotError = error.message.orEmpty().take(180)
+                        )
+                }
+            } finally {
+                if (current() && _calibrationWorkspace.value.isFuelSnapshotReading) {
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                        isFuelSnapshotReading = false
                     )
                 }
             }

@@ -64,6 +64,7 @@ import com.camarodiag.gen5.data.obd.CamaroCalibrationCatalog
 import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
+import com.camarodiag.gen5.data.obd.Lfx2012FuelReadOnly
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.CamaroDiagConnectorWiringGuide
@@ -87,6 +88,9 @@ sealed interface ArchiveVerification {
 data class CalibrationWorkspaceState(
     val isReading: Boolean = false,
     val isGmlanReading: Boolean = false,
+    val isFuelSnapshotReading: Boolean = false,
+    val fuelReadOnlySnapshot: Lfx2012FuelReadOnly.Snapshot? = null,
+    val fuelSnapshotError: String = "",
     val gmlanIdentity: GmlanIdentityEvidence? = null,
     val gmlanIdentityFailed: Boolean = false,
     val ecuVinResponse: String = "",
