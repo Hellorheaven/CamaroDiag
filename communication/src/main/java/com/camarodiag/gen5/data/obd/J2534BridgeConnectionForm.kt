@@ -14,7 +14,14 @@ object J2534BridgeConnectionForm {
         val responseCanId: Int,
         val can29Bit: Boolean,
         val protocolNumber: Int
-    )
+    ) {
+        // Kotlin data-class toString would otherwise disclose the bearer
+        // pairing code and pinned TLS certificate fingerprint in diagnostics.
+        override fun toString(): String =
+            "J2534BridgeConnectionForm.Validated(host=$host, port=$port, pairingCode=[REDACTED], " +
+                "requestCanId=$requestCanId, responseCanId=$responseCanId, " +
+                "can29Bit=$can29Bit, protocolNumber=$protocolNumber)"
+    }
 
     fun parse(
         hostText: String,
