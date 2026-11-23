@@ -113,6 +113,7 @@ internal static class IsoTpCanFdSession
             else sf[pci] = checked((byte)payload.Length);
             payload.CopyTo(sf, pci + header);
             await link.SendAsync(new(settings.TxId, settings.CanFd, sf), token);
+            _ = Remaining(timeout, clock);
             return;
         }
 
@@ -159,6 +160,7 @@ internal static class IsoTpCanFdSession
             nextSequence = (nextSequence + 1) & 0x0F;
             sentInBlock++;
         }
+        _ = Remaining(timeout, clock);
     }
 
     internal static async Task<byte[]> ReceiveAsync(
@@ -189,6 +191,7 @@ internal static class IsoTpCanFdSession
                 data[addressWidth] & 0x0F;
             if (singleLength == 0 || singleLength > data.Length - header - addressWidth)
                 throw new InvalidDataException("ISO-TP single-frame size mismatch.");
+            _ = Remaining(timeout, clock);
             return data.AsSpan(header + addressWidth, singleLength).ToArray();
         }
 
@@ -251,6 +254,7 @@ internal static class IsoTpCanFdSession
                 framesInBlock = 0;
             }
         }
+        _ = Remaining(timeout, clock);
         return output;
     }
 
@@ -284,6 +288,7 @@ internal static class IsoTpCanFdSession
         for (var attempts = 0; attempts < 64; attempts++)
         {
             var frame = await link.ReceiveAsync(Remaining(timeout, clock), token);
+            _ = Remaining(timeout, clock);
             if (frame.Id != config.RxId) continue; // Ignore unrelated bus traffic
             if (frame.IsFd != config.CanFd ||
                 frame.Data is null || frame.Data.Length is < 1 or > 64 ||
