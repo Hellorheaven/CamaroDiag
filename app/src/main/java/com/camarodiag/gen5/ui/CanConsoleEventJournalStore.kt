@@ -26,8 +26,13 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
         try {
             if (writer == null) {
                 val file = File.createTempFile("camarodiag-console-events-", ".csv", directory)
-                archive = file
-                writer = CanConsoleEventJournalWriter(file.bufferedWriter(Charsets.UTF_8))
+                try {
+                    writer = CanConsoleEventJournalWriter(file.bufferedWriter(Charsets.UTF_8))
+                    archive = file
+                } catch (error: Exception) {
+                    file.delete()
+                    throw error
+                }
             }
             val target = checkNotNull(writer)
             for (event in events) {
@@ -53,7 +58,10 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
             failed = true
             return null
         }
-        val file = archive?.takeIf { it.isFile } ?: return null
+        val file = archive?.takeIf { it.isFile } ?: run {
+            failed = true
+            return null
+        }
         return Snapshot(file, generation, target.eventCount)
     }
 
