@@ -875,7 +875,8 @@ internal static class StandardProtocolCli
     internal sealed record IsoTpOptions(
         int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
         byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs, uint? DataBaud,
-        string Mode, bool ValidateUds = false, bool InterpretJ1979 = false);
+        string Mode, bool ValidateUds = false, bool InterpretJ1979 = false,
+        string? TraceFile = null);
 
     internal static IsoTpOptions ParseIsoTp(string[] args)
     {
@@ -928,6 +929,9 @@ internal static class StandardProtocolCli
         var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
         var udsValidate = bool.Parse(Optional(args, "--uds-validate") ?? "false");
         var interpretJ1979 = bool.Parse(Optional(args, "--j1979-decode") ?? "false");
+        var traceFile = Optional(args, "--trace-file");
+        if (traceFile is not null && string.IsNullOrWhiteSpace(traceFile))
+            throw new ArgumentException("ISO-TP trace file path cannot be empty.");
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
         var udsDids = Optional(args, "--uds-dids");
@@ -1026,7 +1030,7 @@ internal static class StandardProtocolCli
                 obdDtcCountMask is not null || wwhStatus is not null ||
                 wwhPermanent || wwhReadiness is not null ||
                 snapshotDtc is not null || extendedDtc is not null ||
-                obdIdentify, interpretJ1979);
+                obdIdentify, interpretJ1979, traceFile);
     }
 
     internal static TimeSpan RemainingIsoTpExchangeBudget(
@@ -1067,8 +1071,17 @@ internal static class StandardProtocolCli
             System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(
                 pattern, o.Settings.RxId);
             driver.ConfigureFilter(mask, pattern);
-            var link = new IsoTpJ2534RawCanLink(driver, o.Settings.CanFd,
+            var rawLink = new IsoTpJ2534RawCanLink(driver, o.Settings.CanFd,
                 o.ExtendedId, o.Brs);
+            // Opt-in local trace; CreateNew preserves older bench evidence.
+            // Host-clock timestamps do not represent physical CAN timing.
+            using var traceStream = o.TraceFile is null ? null : new FileStream(
+                o.TraceFile, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+            using var traceWriter = traceStream is null ? null : new StreamWriter(
+                traceStream, new System.Text.UTF8Encoding(false))
+                { AutoFlush = true };
+            IsoTpCanFdSession.ICanLink link = traceWriter is null ?
+                rawLink : new IsoTpHostTraceLink(rawLink, traceWriter);
             var limit = TimeSpan.FromMilliseconds(o.TimeoutMs);
             // The CLI request/reply budget includes TX and all RX frames.
             // Neither the send phase nor a series of 0x78 pending replies
@@ -1105,7 +1118,8 @@ internal static class StandardProtocolCli
         catch (Exception ex) when (ex is ArgumentException or IOException or
             InvalidOperationException or TimeoutException or
             DllNotFoundException or BadImageFormatException or
-            EntryPointNotFoundException or OverflowException or InvalidDataException)
+            EntryPointNotFoundException or OverflowException or InvalidDataException or
+            UnauthorizedAccessException)
         {
             Console.Error.WriteLine("ISO-TP exchange failed: " + ex.Message);
             return 6;

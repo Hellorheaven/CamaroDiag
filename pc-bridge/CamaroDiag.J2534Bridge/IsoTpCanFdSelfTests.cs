@@ -736,6 +736,57 @@ internal static class IsoTpCanFdSelfTests
         Check(vendorClassic.Transmitted.Count == 1,
             "Canceled raw J2534 send leaves vendor TX queue unchanged.");
 
+        var traceCli = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--payload", "22F190",
+            "--trace-file", "isotp-bench-01.csv"]);
+        Check(traceCli.TraceFile == "isotp-bench-01.csv",
+            "ISO-TP trace is explicitly configured and disabled by default.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--payload", "22F190",
+            "--trace-file", ""]),
+            "Blank trace path cannot select an unintended output file.");
+
+        var traceInner = new QueueLink();
+        traceInner.Replies.Enqueue(RX(false,
+            3, 0x62, 0xF1, 0x90, 0, 0, 0, 0));
+        using var traceOutput = new StringWriter(
+            System.Globalization.CultureInfo.InvariantCulture);
+        var traceLink = new IsoTpHostTraceLink(traceInner, traceOutput);
+        IsoTpCanFdSession.SendAsync(traceLink, classic,
+            [0x22, 0xF1, 0x90], TimeSpan.FromSeconds(1),
+            CancellationToken.None).GetAwaiter().GetResult();
+        var traceReply = IsoTpCanFdSession.ReceiveAsync(traceLink, classic,
+            TimeSpan.FromSeconds(1), CancellationToken.None)
+            .GetAwaiter().GetResult();
+        var traceLines = traceOutput.ToString().Split(
+            '\n', StringSplitOptions.RemoveEmptyEntries);
+        Check(traceReply.SequenceEqual(new byte[] {0x62, 0xF1, 0x90}) &&
+            traceLines.Length == 6 &&
+            traceLines[0].Contains("CAMARODIAG_ISOTP_HOST_TRACE_V1",
+                StringComparison.Ordinal) &&
+            traceLines[1].Contains("HOST_CLOCK_NOT_WIRE_TIMESTAMP",
+                StringComparison.Ordinal) &&
+            traceLines[3].Contains(",TX_REQUEST,0x000007E0,CAN,8,",
+                StringComparison.Ordinal) &&
+            traceLines[4].Contains(",TX_QUEUED,0x000007E0,CAN,8,",
+                StringComparison.Ordinal) &&
+            traceLines[5].Contains(",RX,0x000007E8,CAN,8,",
+                StringComparison.Ordinal),
+            "Trace records TX intent/queued/RX without claiming physical bus timing.");
+
+        var passiveTrace = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive",
+            "--trace-file", "isotp-listen.csv"]);
+        Check(passiveTrace.Mode == "receive" &&
+            passiveTrace.TraceFile == "isotp-listen.csv",
+            "Receive-only host trace never constructs a TX payload.");
+
         var protocolIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8",

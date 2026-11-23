@@ -40,6 +40,12 @@ La CLI demande volontairement les **deux confirmations opérateur** avant tout �
 | Compatibilité sur ECU réel | ECU(s) précisément identifiés | Lecture légitime répétée, captures conservées et identités constatées |
 | Diagnostic/programmation avec octets d'écriture | **Procédure ECU/OEM séparée** avec sauvegarde physique, vérification et consentement | Qualification ECU individuelle seulement, jamais déduite des tests de transport |
 
+## Journalisation optionnelle pendant les essais
+
+L'option `--trace-file isotp-essai-01.csv` ajoutée à la commande `--isotp-exchange` enregistre dans un **nouveau fichier seulement** (`CreateNew`) les intentions d'émission (`TX_REQUEST`), les confirmations de mise en file J2534 (`TX_QUEUED`) et les trames reçues (`RX`) avec un horodatage **côté PC**, en microsecondes relatives. Aucun fichier n'est créé sans cette option. Les journaux peuvent contenir VIN et données ECU : les conserver localement.
+
+**Attention :** les durées de ces traces ne sont pas des horodatages physiques du bus. `TX_QUEUED` n'est pas un ACK de l'ECU ; la capture CAN indépendante reste obligatoire pour qualifier STmin. Si l'écriture du journal échoue après une transmission, **ne jamais relancer automatiquement**.
+
 ## Attestation et critères de clôture
 
 Consigner pour chaque campagne : commit exact et CI Windows réussie, date, adaptateur/firmware/DLL, type et débit CAN, identité ECU ou simulateur, trames horodatées, essais positifs/négatifs, erreurs, différences et signatures de l'opérateur responsable.
