@@ -81,7 +81,7 @@ class EcuWriteConsentFlowTest {
         vehicleStillSelected = true
         accountActive = false
         assertTrue(runCatching { verify() }.isFailure)
-        assertEquals(4, checks)
+        assertEquals(5, checks)
     }
 
     @Test fun transmitGateRejectsAnAbsentYesAndNeverConsultsTheContext() {
