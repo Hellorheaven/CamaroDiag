@@ -109,3 +109,8 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Autotest ajouté avec RTS limité à un paquet, trois fenêtres CTS successives, reconstruction des octets et acquittement EOM_ACK.
 - Commits `c849df3`, `071b4c0`. Tests ajoutés **non exécutés** à ce stade ; aucune qualification matérielle ou véhicule revendiquée.
 - Filtrage des abandons `TP.CM Abort` pendant la réception `TP.DT` : une interruption ne s'applique qu'à la destination et au PGN de la session active. Tests ajoutés pour abort d'un autre PGN et abort correspondant (`f8529cb`, `adc71f9`), non encore exécutés.
+
+## ISO-TP étendu — tranche logicielle (23 novembre 2026)
+- Trames SF, FF, CF et FlowControl avec octets d'adressage logique TX/RX pour CAN et CAN-FD ; réduction correcte des charges utiles par trame et filtrage des réponses par adresse.
+- CLI `--tx-address` / `--rx-address` distincte de `--extended` qui règle l'identifiant CAN 29 bits.
+- Tests logiciels de fragmentation, relecture et corrélation ajoutés ; **non exécutés**. Pas de preuve de prise en charge de l'adressage mixte, de matériel réel ni de programmation ECU.
