@@ -1,0 +1,49 @@
+name: C4 LFX FlexFuel read-only unit gate
+
+# Trigger exactly once after C4 code freeze; never on each commit or PR sync.
+on:
+  push:
+    branches: [chore/unified-ci]
+    paths:
+      - '.github/c4-flexfuel-readonly-gate-request.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c4-flexfuel-readonly-unit-gate
+  cancel-in-progress: false
+
+jobs:
+  android-readonly:
+    name: C4 Android communication, diagnostic and app unit suites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: 14742923
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Prepare repository Gradle wrapper
+        run: gradle wrapper --gradle-version 8.11.1
+      - name: Run C4 fuel observations and app unit tests with warnings as errors
+        run: ./gradlew :communication:testDebugUnitTest :diagnostic:testDebugUnitTest :app:testDebugUnitTest --warning-mode=fail --stacktrace
+      - name: Preserve C4 Android test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: c4-flexfuel-readonly-${{ github.sha }}
+          path: |
+            **/build/reports/tests/testDebugUnitTest/**
+            **/build/test-results/testDebugUnitTest/**
+          if-no-files-found: ignore
+          retention-days: 14
