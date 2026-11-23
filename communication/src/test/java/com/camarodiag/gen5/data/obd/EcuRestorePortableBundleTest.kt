@@ -133,7 +133,7 @@ class EcuRestorePortableBundleTest {
             }.isFailure)
             assertTrue(runCatching {
                 EcuRestorePortableBundle.importNew(
-                    complete + byteArrayOf(42), File(root, "appended")
+                    (complete + byteArrayOf(42)).inputStream(), File(root, "appended")
                 )
             }.isFailure)
             assertTrue(!File(root, "appended/index.ecu-package").exists())
