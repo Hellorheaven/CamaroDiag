@@ -1,21 +1,20 @@
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// PR #95 exposes verified read-only diagnostics, memory capture and offline
-/// analysis, but does NOT qualify any physical ECU programming/recovery route.
-/// This compile-time security boundary has no CLI, environment-variable or
-/// network bypass. A later, separately reviewed hardware-qualified release
-/// must explicitly replace it before enabling any on-device flash operation.
+/// The dedicated LOCAL E39 bench programming entry point is compiled in for
+/// physical hardware validation. This flag does not confer programming
+/// authorization: a trusted signed bench profile, verified driver, complete
+/// matching physical backup and voltage/recovery checks remain mandatory.
+/// The network bridge stays read-only and cannot reach this entry point.
 /// </summary>
 internal static class NativeEcuWriteAvailability
 {
-    internal static bool PhysicalEcuProgrammingEnabled => false;
+    internal static bool PhysicalEcuProgrammingEnabled => true;
 
     internal static void RequirePhysicalEcuProgrammingEnabled()
     {
         if (!PhysicalEcuProgrammingEnabled)
             throw new UnauthorizedAccessException(
-                "Physical ECU programming is disabled in this read-only CamaroDiag build. " +
-                "Offline analysis and test simulation remain available.");
+                "Physical ECU programming is unavailable in this CamaroDiag build.");
     }
 }
