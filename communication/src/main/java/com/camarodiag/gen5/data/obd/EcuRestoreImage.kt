@@ -47,7 +47,12 @@ object EcuRestoreImage {
         archive: EcuBackupArchive.Imported,
         knownMemoryMap: List<MemoryRegion>
     ): List<RegionImage> {
-        require(archive.verification.consistent) { "ECU backup archive integrity is not verified" }
+        require(archive.verification.consistent &&
+            EcuBackupIntegrity.verify(
+                archive.manifest, archive.captures, archive.requiredRegions
+            ).consistent) {
+            "ECU backup bytes or metadata have changed since archive verification"
+        }
         require(knownMemoryMap.isNotEmpty()) { "Missing known ECU memory map" }
         require(knownMemoryMap.distinct().size == knownMemoryMap.size) {
             "Duplicate ECU memory region"
