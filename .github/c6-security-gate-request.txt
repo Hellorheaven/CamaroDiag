@@ -1,0 +1,4 @@
+C6 security development freeze
+Previous HEAD: fd94cb2697219a16670d33ff6495f739aad72159
+One grouped run: Android communication/diagnostic/app unit suites; Windows J2534 Debug and self-tests; PR95 no-programming policy.
+No Release build, no merge, no real ECU qualification.
