@@ -1,3 +1,6 @@
+# Addendum prioritaire 23/11/2026 — normes ECU et recette post-flash (issue #110)
+La PR #95 sur chore/unified-ci couvre maintenant une première tranche ISO/SAE et contrôle offline de sauvegardes physiques ; état détaillé docs/PROTOCOLES_STANDARDS_ET_RECUPERATION.md. Exiger pile standard ISO 14229/13400/15765-2 (CAN-FD compris), 9141-2/14230 K-Line, SAE J1850/J2534/J1979/J1939 ; niveau réel transport/matériel/flash distingué. Après écriture, test ECU + véhicule, comparatif DTC et VIN, statut PASS/FAIL/INCONCLUSIF ; toute restauration est une nouvelle écriture avec backup original physique vérifié et double consentement OK puis Oui/Non, jamais automatique ; ECU muet nécessite récupération qualifiée sur banc. Respecter AGENTS.md. Ne pas créer nouvelle branche/PR, ne pas lancer CI par commit.
+
 # PROMPT DE REPRISE — CamaroDiag
 
 > Fichier de continuité du projet. À lire en premier dans tout nouveau chat consacré à CamaroDiag. Mettre ce fichier à jour dès qu'une décision durable, un changement de périmètre, une modification GitHub/PR, un résultat CI ou un état technique important est confirmé. Tenir le changelog propre à chaque PR (`docs/CHANGELOG_PR<number>.md`) à jour sur la branche de cette PR.
