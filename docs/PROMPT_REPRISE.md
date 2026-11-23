@@ -5,6 +5,14 @@ La PR #95 sur chore/unified-ci couvre maintenant une première tranche ISO/SAE e
 
 > Fichier de continuité du projet. À lire en premier dans tout nouveau chat consacré à CamaroDiag. Mettre ce fichier à jour dès qu'une décision durable, un changement de périmètre, une modification GitHub/PR, un résultat CI ou un état technique important est confirmé. Tenir le changelog propre à chaque PR (`docs/CHANGELOG_PR<number>.md`) à jour sur la branche de cette PR.
 
+## CLARIFICATION PRIORITAIRE DU PROPRIÉTAIRE — C6 NE DOIT PAS BLOQUER L'ÉCRITURE (23/11/2026)
+
+**C6 est un chantier de fiabilisation, PAS un chantier de remise en lecture seule.** Interdiction de réintroduire un verrou général `read-only`, une whitelist de pilotes ou d'ECU, un certificat/signature ou une permission CamaroDiag de programmation inventée, un interrupteur d'écriture désactivé par défaut, ou de transformer une fonction d'écriture réellement implémentée en fonction indisponible par prudence générique. Ne pas réinterpréter les anciennes notes « toute écriture interdite », « pilotes enregistrés uniquement » ou « read-only PR95 » comme une consigne actuelle : elles sont remplacées par cette décision.
+
+**Conserver** le consentement explicite de l'utilisateur en deux étapes (avertissement OK, puis Oui/Non), les contrôles réels imposés par le matériel/constructeur/ECU, la vérification de l'identité, des secteurs et octets envoyés, la sauvegarde préalable réellement restaurable, les checksums, la relecture et le rollback prévus. Ce sont des conditions de cohérence d'une opération physique, **pas des licences ou freins artificiels à la programmation**.
+
+Si un véritable pilote ou une capacité n'existe pas, le signaler précisément et développer la capacité manquante ; ne pas prétendre qu'une opération est opérationnelle et ne pas ajouter de verrou technique générique pour remplacer le développement. Ne pas modifier les protocoles actuellement confiés à l'autre chat. Respecter ce principe dans C6, C2, l'interface Android, le pont Windows, les tests et la documentation.
+
 ## ÉTAT DE REPRISE — C6 ET CONNECTEURS (23/11/2026, PR #95)
 
 - **C6 n'est pas disparu et ne doit pas être clôturé.** Il couvre le consentement OK puis Oui/Non, l'identité de l'ECU, le bloc d'écriture exact, le pont TLS J2534, le pré-flash et la récupération après écriture. L'audit `docs/AUDIT_PR95_C1_C2_C4_C6_C8.md` et le contrôle `docs/C8_PARALLEL_NON_PROTOCOL_REVIEW.md` le suivent explicitement.
