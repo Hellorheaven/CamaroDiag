@@ -492,6 +492,27 @@ internal static class IsoTpCanFdSelfTests
             blockBoundary.Separations[1] <= TimeSpan.FromMilliseconds(5),
             "Reissued FC across BS boundary cannot reset CF-to-CF separation timing.");
 
+        Check(IsoTpCanFdSession.IsReservedStMin(0x80) &&
+            IsoTpCanFdSession.IsReservedStMin(0xF0) &&
+            IsoTpCanFdSession.IsReservedStMin(0xFA) &&
+            IsoTpCanFdSession.IsReservedStMin(0xFF) &&
+            !IsoTpCanFdSession.IsReservedStMin(0x7F) &&
+            !IsoTpCanFdSession.IsReservedStMin(0xF1) &&
+            !IsoTpCanFdSession.IsReservedStMin(0xF9),
+            "Reserved ISO-TP STmin ranges are classified without rounding valid codes.");
+        var reservedThenClear = new QueueLink();
+        reservedThenClear.Replies.Enqueue(RX(false,
+            0x30, 1, 0x80, 0, 0, 0, 0, 0));
+        reservedThenClear.Replies.Enqueue(RX(false,
+            0x30, 0, 0, 0, 0, 0, 0, 0));
+        Send(reservedThenClear, classic, Fill(20));
+        Check(reservedThenClear.Sent.Count == 3 &&
+            reservedThenClear.Separations.Count == 2 &&
+            reservedThenClear.Separations[0] == TimeSpan.Zero &&
+            reservedThenClear.Separations[1] >= TimeSpan.Zero &&
+            reservedThenClear.Separations[1] <= TimeSpan.FromMilliseconds(127),
+            "Reserved STmin transfer accepts subsequent FC and retains CF pacing.");
+
         var boundedWait = new QueueLink();
         boundedWait.Replies.Enqueue(RX(false, 0x31, 0, 0, 0, 0, 0, 0, 0));
         boundedWait.Replies.Enqueue(RX(false, 0x31, 0, 0, 0, 0, 0, 0, 0));

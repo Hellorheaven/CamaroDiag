@@ -95,9 +95,12 @@ internal static class IsoTpCanFdSession
         _ => TimeSpan.FromMilliseconds(127)
     };
 
+    internal static bool IsReservedStMin(byte value) =>
+        value > 0x7F && (value < 0xF1 || value > 0xF9);
+
     private static void ValidateAdvertisedStMin(byte value)
     {
-        if (value > 0x7F && (value < 0xF1 || value > 0xF9))
+        if (IsReservedStMin(value))
             throw new InvalidDataException(
                 "Local ISO-TP FlowControl cannot advertise a reserved STmin.");
     }
@@ -179,19 +182,27 @@ internal static class IsoTpCanFdSession
         long? previousCfCompletedAt = null;
         var flow = await AwaitCtsAsync(link, settings,
             Remaining(timeout, clock), token);
+        // ISO 15765-2: once an FC carries a reserved STmin, the longest
+        // defined interval applies for the rest of this segmented transfer.
+        // Later CTS frames may change block size but cannot clear that
+        // conservative 127 ms fallback.
+        var reservedStMinSeen = flow.ReservedSeparation;
         while (offset < payload.Length)
         {
             if (flow.BlockSize != 0 && sentInBlock >= flow.BlockSize)
             {
                 flow = await AwaitCtsAsync(link, settings,
                     Remaining(timeout, clock), token);
+                reservedStMinSeen |= flow.ReservedSeparation;
                 sentInBlock = 0;
             }
             _ = Remaining(timeout, clock);
             var sincePreviousCf = previousCfCompletedAt is long previous ?
                 Stopwatch.GetElapsedTime(previous) : flow.Separation;
+            var effectiveSeparation = reservedStMinSeen ?
+                TimeSpan.FromMilliseconds(127) : flow.Separation;
             var separationToWait = RemainingCfSeparation(
-                flow.Separation, sincePreviousCf);
+                effectiveSeparation, sincePreviousCf);
             await link.WaitMinimumSeparationAsync(separationToWait, token);
             _ = Remaining(timeout, clock);
             var cf = Pad(settings);
@@ -317,7 +328,8 @@ internal static class IsoTpCanFdSession
         return output;
     }
 
-    private sealed record Flow(byte BlockSize, TimeSpan Separation);
+    private sealed record Flow(
+        byte BlockSize, TimeSpan Separation, bool ReservedSeparation);
 
     private static async Task<Flow> AwaitCtsAsync(
         ICanLink link, Settings config, TimeSpan timeout, CancellationToken token)
@@ -336,7 +348,9 @@ internal static class IsoTpCanFdSession
             if (status == 2) throw new IOException("ISO-TP receiver overflow (FC/OVFLW).");
             if (status == 1) continue;
             if (status != 0) throw new InvalidDataException("Invalid ISO-TP FC status.");
-            return new Flow(frame.Data[pci + 1], DecodeStMin(frame.Data[pci + 2]));
+            var receivedStMin = frame.Data[pci + 2];
+            return new Flow(frame.Data[pci + 1], DecodeStMin(receivedStMin),
+                IsReservedStMin(receivedStMin));
         }
         throw new TimeoutException("Too many ISO-TP FC/WAIT responses.");
     }
