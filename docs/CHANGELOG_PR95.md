@@ -335,3 +335,14 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 - Le travail de connexion J2534 utilise désormais le compteur global `isBusy`, avec nettoyage en `finally` pour les annulations de handshake.
 - Le firmware ESP32-S3 prototype n'a toujours que la découverte publique : aucun accès physique ECU activé ou attesté ici.
 - Commits complémentaires : `4454797`, `5fbf50e`, `ad9b2f5`, `c98b8bb`, `333d8bc`, `8b6a9c2`, `7da6bc8`, `7666aaf`, `f85f5be`.
+
+
+## Protocoles — compléments de la session du 23/11/2026
+- ISO 14230 KWP2000 : codec d'adressage fonctionnel, longueurs 1–255, checksum ; constructeurs physiques/fonctionnels CLI J2534 et parseur RX opt-in, tests négatifs.
+- ISO 14229 : constructeurs standards 0x24, 0x2F, 0x28, 0x85, 0x2A et validation des échos DID. Nouveau `UdsResponseSequence` pour attendre la réponse finale malgré NRC 0x78 sous délai borné, utilisé en ISO-TP avec `--uds-validate true` ou commandes OBDonUDS.
+- SAE J2534 : correction des protocoles optionnels SW_ISO15765=0x8007 et SW_CAN=0x8008 ; les filtres FLOW_CONTROL et l'initialisation K-Line sont refusés en réception passive. Les échos RX et indications J2534 sont ignorés sans clore la fenêtre de lecture.
+- J1939-22 : délais cumulés de transfert et par phase, bornes 30 s par appel pilote, fenêtre globale jusqu'à 10 min, abort corrélé sur erreurs CMDT, tests de faux bus et limites.
+- J1939-81 : initial claim NAME choisi explicitement (250 ms), conflit de priorité, cannot-claim et réponse aux requêtes PGN EE00 pendant la fenêtre, sans suivi persistant des adresses.
+- DoIP : version 2/3 sélectionnable, plafond de message en mémoire 1 Mio, source de demande et capture binaires sans écrasement, DoIP generic NACK, TLS mutuel optionnel via certificat installé sur Windows. Tests codec/CLI et fichiers temporaires ajoutés.
+- Catalogue des protocoles : capacité de transport logiciel distincte des écritures ECU physiquement qualifiées.
+- **Campagne Windows Debug, auto-tests intégrés et qualification matérielle toujours à lancer une seule fois à la fin du chantier.** Aucun succès supposé.
