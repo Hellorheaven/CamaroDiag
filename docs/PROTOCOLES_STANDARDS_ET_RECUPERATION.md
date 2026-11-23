@@ -73,9 +73,13 @@ La CLI Windows exploite uniquement les **canaux CAN bruts** des DLL SAE J2534 po
 ```text
 CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-id 7E8 --baud 500000 --fd true --tx-dl 64 --brs true --data-baud 2000000 --payload 22F190
 CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-id 7E8 --baud 500000 --fd false --tx-dl 8 --payload 2EF1900102
+CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-id 7E8 --baud 500000 --fd false --mode receive
+CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-id 7E8 --baud 500000 --fd false --tx-address 0xF1 --rx-address 0x10 --payload 22F190
 CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-id 7E8 --baud 500000 --fd true --tx-dl 64 --data-baud 2000000 --payload-file "C:\\ecu\\sector.bin"
 ```
 
+- `--mode receive` attend un message ECU sans requête diagnostique sortante. Une réception multipaquet déclenche uniquement les réponses FlowControl nécessaires ; ne remplace pas une opération de diagnostic requête/réponse.
+- `--mode exchange` est le comportement par défaut, avec requête et réponse ; il exige la confirmation opérateur avant émission.
 - `--payload-file` transmet exactement les octets du fichier dans la limite de 1 Mio pour le moteur logiciel (plafond d'allocation, **pas** promesse de capacité de l'ECU) ; les adresses/secteurs nécessaires à un flash réel restent définis par le pilote ECU. L'acceptation de la trame seule ne prouve pas l'écriture flash.
 - `--block-size` et `--stmin` contrôlent les réponses FlowControl produites ; le moteur respecte celles du pair, y compris les valeurs sub-millisecondes. Une programmation avec timing précis ne sera considérée matériellement qualifiée qu'après preuve sur le matériel ciblé.
 - `--extended true` sélectionne un identifiant CAN 29 bits (et non l'adressage ISO-TP étendu, accessible par --tx-address/--rx-address).
