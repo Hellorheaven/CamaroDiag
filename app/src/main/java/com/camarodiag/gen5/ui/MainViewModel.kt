@@ -2346,7 +2346,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * A confirmation dialog must not authorize TX on a replacement adapter or
      * another vehicle. Recheck the live generation when the user confirms.
      */
-    fun confirmRawCanConsoleFrame(input: String, expectedContextGeneration: Long) {
+    fun confirmRawCanConsoleFrame(
+        input: String,
+        expectedContextGeneration: Long,
+        approval: EcuWriteConsentFlow.Approval
+    ) {
         if (!requirePremiumLicense()) return
         val state = _liveCanMonitorState.value
         val frame = RawCanFrameParser.parse(input)
@@ -2359,10 +2363,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 canTransmit = _adapter.value.supportsCanTransmit,
                 busy = state.isCapturing || state.isSendingRequest
             )) return
-        sendRawCanConsoleFrame(input, requireNotNull(frame))
+        sendRawCanConsoleFrame(input, requireNotNull(frame), expectedContextGeneration, approval)
     }
 
-    private fun sendRawCanConsoleFrame(input: String, frame: com.camarodiag.gen5.data.obd.RawCanFrame) {
+    private fun sendRawCanConsoleFrame(
+        input: String,
+        frame: com.camarodiag.gen5.data.obd.RawCanFrame,
+        confirmedConsoleGeneration: Long,
+        approval: EcuWriteConsentFlow.Approval
+    ) {
         if (!SafeRawCanTransmitPolicy.allows(frame)) {
             val message = localizedContext.getString(R.string.can_console_unsafe_can_payload)
             appendCanConsoleSystemEvent(message, succeeded = false)
@@ -2384,6 +2393,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _liveCanMonitorState.value = _liveCanMonitorState.value.copy(message = message)
             return
         }
+        val confirmedAccountGeneration = accountSessionGeneration
+        val confirmedAdapterGeneration = connectionAttemptGeneration
+        val confirmedVehicle = _vehicle.value
         val txEvent = CanConsoleHistoryEntry(
             id = System.nanoTime(),
             direction = "TX",
@@ -2400,7 +2412,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
-                val transmission = obdManager.sendRawCanFrameWithStatus(frame)
+                val transmission = obdManager.sendRawCanFrameWithStatus(frame) {
+                    EcuWriteConsentFlow.requireCurrentForTransmit(approval) {
+                        isCurrentAccountGeneration(confirmedAccountGeneration) &&
+                            confirmedAdapterGeneration == connectionAttemptGeneration &&
+                            confirmedVehicle == _vehicle.value &&
+                            confirmedConsoleGeneration == _liveCanMonitorState.value.consoleContextGeneration
+                    }
+                }
                 val response = transmission.adapterOutput
                 if (canRequestJob === requestJob) {
                     val current = _liveCanMonitorState.value
