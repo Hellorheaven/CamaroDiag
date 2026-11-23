@@ -327,3 +327,11 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 - Le formulaire Wi-Fi OBD refuse un hôte vide, un URI, une adresse comprenant des espaces/contrôles ou un port TCP hors de 1..65535 **avant** de réinitialiser une session fonctionnelle. Les hôtes locaux ordinaires et les noms compatibles restent autorisés ; aucune modification du protocole OBD/ELM.
 - Les adresses Bluetooth sont normalisées en six octets hexadécimaux séparés par des deux-points avant toute tentative de connexion, avec message d'erreur sans basculement d'adaptateur si la saisie est invalide.
 - Tests unitaires de prévalidation ajoutés ; commits `333d8bc`, `8b6a9c2`, `7da6bc8`. Pas de tests sur périphérique physique confirmés.
+
+### Pont et connexions — compléments de prévalidation
+
+- Les champs du pont J2534 sont contrôlés côté Android **avant** la déconnexion de l'ancien adaptateur, avec test d'une paire CAN standard 11 bits et d'une paire CAN étendue 29 bits, ainsi que les refus de PIN TLS absent, cible Internet, port et formats invalides.
+- Les autres interfaces acceptent aussi un contrôle local des valeurs de saisie avant bascule de transport : adresse Wi-Fi/port et MAC Bluetooth ; tests de scénarios malformés ajoutés.
+- Le travail de connexion J2534 utilise désormais le compteur global `isBusy`, avec nettoyage en `finally` pour les annulations de handshake.
+- Le firmware ESP32-S3 prototype n'a toujours que la découverte publique : aucun accès physique ECU activé ou attesté ici.
+- Commits complémentaires : `4454797`, `5fbf50e`, `ad9b2f5`, `c98b8bb`, `333d8bc`, `8b6a9c2`, `7da6bc8`, `7666aaf`, `f85f5be`.
