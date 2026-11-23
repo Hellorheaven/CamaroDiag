@@ -213,6 +213,32 @@ internal static class J1939ClassicTpSelfTests
             "Cancelled transfer cannot send any PGN.");
         Check(noTx.Outgoing.Count == 0, "No J1939 frames sent after cancellation.");
 
+        var CLI = StandardProtocolCli.ParseJ1939([
+            StandardProtocolCli.J1939Command,
+            "--adapter-index", "0", "--baud", "250000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "send",
+            "--payload", "01020304"]);
+        Check(CLI.Settings.LocalAddress == 0xF1 &&
+            CLI.Settings.RemoteAddress == 0x10 &&
+            CLI.Settings.Pgn == 0xF004 &&
+            CLI.Request.SequenceEqual(new byte[] {1, 2, 3, 4}),
+            "J1939 transmit CLI can select real source/target/PGN with arbitrary data.");
+        var listen = StandardProtocolCli.ParseJ1939([
+            StandardProtocolCli.J1939Command,
+            "--adapter-index", "0", "--baud", "250000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "receive"]);
+        Check(listen.Request.Length == 0 && listen.Mode == "receive",
+            "J1939 receive-only mode needs no emission or write permission.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939([
+            StandardProtocolCli.J1939Command,
+            "--adapter-index", "0", "--baud", "250000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xEF44", "--mode", "send",
+            "--payload", "01"]),
+            "CLI rejects PGN that encodes destination incorrectly.");
+
         return count;
     }
 }
