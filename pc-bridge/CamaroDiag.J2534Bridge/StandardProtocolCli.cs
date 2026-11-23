@@ -23,9 +23,12 @@ internal static class StandardProtocolCli
         {
             var host = Optional(args, "--host");
             var broadcastIp = Optional(args, "--broadcast-ip");
-            if ((host is null) == (broadcastIp is null))
+            var passiveListen = bool.Parse(Optional(args, "--listen") ?? "false");
+            if (passiveListen ?
+                host is not null || broadcastIp is not null :
+                (host is null) == (broadcastIp is null))
                 throw new ArgumentException(
-                    "Supply exactly one of --host or --broadcast-ip.");
+                    "Listen mode needs no destination; active discovery requires one host or broadcast IP.");
             var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
                 CultureInfo.InvariantCulture);
             var requestedVin = Optional(args, "--vin");
@@ -35,7 +38,15 @@ internal static class StandardProtocolCli
             var eid = eidHex is null ? null : Convert.FromHexString(eidHex);
             var timeout = TimeSpan.FromMilliseconds(timeoutMs);
             IReadOnlyList<DoIpVehicleDiscovery.Identity> identities;
-            if (broadcastIp is not null)
+            if (passiveListen)
+            {
+                if (requestedVin is not null || eid is not null)
+                    throw new ArgumentException(
+                        "Passive DoIP listening cannot apply an outgoing VIN/EID request.");
+                identities = await DoIpVehicleDiscovery.ListenAsync(
+                    timeout, CancellationToken.None);
+            }
+            else if (broadcastIp is not null)
                 identities = await DoIpVehicleDiscovery.DiscoverBroadcastAsync(
                     broadcastIp, timeout, CancellationToken.None,
                     vin: requestedVin, eid: eid);
