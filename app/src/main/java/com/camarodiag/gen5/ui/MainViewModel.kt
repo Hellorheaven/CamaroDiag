@@ -56,9 +56,9 @@ import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
 import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
 import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
-import com.camarodiag.gen5.data.obd.UsbPermissionPendingException
 import com.camarodiag.gen5.data.obd.J2534BridgeConnectionForm
 import com.camarodiag.gen5.data.obd.AdapterEndpointPreflight
+import com.camarodiag.gen5.data.obd.AdapterConnectionFailurePolicy
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeException
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeCancelled
 import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
@@ -3497,7 +3497,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .onFailure { error ->
                         if (attempt == connectionAttemptGeneration) {
                             _connectionMessage.value =
-                                if (error is UsbPermissionPendingException) {
+                                if (AdapterConnectionFailurePolicy.classify(error) ==
+                                    AdapterConnectionFailurePolicy.Kind.USB_PERMISSION_REQUIRED) {
                                     localizedContext.getString(R.string.msg_usb_permission_pending)
                                 } else fallbackMessage
                         }
