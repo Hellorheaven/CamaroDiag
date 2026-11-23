@@ -512,6 +512,29 @@ internal static class J1939ClassicTpSelfTests
             CLI.Settings.Pgn == 0xF004 &&
             CLI.Request.SequenceEqual(new byte[] {1, 2, 3, 4}),
             "J1939 transmit CLI can select real source/target/PGN with arbitrary data.");
+        var claimedCli = StandardProtocolCli.ParseJ1939([
+            StandardProtocolCli.J1939Command,
+            "--adapter-index", "0", "--baud", "250000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "send",
+            "--payload", "0102", "--name", "0x8000000200000001"]);
+        Check(claimedCli.Name == 0x8000000200000001UL,
+            "J1939-81 explicit unique NAME is parsed as full 64-bit hex.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939([
+            StandardProtocolCli.J1939Command,
+            "--adapter-index", "0", "--baud", "250000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "send",
+            "--payload", "0102", "--name", "0011"]),
+            "Truncated NAME cannot silently claim a source address.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939([
+            StandardProtocolCli.J1939Command,
+            "--adapter-index", "0", "--baud", "250000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "send",
+            "--payload", "0102", "--name", "FFFFFFFFFFFFFFFF"]),
+            "All-FF NAME is not a usable J1939 controller identity.");
+
         var listen = StandardProtocolCli.ParseJ1939([
             StandardProtocolCli.J1939Command,
             "--adapter-index", "0", "--baud", "250000",
