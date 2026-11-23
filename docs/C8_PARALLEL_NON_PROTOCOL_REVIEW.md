@@ -34,3 +34,13 @@
 - Revoir les tests UI/documentation FR/EN sur les chantiers C1/C4 et le diff C8, sans toucher aux transports ni rendre opérationnelle une écriture non qualifiée.
 
 **Statut de cette revue** : inventaire et priorisation documentés ; aucune compilation ou campagne CI du nouveau HEAD exécutée au titre de cette revue. Aucune fusion autorisée.
+
+## Revue de corrections indépendantes — 23 novembre 2026, session C1/C4
+
+**C1 :** vérification explicite de l'archive à la fin d'une capture et au moment d'un Stop. Les erreurs de vidage et fermeture ne doivent pas être masquées par l'annulation de coroutine : elles sont signalées et interdisent l'export. L'export vérifie également que le contexte d'utilisation, la génération de console, le besoin d'une archive brute et son état d'erreur n'ont pas changé pendant l'écriture du rapport. Régressions ciblées ajoutées au vérificateur d'archive et à la politique d'export.
+
+**C4 :** invalidation de l'historique temporaire au changement de compte, d'adaptateur, de session de pont et après déconnexion ; publication des nouvelles mesures sur le dispatcher UI après recontrôle de génération. Les valeurs d'éthanol et de trims sont affichées en plages min/max uniquement pour les PID réellement répondants ; traductions FR/EN. Le test des caractères de contrôle CSV a été corrigé pour utiliser des tabulations et retours à la ligne réels, avec cas complémentaires pour changement de source et répétition d'horodatage.
+
+**Validation :** une demande unique de campagne C4 Debug ciblée a été commitée sur le chemin prévu par GitHub Actions ; **aucun rapport d'exécution n'a pu être confirmé ici**. Le HEAD a encore changé depuis cette demande du fait des corrections et des travaux parallèles. Ces commits ne sont donc pas considérés comme validés par le simple dépôt de la demande. Une validation de l'exact HEAD stabilisé reste obligatoire avant fusion.
+
+**Dépendances non résolues :** la restauration physique C2, les transports standard de l'autre chat et la recette véhicule restent séparés de ces correctifs. Aucun merge, nouvelle branche ou écriture ECU physique.
