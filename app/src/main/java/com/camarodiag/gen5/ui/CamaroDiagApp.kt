@@ -709,8 +709,8 @@ fun CamaroDiagApp(
                     onStart = { can29Bit -> viewModel.startCanMonitor(can29Bit = can29Bit) },
                     onStop = { viewModel.stopCanMonitor() },
                     onSendRequest = { viewModel.sendCanConsoleInput(it) },
-                    onConfirmRawFrame = { frame, epoch ->
-                        viewModel.confirmRawCanConsoleFrame(frame, epoch)
+                    onConfirmRawFrame = { frame, epoch, approval ->
+                        viewModel.confirmRawCanConsoleFrame(frame, epoch, approval)
                     },
                     onClearHistory = { viewModel.clearCanConsoleHistory() },
                     onExport = { withExportFolder { viewModel.exportCanCapture("CamaroDiag_CAN_${System.currentTimeMillis()}.txt") } }
@@ -1694,7 +1694,7 @@ fun CanSnifferScreen(
     onStart: (Boolean) -> Unit,
     onStop: () -> Unit,
     onSendRequest: (String) -> Unit,
-    onConfirmRawFrame: (String, Long) -> Unit,
+    onConfirmRawFrame: (String, Long, EcuWriteConsentFlow.Approval) -> Unit,
     onClearHistory: () -> Unit,
     onExport: () -> Unit
 ) {
@@ -2358,10 +2358,12 @@ fun CanSnifferScreen(
                             // OK only acknowledges the risk notice: it NEVER sends.
                             writeConsentStep = EcuWriteConsentFlow.afterWarningOk(writeConsentStep)
                         } else {
-                            if (EcuWriteConsentFlow.approval(
-                                    writeConsentStep, confirmedYes = true,
-                                    sameConnection = canConfirm
-                                ) != null) onConfirmRawFrame(frame, pendingEpoch)
+                            EcuWriteConsentFlow.approval(
+                                writeConsentStep, confirmedYes = true,
+                                sameConnection = canConfirm
+                            )?.let { approval ->
+                                onConfirmRawFrame(frame, pendingEpoch, approval)
+                            }
                             pendingRawFrameInput = null
                             writeConsentStep = EcuWriteConsentFlow.Step.WARNING
                         }
