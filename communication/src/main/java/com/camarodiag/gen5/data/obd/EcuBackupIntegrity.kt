@@ -24,6 +24,8 @@ object EcuBackupIntegrity {
         INVALID_VIN,
         PHYSICAL_ORIGIN_MISSING_VIN,
         PHYSICAL_CHANNEL_MISSING_VIN,
+        FIRMWARE_EVIDENCE_WITHOUT_CHANNEL,
+        ROUTED_SCOPE_INVALID,
         INVALID_CAPTURE_TIMESTAMP
     }
 
@@ -53,6 +55,21 @@ object EcuBackupIntegrity {
         }
         if (manifest.channel != null && manifest.vehicleVin == null) {
             problems += Problem.PHYSICAL_CHANNEL_MISSING_VIN
+        }
+        if (manifest.firmwareEvidence != null && manifest.channel == null) {
+            problems += Problem.FIRMWARE_EVIDENCE_WITHOUT_CHANNEL
+        }
+        if (manifest.channel != null && (
+            captures.size != 1 || requiredRegions.isNotEmpty() ||
+            captures.any {
+                !EcuBackupArchive.isPortableJ2534Range(it.startAddress, it.expectedBytes) ||
+                    it.firstRead.size.toLong() != it.expectedBytes ||
+                    it.independentRead?.size?.toLong() != it.expectedBytes
+            }
+        )) {
+            // A 32-bit J2534 route proves at most one double-read span.
+            // Full ECU coverage cannot be inferred from an operator label.
+            problems += Problem.ROUTED_SCOPE_INVALID
         }
         if (manifest.hardwareProvenanceVerified) {
             // No hardware reader currently issues an independently authenticated attestation.

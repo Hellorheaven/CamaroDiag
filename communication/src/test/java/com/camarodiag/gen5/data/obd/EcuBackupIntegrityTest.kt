@@ -35,6 +35,47 @@ class EcuBackupIntegrityTest {
         assertFalse(identified.hardwareProvenanceVerified)
     }
 
+    @Test fun firmwareEvidenceAndRoutedScopeCannotBeForgedByManifestCopy() {
+        val vin = "1G1FA1RXXR0123456"
+        val channel = EcuBackupManifest.Channel(0x7E0, 0x7E8, 33, 1)
+        val firmware = EcuBackupManifest.FirmwareEvidence(0x123456, 0xC1)
+        val sample = capture().copy(origin = EcuBackupManifest.Origin.REPORTED_HARDWARE_READ)
+        val read = listOf(sample)
+        val correct = EcuBackupManifest.inspect(
+            "ECU", 1L, read, emptySet(), vin, channel, firmware
+        )
+        assertTrue(EcuBackupIntegrity.verify(correct, read, emptySet()).consistent)
+
+        val unbound = EcuBackupIntegrity.verify(
+            correct.copy(channel = null), read, emptySet()
+        ).problems
+        assertTrue(EcuBackupIntegrity.Problem.FIRMWARE_EVIDENCE_WITHOUT_CHANNEL in unbound)
+
+        val secondScope = read + sample.copy(startAddress = 0x1000L)
+        val twoScopes = EcuBackupManifest.inspect(
+            "ECU", 1L, secondScope, emptySet(), vin, channel, firmware
+        )
+        assertTrue(EcuBackupIntegrity.Problem.ROUTED_SCOPE_INVALID in
+            EcuBackupIntegrity.verify(twoScopes, secondScope, emptySet()).problems)
+
+        assertTrue(EcuBackupIntegrity.Problem.ROUTED_SCOPE_INVALID in
+            EcuBackupIntegrity.verify(correct, read, setOf(region)).problems)
+
+        val incomplete = listOf(sample.copy(expectedBytes = 4L))
+        val partial = EcuBackupManifest.inspect(
+            "ECU", 1L, incomplete, emptySet(), vin, channel, firmware
+        )
+        assertTrue(EcuBackupIntegrity.Problem.ROUTED_SCOPE_INVALID in
+            EcuBackupIntegrity.verify(partial, incomplete, emptySet()).problems)
+
+        val beyond32Bits = listOf(sample.copy(startAddress = 0x1_0000_0000L))
+        val impossible = EcuBackupManifest.inspect(
+            "ECU", 1L, beyond32Bits, emptySet(), vin, channel, firmware
+        )
+        assertTrue(EcuBackupIntegrity.Problem.ROUTED_SCOPE_INVALID in
+            EcuBackupIntegrity.verify(impossible, beyond32Bits, emptySet()).problems)
+    }
+
     @Test fun consistentBytesAndManifestPassOfflineCheck() {
         val captures = listOf(capture())
         assertTrue(EcuBackupIntegrity.verify(manifest(captures), captures, required).consistent)
