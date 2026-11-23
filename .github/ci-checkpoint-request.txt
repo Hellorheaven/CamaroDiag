@@ -68,3 +68,10 @@ but aborted bridge self-tests before ISO-TP on an earlier UDS upload
 memory-range regression. Added address-space boundary guard and tests in
 53b07df0ca06bd1e024e61823383fa847f0c2315. Re-run single grouped Debug after this fix.
 No per-commit tests, no Release/merge, and no physical ECU claim.
+
+23/11/2026 — ISO-TP software: grouped Debug validation after stale catalog expectation
+Prior grouped run #45267559627: Windows Debug BUILD PASS (0 errors, 0 warnings),
+self-tests interrupted before ISO-TP by stale J1939-22 scope *test text*,
+which was reconciled to actual existing catalog at 9deb193169502bf467791c04bbd2e1698489a8b0.
+Run one combined Debug Windows/Android/native/Connectors checkpoint at this
+marker commit. No new protocol begun; no hardware or ECU validation asserted.
