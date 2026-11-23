@@ -675,12 +675,21 @@ internal static class StandardProtocolCli
         var payloadFile = Optional(args, "--payload-file");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
+        var wwhStatus = Optional(args, "--obd-wwh-status");
+        var wwhSeverity = Optional(args, "--obd-wwh-severity");
+        var wwhPermanent = args.Contains("--obd-wwh-permanent",
+            StringComparer.OrdinalIgnoreCase);
+        if (wwhSeverity is not null && wwhStatus is null)
+            throw new ArgumentException(
+                "WWH severity mask requires --obd-wwh-status.");
         var obdIdentify = args.Contains("--obd-identify",
             StringComparer.OrdinalIgnoreCase);
         var payloadSources = (hexPayload is null ? 0 : 1) +
             (payloadFile is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
+            (wwhStatus is null ? 0 : 1) +
+            (wwhPermanent ? 1 : 0) +
             (obdIdentify ? 1 : 0);
         if (mode is not ("exchange" or "receive") ||
             (mode == "exchange" && payloadSources != 1) ||
@@ -693,6 +702,11 @@ internal static class StandardProtocolCli
                 checked((ushort)ParseCanId(obdDid))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(obdDtcMask))) :
+            wwhStatus is not null ? ObdOnUdsServices.ReadWwhEmissionsDtcs(
+                checked((byte)Number(wwhStatus)),
+                wwhSeverity is null ? (byte)0xFF :
+                    checked((byte)Number(wwhSeverity))) :
+            wwhPermanent ? ObdOnUdsServices.ReadWwhPermanentEmissionsDtcs() :
             payloadFile is not null ? File.ReadAllBytes(payloadFile) :
             Convert.FromHexString(hexPayload!);
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
@@ -845,12 +859,21 @@ internal static class StandardProtocolCli
         var payloadFile = Optional(args, "--payload-file");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
+        var wwhStatus = Optional(args, "--obd-wwh-status");
+        var wwhSeverity = Optional(args, "--obd-wwh-severity");
+        var wwhPermanent = args.Contains("--obd-wwh-permanent",
+            StringComparer.OrdinalIgnoreCase);
+        if (wwhSeverity is not null && wwhStatus is null)
+            throw new ArgumentException(
+                "WWH severity mask requires --obd-wwh-status.");
         var obdIdentify = args.Contains("--obd-identify",
             StringComparer.OrdinalIgnoreCase);
         if ((hexPayload is null ? 0 : 1) +
             (payloadFile is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
+            (wwhStatus is null ? 0 : 1) +
+            (wwhPermanent ? 1 : 0) +
             (obdIdentify ? 1 : 0) != 1)
             throw new ArgumentException(
                 "Supply exactly one of --payload, --obd-did or --obd-dtc-mask.");
@@ -866,6 +889,11 @@ internal static class StandardProtocolCli
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(obdDtcMask))) :
+            wwhStatus is not null ? ObdOnUdsServices.ReadWwhEmissionsDtcs(
+                checked((byte)Number(wwhStatus)),
+                wwhSeverity is null ? (byte)0xFF :
+                    checked((byte)Number(wwhSeverity))) :
+            wwhPermanent ? ObdOnUdsServices.ReadWwhPermanentEmissionsDtcs() :
             payloadFile is not null ? File.ReadAllBytes(payloadFile) :
             Hex(hexPayload!);
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
