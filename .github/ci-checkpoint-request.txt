@@ -31,3 +31,14 @@ resolve CS0136 x2 and CS1929 after first full checkpoint #45145349219.
 Retest Debug bridge, protocol suites; other C2 Android work is owned by concurrent chat.
 
 23/11/2026 — protocol correction checkpoint: FD escaped single frame must start 0x00 (SHA ed4cadb), caught by Windows tests. Re-run once after grouped corrections; PR #95 remains draft.
+
+
+23/11/2026 — grouped protocol checkpoint after UDS and J1850 improvements.
+Implementation HEAD before checkpoint: 9d6a321a73bcd5e68de3871ebd1a12abbc21187e
+Changes: multi-DID reads ISO-TP/DoIP; UDS RequestDownload/Upload
+maxNumberOfBlockLength LFI parser; generalized 1–8 byte ALFI; read-only
+UDS RequestUpload two-acquisition comparison and regression tests;
+J1850 CRC-8 reference + optional wire CRC check; J2534 CAN_29BIT_ID RX
+validation; corrected fourteen-entry protocol catalog self-test.
+Run one COMPLETE Debug CI checkpoint; NO per-commit builds and no Release.
+Do not claim driver/ECU certification or merge PR95 on CI completion.
