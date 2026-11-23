@@ -21,9 +21,10 @@ internal static class ObdOnUdsVehicleIdentification
             throw new InvalidDataException("OBDonUDS F802 VIN must have 17 bytes.");
         foreach (var value in raw)
         {
-            if (!((value is >= (byte)'A' and <= (byte)'Z' &&
-                value is not ((byte)'I' or (byte)'O' or (byte)'Q')) ||
-                value is >= (byte)'0' and <= (byte)'9'))
+            if (!((value >= (byte)'A' && value <= (byte)'Z' &&
+                value != (byte)'I' && value != (byte)'O' &&
+                value != (byte)'Q') ||
+                (value >= (byte)'0' && value <= (byte)'9')))
                 throw new InvalidDataException(
                     "OBDonUDS VIN has invalid ASCII characters.");
         }
