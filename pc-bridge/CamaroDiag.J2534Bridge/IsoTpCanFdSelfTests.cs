@@ -433,6 +433,27 @@ internal static class IsoTpCanFdSelfTests
             "--mode", "receive", "--obd-identify"]),
             "Passive ISO-TP reception cannot perform protocol detection TX.");
 
+        var udsStrictIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand,
+            "--adapter-index", "0", "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--fd", "false",
+            "--payload", "22F190", "--uds-validate", "true"]);
+        Check(udsStrictIsoTp.ValidateUds &&
+            udsStrictIsoTp.Request.SequenceEqual(
+                new byte[] {0x22, 0xF1, 0x90}),
+            "ISO-TP opt-in UDS validation retains arbitrary read and write SID.");
+        var opaqueIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand,
+            "--adapter-index", "0", "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--fd", "false", "--payload", "AABB"]);
+        Check(!opaqueIsoTp.ValidateUds,
+            "ISO-TP arbitrary manufacturer protocol is not forced into UDS.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand,
+            "--adapter-index", "0", "--tx-id", "7E0", "--rx-id", "7E8",
+            "--baud", "500000", "--fd", "false",
+            "--mode", "receive", "--uds-validate", "true"]),
+            "Passive ISO-TP cannot claim an active UDS request/response correlation.");
         var obdIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
