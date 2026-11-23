@@ -98,6 +98,51 @@ internal static class StandardVehicleProtocols
     }
 
     /// <summary>
+    /// SAE J2534 ISO 14230 adapters normally append the K-Line checksum
+    /// themselves. Only when CHECKSUM_DISABLED (0x200) is explicitly set
+    /// must application bytes include the manually computed checksum.
+    /// This method takes a full, codec-verified normative wire frame.
+    /// </summary>
+    internal static byte[] KwpForJ2534(
+        byte[] fullWire, bool checksumDisabled)
+    {
+        ArgumentNullException.ThrowIfNull(fullWire);
+        if (fullWire.Length < 5)
+            throw new ArgumentException("KWP wire PDU is too short.");
+        var sum = 0;
+        for (var i = 0; i < fullWire.Length - 1; i++)
+            sum = (sum + fullWire[i]) & 0xFF;
+        if (sum != fullWire[^1])
+            throw new InvalidDataException("Invalid KWP checksum before adapter hand-off.");
+        return checksumDisabled ? fullWire.ToArray() : fullWire[..^1];
+    }
+
+    /// <summary>
+    /// Parse vendor J2534 KWP RX. In the usual driver-checksum mode, the
+    /// device has already validated and stripped the checksum byte; only
+    /// header/length/addresses can be verified by the application. The
+    /// computed last byte below is NOT claimed to be the received wire CRC.
+    /// </summary>
+    internal static byte[] ParseKwpJ2534(
+        ReadOnlySpan<byte> data, byte expectedTarget, byte expectedSource,
+        bool functional, bool checksumDisabled)
+    {
+        if (!checksumDisabled)
+        {
+            if (data.Length < 4 || data.Length > 259)
+                throw new InvalidDataException("Invalid J2534 KWP body length.");
+            var reconstructed = new byte[data.Length + 1];
+            data.CopyTo(reconstructed);
+            reconstructed[^1] = (byte)(reconstructed.AsSpan(0, data.Length)
+                .ToArray().Sum(x => (int)x) & 0xFF);
+            data = reconstructed;
+        }
+        return functional ?
+            ParseKwpFunctionalFrame(data, expectedTarget, expectedSource) :
+            ParseKwpPhysicalFrame(data, expectedTarget, expectedSource);
+    }
+
+    /// <summary>
     /// ISO 14230-2 KWP2000 functional addressing, with format bits 11,
     /// target/source addresses, optional extended-length byte and additive
     /// checksum. This is wire framing only; no real K-Line init is performed.
