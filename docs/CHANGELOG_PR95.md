@@ -21,3 +21,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Le bloc réellement envoyé reste comparé à la bonne adresse, longueur, zone et séquence d'octets de l'image cible, y compris checksum du paquet E39.
 - Règle transversale inscrite dans `AGENTS.md`, `.github/copilot-instructions.md` et `docs/PROMPT_REPRISE.md`.
 - La qualification sur ECU/adapter réel et la récupération complète ne sont toujours pas démontrées ; C2/C6/C8 ne doivent pas être présentés comme validés matériellement.
+
+## C2 — préparation d'images de restauration hors ligne (23 novembre 2026)
+- Assemblage des régions mémoire à partir de lectures indépendantes dont les octets sont cohérents, uniquement lorsque la cartographie physique fournie couvre exactement les adresses attendues sans trou ni chevauchement.
+- Création de fichiers image par région contenant les octets originaux, le VIN, l'identité du calculateur/firmware, l'adresse absolue, la longueur et l'empreinte SHA-256. Écriture dans un fichier neuf, synchronisation disque et vérification par relecture.
+- Tests ajoutés pour l'intégrité, l'immuabilité, les régions incomplètes, les mauvais plans mémoire, l'altération et la troncature.
+- **Statut : code commité, tests de ce complément non encore exécutés.** L'image d'une région n'est pas une sauvegarde complète ECU : il manque toujours la qualification de la cartographie exhaustive et le pilote de restauration physique vérifié. Les protocoles standard restent hors de ce lot et sont traités séparément sur la même PR.
