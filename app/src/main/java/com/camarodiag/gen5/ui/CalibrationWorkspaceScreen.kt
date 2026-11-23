@@ -65,6 +65,7 @@ import com.camarodiag.gen5.data.obd.J2534BridgePairingCodeFormat
 import com.camarodiag.gen5.data.obd.Lfx2012ControllerReferences
 import com.camarodiag.gen5.data.obd.Lfx2012FlexFuelPreflight
 import com.camarodiag.gen5.data.obd.Lfx2012FuelReadOnly
+import com.camarodiag.gen5.data.obd.Lfx2012FuelSessionHistory
 import com.camarodiag.gen5.data.obd.Lfx2012ProgrammingAudit
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.CamaroDiagConnectorWiringGuide
@@ -91,6 +92,7 @@ data class CalibrationWorkspaceState(
     val isFuelSnapshotReading: Boolean = false,
     val fuelReadOnlySnapshot: Lfx2012FuelReadOnly.Snapshot? = null,
     val fuelHistoryCount: Int = 0,
+    val fuelHistorySummary: Lfx2012FuelSessionHistory.Report? = null,
     val fuelSnapshotError: String = "",
     val gmlanIdentity: GmlanIdentityEvidence? = null,
     val gmlanIdentityFailed: Boolean = false,
@@ -383,6 +385,23 @@ fun CalibrationWorkspaceScreen(
                                 !state.isFuelSnapshotReading
                         ) {
                             Text(stringResource(R.string.flexfuel_lfx2012_read_fuel))
+                        }
+                        val ethanolHistory = state.fuelHistorySummary?.readings
+                            ?.firstOrNull { it.pid == Lfx2012FuelReadOnly.ETHANOL }
+                        if (ethanolHistory != null &&
+                            ethanolHistory.reportedCount > 0 &&
+                            ethanolHistory.minimum != null &&
+                            ethanolHistory.maximum != null
+                        ) {
+                            Text(
+                                stringResource(
+                                    R.string.flexfuel_lfx2012_history_range,
+                                    ethanolHistory.reportedCount,
+                                    ethanolHistory.minimum,
+                                    ethanolHistory.maximum
+                                ),
+                                color = TextMuted, fontSize = 11.sp
+                            )
                         }
                         if (state.fuelHistoryCount > 0) {
                             OutlinedButton(
