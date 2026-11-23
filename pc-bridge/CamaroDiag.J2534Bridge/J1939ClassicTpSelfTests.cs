@@ -253,6 +253,29 @@ internal static class J1939ClassicTpSelfTests
             o.RemoteAddress, o.LocalAddress, 2, Data(7)));
         Reject<InvalidDataException>(() => Receive(badPacket, o),
             "Wrong transport packet number refused.");
+        Check(badPacket.Outgoing.Count == 2 &&
+            badPacket.Outgoing[1].Data[0] == J1939ClassicTpSession.Abort &&
+            badPacket.Outgoing[1].Data[1] == 7,
+            "Bad J1939 sequence sends correlated TP.Conn_Abort reason 7.");
+
+        var timedOut = new FakeCan();
+        timedOut.Incoming.Enqueue(J1939ClassicTpSession.MakeControl(o,
+            J1939ClassicTpSession.Rts, 13, 2, 2, false, false));
+        Reject<TimeoutException>(() => Receive(timedOut, o),
+            "Missing J1939 TP.DT packet is a transport timeout.");
+        Check(timedOut.Outgoing.Count == 2 &&
+            timedOut.Outgoing[0].Data[0] == J1939ClassicTpSession.Cts &&
+            timedOut.Outgoing[1].Data[0] == J1939ClassicTpSession.Abort &&
+            timedOut.Outgoing[1].Data[1] == 3,
+            "CMDT packet timeout sends reason 3 after CTS.");
+
+        var malformedAbort = J1939ClassicTpSession.MakeAbort(o, 7);
+        Check(malformedAbort.Data[0] == 0xFF &&
+            malformedAbort.Data[2] == 0xFF &&
+            malformedAbort.Data[5] == 0x04 &&
+            StandardVehicleProtocols.ParseJ1939Id(
+                malformedAbort.Id).Destination == o.RemoteAddress,
+            "TP.Conn_Abort uses standard PGN and peer destination.");
 
         var badSize = new FakeCan();
         var cm = J1939ClassicTpSession.MakeControl(o,
