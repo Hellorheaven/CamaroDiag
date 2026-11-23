@@ -62,6 +62,39 @@ class CanConsoleEventJournalStoreTest {
         }
     }
 
+    @Test fun truncationBeforeSnapshotIsRejectedAgainstLastFlushedSize() {
+        val directory = Files.createTempDirectory("console-before-snapshot").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            store.append(listOf(event(0), event(1)))
+            val file = requireNotNull(store.snapshot()).file
+            java.io.RandomAccessFile(file, "rw").use { it.setLength(2L) }
+            assertFalse(store.isAvailable())
+            assertNull(store.snapshot())
+            assertTrue(store.hasFailed())
+            assertTrue(runCatching { store.append(listOf(event(2))) }.isFailure)
+            store.reset()
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test fun journalChangedBetweenAppendsFailsWithoutReclassifyingHistoryComplete() {
+        val directory = Files.createTempDirectory("console-before-append").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            store.append(listOf(event(0)))
+            val file = requireNotNull(store.snapshot()).file
+            java.io.RandomAccessFile(file, "rw").use { it.setLength(1L) }
+            assertTrue(runCatching { store.append(listOf(event(1))) }.isFailure)
+            assertTrue(store.hasFailed())
+            assertNull(store.snapshot())
+            store.reset()
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun externalTruncationInvalidatesAnOtherwiseUnchangedSnapshot() {
         val directory = Files.createTempDirectory("console-shortened").toFile()
         try {
