@@ -1,3 +1,13 @@
+# Correctifs C1/C6 après le premier checkpoint C6 du 23/11/2026
+
+- Premier checkpoint [#45274227208](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45274227208), SHA `d2ac70f` : **Windows/J2534 success**, Android compilé mais `:communication:testDebugUnitTest` a échoué **2/574 tests**, sur `EcuWriteConsentFlowTest.operatorAuthorizationIsRecheckedWhenQueuedWriteActuallyStarts` et `CanConsoleRawArchiveWriterTest.failedFlushMakesArchivePermanentlyIncomplete`. **Aucun statut vert global** sur cette campagne.
+- C6 test corrigé : le contrôle de contexte est appelé cinq fois, pas quatre (`ed26b75`).
+- C1 archive CAN : après un `flush` déjà en erreur, `close()` ne retente plus ce `flush` mais libère toujours le writer, en conservant `hasFailed=true` et `isComplete=false` (`85d031d`), test renforcé (`ae5b9b6`).
+- C6 console CAN brute : l'objet de consentement issu des deux écrans de l'UI est désormais passé jusqu'au ViewModel (`8b475e0`). Le ViewModel compare compte, véhicule, génération d'adaptateur et génération console ; la fonction de validation est exécutée par le transport ELM **immédiatement avant l'émission du payload CAN** et non à la simple mise en file (`78e5530`, `20365b5`). Les commandes de configuration du transceiver ne sont pas des preuves d'émission ECU.
+- Règle : aucun protocole ISO/SAE modifié, aucune capacité ECU/VCI simulée. C6 **ouvert** pour qualification physique et récupération. Regrouper la prochaine campagne C6 au nouveau HEAD ; ne pas merger, publier de Release ni annoncer des tests passés avant résultats.
+
+---
+
 # 23/11/2026 — ISO-TP CAN CLASSIQUE : point de reprise de fin de tranche
 
 - Chantier de protocole **exclusivement ISO 15765-2 ISO-TP CAN classique**. Aucun nouveau protocole démarré, aucune autre branche/PR, aucune fusion. PR #95 Draft `chore/unified-ci`, issue #110.
