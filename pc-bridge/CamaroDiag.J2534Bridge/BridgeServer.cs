@@ -443,12 +443,6 @@ internal sealed class BridgeServer
     }
 
     /// <summary>
-    /// Closed schema for the current JSON-lines J2534 protocol. In particular,
-    /// duplicate payloadHex, confirmed, CAN ID or timeout fields are rejected:
-    /// "last key wins" cannot reinterpret an authenticated CAN operation.
-    /// Legacy clients may omit optional open defaults or timeoutMs.
-    /// </summary>
-    /// <summary>
     /// Explicit UI confirmation fields for raw ECU transmissions. This is
     /// operator acknowledgement, NOT a new ECU signing key or manufacturer
     /// SecurityAccess replacement. Require both fields on the same request.
@@ -460,6 +454,11 @@ internal sealed class BridgeServer
         root.TryGetProperty("writeConfirmed", out var confirmation) &&
         confirmation.ValueKind == JsonValueKind.True;
 
+    /// <summary>
+    /// Strict JSON-lines protocol schema: duplicate, missing, unknown or
+    /// mistyped fields are rejected before any native J2534 operation.
+    /// In raw write mode, NO is not a valid transmission request.
+    /// </summary>
     internal static bool HasCanonicalRequestShape(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object ||
@@ -478,6 +477,8 @@ internal sealed class BridgeServer
             _ => []
         };
         if (required.Length == 0) return false;
+        if ((op is "exchangeRaw" or "sendRaw") && !HasExplicitRawWriteConsent(root))
+            return false;
         string[] allowedExtra = op switch
         {
             "open" => ["can29Bit", "protocolNumber"],
