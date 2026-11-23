@@ -220,6 +220,17 @@ internal static class J1939FdCmdtSelfTests
         Check(cli.Cmdt && !cli.Bam && cli.Session == 1 &&
             cli.Window == 2 && cli.Payload.Length == 131,
             "CMDT CLI selects 131-byte directed FD.TP session and CTS window.");
+        var namedFd = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCmdtCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xEF00", "--session", "1", "--window", "2",
+            "--mode", "send", "--payload",
+            Convert.ToHexString(Fill(131)),
+            "--name", "8000000200000001"]);
+        Check(namedFd.Name == 0x8000000200000001UL,
+            "J1939-22 FD.TP accepts a 64-bit local NAME for explicit claim.");
+
         var rxCli = StandardProtocolCli.ParseJ1939Fd([
             StandardProtocolCli.J1939FdCmdtCommand,
             "--adapter-index", "0", "--baud", "500000",
