@@ -2563,6 +2563,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             activeCanCaptureFile == selectedArchive &&
             !_liveCanMonitorState.value.isCapturing &&
             !_liveCanMonitorState.value.isSendingRequest &&
+            !_liveCanMonitorState.value.rawArchiveFailed &&
+            _liveCanMonitorState.value.captureArchiveRequired == snapshot.captureArchiveRequired &&
+            _liveCanMonitorState.value.consoleContextGeneration == snapshot.consoleContextGeneration &&
             _liveCanMonitorState.value.consoleHistory == history &&
             _liveCanMonitorState.value.rawText == snapshot.rawText
         viewModelScope.launch(Dispatchers.IO) {
