@@ -1,3 +1,22 @@
+# Session hors protocoles — reprise C6 / ponts / C2 / C4 (23/11/2026)
+
+**PR unique** : #95 sur `chore/unified-ci`. L'autre chat reste responsable des standards/protocoles ISO/SAE. **C6 reste OUVERT**, en particulier les essais matériels, l'intégrité physique, la sauvegarde/restauration prouvées et la qualification OEM. N'ajouter ni signature/clé de programmation CamaroDiag, ni blocage universel de services d'écriture. Ne pas fusionner.
+
+## C6 — suppression DTC et contexte actuel à l'instant TX
+- Le consentement opérateur a toujours deux écrans (OK puis Oui/Non) ; ajout de `EcuWriteConsentFlow.requireCurrentForTransmit` (commit `51ac6fe`) et tests pour refus après changement de génération d'adaptateur, véhicule ou compte (`cca08b3`).
+- L'effacement standard sur **ELM/USB/BLE/Wi-Fi** repasse désormais une fonction de vérification de contexte sous les mutex de commande, **juste avant émission physique** (`BluetoothObdManager.sendAtCommandInternal`, `c34bf9e`).
+- Même vérification pour le **pont Windows J2534** avant l'appel réseau `clearStandardObdDtcs`, après acquisition du mutex transport (`d99e18b`) ; le ViewModel lie les deux voies à la session opérateur en cours (`fd18159`, `a78a145`).
+- Ces vérifications protègent des confirmations devenues obsolètes lors de commandes en file d'attente ; elles n'attestent pas la programmation ECU, le bench ou un éventuel rollback.
+
+## Réparations de compilation C2/C4
+- Runs antérieurs #45272690164 et #45273390209 : Windows, natif, connecteurs réussis, mais compilation Android en échec sur `EcuRestorePortableBundleTest.kt:136` (ByteArray au lieu d'InputStream) et `CalibrationWorkspaceScreen.kt:400-401` (smart cast multi-module). Correctifs `bfd5dba` et `7144db3`.
+- Les nouveaux commits de cette tranche **ne sont pas encore validés** par CI à la rédaction ; ne pas annoncer build vert sur le HEAD. Une campagne groupée est nécessaire à la fin du lot, sans exécution par commit.
+
+## Linux
+- Pont Linux natif x64/ARM64, GUI, CLI, aide hiérarchique avec exemples et paquets .deb : issue [#115](https://github.com/Hellorheaven/CamaroDiag/issues/115), **future PR après #95**, pas de deuxième branche.
+
+---
+
 # Tranche hors protocoles — connexions et C6, 23/11/2026 (soir)
 
 - **PR #95** sur l'unique branche `chore/unified-ci`. **C6 reste actif**, sans aucun verrou logiciel artificiel d'écriture. Les vrais prérequis ECU/OEM, la sauvegarde physique, le contrôle des blocs et le double consentement restent obligatoires. Aucune programmation/restauration de véhicule démontrée.
