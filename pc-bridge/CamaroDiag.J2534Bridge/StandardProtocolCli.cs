@@ -1021,6 +1021,15 @@ internal static class StandardProtocolCli
                 obdIdentify, interpretJ1979);
     }
 
+    internal static TimeSpan RemainingIsoTpExchangeBudget(
+        TimeSpan limit, TimeSpan elapsed)
+    {
+        var remaining = limit - elapsed;
+        if (remaining <= TimeSpan.Zero)
+            throw new TimeoutException("ISO-TP exchange deadline exceeded.");
+        return remaining;
+    }
+
     internal static async Task<int> RunIsoTpAsync(string[] args)
     {
         try
@@ -1060,9 +1069,8 @@ internal static class StandardProtocolCli
             if (o.Mode == "exchange")
                 await IsoTpCanFdSession.SendAsync(link, o.Settings, o.Request,
                     limit, CancellationToken.None);
-            var remainingBudget = limit - elapsed.Elapsed;
-            if (remainingBudget <= TimeSpan.Zero)
-                throw new TimeoutException("ISO-TP request used the whole exchange deadline.");
+            var remainingBudget = RemainingIsoTpExchangeBudget(
+                limit, elapsed.Elapsed);
             var reply = o.Mode == "exchange" && o.ValidateUds ?
                 await UdsResponseSequence.AwaitFinalAsync(
                     o.Request,
@@ -1071,8 +1079,7 @@ internal static class StandardProtocolCli
                     remainingBudget, CancellationToken.None) :
                 await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
                     remainingBudget, CancellationToken.None);
-            if (elapsed.Elapsed >= limit)
-                throw new TimeoutException("ISO-TP reply exceeded the request/reply deadline.");
+            _ = RemainingIsoTpExchangeBudget(limit, elapsed.Elapsed);
             Console.WriteLine("ISO-TP ECU RX: " + Convert.ToHexString(reply));
             if (o.InterpretJ1979)
             {
