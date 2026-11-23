@@ -482,6 +482,19 @@ internal static class StandardVehicleProtocolsSelfTests
             "--obd-snapshot-record", "0x02", "--payload", "22F190"]),
             "DoIP snapshot record is forbidden without a DTC.");
 
+        var extendedDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-extended-dtc", "0x123456"]);
+        Check(extendedDoIp.Request.SequenceEqual(
+            new byte[] {0x19, 0x06, 0x12, 0x34, 0x56, 0xFE}),
+            "DoIP default extended DTC record FE selects regulated OBD records.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-extended-record", "0x90", "--obd-did", "0xF810"]),
+            "DoIP does not accept extended record selector without a DTC.");
+
         var obdDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
