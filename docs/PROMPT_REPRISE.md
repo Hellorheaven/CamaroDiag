@@ -1,3 +1,11 @@
+# 23/11/2026 — ISO-TP CAN classique : seule famille de protocole active
+
+- PR #95, branche unique `chore/unified-ci`, issue #110. **Ne commencer aucun autre protocole avant de clôturer ISO-TP classique** ; correction transversale des tests C# ne constitue pas un nouveau chantier protocole.
+- Travaux logiciels : FC/OVFLW sur FF >1 MiB, tests limites 7/8 et 4095/4096, FC avec adressage logique, N_Bs/N_Cr indépendants et bornés par le budget global, STmin réservé reçu traité à 127 ms sans publicité locale réservée. Commits d'implémentation : `2371a0c`, `3551e42`, `1aa147e`.
+- **Checkpoint testé : `23bbbe6474f7f82d4c48598c24ab578bc3e5adb4`, run #45268234408. Windows Debug BUILD avec 0 erreur, 0 avertissement ; 1593 autotests logiciel/pont J2534 réussis, dont ISO-TP et deadlines ; natif et connecteurs réussis. Android encore en cours lors de l'enregistrement de cette note ; ne pas annoncer globalement « CI verte » avant résultat.**
+- Ce n'est **pas un protocole terminé physiquement** : qualification J2534/ECU CAN classique, 11/29 bits, N_Bs/N_Cr/STmin sur vrais adaptateurs, erreurs bus-off, lecture/écriture et scénarios d'interruption, attestation de capacité VCI restent exigés. Aucun flash/rollback constructeur physiquement prouvé. Statut ouvert, progrès logiciel indicatif historique 75 %, aucun 100 % inventé.
+- Issue #110 mise à jour par commentaire avec les résultats. Aucun merge/Release, aucune autre PR, aucun test automatique par commit.
+
 ## C2 / C4 — fin de tranche indépendante des protocoles (23/11/2026, soir)
 
 - **C2, toujours incomplet physiquement :** `EcuRestoreCoveragePreview` produit un inventaire exact des plages d'adresses absentes ou non issues de deux lectures déclarées physiques et concordantes ; les captures hors carte sont distinguées. La création du dossier de restauration hors ligne réclame désormais la couverture de la **carte fournie** avant publication. Ceci ne démontre PAS que cette carte est la carte mémoire OEM exhaustive, que l'origine physique a été authentifiée ou que le calculateur est récupérable. Tests dédiés ajoutés.
