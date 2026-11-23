@@ -286,3 +286,16 @@ Les événements TX sont enregistrés au moment de leur émission avec le statut
 - Commits : `05adb73`, `39882bd`, `4e7b766`.
 - **Limitation inchangée :** contrôle d'intégrité du paquet hors ligne uniquement ; aucun flash/rollback matériel ni carte mémoire constructeur attestée.
 - **Validation** : tests ajoutés, résultat CI du HEAD courant non encore confirmé.
+
+## C4 — export d'historique carburant stable (23/11/2026, session parallèle hors protocoles)
+
+- Nouveau `Lfx2012FuelHistoryExportPolicy` : refuse les historiques vides, incohérents, non chronologiques, les séries modifiées et les exports lancés pendant une acquisition physique en cours.
+- Le ViewModel revérifie la série active avant l'écriture et juste avant la publication dans le stockage utilisateur, en complément de la génération de compte, de connexion et de véhicule.
+- Tests unitaires ajoutés : série stable, mesure en cours, ajout d'un nouvel échantillon, changement de session, horodatage non croissant.
+- Commits : `e44d3cb`, `b308cc0`, `4085821`.
+- Aucune activation éthanol, écriture de calibration ni modification du protocole ; toujours aucun essai du LFX physique. Validation CI du nouveau SHA non confirmée.
+
+## C1 — fermeture robuste du journal
+
+- Le magasin intercepte les erreurs de fermeture sans empêcher la remise à zéro du fichier et de la session ; la destruction du ViewModel reste une désactivation définitive.
+- Commit `e27343e`. Tests du correctif non exécutés à la rédaction.
