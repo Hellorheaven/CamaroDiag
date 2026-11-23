@@ -513,7 +513,7 @@ internal static class StandardProtocolCli
     internal sealed record IsoTpOptions(
         int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
         byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs, uint? DataBaud,
-        string Mode);
+        string Mode, bool ValidateUds = false);
 
     internal static IsoTpOptions ParseIsoTp(string[] args)
     {
@@ -558,6 +558,7 @@ internal static class StandardProtocolCli
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
         var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
+        var udsValidate = bool.Parse(Optional(args, "--uds-validate") ?? "false");
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
         var obdDid = Optional(args, "--obd-did");
@@ -571,7 +572,7 @@ internal static class StandardProtocolCli
             (obdIdentify ? 1 : 0);
         if (mode is not ("exchange" or "receive") ||
             (mode == "exchange" && payloadSources != 1) ||
-            (mode == "receive" && payloadSources != 0))
+            (mode == "receive" && (payloadSources != 0 || udsValidate)))
             throw new ArgumentException(
                 "Exchange needs exactly one payload, file, OBD DID or DTC mask; receive mode accepts none.");
         byte[] bytes = mode == "receive" ? Array.Empty<byte>() :
@@ -595,7 +596,8 @@ internal static class StandardProtocolCli
             (!fd && brs))
             throw new ArgumentException("Invalid ISO-TP physical address or J2534 option.");
         return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud,
-            mode);
+            mode, udsValidate || obdDid is not null ||
+                obdDtcMask is not null || obdIdentify);
     }
 
     internal static async Task<int> RunIsoTpAsync(string[] args)
@@ -633,8 +635,14 @@ internal static class StandardProtocolCli
             if (o.Mode == "exchange")
                 await IsoTpCanFdSession.SendAsync(link, o.Settings, o.Request,
                     limit, CancellationToken.None);
-            var reply = await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
-                limit, CancellationToken.None);
+            var reply = o.Mode == "exchange" && o.ValidateUds ?
+                await UdsResponseSequence.AwaitFinalAsync(
+                    o.Request,
+                    (remaining, token) => IsoTpCanFdSession.ReceiveAsync(
+                        link, o.Settings, remaining, token),
+                    limit, CancellationToken.None) :
+                await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
+                    limit, CancellationToken.None);
             Console.WriteLine("ISO-TP ECU RX: " + Convert.ToHexString(reply));
             if (o.Mode == "exchange")
                 PrintObdOnUdsResponse(o.Request, reply);
