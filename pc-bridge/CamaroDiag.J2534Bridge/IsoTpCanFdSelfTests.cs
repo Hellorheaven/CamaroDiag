@@ -106,24 +106,25 @@ internal static class IsoTpCanFdSelfTests
         var addressedMulti = new QueueLink();
         addressedMulti.Replies.Enqueue(RX(false, 0x10, 0x30, 0, 0, 0, 0, 0, 0));
         addressedMulti.Replies.Enqueue(RX(false, 0x10, 0x30, 0, 0, 0, 0, 0, 0));
-        Send(addressedMulti, extendedAddress, Fill(13));
+        addressedMulti.Replies.Enqueue(RX(false, 0x10, 0x30, 0, 0, 0, 0, 0, 0));
+        Send(addressedMulti, extendedAddress, Fill(19));
         Check(addressedMulti.Sent.Count == 4 &&
             addressedMulti.Sent[0].Data[0] == 0xF1 &&
             addressedMulti.Sent[0].Data[1] == 0x10 &&
-            addressedMulti.Sent[0].Data[2] == 13 &&
+            addressedMulti.Sent[0].Data[2] == 19 &&
             addressedMulti.Sent[1].Data[0] == 0xF1 &&
             addressedMulti.Sent[1].Data[1] == 0x21 &&
             addressedMulti.Sent[2].Data[1] == 0x22 &&
             addressedMulti.Sent[3].Data[1] == 0x23,
-            "Extended addressing correctly segments 5 + 6 + 2 bytes.");
+            "Extended addressing correctly segments 5 + 6 + 6 + 2 bytes.");
 
         var addressedReassembly = new QueueLink();
         foreach (var frame in addressedMulti.Sent)
             addressedReassembly.Replies.Enqueue(new(0x7E8, false,
                 new byte[] {0x10}.Concat(frame.Data.AsSpan(1).ToArray()).ToArray()));
         Check(Receive(addressedReassembly, extendedAddress)
-            .SequenceEqual(Fill(13)) &&
-            addressedReassembly.Sent.Count == 2 &&
+            .SequenceEqual(Fill(19)) &&
+            addressedReassembly.Sent.Count == 3 &&
             addressedReassembly.Sent.All(frame =>
                 frame.Data[0] == 0xF1 && frame.Data[1] == 0x30),
             "Extended addressing reassembles CF and emits addressed FC windows.");
