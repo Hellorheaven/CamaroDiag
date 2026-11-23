@@ -10,8 +10,8 @@ internal static class J1939DmDiagnostics
     internal const int Dm1Pgn = 0xFECA;
     internal const int Dm2Pgn = 0xFECB;
 
-    internal sealed record Dtc(int Spn, int Fmi, int OccurrenceCount,
-        bool AlternativeSpnConversion);
+    internal sealed record Dtc(int? Spn, int Fmi, int OccurrenceCount,
+        bool AlternativeSpnConversion, byte[] RawBytes);
 
     internal sealed record Report(int Pgn, byte LampStatus, byte LampFlashStatus,
         IReadOnlyList<Dtc> Codes);
@@ -40,9 +40,14 @@ internal static class J1939DmDiagnostics
             var b3 = payload[offset + 3];
             if (b0 == 0 && b1 == 0 && b2 == 0 && b3 == 0)
                 continue; // Standard zero-code indicator; not an active fault.
-            var spn = b0 | b1 << 8 | (b2 & 0xE0) << 11;
+            var legacyConversion = (b3 & 0x80) != 0;
+            // Conversion method 1 does not use the modern three-byte SPN
+            // bit layout. Expose the original four DTC bytes rather than
+            // reporting a misleading modern SPN.
+            int? spn = legacyConversion ? null :
+                b0 | b1 << 8 | (b2 & 0xE0) << 11;
             codes.Add(new Dtc(spn, b2 & 0x1F, b3 & 0x7F,
-                (b3 & 0x80) != 0));
+                legacyConversion, payload.Slice(offset, 4).ToArray()));
         }
         return new Report(pgn, payload[0], payload[1], codes);
     }
