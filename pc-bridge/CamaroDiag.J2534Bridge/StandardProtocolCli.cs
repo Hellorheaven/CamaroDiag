@@ -119,6 +119,8 @@ internal static class StandardProtocolCli
             CultureInfo.InvariantCulture);
         var stMin = byte.Parse(Optional(args, "--stmin") ?? "0",
             CultureInfo.InvariantCulture);
+        var maxWaitFrames = int.Parse(Optional(args, "--wftmax") ?? "4",
+            CultureInfo.InvariantCulture);
         var extended = bool.Parse(Optional(args, "--extended") ?? "false");
         // --extended selects 29-bit CAN IDs. These separate options select
         // ISO 15765-2 extended addressing with a one-byte address prefix.
@@ -142,7 +144,8 @@ internal static class StandardProtocolCli
         byte[] bytes = mode == "receive" ? Array.Empty<byte>() : payloadFile is null ?
             Convert.FromHexString(hexPayload!) : File.ReadAllBytes(payloadFile);
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
-            bs, stMin, TxAddress: txAddress, RxAddress: rxAddress);
+            bs, stMin, TxAddress: txAddress, RxAddress: rxAddress,
+            MaxWaitFrames: maxWaitFrames);
         setting.Validate();
         if (index < 0 || bitrate == 0 || timeout is < 100 or > 30000 ||
             (mode == "exchange" && bytes.Length is < 1 or > IsoTpCanFdSession.MaximumPayloadBytes) ||
