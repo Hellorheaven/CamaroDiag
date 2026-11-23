@@ -80,6 +80,7 @@
     <string name="common_refresh">Refresh</string>
     <string name="adapter_none_detected">No adapter detected. Pair OBDLink MX+, MX, LX and other Classic Bluetooth adapters; CX is discovered nearby over BLE.</string>
     <string name="common_connect">Connect</string>
+    <string name="adapter_j2534_bridge_connected">Windows J2534 bridge paired (PC connection)</string>
     <string name="adapter_disconnect_label">Disconnect adapter</string>
     <string name="usb_connection_title">USB connection (OBDLink EX / SX, ELM327 and serial adapters)</string>
     <string name="usb_devices_detected">Detected USB devices</string>
