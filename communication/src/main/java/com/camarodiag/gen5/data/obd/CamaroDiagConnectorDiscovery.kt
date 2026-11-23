@@ -42,16 +42,22 @@ object CamaroDiagConnectorDiscovery {
     fun isLegacyKklUsbLabel(label: String): Boolean =
         Regex("(?i)(?<![a-z0-9])(?:KKL|K[- ]?LINE)(?![a-z0-9])").containsMatchIn(label)
 
+    /** Android's actual USB device ID is the final enumeration suffix,
+     * never the first '#' in an arbitrary product name. */
+    fun deviceIdFromLabel(label: String): Int? {
+        val suffix = Regex("(?:\\(#([0-9]+)\\)| #([0-9]+))$").find(label.trim())
+            ?: return null
+        return suffix.groupValues[1].ifEmpty { suffix.groupValues[2] }.toIntOrNull()
+    }
+
     fun requiresLegacyKklIsolation(deviceId: Int, deviceLabels: List<String>): Boolean =
         deviceLabels.any { label ->
-            isLegacyKklUsbLabel(label) &&
-                Regex("#(\\d+)").find(label)?.groupValues?.get(1)?.toIntOrNull() == deviceId
+            isLegacyKklUsbLabel(label) && deviceIdFromLabel(label) == deviceId
         }
 
     fun requiresDedicatedUsbDiscovery(deviceId: Int, deviceLabels: List<String>): Boolean =
         deviceLabels.any { label ->
-            isConnectorUsbLabel(label) &&
-                Regex("#(\\d+)").find(label)?.groupValues?.get(1)?.toIntOrNull() == deviceId
+            isConnectorUsbLabel(label) && deviceIdFromLabel(label) == deviceId
         }
 
     /** USB routing gate: a product-name match is necessary for discovery,
