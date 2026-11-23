@@ -61,6 +61,22 @@ object EcuRestoreImage {
                 "Overlapping ECU memory regions"
             }
         }
+        // A restore package must not silently discard captures that belong to
+        // another address/region. Every source byte needs an explicit mapping.
+        val capturedKeys = archive.captures.map { it.region to it.startAddress }
+        require(capturedKeys.distinct().size == capturedKeys.size) {
+            "Duplicate physical ECU capture address"
+        }
+        require(archive.captures.all { capture ->
+            sortedGeometry.any { geometry ->
+                capture.region == geometry.region &&
+                    capture.startAddress >= geometry.startAddress &&
+                    capture.expectedBytes > 0L &&
+                    capture.startAddress <= Long.MAX_VALUE - capture.expectedBytes &&
+                    capture.startAddress + capture.expectedBytes <=
+                        geometry.startAddress + geometry.length
+            }
+        }) { "A captured ECU memory segment has no matching restore image region" }
         return sortedGeometry.map { geometry ->
             require(geometry.length <= Int.MAX_VALUE.toLong()) {
                 "Region image exceeds the in-memory assembler capacity"
@@ -69,6 +85,11 @@ object EcuRestoreImage {
                 .filter { it.region == geometry.region }
                 .sortedBy { it.startAddress }
             require(relevant.isNotEmpty()) { "No ECU capture for requested memory region" }
+            // Archive entries are bounded to 64 MiB; reject an oversized supplied map
+            // before attempting an allocation or copying any captured bytes.
+            require(geometry.length <= 64L * 1024 * 1024) {
+                "ECU image region exceeds the supported archive segment budget"
+            }
             val result = ByteArray(geometry.length.toInt())
             var position = geometry.startAddress
             relevant.forEach { capture ->
