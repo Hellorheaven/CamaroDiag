@@ -26,10 +26,14 @@ internal sealed class IsoTpJ2534RawCanLink : IsoTpCanFdSession.ICanLink
         J2534StandardChannel.Frame? Receive(int timeoutMs);
     }
 
-    private sealed class VendorChannel(J2534StandardChannel device) : IRawChannel
+    private sealed class VendorChannel : IRawChannel
     {
-        private readonly J2534StandardChannel device =
-            device ?? throw new ArgumentNullException(nameof(device));
+        private readonly J2534StandardChannel device;
+
+        internal VendorChannel(J2534StandardChannel channel)
+        {
+            device = channel ?? throw new ArgumentNullException(nameof(channel));
+        }
         public uint ProtocolId => device.ProtocolId;
         public void Transmit(byte[] data, uint flags) => device.Transmit(data, flags);
         public J2534StandardChannel.Frame? Receive(int timeoutMs) =>
