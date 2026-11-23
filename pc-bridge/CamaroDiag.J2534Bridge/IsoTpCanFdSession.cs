@@ -139,10 +139,10 @@ internal static class IsoTpCanFdSession
             if (!extended && data.Length > 8)
                 throw new InvalidDataException("CAN FD SF must use escaped size on CAN_DL > 8.");
             var header = extended ? 2 : 1;
-            var length = extended ? data[1] : data[0] & 0x0F;
-            if (length == 0 || length > data.Length - header)
+            var singleLength = extended ? data[1] : data[0] & 0x0F;
+            if (singleLength == 0 || singleLength > data.Length - header)
                 throw new InvalidDataException("ISO-TP single-frame size mismatch.");
-            return data.AsSpan(header, length).ToArray();
+            return data.AsSpan(header, singleLength).ToArray();
         }
 
         if (kind != 0x10 || data.Length < 3)
