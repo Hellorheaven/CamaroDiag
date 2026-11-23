@@ -26,6 +26,7 @@ import com.camarodiag.gen5.data.obd.EcuBackupCoverage
 import com.camarodiag.gen5.data.obd.EcuBackupManifest
 import com.camarodiag.gen5.data.obd.Lfx2012FuelReadOnly
 import com.camarodiag.gen5.data.obd.Lfx2012FuelSessionHistory
+import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryWindow
 import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryCsv
 import com.camarodiag.gen5.data.obd.EcuExternalDumpPair
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
@@ -873,15 +874,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var calibrationIdentityGeneration = 0L
     private var gmlanIdentityGeneration = 0L
     private var fuelSnapshotGeneration = 0L
-    private val fuelHistoryLock = Any()
-    private val fuelHistory = mutableListOf<Lfx2012FuelSessionHistory.Sample>()
+    private val fuelHistory = Lfx2012FuelHistoryWindow()
 
 
     private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
         fuelSnapshotGeneration++
-        synchronized(fuelHistoryLock) { fuelHistory.clear() }
+        fuelHistory.clear()
         val newCanContext = ++canConsoleContextGeneration
         val interruptedCapture = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
         discardCanMonitor(deleteArchive = !preserveCanConsole)
@@ -1627,25 +1627,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (current()) {
                     val validVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
                         .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
-                    val historySummary = synchronized(fuelHistoryLock) {
-                        if (validVin != null) {
-                            val identity = Lfx2012FuelSessionHistory.SessionIdentity(
+                    val historySummary = if (validVin != null) {
+                        fuelHistory.append(
+                            Lfx2012FuelSessionHistory.SessionIdentity(
                                 validVin, "account-$account-connection-$connection",
                                 captured.source
-                            )
-                            if (fuelHistory.isNotEmpty() &&
-                                (fuelHistory.last().identity != identity ||
-                                    fuelHistory.last().snapshot.observedAtUtcMillis >=
-                                    captured.observedAtUtcMillis)
-                            ) fuelHistory.clear()
-                            if (fuelHistory.size >= Lfx2012FuelSessionHistory.MAX_SNAPSHOTS) {
-                                fuelHistory.removeAt(0)
-                            }
-                            fuelHistory += Lfx2012FuelSessionHistory.Sample(identity, captured)
-                        }
-                        if (fuelHistory.isEmpty()) null
-                        else Lfx2012FuelSessionHistory.summarize(fuelHistory.toList())
-                    }
+                            ), captured
+                        )
+                    } else null
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         isFuelSnapshotReading = false,
                         fuelReadOnlySnapshot = captured,
@@ -1686,7 +1675,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val account = accountSessionGeneration
         val connection = connectionAttemptGeneration
         val generation = fuelSnapshotGeneration
-        val observed = synchronized(fuelHistoryLock) { fuelHistory.toList() }
+        val observed = fuelHistory.copySamples()
         fun current() = isCurrentAccountGeneration(account) &&
             connectionAttemptGeneration == connection &&
             fuelSnapshotGeneration == generation &&
