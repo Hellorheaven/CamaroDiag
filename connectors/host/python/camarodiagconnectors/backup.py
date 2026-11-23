@@ -136,8 +136,15 @@ def write_bundle(prefix: Path, image: bytes, manifest: Manifest) -> None:
             out.flush()
             os.fsync(out.fileno())
         with _open_regular_nofollow(binary) as reread:
-            if reread.read(len(image) + 1) != image:
-                raise ValueError("Backup image readback differs from its source")
+            # Stream independent disk readback in bounded chunks: large ECU
+            # images must not need a second full-size in-memory byte array.
+            source = memoryview(image)
+            for start in range(0, len(source), 1024 * 1024):
+                expected = source[start:start + 1024 * 1024]
+                if reread.read(len(expected)) != expected:
+                    raise ValueError("Backup image readback differs from its source")
+            if reread.read(1):
+                raise ValueError("Backup image readback has unexpected trailing bytes")
         # Persist the .bin filename before making a manifest visible.
         _sync_parent_directory(binary.parent)
         with metadata.open("xb") as out:
