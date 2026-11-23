@@ -17,3 +17,11 @@ J2534 dynamic transports, K-Line 5-baud/fast init, UDS standard services,
 post-write inspection and hardware-free regression tests are committed.
 No per-commit CI; do not build Release, merge or activate unqualified ECU flash.
 Verify Android, Windows, kernel, connectors and backend at this exact commit.
+
+
+23/11/2026 — grouped standard protocols read/write checkpoint (issue #110).
+New J1939-21 BAM/RTS/CTS/TP.DT/EOM_ACK, ISO-TP CAN-FD SF/FF/CF/FC,
+J2534 raw CAN-FD adapter, SET_CONFIG FD data phase rate, CLI dispatch,
+negative regression tests and updated docs. One full Debug checkpoint only
+after coherent protocol chantier. C2 parallel changes require separate
+assessment; do not merge PR #95 and never claim real vehicle proof.
