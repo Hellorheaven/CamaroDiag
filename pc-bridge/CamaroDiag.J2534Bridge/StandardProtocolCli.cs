@@ -21,7 +21,11 @@ internal static class StandardProtocolCli
     {
         try
         {
-            var host = Required(args, "--host");
+            var host = Optional(args, "--host");
+            var broadcastIp = Optional(args, "--broadcast-ip");
+            if ((host is null) == (broadcastIp is null))
+                throw new ArgumentException(
+                    "Supply exactly one of --host or --broadcast-ip.");
             var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
                 CultureInfo.InvariantCulture);
             var requestedVin = Optional(args, "--vin");
@@ -29,17 +33,28 @@ internal static class StandardProtocolCli
             if (requestedVin is not null && eidHex is not null)
                 throw new ArgumentException("Choose VIN or EID, not both.");
             var eid = eidHex is null ? null : Convert.FromHexString(eidHex);
-            var identity = await DoIpVehicleDiscovery.DiscoverAsync(
-                host, TimeSpan.FromMilliseconds(timeoutMs), CancellationToken.None,
-                vin: requestedVin, eid: eid);
-            Console.WriteLine($"DoIP gateway={identity.Source} " +
-                $"VIN={identity.Vin} logical=0x{identity.LogicalAddress:X4} " +
-                $"EID={Convert.ToHexString(identity.Eid)} " +
-                $"GID={Convert.ToHexString(identity.Gid)} " +
-                $"further=0x{identity.FurtherAction:X2} " +
-                $"sync={(identity.VinGidStatus.HasValue ?
-                    $"0x{identity.VinGidStatus.Value:X2}" : "unspecified")}");
-            Console.WriteLine("Discovery is not ECU authentication or programming qualification.");
+            var timeout = TimeSpan.FromMilliseconds(timeoutMs);
+            IReadOnlyList<DoIpVehicleDiscovery.Identity> identities;
+            if (broadcastIp is not null)
+                identities = await DoIpVehicleDiscovery.DiscoverBroadcastAsync(
+                    broadcastIp, timeout, CancellationToken.None,
+                    vin: requestedVin, eid: eid);
+            else
+                identities = [await DoIpVehicleDiscovery.DiscoverAsync(
+                    host!, timeout, CancellationToken.None,
+                    vin: requestedVin, eid: eid)];
+            if (identities.Count == 0)
+                throw new TimeoutException("No DoIP gateway identity received.");
+            foreach (var identity in identities)
+                Console.WriteLine($"DoIP gateway={identity.Source} " +
+                    $"VIN={identity.Vin ?? "unavailable"} " +
+                    $"logical=0x{identity.LogicalAddress:X4} " +
+                    $"EID={Convert.ToHexString(identity.Eid)} " +
+                    $"GID={Convert.ToHexString(identity.Gid)} " +
+                    $"further=0x{identity.FurtherAction:X2} " +
+                    $"sync={(identity.VinGidStatus.HasValue ?
+                        $"0x{identity.VinGidStatus.Value:X2}" : "unspecified")}");
+            Console.WriteLine("UDP identities are not ECU authentication or programming qualification.");
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or
