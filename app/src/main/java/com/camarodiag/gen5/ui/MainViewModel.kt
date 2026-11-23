@@ -25,6 +25,8 @@ import com.camarodiag.gen5.data.obd.EcuBackupArchive
 import com.camarodiag.gen5.data.obd.EcuBackupCoverage
 import com.camarodiag.gen5.data.obd.EcuBackupManifest
 import com.camarodiag.gen5.data.obd.Lfx2012FuelReadOnly
+import com.camarodiag.gen5.data.obd.Lfx2012FuelSessionHistory
+import com.camarodiag.gen5.data.obd.Lfx2012FuelHistoryCsv
 import com.camarodiag.gen5.data.obd.EcuExternalDumpPair
 import com.camarodiag.gen5.data.obd.EcuBenchExpertPlan
 import com.camarodiag.gen5.data.obd.EcuPartialWritePlanner
@@ -871,11 +873,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var calibrationIdentityGeneration = 0L
     private var gmlanIdentityGeneration = 0L
     private var fuelSnapshotGeneration = 0L
+    private val fuelHistoryLock = Any()
+    private val fuelHistory = mutableListOf<Lfx2012FuelSessionHistory.Sample>()
+
 
     private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
         calibrationIdentityGeneration++
         gmlanIdentityGeneration++
         fuelSnapshotGeneration++
+        synchronized(fuelHistoryLock) { fuelHistory.clear() }
         val newCanContext = ++canConsoleContextGeneration
         val interruptedCapture = canMonitorJob != null || _liveCanMonitorState.value.isCapturing
         discardCanMonitor(deleteArchive = !preserveCanConsole)
@@ -910,6 +916,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isGmlanReading = false,
             isFuelSnapshotReading = false,
             fuelReadOnlySnapshot = null,
+            fuelHistoryCount = 0,
             fuelSnapshotError = "",
             gmlanIdentity = null,
             gmlanIdentityFailed = false,
@@ -1616,12 +1623,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val captured = Lfx2012FuelReadOnly.inspect(
                     survey, raw, System.currentTimeMillis()
                 )
-                if (current()) _calibrationWorkspace.value =
-                    _calibrationWorkspace.value.copy(
+                if (current()) {
+                    val validVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
+                        .takeIf { it.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) }
+                    val historySize = synchronized(fuelHistoryLock) {
+                        if (validVin != null) {
+                            val identity = Lfx2012FuelSessionHistory.SessionIdentity(
+                                validVin, "account-$account-connection-$connection",
+                                captured.source
+                            )
+                            if (fuelHistory.isNotEmpty() &&
+                                (fuelHistory.last().identity != identity ||
+                                    fuelHistory.last().snapshot.observedAtUtcMillis >=
+                                    captured.observedAtUtcMillis)
+                            ) fuelHistory.clear()
+                            if (fuelHistory.size >= Lfx2012FuelSessionHistory.MAX_SNAPSHOTS) {
+                                fuelHistory.removeAt(0)
+                            }
+                            fuelHistory += Lfx2012FuelSessionHistory.Sample(identity, captured)
+                        }
+                        fuelHistory.size
+                    }
+                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         isFuelSnapshotReading = false,
                         fuelReadOnlySnapshot = captured,
+                        fuelHistoryCount = historySize,
                         fuelSnapshotError = ""
                     )
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -1640,6 +1669,57 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isFuelSnapshotReading = false
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Export only readings captured in the active vehicle/connection context.
+     * This uses the same private export store as ECU identity reports.
+     */
+    fun exportLfx2012FuelHistory(fileName: String) {
+        if (!requirePremiumLicense()) return
+        val vehicle = _vehicle.value
+        val account = accountSessionGeneration
+        val connection = connectionAttemptGeneration
+        val generation = fuelSnapshotGeneration
+        val observed = synchronized(fuelHistoryLock) { fuelHistory.toList() }
+        fun current() = isCurrentAccountGeneration(account) &&
+            connectionAttemptGeneration == connection &&
+            fuelSnapshotGeneration == generation &&
+            _vehicle.value == vehicle && hasPremiumLicense()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (!current()) return@launch
+                check(observed.isNotEmpty()) { "No fuel observations to export" }
+                val expectedVin = vehicle.vin.trim().uppercase(java.util.Locale.ROOT)
+                check(observed.all {
+                    it.identity.vin == expectedVin &&
+                        it.identity.sessionId == "account-$account-connection-$connection"
+                }) { "Fuel history session no longer matches the selected vehicle" }
+                val path = CamaroDiagExportStorage.write(
+                    getApplication<Application>(), fileName, "text/csv",
+                    category = CamaroDiagExportStorage.Category.REPORTS,
+                    beforePublish = { check(current()) }
+                ) { stream ->
+                    java.io.OutputStreamWriter(stream, Charsets.UTF_8).apply {
+                        Lfx2012FuelHistoryCsv.export(observed, this)
+                        flush()
+                    }
+                }
+                if (current()) _calibrationWorkspace.value =
+                    _calibrationWorkspace.value.copy(
+                        message = getApplication<Application>()
+                            .getString(R.string.flexfuel_lfx2012_history_saved) + "\n" + path
+                    )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current()) _calibrationWorkspace.value =
+                    _calibrationWorkspace.value.copy(
+                        message = getApplication<Application>()
+                            .getString(R.string.flexfuel_lfx2012_history_failed)
+                    )
             }
         }
     }
