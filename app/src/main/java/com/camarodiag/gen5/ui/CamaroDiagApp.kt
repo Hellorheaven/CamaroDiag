@@ -637,7 +637,7 @@ fun CamaroDiagApp(
                     onConnectUsb = { viewModel.connectUsb(it) },
                     onDiscoverConnector = { viewModel.discoverCamaroDiagConnector(it) },
                     onDiscoverBinaryConnector = { viewModel.discoverCamaroDiagConnector(it, binary = true) },
-                    onCaptureConnectorCheckpoint = { label -> withExportFolder { viewModel.captureConnectorCheckpoint(label) } },
+                    // Physical CDJ/USB checkpoint capture is not implemented (C5): never enable it as a working export.
                     onConnectWifi = { host, port -> viewModel.connectWifi(host, port) }
                 )
                 DiagTab.MODULES -> ModulesScreen(modules)
@@ -1143,7 +1143,7 @@ fun AdapterScreen(
                                 Text(stringResource(R.string.adapter_connect_label, label))
                             }
                         }
-                        if (!kklOnly && onDiscoverConnector != null) {
+                        if (!kklOnly && label.contains("CamaroDiagConnectors", ignoreCase = true) && onDiscoverConnector != null) {
                             OutlinedButton(onClick = { onDiscoverConnector(label) }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Column {
@@ -1153,7 +1153,7 @@ fun AdapterScreen(
                                 }
                             }
                         }
-                        if (!kklOnly && onDiscoverBinaryConnector != null) {
+                        if (!kklOnly && label.contains("CamaroDiagConnectors", ignoreCase = true) && onDiscoverBinaryConnector != null) {
                             OutlinedButton(onClick = { onDiscoverBinaryConnector(label) }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Column {
@@ -1163,7 +1163,7 @@ fun AdapterScreen(
                                 }
                             }
                         }
-                        if (!kklOnly && onCaptureConnectorCheckpoint != null) {
+                        if (!kklOnly && label.contains("CamaroDiagConnectors", ignoreCase = true) && onCaptureConnectorCheckpoint != null) {
                             OutlinedButton(onClick = { pendingCheckpoint = label }, enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Column {
