@@ -503,6 +503,7 @@
     <string name="msg_native_catalog_load_failed">Native Camaro signal catalogue could not be loaded.</string>
     <string name="msg_obdb_catalog_load_failed">OBDb Camaro catalog could not be loaded.</string>
     <string name="msg_obdb_signal_read_failed">OBDb signal read failed.</string>
+    <string name="msg_j2534_bridge_invalid_form">Check the PC bridge LAN IPv4 address, TCP port, TLS pairing code and selected CAN IDs/profile. The current adapter was not disconnected.</string>
     <string name="msg_j2534_bridge_connect_failed">Unable to connect to the J2534 bridge.</string>
     <string name="live_pid_fuel_system_status">Fuel system status</string>
     <string name="live_pid_ltft">Long-term fuel trim B1</string>
