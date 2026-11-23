@@ -185,9 +185,12 @@ internal static class IsoTpCanFdSession
             throw new InvalidDataException("Invalid ISO-TP first frame header.");
         var lengthLong = extendedSize ?
             BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(addressWidth + 2, 4)) : (uint)size12;
-        if (lengthLong <= (settings.TxFrameLength == 8 ?
+        // RX_DL is defined by the peer's FirstFrame CAN_DL, not the
+        // length we use for our own outgoing CAN/FC frames.
+        var rxDl = data.Length;
+        if (lengthLong <= (rxDl == 8 ?
                 (uint)(7 - addressWidth) :
-                (uint)(settings.TxFrameLength - 2 - addressWidth)) ||
+                (uint)(rxDl - 2 - addressWidth)) ||
             lengthLong > MaximumPayloadBytes ||
             (extendedSize && lengthLong <= 4095))
             throw new InvalidDataException("ISO-TP first frame has invalid declared size.");
@@ -212,7 +215,7 @@ internal static class IsoTpCanFdSession
             var take = Math.Min(length - collected, cf.Length - 1 - addressWidth);
             // Nonterminal frames must carry a full CAN payload. An early
             // short frame would introduce a gap, not a valid next offset.
-            if (take < length - collected && cf.Length != settings.TxFrameLength)
+            if (take < length - collected && cf.Length != rxDl)
                 throw new InvalidDataException("Truncated nonterminal ISO-TP CF.");
             cf.AsSpan(1 + addressWidth, take).CopyTo(output.AsSpan(collected));
             collected += take;
