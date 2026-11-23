@@ -346,3 +346,8 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 - DoIP : version 2/3 sélectionnable, plafond de message en mémoire 1 Mio, source de demande et capture binaires sans écrasement, DoIP generic NACK, TLS mutuel optionnel via certificat installé sur Windows. Tests codec/CLI et fichiers temporaires ajoutés.
 - Catalogue des protocoles : capacité de transport logiciel distincte des écritures ECU physiquement qualifiées.
 - **Campagne Windows Debug, auto-tests intégrés et qualification matérielle toujours à lancer une seule fois à la fin du chantier.** Aucun succès supposé.
+
+### Classification des erreurs USB pour l'interface
+
+- `AdapterConnectionFailurePolicy` conserve le statut particulier de la demande de permission Android, sans traiter une permission refusée ni une connexion interrompue comme une permission « en attente ». Le ViewModel utilise cette classification ; tests dédiés ajoutés.
+- Commits `ad4b4ff`, `7252371`, `8fef38e`. Aucun contact ECU supplémentaire ni changement de protocole.
