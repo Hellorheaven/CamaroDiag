@@ -1,5 +1,5 @@
-C2 ECU backup code frozen for one targeted validation.
-Development HEAD: 35c3014f25a0e5fbf5ab9a65ebdc65af4b9aed28
-Android: :communication:testDebugUnitTest :app:testDebugUnitTest (warnings fail)
-Windows: J2534 bridge Debug -warnaserror + --self-test
-No vehicle/ECU hardware qualification is implied.
+C2 ECU backup corrective validation after the first grouped compile diagnostics.
+Corrected development HEAD: d1da9c10c7b6788999fa0acefdab30fdb8ebd3ef
+First run #45114532519: Windows missing braces/status punctuation; Android JUnit import and cross-module visibility. Corrections grouped before this validation.
+Targets: Android communication and app Debug unit suites; Windows J2534 Debug -warnaserror and --self-test.
+No hardware ECU qualification or release build is implied.
