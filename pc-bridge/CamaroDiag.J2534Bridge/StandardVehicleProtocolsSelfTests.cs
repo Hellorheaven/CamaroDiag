@@ -287,6 +287,19 @@ internal static class StandardVehicleProtocolsSelfTests
             "--payload", "2EF19001"]);
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
+        var protocolDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-identify"]);
+        Check(protocolDoIp.Request.SequenceEqual(
+            new byte[] {0x22, 0xF8, 0x10}),
+            "DoIP OBDonUDS discovery selects F810 without arbitrary payload.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-identify", "--payload", "22F810"]),
+            "Protocol identification cannot be combined with raw DoIP payload.");
+
         var obdDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
