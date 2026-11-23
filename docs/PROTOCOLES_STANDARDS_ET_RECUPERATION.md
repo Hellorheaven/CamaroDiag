@@ -334,3 +334,13 @@ CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-i
 Le décodage du flux applicatif `--isotp-exchange --j1979-decode true` inclut désormais les PID classiques **05** (température), **06/07/08/09** (corrections carburant par banque), **0C** (régime), **0D** (vitesse), **10** (débit d'air), **11** (papillon) et **52** (pourcentage éthanol) en modes 01/02 lorsque la longueur et l'identifiant de la réponse correspondent à la requête. Les formules connues sont appliquées ; aucune lecture physique, présence de capteur, adaptation E85 ni capacité d'écriture n'est déduite de l'existence du décodeur. Les PID sans formule implémentée sont toujours affichés **bruts**. Les réponses absentes, tronquées ou incohérentes ne reçoivent aucune valeur par défaut.
 
 Des tests offline positifs/négatifs ont été **écrits, non exécutés** sur ce nouveau lot. Le reste des valeurs SAE J1979DA par édition et profil reste à développer, ainsi que leur validation sur calculateur réel.
+
+### Découverte fonctionnelle J1979 sur CAN 11 bits
+
+Une deuxième commande peut envoyer **une seule** requête SAE J1979 Mode 01 PID 00 sur l'ID fonctionnel CAN `0x7DF`, puis collecter les réponses standard `0x7E8..0x7EF` pendant une fenêtre bornée. Les doublons et les trames étrangères ne deviennent pas de nouveaux ECU ; seules les réponses single-frame ISO-TP avec le PID 00 et les 4 octets de bitmap sont retenues. Elle ne déclare pas que tous les autres PID sont disponibles et n'identifie pas le VIN.
+
+```text
+CamaroDiag.J2534Bridge.exe --j1979-discover-can --adapter-index 0 --baud 500000 --timeout-ms 2500
+```
+
+La commande s'appuie sur le pilote fournisseur SAE J2534 et sur CAN brut classique, pas CAN-FD et pas sur une simulation ; elle n'a cependant **pas été qualifiée sur adaptateur ni véhicule**. Les preuves tests sont pour le moment uniquement des vecteurs offline écrits, non exécutés. Pour lire les pages suivantes d'un ECU ayant répondu, utiliser ensuite la commande `--j1979-pids` avec une paire TX/RX physique explicitement vérifiée.
