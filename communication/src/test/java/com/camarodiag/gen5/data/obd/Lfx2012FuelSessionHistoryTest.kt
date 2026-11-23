@@ -40,6 +40,8 @@ class Lfx2012FuelSessionHistoryTest {
         assertEquals(1, ethanol.noResponseCount)
         assertEquals(0.0, ethanol.firstReported!!, 0.0)
         assertTrue(ethanol.lastReported!! > 0.0)
+        assertEquals(300L, ethanol.lastReportedAtUtcMillis)
+        assertEquals(ethanol.lastReported, ethanol.currentSnapshotPercent)
         assertEquals(0.0, ethanol.minimum!!, 0.0)
         assertEquals(0L, report.startedAtUtcMillis - 100L)
         assertFalse(report.sensorOrFlexFuelCalibrationVerified)
@@ -56,7 +58,24 @@ class Lfx2012FuelSessionHistoryTest {
         assertNull(trim.delta)
         val ethanol = report.readings.first { it.pid == Lfx2012FuelReadOnly.ETHANOL }
         assertEquals(1, ethanol.reportedCount)
+        assertEquals(2L, ethanol.lastReportedAtUtcMillis)
+        assertEquals(ethanol.lastReported, ethanol.currentSnapshotPercent)
         assertNull(ethanol.delta)
+    }
+
+    @Test fun previousFuelObservationIsNotReportedAsCurrentAfterLostPidReply() {
+        val report = Lfx2012FuelSessionHistory.summarize(
+            listOf(sample(100L, 128), sample(200L, null), sample(300L, null))
+        )
+        val ethanol = report.readings.first { it.pid == Lfx2012FuelReadOnly.ETHANOL }
+        assertEquals(1, ethanol.reportedCount)
+        assertEquals(2, ethanol.noResponseCount)
+        assertEquals(100L, ethanol.lastReportedAtUtcMillis)
+        assertTrue(ethanol.lastReported != null)
+        assertNull(ethanol.currentSnapshotPercent)
+        val trim = report.readings.first { it.pid == Lfx2012FuelReadOnly.STFT_BANK_1 }
+        assertEquals(300L, trim.lastReportedAtUtcMillis)
+        assertTrue(trim.currentSnapshotPercent != null)
     }
 
     @Test fun aHistoryCannotMixSessionsOrOutOfOrderSnapshots() {
