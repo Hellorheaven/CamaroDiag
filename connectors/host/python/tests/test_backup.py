@@ -67,6 +67,14 @@ class BackupTests(unittest.TestCase):
             self.assertGreaterEqual(sync.call_count, 2)
             self.assertEqual(verify_bundle(prefix), manifest)
 
+    def test_large_backup_readback_is_chunked(self):
+        data = b"ECU" * 900_000  # crosses two 1 MiB readback boundaries
+        manifest = backup_manifest("offline-chip", len(data), 0, data)
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory) / "large"
+            write_bundle(prefix, data, manifest)
+            self.assertEqual(verify_bundle(prefix), manifest)
+
     def test_file_sync_failure_leaves_no_authoritative_bundle(self):
         data = b"original-image"
         manifest = backup_manifest("offline-chip", len(data), 0, data)
