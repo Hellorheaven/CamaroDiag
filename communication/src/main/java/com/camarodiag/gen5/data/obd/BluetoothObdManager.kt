@@ -601,7 +601,10 @@ class BluetoothObdManager(context: Context) {
     fun isJ2534StandardObdClearAvailable(): Boolean =
         isJ2534StandardObdAvailable() && j2534BridgeTransport?.isStandardObdClearEnabled == true
 
-    suspend fun clearJ2534StandardDtcs(approval: EcuWriteConsentFlow.Approval) {
+    suspend fun clearJ2534StandardDtcs(
+        approval: EcuWriteConsentFlow.Approval,
+        beforeTransmit: () -> Unit = {}
+    ) {
         require(approval.warningAcknowledged && approval.confirmedYes) {
             "Risk notice OK and separate YES are required before clearing ECU DTCs."
         }
@@ -610,7 +613,7 @@ class BluetoothObdManager(context: Context) {
         commandSessionMutex.withLock {
             transportSessionEpoch.requireQueuedCurrent(epoch)
             check(isJ2534StandardObdClearAvailable())
-            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs(approval)
+            checkNotNull(j2534BridgeTransport).clearStandardObdDtcs(approval, beforeTransmit)
             transportSessionEpoch.requireQueuedCurrent(epoch)
         }
     }
@@ -861,7 +864,11 @@ class BluetoothObdManager(context: Context) {
         }
     }
 
-    suspend fun sendAtCommand(command: String, timeoutMs: Long = 1200L): String {
+    suspend fun sendAtCommand(
+        command: String,
+        timeoutMs: Long = 1200L,
+        beforeTransmit: () -> Unit = {}
+    ): String {
         val requestedEpoch = transportSessionEpoch.capture()
         return withContext(Dispatchers.IO) {
             commandSessionMutex.withLock {
@@ -869,7 +876,10 @@ class BluetoothObdManager(context: Context) {
                 // Adapter probing calls this before capability detection has cleared
                 // demo mode. The epoch check is valid here; a channel-available
                 // check would incorrectly reject every initial ATZ/0100 probe.
-                sendAtCommandInternal(command, timeoutMs, expectedEpoch = requestedEpoch)
+                sendAtCommandInternal(
+                    command, timeoutMs, expectedEpoch = requestedEpoch,
+                    beforeTransmit = beforeTransmit
+                )
             }
         }
     }
@@ -878,7 +888,8 @@ class BluetoothObdManager(context: Context) {
         command: String,
         timeoutMs: Long,
         expectedEpoch: Long? = null,
-        onChunk: ((String) -> Unit)? = null
+        onChunk: ((String) -> Unit)? = null,
+        beforeTransmit: () -> Unit = {}
     ): String = withContext(Dispatchers.IO) {
         commandMutex.withLock {
             // The operation may have waited on the command mutex across a reconnect.
@@ -894,6 +905,11 @@ class BluetoothObdManager(context: Context) {
                 }
             }
             val payload = (command.trim() + "\r").toByteArray(Charsets.US_ASCII)
+            ensureSameSession()
+            // Check the operator's account, vehicle and connection consent
+            // at the physical command boundary, not only at queue admission.
+            // Read-only commands use the default no-op callback.
+            beforeTransmit()
             ensureSameSession()
             try {
             if (sessionTransport == "USB") {
