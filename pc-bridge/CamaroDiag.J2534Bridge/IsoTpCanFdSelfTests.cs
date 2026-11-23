@@ -775,6 +775,31 @@ internal static class IsoTpCanFdSelfTests
                 lateCancellation.Token).GetAwaiter().GetResult(),
             "Cancellation during vendor receive discards late ECU responses.");
 
+        // Distinguish classic 29-bit arbitration from CAN-FD: the raw
+        // channel must set CAN_29BIT_ID without FD_CAN_FORMAT or BRS.
+        var classic29Vendor = new FakeRawJ2534();
+        var classic29Link = new IsoTpJ2534RawCanLink(classic29Vendor,
+            canFd: false, extendedId: true, bitRateSwitch: false);
+        var classic29Settings = new IsoTpCanFdSession.Settings(
+            0x18DA10F1, 0x18DAF110, 8, false);
+        IsoTpCanFdSession.SendAsync(classic29Link, classic29Settings,
+            [0x22, 0xF1, 0x90], TimeSpan.FromSeconds(1),
+            CancellationToken.None).GetAwaiter().GetResult();
+        Check(classic29Vendor.Transmitted.Count == 1 &&
+            classic29Vendor.Transmitted[0].Flags == 0x100u &&
+            classic29Vendor.Transmitted[0].Data.SequenceEqual(
+                IsoTpJ2534RawCanLink.Pack(0x18DA10F1,
+                    [3, 0x22, 0xF1, 0x90, 0xCC, 0xCC, 0xCC, 0xCC], true)),
+            "Classic CAN 29-bit J2534 transport preserves ID and avoids FD flags.");
+        classic29Vendor.Incoming.Enqueue(new(J2534StandardChannel.Can,
+            0x100u, 0, IsoTpJ2534RawCanLink.Pack(0x18DAF110,
+                [3, 0x62, 0xF1, 0x90, 0xCC, 0xCC, 0xCC, 0xCC], true)));
+        var classic29Reply = IsoTpCanFdSession.ReceiveAsync(
+            classic29Link, classic29Settings, TimeSpan.FromSeconds(1),
+            CancellationToken.None).GetAwaiter().GetResult();
+        Check(classic29Reply.SequenceEqual(new byte[] {0x62, 0xF1, 0x90}),
+            "Classic CAN 29-bit J2534 software loop accepts matching RX arbitration.");
+
         var vendorFdExtended = new FakeRawJ2534
         {
             ProtocolId = J2534StandardChannel.FdCan
