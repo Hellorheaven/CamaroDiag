@@ -44,4 +44,61 @@ class CanConsoleRawArchiveWriterTest {
         assertEquals("failed to sync archive", error.cause?.message)
         assertEquals(false, ObdTransportFailurePolicy.isConnectionLoss(error))
     }
+    @Test fun completedArchiveReportsSuccessAndRejectsLateAppends() {
+        val sink = StringWriter()
+        val archive = CanConsoleRawArchiveWriter(sink)
+        archive.append("7E8 01 41")
+        archive.flush()
+        assertEquals(false, archive.isComplete)
+        archive.close()
+        assertEquals(true, archive.isComplete)
+        archive.close()
+        assertThrows(IllegalStateException::class.java) {
+            archive.append("7E8 01 42")
+        }
+        assertEquals("7E8 01 41", sink.toString())
+    }
+
+    @Test fun failedWriteMakesArchivePermanentlyIncomplete() {
+        var writes = 0
+        val sink = object : Writer() {
+            override fun write(cbuf: CharArray, off: Int, len: Int) {
+                writes++
+                throw IOException("storage exhausted")
+            }
+            override fun flush() = Unit
+            override fun close() = Unit
+        }
+        val archive = CanConsoleRawArchiveWriter(sink)
+        assertThrows(CanCaptureArchiveWriteException::class.java) {
+            archive.append("7E8 01 41")
+        }
+        assertEquals(true, archive.hasFailed)
+        assertThrows(IllegalStateException::class.java) {
+            archive.append("7E8 01 42")
+        }
+        archive.close()
+        assertEquals(false, archive.isComplete)
+        assertEquals(1, writes)
+    }
+
+    @Test fun failedFlushMakesArchivePermanentlyIncomplete() {
+        val sink = object : Writer() {
+            override fun write(cbuf: CharArray, off: Int, len: Int) = Unit
+            override fun flush() { throw IOException("failed to flush") }
+            override fun close() = Unit
+        }
+        val archive = CanConsoleRawArchiveWriter(sink)
+        archive.append("7E8 01 41")
+        assertThrows(CanCaptureArchiveWriteException::class.java) {
+            archive.flush()
+        }
+        assertThrows(IllegalStateException::class.java) {
+            archive.append("7E8 01 42")
+        }
+        archive.close()
+        assertEquals(true, archive.hasFailed)
+        assertEquals(false, archive.isComplete)
+    }
+
 }
