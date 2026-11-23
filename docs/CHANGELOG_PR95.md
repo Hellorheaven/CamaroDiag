@@ -27,3 +27,10 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Création de fichiers image par région contenant les octets originaux, le VIN, l'identité du calculateur/firmware, l'adresse absolue, la longueur et l'empreinte SHA-256. Écriture dans un fichier neuf, synchronisation disque et vérification par relecture.
 - Tests ajoutés pour l'intégrité, l'immuabilité, les régions incomplètes, les mauvais plans mémoire, l'altération et la troncature.
 - **Statut : code commité, tests de ce complément non encore exécutés.** L'image d'une région n'est pas une sauvegarde complète ECU : il manque toujours la qualification de la cartographie exhaustive et le pilote de restauration physique vérifié. Les protocoles standard restent hors de ce lot et sont traités séparément sur la même PR.
+
+## C2 — images de restauration multi-régions (suite)
+- Vérification stricte de la couverture : aucune capture ECU ignorée, prise en charge de régions disjointes et rejet d'une région trop volumineuse pour le format.
+- Ajout d'un dossier de sauvegarde multi-régions contenant une image indépendante par région et un index signé par les empreintes SHA-256 des fichiers (empreinte d'intégrité, **pas une signature de licence ou d'autorisation**). L'index n'est publié qu'après les images ; ouverture refusée si les fichiers manquent, diffèrent, se chevauchent ou ont été altérés.
+- Raccordement logiciel de la double capture J2534 vérifiée à l'export d'une image de région, sans modifier les couches de protocole.
+- Tests ajoutés pour interruptions, altération, VIN différent, provenance simulée, carte mémoire incomplète et deux régions disjointes.
+- **Pas d'affirmation de sauvegarde complète de l'ECU ni de restauration physique** : cartes mémoire et pilote réel par firmware encore manquants. Les tests de ces commits ne sont pas encore exécutés afin de respecter la campagne regroupée par chantier et l'autre intervention prioritaire sur les protocoles.
