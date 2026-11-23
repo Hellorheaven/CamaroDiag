@@ -16,6 +16,7 @@ internal static class StandardProtocolCli
     internal const string DoIpStatusCommand = "--doip-status";
     internal const string ObdCanDiscoverCommand = "--obd-discover-can";
     internal const string J1979PidDiscoveryCommand = "--j1979-pids";
+    internal const string J1979FunctionalDiscoveryCommand = "--j1979-discover-can";
     internal const string PassThruCommand = "--j2534-standard";
     internal const string RawIsoTpCommand = "--isotp-exchange";
     internal const string J1939Command = "--j1939-transport";
@@ -109,6 +110,40 @@ internal static class StandardProtocolCli
             BadImageFormatException or EntryPointNotFoundException or OverflowException)
         {
             Console.Error.WriteLine("SAE J1979 PID discovery failed: " + ex.Message);
+            return 6;
+        }
+    }
+
+    /// <summary>Read-only functional Mode 01 PID 00 query on 11-bit classic CAN.</summary>
+    internal static async Task<int> RunJ1979FunctionalDiscoveryAsync(string[] args)
+    {
+        try
+        {
+            var o = ParseObdCanDiscovery(args);
+            var adapters = J2534Registry.Discover();
+            if (o.AdapterIndex >= adapters.Count)
+                throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
+            using var driver = J2534StandardChannel.Connect(
+                adapters[o.AdapterIndex], J2534StandardChannel.Can, o.Baud);
+            driver.ConfigureFilter(new byte[4], new byte[4]);
+            var link = new IsoTpJ2534RawCanLink(driver,
+                canFd: false, extendedId: false, bitRateSwitch: false);
+            var found = await ObdJ1979FunctionalCanDiscovery.DiscoverAsync(
+                link, TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None);
+            foreach (var ecu in found)
+                Console.WriteLine($"J1979 response CAN=0x{ecu.ResponseId:X3} " +
+                    $"PID 00 supports={string.Join(",", ecu.SupportedPids.Select(x => x.ToString("X2")))} " +
+                    $"next={ecu.NextPage}");
+            Console.WriteLine($"J1979 functional Mode 01 PID 00 responders={found.Count}; " +
+                "physical ECU identity and sensor support require further verification.");
+            return 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or
+            InvalidOperationException or IOException or TimeoutException or
+            DllNotFoundException or BadImageFormatException or
+            EntryPointNotFoundException or OverflowException)
+        {
+            Console.Error.WriteLine("J1979 functional CAN discovery failed: " + ex.Message);
             return 6;
         }
     }
