@@ -2474,6 +2474,11 @@ private fun localizedDtcDescription(dtc: DiagnosticDtc): String {
 @Composable
 fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparison: VehicleVinComparison?, onScan: () -> Unit, onClear: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
+    var clearConsentStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
+    LaunchedEffect(vehicle.vin, vehicle.modelYear) {
+        confirmClear = false
+        clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+    }
     val isFrench = LocalConfiguration.current.locales[0].language.equals("fr", ignoreCase = true)
     var selectedDtc by remember { mutableStateOf<DiagnosticDtc?>(null) }
     selectedDtc?.let { selected ->
@@ -2545,7 +2550,10 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
                 SectionTitle(stringResource(R.string.dtc_title))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onScan) { Text(stringResource(R.string.dtc_scan)) }
-                    Button(onClick = { confirmClear = true }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
+                    Button(onClick = {
+                        clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+                        confirmClear = true
+                    }, colors = ButtonDefaults.buttonColors(containerColor = WarnRed)) {
                         Text(stringResource(R.string.dtc_clear), color = Color.White)
                     }
                 }
@@ -2601,20 +2609,57 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
 
     if (confirmClear) {
         AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { Text(stringResource(R.string.dtc_confirm_clear)) },
-            text = { Text(stringResource(R.string.dtc_clear_description)) },
+            onDismissRequest = {
+                confirmClear = false
+                clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+            },
+            title = {
+                Text(stringResource(
+                    if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                        R.string.ecu_write_warning_title
+                    else R.string.dtc_confirm_clear
+                ))
+            },
+            text = {
+                Text(stringResource(
+                    if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                        R.string.ecu_write_warning_message
+                    else R.string.dtc_clear_description
+                ))
+            },
             confirmButton = {
                 Button(
                     onClick = {
-                        confirmClear = false
-                        onClear()
+                        if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING) {
+                            // Acknowledging the warning never clears DTCs.
+                            clearConsentStep = EcuWriteConsentFlow.afterWarningOk(clearConsentStep)
+                        } else {
+                            val yes = EcuWriteConsentFlow.approval(
+                                clearConsentStep, confirmedYes = true, sameConnection = true
+                            ) != null
+                            confirmClear = false
+                            clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+                            if (yes) onClear()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = WarnRed)
-                ) { Text(stringResource(R.string.dtc_clear_action)) }
+                ) {
+                    Text(stringResource(
+                        if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_ok else R.string.ecu_write_yes
+                    ))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.common_cancel)) }
+                TextButton(onClick = {
+                    confirmClear = false
+                    clearConsentStep = EcuWriteConsentFlow.Step.WARNING
+                }) {
+                    Text(stringResource(
+                        if (clearConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_cancel else R.string.ecu_write_no
+                    ))
+                }
             }
         )
     }
