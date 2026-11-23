@@ -19,7 +19,9 @@ internal static class IsoTpCanFdSession
         uint TxId, uint RxId, int TxFrameLength, bool CanFd,
         byte BlockSize = 8, byte StMin = 0, byte Padding = 0xCC,
         byte? TxAddress = null, byte? RxAddress = null,
-        int MaxWaitFrames = 4, bool MixedAddressing = false)
+        int MaxWaitFrames = 4, bool MixedAddressing = false,
+        int FlowControlTimeoutMs = 1000,
+        int ConsecutiveFrameTimeoutMs = 1000)
     {
         internal void Validate()
         {
@@ -32,6 +34,11 @@ internal static class IsoTpCanFdSession
                 throw new ArgumentException("Unsupported CAN/CAN-FD ISO-TP IDs or frame size.");
             if (MaxWaitFrames is < 0 or > 255)
                 throw new ArgumentOutOfRangeException(nameof(MaxWaitFrames));
+            if (FlowControlTimeoutMs is < 1 or > 30000 ||
+                ConsecutiveFrameTimeoutMs is < 1 or > 30000)
+                throw new ArgumentOutOfRangeException(
+                    nameof(FlowControlTimeoutMs),
+                    "N_Bs and N_Cr must each be between 1 and 30000 ms.");
             if (TxAddress.HasValue != RxAddress.HasValue)
                 throw new ArgumentException("ISO-TP one-byte addressing requires both TX and RX addresses.");
             // Mixed addressing carries the same N_AE in both directions;
@@ -41,7 +48,7 @@ internal static class IsoTpCanFdSession
                  TxAddress != RxAddress || TxId == RxId))
                 throw new ArgumentException(
                     "Mixed ISO-TP requires one shared address extension and distinct CAN IDs.");
-            _ = DecodeStMin(StMin);
+            ValidateAdvertisedStMin(StMin);
         }
     }
 
@@ -60,12 +67,26 @@ internal static class IsoTpCanFdSession
         Task WaitMinimumSeparationAsync(TimeSpan minimum, CancellationToken token);
     }
 
+    /// <summary>
+    /// When the peer supplies a reserved STmin (0x80..0xF0 or 0xFA..0xFF),
+    /// ISO 15765-2 requires a sender to use the longest defined interval
+    /// (127 ms), not to silently send at zero separation or abort a valid
+    /// transfer. Locally advertised STmin remains restricted to defined
+    /// codes by ValidateAdvertisedStMin.
+    /// </summary>
     internal static TimeSpan DecodeStMin(byte value) => value switch
     {
         <= 0x7F => TimeSpan.FromMilliseconds(value),
         >= 0xF1 and <= 0xF9 => TimeSpan.FromTicks((value - 0xF0) * 1000L),
-        _ => throw new InvalidDataException("Reserved ISO-TP STmin value.")
+        _ => TimeSpan.FromMilliseconds(127)
     };
+
+    private static void ValidateAdvertisedStMin(byte value)
+    {
+        if (value > 0x7F && (value < 0xF1 || value > 0xF9))
+            throw new InvalidDataException(
+                "Local ISO-TP FlowControl cannot advertise a reserved STmin.");
+    }
 
     internal static byte[] BuildFlowControl(int length, byte status,
         byte blockSize, byte stMin, byte padding = 0xCC,
@@ -75,7 +96,7 @@ internal static class IsoTpCanFdSession
             (length > 8 && StandardVehicleProtocols.CanFdLengthToDlc(length) < 0) ||
             status > 2)
             throw new ArgumentOutOfRangeException(nameof(length));
-        _ = DecodeStMin(stMin);
+        ValidateAdvertisedStMin(stMin);
         var bytes = Enumerable.Repeat(padding, length).ToArray();
         var offset = address.HasValue ? 1 : 0;
         if (address is byte source) bytes[0] = source;
@@ -243,7 +264,8 @@ internal static class IsoTpCanFdSession
         while (collected < length)
         {
             var next = await ReceiveCorrelatedAsync(link, settings,
-                Remaining(timeout, clock), token);
+                RemainingStage(timeout, clock,
+                    settings.ConsecutiveFrameTimeoutMs), token);
             var cf = next.Data;
             if (cf.Length < addressWidth + 2 || cf.Length > rxDl ||
                 (cf[addressWidth] & 0xF0) != 0x20 ||
@@ -280,7 +302,8 @@ internal static class IsoTpCanFdSession
         for (var wait = 0; wait <= config.MaxWaitFrames; wait++)
         {
             var frame = await ReceiveCorrelatedAsync(link, config,
-                Remaining(timeout, clock), token);
+                RemainingStage(timeout, clock,
+                    config.FlowControlTimeoutMs), token);
             var pci = AddressWidth(config);
             if (frame.Data.Length < pci + 3 ||
                 (frame.Data[pci] & 0xF0) != 0x30)
@@ -315,6 +338,19 @@ internal static class IsoTpCanFdSession
                 (frame.Data.Length == 0 || frame.Data[0] != target)) continue;
             return frame;
         }
+    }
+
+    /// <summary>
+    /// Bound each required peer FC (N_Bs) or subsequent CF (N_Cr) inside
+    /// the still-active overall PDU deadline. Unrelated CAN frames do not
+    /// restart this per-frame window.
+    /// </summary>
+    private static TimeSpan RemainingStage(TimeSpan budget,
+        Stopwatch clock, int stageTimeoutMs)
+    {
+        var overall = Remaining(budget, clock);
+        var stage = TimeSpan.FromMilliseconds(stageTimeoutMs);
+        return overall < stage ? overall : stage;
     }
 
     /// <summary>

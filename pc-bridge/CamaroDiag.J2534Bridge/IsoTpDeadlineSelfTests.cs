@@ -124,6 +124,54 @@ internal static class IsoTpDeadlineSelfTests
         Check(waiting.Outgoing.Count == 1 &&
             waiting.Outgoing[0].Data[0] == 0x10,
             "Only FirstFrame was sent before late FC was rejected.");
+        var flowTimer = new SlowLink { DelayMs = 45 };
+        flowTimer.Incoming.Enqueue(new(0x7E8, false,
+            [0x30, 0, 0, 0, 0, 0, 0, 0]));
+        Reject<TimeoutException>(() =>
+            IsoTpCanFdSession.SendAsync(flowTimer,
+                settings with { FlowControlTimeoutMs = 15 },
+                Enumerable.Repeat((byte)0x55, 20).ToArray(),
+                TimeSpan.FromSeconds(1), CancellationToken.None)
+                .GetAwaiter().GetResult(),
+            "N_Bs expires independently of longer overall TX deadline.");
+        Check(flowTimer.Outgoing.Count == 1 &&
+            flowTimer.Outgoing[0].Data[0] == 0x10 &&
+            flowTimer.ReceiveTimeouts[0] <= TimeSpan.FromMilliseconds(15),
+            "N_Bs expiry never authorizes a subsequent CF.");
+
+        var consecutiveTimer = new SlowLink { DelayMs = 45 };
+        consecutiveTimer.Incoming.Enqueue(new(0x7E8, false,
+            [0x10, 0x13, 1, 2, 3, 4, 5, 6]));
+        consecutiveTimer.Incoming.Enqueue(new(0x7E8, false,
+            [0x21, 7, 8, 9, 10, 11, 12, 13]));
+        Reject<TimeoutException>(() =>
+            IsoTpCanFdSession.ReceiveAsync(consecutiveTimer,
+                settings with { ConsecutiveFrameTimeoutMs = 15 },
+                TimeSpan.FromSeconds(1), CancellationToken.None)
+                .GetAwaiter().GetResult(),
+            "N_Cr expires independently of longer overall RX deadline.");
+        Check(consecutiveTimer.Outgoing.Count == 1 &&
+            consecutiveTimer.Outgoing[0].Data[0] == 0x30 &&
+            consecutiveTimer.ReceiveTimeouts.Count == 2 &&
+            consecutiveTimer.ReceiveTimeouts[1] <= TimeSpan.FromMilliseconds(15),
+            "N_Cr times only the next CF after a valid FF/CTS.");
+
+        Reject<ArgumentOutOfRangeException>(() =>
+            (settings with { FlowControlTimeoutMs = 0 }).Validate(),
+            "N_Bs zero is not an unlimited timeout.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            (settings with { ConsecutiveFrameTimeoutMs = 30001 }).Validate(),
+            "N_Cr out of range rejected.");
+        var configured = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--n-bs-ms", "150", "--n-cr-ms", "225",
+            "--payload", "22F190"
+        ]);
+        Check(configured.Settings.FlowControlTimeoutMs == 150 &&
+            configured.Settings.ConsecutiveFrameTimeoutMs == 225,
+            "CAN transport CLI sets independent N_Bs/N_Cr timers.");
+
         return checkedCount;
     }
 }

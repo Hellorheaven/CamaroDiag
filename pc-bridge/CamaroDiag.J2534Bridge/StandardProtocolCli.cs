@@ -897,6 +897,12 @@ internal static class StandardProtocolCli
             CultureInfo.InvariantCulture);
         var maxWaitFrames = int.Parse(Optional(args, "--wftmax") ?? "4",
             CultureInfo.InvariantCulture);
+        var flowControlTimeout = int.Parse(
+            Optional(args, "--n-bs-ms") ?? "1000",
+            CultureInfo.InvariantCulture);
+        var consecutiveFrameTimeout = int.Parse(
+            Optional(args, "--n-cr-ms") ?? "1000",
+            CultureInfo.InvariantCulture);
         var extended = bool.Parse(Optional(args, "--extended") ?? "false");
         // --extended selects 29-bit CAN IDs. These separate options select
         // ISO 15765-2 extended addressing with a one-byte address prefix.
@@ -1002,7 +1008,9 @@ internal static class StandardProtocolCli
 
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
             bs, stMin, TxAddress: txAddress, RxAddress: rxAddress,
-            MaxWaitFrames: maxWaitFrames, MixedAddressing: mixedAddressing);
+            MaxWaitFrames: maxWaitFrames, MixedAddressing: mixedAddressing,
+            FlowControlTimeoutMs: flowControlTimeout,
+            ConsecutiveFrameTimeoutMs: consecutiveFrameTimeout);
         setting.Validate();
         if (index < 0 || bitrate == 0 || timeout is < 100 or > 30000 ||
             (mode == "exchange" && bytes.Length is < 1 or > IsoTpCanFdSession.MaximumPayloadBytes) ||

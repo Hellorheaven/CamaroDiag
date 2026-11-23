@@ -486,8 +486,31 @@ internal static class IsoTpCanFdSelfTests
             0, 0, 0, 0));
         Reject<ArgumentOutOfRangeException>(() => Receive(wrongDlc, fd12),
             "CAN-FD invalid DLC is rejected at decoder.");
-        Reject<InvalidDataException>(() => IsoTpCanFdSession.DecodeStMin(0x80),
-            "Reserved STmin explicitly rejected.");
+        Check(IsoTpCanFdSession.DecodeStMin(0x80) ==
+                TimeSpan.FromMilliseconds(127) &&
+            IsoTpCanFdSession.DecodeStMin(0xF0) ==
+                TimeSpan.FromMilliseconds(127) &&
+            IsoTpCanFdSession.DecodeStMin(0xFA) ==
+                TimeSpan.FromMilliseconds(127) &&
+            IsoTpCanFdSession.DecodeStMin(0xFF) ==
+                TimeSpan.FromMilliseconds(127),
+            "Reserved peer STmin values safely fall back to 127ms.");
+        Reject<InvalidDataException>(() =>
+            new IsoTpCanFdSession.Settings(0x7E0, 0x7E8,
+                8, false, StMin: 0x80).Validate(),
+            "Locally advertised reserved STmin is forbidden.");
+        Reject<InvalidDataException>(() =>
+            IsoTpCanFdSession.BuildFlowControl(8, 0, 8, 0xFA),
+            "Constructed FC cannot advertise a reserved STmin.");
+
+        var peerReservedMin = new QueueLink();
+        peerReservedMin.Replies.Enqueue(RX(false,
+            0x30, 0, 0x80, 0, 0, 0, 0, 0));
+        Send(peerReservedMin, classic, Fill(14));
+        Check(peerReservedMin.Separations.Count == 2 &&
+            peerReservedMin.Separations.All(x =>
+                x == TimeSpan.FromMilliseconds(127)),
+            "Peer reserved STmin keeps both outgoing CF at longest separation.");
         Reject<ArgumentException>(() => Send(new QueueLink(),
             new IsoTpCanFdSession.Settings(0x7E0, 0x7E0, 12, true), [0x22]),
             "Identical physical TX/RX arbitration IDs rejected.");
