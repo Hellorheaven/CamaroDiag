@@ -5,6 +5,14 @@ La PR #95 sur chore/unified-ci couvre maintenant une première tranche ISO/SAE e
 
 > Fichier de continuité du projet. À lire en premier dans tout nouveau chat consacré à CamaroDiag. Mettre ce fichier à jour dès qu'une décision durable, un changement de périmètre, une modification GitHub/PR, un résultat CI ou un état technique important est confirmé. Tenir le changelog propre à chaque PR (`docs/CHANGELOG_PR<number>.md`) à jour sur la branche de cette PR.
 
+## ÉTAT DE REPRISE — C6 ET CONNECTEURS (23/11/2026, PR #95)
+
+- **C6 n'est pas disparu et ne doit pas être clôturé.** Il couvre le consentement OK puis Oui/Non, l'identité de l'ECU, le bloc d'écriture exact, le pont TLS J2534, le pré-flash et la récupération après écriture. L'audit `docs/AUDIT_PR95_C1_C2_C4_C6_C8.md` et le contrôle `docs/C8_PARALLEL_NON_PROTOCOL_REVIEW.md` le suivent explicitement.
+- Une correction C6 vient de lier le consentement d'effacement DTC à la génération de connexion au moment de l'avertissement ; toute reconnexion/déconnexion/expiration de compte invalide le « Oui » précédent. Tests unitaires ajoutés. La même exigence vaut pour toute future écriture physique, sans clé ni licence artificielle.
+- C2 conserve les régions et les octets exacts des images hors ligne. Si la vérification finale d'un paquet de restauration échoue, supprimer l'index plutôt que laisser une image apparemment complète. **Toujours pas de preuve d'une image complète et physiquement restaurable sur ECU.**
+- L'UI Adaptateur possède une commande générale de déconnexion pour USB, Wi-Fi, Bluetooth/BLE, J2534 et simulation. Les périphériques USB sont vérifiés par numéro Android final, puis par énumération ; les annulations USB/Wi-Fi propagent correctement leur `CancellationException`.
+- Les développements protocoles SAE/ISO, l'écriture et les transports physiques du firmware connecteurs relèvent de l'autre chat. Pour cette intervention : connexions, sécurité de session, C1/C2/C4/C6/C8 et leurs tests ; pas de création de branche/PR, pas de merge, CI groupée en fin de chantier. Ne pas présenter l'ajout des tests comme une réussite CI.
+
 ## DÉCISIONS LES PLUS RÉCENTES — À APPLIQUER DANS TOUT NOUVEAU CHAT (23/11/2026)
 
 **Lire impérativement [AGENTS.md](../AGENTS.md) et [l'audit de PR #95](AUDIT_PR95_C1_C2_C4_C6_C8.md).** Ces règles priment sur les anciennes indications de PR #35, branche `feat/live-can-monitor`, CI à chaque ~50 commits, verrouillage ECU globalement lecture seule et anciens blocages d'écriture décrits plus bas. Sur GitHub au 23/11/2026 : PR **#95** et branche **`chore/unified-ci`**, non fusionnée ; toujours rafraîchir ce statut en temps réel.
