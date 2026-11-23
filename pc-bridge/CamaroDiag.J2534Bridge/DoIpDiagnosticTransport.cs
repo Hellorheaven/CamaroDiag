@@ -20,22 +20,27 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     private readonly Stream stream;
     private readonly ushort testerAddress;
     private readonly ushort ecuAddress;
+    private readonly byte protocolVersion;
 
     private DoIpDiagnosticTransport(TcpClient socket, Stream dataStream,
-        ushort tester, ushort ecu)
+        ushort tester, ushort ecu, byte version)
     {
         this.socket = socket;
         stream = dataStream;
         testerAddress = tester;
         ecuAddress = ecu;
+        protocolVersion = version;
     }
 
     internal static async Task<DoIpDiagnosticTransport> ConnectAsync(
         string host, ushort tester, ushort ecu, TimeSpan timeout,
-        CancellationToken cancellationToken, bool useTls = false)
+        CancellationToken cancellationToken, bool useTls = false,
+        byte protocolVersion = DoIpCodec.Version)
     {
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
-            tester == ecu || timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
+            tester == ecu || timeout <= TimeSpan.Zero ||
+            timeout > TimeSpan.FromSeconds(30) ||
+            protocolVersion is not (0x02 or 0x03))
             throw new ArgumentException("Explicit gateway, distinct logical addresses and timeout required.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
@@ -58,8 +63,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 dataStream = tls;
             }
             var session = new DoIpDiagnosticTransport(socket, dataStream,
-                tester, ecu);
-            await session.SendAsync(DoIpCodec.RoutingActivation(tester), deadline.Token);
+                tester, ecu, protocolVersion);
+            await session.SendAsync(DoIpCodec.RoutingActivation(
+                tester, version: protocolVersion), deadline.Token);
             DoIpCodec.Message routing;
             do
             {
@@ -69,6 +75,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                         routing, tester), deadline.Token);
             }
             while (routing.Type == DoIpCodec.AliveCheckRequest);
+            if (routing.Version != protocolVersion)
+                throw new InvalidDataException(
+                    "DoIP gateway routing response used an unexpected protocol version.");
             DoIpCodec.RequireRoutingActive(routing, tester);
             return session;
         }
@@ -88,7 +97,8 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(timeout));
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
-        await SendAsync(DoIpCodec.Diagnostic(testerAddress, ecuAddress, request), deadline.Token);
+        await SendAsync(DoIpCodec.Diagnostic(
+            testerAddress, ecuAddress, request, protocolVersion), deadline.Token);
         // UDS NRC 0x78 (ResponsePending), DoIP diagnostic ACKs and Alive
         // Check requests are legitimate interim messages. An arbitrary
         // count limit can terminate a valid long-running routine. The
@@ -98,6 +108,9 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         {
             deadline.Token.ThrowIfCancellationRequested();
             var message = await ReceiveAsync(deadline.Token);
+            if (message.Version != protocolVersion)
+                throw new InvalidDataException(
+                    "DoIP diagnostic response changed the negotiated protocol version.");
             if (message.Type == DoIpCodec.AliveCheckRequest)
             {
                 await SendAsync(DoIpCodec.ReplyToAliveCheck(
