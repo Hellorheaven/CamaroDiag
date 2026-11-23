@@ -114,12 +114,12 @@ internal static class J1939ClassicTpSession
         if (payload.Length <= 8)
         {
             var pf = (o.Pgn >> 8) & 0xFF;
-            byte? destination = pf < 240 ?
+            byte? directDestination = pf < 240 ?
                 broadcast ? (byte)0xFF : o.RemoteAddress : null;
             var direct = Enumerable.Repeat((byte)0xFF, 8).ToArray();
             payload.CopyTo(direct, 0);
             await link.SendAsync(new(ArbitrationId(o.Pgn, o.Priority,
-                o.LocalAddress, destination), false, direct), token);
+                o.LocalAddress, directDestination), false, direct), token);
             return;
         }
         var count = (payload.Length + 6) / 7;
