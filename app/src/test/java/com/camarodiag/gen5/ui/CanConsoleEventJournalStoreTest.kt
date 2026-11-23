@@ -62,6 +62,22 @@ class CanConsoleEventJournalStoreTest {
         }
     }
 
+    @Test fun deletedFileFailsNextAppendWithoutCreatingSilentHistory() {
+        val directory = Files.createTempDirectory("console-deleted-on-append").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            store.append(listOf(event(0)))
+            val before = requireNotNull(store.snapshot())
+            assertTrue(before.file.delete())
+            assertTrue(runCatching { store.append(listOf(event(1))) }.isFailure)
+            assertTrue(store.hasFailed())
+            assertNull(store.snapshot())
+            store.reset()
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun invalidStorageDirectoryDoesNotLeakAnExportableJournal() {
         val directory = Files.createTempFile("console-invalid-dir", ".tmp").toFile()
         try {
