@@ -67,7 +67,8 @@ internal static class DoIpVehicleDiscovery
     /// sends any UDS service. Identities are announced, not authenticated.
     /// </summary>
     internal static async Task<IReadOnlyList<Identity>> DiscoverBroadcastAsync(
-        string broadcastIp, TimeSpan timeout, CancellationToken cancellationToken)
+        string broadcastIp, TimeSpan timeout, CancellationToken cancellationToken,
+        string? vin = null, byte[]? eid = null)
     {
         if (!IPAddress.TryParse(broadcastIp, out var address) ||
             address.AddressFamily != AddressFamily.InterNetwork ||
@@ -76,13 +77,17 @@ internal static class DoIpVehicleDiscovery
             throw new ArgumentException(
                 "Explicit IPv4 broadcast destination and bounded timeout required.");
 
+        if (vin is not null && eid is not null)
+            throw new ArgumentException("Choose VIN or EID identification, not both.");
+        var request = vin is not null ? BuildVinRequest(vin) :
+            eid is not null ? BuildEidRequest(eid) : BuildRequest();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
         using var socket = new UdpClient(AddressFamily.InterNetwork)
         {
             EnableBroadcast = true
         };
-        await socket.SendAsync(BuildRequest().AsMemory(),
+        await socket.SendAsync(request.AsMemory(),
             new IPEndPoint(address, 13400), deadline.Token);
         var identified = new Dictionary<string, Identity>(StringComparer.Ordinal);
         while (identified.Count < 32)
