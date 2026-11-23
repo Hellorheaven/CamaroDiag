@@ -185,6 +185,11 @@ internal static class J1939FdCmdtSelfTests
             o.Peer, o.Local, o.Session, 2, 0, Fill(60), 7)));
         Reject<InvalidDataException>(() => Receive(wrongOrder, o),
             "First segment number 2 cannot satisfy segment 1.");
+        Check(wrongOrder.TX.Count == 2 &&
+            J1939FdTransportFrames.DecodeControl(wrongOrder.TX[1]).Type ==
+                J1939FdTransportFrames.ConnectionAbort &&
+            J1939FdTransportFrames.DecodeControl(wrongOrder.TX[1]).Aux8 == 7,
+            "Invalid CMDT segment triggers reason 7 abort and never EOM_ACK.");
         Reject<ArgumentException>(() =>
             (o with { Pgn = 0xF004 }).Validate(),
             "Connection-mode requires a directed PDU1 PGN.");
