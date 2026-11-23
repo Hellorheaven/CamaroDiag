@@ -99,6 +99,41 @@ internal static class J1939FdCmdtSelfTests
                 J1939FdTransportFrames.EndOfMessageAck,
             "FD.TP receiver reconstructs data and emits two CTS plus final EOM_ACK.");
 
+        var wrongCts = new FakeLink();
+        wrongCts.RX.Enqueue(Control(o, true,
+            J1939FdTransportFrames.ClearToSend,
+            0xFFFFFF, 2, 2, 0));
+        Reject<InvalidDataException>(() => Send(wrongCts, o, Fill(131)),
+            "Wrong CTS next-segment cannot change the current TX sequence.");
+        Check(wrongCts.TX.Count == 1,
+            "Invalid CTS cannot authorize any FD.TP.DT segment.");
+
+        var peerAbort = new FakeLink();
+        peerAbort.RX.Enqueue(Control(o, true,
+            J1939FdTransportFrames.ConnectionAbort,
+            0xFFFFFF, 0xFFFFFF, 0xFF, 3));
+        Reject<IOException>(() => Send(peerAbort, o, Fill(131)),
+            "Peer CMDT abort terminates a pending send without DT emission.");
+        Check(peerAbort.TX.Count == 1,
+            "Peer abort leaves only original RTS in transmitter history.");
+
+        var wrongSession = new FakeLink();
+        wrongSession.RX.Enqueue(Control(o with { Session = 2 }, true,
+            J1939FdTransportFrames.ClearToSend,
+            0xFFFFFF, 1, 2, 0));
+        wrongSession.RX.Enqueue(Control(o, true,
+            J1939FdTransportFrames.ClearToSend,
+            0xFFFFFF, 1, 2, 0));
+        wrongSession.RX.Enqueue(Control(o, true,
+            J1939FdTransportFrames.ClearToSend,
+            0xFFFFFF, 3, 1, 0));
+        wrongSession.RX.Enqueue(Control(o, true,
+            J1939FdTransportFrames.EndOfMessageAck,
+            131, 3, 0xFF, 0xFF));
+        Send(wrongSession, o, Fill(131));
+        Check(wrongSession.TX.Count == 5,
+            "CTS for a second session is ignored without interrupting active transfer.");
+
         var noCts = new FakeLink();
         Reject<TimeoutException>(() => Send(noCts, o, Fill(131)),
             "Missing CTS aborts outgoing connection-mode session.");
