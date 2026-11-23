@@ -6,3 +6,7 @@ Full PR Debug validation stays reserved for C8. No vehicle write, no Release, no
 
 C1 integrated console event journal follow-up: 45756aa779759d1abb29c59fa04fbe1f967df9ad
 Validation scope: complete TX/RX/SYSTEM journal, app/communication tests; once per finished lot only.
+
+Grouped completion checkpoint — C1 journal chronological TX/RX/SYSTEM and lifecycle correction
+Source before checkpoint: 6788763f95182bb853e8883d2be7c6d1f9ba40e3
+No physical ECU qualification, no merge.
