@@ -109,8 +109,19 @@ internal static class J1939ClassicTpSession
         ArgumentNullException.ThrowIfNull(link);
         ArgumentNullException.ThrowIfNull(payload);
         o.Validate();
-        if (timeout <= TimeSpan.Zero || payload.Length is < 9 or > MaxPayload)
+        if (timeout <= TimeSpan.Zero || payload.Length is < 1 or > MaxPayload)
             throw new ArgumentOutOfRangeException(nameof(payload));
+        if (payload.Length <= 8)
+        {
+            var pf = (o.Pgn >> 8) & 0xFF;
+            byte? destination = pf < 240 ?
+                broadcast ? (byte)0xFF : o.RemoteAddress : null;
+            var direct = Enumerable.Repeat((byte)0xFF, 8).ToArray();
+            payload.CopyTo(direct, 0);
+            await link.SendAsync(new(ArbitrationId(o.Pgn, o.Priority,
+                o.LocalAddress, destination), false, direct), token);
+            return;
+        }
         var count = (payload.Length + 6) / 7;
         var destination = broadcast ? (byte)0xFF : o.RemoteAddress;
         var first = new IsoTpCanFdSession.CanFrame(
@@ -159,8 +170,11 @@ internal static class J1939ClassicTpSession
         o.Validate();
         if (timeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(timeout));
-        var start = await ReadControlAsync(link, o, fromPeer: true, timeout, token,
-            permitBroadcast: true);
+        var start = await ReadStartAsync(link, o, timeout, token);
+        var physical = StandardVehicleProtocols.ParseJ1939Id(start.Id);
+        if (physical.Pgn == o.Pgn)
+            return new(o.Pgn, start.Data.ToArray(),
+                physical.Destination is null or 0xFF);
         if (start.Data[0] == Abort)
             throw new IOException("J1939 peer aborted transport before data.");
         if (start.Data[0] is not (Rts or Bam))
@@ -198,6 +212,35 @@ internal static class J1939ClassicTpSession
         if (!broadcast)
             await link.SendAsync(MakeAck(o, length), token);
         return new(o.Pgn, result, broadcast);
+    }
+
+    private static async Task<IsoTpCanFdSession.CanFrame> ReadStartAsync(
+        IsoTpCanFdSession.ICanLink link, Options o,
+        TimeSpan timeout, CancellationToken token)
+    {
+        for (var tries = 0; tries < 64; tries++)
+        {
+            var frame = await link.ReceiveAsync(timeout, token);
+            if (frame.IsFd || frame.Data.Length != 8) continue;
+            var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+            if (id.Source != o.RemoteAddress) continue;
+            if (id.Pgn == o.Pgn)
+            {
+                var pf = (o.Pgn >> 8) & 0xFF;
+                if (pf < 240 && id.Destination != o.LocalAddress &&
+                    id.Destination != 0xFF)
+                    continue;
+                return frame;
+            }
+            if (id.Pgn != TpCmPgn ||
+                id.Destination != o.LocalAddress && id.Destination != 0xFF)
+                continue;
+            if ((frame.Data[5] | (frame.Data[6] << 8) |
+                frame.Data[7] << 16) != o.Pgn)
+                throw new InvalidDataException("J1939 RTS/BAM target PGN mismatch.");
+            return frame;
+        }
+        throw new TimeoutException("No J1939 transport start frame from expected ECU.");
     }
 
     private static async Task<int> AwaitCtsAsync(
