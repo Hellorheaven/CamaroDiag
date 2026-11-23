@@ -203,6 +203,25 @@ internal static class UdsStandardServicesSelfTests
             ObdOnUdsServices.DecodeDtcSnapshot(0x123456,
                 [0x59, 0x04, 0x12, 0x34, 0x57, 0x08]),
             "Snapshot cannot silently substitute another 24-bit DTC.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse(
+                [0x19, 0x04, 0x12, 0x34, 0x56, 0x01],
+                [0x59, 0x04, 0x12, 0x34, 0x56, 0x08, 0x02, 0x00]),
+            "UDS snapshot record selector rejects a response from another record.");
+        Check(UdsStandardServices.RequireResponse(
+                [0x19, 0x04, 0x12, 0x34, 0x56, 0xFF],
+                [0x59, 0x04, 0x12, 0x34, 0x56, 0x08, 0x02, 0x00]).Length == 8,
+            "UDS snapshot FF all-record selector accepts arbitrary returned records.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse(
+                [0x19, 0x06, 0x12, 0x34, 0x56, 0x90],
+                [0x59, 0x06, 0x12, 0x34, 0x56, 0x08, 0x91, 0x00]),
+            "UDS extended-data specific record cannot accept another record ID.");
+        Check(UdsStandardServices.RequireResponse(
+                [0x19, 0x06, 0x12, 0x34, 0x56, 0xFE],
+                [0x59, 0x06, 0x12, 0x34, 0x56, 0x08, 0x90, 0x00]).Length == 8,
+            "UDS FE all-regulated selector accepts an emitted regulated record.");
+
         Check(UdsStandardServices.RequireResponse(
                 [0x19, 0x04, 0x12, 0x34, 0x56, 0x01],
                 [0x59, 0x04, 0x12, 0x34, 0x56, 0x08]).Length == 6,
