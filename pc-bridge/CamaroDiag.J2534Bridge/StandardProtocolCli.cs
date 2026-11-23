@@ -24,8 +24,14 @@ internal static class StandardProtocolCli
             var host = Required(args, "--host");
             var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
                 CultureInfo.InvariantCulture);
+            var requestedVin = Optional(args, "--vin");
+            var eidHex = Optional(args, "--eid");
+            if (requestedVin is not null && eidHex is not null)
+                throw new ArgumentException("Choose VIN or EID, not both.");
+            var eid = eidHex is null ? null : Convert.FromHexString(eidHex);
             var identity = await DoIpVehicleDiscovery.DiscoverAsync(
-                host, TimeSpan.FromMilliseconds(timeoutMs), CancellationToken.None);
+                host, TimeSpan.FromMilliseconds(timeoutMs), CancellationToken.None,
+                vin: requestedVin, eid: eid);
             Console.WriteLine($"DoIP gateway={identity.Source} " +
                 $"VIN={identity.Vin} logical=0x{identity.LogicalAddress:X4} " +
                 $"EID={Convert.ToHexString(identity.Eid)} " +
@@ -38,7 +44,7 @@ internal static class StandardProtocolCli
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or
             InvalidDataException or TimeoutException or SocketException or
-            OperationCanceledException or OverflowException)
+            OperationCanceledException or OverflowException or FormatException)
         {
             Console.Error.WriteLine("DoIP vehicle discovery failed: " + ex.Message);
             return 6;
