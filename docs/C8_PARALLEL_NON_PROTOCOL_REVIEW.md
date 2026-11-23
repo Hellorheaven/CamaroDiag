@@ -100,3 +100,12 @@ C6 **reste ouvert** sur PR #95, il n'a pas été supprimé ni transféré au cha
 - **C2/C6 indissociables avant programmation :** démontrer les octets d'origine relus physiquement deux fois, la carte mémoire complète du calculateur visé, la sauvegarde restaurable, l'identité et les blocs exacts avant effacement, les preuves de réécriture et récupération. Aucun de ces objectifs n'est réputé démontré par l'import ZIP ou par la double confirmation seule.
 - **C8 :** tests d'intégration au HEAD final + essais matériel ; relever séparément résultats Android, Windows J2534, sécurité du firmware, preuves de récupération et conflits GitHub. Ne pas conclure « C6 terminé » sans toutes les preuves applicables.
 
+
+## C6 + connexion J2534 : identité du véhicule et statut du pont (23/11/2026)
+
+- L'autorisation de suppression DTC est maintenant rattachée à la génération de connexion **et** au profil véhicule/VIN au moment du premier avertissement. Toute reconnexion, perte de compte, changement de VIN, année, moteur ou profil annule le « Oui » devenu périmé. Le ViewModel vérifie ces conditions encore une fois avant d'envoyer la commande.
+- `EcuWriteConsentFlow.approvalForContext` centralise ces critères. Tests unitaires sur changement de connexion et véhicule, avertissement sans seconde confirmation et refus.
+- L'écran Adaptateur affiche une connexion Windows J2534 appairée distinctement d'un ELM. La liaison TLS PC ne prouve aucun accès ECU : les badges de capacité ELM sont masqués dans ce cas et remplacés par une information utilisateur FR/EN.
+- C2 : le constructeur de paquet de restauration local efface l'index si la vérification finale n'aboutit pas. Il ne certifie toujours ni la carte mémoire constructeur exhaustive ni le rollback physique.
+- La couverture de tests Android/communication/Windows au SHA final reste à confirmer, et C6 ne peut être clôturé sans essai matériel de programmation + sauvegarde restaurable. La prise en charge des protocoles reste au chat parallèle.
+
