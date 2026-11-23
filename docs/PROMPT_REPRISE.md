@@ -13,6 +13,14 @@ La PR #95 sur chore/unified-ci couvre maintenant une première tranche ISO/SAE e
 - L'UI Adaptateur possède une commande générale de déconnexion pour USB, Wi-Fi, Bluetooth/BLE, J2534 et simulation. Les périphériques USB sont vérifiés par numéro Android final, puis par énumération ; les annulations USB/Wi-Fi propagent correctement leur `CancellationException`.
 - Les développements protocoles SAE/ISO, l'écriture et les transports physiques du firmware connecteurs relèvent de l'autre chat. Pour cette intervention : connexions, sécurité de session, C1/C2/C4/C6/C8 et leurs tests ; pas de création de branche/PR, pas de merge, CI groupée en fin de chantier. Ne pas présenter l'ajout des tests comme une réussite CI.
 
+## DERNIER LOT HORS PROTOCOLES — C6 ET PONT WINDOWS (23/11/2026)
+
+- C6 : double validation DTC désormais liée au même adaptateur **et** à l'identité du véhicule/VIN depuis l'avertissement jusqu'au ViewModel. Même une reconnection rapide, un changement de profil véhicule ou un changement de compte invalide l'autorisation. Tests `EcuWriteConsentFlowTest` étendus.
+- J2534 : le pont TLS appairé est visible distinctement de l'adaptateur ELM, sans affichage trompeur des capacités ELM ni prétention d'accès ECU. Le formulaire de connexion masque son jeton + empreinte TLS dans `toString()` et possède un test de confidentialité.
+- C1 : la console brute revérifie déjà son contexte avant TX, ne pas supprimer cette protection. C2 : l'index d'un paquet de sauvegarde hors ligne est supprimé en cas d'échec de finalisation ; toujours pas de preuve de restauration physique.
+- CI : une validation groupée Android/communication/Windows a été demandée via `.github/c1-console-gate-request.txt` au commit `671bbbe`. **Son résultat n'est pas confirmé** ; aucune validation C8 complète au HEAD final ni essai physique n'est revendiqué.
+- C6 **reste actif** en lien avec C2 et le chantier des pilotes physiques. Ne pas annoncer programmation, sauvegarde complète, rollback ou prise en charge complète des connecteurs à la seule vue d'une UI ou d'une suite de tests.
+
 ## DÉCISIONS LES PLUS RÉCENTES — À APPLIQUER DANS TOUT NOUVEAU CHAT (23/11/2026)
 
 **Lire impérativement [AGENTS.md](../AGENTS.md) et [l'audit de PR #95](AUDIT_PR95_C1_C2_C4_C6_C8.md).** Ces règles priment sur les anciennes indications de PR #35, branche `feat/live-can-monitor`, CI à chaque ~50 commits, verrouillage ECU globalement lecture seule et anciens blocages d'écriture décrits plus bas. Sur GitHub au 23/11/2026 : PR **#95** et branche **`chore/unified-ci`**, non fusionnée ; toujours rafraîchir ce statut en temps réel.
