@@ -14,6 +14,87 @@ internal static class StandardProtocolCli
     internal const string DoIpCommand = "--doip-exchange";
     internal const string PassThruCommand = "--j2534-standard";
     internal const string RawIsoTpCommand = "--isotp-exchange";
+    internal const string J1939Command = "--j1939-transport";
+
+    internal sealed record J1939Options(
+        int AdapterIndex, uint Bitrate, J1939ClassicTpSession.Options Settings,
+        string Mode, bool Broadcast, byte[] Request, int TimeoutMs);
+
+    internal static J1939Options ParseJ1939(string[] args)
+    {
+        var index = int.Parse(Required(args, "--adapter-index"),
+            CultureInfo.InvariantCulture);
+        var baud = Number(Required(args, "--baud"));
+        var source = (byte)Number(Required(args, "--source"));
+        var target = (byte)Number(Required(args, "--target"));
+        var pgn = (int)Number(Required(args, "--pgn"));
+        var priority = (byte)Number(Optional(args, "--priority") ?? "6");
+        var window = (byte)Number(Optional(args, "--receive-window") ?? "16");
+        var mode = Required(args, "--mode").ToLowerInvariant();
+        var broadcast = bool.Parse(Optional(args, "--broadcast") ?? "false");
+        var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
+            CultureInfo.InvariantCulture);
+        var data = mode == "send" ? Hex(Required(args, "--payload")) : [];
+        var options = new J1939ClassicTpSession.Options(source, target, pgn,
+            priority, window);
+        options.Validate();
+        if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
+            mode is not ("send" or "receive") ||
+            (mode == "receive" && broadcast) ||
+            data.Length > J1939ClassicTpSession.MaxPayload)
+            throw new ArgumentException("Invalid J1939 transport or operating mode.");
+        return new(index, baud, options, mode, broadcast, data, timeout);
+    }
+
+    internal static async Task<int> RunJ1939Async(string[] args)
+    {
+        try
+        {
+            var o = ParseJ1939(args);
+            var adapters = J2534Registry.Discover();
+            if (o.AdapterIndex >= adapters.Count)
+                throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
+            if (o.Mode == "send" &&
+                !Confirm($"SAE J1939-21 PGN=0x{o.Settings.Pgn:X} " +
+                    $"source=0x{o.Settings.LocalAddress:X2} " +
+                    $"destination=0x{(o.Broadcast ? 0xFF : o.Settings.RemoteAddress):X2} " +
+                    $"payload={Convert.ToHexString(o.Request)}"))
+                return 2;
+            // J1939-21 TP uses RAW 29-bit CAN; do not use ISO15765 framing.
+            using var driver = J2534StandardChannel.Connect(
+                adapters[o.AdapterIndex], J2534StandardChannel.Can,
+                o.Bitrate, flags: 0x100);
+            // CM (0xEC00), DT (0xEB00), and direct PGNs need more than one
+            // arbitration ID. Software session code correlates PGN + source
+            // and destination; listen to the 29-bit CAN bus.
+            driver.ConfigureFilter(new byte[4], new byte[4]);
+            var link = new IsoTpJ2534RawCanLink(driver, canFd: false,
+                extendedId: true, bitRateSwitch: false);
+            var window = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            if (o.Mode == "send")
+            {
+                await J1939ClassicTpSession.SendAsync(link, o.Settings,
+                    o.Request, o.Broadcast, window, CancellationToken.None);
+                Console.WriteLine("J1939 TP transmit completed; ECU functionality remains unverified.");
+            }
+            else
+            {
+                var response = await J1939ClassicTpSession.ReceiveAsync(
+                    link, o.Settings, window, CancellationToken.None);
+                Console.WriteLine($"J1939 RX PGN=0x{response.Pgn:X} " +
+                    $"broadcast={response.Broadcast}: {Convert.ToHexString(response.Payload)}");
+            }
+            return 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or
+            IOException or InvalidOperationException or TimeoutException or
+            DllNotFoundException or BadImageFormatException or
+            EntryPointNotFoundException or OverflowException)
+        {
+            Console.Error.WriteLine("J1939 TP exchange failed: " + ex.Message);
+            return 6;
+        }
+    }
 
     internal sealed record IsoTpOptions(
         int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
