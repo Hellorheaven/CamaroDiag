@@ -12,25 +12,33 @@ internal static class NativeUdsUploadProtocol
     internal const int MaximumReadBytes = 16 * 1024 * 1024;
     internal const int BridgeMaximumTransferData = 4089;
 
-    internal sealed record Result(uint Address, byte[] Image, int Blocks,
+    internal sealed record Result(ulong Address, byte[] Image, int Blocks,
         byte LastSequenceCounter);
+
+    internal static Task<Result> UploadAsync(
+        NativeUdsDownloadProtocol.IExchange link,
+        uint address, int length, CancellationToken token) =>
+        UploadAsync(link, (ulong)address, length, 4, 4, token);
 
     internal static async Task<Result> UploadAsync(
         NativeUdsDownloadProtocol.IExchange link,
-        uint address, int length, CancellationToken token)
+        ulong address, int length, byte addressBytes,
+        byte lengthBytes, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(link);
         if (length is < 1 or > MaximumReadBytes ||
-            (ulong)address + (uint)length > 0x1_0000_0000UL)
+            (ulong)length > ulong.MaxValue - address)
             throw new ArgumentOutOfRangeException(nameof(length),
-                "UDS upload must be a bounded 32-bit memory range.");
+                "UDS upload must be a bounded physical memory range.");
+        // Check the caller's address field width and size field width
+        // before sending anything. The payload remains a read request.
+        var request = UdsStandardServices.RequestUpload(
+            address, (ulong)length, addressBytes, lengthBytes);
         token.ThrowIfCancellationRequested();
 
         // This only requests a read from an already properly authenticated
         // ECU; no fabricated address map, seed/key, flash erase or write.
-        var response = await link.SendAsync(
-            UdsStandardServices.RequestUpload(address, (uint)length),
-            token);
+        var response = await link.SendAsync(request, token);
         NativeUdsDownloadProtocol.CheckPositiveReply(response, 0x35, 0x75);
         var negotiated = UdsStandardServices.DecodeTransferParameters(
             0x35, response);
