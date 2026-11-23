@@ -263,7 +263,8 @@ internal static class StandardProtocolCli
         byte[] Request, int TimeoutMs);
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
-        byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames);
+        byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
+        byte? KwpRxTarget, byte? KwpRxSource);
 
     private static string Required(IReadOnlyList<string> args, string option)
     {
@@ -331,6 +332,10 @@ internal static class StandardProtocolCli
         var pattern = Optional(args, "--pattern") is string p ? Hex(p) : null;
         var flow = Optional(args, "--flow-control") is string f ? Hex(f) : null;
         var init = Optional(args, "--kline-init");
+        var kwpRxTarget = Optional(args, "--kwp-rx-target") is string targetText ?
+            checked((byte)Number(targetText)) : (byte?)null;
+        var kwpRxSource = Optional(args, "--kwp-rx-source") is string sourceText ?
+            checked((byte)Number(sourceText)) : (byte?)null;
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "1500",
             CultureInfo.InvariantCulture);
         var count = int.Parse(Optional(args, "--read-frames") ?? "1",
@@ -340,13 +345,16 @@ internal static class StandardProtocolCli
             data.Length > J2534StandardChannel.MaxData ||
             (mask == null) != (pattern == null) ||
             (flow != null && mask == null) ||
+            (kwpRxTarget.HasValue != kwpRxSource.HasValue) ||
+            (kwpRxTarget.HasValue && protocol != J2534StandardChannel.Iso14230) ||
             (init != null && protocol is not (J2534StandardChannel.Iso9141
                                              or J2534StandardChannel.Iso14230)) ||
             (init != null && !init.StartsWith("five:", StringComparison.OrdinalIgnoreCase) &&
                 !init.StartsWith("fast:", StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("Invalid standard J2534 channel configuration.");
         return new(index, protocol, baud, flags, data,
-            mask, pattern, flow, init, timeout, count);
+            mask, pattern, flow, init, timeout, count,
+            kwpRxTarget, kwpRxSource);
     }
 
     internal static async Task<int> RunDoIpAsync(string[] args)
@@ -409,6 +417,13 @@ internal static class StandardProtocolCli
                 if (received == null) break;
                 Console.WriteLine($"J2534 RX protocol=0x{received.ProtocolId:X} " +
                     $"status=0x{received.RxStatus:X} {Convert.ToHexString(received.Data)}");
+                if (o.KwpRxTarget is byte target && o.KwpRxSource is byte source)
+                {
+                    var payload = StandardVehicleProtocols.ParseKwpPhysicalFrame(
+                        received.Data, target, source);
+                    Console.WriteLine("KWP physical RX payload: " +
+                        Convert.ToHexString(payload));
+                }
             }
             return 0;
         }
