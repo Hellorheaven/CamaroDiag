@@ -33,6 +33,9 @@ internal static class Program
 
         // Explicit bidirectional ISO/SAE exchanges. No default startup
         // programming and no network-listener fallback on malformed CLI.
+        if (args.Contains(StandardProtocolCli.J1939FdCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunJ1939FdAsync(args);
         if (args.Contains(StandardProtocolCli.J1939Command,
             StringComparer.OrdinalIgnoreCase))
             return await StandardProtocolCli.RunJ1939Async(args);
