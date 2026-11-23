@@ -98,7 +98,7 @@ internal static class StandardProtocolCli
 
     internal sealed record IsoTpOptions(
         int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
-        byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs);
+        byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs, uint? DataBaud);
 
     internal static IsoTpOptions ParseIsoTp(string[] args)
     {
@@ -120,18 +120,27 @@ internal static class StandardProtocolCli
             CultureInfo.InvariantCulture);
         var extended = bool.Parse(Optional(args, "--extended") ?? "false");
         var brs = bool.Parse(Optional(args, "--brs") ?? "false");
+        var dataBaud = Optional(args, "--data-baud") is string rate ?
+            Number(rate) : (uint?)null;
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
-        var bytes = Hex(Required(args, "--payload"));
+        var hexPayload = Optional(args, "--payload");
+        var payloadFile = Optional(args, "--payload-file");
+        if ((hexPayload is null) == (payloadFile is null))
+            throw new ArgumentException("Supply exactly one of --payload or --payload-file.");
+        var bytes = payloadFile is null ?
+            Convert.FromHexString(hexPayload!) : File.ReadAllBytes(payloadFile);
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd, bs, stMin);
         setting.Validate();
         if (index < 0 || bitrate == 0 || timeout is < 100 or > 30000 ||
-            bytes.Length > IsoTpCanFdSession.MaximumPayloadBytes ||
+            bytes.Length is < 1 or > IsoTpCanFdSession.MaximumPayloadBytes ||
+            (brs && (!dataBaud.HasValue || dataBaud.Value == 0)) ||
+            (dataBaud.HasValue && (!fd || dataBaud.Value == 0)) ||
             tx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
             rx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
             (!fd && brs))
             throw new ArgumentException("Invalid ISO-TP physical address or J2534 option.");
-        return new(index, bitrate, setting, bytes, timeout, extended, brs);
+        return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud);
     }
 
     internal static async Task<int> RunIsoTpAsync(string[] args)
@@ -152,6 +161,8 @@ internal static class StandardProtocolCli
                 o.Settings.CanFd ? J2534StandardChannel.FdCan :
                 J2534StandardChannel.Can, o.Bitrate,
                 o.ExtendedId ? 0x100u : 0u);
+            if (o.DataBaud.HasValue)
+                driver.SetCanFdDataPhaseRate(o.DataBaud.Value);
             var mask = new byte[4];
             var pattern = new byte[4];
             System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(
