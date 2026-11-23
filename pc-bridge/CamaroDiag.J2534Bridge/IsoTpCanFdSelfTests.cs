@@ -103,7 +103,7 @@ internal static class IsoTpCanFdSelfTests
         foreach (var frame in multi.Sent)
             reconstruct.Replies.Enqueue(new(0x7E8, true, frame.Data));
         Check(Receive(reconstruct, fd12).SequenceEqual(Fill(35)) &&
-            reconstruct.Sent.Count == 4,
+            reconstruct.Sent.Count == 3,
             "Fully round-tripped CAN FD PDU and repeated CTS per receiver BS=1.");
 
         var longTx = new QueueLink();
