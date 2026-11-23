@@ -133,6 +133,17 @@ internal static class StandardProtocolCli
                     link, o.Settings, window, CancellationToken.None);
                 Console.WriteLine($"J1939 RX PGN=0x{response.Pgn:X} " +
                     $"broadcast={response.Broadcast}: {Convert.ToHexString(response.Payload)}");
+                if (response.Pgn == J1939AddressClaim.AddressClaimPgn)
+                {
+                    var claimId = J1939ClassicTpSession.ArbitrationId(
+                        response.Pgn, o.Settings.Priority,
+                        o.Settings.RemoteAddress, 0xFF);
+                    var claim = J1939AddressClaim.Decode(claimId, response.Payload);
+                    Console.WriteLine($"J1939 Address Claimed source=0x{claim.SourceAddress:X2} " +
+                        $"NAME=0x{claim.Name:X16} manufacturer={claim.ManufacturerCode} " +
+                        $"identity={claim.IdentityNumber} function={claim.Function} " +
+                        $"arbitraryAddress={claim.ArbitraryAddressCapable}");
+                }
                 if (response.Pgn is J1939DmDiagnostics.Dm1Pgn or
                     J1939DmDiagnostics.Dm2Pgn)
                 {
