@@ -52,3 +52,9 @@
 - Test C1 supplémentaire : 6 000 lignes de capture divisées arbitrairement en fragments, soit plus que 128 Kio, restent intégralement écrites dans l'archive.
 - **Point bloquant de clôture de #59 :** journal chronologique persistant de tous les événements TX/RX/SYSTEM (sans dépendance aux protocoles standard), puis export de l'intégralité de ce journal avec le flux RX brut, avec contrôles d'erreurs d'E/S, tests longs et qualification physique.
 - Aucun test nouvellement commité n'est déclaré réussi à ce stade. La campagne C4 demandée auparavant ne prouve pas la validation des modifications suivantes du HEAD.
+
+## Contrôle statique final de cette session C1/C4
+- Test de capture CAN longue : import JUnit manquant corrigé, et test ajusté pour émettre de **vrais enregistrements CRLF** fragmentés (`CanConsoleRawArchiveWriterTest.kt`), toujours sans exécution annoncée.
+- Ressources d'interface et d'export C1 : présence unique en français et en anglais des huit clés contrôlées ; écran et ViewModel référencent bien les nouvelles clés / vérifications de contexte.
+- C4 : le moteur rejette les mesures dont la réponse physique brute est absente/vide, indépendamment de la valeur d'un tampon déjà décodé. Les deux tests concernés ont été ajoutés.
+- Le contrôle ici est **statique**, non une compilation Android ni une preuve de réussite de GitHub Actions. Les validations sur un SHA stabilisé et la clôture de #59 restent à mener.
