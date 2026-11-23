@@ -162,8 +162,12 @@ internal static class StandardProtocolCli
             StringComparer.OrdinalIgnoreCase);
         var cmdt = args.Contains(J1939FdCmdtCommand,
             StringComparer.OrdinalIgnoreCase);
-        if (bam && cmdt)
-            throw new ArgumentException("Choose one J1939-22 FD transport.");
+        var multiPg = args.Contains(J1939FdCommand,
+            StringComparer.OrdinalIgnoreCase);
+        if ((bam ? 1 : 0) + (cmdt ? 1 : 0) +
+            (multiPg ? 1 : 0) != 1)
+            throw new ArgumentException(
+                "Select exactly one SAE J1939-22 Multi-PG, BAM or CMDT transport.");
         var window = checked((byte)Number(Optional(args, "--window") ?? "8"));
         var session = checked((byte)Number(Optional(args, "--session") ?? "0"));
         var priority = checked((byte)Number(Optional(args, "--priority") ??
