@@ -1459,10 +1459,16 @@ internal static class StandardProtocolCli
                 driver.Transmit(o.Data, timeoutMs: o.TimeoutMs);
                 Console.WriteLine("J2534 TX queued; this does not prove ECU execution.");
             }
+            var correlatedKwp = false;
             for (var i = 0; i < o.ReadFrames; i++)
             {
                 var received = driver.Receive(o.TimeoutMs);
                 if (received == null) break;
+                // J2534 TX acknowledgements and status frames are not an
+                // ISO 14230 physical application reply.
+                if (o.KwpRequest is not null &&
+                    J2534StandardChannel.IsAuxiliaryReceiveStatus(received.RxStatus))
+                    continue;
                 Console.WriteLine($"J2534 RX protocol=0x{received.ProtocolId:X} " +
                     $"status=0x{received.RxStatus:X} {Convert.ToHexString(received.Data)}");
                 // Only inspect the wire CRC when the operator explicitly
@@ -1482,7 +1488,26 @@ internal static class StandardProtocolCli
                             J2534StandardChannel.KlineChecksumDisabled) != 0);
                     Console.WriteLine("KWP physical RX payload: " +
                         Convert.ToHexString(payload));
+                    if (o.KwpRequest is not null)
+                    {
+                        var reply = Kwp2000Transaction.Decode(o.KwpRequest, payload);
+                        Console.WriteLine($"KWP service=0x{reply.Service:X2} " +
+                            $"status={reply.Status} " +
+                            $"NRC={(reply.NegativeResponseCode is byte code ? $"0x{code:X2}" : "none")}");
+                        if (reply.Status == Kwp2000Transaction.Kind.Negative)
+                            return 7;
+                        if (reply.Status == Kwp2000Transaction.Kind.ResponsePending)
+                            continue;
+                        correlatedKwp = true;
+                        break;
+                    }
                 }
+            }
+            if (o.KwpRequest is not null && !correlatedKwp)
+            {
+                Console.Error.WriteLine(
+                    "No final correlated KWP ECU response received; transmission is unconfirmed.");
+                return 7;
             }
             return 0;
         }
