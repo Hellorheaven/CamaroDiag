@@ -30,6 +30,13 @@ internal static class ObdJ1979InterpretationSelfTests
         Check(freeze.Positive && freeze.Description.Contains("freeze-frame=1"),
             "Mode 02 freeze-frame correlation.");
 
+        var readiness = ObdJ1979Interpretation.Interpret(
+            [0x01, 0x01], [0x41, 0x01, 0x83, 0x08, 0xA5, 0x5A]);
+        Check(readiness.Positive &&
+            readiness.Description.Contains("MIL=ON") &&
+            readiness.Description.Contains("confirmed-DTCs=3"),
+            "Physical CAN PID 01 reply exposes MIL and stored-DTC count.");
+
         var vin = new byte[] { 0x49, 0x02, 0x01 }
             .Concat(Encoding.ASCII.GetBytes("1G1FF1R70C0100001")).ToArray();
         Check(ObdJ1979Interpretation.Interpret([0x09, 0x02], vin)
