@@ -1,15 +1,14 @@
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// The dedicated LOCAL E39 bench programming entry point is compiled in for
-/// physical hardware validation. This flag does not confer programming
-/// authorization: a trusted signed bench profile, verified driver, complete
-/// matching physical backup and voltage/recovery checks remain mandatory.
-/// The network bridge stays read-only and cannot reach this entry point.
+/// PR #95 permits read-only physical diagnostics and backup only.
+/// Programming, including the local E39 bench entry, is deferred until the
+/// separately qualified C3/anti-brick work after audit #106.
+/// This is an immutable fail-closed gate: no CLI, network or runtime toggle.
 /// </summary>
 internal static class NativeEcuWriteAvailability
 {
-    internal static bool PhysicalEcuProgrammingEnabled => true;
+    internal static bool PhysicalEcuProgrammingEnabled => false;
 
     internal static void RequirePhysicalEcuProgrammingEnabled()
     {

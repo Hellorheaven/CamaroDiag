@@ -21,9 +21,9 @@ internal static class NativeE39QualifiedBenchCli
         Console.CancelKeyPress += Cancel;
         try
         {
-            // Enable the explicitly invoked LOCAL physical bench test path.
-            // Independent signed qualification is still required before
-            // discovering an adapter or contacting an ECU.
+            // C6 safety boundary: signed profile checks are necessary but do
+            // NOT authorize hardware programming in PR #95. Deny this CLI
+            // before loading files or opening a J2534 device.
             NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
             // Verify trusted qualification BEFORE discovering adapters or
             // processing operator input. There is no self-qualification switch.
