@@ -1,5 +1,5 @@
-C4 LFX 2012 read-only fuel observations implementation frozen for one grouped validation.
-Development HEAD: a9af6efd144f06c32635d56595b7e24af909e1ea
-Android tests: communication + diagnostic + app Debug unit suites, warnings fail.
-Read SAE Mode 01 0x52 ethanol, 0x06/07/08/09 fuel trims only. No ECU programming.
-No physical vehicle, ethanol sensor, FlexFuel activation or ECU mapping qualification.
+C4 read-only fuel observations, session-bound history and CSV export: grouped Android Debug checkpoint.
+Source revision before request: de4ea6c84188643d832921a803307766f3ffc02e
+Includes communication history/CSV unit regressions and Android calibration screen/export integration.
+Run communication, diagnostic and app unit suites once; fail on warnings.
+No physical ECU, installed ethanol sensor or calibration qualification is implied.
