@@ -131,6 +131,43 @@ internal static class DoIpVehicleDiscovery
     }
 
     /// <summary>
+    /// Query one explicitly selected DoIP gateway for status or diagnostic
+    /// power mode. Uses standard UDP control messages only, never UDS.
+    /// </summary>
+    internal static async Task<DoIpCodec.Message> QueryStatusAsync(
+        string host, bool powerMode, TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        if (!IPAddress.TryParse(host, out var address) ||
+            address.AddressFamily != AddressFamily.InterNetwork ||
+            address.Equals(IPAddress.Any) ||
+            address.Equals(IPAddress.Broadcast) ||
+            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
+            throw new ArgumentException("Provide a valid unicast DoIP IPv4 gateway and timeout.");
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+        using var socket = new UdpClient(AddressFamily.InterNetwork);
+        var request = DoIpCodec.Encode(powerMode ?
+            DoIpCodec.PowerModeRequest : DoIpCodec.EntityStatusRequest, []);
+        await socket.SendAsync(request.AsMemory(),
+            new IPEndPoint(address, 13400), deadline.Token);
+        var expectedType = powerMode ?
+            DoIpCodec.PowerModeResponse : DoIpCodec.EntityStatusResponse;
+        while (true)
+        {
+            var response = await socket.ReceiveAsync(deadline.Token);
+            if (!response.RemoteEndPoint.Address.Equals(address))
+                continue;
+            var decoded = DoIpCodec.Decode(response.Buffer);
+            if (decoded.Type != expectedType)
+                continue;
+            if (powerMode) _ = DoIpCodec.ParseDiagnosticPowerMode(decoded);
+            else _ = DoIpCodec.ParseEntityStatus(decoded);
+            return decoded;
+        }
+    }
+
+    /// <summary>
     /// Listen for spontaneous DoIP UDP identification announcements, without
     /// sending even a vehicle-identification request. Requires permission to
     /// bind local UDP port 13400; this is not ECU authentication.
