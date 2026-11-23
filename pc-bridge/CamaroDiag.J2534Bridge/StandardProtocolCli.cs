@@ -19,6 +19,7 @@ internal static class StandardProtocolCli
     internal const string J1939Command = "--j1939-transport";
     internal const string J1939FdCommand = "--j1939-fd-multipg";
     internal const string J1939FdBamCommand = "--j1939-fd-bam";
+    internal const string J1939FdCmdtCommand = "--j1939-fd-cmdt";
 
     internal static async Task<int> RunDoIpStatusAsync(string[] args)
     {
@@ -145,7 +146,7 @@ internal static class StandardProtocolCli
     internal sealed record J1939FdOptions(int AdapterIndex, uint Bitrate,
         uint? DataBaud, bool Brs, byte Source, byte Target, byte Priority,
         int? Pgn, string Mode, byte[] Payload, int TimeoutMs,
-        bool Bam, byte Session);
+        bool Bam, byte Session, bool Cmdt, byte Window);
 
     internal static J1939FdOptions ParseJ1939Fd(string[] args)
     {
@@ -159,8 +160,14 @@ internal static class StandardProtocolCli
         var target = checked((byte)Number(Required(args, "--target")));
         var bam = args.Contains(J1939FdBamCommand,
             StringComparer.OrdinalIgnoreCase);
+        var cmdt = args.Contains(J1939FdCmdtCommand,
+            StringComparer.OrdinalIgnoreCase);
+        if (bam && cmdt)
+            throw new ArgumentException("Choose one J1939-22 FD transport.");
+        var window = checked((byte)Number(Optional(args, "--window") ?? "8"));
         var session = checked((byte)Number(Optional(args, "--session") ?? "0"));
-        var priority = checked((byte)Number(Optional(args, "--priority") ?? (bam ? "7" : "6")));
+        var priority = checked((byte)Number(Optional(args, "--priority") ??
+            (bam || cmdt ? "7" : "6")));
         var pgnText = Optional(args, "--pgn");
         int? pgn = pgnText is null ? null : checked((int)Number(pgnText));
         var mode = Required(args, "--mode").ToLowerInvariant();
@@ -171,7 +178,7 @@ internal static class StandardProtocolCli
         if (payloadFile is not null)
         {
             var fileBytes = new FileInfo(payloadFile).Length;
-            if (fileBytes > (bam ? J1939FdBamSession.MaximumPayload : 60))
+            if (fileBytes > (bam || cmdt ? J1939FdBamSession.MaximumPayload : 60))
                 throw new ArgumentException("J1939-22 payload file exceeds transport limit.");
         }
         byte[] payload = payloadText is not null ? Hex(payloadText) :
@@ -183,12 +190,16 @@ internal static class StandardProtocolCli
             (mode == "receive" && target >= 0xFE) ||
             priority > 7 || mode is not ("send" or "receive") ||
             (mode == "send" && (pgn is null ||
-                (bam ? payload.Length is <= 60 or > J1939FdBamSession.MaximumPayload :
+                (bam || cmdt ?
+                    payload.Length is <= 60 or > J1939FdBamSession.MaximumPayload :
                     payload.Length is < 1 or > 60))) ||
             (mode == "receive" && (payloadText is not null || payloadFile is not null)) ||
             (bam && (pgn is null || session > 3 ||
                 (mode == "send" && target != 0xFF))) ||
-            (!bam && Optional(args, "--session") is not null) ||
+            (cmdt && (pgn is null || session > 7 ||
+                target >= 0xFE || window == 0)) ||
+            (!bam && !cmdt && Optional(args, "--session") is not null) ||
+            (!cmdt && Optional(args, "--window") is not null) ||
             pgn is < 0 or > 0x3FFFF ||
             (brs && (dataBaud is null or 0)) ||
             (dataBaud.HasValue && dataBaud.Value == 0))
@@ -201,8 +212,10 @@ internal static class StandardProtocolCli
             throw new ArgumentException("J1939-22 PDU2 contained PGN must be broadcast.");
         if (bam && pgn.HasValue && ((pgn.Value >> 8) & 0xFF) < 240)
             throw new ArgumentException("J1939-22 broadcast TP requires a PDU2 PGN.");
+        if (cmdt && pgn.HasValue && ((pgn.Value >> 8) & 0xFF) >= 240)
+            throw new ArgumentException("J1939-22 directed FD.TP requires a PDU1 PGN.");
         return new(index, baud, dataBaud, brs, source, target,
-            priority, pgn, mode, payload, timeout, bam, session);
+            priority, pgn, mode, payload, timeout, bam, session, cmdt, window);
     }
 
     internal static async Task<int> RunJ1939FdAsync(string[] args)
@@ -214,7 +227,7 @@ internal static class StandardProtocolCli
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
             if (o.Mode == "send" &&
-                !Confirm($"SAE J1939-22 {(o.Bam ? "FD.TP BAM" : "FEFF Multi-PG")} " +
+                !Confirm($"SAE J1939-22 {(o.Bam ? "FD.TP BAM" : o.Cmdt ? "FD.TP CMDT" : "FEFF Multi-PG")} " +
                     $"TX source=0x{o.Source:X2} destination=0x{o.Target:X2} " +
                     $"PGN=0x{o.Pgn:X} length={o.Payload.Length} " +
                     $"SHA256={Convert.ToHexString(
@@ -234,7 +247,17 @@ internal static class StandardProtocolCli
 
             if (o.Mode == "send")
             {
-                if (o.Bam)
+                if (o.Cmdt)
+                {
+                    var session = new J1939FdCmdtSession.Options(
+                        o.Source, o.Target, o.Pgn!.Value,
+                        o.Session, o.Priority, o.Window);
+                    await J1939FdCmdtSession.SendAsync(link, session,
+                        o.Payload, TimeSpan.FromMilliseconds(o.TimeoutMs),
+                        CancellationToken.None);
+                    Console.WriteLine("J1939-22 directed FD.TP sent and acknowledged; no ECU operation qualified.");
+                }
+                else if (o.Bam)
                 {
                     await J1939FdBamSession.SendAsync(link, o.Source,
                         o.Pgn!.Value, o.Session, o.Payload,
@@ -253,6 +276,17 @@ internal static class StandardProtocolCli
             }
 
             var limit = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            if (o.Cmdt)
+            {
+                var options = new J1939FdCmdtSession.Options(
+                    o.Source, o.Target, o.Pgn!.Value,
+                    o.Session, o.Priority, o.Window);
+                var payload = await J1939FdCmdtSession.ReceiveAsync(
+                    link, options, limit, CancellationToken.None);
+                Console.WriteLine($"J1939-22 CMDT RX PGN=0x{o.Pgn:X} " +
+                    $"length={payload.Length} raw={Convert.ToHexString(payload)}");
+                return 0;
+            }
             if (o.Bam)
             {
                 var payload = await J1939FdBamSession.ReceiveAsync(link,
