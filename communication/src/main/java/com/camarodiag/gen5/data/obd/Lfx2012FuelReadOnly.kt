@@ -76,7 +76,8 @@ object Lfx2012FuelReadOnly {
                 Reading(pid, Availability.UNSUPPORTED)
             } else {
                 val data = rawData[pid]
-                if (data == null || data.size != 1 || data[0] !in 0..255) {
+                if (survey.responses[pid].isNullOrBlank() ||
+                    data == null || data.size != 1 || data[0] !in 0..255) {
                     Reading(pid, Availability.NO_VALID_RESPONSE)
                 } else {
                     // Reuse the existing SAE PID 52 decoder, rather than
