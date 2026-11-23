@@ -56,6 +56,7 @@ import com.camarodiag.gen5.data.obd.CanConsoleDisplayFilter
 import com.camarodiag.gen5.data.obd.CanConsoleStreamFramer
 import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
 import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
+import com.camarodiag.gen5.data.obd.UsbPermissionPendingException
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeException
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeCancelled
 import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
@@ -3493,9 +3494,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     }
-                    .onFailure {
+                    .onFailure { error ->
                         if (attempt == connectionAttemptGeneration) {
-                            _connectionMessage.value = fallbackMessage
+                            _connectionMessage.value =
+                                if (error is UsbPermissionPendingException) {
+                                    localizedContext.getString(R.string.msg_usb_permission_pending)
+                                } else fallbackMessage
                         }
                     }
             } catch (cancelled: CancellationException) {
