@@ -75,8 +75,27 @@ def backup_manifest(
     )
 
 
+def _sync_parent_directory(parent: Path) -> None:
+    """Persist backup directory entries on POSIX after file data has been fsynced.
+
+    Windows does not expose portable directory fsync through Python; its files
+    are still explicitly flushed to stable storage before publishing metadata.
+    """
+    if os.name != "posix":
+        return
+    fd = os.open(parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def write_bundle(prefix: Path, image: bytes, manifest: Manifest) -> None:
-    """Create backup .bin/.json files exclusively, never overwrite."""
+    """Create and read back a durable OFFLINE backup; publish metadata last.
+
+    A matching digest proves file integrity only, never physical ECU provenance
+    or whether a future restoration can succeed.
+    """
     if sha256(image).hexdigest() != manifest.image_sha256 or len(image) != manifest.region_length:
         raise ValueError("Image does not match manifest")
     if (type(manifest.schema) is not int or type(manifest.declared_capacity) is not int
@@ -109,17 +128,38 @@ def write_bundle(prefix: Path, image: bytes, manifest: Manifest) -> None:
     binary_created = False
     metadata_created = False
     try:
+        # The .json manifest is the publication marker. A crash leaving only
+        # .bin cannot be mistaken for a complete backup by verify_bundle().
         with binary.open("xb") as out:
             binary_created = True
             out.write(image)
+            out.flush()
+            os.fsync(out.fileno())
+        with _open_regular_nofollow(binary) as reread:
+            if reread.read(len(image) + 1) != image:
+                raise ValueError("Backup image readback differs from its source")
+        # Persist the .bin filename before making a manifest visible.
+        _sync_parent_directory(binary.parent)
         with metadata.open("xb") as out:
             metadata_created = True
             out.write(encoded_manifest)
+            out.flush()
+            os.fsync(out.fileno())
+        if verify_bundle(prefix) != manifest:
+            raise ValueError("Backup manifest readback differs from its source")
+        # Persist both directory entries after the final, verified manifest.
+        _sync_parent_directory(binary.parent)
     except BaseException:
         if metadata_created:
             metadata.unlink(missing_ok=True)
         if binary_created:
             binary.unlink(missing_ok=True)
+        # Make cleanup durable where the host filesystem permits it. Preserve
+        # the original error if the directory itself has already disappeared.
+        try:
+            _sync_parent_directory(binary.parent)
+        except OSError:
+            pass
         raise
 
 
