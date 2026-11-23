@@ -382,13 +382,19 @@ class J2534BridgeTransport(
         }
     }
 
-    suspend fun clearStandardObdDtcs(approval: EcuWriteConsentFlow.Approval) =
-        withContext(Dispatchers.IO) {
+    suspend fun clearStandardObdDtcs(
+        approval: EcuWriteConsentFlow.Approval,
+        beforeTransmit: () -> Unit = {}
+    ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             require(approval.warningAcknowledged && approval.confirmedYes) {
                 "Risk notice OK and subsequent YES required before ECU clear."
             }
             check(isStandardObdClearEnabled) { "Local Windows operator has not enabled OBD clear." }
+            // A queued bridge request must not reuse operator consent after
+            // logout, vehicle selection changes or an adapter transition.
+            beforeTransmit()
+            ensureOpen()
             val response = request(JSONObject()
                 .put("op", "clearStandardObdDtcs")
                 .put("token", tlsPairing.token)
