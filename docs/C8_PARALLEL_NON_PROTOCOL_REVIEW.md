@@ -74,3 +74,10 @@
 - **C4 :** l'export de l'historique de mesures carburant exige une série complète et inchangée, hors acquisition, sans interpréter les PID absents comme 0 % ni présumer de l'activation éthanol.
 - **Tests :** suites unitaires dédiées ajoutées ; requêtes C1/C2/C4 déclenchées via les fichiers de contrôle des workflows. Aucune conclusion sur la réussite des jobs pour le nouveau HEAD n'est permise sans consultation explicite de GitHub Actions ; la compilation globale C8 reste à faire après fin de l'autre intervention protocoles.
 - **Périmètre :** aucune modification des transports ISO/SAE, J2534, DoIP, K-Line, CAN-FD, J1939 ni des firmwares connecteurs par cette intervention. PR #95 reste Draft ; aucun merge/Release.
+
+## C8 — revue supplémentaire des archives C1/C2 (23/11/2026)
+
+- **C1 :** le contrôle d'export vérifie la génération, le nombre d'événements et désormais la longueur du journal persistant ; un fichier tronqué pendant l'export devient invalide. La seule égalité de taille n'est pas un hash d'intégrité ni une preuve de réception physique.
+- **C2 :** l'export d'un paquet de restauration contrôlé hors ligne ne peut pas annoncer une réussite lorsque des fichiers sources changent pendant la copie. Il compare les digests lors de la copie puis le contenu des images vérifiées, par région, avec un pic mémoire borné plutôt que de rouvrir le paquet entier en une deuxième collection d'images.
+- **Limite :** tous ces contrôles sont sur fichiers locaux ; aucun write/erase, protocole constructeur, plan mémoire exhaustif ou récupération d'ECU physique n'a été validé.
+- **Tests** : tests de troncature du journal et de mutation de l'index/région pendant export ajoutés. Résultats GitHub Actions sur le dernier HEAD toujours à vérifier. Les travaux standards transport restent à l'autre chat.
