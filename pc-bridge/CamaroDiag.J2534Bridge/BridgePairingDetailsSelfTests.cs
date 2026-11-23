@@ -53,8 +53,8 @@ internal static class BridgePairingDetailsSelfTests
             "short." + new string('A', 64),
             new string('T', 42) + "." + new string('A', 64),
             new string('T', 44) + "." + new string('A', 64),
-            new string('T', 43) + ".\\n" + new string('A', 64),
-            new string('T', 42) + "\\n." + new string('A', 64),
+            new string('T', 43) + "." + '\n' + new string('A', 64),
+            new string('T', 42) + '\n' + "." + new string('A', 64),
             new string('T', 42) + "+." + new string('A', 64),
             new string('T', 43) + "." + new string('A', 63)
         })
