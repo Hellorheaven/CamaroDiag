@@ -62,6 +62,24 @@ class CanConsoleEventJournalStoreTest {
         }
     }
 
+    @Test fun externalTruncationInvalidatesAnOtherwiseUnchangedSnapshot() {
+        val directory = Files.createTempDirectory("console-shortened").toFile()
+        try {
+            val store = CanConsoleEventJournalStore(directory)
+            store.append(listOf(event(0), event(1)))
+            val snapshot = requireNotNull(store.snapshot())
+            assertTrue(snapshot.sizeBytes > 0)
+            assertTrue(store.isCurrent(snapshot))
+            java.io.RandomAccessFile(snapshot.file, "rw").use {
+                it.setLength(1L)
+            }
+            assertFalse(store.isCurrent(snapshot))
+            store.reset()
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun deletedFileFailsNextAppendWithoutCreatingSilentHistory() {
         val directory = Files.createTempDirectory("console-deleted-on-append").toFile()
         try {
