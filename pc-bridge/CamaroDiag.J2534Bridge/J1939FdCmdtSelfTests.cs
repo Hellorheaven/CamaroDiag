@@ -134,6 +134,42 @@ internal static class J1939FdCmdtSelfTests
         Check(wrongSession.TX.Count == 5,
             "CTS for a second session is ignored without interrupting active transfer.");
 
+        var peerLimited = new FakeLink();
+        foreach (var frame in tx.TX)
+        {
+            var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+            var altered = frame.Data.ToArray();
+            if (id.Pgn == J1939FdTransportFrames.ControlPgn &&
+                (altered[0] & 0x0F) == J1939FdTransportFrames.RequestToSend)
+                altered[7] = 1; // Peer RTS allows one DT per CTS.
+            peerLimited.RX.Enqueue(new(
+                J1939ClassicTpSession.ArbitrationId(
+                    id.Pgn, (byte)id.Priority, o.Peer, o.Local),
+                true, altered));
+        }
+        Check(Receive(peerLimited, o with { Window = 3 })
+                .SequenceEqual(Fill(131)) &&
+            peerLimited.TX.Count == 4 &&
+            J1939FdTransportFrames.DecodeControl(peerLimited.TX[0]).Aux7 == 1 &&
+            J1939FdTransportFrames.DecodeControl(peerLimited.TX[1]).Aux7 == 1 &&
+            J1939FdTransportFrames.DecodeControl(peerLimited.TX[2]).Aux7 == 1,
+            "Receiver respects peer RTS maximum CTS window even if local window is larger.");
+
+        var malformedEom = new FakeLink();
+        foreach (var frame in tx.TX)
+        {
+            var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+            var altered = frame.Data.ToArray();
+            if (id.Pgn == J1939FdTransportFrames.ControlPgn &&
+                (altered[0] & 0x0F) == J1939FdTransportFrames.EndOfMessageStatus)
+                altered[7] = 1;
+            malformedEom.RX.Enqueue(new(
+                J1939ClassicTpSession.ArbitrationId(
+                    id.Pgn, (byte)id.Priority, o.Peer, o.Local),
+                true, altered));
+        }
+        Reject<InvalidDataException>(() => Receive(malformedEom, o),
+            "Receiver rejects EOM_STATUS with invalid reserved fields.");
         var noCts = new FakeLink();
         Reject<TimeoutException>(() => Send(noCts, o, Fill(131)),
             "Missing CTS aborts outgoing connection-mode session.");
