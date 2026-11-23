@@ -162,6 +162,22 @@ internal static class StandardVehicleProtocolsSelfTests
             DoIpCodec.Encode(DoIpCodec.DiagnosticMessage, identityBytes),
             discoveryAddress), "Diagnostic DoIP packet cannot masquerade as discovery.");
 
+        var aliveRequest = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.AliveCheckRequest, [], version: 0x03));
+        var aliveReply = DoIpCodec.Decode(
+            DoIpCodec.ReplyToAliveCheck(aliveRequest, 0x0E80));
+        Check(aliveReply.Type == DoIpCodec.AliveCheckResponse &&
+            aliveReply.Version == 0x03 &&
+            aliveReply.Payload.SequenceEqual(new byte[] {0x0E, 0x80}),
+            "DoIP alive-check response carries tester address and peer version.");
+        Reject<InvalidDataException>(() => DoIpCodec.ReplyToAliveCheck(
+            DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.AliveCheckRequest, [0x01])), 0x0E80),
+            "DoIP alive-check request with payload rejected.");
+        Reject<InvalidDataException>(() => DoIpCodec.ReplyToAliveCheck(
+            DoIpCodec.Decode(DoIpCodec.RoutingActivation(0x0E80)), 0x0E80),
+            "Routing activation cannot masquerade as DoIP alive-check.");
+
         var route = DoIpCodec.Decode(DoIpCodec.RoutingActivation(0x0E80));
         Check(route.Type == DoIpCodec.RoutingActivationRequest &&
               route.Payload.Length == 7, "ISO 13400 route request.");
