@@ -40,6 +40,16 @@ class CanConsoleEventJournalWriterTest {
         assertEquals("1,42,RX,true,\"line1\\n\"\"line2\"\"\\r\"", lines[1])
     }
 
+    @Test fun spreadsheetFormulaPayloadIsStoredAsPlainText() {
+        val output = StringWriter()
+        val journal = CanConsoleEventJournalWriter(output)
+        journal.append(3L, CanConsoleEventJournalWriter.Direction.RX, true, "=HYPERLINK(\"url\")")
+        journal.append(4L, CanConsoleEventJournalWriter.Direction.SYSTEM, false, "  +1")
+        journal.close()
+        assertTrue(output.toString().contains("\"'=HYPERLINK(\"\"url\"\")\""))
+        assertTrue(output.toString().contains("\"'  +1\""))
+    }
+
     @Test fun failureLeavesJournalIncompleteAndPreventsSubsequentAppend() {
         val output = object : Writer() {
             private var writes = 0
