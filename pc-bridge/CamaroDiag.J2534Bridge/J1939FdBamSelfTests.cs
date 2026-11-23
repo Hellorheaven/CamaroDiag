@@ -125,6 +125,19 @@ internal static class J1939FdBamSelfTests
         Reject<TimeoutException>(() => Receive(wrongSessionBam),
             "BAM cannot complete using only DT segments from another session.");
 
+        var badPadding = new FakeLink();
+        foreach (var frame in sender.Outgoing)
+        {
+            var copy = frame.Data.ToArray();
+            var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+            if (id.Pgn == J1939FdTransportFrames.DataPgn &&
+                copy[1] == 3)
+                copy[^1] = 0x11;
+            badPadding.Incoming.Enqueue(new(frame.Id, frame.IsFd, copy));
+        }
+        Reject<InvalidDataException>(() => Receive(badPadding),
+            "BAM final segment detects corrupt non-FF CAN FD padding.");
+
         var noFinalStatus = new FakeLink();
         foreach (var frame in sender.Outgoing.Take(4))
             noFinalStatus.Incoming.Enqueue(frame);
