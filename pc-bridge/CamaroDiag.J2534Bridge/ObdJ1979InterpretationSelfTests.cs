@@ -30,6 +30,20 @@ internal static class ObdJ1979InterpretationSelfTests
         Check(freeze.Positive && freeze.Description.Contains("freeze-frame=1"),
             "Mode 02 freeze-frame correlation.");
 
+        var monitors = ObdJ1979Interpretation.Interpret(
+            [0x06, 0x00], [0x46, 0, 0x80, 0, 0, 1]);
+        Check(monitors.Positive &&
+            monitors.Description.Contains("supported=01,20"),
+            "Mode 06 monitor availability is interpreted.");
+        var monitorTest = ObdJ1979Interpretation.Interpret(
+            [0x06, 0x21],
+            [0x46, 0x21, 0x80, 0x24, 0, 0x64, 0, 0, 0, 0xC8]);
+        Check(monitorTest.Positive &&
+            monitorTest.Description.Contains("TID=0x80") &&
+            monitorTest.Description.Contains("UASID=0x24") &&
+            monitorTest.Description.Contains("raw=100") &&
+            monitorTest.Description.Contains("no UASID conversion"),
+            "Mode 06 physical monitor test retains raw unit/scaling ID.");
         var readiness = ObdJ1979Interpretation.Interpret(
             [0x01, 0x01], [0x41, 0x01, 0x83, 0x08, 0xA5, 0x5A]);
         Check(readiness.Positive &&
