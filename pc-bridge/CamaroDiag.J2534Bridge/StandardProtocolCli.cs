@@ -192,6 +192,16 @@ internal static class StandardProtocolCli
             checked((byte)Number(txAddressText)) : (byte?)null;
         var rxAddress = Optional(args, "--rx-address") is string rxAddressText ?
             checked((byte)Number(rxAddressText)) : (byte?)null;
+        var mixedText = Optional(args, "--mixed-address");
+        var mixedAddressing = mixedText is not null;
+        if (mixedAddressing)
+        {
+            if (txAddress.HasValue || rxAddress.HasValue || !extended)
+                throw new ArgumentException(
+                    "Mixed addressing requires --extended true (29-bit IDs) and no TX/RX address selectors.");
+            txAddress = checked((byte)Number(mixedText!));
+            rxAddress = txAddress;
+        }
         var brs = bool.Parse(Optional(args, "--brs") ?? "false");
         var dataBaud = Optional(args, "--data-baud") is string rate ?
             Number(rate) : (uint?)null;
@@ -209,7 +219,7 @@ internal static class StandardProtocolCli
             Convert.FromHexString(hexPayload!) : File.ReadAllBytes(payloadFile);
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
             bs, stMin, TxAddress: txAddress, RxAddress: rxAddress,
-            MaxWaitFrames: maxWaitFrames);
+            MaxWaitFrames: maxWaitFrames, MixedAddressing: mixedAddressing);
         setting.Validate();
         if (index < 0 || bitrate == 0 || timeout is < 100 or > 30000 ||
             (mode == "exchange" && bytes.Length is < 1 or > IsoTpCanFdSession.MaximumPayloadBytes) ||
