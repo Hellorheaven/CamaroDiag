@@ -44,7 +44,11 @@ object Lfx2012FuelSessionHistory {
         val lastReported: Double?,
         val minimum: Double?,
         val maximum: Double?,
-        val delta: Double?
+        val delta: Double?,
+        /** Null when the very last physical survey did not report this PID. */
+        val currentSnapshotPercent: Double?,
+        /** Timestamp of the last actual measurement, not the survey timestamp. */
+        val lastReportedAtUtcMillis: Long?
     )
 
     data class Report(
@@ -75,6 +79,9 @@ object Lfx2012FuelSessionHistory {
             val reported = values.filter {
                 it.availability == Lfx2012FuelReadOnly.Availability.REPORTED
             }.map { checkNotNull(it.percent) }
+            val mostRecentReportedIndex = values.indexOfLast {
+                it.availability == Lfx2012FuelReadOnly.Availability.REPORTED
+            }
             PidSummary(
                 pid = pid,
                 reportedCount = reported.size,
@@ -88,7 +95,12 @@ object Lfx2012FuelSessionHistory {
                 lastReported = reported.lastOrNull(),
                 minimum = reported.minOrNull(),
                 maximum = reported.maxOrNull(),
-                delta = if (reported.size >= 2) reported.last() - reported.first() else null
+                delta = if (reported.size >= 2) reported.last() - reported.first() else null,
+                currentSnapshotPercent = values.last().takeIf {
+                    it.availability == Lfx2012FuelReadOnly.Availability.REPORTED
+                }?.percent,
+                lastReportedAtUtcMillis = if (mostRecentReportedIndex >= 0)
+                    samples[mostRecentReportedIndex].snapshot.observedAtUtcMillis else null
             )
         }
         return Report(
