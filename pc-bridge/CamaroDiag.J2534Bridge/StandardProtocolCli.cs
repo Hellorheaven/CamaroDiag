@@ -17,6 +17,7 @@ internal static class StandardProtocolCli
     internal const string ObdCanDiscoverCommand = "--obd-discover-can";
     internal const string J1979PidDiscoveryCommand = "--j1979-pids";
     internal const string J1979FunctionalDiscoveryCommand = "--j1979-discover-can";
+    internal const string ObdProtocolAutoDetectCommand = "--obd-auto-detect-can";
     internal const string PassThruCommand = "--j2534-standard";
     internal const string RawIsoTpCommand = "--isotp-exchange";
     internal const string J1939Command = "--j1939-transport";
@@ -144,6 +145,43 @@ internal static class StandardProtocolCli
             EntryPointNotFoundException or OverflowException)
         {
             Console.Error.WriteLine("J1979 functional CAN discovery failed: " + ex.Message);
+            return 6;
+        }
+    }
+
+    /// <summary>
+    /// ISO 15765-4 CAN 11-bit two-stage emissions protocol detection:
+    /// functional UDS F810 first, classic J1979 PID 00 only if not confirmed.
+    /// This does not authorize or perform any ECU write.
+    /// </summary>
+    internal static async Task<int> RunObdProtocolAutoDetectAsync(string[] args)
+    {
+        try
+        {
+            var o = ParseObdCanDiscovery(args);
+            var adapters = J2534Registry.Discover();
+            if (o.AdapterIndex >= adapters.Count)
+                throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
+            using var driver = J2534StandardChannel.Connect(
+                adapters[o.AdapterIndex], J2534StandardChannel.Can, o.Baud);
+            driver.ConfigureFilter(new byte[4], new byte[4]);
+            var link = new IsoTpJ2534RawCanLink(driver,
+                canFd: false, extendedId: false, bitRateSwitch: false);
+            var result = await ObdCanProtocolDetection.DetectAsync(link,
+                TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None);
+            Console.WriteLine($"OBD protocol={result.Kind} " +
+                $"ECU responders={string.Join(",", result.ResponseIds.Select(x => $"0x{x:X3}"))} " +
+                $"classic fallback={result.ClassicFallbackAttempted}; " +
+                "no physical ECU programming capability inferred.");
+            return result.Kind == ObdCanProtocolDetection.ProtocolKind.NoConfirmedProtocol
+                ? 7 : 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or
+            InvalidOperationException or IOException or TimeoutException or
+            DllNotFoundException or BadImageFormatException or
+            EntryPointNotFoundException or OverflowException)
+        {
+            Console.Error.WriteLine("OBD CAN protocol detection failed: " + ex.Message);
             return 6;
         }
     }
