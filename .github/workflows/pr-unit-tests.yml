@@ -123,6 +123,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
+      - name: Enforce PR95 read-only ECU boundary
+        shell: pwsh
+        run: ./.github/scripts/verify-pr95-readonly.ps1
       - name: Build and self-test Windows bridge (Debug only)
         shell: pwsh
         run: |
