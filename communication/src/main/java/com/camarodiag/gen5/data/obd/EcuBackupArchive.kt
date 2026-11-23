@@ -259,7 +259,7 @@ object EcuBackupArchive {
         // Preserve legacy v1/v2 archive semantics for offline imports.
         if (channel != null) {
             val label = properties.getProperty("controller").orEmpty()
-            require(label.length <= 128 && label.none(Character::isISOControl)) {
+            require(label.length <= 128 && label.none { Character.isISOControl(it) }) {
                 "Routed ECU archive controller labels may not contain control characters."
             }
             require(count == 1 && required.isEmpty()) {
