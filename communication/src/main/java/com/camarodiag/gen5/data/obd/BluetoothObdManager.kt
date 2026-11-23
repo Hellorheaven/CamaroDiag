@@ -216,14 +216,11 @@ class BluetoothObdManager(context: Context) {
                 val probe = ElmUsbTransport(connectorUsbContext)
                 try {
                     val enumerated = probe.availableDevices()
-                    if (CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, enumerated)) {
-                        return@withLock Result.failure(IllegalStateException("KKL requires its own qualified transport"))
-                    }
-                    // A discovery-only handshake must never be sent to a generic
-                    // ELM, KKL or unrelated serial adapter selected by stale UI data.
-                    if (!CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(deviceId, enumerated)) {
+                    // Recheck the actual USB enumeration at the manager
+                    // boundary, even when UI selection was once valid.
+                    if (!CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(deviceId, enumerated)) {
                         return@withLock Result.failure(IllegalStateException(
-                            "Selected USB device is not enumerated as CamaroDiagConnectors"
+                            "USB connector discovery requires a named non-KKL CamaroDiagConnectors device"
                         ))
                     }
                     probe.connect(
