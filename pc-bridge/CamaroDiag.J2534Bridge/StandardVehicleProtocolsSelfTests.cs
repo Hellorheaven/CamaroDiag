@@ -24,6 +24,17 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(StandardVehicleProtocols.Find("K-Line KWP2000").J2534ProtocolId == 4 &&
             !StandardVehicleProtocols.Find("K-Line KWP2000").TransportPresent,
             "J2534 K-Line ID is recognized, initialization not invented.");
+        Check(J2534StandardChannel.SwIso15765 == 0x8007 &&
+            J2534StandardChannel.SwCan == 0x8008 &&
+            J2534StandardChannel.IsKnownProtocol(0x8007) &&
+            J2534StandardChannel.IsKnownProtocol(0x8008),
+            "SAE J2534-2 distinguishes SW_ISO15765 and SW_CAN channels.");
+        Check(StandardVehicleProtocols.Find("SW ISO-TP").J2534ProtocolId == 0x8007 &&
+            StandardVehicleProtocols.Find("GM single-wire CAN").J2534ProtocolId ==
+                0x8008 &&
+            !StandardVehicleProtocols.Find("GM single-wire CAN").PhysicalWriteQualified,
+            "GM single-wire CAN must map to SW_CAN 0x8008 without physical claim.");
+
         Check(StandardVehicleProtocols.Find("J1850 VPW").J2534ProtocolId == 1 &&
             StandardVehicleProtocols.Find("J1850 PWM").J2534ProtocolId == 2,
             "SAE J1850 J2534 IDs.");
