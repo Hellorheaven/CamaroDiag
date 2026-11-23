@@ -402,3 +402,12 @@ L'interface n'affiche déjà plus le bouton de capture physique CDJ/1 non implé
 
 
 - FD.TP BAM/CMDT : l'attente initiale d'une annonce BAM ou d'un RTS dirigé respecte désormais un délai global pouvant dépasser 30 secondes, malgré le plafond de chaque réception J2534. Les phases CTS/DT/EOM conservent leurs délais courts. Tests simulant une expiration pilote intermédiaire ajoutés, non exécutés.
+
+
+## Protocoles : FEFF/FBFF Multi-PG et UDS multi-DID (23/11/2026)
+
+- J1939-22 : ajout du format **FBFF** CAN-FD 11 bits diffusé et conservant FEFF CAN-FD 29 bits ; option CLI `--fbff`, validation des destinataires et tests de cadrage.
+- Multi-PG : nouvelle option `--groups` pour composer plusieurs PGN dans une trame CAN-FD, avec parsing strict, prévalidation de longueur et confirmation du hachage du contenu réellement émis. Tests de refus des formats incohérents.
+- UDS ISO 14229 : construction de requêtes de lecture **multi-DID** avec extraction strictement ordonnée de réponses à longueurs explicites et tests tronquage/réordonnancement.
+- CLI ISO-TP et DoIP : option `--uds-dids DID:longueur,DID:longueur`, validation de réponse commune, tests d'options exclusives et de réception passive.
+- Tests écrits et committés, **non exécutés** ; aucune compatibilité matérielle ou écriture/restauration ECU certifiée par ces changements.
