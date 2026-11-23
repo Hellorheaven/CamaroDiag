@@ -308,10 +308,22 @@ internal static class StandardVehicleProtocolsSelfTests
         Reject<InvalidDataException>(() =>
             DoIpCodec.RequireRoutingActive(routeResponse, 0x0E81),
             "DoIP routing response to another tester.");
-        Reject<InvalidDataException>(() => DoIpCodec.RequireRoutingActive(
-            DoIpCodec.Decode(DoIpCodec.Encode(
-                DoIpCodec.RoutingActivationResponse, [0x0E, 0x80, 0x12, 0x34, 0x11, 0, 0, 0, 0])),
-            0x0E80), "DoIP refused routing activation.");
+        var pendingRoute = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.RoutingActivationResponse,
+            [0x0E, 0x80, 0x12, 0x34, 0x11, 0, 0, 0, 0]));
+        Check(DoIpCodec.ReadRoutingActivationCode(pendingRoute, 0x0E80) ==
+            0x11, "DoIP routing 0x11 is pending vehicle-side confirmation.");
+        Reject<IOException>(() =>
+            DoIpCodec.RequireRoutingActive(pendingRoute, 0x0E80),
+            "DoIP confirmation-pending must not be declared routing active.");
+        var deniedRoute = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.RoutingActivationResponse,
+            [0x0E, 0x80, 0x12, 0x34, 0x04, 0, 0, 0, 0]));
+        Reject<IOException>(() =>
+            DoIpCodec.RequireRoutingActive(deniedRoute, 0x0E80),
+            "DoIP routing authentication required is not bypassed.");
+        Check(DoIpCodec.ReadRoutingActivationCode(routeResponse, 0x0E80) ==
+            0x10, "DoIP routing only becomes active on code 0x10.");
         var diag = DoIpCodec.Decode(DoIpCodec.Diagnostic(
             0x0E80, 0x1234, [0x22, 0xF1, 0x90]));
         Check(diag.Type == 0x8001 && diag.Payload.Length == 7 &&
