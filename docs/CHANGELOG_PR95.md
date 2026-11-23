@@ -191,3 +191,6 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 
 ## ISO-TP : adressage mixte explicite (23/11/2026)
 - Mode N_AE partagé entre TX et RX avec identifiants CAN 29 bits distincts, `--extended true --mixed-address` ; tests de cohérence, réception et refus des paramètres incohérents ajoutés. Pas de qualification physique ni de CI sur ce commit.
+
+## J1939-81 — identification passive (23/11/2026)
+- Ajout du décodeur des annonces `Address Claimed` (PGN EE00), extraction NAME 64 bits et de ses champs d'identité ; affichage dans le mode réception J1939. Aucun `Address Claim` actif ni conflit d'adresses implémenté. Tests unitaires ajoutés, non exécutés.
