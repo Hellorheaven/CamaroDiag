@@ -349,7 +349,7 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(largeDoIp.Payload.Length == largeUds.Length + 4 &&
             largeDoIp.Payload.AsSpan(4).SequenceEqual(largeUds),
             "DoIP codec carries a six-kilobyte UDS payload without 4KB truncation.");
-        Reject<ArgumentOutOfRangeException>(() => DoIpCodec.Diagnostic(
+        Reject<ArgumentException>(() => DoIpCodec.Diagnostic(
             0x0E80, 0x1234, new byte[DoIpCodec.MaxPayload]),
             "DoIP retains an explicit in-memory payload cap.");
 
