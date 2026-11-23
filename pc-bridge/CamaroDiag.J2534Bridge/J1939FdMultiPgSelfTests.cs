@@ -144,6 +144,44 @@ internal static class J1939FdMultiPgSelfTests
             "--mode", "send", "--fbff", "true", "--pgn", "0xF004",
             "--payload", Convert.ToHexString(new byte[100])]),
             "FBFF is not an alias for FD.TP BAM.");
+        var groupList = J1939FdMultiPgCliParser.Parse(
+            "0xF004:010203;0xFECA:C7FF");
+        Check(groupList.Count == 2 &&
+            groupList[0].Pgn == 0xF004 &&
+            groupList[0].Payload.SequenceEqual(new byte[] {1, 2, 3}) &&
+            J1939FdMultiPg.Decode(J1939FdMultiPg.Encode(
+                0x80, 0xFF, 6, groupList)).Groups.Count == 2,
+            "CLI grouped PGN list composes multiple real C-PGs in a CAN-FD frame.");
+        var groupsCli = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--groups", "0xF004:010203;0xFECA:C7FF"]);
+        Check(groupsCli.Groups?.Count == 2 && groupsCli.Pgn is null &&
+            groupsCli.Payload.Length == 0,
+            "Multi-PG CLI transmits the explicit group list, not an invented raw payload.");
+        var groupsFbff = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--fbff", "true",
+            "--groups", "0xF004:010203;0xFECA:C7FF"]);
+        Check(groupsFbff.FastBroadcast && groupsFbff.Groups?.Count == 2,
+            "FBFF can broadcast multiple standard C-PGs in one frame.");
+        Reject<ArgumentException>(() =>
+            J1939FdMultiPgCliParser.Parse("0xF004:11;0xFECA:ZZ"),
+            "Group list rejects invalid data bytes before any adapter access.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--pgn", "0xF004", "--payload", "AA",
+            "--groups", "0xF004:0102;0xFECA:0304"]),
+            "Multi-PG cannot mix raw transmission with explicit group collection.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--groups",
+            "0xF004:0102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F202122232425262728292A2B2C2D2E2F303132333435363738393A3B3C3D3E3F40;0xFECA:CC"]),
+            "Grouped PGNs are rejected when their combined wire size exceeds 64 bytes.");
+
         var transmit = StandardProtocolCli.ParseJ1939Fd([
             StandardProtocolCli.J1939FdCommand,
             "--adapter-index", "0", "--baud", "500000",
