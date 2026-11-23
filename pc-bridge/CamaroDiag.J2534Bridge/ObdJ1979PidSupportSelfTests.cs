@@ -33,10 +33,21 @@ internal static class ObdJ1979PidSupportSelfTests
         Check(noNext.SupportedPids.SequenceEqual(new byte[] {0x21}) &&
             !noNext.HasNextPage, "Next page not assumed when next-page bit is clear.");
         var freeze = ObdJ1979PidSupport.Decode(
-            [0x02, 0x40], [0x42, 0x40, 0x40, 0, 0, 0]);
-        Check(freeze.Mode == 2 &&
+            [0x02, 0x40, 0x00], [0x42, 0x40, 0x00, 0x40, 0, 0, 0]);
+        Check(freeze.Mode == 2 && freeze.FreezeFrameNumber == 0 &&
             freeze.SupportedPids.SequenceEqual(new byte[] {0x42}),
             "Mode 02 page 40 uses the same support bitmap ordering.");
+        Check(ObdJ1979PidSupport.BuildRequest(0x02, 0x40, 0x02)
+            .SequenceEqual([0x02, 0x40, 0x02]),
+            "Mode 02 request carries explicit freeze-frame index.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979PidSupport.Decode([0x02, 0x40, 0x02],
+                [0x42, 0x40, 0x00, 0x40, 0, 0, 0]),
+            "Mode 02 response must echo the requested freeze-frame index.");
+        Reject<ArgumentException>(() =>
+            ObdJ1979PidSupport.Decode([0x02, 0x40],
+                [0x42, 0x40, 0, 0, 0, 0, 0]),
+            "Mode 02 request without frame index rejected.");
         var empty = ObdJ1979PidSupport.Decode(
             [0x01, 0x60], [0x41, 0x60, 0, 0, 0, 0]);
         Check(empty.SupportedPids.Count == 0 && !empty.HasNextPage,
