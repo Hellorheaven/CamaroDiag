@@ -71,6 +71,7 @@ internal sealed class J2534StandardChannel : IDisposable
 
     internal const uint SetConfigIoctl = 0x02;
     internal const uint FdCanDataPhaseRate = 0x805C;
+    internal const uint SwCanHighSpeedDataRate = 0x8010;
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate uint OpenFn(IntPtr name, out uint device);
@@ -260,19 +261,39 @@ internal sealed class J2534StandardChannel : IDisposable
     {
         EnsureConnected();
         if (protocolId is not (FdCan or FdIso15765) || bitRate == 0)
-            throw new ArgumentException("CAN FD channel and positive data bitrate required.");
+            throw new ArgumentException(
+                "CAN FD channel and positive data bitrate required.");
+        SetStandardConfig(FdCanDataPhaseRate, bitRate);
+    }
+
+    /// <summary>
+    /// SAE J2534-2 SW_CAN_HS_DATA_RATE (0x8010). This asks the
+    /// vendor driver to configure the optional hardware high-speed mode;
+    /// it does not claim a transceiver or ECU supports mode switching.
+    /// </summary>
+    internal void SetSwCanHighSpeedRate(uint bitRate)
+    {
+        EnsureConnected();
+        if (protocolId != SwCan || bitRate == 0)
+            throw new ArgumentException(
+                "An actual J2534-2 SW_CAN driver channel and a positive high-speed bitrate are required.");
+        SetStandardConfig(SwCanHighSpeedDataRate, bitRate);
+    }
+
+    private void SetStandardConfig(uint parameter, uint value)
+    {
         var config = Marshal.AllocHGlobal(Marshal.SizeOf<SConfig>());
         var list = Marshal.AllocHGlobal(Marshal.SizeOf<SConfigList>());
         try
         {
             Marshal.StructureToPtr(new SConfig {
-                Parameter = FdCanDataPhaseRate, Value = bitRate
+                Parameter = parameter, Value = value
             }, config, false);
             Marshal.StructureToPtr(new SConfigList {
                 NumOfParams = 1, ConfigPtr = config
             }, list, false);
             Require(ioctl!(channelId, SetConfigIoctl, list, IntPtr.Zero),
-                "PassThruIoctl(SET_CONFIG FD_CAN_DATA_PHASE_RATE)");
+                $"PassThruIoctl(SET_CONFIG 0x{parameter:X4})");
         }
         finally
         {
