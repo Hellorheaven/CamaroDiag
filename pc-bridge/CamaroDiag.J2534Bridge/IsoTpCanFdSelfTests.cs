@@ -522,6 +522,22 @@ internal static class IsoTpCanFdSelfTests
             "--obd-snapshot", "0x123456"]),
             "Passive ISO-TP never sends DTC snapshot read request.");
 
+        var extendedIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-extended-dtc", "0x123456",
+            "--obd-extended-record", "0x90"]);
+        Check(extendedIsoTp.Request.SequenceEqual(
+                new byte[] {0x19, 0x06, 0x12, 0x34, 0x56, 0x90}) &&
+            extendedIsoTp.ValidateUds,
+            "ISO-TP DTC extended record is correlated before display.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive",
+            "--obd-extended-dtc", "0x123456"]),
+            "Passive ISO-TP forbids DTC extended read request.");
+
         var obdIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
