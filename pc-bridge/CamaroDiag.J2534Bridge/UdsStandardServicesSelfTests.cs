@@ -157,6 +157,37 @@ internal static class UdsStandardServicesSelfTests
             "194233FF08", "OBDonUDS confirmed emission DTCs use WWH 0x42.");
         Equal(ObdOnUdsServices.ReadWwhEmissionsDtcs(0x04, 0x80),
             "1942338004", "WWH DTC requests retain explicit severity and pending masks.");
+        Equal(ObdOnUdsServices.ReadDtcSnapshot(0x123456, 0x01),
+            "190412345601", "UDS snapshot reads selected 24-bit DTC and record 1.");
+        Equal(ObdOnUdsServices.ReadDtcSnapshot(0xABCDEF, 0xFF),
+            "1904ABCDEFFF", "UDS DTC snapshot can request all records.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            ObdOnUdsServices.ReadDtcSnapshot(0x1000000, 1),
+            "UDS snapshot rejects out-of-range DTC number.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            ObdOnUdsServices.ReadDtcSnapshot(0x123456, 0),
+            "UDS snapshot rejects legislatively reserved record zero.");
+        var snapshot = ObdOnUdsServices.DecodeDtcSnapshot(0x123456,
+            [0x59, 0x04, 0x12, 0x34, 0x56, 0x08,
+             0x01, 0x01, 0xF4, 0x0C, 0x14, 0x2A]);
+        Check(snapshot.Dtc == 0x123456 && snapshot.Status == 0x08 &&
+            snapshot.RawSnapshotRecords.SequenceEqual(
+                new byte[] {0x01, 0x01, 0xF4, 0x0C, 0x14, 0x2A}),
+            "Snapshot preserves variable-length DID records without guessing scaling.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeDtcSnapshot(0x123456,
+                [0x59, 0x04, 0x12, 0x34, 0x57, 0x08]),
+            "Snapshot cannot silently substitute another 24-bit DTC.");
+        Check(UdsStandardServices.RequireResponse(
+                [0x19, 0x04, 0x12, 0x34, 0x56, 0x01],
+                [0x59, 0x04, 0x12, 0x34, 0x56, 0x08]).Length == 6,
+            "ISO 14229 snapshot response passes matching DTC correlation.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse(
+                [0x19, 0x04, 0x12, 0x34, 0x56, 0x01],
+                [0x59, 0x04, 0x12, 0x34, 0x57, 0x08]),
+            "Stale snapshot response for another DTC is rejected.");
+
         Equal(ObdOnUdsServices.ReadWwhReadinessGroup(0x06),
             "19563306", "OBDonUDS readiness-group query uses UDS 0x19 0x56.");
         var readiness = ObdOnUdsServices.DecodeWwhReadinessGroup(
