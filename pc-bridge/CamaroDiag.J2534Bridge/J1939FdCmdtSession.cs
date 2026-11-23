@@ -135,6 +135,15 @@ internal static class J1939FdCmdtSession
                         throw new InvalidDataException(
                             "Truncated directed FD.TP.DT; CMDT session aborted.");
                     }
+                    if (next == count && segment.Data.AsSpan(useful)
+                        .IndexOfAnyExcept((byte)0xFF) >= 0)
+                    {
+                        if (!token.IsCancellationRequested)
+                            await link.SendAsync(MakeAbort(
+                                o, fromLocal: true, reason: 7), token);
+                        throw new InvalidDataException(
+                            "J1939-22 CMDT final segment has invalid padding.");
+                    }
                     segment.Data.AsSpan(0, useful).CopyTo(result.AsSpan(offset));
                     next++;
                 }
