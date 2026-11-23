@@ -538,6 +538,21 @@ internal static class IsoTpCanFdSelfTests
             "--obd-extended-dtc", "0x123456"]),
             "Passive ISO-TP forbids DTC extended read request.");
 
+        var multiDid = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--uds-dids", "0xF190:17,0xF187:4"]);
+        Check(multiDid.Request.SequenceEqual(
+            new byte[] {0x22, 0xF1, 0x90, 0xF1, 0x87}) &&
+            multiDid.ValidateUds,
+            "ISO-TP multi-DID request uses standard UDS and enables validation.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive",
+            "--uds-dids", "0xF190:17,0xF187:4"]),
+            "ISO-TP passive mode rejects outgoing multi-DID reads.");
+
         var obdIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
