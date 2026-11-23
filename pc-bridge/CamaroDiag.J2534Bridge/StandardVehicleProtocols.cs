@@ -10,7 +10,8 @@ namespace CamaroDiag.J2534Bridge;
 internal static class StandardVehicleProtocols
 {
     internal sealed record Entry(string Name, string Standard, string Layer,
-        uint? J2534ProtocolId, bool TransportPresent, bool PhysicalWriteQualified);
+        uint? J2534ProtocolId, bool TransportPresent, bool PhysicalWriteQualified,
+        string Scope = "Adapter-dependent; not physically qualified");
 
     internal static readonly IReadOnlyList<Entry> Catalog =
     [
@@ -21,12 +22,16 @@ internal static class StandardVehicleProtocols
         new("CAN 11/29-bit", "ISO 11898 / SAE J2284", "physical/data link", 0x05, false, false),
         new("ISO-TP / UDS over CAN", "ISO 15765-2 / ISO 14229", "transport/application", 0x06, true, false),
         new("GM single-wire CAN", "SAE J2411 / GMLAN", "physical/transport", 0x8007, true, false),
-        new("CAN FD + ISO-TP", "ISO 11898-1 / ISO 15765-2:2024", "physical/transport", null, false, false),
+        new("CAN FD + ISO-TP", "ISO 11898-1 / ISO 15765-2:2024", "physical/transport", null, true, false,
+            "Raw FD_CAN ISO-TP SF/FF/CF/FC and mixed/extended addressing; driver and ECU unverified"),
         new("DoIP", "ISO 13400-2 / ISO 14229-5", "network/transport", null, true, false),
         new("OBD-II", "SAE J1979 / ISO 15031-5", "application", null, true, false),
-        new("OBDonUDS", "SAE J1979-2", "application", null, false, false),
-        new("J1939 classical CAN", "SAE J1939-21 / J1939-73", "network/application", null, false, false),
-        new("J1939 CAN FD", "SAE J1939-22", "network/transport", null, false, false),
+        new("OBDonUDS", "SAE J1979-2", "application", null, true, false,
+            "F810 identification, emissions DIDs and UDS DTC 0x19/0x02 only; full service mapping pending"),
+        new("J1939 classical CAN", "SAE J1939-21 / J1939-73", "network/application", null, true, false,
+            "J1939-21 BAM/RTS/CTS, Request, DM1/DM2, initial NAME claim; hardware unverified"),
+        new("J1939 CAN FD", "SAE J1939-22", "network/transport", null, true, false,
+            "FEFF Multi-PG and FD.TP BAM/CMDT TOS2 no assurance; FBFF/security/concurrency pending"),
     ];
 
     internal static Entry Find(string name) => Catalog.Single(p => p.Name == name);
