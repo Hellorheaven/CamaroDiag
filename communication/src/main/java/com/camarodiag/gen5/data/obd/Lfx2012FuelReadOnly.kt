@@ -79,8 +79,12 @@ object Lfx2012FuelReadOnly {
                 if (data == null || data.size != 1 || data[0] !in 0..255) {
                     Reading(pid, Availability.NO_VALID_RESPONSE)
                 } else {
+                    // Reuse the existing SAE PID 52 decoder, rather than
+                    // introducing an independent ethanol conversion formula.
                     val value = if (pid == ETHANOL)
-                        data[0] * 100.0 / 255.0
+                        checkNotNull(EthanolContentPidDecoder.decode(
+                            byteArrayOf(0x41, 0x52, data[0].toByte())
+                        ))
                     else data[0] * 100.0 / 128.0 - 100.0
                     Reading(pid, Availability.REPORTED, value, data[0])
                 }
