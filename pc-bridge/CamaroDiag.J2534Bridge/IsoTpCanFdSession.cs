@@ -285,8 +285,9 @@ internal static class IsoTpCanFdSession
         ICanLink link, Settings config, TimeSpan timeout, CancellationToken token)
     {
         var clock = Stopwatch.StartNew();
-        for (var attempts = 0; attempts < 64; attempts++)
+        while (true)
         {
+            token.ThrowIfCancellationRequested();
             var frame = await link.ReceiveAsync(Remaining(timeout, clock), token);
             _ = Remaining(timeout, clock);
             if (frame.Id != config.RxId) continue; // Ignore unrelated bus traffic
@@ -301,7 +302,6 @@ internal static class IsoTpCanFdSession
                 (frame.Data.Length == 0 || frame.Data[0] != target)) continue;
             return frame;
         }
-        throw new TimeoutException("No correlated ISO-TP peer frame.");
     }
 
     /// <summary>
