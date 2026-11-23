@@ -32,8 +32,8 @@ internal static class ObdJ1979VehicleInfoSelfTests
             !noNext.HasNextPage,
             "Mode 09 bitmap has no extension unless InfoType 20 is announced.");
 
-        const string first = "ECU-CAL-ALPHA0001";
-        const string second = "ECU-CAL-BETA00002";
+        const string first = "ECU-CAL-ALPHA001";
+        const string second = "ECU-CAL-BETA0002";
         var ids = new byte[] { 0x49, 0x04, 0x02 }
             .Concat(Encoding.ASCII.GetBytes(first))
             .Concat(Encoding.ASCII.GetBytes(second)).ToArray();
