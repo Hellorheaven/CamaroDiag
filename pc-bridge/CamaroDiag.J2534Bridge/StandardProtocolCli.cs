@@ -142,9 +142,10 @@ internal static class StandardProtocolCli
                         $"flash=0x{report.LampFlashStatus:X2}, " +
                         $"DTC count={report.Codes.Count}");
                     foreach (var code in report.Codes)
-                        Console.WriteLine($"SPN={code.Spn} FMI={code.Fmi} " +
-                            $"occurrences={code.OccurrenceCount} " +
-                            $"conversion={(code.AlternativeSpnConversion ? 1 : 0)}");
+                        Console.WriteLine($"SPN={(code.Spn?.ToString() ?? "undecoded")} " +
+                            $"FMI={code.Fmi} occurrences={code.OccurrenceCount} " +
+                            $"conversion={(code.AlternativeSpnConversion ? 1 : 0)} " +
+                            $"raw={Convert.ToHexString(code.RawBytes)}");
                 }
             }
             return 0;
