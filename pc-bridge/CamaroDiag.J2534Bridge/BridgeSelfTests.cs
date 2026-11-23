@@ -70,6 +70,17 @@ internal static class BridgeSelfTests
             "Missing local bench profile is rejected before opening J2534 drivers");
 
         const string memoryVin = "1G1FA1RXXR0123456";
+        Assert(J2534Device.IsUnsupportedUdsVinResponse([0x7F, 0x22, 0x11]) &&
+               J2534Device.IsUnsupportedUdsVinResponse([0x7F, 0x22, 0x12]) &&
+               J2534Device.IsUnsupportedUdsVinResponse([0x7F, 0x22, 0x31]) &&
+               !J2534Device.IsUnsupportedUdsVinResponse([0x7F, 0x22, 0x33]),
+            "Only unsupported UDS VIN replies permit a legacy GMLAN fallback");
+        var physicalGmlanVin = new byte[] { 0x5A, 0x90 }
+            .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray();
+        Assert(J2534Device.MatchesScopedGmlanVin(physicalGmlanVin, memoryVin) &&
+               !J2534Device.MatchesScopedGmlanVin(physicalGmlanVin, "1G1FA1RXXR0123457") &&
+               !J2534Device.MatchesScopedGmlanVin(physicalGmlanVin[..^1], memoryVin),
+            "GMLAN 1A/90 must prove the exact full VIN before memory read");
         var memoryVinReply = new byte[] { 0x62, 0xF1, 0x90 }
             .Concat(Encoding.ASCII.GetBytes(memoryVin)).ToArray();
         Assert(J2534Device.MatchesScopedMemoryVin(memoryVinReply, memoryVin),

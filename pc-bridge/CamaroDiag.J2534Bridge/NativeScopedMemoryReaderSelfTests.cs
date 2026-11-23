@@ -14,6 +14,10 @@ internal static class NativeScopedMemoryReaderSelfTests
         internal int VinCalls;
         internal int? ChangeVinAfterMemoryCalls;
         internal bool MalformedVin;
+        internal bool UdsVinUnsupported;
+        internal bool UdsVinTimeout;
+        internal bool GmlanVinMalformed;
+        internal int GmlanVinCalls;
         internal bool RejectDefaultSession;
         internal bool MalformedExtendedReply;
         internal bool ExtendedReplyWithTrailingByte;
@@ -33,10 +37,21 @@ internal static class NativeScopedMemoryReaderSelfTests
             if (request.SequenceEqual(new byte[] { 0x22, 0xF1, 0x90 }))
             {
                 VinCalls++;
+                if (UdsVinTimeout) throw new TimeoutException("No UDS F190 reply from legacy GMLAN ECU.");
+                if (UdsVinUnsupported) return Task.FromResult(new byte[] { 0x7F, 0x22, 0x11 });
                 if (MalformedVin) return Task.FromResult(new byte[] { 0x62, 0xF1, 0x90 });
                 var vin = ChangeVinAfterMemoryCalls is int after && Calls >= after
                     ? "1G1FA1RXXR0123457" : "1G1FA1RXXR0123456";
                 return Task.FromResult(new byte[] { 0x62, 0xF1, 0x90 }
+                    .Concat(System.Text.Encoding.ASCII.GetBytes(vin)).ToArray());
+            }
+            if (request.SequenceEqual(new byte[] { 0x1A, 0x90 }))
+            {
+                GmlanVinCalls++;
+                if (GmlanVinMalformed) return Task.FromResult(new byte[] { 0x5A, 0x90, 0x41 });
+                var vin = ChangeVinAfterMemoryCalls is int after && Calls >= after
+                    ? "1G1FA1RXXR0123457" : "1G1FA1RXXR0123456";
+                return Task.FromResult(new byte[] { 0x5A, 0x90 }
                     .Concat(System.Text.Encoding.ASCII.GetBytes(vin)).ToArray());
             }
             if (request.Length == 2 && request[0] == 0x10)
@@ -175,6 +190,33 @@ internal static class NativeScopedMemoryReaderSelfTests
                 finalSwap, scope, null, CancellationToken.None).GetAwaiter().GetResult());
         Assert(finalSwap.Calls == 6 && finalSwap.VinCalls == 3,
             "Final VIN mismatch rejects even identical data");
+        var gmlan = new FakeEcu(scope.StartAddress, memory) { UdsVinUnsupported = true };
+        var gmlanRead = NativeScopedMemoryReader.ReadTwiceAsync(
+            gmlan, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(gmlanRead.Bytes.SequenceEqual(memory) && gmlan.GmlanVinCalls == 3 &&
+               gmlan.VinCalls == 3,
+            "Unsupported UDS VIN falls back to exact legacy GMLAN 1A/90");
+        var silentUds = new FakeEcu(scope.StartAddress, memory) { UdsVinTimeout = true };
+        var silentRead = NativeScopedMemoryReader.ReadTwiceAsync(
+            silentUds, scope, null, CancellationToken.None).GetAwaiter().GetResult();
+        Assert(silentRead.Bytes.SequenceEqual(memory) && silentUds.GmlanVinCalls == 3,
+            "Silent F190 falls back to the exact legacy GMLAN VIN");
+        var wrongGmlan = new FakeEcu(scope.StartAddress, memory) {
+            UdsVinUnsupported = true, ChangeVinAfterMemoryCalls = 0
+        };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                wrongGmlan, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(wrongGmlan.Calls == 0,
+            "Wrong GMLAN VIN rejects memory capture before the first byte");
+        var brokenGmlan = new FakeEcu(scope.StartAddress, memory) {
+            UdsVinUnsupported = true, GmlanVinMalformed = true
+        };
+        Reject<UnauthorizedAccessException>(() =>
+            NativeScopedMemoryReader.ReadTwiceAsync(
+                brokenGmlan, scope, null, CancellationToken.None).GetAwaiter().GetResult());
+        Assert(brokenGmlan.Calls == 0,
+            "Truncated GM VIN cannot authorize memory reads");
         var malformedVin = new FakeEcu(scope.StartAddress, memory) { MalformedVin = true };
         Reject<UnauthorizedAccessException>(() =>
             NativeScopedMemoryReader.ReadTwiceAsync(

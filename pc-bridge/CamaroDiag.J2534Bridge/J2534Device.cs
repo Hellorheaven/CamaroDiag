@@ -165,12 +165,33 @@ internal sealed partial class J2534Device : IDisposable
             _opened = true;
             if (_memoryReadScope != null)
             {
-                // Read live VIN via an already allowed, non-destructive DID before
-                // exposing any memory command. No identity -> no 0x23 permission.
-                var vinResponse = Exchange(new byte[] { 0x22, 0xF1, 0x90 }, 6000);
-                if (!MatchesScopedMemoryVin(vinResponse, _memoryReadScope.ExpectedVin))
-                    throw new UnauthorizedAccessException(
-                        "The live ECU did not return the exact VIN from the approved memory read profile.");
+                // Some stock GM GMLAN ECUs use service 1A/90, not UDS F190.
+                // An unsupported/silent F190 may fall back to an EXACT live
+                // GMLAN VIN. Never fall back after a malformed or wrong VIN.
+                bool gmVinFallback;
+                try
+                {
+                    var vinReply = Exchange([0x22, 0xF1, 0x90], 6000);
+                    if (MatchesScopedMemoryVin(vinReply, _memoryReadScope.ExpectedVin))
+                        gmVinFallback = false;
+                    else if (IsUnsupportedUdsVinResponse(vinReply))
+                        gmVinFallback = true;
+                    else throw new UnauthorizedAccessException(
+                        "ECU UDS VIN differs from the operator-selected memory target.");
+                }
+                catch (TimeoutException)
+                {
+                    // No positive reply. A GMLAN-only ECU may still identify
+                    // itself using 1A/90; no write or unlock request is sent.
+                    gmVinFallback = true;
+                }
+                if (gmVinFallback)
+                {
+                    var gmReply = Exchange([0x1A, 0x90], 6000);
+                    if (!MatchesScopedGmlanVin(gmReply, _memoryReadScope.ExpectedVin))
+                        throw new UnauthorizedAccessException(
+                            "ECU GMLAN VIN differs from the operator-selected memory target.");
+                }
                 _memoryReadVinVerified = true;
             }
         }
@@ -190,6 +211,15 @@ internal sealed partial class J2534Device : IDisposable
         response.Length == 20 && expectedVin.Length == 17 &&
         response[0] == 0x62 && response[1] == 0xF1 && response[2] == 0x90 &&
         response.AsSpan(3, 17).SequenceEqual(Encoding.ASCII.GetBytes(expectedVin));
+
+    internal static bool IsUnsupportedUdsVinResponse(byte[] reply) =>
+        reply.Length == 3 && reply[0] == 0x7F && reply[1] == 0x22 &&
+        reply[2] is 0x11 or 0x12 or 0x31;
+
+    internal static bool MatchesScopedGmlanVin(byte[] reply, string expectedVin) =>
+        reply.Length == 19 && expectedVin.Length == 17 &&
+        reply[0] == 0x5A && reply[1] == 0x90 &&
+        reply.AsSpan(2, 17).SequenceEqual(Encoding.ASCII.GetBytes(expectedVin));
 
     public byte[] Exchange(byte[] payload, int timeoutMs)
     {

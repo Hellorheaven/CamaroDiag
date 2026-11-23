@@ -8,8 +8,8 @@ namespace CamaroDiag.J2534Bridge;
 /// Explicit Windows-operator allowlist for REAL, non-destructive UDS memory reads.
 ///
 /// This is never shipped with a guessed GM address map. A documented map must be
-/// supplied on the PC via --memory-read-profile and the connected ECU must return
-/// the exact expected VIN at DID F190 before even a single 0x23 read is allowed.
+/// supplied on the PC via --memory-read-profile. The ECU must return the exact
+/// VIN at UDS F190 or legacy GM GMLAN 1A/90 before 0x23 reads are allowed.
 /// The profile NEVER authorizes erase, write, SecurityAccess, or download.
 /// </summary>
 internal sealed class J2534MemoryReadScope

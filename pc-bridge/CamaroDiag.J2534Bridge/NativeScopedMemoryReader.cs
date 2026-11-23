@@ -86,13 +86,31 @@ internal static class NativeScopedMemoryReader
         ITransport link, J2534MemoryReadScope scope, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        var reply = await link.ExchangeAsync([0x22, 0xF1, 0x90], token);
-        token.ThrowIfCancellationRequested();
-        if (reply.Length != 20 || reply[0] != 0x62 ||
-            reply[1] != 0xF1 || reply[2] != 0x90 ||
-            !string.Equals(System.Text.Encoding.ASCII.GetString(reply, 3, 17),
-                scope.ExpectedVin, StringComparison.Ordinal))
-            throw new LiveVinMismatchException();
+        bool gmlanFallback;
+        try
+        {
+            var reply = await link.ExchangeAsync([0x22, 0xF1, 0x90], token);
+            token.ThrowIfCancellationRequested();
+            if (J2534Device.MatchesScopedMemoryVin(reply, scope.ExpectedVin))
+                return;
+            if (!J2534Device.IsUnsupportedUdsVinResponse(reply))
+                throw new LiveVinMismatchException();
+            gmlanFallback = true;
+        }
+        catch (TimeoutException)
+        {
+            // F190 silence on a GM GMLAN ECU is not proof of wrong hardware.
+            // Attempt the read-only legacy VIN DID instead.
+            gmlanFallback = true;
+        }
+        if (gmlanFallback)
+        {
+            var reply = await link.ExchangeAsync([0x1A, 0x90], token);
+            token.ThrowIfCancellationRequested();
+            if (J2534Device.MatchesScopedGmlanVin(reply, scope.ExpectedVin))
+                return;
+        }
+        throw new LiveVinMismatchException();
     }
 
     /// <summary>
