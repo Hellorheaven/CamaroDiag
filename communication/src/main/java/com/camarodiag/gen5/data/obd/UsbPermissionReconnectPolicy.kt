@@ -13,7 +13,13 @@ object UsbPermissionReconnectPolicy {
     )
 
     fun forSelection(transport: String, endpoint: String, generation: Long): Pending? {
-        if (transport !in setOf("usb", "connector_usb", "connector_usb_binary")) return null
+        val dedicated = CamaroDiagConnectorDiscovery.isConnectorUsbLabel(endpoint)
+        val kkl = CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel(endpoint)
+        when (transport) {
+            "usb" -> if (dedicated || kkl) return null
+            "connector_usb", "connector_usb_binary" -> if (!dedicated || kkl) return null
+            else -> return null
+        }
         val id = CamaroDiagConnectorDiscovery.deviceIdFromLabel(endpoint) ?: return null
         return Pending(transport, endpoint, id, generation)
     }
@@ -24,11 +30,25 @@ object UsbPermissionReconnectPolicy {
         granted: Boolean,
         currentGeneration: Long,
         enumerated: List<String>
-    ): Boolean = pending != null && granted &&
-        pending.deviceId == deviceId &&
-        pending.generation == currentGeneration &&
-        pending.endpoint in enumerated &&
-        CamaroDiagConnectorDiscovery.deviceIdFromLabel(pending.endpoint) == deviceId &&
-        (!pending.transport.startsWith("connector_usb") ||
-            CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(deviceId, enumerated))
+    ): Boolean {
+        if (pending == null || !granted || pending.deviceId != deviceId ||
+            pending.generation != currentGeneration || pending.endpoint !in enumerated ||
+            CamaroDiagConnectorDiscovery.deviceIdFromLabel(pending.endpoint) != deviceId
+        ) return false
+
+        // An Android device ID is only valid for the current enumeration. Avoid
+        // silently choosing a different serial interface if labels collide or
+        // discovery now assigns this ID to another adapter type.
+        if (enumerated.count {
+                CamaroDiagConnectorDiscovery.deviceIdFromLabel(it) == deviceId
+            } != 1
+        ) return false
+        return when (pending.transport) {
+            "usb" -> !CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(deviceId, enumerated) &&
+                !CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, enumerated)
+            "connector_usb", "connector_usb_binary" ->
+                CamaroDiagConnectorDiscovery.allowsDedicatedUsbDiscovery(deviceId, enumerated)
+            else -> false
+        }
+    }
 }
