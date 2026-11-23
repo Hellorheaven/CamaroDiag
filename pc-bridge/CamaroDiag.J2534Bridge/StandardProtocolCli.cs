@@ -866,13 +866,16 @@ internal static class StandardProtocolCli
             throw new ArgumentException(
                 "KWP TX addressing requires a KWP service payload.");
         var data = kwpService is not null ?
-            (kwpFunctional ?
-                StandardVehicleProtocols.BuildKwpFunctionalFrame(
-                    checked((byte)Number(kwpTxTargetText!)),
-                    checked((byte)Number(kwpTxSourceText!)), Hex(kwpService)) :
-                StandardVehicleProtocols.BuildKwpPhysicalFrame(
-                    checked((byte)Number(kwpTxTargetText!)),
-                    checked((byte)Number(kwpTxSourceText!)), Hex(kwpService))) :
+            StandardVehicleProtocols.KwpForJ2534(
+                kwpFunctional ?
+                    StandardVehicleProtocols.BuildKwpFunctionalFrame(
+                        checked((byte)Number(kwpTxTargetText!)),
+                        checked((byte)Number(kwpTxSourceText!)), Hex(kwpService)) :
+                    StandardVehicleProtocols.BuildKwpPhysicalFrame(
+                        checked((byte)Number(kwpTxTargetText!)),
+                        checked((byte)Number(kwpTxSourceText!)), Hex(kwpService)),
+                checksumDisabled: (flags &
+                    J2534StandardChannel.KlineChecksumDisabled) != 0) :
             txText is null ? Array.Empty<byte>() : Hex(txText);
         var mask = Optional(args, "--mask") is string m ? Hex(m) : null;
         var pattern = Optional(args, "--pattern") is string p ? Hex(p) : null;
@@ -1020,11 +1023,11 @@ internal static class StandardProtocolCli
                     $"status=0x{received.RxStatus:X} {Convert.ToHexString(received.Data)}");
                 if (o.KwpRxTarget is byte target && o.KwpRxSource is byte source)
                 {
-                    var payload = o.KwpFunctionalRx ?
-                        StandardVehicleProtocols.ParseKwpFunctionalFrame(
-                            received.Data, target, source) :
-                        StandardVehicleProtocols.ParseKwpPhysicalFrame(
-                            received.Data, target, source);
+                    var payload = StandardVehicleProtocols.ParseKwpJ2534(
+                        received.Data, target, source,
+                        functional: o.KwpFunctionalRx,
+                        checksumDisabled: (o.Flags &
+                            J2534StandardChannel.KlineChecksumDisabled) != 0);
                     Console.WriteLine("KWP physical RX payload: " +
                         Convert.ToHexString(payload));
                 }
