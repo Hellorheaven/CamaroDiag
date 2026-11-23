@@ -268,3 +268,14 @@ Ces sélecteurs sont mutuellement exclusifs des autres sources de requêtes ; le
 
 
 **Délais FD.TP BAM et CMDT** : la réception d'un message peut attendre jusqu'à 600 000 ms si l'opérateur a demandé ce délai. Les appels unitaires au pilote J2534 restent limités à 30 secondes ; lors de l'attente initiale non segmentée (annonce BAM ou RTS dirigé), l'expiration d'une de ces tranches est désormais traitée comme une étape d'attente, pas comme l'échec du délai global. En revanche, les **délais courts normatifs des phases CTS/DT/EOM** ne sont pas prolongés par ce mécanisme. Deux tests de faux adaptateur simulent explicitement une expiration intermédiaire suivie d'une séquence recevable. Tests commités, **non exécutés** ; la précision des attentes et la gestion des interruptions restent à valider sur pilote et bus CAN-FD réels.
+
+
+### J1939-22 FEFF / FBFF et C-PG multiples — complément 23/11/2026
+
+La couche Multi-PG sait maintenant composer/décoder deux formats de CAN-FD : **FEFF**, trame CAN 29 bits PGN 0x2500 avec destination, et **FBFF**, trame CAN **11 bits** dont l'identifiant est l'adresse source revendiquée (diffusion uniquement). La CLI `--j1939-fd-multipg` accepte `--fbff true` (envoi vers `--target 0xFF`, priorité 0) ou le mode FEFF par défaut. Les filtres/flags de connexion J2534 respectent le mode 11 bits ou 29 bits choisi. Les deux formats conservent la même limitation TOS=2/TF=0 sans assurance OEM.
+
+L'option `--groups "0xF004:010203;0xFECA:C7FF"` permet de transmettre **plusieurs C-PG** dans une seule trame FEFF/FBFF, avec refus avant ouverture du pilote si la longueur combinée dépasse 64 octets ou si la destination du PGN est incompatible. Elle est exclusive de `--payload`, `--payload-file` et `--pgn` et ne s'utilise qu'en mode send. La confirmation affiche les PGN, le nombre d'octets réellement émis et l'empreinte SHA-256 du contenu CAN-FD. Les tests de construction et parsing sont enregistrés mais non encore exécutés.
+
+### ISO 14229 — plusieurs DID en une requête UDS
+
+La pile UDS fournit `ReadDids` et `DecodeDids` pour coder `22 DID1 DID2 ...` et vérifier les réponses `62 DID1 DATA1 DID2 DATA2 ...`. Puisque les longueurs des données d'un DID sont **spécifiques aux définitions du véhicule**, les longueurs doivent être fournies par l'utilisateur/ODX ; elles ne sont jamais déduites arbitrairement de l'identifiant. Exemples CLI : `--uds-dids "0xF190:17,0xF187:4"` sur les commandes ISO-TP et DoIP, avec confirmation d'émission habituelle. Le décodeur refuse les DID réordonnés, les données tronquées et les octets supplémentaires. Le mode ISO-TP `receive` reste sans émission. Tests nouveaux, non exécutés.
