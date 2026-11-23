@@ -161,7 +161,7 @@ internal static class J1939FdCmdtSession
     {
         for (var holds = 0; holds < 5; holds++)
         {
-            var cm = await ReadCmAsync(link, o, timeout, token);
+            var cm = await ReadCmAsync(link, o, timeout, clock, token);
             if (cm.Type == J1939FdTransportFrames.ConnectionAbort)
                 throw new IOException("J1939-22 peer aborted RTS/CTS.");
             if (cm.Type != J1939FdTransportFrames.ClearToSend ||
