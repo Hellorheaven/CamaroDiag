@@ -207,6 +207,23 @@ class EcuBackupArchiveTest {
         assertTrue(!imported.manifest.hardwareProvenanceVerified)
     }
 
+    @Test fun routedV3ArchivePreserves29BitIsoTpIdsWithoutClaimingPhysicalProof() {
+        val longCanIds = EcuBackupManifest.Channel(
+            requestCanId = 0x18DA10F1, responseCanId = 0x18DAF110,
+            protocolNumber = 34, diagnosticSession = 3
+        )
+        val output = ByteArrayOutputStream()
+        EcuBackupArchive.export(
+            output, listOf(capture()), emptySet(),
+            vehicleVin = "1G1FA1RXXR0123456", channel = longCanIds
+        )
+        val reopened = EcuBackupArchive.import(output.toByteArray().inputStream())
+        assertEquals(longCanIds, reopened.manifest.channel)
+        assertEquals(EcuBackupCoverage.Status.PARTIAL, reopened.manifest.coverage.status)
+        assertTrue(reopened.verification.consistent)
+        assertTrue(!reopened.manifest.hardwareProvenanceVerified)
+    }
+
     @Test fun invalidPhysicalRouteShapeIsRejectedBeforeZipWriting() {
         for (illegal in listOf(
             { EcuBackupManifest.Channel(0x7E0, 0x7E0, 33, 1) },
