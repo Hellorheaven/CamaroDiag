@@ -1,3 +1,12 @@
+## REPRISE DU CHANTIER HORS PROTOCOLES — C6 ACTIF (23/11/2026, soir)
+
+- Ne pas perdre le chantier **C6** : il traite l'authentification constructeur réelle, le consentement utilisateur OK puis Oui/Non, l'intégrité des opérations et la sauvegarde/récupération ECU, **jamais** un verrou logiciel de programmation CamaroDiag. Les trames CAN valides restent admises quelle que soit leur commande OEM (test `SafeRawCanTransmitPolicyTest`), dans les limites du transport physique et de la confirmation utilisateur.
+- Nouveau raccordement USB Android : retour de permission reçu par `UsbPermissionReceiver`, vérification effective de la permission, reprise uniquement de l'adaptateur et de la session sélectionnés grâce à `UsbPermissionReconnectPolicy` ; le choix CD/1 ASCII/binaire est conservé, le refus est localisé FR/EN. Aucun accès ECU certifié par la permission USB.
+- Déconnexion J2534/USB/BLE/Wi-Fi unifiée et sérialisée au niveau du ViewModel. Annulation de la sonde ELM propagée au lieu d'être transformée en erreur.
+- C1 : SHA-256 de l'instantané CSV pour déceler une modification à taille constante ; C4 : mesure PID actuelle distinguée d'une valeur historique non actualisée.
+- C2 conserve la demande d'**image ECU entière physiquement restaurable**, pas de prétention de clôture. C8 : campagne Debug regroupée seulement après stabilisation de ce lot et du HEAD visé ; tests ajoutés ne valent pas tests exécutés.
+- Développement standard ISO/SAE/UDS dans l'autre chat sur la même PR #95. Ne pas éditer ses fichiers de protocole ni publier un verdict de validation de ses changements. Une seule branche `chore/unified-ci` ; pas de fusion ni Release.
+
 # Tranche ISO14230 KWP2000 — 23/11/2026
 
 Corrélation facultative des premiers paramètres réémis après SID sur une réponse positive KWP (`--kwp-echo-bytes`), refus des réponses appartenant à un autre identifiant, statut NRC/0x78 préservé, tests offline ajoutés. PR #95 inchangée, aucune CI compil ni essai VCI/ECU pendant ce lot.
