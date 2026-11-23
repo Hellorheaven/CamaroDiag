@@ -266,6 +266,13 @@ internal sealed class BridgeServer
                         throw new InvalidOperationException($"Unknown bridge operation: {operation ?? "(null)"}");
                 }
             }
+            catch (JsonException)
+            {
+                // Malformed protocol or duplicate security field attempts must
+                // not keep an authenticated transport session alive.
+                await WriteErrorAsync(writer, "Malformed bridge request.");
+                break;
+            }
             catch (Exception ex)
             {
                 await WriteErrorAsync(writer, ex.Message);
@@ -281,6 +288,7 @@ internal sealed class BridgeServer
         var line = new StringBuilder();
         var character = new char[1];
         var received = 0;
+        var endingCarriageReturn = false;
         while (true)
         {
             var count = await reader.ReadAsync(character.AsMemory(), cancellationToken);
@@ -292,7 +300,16 @@ internal sealed class BridgeServer
             if (character[0] == '\n') return line.ToString();
             if (++received > MaxRequestLineChars)
                 throw new InvalidDataException("Bridge request exceeds the 64 KiB limit.");
-            if (character[0] != '\r') line.Append(character[0]);
+            if (character[0] == '\r')
+            {
+                if (endingCarriageReturn)
+                    throw new InvalidDataException("Only one terminal CR is allowed in a bridge request.");
+                endingCarriageReturn = true;
+                continue;
+            }
+            if (endingCarriageReturn || character[0] == '\0')
+                throw new InvalidDataException("Malformed bridge request framing.");
+            line.Append(character[0]);
         }
     }
 
@@ -326,6 +343,20 @@ internal sealed class BridgeServer
         if (root.ValueKind != JsonValueKind.Object ||
             !root.TryGetProperty("token", out var token) ||
             token.ValueKind != JsonValueKind.String)
+            return false;
+        // Do not let last-key-wins JSON parsers reinterpret credentials
+        // or route an authenticated request to a different operation.
+        int tokens = 0;
+        int operations = 0;
+        foreach (var field in root.EnumerateObject())
+        {
+            if (field.NameEquals("token")) ++tokens;
+            if (field.NameEquals("op")) ++operations;
+        }
+        if (tokens != 1 || operations != 1 ||
+            !root.TryGetProperty("op", out var operation) ||
+            operation.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(operation.GetString()))
             return false;
         var supplied = token.GetString();
         if (string.IsNullOrEmpty(supplied) || string.IsNullOrEmpty(expectedToken))

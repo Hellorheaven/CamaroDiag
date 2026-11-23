@@ -140,7 +140,11 @@ internal static class BridgeSelfTests
             "{\"token\":[]}", "{\"token\":{}}",
             "{\"token\":\"\"}",
             "{\"token\":\"authenticated-bridge-TOKEN\"}",
-            "{\"token\":\"authenticated-bridge-token-extra\"}"
+            "{\"token\":\"authenticated-bridge-token-extra\"}",
+            "{\"token\":\"bad\",\"token\":\"authenticated-bridge-token\",\"op\":\"open\"}",
+            "{\"token\":\"authenticated-bridge-token\",\"op\":\"close\",\"op\":\"open\"}",
+            "{\"token\":\"authenticated-bridge-token\"}",
+            "{\"token\":\"authenticated-bridge-token\",\"op\":42}"
         })
         {
             using var json = JsonDocument.Parse(denied);
@@ -161,6 +165,17 @@ internal static class BridgeSelfTests
                 .GetAwaiter().GetResult();
         }
         Assert(ReadWire("{\"op\":\"open\"}\r\n") == "{\"op\":\"open\"}", "CRLF bridge request");
+        foreach (var invalidFrame in new[] {
+            "{\"op\":\"cl\rose\"}\n",
+            "{\"op\":\"open\"}\r\r\n",
+            "{\"op\":\"open\"}\0\n"
+        })
+        {
+            var refused = false;
+            try { ReadWire(invalidFrame); }
+            catch (InvalidDataException) { refused = true; }
+            Assert(refused, "A malformed bridge line must not be silently canonicalized");
+        }
         Assert(ReadWire("") is null, "Clean EOF on empty client");
         Assert(ReadWire(new string('A', 64 * 1024) + "\n")?.Length == 64 * 1024,
             "Maximum request accepted");
