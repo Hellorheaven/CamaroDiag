@@ -108,7 +108,9 @@ class CanConsoleRecordParserTest {
         assertFalse(permitted(physical11, transmit = false))
         assertFalse(permitted(physical11, busy = true))
         assertFalse(permitted(null))
-        assertFalse(permitted(requireNotNull(RawCanFrameParser.parse("7E0 03 2E F1 90"))))
+        // Explicit RAW console accepts the wire-valid service. Only the
+        // physical session, adapter capabilities and busy state gate TX.
+        assertTrue(permitted(requireNotNull(RawCanFrameParser.parse("7E0 03 2E F1 90"))))
     }
 
     @Test fun rawCanAdapterErrorsCannotBeReportedAsSuccessfulTransmissions() {
