@@ -179,6 +179,25 @@ class UdsClientTest {
         }.isSuccess)
     }
 
+    @Test fun emptyNonProtocolEvidenceLabelIsNotAProgrammingLock() {
+        val vin = "1G1FA1RXXR0123456"
+        val id = UdsEcuIdentity("ECM", "HW-1", "OS-1", "CAL-1", "A1B2", vin)
+        val policy = UdsAccessPolicy.verified(
+            vehicleVin = vin, identity = id, expectedVin = vin,
+            expectedCalId = "CAL-1", expectedCvn = "A1B2",
+            expectedControllerFamily = "ECM",
+            expectedHardwarePartNumber = "HW-1", expectedOperatingSystemId = "OS-1",
+            readDids = emptySet(), writeDids = setOf(0x1234),
+            allowedSessions = setOf(0x01), routineControlPermissions = emptyMap(),
+            allowedSecurityLevels = emptySet(),
+            readableMemoryRegions = emptyList(), writableMemoryRegions = emptyList(),
+            maxTransferBytes = 0, requireSecurityAccess = false,
+            evidenceReference = ""
+        )
+        assertEquals(setOf(0x1234), policy.writeDids)
+        assertFalse(policy.requireSecurityAccess)
+    }
+
     @Test fun ecuWithoutSeedKeyOrExtendedSessionCanAcknowledgeAuthorizedDidWrite() = runBlocking {
         val transport = FakeTransport(listOf(response(0x6E, 0x12, 0x34)))
         val client = UdsClient(

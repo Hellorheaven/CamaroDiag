@@ -34,8 +34,18 @@ class EcuProgrammingDriverContractTest {
         assertFalse(driver.supportsWrite(target, EcuProgrammingDriverContract.Transport.NEXUS_JTAG, region, route))
         assertFalse(driver.supportsWrite(target, driver.transport, EcuBackupCoverage.Region.DATA_FLASH, route))
         assertFalse(driver.copy(writeQualifications = emptySet()).supportsWrite(target, driver.transport))
+        // Only a real registered implementation can ever use this descriptor.
+        // A transport label alone (ELM/STN) must not veto an otherwise matching
+        // target/driver; a BOOT/BAM qualification cannot be reused for OBD.
         val elm = driver.copy(transport = EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS)
         assertFalse(elm.supportsWrite(target, elm.transport, region, EcuBenchExpertPlan.AccessMethod.OBD))
+        val explicitlySupportedElm = elm.copy(writeQualifications = setOf(
+            EcuProgrammingDriverContract.WriteQualification(
+                target, region, EcuBenchExpertPlan.AccessMethod.OBD)))
+        assertTrue(explicitlySupportedElm.supportsWrite(
+            target, explicitlySupportedElm.transport, region, EcuBenchExpertPlan.AccessMethod.OBD))
+        assertFalse(EcuProgrammingDriverContract.hasValidatedWriteDriver(
+            "E39", EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS))
         for ((transport, method) in listOf(
             EcuProgrammingDriverContract.Transport.CHIP_OFF to EcuBenchExpertPlan.AccessMethod.EXTERNAL_CHIP_OFF,
             EcuProgrammingDriverContract.Transport.EEPROM_ISP to EcuBenchExpertPlan.AccessMethod.EXTERNAL_EEPROM_ISP

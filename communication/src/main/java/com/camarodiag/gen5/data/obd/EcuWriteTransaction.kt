@@ -102,11 +102,9 @@ object EcuWriteTransaction {
             unavailableIdentity(request.expectedIdentity.firmwareId) ||
             request.expectedIdentity.vin?.matches(Regex("[A-HJ-NPR-Z0-9]{17}")) != true
         ) blockers += Blocker.UNKNOWN_TARGET
-        if (request.transport == EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS) {
-            blockers += Blocker.DIAGNOSTIC_ONLY_TRANSPORT
-        }
-        if (request.transport != EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS &&
-            !request.transport.permitsMemoryProgramming(request.region)) {
+        // Admission is based on real protocol+driver capabilities, never an
+        // invented blanket denial for a transport name such as ELM/STN.
+        if (!request.transport.permitsMemoryProgramming(request.region)) {
             blockers += Blocker.INCOMPATIBLE_TRANSPORT_REGION
         }
         if (request.transport !in request.accessMethod.candidateTransports)

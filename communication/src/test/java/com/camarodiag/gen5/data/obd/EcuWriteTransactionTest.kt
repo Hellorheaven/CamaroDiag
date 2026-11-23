@@ -147,14 +147,14 @@ class EcuWriteTransactionTest {
         }
     }
 
-    @Test fun preparationRejectsElmMissingChecksAndUnverifiedMap() {
+    @Test fun transportLabelDoesNotInventWriteBanButMissingPhysicalEvidenceStillStopsFlash() {
         val invalid = request(evidence = EcuWriteTransaction.SafetyEvidence()).copy(
             transport = EcuProgrammingDriverContract.Transport.ELM_DIAGNOSTICS,
             layout = originalLayout.copy(mapVerifiedForTargetEcu = false)
         )
         val result = EcuWriteTransaction.prepare(invalid)
         assertFalse(result.canAttemptWithValidatedHardware)
-        assertTrue(EcuWriteTransaction.Blocker.DIAGNOSTIC_ONLY_TRANSPORT in result.blockers)
+        assertFalse(EcuWriteTransaction.Blocker.DIAGNOSTIC_ONLY_TRANSPORT in result.blockers)
         assertTrue(EcuWriteTransaction.Blocker.UNVERIFIED_MEMORY_MAP in result.blockers)
         assertTrue(EcuWriteTransaction.Blocker.UNVERIFIED_OEM_CHECKSUM in result.blockers)
         assertTrue(EcuWriteTransaction.Blocker.UNVERIFIED_HARDWARE_BACKUP in result.blockers)

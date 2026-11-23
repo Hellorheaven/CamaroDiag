@@ -115,7 +115,9 @@ data class UdsAccessPolicy internal constructor(
                     identity.operatingSystemId).all(::validEcuIdentifier)) {
                 "Placeholder or invalid ECU identity cannot authorize programming."
             }
-            require(evidenceReference.isNotBlank()) { "Traceable OEM evidence is required." }
+            // A free-text document reference is useful for diagnostics, but
+            // it is not a manufacturer unlock mechanism or a condition of the
+            // on-wire UDS protocol. Do not turn it into another authorization key.
             // Freeze *before* validating: source collections may be mutable and
             // must not be able to widen later, even via their nested map sets.
             val safeReadDids = frozenSet(readDids)
