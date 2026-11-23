@@ -174,6 +174,19 @@ internal static class StandardProtocolCli
         }
     }
 
+    private static void PrintMultiDidResponse(
+        string[] args, byte[] request, byte[] response)
+    {
+        var specification = Optional(args, "--uds-dids");
+        if (specification is null) return;
+        var entries = UdsMultiDidCli.Parse(specification);
+        var results = UdsMultiDidCli.Decode(entries, request, response);
+        foreach (var item in results)
+            Console.WriteLine($"UDS multi-DID=0x{item.Did:X4} " +
+                $"raw={Convert.ToHexString(item.Data)} " +
+                "(scaling and meaning require vehicle/ODX metadata).");
+    }
+
     private static void PrintObdOnUdsResponse(byte[] request, byte[] response)
     {
         if (request.Length == 3 && request[0] == 0x22)
@@ -858,7 +871,10 @@ internal static class StandardProtocolCli
                     limit, CancellationToken.None);
             Console.WriteLine("ISO-TP ECU RX: " + Convert.ToHexString(reply));
             if (o.Mode == "exchange")
+            {
+                PrintMultiDidResponse(args, o.Request, reply);
                 PrintObdOnUdsResponse(o.Request, reply);
+            }
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or
@@ -1161,6 +1177,7 @@ internal static class StandardProtocolCli
                 Console.WriteLine($"DoIP ECU RX: bytes={reply.Length} " +
                     $"SHA256={replyHash} prefix={Convert.ToHexString(reply.AsSpan(0, 64))} " +
                     "(use --rx-file to preserve all bytes).");
+            PrintMultiDidResponse(args, o.Request, reply);
             PrintObdOnUdsResponse(o.Request, reply);
             return 0;
         }
