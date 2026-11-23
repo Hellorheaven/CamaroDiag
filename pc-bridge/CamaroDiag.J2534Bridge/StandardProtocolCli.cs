@@ -295,7 +295,7 @@ internal static class StandardProtocolCli
     }
 
     internal sealed record DoIpOptions(string Host, ushort Tester, ushort Ecu,
-        byte[] Request, int TimeoutMs);
+        byte[] Request, int TimeoutMs, bool UseTls);
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
@@ -349,10 +349,11 @@ internal static class StandardProtocolCli
         var bytes = Hex(Required(args, "--payload"));
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
+        var useTls = bool.Parse(Optional(args, "--tls") ?? "false");
         if (host.Length is < 1 or > 253 || timeout is < 100 or > 30000 ||
             tester == ecu || bytes.Length > DoIpCodec.MaxPayload - 4)
             throw new ArgumentException("DoIP target or diagnostic PDU is invalid.");
-        return new(host, tester, ecu, bytes, timeout);
+        return new(host, tester, ecu, bytes, timeout, useTls);
     }
 
     internal static PassThruOptions ParseJ2534(string[] args)
@@ -404,11 +405,14 @@ internal static class StandardProtocolCli
         try
         {
             var o = ParseDoIp(args);
-            if (!Confirm($"DoIP {o.Host}:13400 ECU=0x{o.Ecu:X4} UDS={Convert.ToHexString(o.Request)}"))
+            if (!Confirm($"DoIP {(o.UseTls ? "TLS" : "TCP")} " +
+                $"{o.Host}:{(o.UseTls ? 3496 : 13400)} ECU=0x{o.Ecu:X4} " +
+                $"UDS={Convert.ToHexString(o.Request)}"))
                 return 2;
             await using var link = await DoIpDiagnosticTransport.ConnectAsync(
                 o.Host, o.Tester, o.Ecu,
-                TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None);
+                TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None,
+                useTls: o.UseTls);
             var reply = await link.ExchangeUdsAsync(o.Request,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None);
             Console.WriteLine("DoIP ECU RX: " + Convert.ToHexString(reply));
@@ -416,7 +420,8 @@ internal static class StandardProtocolCli
         }
         catch (Exception ex) when (ex is ArgumentException or
             IOException or SocketException or OperationCanceledException or
-            InvalidDataException or TimeoutException)
+            InvalidDataException or TimeoutException or
+            System.Security.Authentication.AuthenticationException)
         {
             Console.Error.WriteLine("DoIP exchange failed: " + ex.Message);
             return 6;
