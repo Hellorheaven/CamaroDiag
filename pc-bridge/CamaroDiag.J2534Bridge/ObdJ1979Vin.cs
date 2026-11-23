@@ -22,7 +22,8 @@ internal static class ObdJ1979Vin
         foreach (var value in vin)
         {
             if (!((value >= 'A' && value <= 'Z' &&
-                    value is not ('I' or 'O' or 'Q')) ||
+                    value != (byte)'I' && value != (byte)'O' &&
+                    value != (byte)'Q') ||
                   (value >= '0' && value <= '9')))
                 throw new InvalidDataException("Invalid ASCII VIN character.");
         }
