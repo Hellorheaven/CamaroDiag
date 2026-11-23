@@ -360,3 +360,12 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 - KWP ISO14230/J2534 : prévention du double-checksum. Par défaut checksum ajouté/vérifié par le pilote, mode 0x200 manuel avec checksum applicatif et vérification RX ; tests physiques/fonctionnels et absence de checksum dans données pass-thru.
 - UDS : constructeurs de services supplémentaires 0x24, 0x28, 0x2A, 0x2F, 0x85, et tests de cohérence DID ; FD.TP CMDT Abort du pair détecté pendant TP.DT et EOM invalide jamais acquitté.
 - Tests enregistrés et branchés à `BridgeSelfTests` ; **pas d'exécution CI prouvée sur le dernier HEAD, pas de qualification matérielle**.
+
+## C6 — sécurité des autorisations et état réel du chantier (23/11/2026)
+
+- C6 reste **actif**, distinct du travail protocolaire parallèle et de C2 (sauvegarde physique complète). Le parcours d'effacement des DTC liait la double confirmation à un booléen `sameConnection=true` ; il est maintenant rattaché à l'identifiant de génération de connexion capturé lors de l'avertissement. Le ViewModel revérifie cette valeur avant toute demande de suppression.
+- Les changements de session, de compte, les déconnexions, les reconnexions et les pertes de liaison invalident l'autorisation de l'ancienne connexion. Nouveau test sur avertissement seul, « Non », changement de génération et absence de session.
+- Déconnexion manuelle unifiée depuis l'écran Adaptateur pour USB, BLE, Bluetooth, Wi-Fi, J2534 et simulation. Sélection USB expirée rejetée avant bascule d'adaptateur ; annulations USB/Wi-Fi relancées correctement après nettoyage.
+- Commits principaux : `bbf4a58`, `4080bca`, `511f621`, `8f56400`, `e4918fd`, `866e859`, `a621e28`, `fdbc5ad`, `dd75d80`, `0bc30a9`, `357820c`, `c391c9d`.
+- La conformité complète de C6 **n'est pas acquise** : essais de programmation, sauvegarde réellement restaurable et vérification des blocs ECU sur matériel manquants ; tests du HEAD final non confirmés. Aucune modification des protocoles standards ni nouvelle restriction artificielle d'écriture.
+
