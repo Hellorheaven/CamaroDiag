@@ -114,3 +114,6 @@ avec temps hôte (jamais temps de bus), fichier CreateNew, pas d'écrasement,
 pas d'envoi après erreur de journal initiale, tests offline, mode réception
 sans TX. Demander UNE suite Debug groupée de compilation/tests sur le SHA
 de ce commit marqueur. Ne pas certifier de timing réel ECU ni fusionner PR.
+
+23/11/2026 — checkpoint groupe ISO-TP CAN classique : filtres J2534 et cancellation RX (#110)
+Deux correctifs ISO-TP dans la seule PR #95: ignorer les evenements J2534 TX/status et rejet de RX hors canal ou arrive apres cancellation dans le lien RAW, et appliquer CAN_29BIT_ID aux deux elements du filtre PASS_FILTER pour CAN 29 bits (SAE J2534-1). Autotests simules 11/29 bits, echo, mauvais protocole, cancellation et delai commun ajoutes. Valider Windows Debug -warnaserror et --self-test au SHA precis de ce checkpoint, puis Android, natif et connecteurs. Aucun test physique VCI/ECU, pas de merge, pas de Release.
