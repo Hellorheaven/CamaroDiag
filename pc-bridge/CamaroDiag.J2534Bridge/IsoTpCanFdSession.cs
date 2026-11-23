@@ -17,7 +17,8 @@ internal static class IsoTpCanFdSession
     internal sealed record Settings(
         uint TxId, uint RxId, int TxFrameLength, bool CanFd,
         byte BlockSize = 8, byte StMin = 0, byte Padding = 0xCC,
-        byte? TxAddress = null, byte? RxAddress = null)
+        byte? TxAddress = null, byte? RxAddress = null,
+        int MaxWaitFrames = 4)
     {
         internal void Validate()
         {
@@ -28,6 +29,8 @@ internal static class IsoTpCanFdSession
                 (!CanFd && TxFrameLength != 8) ||
                 (CanFd && StandardVehicleProtocols.CanFdLengthToDlc(TxFrameLength) < 0))
                 throw new ArgumentException("Unsupported CAN/CAN-FD ISO-TP IDs or frame size.");
+            if (MaxWaitFrames is < 0 or > 255)
+                throw new ArgumentOutOfRangeException(nameof(MaxWaitFrames));
             if (TxAddress.HasValue != RxAddress.HasValue)
                 throw new ArgumentException("ISO-TP extended addressing requires both TX and RX addresses.");
             _ = DecodeStMin(StMin);
@@ -238,7 +241,7 @@ internal static class IsoTpCanFdSession
     private static async Task<Flow> AwaitCtsAsync(
         ICanLink link, Settings config, TimeSpan timeout, CancellationToken token)
     {
-        for (var wait = 0; wait <= 4; wait++)
+        for (var wait = 0; wait <= config.MaxWaitFrames; wait++)
         {
             var frame = await ReceiveCorrelatedAsync(link, config, timeout, token);
             var pci = AddressWidth(config);
