@@ -13,9 +13,46 @@ internal static class StandardProtocolCli
 {
     internal const string DoIpCommand = "--doip-exchange";
     internal const string DoIpDiscoverCommand = "--doip-discover";
+    internal const string DoIpStatusCommand = "--doip-status";
     internal const string PassThruCommand = "--j2534-standard";
     internal const string RawIsoTpCommand = "--isotp-exchange";
     internal const string J1939Command = "--j1939-transport";
+
+    internal static async Task<int> RunDoIpStatusAsync(string[] args)
+    {
+        try
+        {
+            var host = Required(args, "--host");
+            var power = bool.Parse(Optional(args, "--power-mode") ?? "false");
+            var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "2000",
+                CultureInfo.InvariantCulture);
+            var status = await DoIpVehicleDiscovery.QueryStatusAsync(
+                host, power, TimeSpan.FromMilliseconds(timeoutMs),
+                CancellationToken.None);
+            if (power)
+            {
+                var mode = DoIpCodec.ParseDiagnosticPowerMode(status);
+                Console.WriteLine($"DoIP diagnostic power mode={mode} " +
+                    $"({(mode == 1 ? "ready" : mode == 0 ? "not ready" : "not supported")})");
+            }
+            else
+            {
+                var entity = DoIpCodec.ParseEntityStatus(status);
+                Console.WriteLine($"DoIP node type={entity.NodeType} " +
+                    $"sockets={entity.CurrentSockets}/{entity.MaxSockets} " +
+                    $"max data size={(entity.MaxDataSize?.ToString() ?? "unspecified")}");
+            }
+            Console.WriteLine("DoIP UDP status is informational and not ECU authorization.");
+            return 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or
+            InvalidDataException or TimeoutException or SocketException or
+            OperationCanceledException or FormatException or OverflowException)
+        {
+            Console.Error.WriteLine("DoIP UDP status query failed: " + ex.Message);
+            return 6;
+        }
+    }
 
     internal static async Task<int> RunDoIpDiscoveryAsync(string[] args)
     {
