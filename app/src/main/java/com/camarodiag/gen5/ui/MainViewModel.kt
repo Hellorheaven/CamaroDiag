@@ -2079,11 +2079,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // unframed final line; do not append it to rawText a second time.
                     val raw = current.rawText.takeLast(131_072)
                     val trailingEvents = framedEvents(framer.drainTrailing())
+                    val archiveFailed = CanConsoleExportPolicy.archiveFailedAfterStop(
+                        current.rawArchiveFailed,
+                        captureArchive?.isComplete == true
+                    )
                     val stoppedEvent = CanConsoleHistoryEntry(
                         id = System.nanoTime(),
                         direction = "SYSTEM",
                         timestampMillis = System.currentTimeMillis(),
-                        content = localizedContext.getString(R.string.can_sniffer_stop)
+                        content = localizedContext.getString(
+                            if (archiveFailed) R.string.can_sniffer_capture_failed
+                            else R.string.can_sniffer_stop
+                        ),
+                        succeeded = !archiveFailed
                     )
                     val report = runCatching {
                         CanTraceAnalyzer.analyze(
@@ -2096,10 +2104,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         rawText = raw,
                         report = report,
                         message = stoppedEvent.content,
-                        rawArchiveFailed = CanConsoleExportPolicy.archiveFailedAfterStop(
-                            current.rawArchiveFailed,
-                            captureArchive?.isComplete == true
-                        ),
+                        rawArchiveFailed = archiveFailed,
                         consoleHistory = (current.consoleHistory + trailingEvents + stoppedEvent).takeLast(300),
                         observedCanIds = retainObservedCanIds(current.observedCanIds, trailingEvents)
                     )
