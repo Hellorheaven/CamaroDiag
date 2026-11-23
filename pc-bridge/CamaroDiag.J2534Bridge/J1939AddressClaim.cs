@@ -3,9 +3,9 @@ using System.Buffers.Binary;
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// SAE J1939-81 address-claim announcement decoder. This is passive
-/// identification only; it does not arbitrate a claimed address, choose
-/// a source address, or transmit any address-claim message on the bus.
+/// SAE J1939-81 address-claim codec and pure NAME conflict comparison.
+/// Frame construction does not transmit, select a usable bus address or
+/// perform the 250 ms physical claim/listen procedure.
 /// </summary>
 internal static class J1939AddressClaim
 {
@@ -18,6 +18,50 @@ internal static class J1939AddressClaim
         byte FunctionInstance, byte Function, byte VehicleSystem,
         byte VehicleSystemInstance, byte IndustryGroup,
         bool ArbitraryAddressCapable);
+
+    internal enum ClaimConflict
+    {
+        DifferentAddress,
+        LocalNameWins,
+        PeerNameWins,
+        DuplicateName
+    }
+
+    /// <summary>
+    /// Construct the standard 8-byte J1939-81 address-claim frame only.
+    /// No frame is sent and this does not qualify the address for use.
+    /// Source 0xFE is the standard Cannot Claim Address indication.
+    /// </summary>
+    internal static IsoTpCanFdSession.CanFrame Build(
+        byte sourceAddress, ulong name, byte priority = 6)
+    {
+        if (sourceAddress == 0xFF || name == ulong.MaxValue ||
+            priority > 7)
+            throw new ArgumentException("Invalid claimed source, NAME or priority.");
+        var bytes = new byte[8];
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes, name);
+        return new(J1939ClassicTpSession.ArbitrationId(
+            AddressClaimPgn, priority, sourceAddress, 0xFF), false, bytes);
+    }
+
+    /// <summary>
+    /// Lower numeric NAME has priority in a collision on the same source
+    /// address. Duplicate NAME is ambiguous and must never be treated as
+    /// an automatic successful claim.
+    /// </summary>
+    internal static ClaimConflict Compare(Identity peer, byte localAddress,
+        ulong localName)
+    {
+        ArgumentNullException.ThrowIfNull(peer);
+        if (localAddress >= 0xFE || localName == ulong.MaxValue)
+            throw new ArgumentException("Local J1939 identity is not claimable.");
+        if (peer.SourceAddress != localAddress)
+            return ClaimConflict.DifferentAddress;
+        if (peer.Name == localName)
+            return ClaimConflict.DuplicateName;
+        return localName < peer.Name ?
+            ClaimConflict.LocalNameWins : ClaimConflict.PeerNameWins;
+    }
 
     internal static Identity Decode(uint arbitrationId, ReadOnlySpan<byte> data)
     {
