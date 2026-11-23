@@ -43,6 +43,37 @@ internal static class ObdOnUdsServices
     internal static bool IsEmissionsDataDid(ushort did) =>
         did is >= 0xF400 and <= 0xF5FF or >= 0xF700 and <= 0xF7FF;
 
+    internal enum DataGroup
+    {
+        NotLegislated,
+        CurrentPowertrain,
+        LegacyMonitor,
+        VehicleInformation
+    }
+
+    /// <summary>
+    /// Broad OBD-on-UDS legislated DID grouping. The F600-F6FF group is
+    /// legacy monitoring and not necessarily implemented by newer ECUs.
+    /// Data scaling and DID availability are defined by SAE J1979DA and
+    /// the vehicle, not inferred from this numeric range.
+    /// </summary>
+    internal static DataGroup ClassifyDid(ushort did) => did switch
+    {
+        >= 0xF400 and <= 0xF5FF => DataGroup.CurrentPowertrain,
+        >= 0xF600 and <= 0xF6FF => DataGroup.LegacyMonitor,
+        >= 0xF700 and <= 0xF7FF => DataGroup.CurrentPowertrain,
+        >= 0xF800 and <= 0xF8FF => DataGroup.VehicleInformation,
+        _ => DataGroup.NotLegislated
+    };
+
+    internal static byte[] ReadObdDid(ushort did)
+    {
+        if (ClassifyDid(did) == DataGroup.NotLegislated)
+            throw new ArgumentOutOfRangeException(nameof(did),
+                "This DID is not in the supported OBDonUDS data groups; generic ISO 14229 ReadDID remains available.");
+        return UdsStandardServices.ReadDid(did);
+    }
+
     internal static byte[] ReadEmissionsData(ushort did)
     {
         if (!IsEmissionsDataDid(did))
