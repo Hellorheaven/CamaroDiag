@@ -364,6 +364,12 @@ internal static class StandardProtocolCli
                 Console.WriteLine($"OBDonUDS protocol F810=0x{identification.Value:X2} " +
                     $"OBDonUDS={(identification.IsObdOnUds ? "identified" : "not confirmed")}");
             }
+            else if (did == ObdOnUdsVehicleIdentification.VinDid &&
+                response.Length > 0 && response[0] == 0x62)
+            {
+                var vin = ObdOnUdsVehicleIdentification.DecodeVin(response);
+                Console.WriteLine($"OBDonUDS F802 VIN={vin}");
+            }
             else if (ObdOnUdsServices.ClassifyDid(did) !=
                     ObdOnUdsServices.DataGroup.NotLegislated &&
                 response.Length > 0 && response[0] == 0x62)
