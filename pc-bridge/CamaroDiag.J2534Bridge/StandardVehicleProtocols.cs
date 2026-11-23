@@ -134,7 +134,9 @@ internal static class DoIpCodec
     internal const ushort DiagnosticMessage = 0x8001;
     internal const ushort DiagnosticPositiveAck = 0x8002;
     internal const ushort DiagnosticNegativeAck = 0x8003;
-    internal const int MaxPayload = 4096;
+    // Explicit bounded implementation ceiling, not the ISO 13400 32-bit
+    // wire limit. Large OEM transfers need streaming and gateway limits.
+    internal const int MaxPayload = 1024 * 1024;
 
     internal sealed record Message(byte Version, ushort Type, byte[] Payload);
 
@@ -196,12 +198,13 @@ internal static class DoIpCodec
         return response.Payload[0]; // 0=not ready, 1=ready, 2=not supported
     }
 
-    internal static byte[] RoutingActivation(ushort testerAddress, byte activationType = 0x00)
+    internal static byte[] RoutingActivation(ushort testerAddress,
+        byte activationType = 0x00, byte version = Version)
     {
         var payload = new byte[7];
         BinaryPrimitives.WriteUInt16BigEndian(payload, testerAddress);
         payload[2] = activationType;
-        return Encode(RoutingActivationRequest, payload);
+        return Encode(RoutingActivationRequest, payload, version);
     }
 
     internal static void RequireRoutingActive(Message response, ushort testerAddress)
@@ -222,7 +225,8 @@ internal static class DoIpCodec
         return Encode(AliveCheckResponse, payload, request.Version);
     }
 
-    internal static byte[] Diagnostic(ushort testerAddress, ushort ecuAddress, byte[] uds)
+    internal static byte[] Diagnostic(ushort testerAddress,
+        ushort ecuAddress, byte[] uds, byte version = Version)
     {
         ArgumentNullException.ThrowIfNull(uds);
         if (testerAddress == ecuAddress || uds.Length is < 1 or > MaxPayload - 4)
@@ -231,7 +235,7 @@ internal static class DoIpCodec
         BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), testerAddress);
         BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(2), ecuAddress);
         uds.CopyTo(data, 4);
-        return Encode(DiagnosticMessage, data);
+        return Encode(DiagnosticMessage, data, version);
     }
 
     internal static byte[] RequireDiagnosticResponse(Message response,
