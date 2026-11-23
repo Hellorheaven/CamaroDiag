@@ -617,6 +617,32 @@ internal static class StandardVehicleProtocolsSelfTests
             "--flow-control", "000007E0"]),
             "Passive J2534 mode must reject vendor automatic ISO-TP FC transmission.");
 
+        var swCanHighSpeed = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x8008",
+            "--baud", "33333", "--sw-can-hs-baud", "83333",
+            "--data", "0102"]);
+        Check(swCanHighSpeed.ProtocolId == J2534StandardChannel.SwCan &&
+            swCanHighSpeed.SwCanHighSpeedBaud == 83333,
+            "J2534 SW_CAN high-speed data-rate delegated to vendor on real channel.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x8007",
+            "--baud", "33333", "--sw-can-hs-baud", "83333",
+            "--data", "0102"]),
+            "SW_CAN high-speed rate is not applicable to SW_ISO15765.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x8008",
+            "--baud", "33333", "--mode", "receive",
+            "--sw-can-hs-baud", "83333"]),
+            "Passive J2534 SW_CAN cannot trigger a physical speed-mode switch.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x8008",
+            "--baud", "33333", "--sw-can-hs-baud", "0", "--data", "0102"]),
+            "SW_CAN high-speed setting refuses zero bitrate.");
+
         var passiveVpw = StandardProtocolCli.ParseJ2534([
             StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
             "--protocol-id", "0x01", "--baud", "10400",
