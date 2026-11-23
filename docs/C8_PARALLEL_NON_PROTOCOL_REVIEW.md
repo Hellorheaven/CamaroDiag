@@ -90,3 +90,13 @@
 - **J2534 :** configuration IPv4 LAN, TCP, appairage TLS avec empreinte et paires CAN 11/29 bits validée avant de déconnecter l'ancien adaptateur ; le transport refait ses vérifications sécurisées. Les indicateurs de lecture mémoire se réinitialisent à la déconnexion ; le handshake est intégré au compteur global busy.
 - **Autres transports :** saisies Wi-Fi et MAC Bluetooth refusées en amont si elles sont malformées.
 - **Validation attendue :** compilation et suites unitaires Android/communication/Windows au HEAD stable ; essai matériel USB permission/discovery sur matériel identifié, PC J2534 TLS réels et transitions déconnexion/reconnexion ; aucun succès matériel n'est revendiqué. L'autre chat conserve les protocoles et firmwares.
+
+## C6 — suivi actif rétabli, preuve de session et tests de restauration (23/11/2026)
+
+C6 **reste ouvert** sur PR #95, il n'a pas été supprimé ni transféré au chat protocoles.
+
+- **Sûreté opérateur logicielle :** validation de l'avertissement « OK » puis deuxième confirmation « Oui/Non », refus sur Non/fermeture/annulation. Le chemin d'effacement des DTC transporte maintenant la génération du canal lors de l'avertissement jusqu'au ViewModel ; tout changement de session, compte ou adaptateur annule la confirmation.
+- **Connexion :** contrôle de déconnexion volontaire de tous les adaptateurs dans l'écran, attente des captures actives, invalidation des générations de connexion, sans redéployer un protocole déjà pris en charge ailleurs.
+- **C2/C6 indissociables avant programmation :** démontrer les octets d'origine relus physiquement deux fois, la carte mémoire complète du calculateur visé, la sauvegarde restaurable, l'identité et les blocs exacts avant effacement, les preuves de réécriture et récupération. Aucun de ces objectifs n'est réputé démontré par l'import ZIP ou par la double confirmation seule.
+- **C8 :** tests d'intégration au HEAD final + essais matériel ; relever séparément résultats Android, Windows J2534, sécurité du firmware, preuves de récupération et conflits GitHub. Ne pas conclure « C6 terminé » sans toutes les preuves applicables.
+
