@@ -194,13 +194,14 @@ internal static class NativeScopedMemoryReaderSelfTests
         var gmlanRead = NativeScopedMemoryReader.ReadTwiceAsync(
             gmlan, scope, null, CancellationToken.None).GetAwaiter().GetResult();
         Assert(gmlanRead.Bytes.SequenceEqual(memory) && gmlan.GmlanVinCalls == 3 &&
-               gmlan.VinCalls == 3,
-            "Unsupported UDS VIN falls back to exact legacy GMLAN 1A/90");
+               gmlan.VinCalls == 1,
+            "UDS-to-GMLAN discovery is cached per transport; each checkpoint still reads exact VIN");
         var silentUds = new FakeEcu(scope.StartAddress, memory) { UdsVinTimeout = true };
         var silentRead = NativeScopedMemoryReader.ReadTwiceAsync(
             silentUds, scope, null, CancellationToken.None).GetAwaiter().GetResult();
-        Assert(silentRead.Bytes.SequenceEqual(memory) && silentUds.GmlanVinCalls == 3,
-            "Silent F190 falls back to the exact legacy GMLAN VIN");
+        Assert(silentRead.Bytes.SequenceEqual(memory) && silentUds.GmlanVinCalls == 3 &&
+               silentUds.VinCalls == 1,
+            "Silent F190 incurs only one timeout per physical link while GM VIN is rechecked");
         var wrongGmlan = new FakeEcu(scope.StartAddress, memory) {
             UdsVinUnsupported = true, ChangeVinAfterMemoryCalls = 0
         };

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -10,6 +11,14 @@ namespace CamaroDiag.J2534Bridge;
 internal static class NativeScopedMemoryReader
 {
     internal const int MaximumUiCaptureBytes = 16 * 1024 * 1024;
+
+    // Cache only the ECU's supported, READ-ONLY VIN dialect on this specific
+    // live transport. Long captures still re-read the exact VIN before every
+    // pass and every 32 memory blocks, but do not wait for repeated silent
+    // F190 timeouts once the physical GM 1A/90 route has succeeded.
+    // Weak keys prevent retaining a disconnected adapter/session.
+    private sealed class VinDialect { internal volatile bool PreferGmlan; }
+    private static readonly ConditionalWeakTable<ITransport, VinDialect> VinDialects = new();
 
     // A 16 MiB capture with small read blocks can issue hundreds of thousands
     // of successful requests. Posting one WinForms Progress<T> callback per
@@ -86,6 +95,15 @@ internal static class NativeScopedMemoryReader
         ITransport link, J2534MemoryReadScope scope, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        var dialect = VinDialects.GetValue(link, static _ => new VinDialect());
+        if (dialect.PreferGmlan)
+        {
+            var gmReply = await link.ExchangeAsync([0x1A, 0x90], token);
+            token.ThrowIfCancellationRequested();
+            if (!J2534Device.MatchesScopedGmlanVin(gmReply, scope.ExpectedVin))
+                throw new LiveVinMismatchException();
+            return;
+        }
         bool gmlanFallback;
         try
         {
@@ -108,7 +126,10 @@ internal static class NativeScopedMemoryReader
             var reply = await link.ExchangeAsync([0x1A, 0x90], token);
             token.ThrowIfCancellationRequested();
             if (J2534Device.MatchesScopedGmlanVin(reply, scope.ExpectedVin))
+            {
+                dialect.PreferGmlan = true;
                 return;
+            }
         }
         throw new LiveVinMismatchException();
     }
