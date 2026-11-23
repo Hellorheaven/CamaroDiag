@@ -983,4 +983,5 @@
     <string name="can_console_export_direction_legend"># TX = envoyé, RX = reçu, SYSTEM = événement applicatif</string>
     <string name="can_console_export_full_raw_rx"># RX BRUT - flux complet archivé de l’adaptateur (texte non modifié)</string>
     <string name="can_console_export_recent_raw_rx"># RX BRUT - extrait mémoire récent uniquement, capture non exhaustive</string>
+    <string name="can_console_export_failed_marker"> ÉCHEC</string>
 </resources>
