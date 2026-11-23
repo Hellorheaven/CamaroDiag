@@ -420,3 +420,13 @@ L'interface n'affiche déjà plus le bouton de capture physique CDJ/1 non implé
 - `J1850Crc` : codec CRC-8 SAE J1850 de référence hors pilote, tests vectoriels `0x4B` et erreurs. Aucun CRC injecté automatiquement dans les messages J2534.
 - `IsoTpJ2534RawCanLink` : vérifier `CAN_29BIT_ID` RX pour rejeter les frames standard/extended attribuées au mauvais format ; tests ajoutés.
 - Aucun build Windows ni campagne CI au dernier HEAD n'a encore démontré la compilation. Aucun test sur ECU réel ni sauvegarde/restauration physiquement validée.
+
+
+### Clôture du créneau protocoles — corrections et régressions
+
+- Tests de limites UDS LFI 8 octets, validations des réponses `0x74 / 0x75`, NRC `RequestTransferExit` et annulation avant toute transmission.
+- Contrôle du statut CAN J2534 `CAN_29BIT_ID` et test du mode 11/29 bits réellement déclaré par la DLL.
+- Validation J1850 CRC brute volontairement optionnelle dans J2534 ; les indications de statut RX/TX n'ont pas de CRC de données et sont ignorées dans ce seul contrôle. Tests du filtrage des statuts.
+- Correction d'une ancienne assertion sur le catalogue : **14 protocoles**, et non plus 13, depuis l'ajout J1939-22.
+- CLI : erreurs de paramètres booléens/numériques invalides traitées par un code d'échec plutôt qu'une exception non interceptée.
+- Pas de preuve matérielle, pas d'exécution C# sur cette branche dans cette session ; l'absence de workflow associé au dernier SHA ne doit pas être présentée comme une validation.
