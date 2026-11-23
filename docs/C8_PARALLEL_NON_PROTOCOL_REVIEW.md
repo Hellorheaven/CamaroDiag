@@ -58,3 +58,11 @@
 - Ressources d'interface et d'export C1 : présence unique en français et en anglais des huit clés contrôlées ; écran et ViewModel référencent bien les nouvelles clés / vérifications de contexte.
 - C4 : le moteur rejette les mesures dont la réponse physique brute est absente/vide, indépendamment de la valeur d'un tampon déjà décodé. Les deux tests concernés ont été ajoutés.
 - Le contrôle ici est **statique**, non une compilation Android ni une preuve de réussite de GitHub Actions. Les validations sur un SHA stabilisé et la clôture de #59 restent à mener.
+
+## C1 — suivi après intégration du journal complet (23/11/2026)
+
+- Le blocage « historique TX au-delà de 300 lignes absent » a reçu une implémentation : `CanConsoleEventJournalWriter` (journal CSV complet), `CanConsoleEventJournalStore` (fichier privé par contexte) et branchements `MainViewModel` pour les événements monitor RX, émission TX, réponse RX/SYSTEM et erreurs.
+- L'écran continue à afficher 300 événements récents, mais l'export peut désormais inclure tous les événements conservés dans le journal disque et le flux RX brut complet. La génération du journal est vérifiée à l'export ; les erreurs de stockage rendent l'archive indisponible.
+- Couverture unitaire écrite : 600/620 événements, ordre, échappement, échec de stockage et nettoyage inter-session. Chaînes d'export FR/EN ajoutées.
+- Une demande de campagne C1 regroupée a été déclenchée par la modification de `.github/c1-console-gate-request.txt` (commit `9bdc221`). **Résultat de CI non encore vérifié : ne pas déclarer C1 validé au nouveau HEAD.**
+- Toujours à qualifier : endurance sur matériel réel, correspondance fiable TX/ACK/réponse ECU, comportement en déconnexion et volumétrie, puis recette de fermeture de #59. Aucun transport ISO/SAE supplémentaire modifié par cette intervention.
