@@ -40,7 +40,15 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             await socket.ConnectAsync(host, 13400, deadline.Token);
             var session = new DoIpDiagnosticTransport(socket, tester, ecu);
             await session.SendAsync(DoIpCodec.RoutingActivation(tester), deadline.Token);
-            var routing = await session.ReceiveAsync(deadline.Token);
+            DoIpCodec.Message routing;
+            do
+            {
+                routing = await session.ReceiveAsync(deadline.Token);
+                if (routing.Type == DoIpCodec.AliveCheckRequest)
+                    await session.SendAsync(DoIpCodec.ReplyToAliveCheck(
+                        routing, tester), deadline.Token);
+            }
+            while (routing.Type == DoIpCodec.AliveCheckRequest);
             DoIpCodec.RequireRoutingActive(routing, tester);
             return session;
         }
@@ -64,6 +72,12 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         for (var count = 0; count < 12; count++)
         {
             var message = await ReceiveAsync(deadline.Token);
+            if (message.Type == DoIpCodec.AliveCheckRequest)
+            {
+                await SendAsync(DoIpCodec.ReplyToAliveCheck(
+                    message, testerAddress), deadline.Token);
+                continue;
+            }
             if (DoIpCodec.IsCorrelatedDiagnosticAck(message, testerAddress, ecuAddress))
                 continue;
             var uds = DoIpCodec.RequireDiagnosticResponse(message, testerAddress, ecuAddress);
