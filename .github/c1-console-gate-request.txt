@@ -14,3 +14,8 @@ No physical ECU qualification, no merge.
 Grouped correction validation — C1 final journal-file integrity follow-up
 Source HEAD before grouped request: 1bd8819068385be797f5bc6f24b7bca9b25ae771
 No Release, merge or physical ECU validation.
+
+Grouped connector / J2534 bridge integration checkpoint (Android + communication + Windows self-test).
+Source HEAD before request: 0688222fbec8b72de84a6ff9f0abc6a9c869e517
+Scope: USB device routing, permission feedback, J2534 TLS form preflight and stale capability clearing.
+No physical connector / ECU tests, no code for ISO/SAE transports, no merge.
