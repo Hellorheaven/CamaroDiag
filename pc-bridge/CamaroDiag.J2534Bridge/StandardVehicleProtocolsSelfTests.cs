@@ -399,6 +399,23 @@ internal static class StandardVehicleProtocolsSelfTests
             0x0E80, 0x1234, new byte[DoIpCodec.MaxPayload]),
             "DoIP retains an explicit in-memory payload cap.");
 
+        const string testThumbprint = "0123456789ABCDEF0123456789ABCDEF01234567";
+        var mutualTlsDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
+            "--tester", "0E80", "--ecu", "1234", "--tls", "true",
+            "--client-cert-thumbprint", testThumbprint, "--payload", "22F810"]);
+        Check(mutualTlsDoIp.ClientCertificateThumbprint == testThumbprint &&
+            mutualTlsDoIp.UseTls,
+            "DoIP can select an installed client certificate without a password.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
+            "--tester", "0E80", "--ecu", "1234",
+            "--client-cert-thumbprint", testThumbprint, "--payload", "22F810"]),
+            "Mutual TLS client cert cannot be sent via unencrypted TCP.");
+        Reject<ArgumentException>(() =>
+            DoIpDiagnosticTransport.FindClientCertificate("1234"),
+            "Malformed certificate thumbprint fails before OS store lookup.");
+
         var secureDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
             "--tester", "0E80", "--ecu", "1234", "--tls", "true",
