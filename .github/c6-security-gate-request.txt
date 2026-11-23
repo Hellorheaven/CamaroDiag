@@ -1,4 +1,6 @@
-C6 security development freeze
-Previous HEAD: fd94cb2697219a16670d33ff6495f739aad72159
-One grouped run: Android communication/diagnostic/app unit suites; Windows J2534 Debug and self-tests; PR95 no-programming policy.
-No Release build, no merge, no real ECU qualification.
+C6/C2 non-OEM gate cleanup — grouped validation checkpoint
+Source HEAD before checkpoint: 1dcd9dc5c8919b29466d1a1c28d27d998129cc66
+Expect: native local E39 bench gate enabled; no TrustedKeys/profile signature; driver fingerprint optional;
+physical UDS F190 or GM GMLAN 1A/90 exact VIN; remote network bridge remains read-only.
+One grouped run: Android communication/diagnostic/app unit tests; Windows Debug -warnaserror and self-tests;
+no Release build, no physical ECU test, no merge.
