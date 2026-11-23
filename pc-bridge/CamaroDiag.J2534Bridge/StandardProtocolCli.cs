@@ -657,7 +657,8 @@ internal static class StandardProtocolCli
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
-        byte? KwpRxTarget, byte? KwpRxSource, string Mode);
+        byte? KwpRxTarget, byte? KwpRxSource, string Mode,
+        bool KwpFunctionalRx = false);
 
     private static string Required(IReadOnlyList<string> args, string option)
     {
@@ -776,11 +777,38 @@ internal static class StandardProtocolCli
         var flags = Number(Optional(args, "--flags") ?? "0");
         var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
         var txText = Optional(args, "--data");
+        var kwpService = Optional(args, "--kwp-service");
+        var kwpTxTargetText = Optional(args, "--kwp-tx-target");
+        var kwpTxSourceText = Optional(args, "--kwp-tx-source");
+        var kwpFunctional = bool.Parse(Optional(args, "--kwp-functional") ?? "false");
+        var kwpFunctionalRx = bool.Parse(
+            Optional(args, "--kwp-rx-functional") ?? "false");
         if (mode is not ("exchange" or "receive") ||
-            (mode == "exchange" && txText is null) ||
-            (mode == "receive" && txText is not null))
-            throw new ArgumentException("J2534 exchange needs TX data; receive mode must not specify TX data.");
-        var data = txText is null ? Array.Empty<byte>() : Hex(txText);
+            (mode == "exchange" &&
+                ((txText is null) == (kwpService is null))) ||
+            (mode == "receive" &&
+                (txText is not null || kwpService is not null)))
+            throw new ArgumentException(
+                "J2534 exchange needs one raw TX or KWP service; receive mode accepts no TX.");
+        if (kwpService is not null &&
+            (protocol != J2534StandardChannel.Iso14230 ||
+             kwpTxTargetText is null || kwpTxSourceText is null))
+            throw new ArgumentException(
+                "KWP service needs ISO14230 with explicit TX source and target.");
+        if (kwpService is null &&
+            (kwpTxTargetText is not null || kwpTxSourceText is not null ||
+             kwpFunctional))
+            throw new ArgumentException(
+                "KWP TX addressing requires a KWP service payload.");
+        var data = kwpService is not null ?
+            (kwpFunctional ?
+                StandardVehicleProtocols.BuildKwpFunctionalFrame(
+                    checked((byte)Number(kwpTxTargetText!)),
+                    checked((byte)Number(kwpTxSourceText!)), Hex(kwpService)) :
+                StandardVehicleProtocols.BuildKwpPhysicalFrame(
+                    checked((byte)Number(kwpTxTargetText!)),
+                    checked((byte)Number(kwpTxSourceText!)), Hex(kwpService))) :
+            txText is null ? Array.Empty<byte>() : Hex(txText);
         var mask = Optional(args, "--mask") is string m ? Hex(m) : null;
         var pattern = Optional(args, "--pattern") is string p ? Hex(p) : null;
         var flow = Optional(args, "--flow-control") is string f ? Hex(f) : null;
@@ -801,6 +829,7 @@ internal static class StandardProtocolCli
             (flow != null && mask == null) ||
             (mode == "receive" && (init != null || flow != null)) ||
             (kwpRxTarget.HasValue != kwpRxSource.HasValue) ||
+            (kwpFunctionalRx && !kwpRxTarget.HasValue) ||
             (kwpRxTarget.HasValue && protocol != J2534StandardChannel.Iso14230) ||
             (init != null && protocol is not (J2534StandardChannel.Iso9141
                                              or J2534StandardChannel.Iso14230)) ||
@@ -809,7 +838,7 @@ internal static class StandardProtocolCli
             throw new ArgumentException("Invalid standard J2534 channel configuration.");
         return new(index, protocol, baud, flags, data,
             mask, pattern, flow, init, timeout, count,
-            kwpRxTarget, kwpRxSource, mode);
+            kwpRxTarget, kwpRxSource, mode, kwpFunctionalRx);
     }
 
     internal static async Task SaveDoIpReplyAsync(
@@ -915,8 +944,11 @@ internal static class StandardProtocolCli
                     $"status=0x{received.RxStatus:X} {Convert.ToHexString(received.Data)}");
                 if (o.KwpRxTarget is byte target && o.KwpRxSource is byte source)
                 {
-                    var payload = StandardVehicleProtocols.ParseKwpPhysicalFrame(
-                        received.Data, target, source);
+                    var payload = o.KwpFunctionalRx ?
+                        StandardVehicleProtocols.ParseKwpFunctionalFrame(
+                            received.Data, target, source) :
+                        StandardVehicleProtocols.ParseKwpPhysicalFrame(
+                            received.Data, target, source);
                     Console.WriteLine("KWP physical RX payload: " +
                         Convert.ToHexString(payload));
                 }
