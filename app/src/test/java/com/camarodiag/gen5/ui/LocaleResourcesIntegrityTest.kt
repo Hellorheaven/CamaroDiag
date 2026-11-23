@@ -487,6 +487,14 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun bridgeFormErrorIsLocalizedAndDoesNotClaimConnectionLoss() {
+        val english = strings("en").getValue("msg_j2534_bridge_invalid_form")
+        val french = strings("fr").getValue("msg_j2534_bridge_invalid_form")
+        assertTrue(english.contains("TLS") && english.contains("not disconnected"))
+        assertTrue(french.contains("TLS") && french.contains("pas été déconnecté"))
+        assertFalse(english == french)
+    }
+
     @Test fun usbPermissionPromptHasActionableFrenchAndEnglishGuidance() {
         val english = strings("en").getValue("msg_usb_permission_pending")
         val french = strings("fr").getValue("msg_usb_permission_pending")
