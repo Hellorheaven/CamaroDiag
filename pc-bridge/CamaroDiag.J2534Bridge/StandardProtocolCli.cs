@@ -295,13 +295,24 @@ internal static class StandardProtocolCli
         var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
+        var obdDid = Optional(args, "--obd-did");
+        var obdDtcMask = Optional(args, "--obd-dtc-mask");
+        var payloadSources = (hexPayload is null ? 0 : 1) +
+            (payloadFile is null ? 0 : 1) +
+            (obdDid is null ? 0 : 1) +
+            (obdDtcMask is null ? 0 : 1);
         if (mode is not ("exchange" or "receive") ||
-            (mode == "exchange" && ((hexPayload is null) == (payloadFile is null))) ||
-            (mode == "receive" && (hexPayload is not null || payloadFile is not null)))
+            (mode == "exchange" && payloadSources != 1) ||
+            (mode == "receive" && payloadSources != 0))
             throw new ArgumentException(
-                "Exchange needs exactly one payload source; receive mode accepts no payload.");
-        byte[] bytes = mode == "receive" ? Array.Empty<byte>() : payloadFile is null ?
-            Convert.FromHexString(hexPayload!) : File.ReadAllBytes(payloadFile);
+                "Exchange needs exactly one payload, file, OBD DID or DTC mask; receive mode accepts none.");
+        byte[] bytes = mode == "receive" ? Array.Empty<byte>() :
+            obdDid is not null ? ObdOnUdsServices.ReadEmissionsData(
+                checked((ushort)ParseCanId(obdDid))) :
+            obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
+                checked((byte)Number(obdDtcMask))) :
+            payloadFile is not null ? File.ReadAllBytes(payloadFile) :
+            Convert.FromHexString(hexPayload!);
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
             bs, stMin, TxAddress: txAddress, RxAddress: rxAddress,
             MaxWaitFrames: maxWaitFrames, MixedAddressing: mixedAddressing);
