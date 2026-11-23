@@ -114,6 +114,32 @@ internal static class StandardProtocolCli
         }
     }
 
+    private static void PrintObdOnUdsResponse(byte[] request, byte[] response)
+    {
+        if (request.Length == 3 && request[0] == 0x22)
+        {
+            var did = (ushort)(request[1] << 8 | request[2]);
+            if (ObdOnUdsServices.IsEmissionsDataDid(did) &&
+                response.Length > 0 && response[0] == 0x62)
+            {
+                var raw = ObdOnUdsServices.DecodeReadDid(did, response);
+                Console.WriteLine($"OBDonUDS emissions DID=0x{did:X4} " +
+                    $"raw={Convert.ToHexString(raw)} " +
+                    "(physical units require the current SAE J1979DA definition).");
+            }
+        }
+        else if (request.Length == 3 && request[0] == 0x19 &&
+            request[1] == 0x02 && response.Length > 0 && response[0] == 0x59)
+        {
+            var report = ObdOnUdsServices.DecodeDtcByStatusMask(response);
+            Console.WriteLine($"UDS DTC available-mask=0x{report.AvailabilityMask:X2} " +
+                $"count={report.Codes.Count}");
+            foreach (var dtc in report.Codes)
+                Console.WriteLine($"DTC=0x{dtc.Code:X6} " +
+                    $"status=0x{dtc.Status:X2}");
+        }
+    }
+
     internal sealed record J1939Options(
         int AdapterIndex, uint Bitrate, J1939ClassicTpSession.Options Settings,
         string Mode, bool Broadcast, byte[] Request, int TimeoutMs);
@@ -367,6 +393,8 @@ internal static class StandardProtocolCli
             var reply = await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
                 limit, CancellationToken.None);
             Console.WriteLine("ISO-TP ECU RX: " + Convert.ToHexString(reply));
+            if (o.Mode == "exchange")
+                PrintObdOnUdsResponse(o.Request, reply);
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or
@@ -515,6 +543,7 @@ internal static class StandardProtocolCli
             var reply = await link.ExchangeUdsAsync(o.Request,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None);
             Console.WriteLine("DoIP ECU RX: " + Convert.ToHexString(reply));
+            PrintObdOnUdsResponse(o.Request, reply);
             return 0;
         }
         catch (Exception ex) when (ex is ArgumentException or
