@@ -1,0 +1,70 @@
+name: C2 ECU backup unit gate
+
+# One deliberate campaign AFTER the C2 implementation is complete.
+# No C2 tests or Debug builds on code commits or PR synchronize events.
+# The separate C8 gate remains responsible for the full multi-component build.
+on:
+  push:
+    branches: [chore/unified-ci]
+    paths:
+      - '.github/c2-ecu-backup-gate-request.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c2-ecu-backup-unit-gate
+  cancel-in-progress: false
+
+jobs:
+  android-c2:
+    name: C2 Android communication and app ECU backup unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: 14742923
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Prepare repository Gradle wrapper
+        run: gradle wrapper --gradle-version 8.11.1
+      - name: Run C2 Android unit suites with warnings as errors
+        run: ./gradlew :communication:testDebugUnitTest :app:testDebugUnitTest --warning-mode=fail --stacktrace
+      - name: Preserve C2 Android test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: c2-android-unit-${{ github.sha }}
+          path: |
+            **/build/reports/tests/testDebugUnitTest/**
+            **/build/test-results/testDebugUnitTest/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-c2:
+    name: C2 Windows J2534 Debug build and all hardware-free self-tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Compile and self-test Windows J2534 backup implementation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build ./pc-bridge/CamaroDiag.J2534Bridge/CamaroDiag.J2534Bridge.csproj --configuration Debug -warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'C2 Windows J2534 Debug build failed' }
+          dotnet run --project ./pc-bridge/CamaroDiag.J2534Bridge/CamaroDiag.J2534Bridge.csproj --configuration Debug --no-build -- --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'C2 Windows ECU backup self-test failed' }
