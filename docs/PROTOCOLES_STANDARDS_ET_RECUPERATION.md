@@ -279,3 +279,18 @@ L'option `--groups "0xF004:010203;0xFECA:C7FF"` permet de transmettre **plusieur
 ### ISO 14229 — plusieurs DID en une requête UDS
 
 La pile UDS fournit `ReadDids` et `DecodeDids` pour coder `22 DID1 DID2 ...` et vérifier les réponses `62 DID1 DATA1 DID2 DATA2 ...`. Puisque les longueurs des données d'un DID sont **spécifiques aux définitions du véhicule**, les longueurs doivent être fournies par l'utilisateur/ODX ; elles ne sont jamais déduites arbitrairement de l'identifiant. Exemples CLI : `--uds-dids "0xF190:17,0xF187:4"` sur les commandes ISO-TP et DoIP, avec confirmation d'émission habituelle. Le décodeur refuse les DID réordonnés, les données tronquées et les octets supplémentaires. Le mode ISO-TP `receive` reste sans émission. Tests nouveaux, non exécutés.
+
+
+### Lecture mémoire UDS standard, ALFI et contrôle des acquisitions — complément 23/11/2026
+
+Le moteur `NativeUdsUploadProtocol` construit une requête `0x35 RequestUpload`, négocie le `maxNumberOfBlockLength` via une réponse `0x75`, reçoit les blocs `0x76 TransferData` avec numéros stricts, y compris le retour du compteur `FF → 00`, et termine par `0x37 / 0x77`. Il vérifie le nombre d'octets exactement demandé, les limites négociées, les dépassements de région et les NRC du calculateur. Il ne transmet aucun service d'effacement ou de programmation. `UploadTwiceAsync` effectue **deux transactions de lecture indépendantes**, compare bit à bit les octets et calcule le SHA-256 seulement si elles correspondent ; le refus d'une différence interdit de présenter un résultat comme sauvegarde vérifiée.
+
+Le constructeur ISO 14229 `RequestDownload` / `RequestUpload` prend désormais en charge des champs explicites d'adresse et taille de **1 à 8 octets** (ALFI), tout en préservant la vérification des limites 32 bits dans les anciennes signatures. `DecodeTransferParameters` valide les réponses `0x74 / 0x75` selon longueur big-endian, nibble réservé et capacité de bloc incluant SID/compteur ; le moteur natif de téléchargement réutilise le même décodeur. Un test de régression refuse l'enroulement d'une adresse 32 bits après la généralisation ALFI.
+
+**Non terminé pour C2 :** le moteur de lecture générique n'est pas encore associé à une cartographie mémoire qualifiée de chaque ECU, aux vrais pilotes et à l'interface utilisateur complète. Le retour `0x77` et le SHA-256 ne prouvent pas à eux seuls la validité de toute l'image ECU. Le stockage physique durable dans une archive, l'identité VIN/OSID, l'exhaustivité des secteurs, une relecture indépendante et un chemin de restauration réellement vérifié sont des conditions obligatoires distinctes. Tests enregistrés, pas de véhicule ni de calculateur physique testé.
+
+### SAE J1850 et J2534 — trames brutes
+
+Ajout d'un codec CRC-8 SAE J1850 `J1850Crc` (polynôme `0x1D`, initialisation `0xFF`, XOR final `0xFF`, référence ASCII `123456789` → `0x4B`) et de tests sur la corruption. Ce codec est un outil **hors ligne** : les pilotes PassThru J1850 VPW/PWM peuvent calculer ou supprimer eux-mêmes l'octet CRC ; **ne pas l'ajouter automatiquement** à leurs messages sans qualification du pilote. Ce travail ne couvre pas les formes d'impulsions, l'arbitrage VPW/PWM ni la synchronisation électrique.
+
+La réception CAN/J2534 brute vérifie maintenant aussi le bit de statut `CAN_29BIT_ID` de la DLL, en plus du DLC, du format CAN-FD et des plages d'ID ; une trame reçue avec un mode 11/29 bits contradictoire est rejetée. Des tests de régression couvrent ces différences ; vérifier les flags renvoyés par chaque pilote réel.
