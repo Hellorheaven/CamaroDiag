@@ -134,7 +134,7 @@ La CLI `--j2534-standard` propose `--mode receive` sans `--data`, pour lire un c
 
 ## J1939-73 — décodage DM1/DM2
 
-Le moteur peut afficher les messages diagnostiques normalisés **DM1 (PGN 0xFECA, défauts actifs)** et **DM2 (PGN 0xFECB, défauts précédemment actifs)** reçus par la CLI J1939. Après reconstruction éventuelle par J1939-21 TP, il extrait l'état et le clignotement des voyants, le SPN 19 bits, le FMI 5 bits, le compteur d'occurrences 7 bits et l'indicateur de méthode de conversion. Un champ de code à zéro n'est pas annoncé comme une panne. Les messages incomplets sont refusés ; les 2 octets de remplissage FF d'un paquet direct sont tolérés. Il ne s'agit ni d'un effacement de DTC, ni d'une base de signification OEM pour tous les SPN, ni d'une qualification véhicule.
+Le moteur peut afficher les messages diagnostiques normalisés **DM1 (PGN 0xFECA, défauts actifs)** et **DM2 (PGN 0xFECB, défauts précédemment actifs)** reçus par la CLI J1939. Après reconstruction éventuelle par J1939-21 TP, il extrait l'état et le clignotement des voyants, le SPN 19 bits, le FMI 5 bits, le compteur d'occurrences 7 bits et l'indicateur de méthode de conversion. Un champ de code à zéro n'est pas annoncé comme une panne. Lorsque le bit CM indique une méthode ancienne, le SPN n'est **pas** extrapolé depuis le codage moderne : CamaroDiag affiche `undecoded` et conserve les quatre octets bruts. Un décodeur spécifique aux méthodes antérieures reste à qualifier. Les messages incomplets sont refusés ; les 2 octets de remplissage FF d'un paquet direct sont tolérés. Il ne s'agit ni d'un effacement de DTC, ni d'une base de signification OEM pour tous les SPN, ni d'une qualification véhicule.
 
 ## DoIP TCP — Alive Check standard (23/11/2026)
 
