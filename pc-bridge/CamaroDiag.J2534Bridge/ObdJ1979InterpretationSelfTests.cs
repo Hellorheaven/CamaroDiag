@@ -36,10 +36,19 @@ internal static class ObdJ1979InterpretationSelfTests
             .Description.Contains("1G1FF1R70C0100001"), "VIN decoded after ISO-TP.");
 
         var dtcs = ObdJ1979Interpretation.Interpret(
-            [0x03], [0x43, 0x01, 0x33, 0, 0, 0xC1, 0]);
+            [0x03], [0x43, 0x02, 0x01, 0x33, 0xC1, 0]);
         Check(dtcs.Positive && dtcs.Description.Contains("P0133,U0100") &&
             dtcs.Description.Contains("count=2"), "DTC pairs interpreted.");
 
+        var pending = ObdJ1979Interpretation.Interpret(
+            [0x07], [0x47, 0x01, 0x01, 0x33]);
+        Check(pending.Positive && pending.Description.Contains("P0133") &&
+            pending.Description.Contains("count=1"),
+            "Pending DTC count decoded for Mode 07.");
+        var permanent = ObdJ1979Interpretation.Interpret(
+            [0x0A], [0x4A, 0x00]);
+        Check(permanent.Positive && permanent.Description.Contains("count=0"),
+            "Mode 0A empty permanent DTC list accepted.");
         var negative = ObdJ1979Interpretation.Interpret(
             [0x04], [0x7F, 0x04, 0x22]);
         Check(!negative.Positive && negative.Description.Contains("NRC=0x22"),
