@@ -635,6 +635,7 @@ fun CamaroDiagApp(
                     usbDevices = usbDevices,
                     onRefreshUsb = { viewModel.refreshUsbDevices() },
                     onConnectUsb = { viewModel.connectUsb(it) },
+                    onDisconnectAdapter = { viewModel.disconnectSelectedAdapter() },
                     onDiscoverConnector = { viewModel.discoverCamaroDiagConnector(it) },
                     onDiscoverBinaryConnector = { viewModel.discoverCamaroDiagConnector(it, binary = true) },
                     // Physical CDJ/USB checkpoint capture is not implemented (C5): never enable it as a working export.
@@ -1032,6 +1033,7 @@ fun AdapterScreen(
     usbDevices: List<String>,
     onRefreshUsb: () -> Unit,
     onConnectUsb: (String) -> Unit,
+    onDisconnectAdapter: () -> Unit,
     onConnectWifi: (String, Int) -> Unit,
     onDiscoverConnector: ((String) -> Unit)? = null,
     onDiscoverBinaryConnector: ((String) -> Unit)? = null
@@ -1054,6 +1056,15 @@ fun AdapterScreen(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(adapter.deviceName, fontWeight = FontWeight.Bold, color = CamaroAmber, fontSize = 16.sp)
                     Text(localizedAdapterTierName(adapter.tier), fontSize = 13.sp)
+                    if (adapter.tier != AdapterTier.DISCONNECTED) {
+                        OutlinedButton(
+                            onClick = onDisconnectAdapter,
+                            enabled = !isBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.adapter_disconnect_label))
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         BadgeChip("CAN 11-bit / 500k", adapter.supportsCanHeaders)
                         BadgeChip("CAN TX", adapter.supportsCanTransmit)
