@@ -737,6 +737,11 @@ fun CamaroDiagApp(
                     onReadIdentification = { viewModel.readCalibrationIdentification() },
                     onReadGmlanIdentification = { viewModel.readGmlanIdentification() },
                     onReadLfx2012FuelSnapshot = { viewModel.readLfx2012FuelSnapshot() },
+                    onExportLfx2012FuelHistory = {
+                        withExportFolder {
+                            viewModel.exportLfx2012FuelHistory("CamaroDiag_LFX_fuel_${System.currentTimeMillis()}.csv")
+                        }
+                    },
                     onExportIdentification = {
                         withExportFolder {
                             viewModel.exportEcuIdentification("CamaroDiag_ECU_identity_${System.currentTimeMillis()}.json")
