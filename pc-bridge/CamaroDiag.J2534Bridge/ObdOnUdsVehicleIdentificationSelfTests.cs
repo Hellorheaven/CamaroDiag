@@ -25,7 +25,7 @@ internal static class ObdOnUdsVehicleIdentificationSelfTests
         var positive = new byte[] { 0x62, 0xF8, 0x02 }
             .Concat(Encoding.ASCII.GetBytes(vin)).ToArray();
         Check(ObdOnUdsVehicleIdentification.ReadVin()
-            .SequenceEqual([0x22, 0xF8, 0x02]),
+            .SequenceEqual(new byte[] {0x22, 0xF8, 0x02}),
             "DID F802 uses UDS 22, not legacy J1979 09 02.");
         Check(ObdOnUdsVehicleIdentification.DecodeVin(positive) == vin,
             "Positive F802 VIN retains its exact seventeen characters.");

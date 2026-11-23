@@ -100,15 +100,15 @@ internal static class ObdJ1979PidDiscoverySelfTests
             list.SupportedPids.SequenceEqual(new byte[] { 0x01, 0x20, 0x21 }),
             "Continuation bit fetches exactly two pages in order.");
         Check(twoPages.SentPayloads.Count == 2 &&
-            twoPages.SentPayloads[0].SequenceEqual([0x01, 0x00]) &&
-            twoPages.SentPayloads[1].SequenceEqual([0x01, 0x20]),
+            twoPages.SentPayloads[0].SequenceEqual(new byte[] {0x01, 0x00}) &&
+            twoPages.SentPayloads[1].SequenceEqual(new byte[] {0x01, 0x20}),
             "Requests sent through the real ISO-TP SendAsync path.");
 
         var frameMode = new FakeLink();
         frameMode.AddResponse(0x42, 0x00, 0x02, 0x80, 0, 0, 0);
         var freeze = Discover(frameMode, 0x02, 0x02);
         Check(freeze.FreezeFrame == 2 && freeze.Pages.Count == 1 &&
-            frameMode.SentPayloads[0].SequenceEqual([0x02, 0x00, 0x02]),
+            frameMode.SentPayloads[0].SequenceEqual(new byte[] {0x02, 0x00, 0x02}),
             "Mode 02 frame number is explicitly emitted and checked.");
 
         var unsupported = new FakeLink();

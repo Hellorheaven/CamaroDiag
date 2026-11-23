@@ -34,7 +34,7 @@ internal static class ObdJ1979FunctionalCanDiscoverySelfTests
         }
         var request = ObdJ1979FunctionalCanDiscovery.BuildRequest();
         Check(!request.IsFd && request.Id == 0x7DF &&
-            request.Data.SequenceEqual([2, 1, 0, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC]),
+            request.Data.SequenceEqual(new byte[] {2, 1, 0, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC}),
             "Single fixed functional request only.");
         static IsoTpCanFdSession.CanFrame Rx(uint id, params byte[] values) =>
             new(id, false, values);

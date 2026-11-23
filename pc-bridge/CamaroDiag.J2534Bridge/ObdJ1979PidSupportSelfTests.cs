@@ -21,7 +21,7 @@ internal static class ObdJ1979PidSupportSelfTests
         }
 
         var request = ObdJ1979PidSupport.BuildRequest(0x01, 0x00);
-        Check(request.SequenceEqual([0x01, 0x00]), "Mode 01 supported page query.");
+        Check(request.SequenceEqual(new byte[] {0x01, 0x00}), "Mode 01 supported page query.");
         var page = ObdJ1979PidSupport.Decode(request,
             [0x41, 0x00, 0x80, 0x10, 0x00, 0x01]);
         Check(page.Mode == 1 && page.RequestedBase == 0 &&
@@ -38,7 +38,7 @@ internal static class ObdJ1979PidSupportSelfTests
             freeze.SupportedPids.SequenceEqual(new byte[] {0x42}),
             "Mode 02 page 40 uses the same support bitmap ordering.");
         Check(ObdJ1979PidSupport.BuildRequest(0x02, 0x40, 0x02)
-            .SequenceEqual([0x02, 0x40, 0x02]),
+            .SequenceEqual(new byte[] {0x02, 0x40, 0x02}),
             "Mode 02 request carries explicit freeze-frame index.");
         Reject<InvalidDataException>(() =>
             ObdJ1979PidSupport.Decode([0x02, 0x40, 0x02],

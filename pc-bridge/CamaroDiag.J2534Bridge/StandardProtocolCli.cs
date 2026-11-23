@@ -95,7 +95,7 @@ internal static class StandardProtocolCli
             var link = new IsoTpJ2534RawCanLink(driver,
                 canFd: false, extendedId: extended, bitRateSwitch: false);
             var discovery = await ObdJ1979PidDiscovery.DiscoverAsync(
-                link, settings, mode, frame,
+                link, o.Settings, mode, frame,
                 TimeSpan.FromMilliseconds(timeoutMs), CancellationToken.None);
             foreach (var page in discovery.Pages)
                 Console.WriteLine($"J1979 mode=0x{mode:X2} page=0x{page.RequestedBase:X2} " +

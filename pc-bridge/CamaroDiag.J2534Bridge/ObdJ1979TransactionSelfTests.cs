@@ -27,7 +27,7 @@ internal static class ObdJ1979TransactionSelfTests
             var reply = ObdJ1979Transaction.Decode(request,
                 [(byte)(service + 0x40), 0x00, 0x55], true);
             Check(reply.Kind == ObdJ1979Transaction.ReplyKind.Positive &&
-                reply.Service == service && reply.Data.SequenceEqual([0, 0x55]),
+                reply.Service == service && reply.Data.SequenceEqual(new byte[] {0, 0x55}),
                 "Positive response and echoed identifier: " + service);
             var negative = ObdJ1979Transaction.Decode(request,
                 [0x7F, service, 0x12]);
@@ -38,7 +38,7 @@ internal static class ObdJ1979TransactionSelfTests
         }
 
         var clear = ObdJ1979Transaction.Request(0x04, []);
-        Check(clear.SequenceEqual([0x04]) &&
+        Check(clear.SequenceEqual(new byte[] {0x04}) &&
             ObdJ1979Transaction.Decode(clear, [0x44]).Kind ==
                 ObdJ1979Transaction.ReplyKind.Positive,
             "Mode 04 command and acknowledgement supported without an invented SID block.");

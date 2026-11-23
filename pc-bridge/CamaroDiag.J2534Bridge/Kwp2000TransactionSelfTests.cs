@@ -23,7 +23,7 @@ internal static class Kwp2000TransactionSelfTests
             [0x1A, 0x90], [0x5A, 0x90, 0x41]);
         Check(positive.Status == Kwp2000Transaction.Kind.Positive &&
             positive.Service == 0x1A &&
-            positive.Data.SequenceEqual([0x90, 0x41]) &&
+            positive.Data.SequenceEqual(new byte[] {0x90, 0x41}) &&
             positive.NegativeResponseCode == null,
             "Physical ECU response correlates service before data display.");
 
@@ -132,7 +132,7 @@ internal static class Kwp2000TransactionSelfTests
             "--kwp-echo-bytes", "1", "--read-frames", "3"
         ]);
         Check(echoOptions.KwpEchoBytes == 1 &&
-            echoOptions.KwpRequest!.SequenceEqual([0x1A, 0x90]),
+            echoOptions.KwpRequest!.SequenceEqual(new byte[] {0x1A, 0x90}),
             "Explicit echo option reaches the real J2534 KWP reply handler.");
         Reject<ArgumentException>(() =>
             StandardProtocolCli.ParseJ2534([

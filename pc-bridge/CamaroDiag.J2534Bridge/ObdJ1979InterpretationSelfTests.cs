@@ -131,7 +131,7 @@ internal static class ObdJ1979InterpretationSelfTests
             "--fd", "false", "--payload", "0100", "--j1979-decode", "true"
         };
         var parsed = StandardProtocolCli.ParseIsoTp(args);
-        Check(parsed.InterpretJ1979 && parsed.Request.SequenceEqual([0x01, 0]),
+        Check(parsed.InterpretJ1979 && parsed.Request.SequenceEqual(new byte[] {0x01, 0}),
             "Actual ISO-TP CLI can request J1979 interpretation.");
 
         Reject<ArgumentException>(() =>

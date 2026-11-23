@@ -24,7 +24,7 @@ internal static class ObdJ1979VinSelfTests
         const string vin = "1G1FF1R70C0100001";
         var answer = new byte[] { 0x49, 0x02, 0x01 }
             .Concat(Encoding.ASCII.GetBytes(vin)).ToArray();
-        Check(ObdJ1979Vin.Request.SequenceEqual([0x09, 0x02]),
+        Check(ObdJ1979Vin.Request.SequenceEqual(new byte[] {0x09, 0x02}),
             "Mode 09 PID 02 request.");
         Check(ObdJ1979Vin.DecodeIsoTp(answer) == vin,
             "Reassembled 17-character VIN returned without invented characters.");
