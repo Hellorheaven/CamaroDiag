@@ -40,9 +40,20 @@ internal static class Kwp2000TransactionSelfTests
             "ResponsePending has its own inconclusive status.");
 
         Reject<InvalidDataException>(() =>
-            Kwp2000Transaction.Decode([0x27, 1], [0x67, 1, 2, 3])
-                .Equals(null),
-            "Placeholder never executed.");
+            Kwp2000Transaction.Decode([0x27, 1], [0x68, 1]),
+            "Wrong positive service must not confirm KWP unlock.");
+        Reject<InvalidDataException>(() =>
+            Kwp2000Transaction.Decode([0x27, 1], [0x7F, 0x31, 0x33]),
+            "Negative answer for another KWP service is rejected.");
+        Reject<InvalidDataException>(() =>
+            Kwp2000Transaction.Decode([0x27, 1], [0x7F, 0x27]),
+            "Truncated negative KWP response rejected.");
+        Reject<InvalidDataException>(() =>
+            Kwp2000Transaction.Decode([0x27, 1], []),
+            "Silent ECU is not a positive reply.");
+        Reject<ArgumentException>(() =>
+            Kwp2000Transaction.Decode([], [0x50, 1]),
+            "No transmitted SID means no meaningful correlation.");
         return checks;
     }
 }
