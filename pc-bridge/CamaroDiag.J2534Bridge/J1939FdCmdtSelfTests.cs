@@ -117,6 +117,37 @@ internal static class J1939FdCmdtSelfTests
         Reject<ArgumentException>(() =>
             (o with { Pgn = 0xF004 }).Validate(),
             "Connection-mode requires a directed PDU1 PGN.");
+        var cli = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCmdtCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xEF00", "--session", "1", "--window", "2",
+            "--mode", "send", "--payload", Convert.ToHexString(Fill(131))]);
+        Check(cli.Cmdt && !cli.Bam && cli.Session == 1 &&
+            cli.Window == 2 && cli.Payload.Length == 131,
+            "CMDT CLI selects 131-byte directed FD.TP session and CTS window.");
+        var rxCli = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCmdtCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xEF00", "--session", "1",
+            "--mode", "receive"]);
+        Check(rxCli.Cmdt && rxCli.Payload.Length == 0,
+            "Directed FD.TP receive never manufactures an outgoing request.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCmdtCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0xFF",
+            "--pgn", "0xEF00", "--mode", "send",
+            "--payload", Convert.ToHexString(Fill(131))]),
+            "CMDT refuses broadcast destination.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCmdtCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "send",
+            "--payload", Convert.ToHexString(Fill(131))]),
+            "CMDT refuses broadcast-only PDU2 PGNs.");
         return checks;
     }
 }
