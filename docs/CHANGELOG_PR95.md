@@ -269,3 +269,11 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 ### C1 — statut des requêtes dans le CSV complet
 
 Les événements TX sont enregistrés au moment de leur émission avec le statut `PENDING`, sans indiquer faussement un échec. Les événements de réception et système portent `OK` ou `FAILED` selon leur résultat observable ; le journal conserve la séquence chronologique et n'infère pas un accusé ECU de la seule confirmation d'un adaptateur. La colonne CSV `succeeded` est remplacée par `status` pour les nouveaux exports. Tests mis à jour (commits `cc74672`, `e3b085d`, `0d5ac24`). Tests et compilation à confirmer à la clôture du lot.
+
+
+## SAE J1939-22 — FD.TP BAM / RTS-CTS (23/11/2026)
+- Création des codecs `J1939FdTransportFrames` pour FD.TP.CM (4D00) et FD.TP.DT (4E00), numéros de session et champs 24 bits. Tests sur RTS/CTS, trames DT, DLC, formats invalides.
+- Transport BAM `J1939FdBamSession` : segmentation/réassemblage, 60 octets utiles par trame CAN-FD, EOM_STATUS et tests interruption/séquence/longueur.
+- Transport CMDT `J1939FdCmdtSession` : RTS, CTS par fenêtres, segments DT, EOM_STATUS/EOM_ACK et Abort sur expiration. Tests d'envoi/réception avec faux CAN et réponses contradictoires.
+- CLI Windows : `--j1939-fd-bam` et `--j1939-fd-cmdt`, `--mode send|receive`, paramètres FD_CAN/BRS, session et fenêtre, fichier binaire borné, consentement avant émission.
+- Suites de régression enregistrées dans `BridgeSelfTests`. **Pas de build/CI encore exécuté sur le HEAD, ni validation d'adaptateur ou d'ECU réel.** Les variantes J1939-22 non couvertes, concurrence réelle et SAE J1939-81 actif restent ouverts.
