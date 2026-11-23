@@ -87,6 +87,35 @@ internal static class J1939FdBamSelfTests
         queued[2].Data[1] = 4;
         Reject<InvalidDataException>(() => Receive(badSequence),
             "Wrong FD.TP.DT segment number aborts reassembly.");
+        var unrelatedBamSession = new FakeLink();
+        foreach (var frame in sender.Outgoing)
+        {
+            unrelatedBamSession.Incoming.Enqueue(new(frame.Id,
+                frame.IsFd, frame.Data.ToArray()));
+            if (J1939FdTransportFrames.DataPgn ==
+                StandardVehicleProtocols.ParseJ1939Id(frame.Id).Pgn)
+            {
+                var other = frame.Data.ToArray();
+                other[0] = (byte)((other[0] & 0x0F) | 0x30);
+                unrelatedBamSession.Incoming.Enqueue(new(
+                    frame.Id, true, other));
+            }
+        }
+        Check(Receive(unrelatedBamSession).SequenceEqual(Fill(131)),
+            "FD.TP ignores interleaved data from another BAM session on the same PGN.");
+
+        var wrongSessionBam = new FakeLink();
+        foreach (var frame in sender.Outgoing)
+        {
+            var copy = frame.Data.ToArray();
+            if (J1939FdTransportFrames.DataPgn ==
+                StandardVehicleProtocols.ParseJ1939Id(frame.Id).Pgn)
+                copy[0] = 0x30;
+            wrongSessionBam.Incoming.Enqueue(new(frame.Id, true, copy));
+        }
+        Reject<TimeoutException>(() => Receive(wrongSessionBam),
+            "BAM cannot complete using only DT segments from another session.");
+
         var noFinalStatus = new FakeLink();
         foreach (var frame in sender.Outgoing.Take(4))
             noFinalStatus.Incoming.Enqueue(frame);
