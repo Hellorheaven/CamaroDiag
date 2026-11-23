@@ -425,6 +425,7 @@ internal static class StandardProtocolCli
             data.Length > J2534StandardChannel.MaxData ||
             (mask == null) != (pattern == null) ||
             (flow != null && mask == null) ||
+            (mode == "receive" && init != null) ||
             (kwpRxTarget.HasValue != kwpRxSource.HasValue) ||
             (kwpRxTarget.HasValue && protocol != J2534StandardChannel.Iso14230) ||
             (init != null && protocol is not (J2534StandardChannel.Iso9141
