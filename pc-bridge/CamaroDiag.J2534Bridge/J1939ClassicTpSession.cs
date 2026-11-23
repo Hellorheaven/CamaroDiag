@@ -275,6 +275,10 @@ internal static class J1939ClassicTpSession
                 if (pf < 240 && id.Destination != o.LocalAddress &&
                     id.Destination != 0xFF)
                     continue;
+                if (id.Pgn == J1939PgnAcknowledgement.AcknowledgementPgn &&
+                    (frame.Data[5] | frame.Data[6] << 8 |
+                     frame.Data[7] << 16) != o.Pgn)
+                    continue; // ACKM for another concurrent PGN request.
                 return frame;
             }
             if (id.Pgn != TpCmPgn ||
