@@ -1,3 +1,13 @@
+# Tranche hors protocoles — connexions et C6, 23/11/2026 (soir)
+
+- **PR #95** sur l'unique branche `chore/unified-ci`. **C6 reste actif**, sans aucun verrou logiciel artificiel d'écriture. Les vrais prérequis ECU/OEM, la sauvegarde physique, le contrôle des blocs et le double consentement restent obligatoires. Aucune programmation/restauration de véhicule démontrée.
+- **USB Android** : `UsbPermissionReconnectPolicy` rattache maintenant la reprise à la famille USB explicitement choisie (ELM/OBDLink ordinaire, KKL isolé, CamaroDiagConnectors découverte dédiée) et refuse les collisions d'identifiant dans l'énumération ; tests unitaires ajoutés. Commits `8d06118`, `136856c`.
+- **Bluetooth BLE** : l'OBDLink CX n'est plus refusé par son seul nom dans `MainViewModel`; le pilote BLE existant détermine les capacités réellement accessibles. Une annulation de tentative BLE est propagée tandis que son timeout local est signalé comme échec. Commits `394a43b`, `eef9066`, `930c56d`. Pas de qualification matérielle CX ni de service GM prétendu.
+- **C4 / CI** : dans le run [#45270916895](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45270916895), Windows/natif/connecteurs réussis mais Android a échoué à compiler `Lfx2012FuelHistoryCsv.kt` (7 appels `Writer.write(Char)` invalides). Correction Kotlin `Writer.write(','.code)` dans `1837bbe`. **Aucune CI après cette correction n'a été lancée par cette tranche ; ne pas annoncer que le HEAD passe.**
+- Développement logiciel hors normes ISO/SAE seulement ; l'autre chat traite les protocoles. Ne pas toucher à ses fichiers. Pas de nouvelle branche/PR, merge, Release ou workflow déclenché à chaque commit ; tests groupés après achèvement du chantier. C1/C2/C4/C6/C8 restent soumis aux preuves manquantes de l'audit.
+
+---
+
 # 23/11/2026 — ISO-TP CAN classique : seule famille de protocole active
 
 - PR #95, branche unique `chore/unified-ci`, issue #110. **Ne commencer aucun autre protocole avant de clôturer ISO-TP classique** ; correction transversale des tests C# ne constitue pas un nouveau chantier protocole.
