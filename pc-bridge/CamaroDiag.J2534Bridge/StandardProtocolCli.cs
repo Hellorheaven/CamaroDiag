@@ -210,6 +210,17 @@ internal static class StandardProtocolCli
                 Console.WriteLine($"DTC=0x{dtc.Code:X6} " +
                     $"severity=0x{dtc.Severity:X2} status=0x{dtc.Status:X2}");
         }
+        else if (request.Length == 6 && request[0] == 0x19 &&
+            request[1] == 0x04 && response.Length > 0 && response[0] == 0x59)
+        {
+            var expectedDtc = (uint)request[2] << 16 |
+                (uint)request[3] << 8 | request[4];
+            var snapshot = ObdOnUdsServices.DecodeDtcSnapshot(expectedDtc, response);
+            Console.WriteLine($"UDS snapshot DTC=0x{snapshot.Dtc:X6} " +
+                $"status=0x{snapshot.Status:X2} " +
+                $"recordsRaw={Convert.ToHexString(snapshot.RawSnapshotRecords)} " +
+                "(DID values require ECU/ODX metadata).");
+        }
         else if (request.Length == 4 && request[0] == 0x19 &&
             request[1] == 0x56 && response.Length > 0 && response[0] == 0x59)
         {
@@ -712,6 +723,11 @@ internal static class StandardProtocolCli
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var wwhStatus = Optional(args, "--obd-wwh-status");
         var wwhReadiness = Optional(args, "--obd-readiness-group");
+        var snapshotDtc = Optional(args, "--obd-snapshot");
+        var snapshotRecord = Optional(args, "--obd-snapshot-record");
+        if (snapshotRecord is not null && snapshotDtc is null)
+            throw new ArgumentException(
+                "DTC snapshot record option requires --obd-snapshot.");
         var wwhSeverity = Optional(args, "--obd-wwh-severity");
         var wwhPermanent = args.Contains("--obd-wwh-permanent",
             StringComparer.OrdinalIgnoreCase);
@@ -726,6 +742,7 @@ internal static class StandardProtocolCli
             (obdDtcMask is null ? 0 : 1) +
             (wwhStatus is null ? 0 : 1) +
             (wwhReadiness is null ? 0 : 1) +
+            (snapshotDtc is null ? 0 : 1) +
             (wwhPermanent ? 1 : 0) +
             (obdIdentify ? 1 : 0);
         if (mode is not ("exchange" or "receive") ||
@@ -746,6 +763,9 @@ internal static class StandardProtocolCli
             wwhPermanent ? ObdOnUdsServices.ReadWwhPermanentEmissionsDtcs() :
             wwhReadiness is not null ? ObdOnUdsServices.ReadWwhReadinessGroup(
                 checked((byte)Number(wwhReadiness))) :
+            snapshotDtc is not null ? ObdOnUdsServices.ReadDtcSnapshot(
+                Number(snapshotDtc), snapshotRecord is null ?
+                    (byte)1 : checked((byte)Number(snapshotRecord))) :
             payloadFile is not null ? File.ReadAllBytes(payloadFile) :
             Convert.FromHexString(hexPayload!);
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
@@ -763,7 +783,8 @@ internal static class StandardProtocolCli
         return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud,
             mode, udsValidate || obdDid is not null ||
                 obdDtcMask is not null || wwhStatus is not null ||
-                wwhPermanent || wwhReadiness is not null || obdIdentify);
+                wwhPermanent || wwhReadiness is not null ||
+                snapshotDtc is not null || obdIdentify);
     }
 
     internal static async Task<int> RunIsoTpAsync(string[] args)
@@ -901,6 +922,11 @@ internal static class StandardProtocolCli
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var wwhStatus = Optional(args, "--obd-wwh-status");
         var wwhReadiness = Optional(args, "--obd-readiness-group");
+        var snapshotDtc = Optional(args, "--obd-snapshot");
+        var snapshotRecord = Optional(args, "--obd-snapshot-record");
+        if (snapshotRecord is not null && snapshotDtc is null)
+            throw new ArgumentException(
+                "DTC snapshot record option requires --obd-snapshot.");
         var wwhSeverity = Optional(args, "--obd-wwh-severity");
         var wwhPermanent = args.Contains("--obd-wwh-permanent",
             StringComparer.OrdinalIgnoreCase);
@@ -915,6 +941,7 @@ internal static class StandardProtocolCli
             (obdDtcMask is null ? 0 : 1) +
             (wwhStatus is null ? 0 : 1) +
             (wwhReadiness is null ? 0 : 1) +
+            (snapshotDtc is null ? 0 : 1) +
             (wwhPermanent ? 1 : 0) +
             (obdIdentify ? 1 : 0) != 1)
             throw new ArgumentException(
@@ -938,6 +965,9 @@ internal static class StandardProtocolCli
             wwhPermanent ? ObdOnUdsServices.ReadWwhPermanentEmissionsDtcs() :
             wwhReadiness is not null ? ObdOnUdsServices.ReadWwhReadinessGroup(
                 checked((byte)Number(wwhReadiness))) :
+            snapshotDtc is not null ? ObdOnUdsServices.ReadDtcSnapshot(
+                Number(snapshotDtc), snapshotRecord is null ?
+                    (byte)1 : checked((byte)Number(snapshotRecord))) :
             payloadFile is not null ? File.ReadAllBytes(payloadFile) :
             Hex(hexPayload!);
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
