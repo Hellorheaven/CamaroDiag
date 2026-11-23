@@ -75,6 +75,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                         routing, tester), deadline.Token);
             }
             while (routing.Type == DoIpCodec.AliveCheckRequest);
+            DoIpCodec.RequireNoGenericNack(routing);
             if (routing.Version != protocolVersion)
                 throw new InvalidDataException(
                     "DoIP gateway routing response used an unexpected protocol version.");
@@ -108,6 +109,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         {
             deadline.Token.ThrowIfCancellationRequested();
             var message = await ReceiveAsync(deadline.Token);
+            DoIpCodec.RequireNoGenericNack(message);
             if (message.Version != protocolVersion)
                 throw new InvalidDataException(
                     "DoIP diagnostic response changed the negotiated protocol version.");
