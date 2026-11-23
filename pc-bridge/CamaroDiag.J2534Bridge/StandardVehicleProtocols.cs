@@ -93,6 +93,8 @@ internal static class DoIpCodec
 {
     internal const byte Version = 0x02;
     internal const ushort VehicleIdentificationRequest = 0x0001;
+    internal const ushort VehicleIdentificationRequestEid = 0x0002;
+    internal const ushort VehicleIdentificationRequestVin = 0x0003;
     internal const ushort VehicleIdentificationResponse = 0x0004;
     internal const ushort RoutingActivationRequest = 0x0005;
     internal const ushort RoutingActivationResponse = 0x0006;
