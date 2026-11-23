@@ -376,3 +376,13 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 - Requêtes/parseurs `0x19/0x42` DTC WWH d'émissions (masques statut/sévérité), `0x19/0x55` DTC permanents, `0x19/0x56` DTC par groupe de readiness, avec tests des réponses vides, trames tronquées et groupes fonctionnels.
 - Contrôle des réponses UDS renforcé contre l'attribution d'une réponse WWH de groupe différent. Commandes CLI exclusives, aucune requête sortante depuis le mode ISO-TP `receive`.
 - Les tests sont écrits et commités, sans exécution CI ni validation physique. Les données constructeur, la cartographie complète J1979DA et les autres sous-fonctions restent à qualifier.
+
+### C6 — liaison de l'autorisation au VIN, confidentialité TLS et état J2534
+
+- L'écran de suppression DTC conserve la génération de connexion et le profil véhicule exact depuis l'avertissement, puis l'opérateur doit confirmer Oui. Le ViewModel compare **de nouveau** la génération et le véhicule avant le Mode 04. Un changement de VIN, année, moteur ou sélection d'adaptateur annule la confirmation précédente.
+- `EcuWriteConsentFlow.approvalForContext` centralise le contrôle, avec tests négatifs (absence de confirmation, nouvelle session, profil véhicule modifié).
+- L'appairage du pont J2534 reste distinct d'une communication ECU réussie. L'écran Adaptateur affiche « PC J2534 appairé » et ne réutilise pas les badges de capacités ELM pour ce pont. UI et notices disponibles en FR/EN.
+- Le code TLS et l'empreinte du pont ne sont plus imprimables accidentellement par `J2534BridgeConnectionForm.Validated.toString()` ; test anti-divulgation ajouté.
+- C2 : suppression de l'index d'un paquet d'image local si la finalisation ou la vérification échoue.
+- Commits supplémentaires : `761d654`, `7832580`, `088116f`, `d773078`, `0d65063`, `92adbdd`, `50d266b`, `28ed4a7`, `673dd18`, `d960a0d`, `fc71a73`. La compilation et le comportement sur matériel réel restent à confirmer.
+
