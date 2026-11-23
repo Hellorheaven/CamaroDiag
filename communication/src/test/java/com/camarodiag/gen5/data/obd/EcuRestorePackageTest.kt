@@ -89,6 +89,42 @@ class EcuRestorePackageTest {
         }
     }
 
+    @Test fun hugeMemoryMapIsRejectedBeforeImageAssemblyOrDirectoryCreation() {
+        val root = Files.createTempDirectory("c2-huge-map").toFile()
+        try {
+            val original = archive(capture(flash, 0L, byteArrayOf(1)))
+            val huge = listOf(
+                EcuRestoreImage.MemoryRegion(flash, 0L, Long.MAX_VALUE)
+            )
+            val destination = File(root, "huge")
+            assertTrue(runCatching {
+                EcuRestorePackage.createNew(destination, original, huge, identity)
+            }.isFailure)
+            assertTrue(!destination.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun aggregateRegionBudgetRejectsOverflowAndOverAllocation() {
+        val root = Files.createTempDirectory("c2-aggregate").toFile()
+        try {
+            val original = archive(capture(flash, 0L, byteArrayOf(1)))
+            val map = (0 until 5).map { n ->
+                EcuRestoreImage.MemoryRegion(
+                    flash, n.toLong() * (64L * 1024 * 1024), 64L * 1024 * 1024
+                )
+            }
+            val destination = File(root, "oversized")
+            assertTrue(runCatching {
+                EcuRestorePackage.createNew(destination, original, map, identity)
+            }.isFailure)
+            assertTrue(!destination.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun incompletePackageNeverPassesReopen() {
         val root = Files.createTempDirectory("c2-incomplete").toFile()
         try {
