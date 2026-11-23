@@ -3750,10 +3750,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val selectedName = _pairedDevices.value.firstOrNull {
             it.second.equals(selectedAddress, ignoreCase = true)
         }?.first.orEmpty()
-        if (selectedName.contains("OBDLink CX", ignoreCase = true)) {
-            _connectionMessage.value = localizedContext.getString(R.string.msg_obdlink_cx_not_gm_compatible)
-            return
-        }
+        // An OBDLink CX may support standard OBD over its BLE UART even when
+        // GM enhanced services are unavailable. Let the physical BLE probe
+        // determine capabilities instead of refusing the adapter by product name.
         connectWithResult(
             connect = { obdManager.connectAndProbe(selectedAddress) },
             fallbackMessage = localizedContext.getString(R.string.msg_bluetooth_connection_failed),
