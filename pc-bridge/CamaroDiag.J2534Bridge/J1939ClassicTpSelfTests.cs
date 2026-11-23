@@ -95,6 +95,16 @@ internal static class J1939ClassicTpSelfTests
             new byte[] {1,2,3,4,5,6,7,8}),
             "Single J1939 PGN received in full, including application padding.");
 
+        var noisyBus = new FakeCan();
+        noisyBus.Incoming.Enqueue(new(0x80000000u, false, Data(8)));
+        noisyBus.Incoming.Enqueue(new(0x18EC10F1u, true, Data(8)));
+        noisyBus.Incoming.Enqueue(new(0x18EC10F1u, false, Data(4)));
+        noisyBus.Incoming.Enqueue(new(
+            J1939ClassicTpSession.ArbitrationId(
+                o.Pgn, 6, o.RemoteAddress), false, Data(8)));
+        Check(Receive(noisyBus, o).Payload.SequenceEqual(Data(8)),
+            "Unrelated malformed bus frames are ignored before ID parsing.");
+
         var concurrentControl = new FakeCan();
         concurrentControl.Incoming.Enqueue(PeerCm(
             J1939ClassicTpSession.Cts, 1, 1, 0xFF, 0xFF, 0x05, 0xF0, 0));
