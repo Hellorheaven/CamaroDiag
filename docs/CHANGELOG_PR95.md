@@ -351,3 +351,12 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 
 - `AdapterConnectionFailurePolicy` conserve le statut particulier de la demande de permission Android, sans traiter une permission refusée ni une connexion interrompue comme une permission « en attente ». Le ViewModel utilise cette classification ; tests dédiés ajoutés.
 - Commits `ad4b4ff`, `7252371`, `8fef38e`. Aucun contact ECU supplémentaire ni changement de protocole.
+
+
+## Conformité SAE/ISO — correctifs supplémentaires du 23/11/2026
+- DoCAN OBDonUDS : découverte fonctionnelle multi-ECU `22 F810` via CAN classique 11 bits, ID 7DF et réponses 7E8–7EF, sélection explicite de débit, collecte/dédoublonnage et tests de faux CAN.
+- DoIP ISO 13400-2:2025 : version d'en-tête 0x04, rejet des versions réservées, code d'activation du routage 0x11 traité comme attente de confirmation véhicule (pas succès), code d'authentification refusée 0x04, contrôle facultatif de l'écho d'ACK contre la requête UDS active.
+- SW_CAN SAE J2534-2 : SET_CONFIG SW_CAN_HS_DATA_RATE 0x8010 uniquement sur canal SW_CAN_PS 0x8008, sous consentement explicite ; tests de refus des combinaisons incohérentes.
+- KWP ISO14230/J2534 : prévention du double-checksum. Par défaut checksum ajouté/vérifié par le pilote, mode 0x200 manuel avec checksum applicatif et vérification RX ; tests physiques/fonctionnels et absence de checksum dans données pass-thru.
+- UDS : constructeurs de services supplémentaires 0x24, 0x28, 0x2A, 0x2F, 0x85, et tests de cohérence DID ; FD.TP CMDT Abort du pair détecté pendant TP.DT et EOM invalide jamais acquitté.
+- Tests enregistrés et branchés à `BridgeSelfTests` ; **pas d'exécution CI prouvée sur le dernier HEAD, pas de qualification matérielle**.
