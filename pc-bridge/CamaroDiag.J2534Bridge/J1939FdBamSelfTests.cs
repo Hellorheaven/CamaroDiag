@@ -8,6 +8,7 @@ internal static class J1939FdBamSelfTests
         internal readonly Queue<IsoTpCanFdSession.CanFrame> Incoming = new();
         internal readonly List<IsoTpCanFdSession.CanFrame> Outgoing = [];
         internal readonly List<TimeSpan> Delays = [];
+        internal readonly List<TimeSpan> ReceiveTimeouts = [];
         public Task SendAsync(IsoTpCanFdSession.CanFrame frame, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -18,6 +19,7 @@ internal static class J1939FdBamSelfTests
             TimeSpan timeout, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            ReceiveTimeouts.Add(timeout);
             if (Incoming.Count == 0)
                 throw new TimeoutException("Fake J1939-22 BAM input exhausted.");
             return Task.FromResult(Incoming.Dequeue());
@@ -79,6 +81,12 @@ internal static class J1939FdBamSelfTests
         Check(Receive(receiver).SequenceEqual(Fill(131)) &&
             receiver.Outgoing.Count == 0,
             "FD.TP broadcast round-trip retains exact data and requires no CTS.");
+        Check(receiver.ReceiveTimeouts.Count == 5 &&
+            receiver.ReceiveTimeouts[0] <= TimeSpan.FromSeconds(1) &&
+            receiver.ReceiveTimeouts.Skip(1).All(t =>
+                t > TimeSpan.Zero && t <= TimeSpan.FromMilliseconds(750)),
+            "BAM receive sends a bounded 750ms phase timeout to the CAN adapter.");
+
         var badSequence = new FakeLink();
         foreach (var frame in sender.Outgoing)
             badSequence.Incoming.Enqueue(new(frame.Id, frame.IsFd,
@@ -149,6 +157,22 @@ internal static class J1939FdBamSelfTests
             bamCommand.Session == 2 && bamCommand.Payload.Length == 131 &&
             bamCommand.Priority == 7,
             "Explicit CLI BAM session accepts large PDU2 PGN and confirmed TX profile.");
+        var extendedBamDeadline = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "receive",
+            "--timeout-ms", "600000"]);
+        Check(extendedBamDeadline.TimeoutMs == 600000,
+            "Large BAM transfers accept an explicit bounded ten-minute deadline.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand,
+            "--adapter-index", "0", "--baud", "500000",
+            "--source", "0xF1", "--target", "0x10",
+            "--pgn", "0xF004", "--mode", "receive",
+            "--timeout-ms", "600001"]),
+            "BAM cannot allocate unbounded overall receive timeout.");
+
         var bamPassive = StandardProtocolCli.ParseJ1939Fd([
             StandardProtocolCli.J1939FdBamCommand,
             "--adapter-index", "0", "--baud", "500000",
