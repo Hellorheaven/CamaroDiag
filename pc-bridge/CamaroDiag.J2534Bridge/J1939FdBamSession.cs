@@ -62,10 +62,14 @@ internal static class J1939FdBamSession
             timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
             throw new ArgumentException("Invalid J1939-22 BAM peer, PGN or receive timeout.");
 
+        // A single deadline covers the complete BAM message, not 30 seconds
+        // re-armed for every packet on a noisy or malicious shared bus.
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         J1939FdTransportFrames.Control? start = null;
         for (var attempts = 0; attempts < 128; attempts++)
         {
-            var frame = await link.ReceiveAsync(timeout, token);
+            var frame = await ReceiveUntilAsync(
+                link, timeout, stopwatch, token);
             if (!Matches(frame, remoteSource, 0xFF,
                     J1939FdTransportFrames.ControlPgn))
                 continue;
@@ -91,7 +95,8 @@ internal static class J1939FdBamSession
             J1939FdTransportFrames.Segment? segment = null;
             for (var tries = 0; tries < 128; tries++)
             {
-                var frame = await link.ReceiveAsync(timeout, token);
+                var frame = await ReceiveUntilAsync(
+                link, timeout, stopwatch, token);
                 if (!Matches(frame, remoteSource, 0xFF,
                         J1939FdTransportFrames.DataPgn))
                     continue;
@@ -115,7 +120,8 @@ internal static class J1939FdBamSession
 
         for (var attempts = 0; attempts < 128; attempts++)
         {
-            var frame = await link.ReceiveAsync(timeout, token);
+            var frame = await ReceiveUntilAsync(
+                link, timeout, stopwatch, token);
             if (!Matches(frame, remoteSource, 0xFF,
                     J1939FdTransportFrames.ControlPgn))
                 continue;
@@ -129,6 +135,17 @@ internal static class J1939FdBamSession
             return result;
         }
         throw new TimeoutException("Missing correlated J1939-22 broadcast EOM_STATUS.");
+    }
+
+    private static Task<IsoTpCanFdSession.CanFrame> ReceiveUntilAsync(
+        IsoTpCanFdSession.ICanLink link, TimeSpan limit,
+        System.Diagnostics.Stopwatch clock, CancellationToken token)
+    {
+        var remaining = limit - clock.Elapsed;
+        if (remaining <= TimeSpan.Zero)
+            throw new TimeoutException(
+                "J1939-22 BAM overall receive deadline expired.");
+        return link.ReceiveAsync(remaining, token);
     }
 
     private static bool Matches(IsoTpCanFdSession.CanFrame frame,
