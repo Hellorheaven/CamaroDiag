@@ -35,12 +35,14 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
     internal static async Task<DoIpDiagnosticTransport> ConnectAsync(
         string host, ushort tester, ushort ecu, TimeSpan timeout,
         CancellationToken cancellationToken, bool useTls = false,
-        byte protocolVersion = DoIpCodec.Version)
+        byte protocolVersion = DoIpCodec.Version,
+        string? clientCertificateThumbprint = null)
     {
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero ||
             timeout > TimeSpan.FromSeconds(30) ||
-            protocolVersion is not (0x02 or 0x03))
+            protocolVersion is not (0x02 or 0x03) ||
+            (clientCertificateThumbprint is not null && !useTls))
             throw new ArgumentException("Explicit gateway, distinct logical addresses and timeout required.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(timeout);
@@ -54,12 +56,18 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
                 // Never downgrade to TCP or bypass certificate/hostname
                 // verification when an OEM gateway requires secure DoIP.
                 var tls = new SslStream(dataStream, leaveInnerStreamOpen: false);
-                await tls.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+                var clientCert = clientCertificateThumbprint is null ? null :
+                    FindClientCertificate(clientCertificateThumbprint);
+                var authentication = new SslClientAuthenticationOptions
                 {
                     TargetHost = host,
                     EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
                     CertificateRevocationCheckMode = X509RevocationMode.Online
-                }, deadline.Token);
+                };
+                if (clientCert is not null)
+                    authentication.ClientCertificates =
+                        new X509CertificateCollection { clientCert };
+                await tls.AuthenticateAsClientAsync(authentication, deadline.Token);
                 dataStream = tls;
             }
             var session = new DoIpDiagnosticTransport(socket, dataStream,
@@ -87,6 +95,41 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
             socket.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Use an already provisioned Windows client certificate, with private
+    /// key held in the OS. Never accept PFX passwords or bypass server trust
+    /// checks through the command-line transport.
+    /// </summary>
+    internal static X509Certificate2 FindClientCertificate(string thumbprint)
+    {
+        if (string.IsNullOrWhiteSpace(thumbprint))
+            throw new ArgumentException("TLS client certificate thumbprint required.");
+        var normalized = new string(thumbprint
+            .Where(c => !char.IsWhiteSpace(c)).ToArray());
+        if (normalized.Length != 40 ||
+            !normalized.All(Uri.IsHexDigit))
+            throw new ArgumentException(
+                "Windows TLS certificate thumbprint must be 40 hexadecimal digits.");
+        foreach (var location in new[]
+            { StoreLocation.CurrentUser, StoreLocation.LocalMachine })
+        {
+            using var store = new X509Store(StoreName.My, location);
+            store.Open(OpenFlags.ReadOnly);
+            var matching = store.Certificates.Find(
+                X509FindType.FindByThumbprint, normalized,
+                validOnly: false);
+            foreach (var certificate in matching)
+            {
+                if (certificate.HasPrivateKey &&
+                    DateTime.UtcNow >= certificate.NotBefore.ToUniversalTime() &&
+                    DateTime.UtcNow <= certificate.NotAfter.ToUniversalTime())
+                    return certificate;
+            }
+        }
+        throw new AuthenticationException(
+            "Requested DoIP client certificate is missing, expired or has no private key.");
     }
 
     internal async Task<byte[]> ExchangeUdsAsync(byte[] request,
