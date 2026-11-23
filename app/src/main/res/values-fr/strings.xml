@@ -977,4 +977,5 @@
     <string name="flexfuel_lfx2012_history_saved">Historique carburant exporté en lecture seule.</string>
     <string name="flexfuel_lfx2012_history_failed">Impossible d’exporter l’historique carburant.</string>
     <string name="flexfuel_lfx2012_history_range">Éthanol : %1$d relevés valides, min. %2$.2f %% / max. %3$.2f %%</string>
+    <string name="flexfuel_lfx2012_history_trim_range">%1$s : %2$d relevés valides, min. %3$.2f %% / max. %4$.2f %%</string>
 </resources>
