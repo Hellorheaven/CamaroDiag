@@ -316,6 +316,11 @@ class BluetoothObdManager(context: Context) {
             isDemoMode = false
             activeAdapterCapabilities = capabilities
             Result.success(capabilities)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            // A cancelled probe is not an adapter failure. The caller joins
+            // this cleanup before opening the replacement physical channel.
+            disconnect()
+            throw cancelled
         } catch (error: Exception) {
             disconnect()
             Result.failure(error)
