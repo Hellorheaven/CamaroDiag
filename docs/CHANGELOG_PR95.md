@@ -155,3 +155,8 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - **C4 :** l'historique carburant est effacé immédiatement lors des changements de compte, de connexion, de pont J2534 ou de simulation. Les synthèses STFT/LTFT des deux bancs sont affichées lorsqu'il existe des réponses valides. Une réponse PID physique absente ou vide ne peut plus être transformée en mesure par des octets de décodage isolés.
 - **C8 :** tests de parité FR/EN des nouvelles notices et contrôles d'intégrité ajoutés. Le journal persistant complet des événements TX/RX/SYSTEM n'existe pas encore ; il reste une condition de clôture de #59.
 - Le déclenchement d'une campagne C4 Debug ciblée a été demandé une fois sur une révision intermédiaire ; son résultat n'est pas vérifié ici et ne qualifie pas les changements ultérieurs. Aucun essai sur matériel physique ni merge.
+
+## KWP2000 / J2534 — réceptions vérifiées et modes (23/11/2026)
+- Parseur de trame physique ISO 14230 : source, destination, longueur 1–255, checksum additif ; tests pour payloads 1/63/64/255, altération et troncature.
+- Vérification RX KWP optionnelle côté Windows quand le fabricant fournit des trames brutes complètes. Mode `--mode receive` sans émission diagnostique pour les canaux J2534 (K-Line/J1850 inclus), distinct du mode `exchange` avec double consentement.
+- Tests de CLI ajoutés, aucune exécution/qualification matérielle à ce stade.
