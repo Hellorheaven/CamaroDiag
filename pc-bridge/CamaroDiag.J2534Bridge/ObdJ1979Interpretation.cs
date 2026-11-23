@@ -36,6 +36,30 @@ internal static class ObdJ1979Interpretation
                 true, reply.Service);
         }
 
+        if (request.Length == 2 && request[0] == 0x09 && request[1] == 0x00)
+        {
+            var types = ObdJ1979VehicleInfo.DecodeSupported(response);
+            return new Result(
+                $"SAE J1979 Mode 09 available InfoTypes=" +
+                string.Join(",", types.InfoTypes.Select(x => x.ToString("X2"))) +
+                $" next={types.HasNextPage}", true, reply.Service);
+        }
+        if (request.Length == 2 && request[0] == 0x09 && request[1] == 0x04)
+        {
+            var identifiers = ObdJ1979VehicleInfo.DecodeCalibrationIds(response);
+            return new Result(
+                $"SAE J1979 CALID count={identifiers.Identifiers.Count} values=" +
+                string.Join(",", identifiers.Identifiers), true, reply.Service);
+        }
+        if (request.Length == 2 && request[0] == 0x09 && request[1] == 0x06)
+        {
+            var values = ObdJ1979VehicleInfo.DecodeCvns(response);
+            return new Result(
+                $"SAE J1979 CVN count={values.HexValues.Count} raw=" +
+                string.Join(",", values.HexValues) +
+                " (not manufacturer authenticity evidence)", true, reply.Service);
+        }
+
         if (request.Length == 2 && request[0] == 0x09 && request[1] == 0x02)
         {
             var vin = ObdJ1979Vin.DecodeIsoTp(response);
