@@ -1,3 +1,10 @@
+## C2 / C4 — fin de tranche indépendante des protocoles (23/11/2026, soir)
+
+- **C2, toujours incomplet physiquement :** `EcuRestoreCoveragePreview` produit un inventaire exact des plages d'adresses absentes ou non issues de deux lectures déclarées physiques et concordantes ; les captures hors carte sont distinguées. La création du dossier de restauration hors ligne réclame désormais la couverture de la **carte fournie** avant publication. Ceci ne démontre PAS que cette carte est la carte mémoire OEM exhaustive, que l'origine physique a été authentifiée ou que le calculateur est récupérable. Tests dédiés ajoutés.
+- **C4, lecture uniquement :** `currentSnapshotPercent` distingue une mesure réellement reçue dans la dernière enquête d'une mesure historique ; en cas d'absence de réponse éthanol, l'écran affiche le statut « historique seulement » en FR/EN. Aucun E85 activé et aucun profil moteur supposé.
+- **C6 reste ouvert et NON BLOQUANT ARTIFICIELLEMENT :** la couche CAN valide seulement le format des trames ; test de non-régression sur charges utiles constructeur sécurité/écriture. Le double consentement utilisateur et les vérifications physiques exactes restent requis.
+- **C8 :** GitHub ne renvoyait aucune exécution de workflows pour la demande groupée de la précédente tranche au moment de la consultation. Ne pas conclure tests verts. Nouvelle demande après stabilisation du lot ; aucun merge/Release.
+
 ## REPRISE DU CHANTIER HORS PROTOCOLES — C6 ACTIF (23/11/2026, soir)
 
 - Ne pas perdre le chantier **C6** : il traite l'authentification constructeur réelle, le consentement utilisateur OK puis Oui/Non, l'intégrité des opérations et la sauvegarde/récupération ECU, **jamais** un verrou logiciel de programmation CamaroDiag. Les trames CAN valides restent admises quelle que soit leur commande OEM (test `SafeRawCanTransmitPolicyTest`), dans les limites du transport physique et de la confirmation utilisateur.
