@@ -10,3 +10,7 @@ Validation scope: complete TX/RX/SYSTEM journal, app/communication tests; once p
 Grouped completion checkpoint — C1 journal chronological TX/RX/SYSTEM and lifecycle correction
 Source before checkpoint: 6788763f95182bb853e8883d2be7c6d1f9ba40e3
 No physical ECU qualification, no merge.
+
+Grouped correction validation — C1 final journal-file integrity follow-up
+Source HEAD before grouped request: 1bd8819068385be797f5bc6f24b7bca9b25ae771
+No Release, merge or physical ECU validation.
