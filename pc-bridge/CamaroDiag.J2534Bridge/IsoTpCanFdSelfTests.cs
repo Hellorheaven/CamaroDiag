@@ -507,6 +507,21 @@ internal static class IsoTpCanFdSelfTests
             "--obd-readiness-group", "0x06"]),
             "Passive ISO-TP mode forbids an outgoing readiness request.");
 
+        var snapshotIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-snapshot", "0x123456"]);
+        Check(snapshotIsoTp.Request.SequenceEqual(
+                new byte[] {0x19, 0x04, 0x12, 0x34, 0x56, 0x01}) &&
+            snapshotIsoTp.ValidateUds,
+            "ISO-TP DTC snapshot defaults to record 1 and validates the reply.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive",
+            "--obd-snapshot", "0x123456"]),
+            "Passive ISO-TP never sends DTC snapshot read request.");
+
         var obdIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
