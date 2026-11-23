@@ -208,6 +208,27 @@ internal static class J1939FdCmdtSelfTests
                 J1939FdTransportFrames.ConnectionAbort,
             "Invalid CMDT EOM_STATUS causes explicit local Abort rather than EOM_ACK.");
 
+        var corruptLast = new FakeLink();
+        foreach (var frame in tx.TX)
+        {
+            var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+            var altered = frame.Data.ToArray();
+            if (id.Pgn == J1939FdTransportFrames.DataPgn &&
+                altered[1] == 3)
+                altered[^1] = 0x17;
+            corruptLast.RX.Enqueue(new(
+                J1939ClassicTpSession.ArbitrationId(
+                    id.Pgn, (byte)id.Priority, o.Peer, o.Local),
+                true, altered));
+        }
+        Reject<InvalidDataException>(() => Receive(corruptLast, o),
+            "Directed FD.TP final segment rejects non-FF padding.");
+        Check(corruptLast.TX.Any(frame =>
+            StandardVehicleProtocols.ParseJ1939Id(frame.Id).Pgn ==
+                J1939FdTransportFrames.ControlPgn &&
+            (frame.Data[0] & 0x0F) == J1939FdTransportFrames.ConnectionAbort),
+            "Corrupt final padding sends abort instead of EOM_ACK.");
+
         var noCts = new FakeLink();
         Reject<TimeoutException>(() => Send(noCts, o, Fill(131)),
             "Missing CTS aborts outgoing connection-mode session.");
