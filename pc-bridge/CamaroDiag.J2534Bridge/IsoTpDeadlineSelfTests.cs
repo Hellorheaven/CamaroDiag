@@ -83,6 +83,22 @@ internal static class IsoTpDeadlineSelfTests
             multi.Outgoing[0].Data[0] == 0x30,
             "One FC/CTS is emitted after an admitted FirstFrame.");
 
+        // A busy bus may contain more than 64 unrelated CAN frames before
+        // the reply. Overall time, not an arbitrary noise-frame threshold,
+        // determines whether this transaction is allowed to continue.
+        var busy = new SlowLink { DelayMs = 0 };
+        for (var i = 0; i < 96; i++)
+            busy.Incoming.Enqueue(new(0x123, false,
+                [3, 0x62, 0xF1, 0x90, 0, 0, 0, 0]));
+        busy.Incoming.Enqueue(new(0x7E8, false,
+            [3, 0x62, 0xF1, 0x90, 0, 0, 0, 0]));
+        var busyResult = IsoTpCanFdSession.ReceiveAsync(busy, settings,
+            TimeSpan.FromSeconds(1), CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Check(busyResult.SequenceEqual(new byte[] { 0x62, 0xF1, 0x90 }) &&
+            busy.ReceiveTimeouts.Count == 97,
+            "ISO-TP no longer loses valid RX after 64 unrelated CAN packets.");
+
         var waiting = new SlowLink();
         waiting.Incoming.Enqueue(new(0x7E8, false,
             [0x30, 0, 0, 0, 0, 0, 0, 0]));
