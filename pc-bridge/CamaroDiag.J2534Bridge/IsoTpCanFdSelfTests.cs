@@ -128,7 +128,7 @@ internal static class IsoTpCanFdSelfTests
         wait.Replies.Enqueue(RX(false, 0x31, 0, 0, 0, 0, 0, 0, 0));
         wait.Replies.Enqueue(RX(false, 0x30, 0, 0xF2, 0, 0, 0, 0, 0));
         Send(wait, classic, Fill(14));
-        Check(wait.Separations.Count == 1 &&
+        Check(wait.Separations.Count == 2 &&
             wait.Separations[0] == TimeSpan.FromTicks(2000),
             "FC/WAIT then CTS microsecond STmin decoded correctly.");
 
