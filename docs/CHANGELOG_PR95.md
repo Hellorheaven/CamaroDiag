@@ -172,3 +172,7 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Construction des trames TP.CM Conn_Abort avec PGN et adresse pair ; émission de reason 3 en cas de timeout CTS/DT et reason 7 après erreur de séquence DT. Aucun abandon sur BAM ni après annulation de l'opérateur.
 - Tests de régression ajoutés pour expiration CTS, expiration après CTS, mauvaise séquence DT et format des octets d'abandon.
 - Limite : aucune retransmission TP.DT facultative ni gestion multi-session complète, et **tests non exécutés / matériel non qualifié**.
+
+## J1939-73 — DM1/DM2 (23/11/2026)
+- Décodeur DTC/état des voyants pour les PGN FECA/FECB, extraction SPN 19 bits, FMI, occurrences et bit CM après assemblage J1939-21. Affichage CLI en réception, avec trame brute conservée.
+- Tests sur trame directe rembourrée, deux DTC multipaquets et absence de codes ajoutés ; **non exécutés**.
