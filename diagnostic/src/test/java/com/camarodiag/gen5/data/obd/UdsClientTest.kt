@@ -151,10 +151,10 @@ class UdsClientTest {
         assertTrue(runCatching { grant("A1B2", "HW-1", "OS-1") }.isSuccess)
     }
 
-    @Test fun stateChangingGrantsCannotDisableSecurityAccessOrOmitKeyLevels() {
+    @Test fun stateChangingGrantsRequireSeedKeyOnlyWhenEcuProtocolSpecifiesIt() {
         assertTrue(runCatching {
             verifiedPolicy(writeDids = setOf(0x1234), requireSecurity = false)
-        }.isFailure)
+        }.isSuccess)
         val vin = "1G1FA1RXXR0123456"
         val id = UdsEcuIdentity("ECM", "HW-1", "OS-1", "CAL-1", "A1B2", vin)
         assertTrue(runCatching {
@@ -177,6 +177,20 @@ class UdsClientTest {
             verifiedPolicy(memoryRegions = listOf(UdsMemoryRegion(0x1000, 0x100)),
                 maxTransferBytes = 0x100, requireSecurity = false)
         }.isSuccess)
+    }
+
+    @Test fun ecuWithoutSeedKeyOrExtendedSessionCanAcknowledgeAuthorizedDidWrite() = runBlocking {
+        val transport = FakeTransport(listOf(response(0x6E, 0x12, 0x34)))
+        val client = UdsClient(
+            transport, 0x7E0, 0x7E8,
+            policy = verifiedPolicy(writeDids = setOf(0x1234),
+                sessions = setOf(0x01), requireSecurity = false)
+        )
+        client.writeDataByIdentifier(0x1234, byteArrayOf(0x55))
+        assertFalse(client.isSecurityUnlocked())
+        assertEquals(1, transport.sent.size)
+        assertArrayEquals(byteArrayOf(0x04, 0x2E, 0x12, 0x34, 0x55),
+            transport.sent[0].data.copyOf(5))
     }
 
     @Test fun sessionControlAndTesterPresentValidatePositiveResponses() = runBlocking {

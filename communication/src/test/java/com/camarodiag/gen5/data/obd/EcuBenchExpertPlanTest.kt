@@ -36,12 +36,20 @@ class EcuBenchExpertPlanTest {
 
     @Test fun unknownControllerAndChipRequireRealIdentification() {
         val missing = EcuBenchExpertPlan.blockers(
-            target.copy(controllerFamily = "E39X", chipMarking = "unknown", programmerName = ""),
+            target.copy(controllerFamily = "unknown", chipMarking = "unknown", programmerName = ""),
             image
         )
         assertTrue(EcuBenchExpertPlan.Blocker.CONTROLLER_NOT_IDENTIFIED in missing)
         assertTrue(EcuBenchExpertPlan.Blocker.CHIP_NOT_IDENTIFIED in missing)
         assertTrue(EcuBenchExpertPlan.Blocker.PROGRAMMER_NOT_IDENTIFIED in missing)
+    }
+
+    @Test fun knownOtherEcuFamiliesAreNotArtificiallyRestrictedToE39() {
+        for (family in listOf("E38", "E69", "E67", "E80", "E92", "E93", "E39X")) {
+            val blockers = EcuBenchExpertPlan.blockers(target.copy(controllerFamily = family), image)
+            assertFalse(family, EcuBenchExpertPlan.Blocker.CONTROLLER_NOT_IDENTIFIED in blockers)
+            assertTrue(family, EcuBenchExpertPlan.Blocker.HARDWARE_PROGRAMMING_DRIVER_UNAVAILABLE in blockers)
+        }
     }
 
     @Test fun anImageNameOrAnImportHashDoesNotBecomeABackup() {

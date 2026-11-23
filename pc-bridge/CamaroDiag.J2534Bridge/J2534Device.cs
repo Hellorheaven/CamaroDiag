@@ -230,6 +230,29 @@ internal sealed partial class J2534Device : IDisposable
         return ExchangeCore(payload, timeoutMs, nativeBenchReply: false);
     }
 
+    /// <summary>
+    /// Explicit local J2534 console exchange. Do not apply an artificial
+    /// service-level read-only list to operator-entered ECU protocol requests.
+    /// Actual vendor transport, ECU SecurityAccess and OEM acknowledgements
+    /// are still handled by the physical adapter and the controller.
+    /// The Android network bridge continues to use the restricted Exchange().
+    /// </summary>
+    internal byte[] ExchangeConsole(byte[] payload, int timeoutMs)
+    {
+        EnsureOpen();
+        if (payload.Length is < 1 or > 4091)
+            throw new ArgumentOutOfRangeException(nameof(payload));
+        return ExchangeCore(payload, timeoutMs, nativeBenchReply: false);
+    }
+
+    internal void SendConsoleOnly(byte[] payload)
+    {
+        EnsureOpen();
+        if (payload.Length is < 1 or > 4091)
+            throw new ArgumentOutOfRangeException(nameof(payload));
+        SendCore(payload);
+    }
+
     // Memory 0x63 replies contain no address echo: a previously queued reply
     // from the same ECU CAN ID could otherwise be assigned to a later block.
     // Also clear before VIN identity reads on the scoped channel so a stale

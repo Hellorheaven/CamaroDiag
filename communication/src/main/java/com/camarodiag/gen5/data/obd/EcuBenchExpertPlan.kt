@@ -82,7 +82,8 @@ object EcuBenchExpertPlan {
     fun blockers(target: Target, image: CandidateImage?, evidence: Evidence = Evidence()): List<Blocker> {
         val missing = mutableListOf<Blocker>()
         val family = target.controllerFamily?.trim().orEmpty()
-        if (family !in setOf("E39", "E39A")) missing += Blocker.CONTROLLER_NOT_IDENTIFIED
+        if (family.isBlank() || family.equals("unknown", ignoreCase = true))
+            missing += Blocker.CONTROLLER_NOT_IDENTIFIED
         if (target.chipMarking.isNullOrBlank() ||
             target.chipMarking.trim().equals("unknown", ignoreCase = true)
         ) missing += Blocker.CHIP_NOT_IDENTIFIED
@@ -98,7 +99,13 @@ object EcuBenchExpertPlan {
         if (!evidence.originalReadbackVerified) missing += Blocker.ORIGINAL_READBACK_NOT_VERIFIED
         if (!evidence.recoveryPathVerified) missing += Blocker.RECOVERY_PATH_NOT_VERIFIED
         if (!evidence.memoryMapVerified) missing += Blocker.MEMORY_MAP_NOT_VERIFIED
-        missing += Blocker.HARDWARE_PROGRAMMING_DRIVER_UNAVAILABLE
+        // No family-specific hard stop: permit any actual, registered driver
+        // that supports this ECU family and selected hardware transport.
+        // The current registry is empty, so availability is not fabricated.
+        val driverAvailable = target.accessMethod.candidateTransports.any { transport ->
+            EcuProgrammingDriverContract.hasValidatedWriteDriver(family, transport)
+        }
+        if (!driverAvailable) missing += Blocker.HARDWARE_PROGRAMMING_DRIVER_UNAVAILABLE
         return missing
     }
 

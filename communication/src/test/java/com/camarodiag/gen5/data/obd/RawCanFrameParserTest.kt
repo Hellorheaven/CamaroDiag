@@ -98,58 +98,30 @@ class RawCanFrameParserTest {
         assertNull(SafeObdRequestPolicy.parse(physicalFrame))
     }
 
-    @Test fun rawConsoleAllowsRealReadQueriesButRejectsDiagnosticProgramming() {
-        for (safe in listOf(
-            "7E0 02 01 0C", "7DF 02 01 52", "7E0 02 09 02",
-            "7E0 01 03", "7E0 03 22 F1 90", "7E0 02 3E 00",
-            "7E0 03 19 01 FF", "7E0 03 19 02 FF", "7E0 02 19 0A",
-            "18DA10F1 03 22 F1 90", "7E0 02 01 0C 00 00"
-        )) {
-            assertTrue(safe, SafeRawCanTransmitPolicy.allows(
-                requireNotNull(RawCanFrameParser.parse(safe))))
-        }
-        for (unsafe in listOf(
-            "7E0 02 04 00", "7E0 02 27 01", "7E0 03 2E F1 90",
-            "7E0 02 31 01", "7E0 02 34 00", "7E0 02 36 01",
-            "7E0 02 11 01", "7DF 02 14 01", "7E0 02 85 01",
-            "7E0 10 14 34 00", "7E0 21 00 00", "7E0 02 01 FF",
-            "7E0 02 01 0C FF", "18DA10F1 03 2E F1 90",
-            "7E0 03 19 FE FF", "7E0 02 19 01",
-            "7E0 03 19 0A FF", "7E0 04 19 02 FF AA",
-            "7E8 02 01 0C", "18DAF110 03 22 F1 90",
-            "7DF 03 22 F1 90"
-        )) {
-            assertFalse(unsafe, SafeRawCanTransmitPolicy.allows(
-                requireNotNull(RawCanFrameParser.parse(unsafe))))
-        }
-    }
-
-    @Test fun nonstandardCanIdsCannotBecomeAnObdWriteLoophole() {
+    @Test fun explicitlyAddressedRawConsoleDoesNotImposeReadOnlyServiceAllowlist() {
         for (input in listOf(
-            "123 03 2E F1 90", "123 02 27 01", "123 02 04 00",
-            "456 03 31 01 01", "456 03 34 00 44",
-            "18DA20F1 03 2E F1 90", "18DA20F1 03 36 01 42",
-            "123 10 14 34 00 11 22", "18DA20F1 10 14 2E F1 90"
-        )) {
-            assertFalse(input, SafeRawCanTransmitPolicy.allows(
-                requireNotNull(RawCanFrameParser.parse(input))))
-        }
-        // The same bytes on an *unknown* CAN address are not proof of a safe
-        // diagnostic request. Only qualified physical diagnostic addressing passes.
-        for (input in listOf(
-            "123 03 22 F1 90", "123 02 01 0C", "123 55 AA BB",
-            "123 08 00 FF", "456 02 01 0C", "00000123 03 22 F1 90"
-        )) {
-            assertFalse(input, SafeRawCanTransmitPolicy.allows(
-                requireNotNull(RawCanFrameParser.parse(input))))
-        }
-        for (input in listOf(
-            "18DA20F1 03 22 F1 90", "7E0 03 22 F1 90",
-            "7DF 02 01 0C"
+            "7E0 02 01 0C", "7DF 02 01 52",
+            "7E0 02 27 01", "7E0 03 2E F1 90",
+            "7E0 02 34 00", "7E0 02 36 01", "7E0 02 11 01",
+            "7E0 10 14 34 00", "7E0 21 00 00",
+            "18DA10F1 03 2E F1 90", "18DAF110 03 22 F1 90",
+            "123 03 2E F1 90", "456 03 31 01 01",
+            "00000123 03 22 F1 90", "123 55 AA BB"
         )) {
             assertTrue(input, SafeRawCanTransmitPolicy.allows(
                 requireNotNull(RawCanFrameParser.parse(input))))
         }
+    }
+
+    @Test fun rawConsoleStillEnforcesPhysicalClassicalCanFraming() {
+        assertFalse(SafeRawCanTransmitPolicy.allows(
+            RawCanFrame(0x800L, false, byteArrayOf(0x02, 0x01, 0x0C))))
+        assertFalse(SafeRawCanTransmitPolicy.allows(
+            RawCanFrame(0x20000000L, true, byteArrayOf(0x02, 0x01, 0x0C))))
+        assertFalse(SafeRawCanTransmitPolicy.allows(
+            RawCanFrame(0x123L, false, byteArrayOf())))
+        assertFalse(SafeRawCanTransmitPolicy.allows(
+            RawCanFrame(0x123L, false, ByteArray(9))))
     }
 
 }

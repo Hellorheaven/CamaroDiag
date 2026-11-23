@@ -146,11 +146,12 @@ data class UdsAccessPolicy internal constructor(
                 safeIoControls.isNotEmpty() || safeCommunicationControls.isNotEmpty() ||
                 safeDtcSettings.isNotEmpty() || safeDtcGroups.isNotEmpty() ||
                 safeEcuResets.isNotEmpty()
-            require(!mutatingCapabilitiesGranted || requireSecurityAccess) {
-                "A verified ECU policy cannot grant state-changing operations without SecurityAccess."
-            }
-            require(!mutatingCapabilitiesGranted || safeSecurityLevels.isNotEmpty()) {
-                "State-changing ECU permissions require an explicit SecurityAccess level."
+            // OEM-dependent: only require a seed/key when this ECU's actual
+            // protocol demands SecurityAccess. Do not manufacture a universal
+            // CamaroDiag key requirement for every state-changing operation.
+            require(!mutatingCapabilitiesGranted || !requireSecurityAccess ||
+                safeSecurityLevels.isNotEmpty()) {
+                "This ECU requires SecurityAccess, but no supported seed/key level is configured."
             }
             return UdsAccessPolicy(
                 safeReadDids, safeWriteDids, safeSessions, safeRoutineControls, safeIoControls,
@@ -322,7 +323,9 @@ class UdsClient private constructor(
     suspend fun requestSecuritySeed(level: Int): ByteArray {
         require(level in policy.allowedSecurityLevels) { "Security level is not allowlisted for this ECU." }
         require(level in 1..0x7D && level % 2 == 1)
-        require(activeSession != 0x01) { "Security access requires a non-default diagnostic session." }
+        require(activeSession in policy.allowedSessions) {
+            "SecurityAccess is not available in the configured ECU session."
+        }
         val response = request(0x27, byteArrayOf(level.toByte()))
         require(response.size >= 2 && (response[1].toInt() and 0x7F) == level)
         requestedSecuritySeeds += level
@@ -541,8 +544,10 @@ class UdsClient private constructor(
     }
 
     private fun requireProgrammingSession() {
-        require(activeSession != 0x01 && activeSession in policy.allowedSessions) {
-            "A verified non-default diagnostic session is required for this operation."
+        // Session 0x01 is valid for writes on some ECU implementations.
+        // The target ECU itself decides which services its active session accepts.
+        require(activeSession in policy.allowedSessions) {
+            "The selected ECU session is not supported by this protocol profile."
         }
     }
 

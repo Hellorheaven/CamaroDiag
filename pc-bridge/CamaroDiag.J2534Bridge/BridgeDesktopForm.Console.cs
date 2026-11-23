@@ -68,8 +68,9 @@ internal sealed partial class BridgeDesktopForm
         WideRow(fields, identityButtons, 48);
         WideRow(fields, new Label
         {
-            Text = "Console complète en lecture/diagnostic : TX et RX affichés séparément. " +
-                "Le pont refuse toute commande de programmation, effacement, déverrouillage ou actionneur. " +
+            Text = "Console J2534 locale : TX et RX séparés ; commandes ECU transmises selon " +
+                "le protocole et le pilote réellement sélectionnés, sans liste blanche CamaroDiag. " +
+                "Les écritures et déverrouillages restent soumis aux réponses du calculateur. " +
                 "Fermez ce canal avant de démarrer le pont Android.",
             Dock = DockStyle.Fill, AutoSize = true, ForeColor = Color.DarkSlateGray
         }, 78);
@@ -166,7 +167,7 @@ internal sealed partial class BridgeDesktopForm
             {
                 if (noResponse)
                 {
-                    await Task.Run(() => device.SendOnly(payload));
+                    await Task.Run(() => device.SendConsoleOnly(payload));
                     // PassThruWriteMsgs only proves acceptance by the driver:
                     // without an ECU reply, physical bus delivery is unknown.
                     ConsoleLine("SYSTEM", frameHex + " [" +
@@ -175,7 +176,7 @@ internal sealed partial class BridgeDesktopForm
                 }
                 else
                 {
-                    var reply = await Task.Run(() => device.Exchange(payload, (int)consoleTimeout.Value));
+                    var reply = await Task.Run(() => device.ExchangeConsole(payload, (int)consoleTimeout.Value));
                     ConsoleLine("SYSTEM", frameHex + " [" +
                         BridgeConsoleTxEvidence.Label(BridgeConsoleTxState.EcuReplied) + "]",
                         Color.DarkGreen);
