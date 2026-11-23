@@ -23,6 +23,12 @@ internal static class ObdJ1979Interpretation
                 $"SAE J1979 service 0x{reply.Service:X2} negative response NRC=0x{reply.NegativeResponseCode:X2}",
                 false, reply.Service);
 
+        if (request.Length == 2 && request[0] == 0x01 && request[1] == 0x01)
+        {
+            var status = ObdJ1979MonitorStatus.Decode(response);
+            return new Result(ObdJ1979MonitorStatus.Format(status), true, reply.Service);
+        }
+
         if (request[0] is 0x01 or 0x02 &&
             request.Length >= 2 && request[1] <= 0xE0 &&
             request[1] % 0x20 == 0)
