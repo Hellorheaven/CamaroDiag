@@ -976,6 +976,7 @@
     <string name="flexfuel_lfx2012_history_range">Ethanol: %1$d valid readings, min %2$.2f %% / max %3$.2f %%</string>
     <string name="flexfuel_lfx2012_history_trim_range">%1$s: %2$d valid readings, min %3$.2f %% / max %4$.2f %%</string>
     <string name="can_console_export_header"># CamaroDiag CAN console export</string>
+    <string name="can_console_export_events_full"># Complete event timeline: TX/RX/SYSTEM recorded in chronological order; raw RX archive follows when available.</string>
     <string name="can_console_export_events_limited"># Event timeline: up to the 300 latest TX/RX/SYSTEM entries. Earlier TX events are not retained; the full captured raw RX stream is archived separately when available.</string>
     <string name="can_console_export_direction_legend"># TX = sent, RX = received, SYSTEM = application event</string>
     <string name="can_console_export_full_raw_rx"># RX RAW - full archived adapter output (unaltered text)</string>
