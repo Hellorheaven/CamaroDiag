@@ -244,6 +244,20 @@ internal static class StandardVehicleProtocolsSelfTests
             "--payload", "2EF19001"]);
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
+        var secureDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
+            "--tester", "0E80", "--ecu", "1234", "--tls", "true",
+            "--payload", "22F190"]);
+        Check(secureDoIp.UseTls && secureDoIp.Host == "gateway.example.org" &&
+            secureDoIp.Request.SequenceEqual(new byte[] {0x22, 0xF1, 0x90}),
+            "Secure DoIP CLI selects certificate-validated TLS transport.");
+        Check(!parsed.UseTls, "Legacy DoIP TCP mode remains explicit and unchanged.");
+        Reject<FormatException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
+            "--tester", "0E80", "--ecu", "1234", "--tls", "maybe",
+            "--payload", "22F190"]),
+            "Invalid DoIP TLS option fails parsing before gateway access.");
+
         var j2534Options = StandardProtocolCli.ParseJ2534([
             StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
             "--protocol-id", "0x04", "--baud", "10400",
