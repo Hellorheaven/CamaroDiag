@@ -52,6 +52,11 @@ internal static class ConnectorDiscoverySelfTests
         Require(ConnectorDiscoveryCli.IsValidPort("com120"));
         foreach(var badPort in new[]{"COM0","COM99999","COM5 ","COM5\n","\\\\.\\COM1","ttyUSB0",""})
             Require(!ConnectorDiscoveryCli.IsValidPort(badPort));
+        Require(ConnectorDiscoveryCli.IsPortStillEnumerated("com5", ["COM5", "COM42"]));
+        Require(!ConnectorDiscoveryCli.IsPortStillEnumerated("COM5", ["COM42"]));
+        Require(!ConnectorDiscoveryCli.IsPortStillEnumerated("COM5", ["COM5", "com5"]));
+        Require(!ConnectorDiscoveryCli.IsPortStillEnumerated("COM5", ["COM50"]));
+        Require(!ConnectorDiscoveryCli.IsPortStillEnumerated("COM0", ["COM0"]));
         Require(ConnectorBinaryDiscovery.Crc32("123456789"u8)==0xcbf43926u);
         using(var link=new Simulation(false,false))
         {
