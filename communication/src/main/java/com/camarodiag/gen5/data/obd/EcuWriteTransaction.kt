@@ -300,7 +300,6 @@ internal class EcuWriteExecutionEngine(
                 val physicalBytes = driver.read(region)
                 if (!physicalBytes.contentEquals(sector.originalBytes) ||
                     !powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
-                    !powerMonitor.isStable() || driver.identify() != request.expectedIdentity ||
                     !driver.independentReadback(region).contentEquals(sector.originalBytes) ||
                     !powerMonitor.isStable() ||
                     driver.identify() != request.expectedIdentity

@@ -354,6 +354,38 @@ class EcuWriteTransactionTest {
         assertArrayEquals(expected, device.memory)
     }
 
+    @Test fun liveEcuSectorBytesAreCapturedBeforeAnyErase() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val snapshots = InMemoryEcuPhysicalBlockBackup()
+        val outcome = EcuWriteExecutionEngine(
+            device, EcuWriteTransaction.Journal {}, EcuWriteTransaction.PowerMonitor { true },
+            snapshots
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.COMPLETED, outcome.status)
+        assertEquals(1, snapshots.blocks.size)
+        assertArrayEquals(
+            original.copyOfRange(0, 8),
+            snapshots.blocks[EcuBackupCoverage.Region.CALIBRATION to 0x1000L]
+        )
+        assertEquals(1, device.eraseCalls)
+    }
+
+    @Test fun diskBackupFailureCannotEraseOrWriteEcu() = runBlocking {
+        val device = FakeDriver(original, expectedIdentity)
+        val refusingBackup = EcuPhysicalBlockBackup { _, _, _ ->
+            throw java.io.IOException("Physical block backup cannot be persisted.")
+        }
+        val records = mutableListOf<EcuWriteTransaction.Record>()
+        val outcome = EcuWriteExecutionEngine(
+            device, journal(records), EcuWriteTransaction.PowerMonitor { true },
+            refusingBackup
+        ).run(request())
+        assertEquals(EcuWriteTransaction.Status.STOPPED_REQUIRES_ASSESSMENT, outcome.status)
+        assertEquals(0, device.eraseCalls)
+        assertEquals(0, device.writeCalls)
+        assertFalse(records.any { it.stage == EcuWriteTransaction.Stage.BEFORE_ERASE })
+    }
+
     @Test fun baselineMismatchStopsBeforeAnyErase() = runBlocking {
         val liveMemory = original.copyOf().also { it[5] = 42 }
         val device = FakeDriver(liveMemory, expectedIdentity)
