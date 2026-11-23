@@ -51,6 +51,9 @@ object EcuRestoreReadback {
         require(saved.regions.size == observations.size) {
             "Missing or additional ECU restore readback regions"
         }
+        require(saved.regions.map { it.geometry }.distinct().size == saved.regions.size) {
+            "Duplicate stored ECU restoration region"
+        }
         val regions = observations.map { it.first }
         require(regions.distinct().size == regions.size) {
             "Duplicate ECU restore readback region"
