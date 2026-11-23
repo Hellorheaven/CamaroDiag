@@ -30,6 +30,7 @@ internal static class J1939FdCmdtSession
         o.Validate();
         CheckLengthAndTimeout(payload.Length, timeout);
         var count = (payload.Length + 59) / 60;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         await link.SendAsync(MakeCm(o, fromLocal: true,
             J1939FdTransportFrames.RequestToSend, payload.Length, count,
             o.Window, 0), token);
@@ -39,7 +40,7 @@ internal static class J1939FdCmdtSession
             while (next <= count)
             {
                 var window = await AwaitCtsAsync(link, o, timeout,
-                    next, count, token);
+                    next, count, clock, token);
                 for (var i = 0; i < window; i++)
                 {
                     token.ThrowIfCancellationRequested();
@@ -55,7 +56,7 @@ internal static class J1939FdCmdtSession
             await link.SendAsync(MakeCm(o, fromLocal: true,
                 J1939FdTransportFrames.EndOfMessageStatus,
                 payload.Length, count, 0, 0), token);
-            var ack = await ReadCmAsync(link, o, timeout, token);
+            var ack = await ReadCmAsync(link, o, timeout, clock, token);
             if (ack.Type == J1939FdTransportFrames.ConnectionAbort)
                 throw new IOException("J1939-22 peer aborted the transfer after EOM_STATUS.");
             if (ack.Type != J1939FdTransportFrames.EndOfMessageAck ||
@@ -80,10 +81,11 @@ internal static class J1939FdCmdtSession
         o.Validate();
         if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
             throw new ArgumentOutOfRangeException(nameof(timeout));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         J1939FdTransportFrames.Control? start = null;
         for (var attempt = 0; attempt < 128; attempt++)
         {
-            var cm = await ReadCmAsync(link, o, timeout, token);
+            var cm = await ReadCmAsync(link, o, timeout, clock, token);
             if (cm.Type != J1939FdTransportFrames.RequestToSend)
                 continue;
             start = cm;
@@ -111,7 +113,7 @@ internal static class J1939FdCmdtSession
                     next, (byte)window, 0), token);
                 for (var i = 0; i < window; i++)
                 {
-                    var segment = await ReadDtAsync(link, o, timeout, token);
+                    var segment = await ReadDtAsync(link, o, timeout, clock, token);
                     if (segment.Number != next)
                     {
                         if (!token.IsCancellationRequested)
@@ -135,7 +137,7 @@ internal static class J1939FdCmdtSession
                     next++;
                 }
             }
-            var eom = await ReadCmAsync(link, o, timeout, token);
+            var eom = await ReadCmAsync(link, o, timeout, clock, token);
             if (eom.Type != J1939FdTransportFrames.EndOfMessageStatus ||
                 eom.MessageLength != result.Length || eom.SegmentCount != count ||
                 eom.Aux7 != 0 || eom.Aux8 != 0)
@@ -154,7 +156,8 @@ internal static class J1939FdCmdtSession
 
     private static async Task<int> AwaitCtsAsync(
         IsoTpCanFdSession.ICanLink link, Options o,
-        TimeSpan timeout, int next, int total, CancellationToken token)
+        TimeSpan timeout, int next, int total,
+        System.Diagnostics.Stopwatch clock, CancellationToken token)
     {
         for (var holds = 0; holds < 5; holds++)
         {
@@ -175,11 +178,13 @@ internal static class J1939FdCmdtSession
 
     private static async Task<J1939FdTransportFrames.Control> ReadCmAsync(
         IsoTpCanFdSession.ICanLink link, Options o,
-        TimeSpan timeout, CancellationToken token)
+        TimeSpan timeout, System.Diagnostics.Stopwatch clock,
+        CancellationToken token)
     {
         for (var tries = 0; tries < 128; tries++)
         {
-            var frame = await link.ReceiveAsync(timeout, token);
+            var frame = await link.ReceiveAsync(
+                Remaining(timeout, clock), token);
             if (!Matches(frame, o.Peer, o.Local,
                 J1939FdTransportFrames.ControlPgn)) continue;
             var cm = J1939FdTransportFrames.DecodeControl(frame);
@@ -191,11 +196,13 @@ internal static class J1939FdCmdtSession
 
     private static async Task<J1939FdTransportFrames.Segment> ReadDtAsync(
         IsoTpCanFdSession.ICanLink link, Options o,
-        TimeSpan timeout, CancellationToken token)
+        TimeSpan timeout, System.Diagnostics.Stopwatch clock,
+        CancellationToken token)
     {
         for (var tries = 0; tries < 128; tries++)
         {
-            var frame = await link.ReceiveAsync(timeout, token);
+            var frame = await link.ReceiveAsync(
+                Remaining(timeout, clock), token);
             if (!Matches(frame, o.Peer, o.Local,
                 J1939FdTransportFrames.DataPgn)) continue;
             var segment = J1939FdTransportFrames.DecodeData(frame);
@@ -228,10 +235,20 @@ internal static class J1939FdCmdtSession
             id.Pgn == pgn;
     }
 
+    private static TimeSpan Remaining(TimeSpan limit,
+        System.Diagnostics.Stopwatch clock)
+    {
+        var left = limit - clock.Elapsed;
+        if (left <= TimeSpan.Zero)
+            throw new TimeoutException("J1939-22 FD.TP CMDT overall deadline exceeded.");
+        return left > TimeSpan.FromSeconds(30) ?
+            TimeSpan.FromSeconds(30) : left;
+    }
+
     private static void CheckLengthAndTimeout(int size, TimeSpan timeout)
     {
         if (size is <= 60 or > J1939FdBamSession.MaximumPayload ||
-            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
+            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes(10))
             throw new ArgumentOutOfRangeException(nameof(size));
     }
 }
