@@ -46,13 +46,14 @@ class J2534BridgeTlsTest {
     @Test fun tlsBridgeUsesNumericPrivateLanAddressWithoutDnsOrPublicFallback() {
         val pairing = J2534BridgeTlsPairing.parse("$token.$fingerprint")
         for (address in listOf("10.0.0.5", "172.16.0.7", "172.31.255.1",
-            "192.168.1.24", "169.254.1.2")) {
+            "192.168.1.24", "192.168.1.0", "192.168.1.255",
+            "169.254.1.2")) {
             assertEquals(address, pairing.localBridgeIpv4(address).hostAddress)
         }
         for (host in listOf("", "localhost", "garage.example.com", "127.0.0.1",
             "8.8.8.8", "100.64.0.1", "172.32.0.1", "192.169.0.1",
-            "192.168.001.24", "192.168.1.256", "192.168.1.0",
-            "192.168.1.255", "192.168.1.2:35001", " 192.168.1.2",
+            "192.168.001.24", "192.168.1.256",
+            "192.168.1.2:35001", " 192.168.1.2",
             "2001:db8::1", "010.0.0.5")) {
             assertThrows(IllegalArgumentException::class.java) {
                 pairing.localBridgeIpv4(host)
