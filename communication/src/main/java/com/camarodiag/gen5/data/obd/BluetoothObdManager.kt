@@ -209,8 +209,11 @@ class BluetoothObdManager(context: Context) {
         inspect: (CamaroDiagConnectorDiscovery.Channel, () -> Unit) -> T
     ): Result<T> = withContext(Dispatchers.IO) {
             connectorDiscoveryMutex.withLock {
-                // Validate selection before tearing down an existing OBD session.
-                // A stale generic USB label must not disconnect the live adapter.
+                // This manager boundary is entered only after the ViewModel
+                // selected a new adapter and cleared the previous UI session.
+                // Keep physical teardown in step with that state transition.
+                disconnect()
+                val epoch = transportSessionEpoch.capture()
                 val probe = ElmUsbTransport(connectorUsbContext)
                 try {
                     val enumerated = probe.availableDevices()
@@ -219,10 +222,7 @@ class BluetoothObdManager(context: Context) {
                             "USB connector discovery requires a named non-KKL CamaroDiagConnectors device"
                         ))
                     }
-                    disconnect()
-                    val epoch = transportSessionEpoch.capture()
-                    // The discovery handle is never the shared ELM transport.
-                    // A stale probe can close only its own handle, never a new OBD session.
+                    // A dedicated probe never shares the old ELM channel.
                     probe.connect(
                         deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE,
                         discoveryOnly = true, requireCdc = requireCdc
