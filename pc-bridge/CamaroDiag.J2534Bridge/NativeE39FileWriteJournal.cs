@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -13,6 +14,8 @@ internal sealed class NativeE39FileWriteJournal :
 {
     private const int MaximumJournalBytes = 8 * 1024 * 1024;
     private readonly FileStream stream;
+    private readonly string backupDirectory;
+    private bool backupDirectoryCreated;
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool disposed;
     private bool appendFailed;
@@ -34,10 +37,67 @@ internal sealed class NativeE39FileWriteJournal :
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var full = Path.GetFullPath(path);
+        backupDirectory = full + ".blocks";
         // An existing path can represent a flash interrupted days ago.
         // Never truncate it, even on an explicit second attempt.
         stream = new FileStream(full, FileMode.CreateNew,
             FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough);
+    }
+
+    /// <summary>
+    /// Persist original bytes ACQUIRED FROM THE ECU in their own create-new,
+    /// fsync'd and readback-verified sector file BEFORE the erase journal event.
+    /// Preserve this directory with the transaction's .meta.json and journal.
+    /// </summary>
+    public async Task PreserveOriginalBlockAsync(
+        uint address, byte[] liveBytes, string expectedSha256, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(liveBytes);
+        if (liveBytes.Length == 0 ||
+            !string.Equals(Convert.ToHexString(SHA256.HashData(liveBytes)),
+                expectedSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Physical sector bytes differ from the verified original.");
+        await gate.WaitAsync(token);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (appendFailed)
+                throw new IOException("Interrupted journal cannot accept physical backup data.");
+            if (!backupDirectoryCreated)
+            {
+                if (Directory.Exists(backupDirectory) || File.Exists(backupDirectory))
+                    throw new IOException("Refusing to reuse an existing ECU sector-backup directory.");
+                Directory.CreateDirectory(backupDirectory);
+                backupDirectoryCreated = true;
+            }
+            var name = Path.Combine(backupDirectory,
+                address.ToString("X8") + "-" + liveBytes.Length + ".ecu-block");
+            var frozen = liveBytes.ToArray();
+            var header = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new {
+                Schema = 1, Region = "E39_MAIN_FLASH",
+                Address = address, Length = frozen.Length,
+                OriginalSha256 = expectedSha256.ToUpperInvariant()
+            }) + "\n");
+            await using (var output = new FileStream(name, FileMode.CreateNew,
+                FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough))
+            {
+                await output.WriteAsync(header, token);
+                await output.WriteAsync(frozen, token);
+                output.Flush(flushToDisk: true);
+            }
+            // Require a newly read, byte-identical persistent capture.
+            var check = File.ReadAllBytes(name);
+            if (check.Length != header.Length + frozen.Length ||
+                !check.AsSpan(0, header.Length).SequenceEqual(header) ||
+                !check.AsSpan(header.Length).SequenceEqual(frozen))
+                throw new InvalidDataException("Persisted ECU sector backup is incomplete or altered.");
+        }
+        catch
+        {
+            appendFailed = true;
+            throw;
+        }
+        finally { gate.Release(); }
     }
 
     public async Task AppendAsync(

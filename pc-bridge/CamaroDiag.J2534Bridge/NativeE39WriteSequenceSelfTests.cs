@@ -6,6 +6,18 @@ internal static class NativeE39WriteSequenceSelfTests
     private sealed class TestJournal : NativeE39WriteSequence.IDurableJournal
     {
         internal readonly List<NativeE39WriteSequence.Event> Events = [];
+        internal readonly Dictionary<uint, byte[]> SavedBlocks = [];
+        public Task PreserveOriginalBlockAsync(uint address, byte[] liveBytes,
+            string sha256, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!string.Equals(Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(liveBytes)), sha256,
+                StringComparison.OrdinalIgnoreCase) ||
+                !SavedBlocks.TryAdd(address, liveBytes.ToArray()))
+                throw new InvalidDataException("Cannot save fresh physical sector.");
+            return Task.CompletedTask;
+        }
         public Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -162,6 +174,10 @@ internal static class NativeE39WriteSequenceSelfTests
         var result = NativeE39WriteSequence.RunBenchSequenceAsync(
             ecu, journal, plan, opts, CancellationToken.None)
             .GetAwaiter().GetResult();
+        Assert(journal.SavedBlocks.Count == 2 &&
+               journal.SavedBlocks[0x20000].SequenceEqual(origin[..16]) &&
+               journal.SavedBlocks[0x20010].SequenceEqual(origin[16..]),
+            "Both original ECU sectors physically captured before any erase");
         Assert(result.SectorsWritten == 2 && result.BytesWritten == 32,
             "Both changed sectors are written exactly once");
         Assert(ecu.Memory.SequenceEqual(updated) && ecu.Erases == 2,

@@ -30,6 +30,11 @@ internal static class NativeE39WriteSequence
         /// storage. Implementation must flush before returning to the caller.
         /// </summary>
         Task AppendAsync(Event evidence, CancellationToken cancellationToken);
+        // Physically re-acquired ORIGINAL bytes must be durably preserved
+        // before ANY erase command. A filename/hash alone is insufficient.
+        Task PreserveOriginalBlockAsync(
+            uint address, byte[] liveBytes, string expectedSha256,
+            CancellationToken cancellationToken);
     }
 
     internal interface IKernelLink
@@ -163,8 +168,10 @@ internal static class NativeE39WriteSequence
                     new(Phase.OriginalCrcVerified, s.Address, expected.ToString("X8")),
                     cancellationToken);
 
-                await RequireFreshBytesAsync(s.Address, s.Original,
+                var physicalOriginal = await RequireFreshBytesAsync(s.Address, s.Original,
                     "Original ECU bytes differ from backup; refusing erase.");
+                await journal.PreserveOriginalBlockAsync(
+                    s.Address, physicalOriginal, s.OriginalSha256, cancellationToken);
                 await journal.AppendAsync(
                     new(Phase.OriginalBytesVerified, s.Address, s.OriginalSha256),
                     cancellationToken);
@@ -293,7 +300,7 @@ internal static class NativeE39WriteSequence
             throw;
         }
 
-        async Task RequireFreshBytesAsync(uint address, byte[] expected, string error)
+        async Task<byte[]> RequireFreshBytesAsync(uint address, byte[] expected, string error)
         {
             await RequireSupplyAsync();
             var observed = await link.ReadFlashBytesAsync(address, expected.Length,
@@ -303,6 +310,7 @@ internal static class NativeE39WriteSequence
                 !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
                     observed, expected))
                 throw new InvalidDataException(error);
+            return observed;
         }
 
         async Task RequireSupplyAsync()

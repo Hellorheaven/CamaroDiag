@@ -132,6 +132,10 @@ internal static class NativeE39BenchWorkflow
         NativeE39WriteSequence.IDurableJournal journal, NativeE39KernelLink link,
         byte[] expected, NativeE39WriteSequence.Options options) : NativeE39WriteSequence.IDurableJournal
     {
+        public Task PreserveOriginalBlockAsync(
+            uint address, byte[] liveBytes, string sha256, CancellationToken token) =>
+            journal.PreserveOriginalBlockAsync(address, liveBytes, sha256, token);
+
         public async Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
             if (evidence.Phase == NativeE39WriteSequence.Phase.Completed)

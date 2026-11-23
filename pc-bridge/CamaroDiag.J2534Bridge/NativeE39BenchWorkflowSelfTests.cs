@@ -8,6 +8,17 @@ internal static class NativeE39BenchWorkflowSelfTests
     private sealed class Journal : NativeE39WriteSequence.IDurableJournal
     {
         internal List<NativeE39WriteSequence.Event> Events = [];
+        internal Dictionary<uint, byte[]> PhysicalBlocks = [];
+        public Task PreserveOriginalBlockAsync(uint address, byte[] liveBytes,
+            string sha256, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!string.Equals(Convert.ToHexString(SHA256.HashData(liveBytes)),
+                sha256, StringComparison.OrdinalIgnoreCase) ||
+                !PhysicalBlocks.TryAdd(address, liveBytes.ToArray()))
+                throw new InvalidDataException("Physical ECU block backup is invalid.");
+            return Task.CompletedTask;
+        }
         public Task AppendAsync(NativeE39WriteSequence.Event evidence, CancellationToken token)
         {
             token.ThrowIfCancellationRequested(); Events.Add(evidence); return Task.CompletedTask;
