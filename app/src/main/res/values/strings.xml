@@ -979,6 +979,7 @@
     <string name="flexfuel_lfx2012_export_history">Export %1$d fuel readings (CSV)</string>
     <string name="flexfuel_lfx2012_history_saved">Read-only fuel history exported.</string>
     <string name="flexfuel_lfx2012_history_failed">Could not export fuel history.</string>
+    <string name="flexfuel_lfx2012_ethanol_no_current_measurement">No current ethanol reading: the displayed range is historical only.</string>
     <string name="flexfuel_lfx2012_history_range">Ethanol: %1$d valid readings, min %2$.2f %% / max %3$.2f %%</string>
     <string name="flexfuel_lfx2012_history_trim_range">%1$s: %2$d valid readings, min %3$.2f %% / max %4$.2f %%</string>
     <string name="can_console_export_header"># CamaroDiag CAN console export</string>
