@@ -260,7 +260,7 @@ internal static class StandardProtocolCli
             {
                 var claim = await J1939AddressClaimSession.ClaimAsync(
                     link, o.Source, o.Name.Value, canFd: true,
-                    CancellationToken.None);
+                    token: CancellationToken.None);
                 if (claim != J1939AddressClaimSession.Outcome.Claimed)
                     throw new IOException(
                         "J1939-81 NAME lost address arbitration; no application PGN sent.");
@@ -421,7 +421,7 @@ internal static class StandardProtocolCli
             {
                 var claim = await J1939AddressClaimSession.ClaimAsync(
                     link, o.Settings.LocalAddress, o.Name.Value, canFd: false,
-                    CancellationToken.None);
+                    token: CancellationToken.None);
                 if (claim != J1939AddressClaimSession.Outcome.Claimed)
                     throw new IOException(
                         "J1939-81 NAME lost address arbitration; no application PGN sent.");
