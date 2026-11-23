@@ -2591,11 +2591,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val snapshot = _liveCanMonitorState.value
         val history = snapshot.consoleHistory.toList()
         val selectedArchive = activeCanCaptureFile
+        val journalSnapshot = consoleEventJournal.snapshot()
         // Do not publish an old snapshot after Clear, a new recording, or a
         // new physical TX has changed the active console since export started.
         fun current() = canResumeExport(exportGeneration, owner) &&
             _vehicle.value == profile && hasPremiumLicense() &&
             activeCanCaptureFile == selectedArchive &&
+            !consoleEventJournalFailed &&
+            (journalSnapshot == null || consoleEventJournal.isCurrent(journalSnapshot)) &&
             !_liveCanMonitorState.value.isCapturing &&
             !_liveCanMonitorState.value.isSendingRequest &&
             !_liveCanMonitorState.value.rawArchiveFailed &&
@@ -2607,6 +2610,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 if (!current()) return@launch
                 val archive = selectedArchive?.takeIf { it.isFile }
+                check(history.isEmpty() || journalSnapshot != null) {
+                    "Complete console event journal is unavailable"
+                }
                 check(CanConsoleExportPolicy.canExport(
                     isCapturing = snapshot.isCapturing,
                     archiveFailed = snapshot.rawArchiveFailed,
@@ -2620,35 +2626,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val outputText = buildString {
                     appendLine(localizedContext.getString(R.string.can_console_export_header))
-                    appendLine(localizedContext.getString(R.string.can_console_export_events_limited))
+                    appendLine(localizedContext.getString(
+                        if (journalSnapshot != null) R.string.can_console_export_events_full
+                        else R.string.can_console_export_events_limited
+                    ))
                     appendLine(localizedContext.getString(R.string.can_console_export_direction_legend))
-                    history.sortedBy { it.timestampMillis }.forEach { entry ->
-                        val timestamp = java.text.SimpleDateFormat(
-                            "yyyy-MM-dd HH:mm:ss.SSS",
-                            java.util.Locale.ROOT
-                        ).format(java.util.Date(entry.timestampMillis))
-                        append(timestamp)
-                        append(" [")
-                        append(entry.direction)
-                        if (!entry.succeeded) {
-                            append(' ')
-                            append(localizedContext.getString(R.string.can_console_export_failed_marker))
-                        }
-                        append("] ")
-                        appendLine(entry.content)
-                    }
-                    if (archive != null || snapshot.rawText.isNotBlank()) {
-                        appendLine()
-                        appendLine(localizedContext.getString(
-                            if (archive != null) R.string.can_console_export_full_raw_rx
-                            else R.string.can_console_export_recent_raw_rx
-                        ))
-                    }
                 }
                 val savedPath = CamaroDiagExportStorage.write(getApplication<Application>(), fileName, "text/plain",
                     category = CamaroDiagExportStorage.Category.CONSOLE, beforePublish = { check(current()) }
                 ) { sink ->
                     sink.write(outputText.toByteArray(Charsets.UTF_8))
+                    if (journalSnapshot != null) {
+                        journalSnapshot.file.inputStream().use { source -> source.copyTo(sink) }
+                    }
+                    if (archive != null || snapshot.rawText.isNotBlank()) {
+                        val rawHeader = "\n" + localizedContext.getString(
+                            if (archive != null) R.string.can_console_export_full_raw_rx
+                            else R.string.can_console_export_recent_raw_rx
+                        ) + "\n"
+                        sink.write(rawHeader.toByteArray(Charsets.UTF_8))
+                    }
                     if (archive != null) {
                         archive.inputStream().use { source -> source.copyTo(sink) }
                     } else if (snapshot.rawText.isNotBlank()) {
