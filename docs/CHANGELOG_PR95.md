@@ -447,3 +447,13 @@ L'interface n'affiche déjà plus le bouton de capture physique CDJ/1 non implé
 - Correction d'une ancienne assertion sur le catalogue : **14 protocoles**, et non plus 13, depuis l'ajout J1939-22.
 - CLI : erreurs de paramètres booléens/numériques invalides traitées par un code d'échec plutôt qu'une exception non interceptée.
 - Pas de preuve matérielle, pas d'exécution C# sur cette branche dans cette session ; l'absence de workflow associé au dernier SHA ne doit pas être présentée comme une validation.
+
+## Intégration Android et sécurité d'utilisation — 23 novembre 2026 (soir)
+
+- L'autorisation USB Android reprend automatiquement la **connexion explicitement sélectionnée**, tant que l'appareil et la session sont inchangés ; message FR/EN en cas de refus.
+- Fiabilisation de la déconnexion USB/Bluetooth/Wi-Fi et du pont PC J2534 lors des changements rapides d'adaptateur.
+- Historique CAN : détection des modifications de fichiers CSV, même sans changement de taille.
+- Historique des observations carburant : distinction entre mesure actuelle et dernière mesure connue.
+- **C6 toujours actif :** préservation de la double confirmation d'écriture et des contrôles constructeurs, sans blocage arbitraire de commandes CAN valides.
+- Tests ajoutés ; fonctionnement matériel et compilation au HEAD final encore à confirmer.
+
