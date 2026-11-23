@@ -229,7 +229,10 @@ internal static class StandardProtocolCli
                         $"groupFunction=0x{ack.GroupFunction:X2} " +
                         $"address=0x{ack.AcknowledgedAddress:X2}; " +
                         "no requested PGN payload was received.");
-                    return ack.Positive ? 0 : 6;
+                    // ACKM only acknowledges the request. Without the
+                    // requested PGN data this is INCONCLUSIVE, never a
+                    // completed data read (and certainly not an ECU write).
+                    return ack.Positive ? 7 : 6;
                 }
                 Console.WriteLine($"J1939 RX PGN=0x{response.Pgn:X} " +
                     $"broadcast={response.Broadcast}: {Convert.ToHexString(response.Payload)}");
