@@ -142,4 +142,21 @@ class CanConsoleRawArchiveWriterTest {
         assertEquals(false, archive.isComplete)
     }
 
+    @Test fun longCaptureKeepsOriginalChunkBoundariesAndAllRawText() {
+        val sink = StringWriter()
+        val frame = "7E8 08 41 0C 1A F8 00 00 00 00\\r\\n"
+        val repeatCount = 6000
+        val writer = CanConsoleRawArchiveWriter(sink)
+        repeat(repeatCount) {
+            // Simulate BLE / USB fragments, never a complete line in one call.
+            writer.append(frame.substring(0, 7))
+            writer.append(frame.substring(7, 21))
+            writer.append(frame.substring(21))
+        }
+        writer.close()
+        assertEquals(frame.repeat(repeatCount), sink.toString())
+        assertEquals(true, writer.isComplete)
+        assertTrue(sink.toString().length > 131_072)
+    }
+
 }
