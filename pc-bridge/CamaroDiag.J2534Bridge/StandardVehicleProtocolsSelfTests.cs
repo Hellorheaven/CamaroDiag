@@ -434,6 +434,27 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(informationDoIp.Request.SequenceEqual(new byte[] {0x22, 0xF8, 0x10}),
             "DoIP OBDonUDS protocol information F810 can be selected.");
 
+        var wwhDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-wwh-status", "0x08",
+            "--obd-wwh-severity", "0x40"]);
+        Check(wwhDoIp.Request.SequenceEqual(
+            new byte[] {0x19, 0x42, 0x33, 0x40, 0x08}),
+            "DoIP WWH emissions DTC status and severity selectors.");
+        var permanentDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-wwh-permanent"]);
+        Check(permanentDoIp.Request.SequenceEqual(
+            new byte[] {0x19, 0x55, 0x33}),
+            "DoIP WWH permanent DTC selector.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-wwh-permanent", "--obd-wwh-status", "0x08"]),
+            "Mutually exclusive DoIP WWH permanent and status-filtered requests.");
+
         var obdDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
