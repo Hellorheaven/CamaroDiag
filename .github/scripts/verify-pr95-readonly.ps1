@@ -1,28 +1,27 @@
-# PR #95 must remain read-only on physical ECU hardware.
-# This guard is independent of self-tests and must not be bypassed by
-# changing their expected result alongside the production capability.
+# Historical filename retained for the C6 workflow.
+# Prevent reintroducing a general physical-programming hard stop.
+# Only the dedicated local E39 bench may write; the network bridge stays read-only.
 $ErrorActionPreference = 'Stop'
-$gatePath = 'pc-bridge/CamaroDiag.J2534Bridge/NativeEcuWriteAvailability.cs'
-$cliPath = 'pc-bridge/CamaroDiag.J2534Bridge/NativeE39QualifiedBenchCli.cs'
-$driverPath = 'pc-bridge/CamaroDiag.J2534Bridge/J2534Device.NativeBench.cs'
-$gate = Get-Content -LiteralPath $gatePath -Raw
-$cli = Get-Content -LiteralPath $cliPath -Raw
-$driver = Get-Content -LiteralPath $driverPath -Raw
+$prefix = 'pc-bridge/CamaroDiag.J2534Bridge/'
+$gate = Get-Content -LiteralPath ($prefix + 'NativeEcuWriteAvailability.cs') -Raw
+$cli = Get-Content -LiteralPath ($prefix + 'NativeE39QualifiedBenchCli.cs') -Raw
+$driver = Get-Content -LiteralPath ($prefix + 'J2534Device.NativeBench.cs') -Raw
+$server = Get-Content -LiteralPath ($prefix + 'BridgeServer.cs') -Raw
 $guardName = 'NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled()'
-if ($gate -notmatch 'PhysicalEcuProgrammingEnabled\s*=>\s*false\s*;') {
-    throw 'PR95 security violation: physical ECU programming gate is not disabled.'
-}
-if ($gate -notmatch 'if\s*\(\s*!PhysicalEcuProgrammingEnabled\s*\)') {
-    throw 'PR95 security violation: physical ECU programming guard is not enforced.'
+if ($gate -notmatch 'PhysicalEcuProgrammingEnabled\s*=>\s*true\s*;') {
+    throw 'C6 regression: the local E39 bench entry was hard-disabled again.'
 }
 foreach ($entry in @(
-    @{ name = 'Native E39 CLI'; code = $cli; next = 'NativeE39QualifiedBenchProfile.Load' },
-    @{ name = 'J2534 physical entry'; code = $driver; next = 'NativeE39PhysicalAdmission.OpenVerifiedDriverLease' }
+    @{ name = 'local E39 CLI'; code = $cli; next = 'NativeE39QualifiedBenchProfile.Load' },
+    @{ name = 'native J2534 E39 bench'; code = $driver; next = 'NativeE39PhysicalAdmission.OpenVerifiedDriverLease' }
 )) {
-    $gateAt = $entry.code.IndexOf($guardName, [System.StringComparison]::Ordinal)
-    $hardwareAt = $entry.code.IndexOf($entry.next, [System.StringComparison]::Ordinal)
-    if ($gateAt -lt 0 -or $hardwareAt -le $gateAt) {
-        throw ("PR95 security violation: missing early write guard in " + $entry.name)
+    $entryAt = $entry.code.IndexOf($guardName, [System.StringComparison]::Ordinal)
+    $nextAt = $entry.code.IndexOf($entry.next, [System.StringComparison]::Ordinal)
+    if ($entryAt -lt 0 -or $nextAt -le $entryAt) {
+        throw ('Missing local E39 bench boundary in ' + $entry.name)
     }
 }
-Write-Output 'PASS: PR95 ECU write/erase/programming entry points remain disabled.'
+if ($server -match 'RunQualifiedNativeE39BenchAsync|NativeE39QualifiedBenchCli') {
+    throw 'Physical bench writer was exposed through the Android network bridge.'
+}
+Write-Output 'PASS: local E39 bench is available; network bridge remains read-only.'

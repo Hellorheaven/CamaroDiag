@@ -36,6 +36,14 @@ Cette règle est prioritaire et s'applique en continu :
 - Ne jamais inscrire un test/build comme réussi sans résultat observable ; noter explicitement `en attente`, `skipped`, `échoué` ou `non exécuté` le cas échéant.
 - Si une modification du prompt ou du backlog sur `main` est nécessaire pendant une PR, effectuer ce commit documentaire séparément sur `main` et ne pas mélanger le contenu de la PR dans ces fichiers.
 
+## Décision impérative du propriétaire — jamais de sécurité ECU artificielle (23/11/2026)
+
+Ne JAMAIS ajouter ni réintroduire, sans demande et accord explicites de l'utilisateur, des clés de confiance, signatures de profils, certificats de programmation, listes figées de pilotes ou interrupteurs bloqués par défaut qui ne sont pas exigés par le protocole réel ECU/transport. C'est une perte de temps et empêche les essais réels. Cette interdiction s'applique aussi aux tests, à la CI et aux futures PR. Toujours expliquer toute restriction nouvelle et obtenir une validation avant de l'implémenter.
+
+Séparer les licences Firebase de CamaroDiag (droits d'utilisation), le jeton et le TLS du pont (sécurité réseau) et le seed/key GM `0x27` (véritable échange ECU). Aucun ne justifie une clé de signature CamaroDiag pour programmer un E39. En revanche, conserver les vérifications techniques qui évitent un ECU inutilisable : identité exacte, sauvegarde complète et réellement restaurable, mémoire/firmware compatible, alimentation stable, checksums OEM, vérification après écriture, récupération réelle. La disponibilité du code ne prouve pas sa validation sur matériel.
+
+Une seule PR et une seule branche actives ; pas de fusion sans autorisation. C2 reste INCOMPLET jusqu'à preuve d'une image entière restaurable. Respecter cette décision sur toute reprise du développement.
+
 ## Règles de collaboration non négociables
 
 - Répondre en français, de façon directe, avec un état concret et honnête.

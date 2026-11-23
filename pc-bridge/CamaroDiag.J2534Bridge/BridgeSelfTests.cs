@@ -59,13 +59,9 @@ internal static class BridgeSelfTests
         Assert(!J2534Device.NeedsFreshReceiveQueue(false, false),
             "Standard read-only J2534 console does not require the memory RX policy");
 
-        Assert(!NativeEcuWriteAvailability.PhysicalEcuProgrammingEnabled,
-            "No ECU programming route is active in read-only PR95");
-        var programmingDenied = false;
-        try { NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled(); }
-        catch (UnauthorizedAccessException) { programmingDenied = true; }
-        Assert(programmingDenied,
-            "Native E39 physical programming is blocked before accessing a J2534 driver");
+        Assert(NativeEcuWriteAvailability.PhysicalEcuProgrammingEnabled,
+            "Dedicated local E39 bench hardware test route is enabled");
+        NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
         var deniedBenchCli = NativeE39QualifiedBenchCli.RunAsync(new[] {
             "--program-e39-bench", "0", "not-present.json", "not-present.sig",
             "original.bin", "target.bin", "kernel.bin", "new-journal.jsonl"

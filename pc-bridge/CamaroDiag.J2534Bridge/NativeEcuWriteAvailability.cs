@@ -1,14 +1,14 @@
 namespace CamaroDiag.J2534Bridge;
 
 /// <summary>
-/// PR #95 permits read-only physical diagnostics and backup only.
-/// Programming, including the local E39 bench entry, is deferred until the
-/// separately qualified C3/anti-brick work after audit #106.
-/// This is an immutable fail-closed gate: no CLI, network or runtime toggle.
+/// Local E39/E39A physical bench entry is enabled for explicit hardware tests.
+/// This is not a license or a GM SecurityAccess substitute.
+/// The Android/network bridge remains read-only; live ECU identity, full
+/// backup, stable power and write verification still guard real operations.
 /// </summary>
 internal static class NativeEcuWriteAvailability
 {
-    internal static bool PhysicalEcuProgrammingEnabled => false;
+    internal static bool PhysicalEcuProgrammingEnabled => true;
 
     internal static void RequirePhysicalEcuProgrammingEnabled()
     {

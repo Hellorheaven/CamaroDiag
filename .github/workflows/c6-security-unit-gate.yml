@@ -59,7 +59,7 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
-      - name: Enforce physical read-only boundary
+      - name: Validate local E39 bench access and remote write isolation
         shell: pwsh
         run: ./.github/scripts/verify-pr95-readonly.ps1
       - name: Build and self-test Windows J2534 security
