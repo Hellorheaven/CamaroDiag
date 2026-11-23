@@ -45,6 +45,39 @@ class UsbPermissionReconnectPolicyTest {
         ))
     }
 
+    @Test fun routesPermissionOnlyToTheOriginallySelectedAdapterFamily() {
+        val connector = "CamaroDiagConnectors CDC (#42)"
+        val elm = "OBDLink USB (#17)"
+        val kkl = "KKL USB (#19)"
+        assertNull(UsbPermissionReconnectPolicy.forSelection("usb", connector, 1L))
+        assertNull(UsbPermissionReconnectPolicy.forSelection("usb", kkl, 1L))
+        assertNull(UsbPermissionReconnectPolicy.forSelection("connector_usb", elm, 1L))
+        assertNull(UsbPermissionReconnectPolicy.forSelection("connector_usb_binary", kkl, 1L))
+        assertTrue(UsbPermissionReconnectPolicy.forSelection("usb", elm, 1L) != null)
+        assertTrue(UsbPermissionReconnectPolicy.forSelection("connector_usb", connector, 1L) != null)
+    }
+
+    @Test fun refusesAmbiguousEnumerationAndMismatchedPendingType() {
+        val elm = "OBDLink USB (#17)"
+        val selected = UsbPermissionReconnectPolicy.forSelection("usb", elm, 6L)
+        assertFalse(UsbPermissionReconnectPolicy.mayResume(
+            selected, 17, true, 6L, listOf(elm, "Different serial interface (#17)")
+        ))
+        assertFalse(UsbPermissionReconnectPolicy.mayResume(
+            selected, 17, true, 6L, listOf(elm, "CamaroDiagConnectors (#17)")
+        ))
+        assertFalse(UsbPermissionReconnectPolicy.mayResume(
+            selected, 17, true, 6L, listOf(elm, "KKL USB (#17)")
+        ))
+        val connector = UsbPermissionReconnectPolicy.forSelection(
+            "connector_usb_binary", "CamaroDiagConnectors CDC (#42)", 7L
+        )
+        assertFalse(UsbPermissionReconnectPolicy.mayResume(
+            connector, 42, true, 7L,
+            listOf("CamaroDiagConnectors CDC (#42)", "Other USB (#42)")
+        ))
+    }
+
     @Test fun usbProductNameCannotSpoofTheDeviceId() {
         val label = "OBD #5 other (#17)"
         val pending = UsbPermissionReconnectPolicy.forSelection("usb", label, 4L)
