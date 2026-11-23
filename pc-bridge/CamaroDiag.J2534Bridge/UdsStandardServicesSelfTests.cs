@@ -122,6 +122,17 @@ internal static class UdsStandardServicesSelfTests
             UdsStandardServices.DecodeTransferParameters(
                 0x34, [0x74, 0x10, 0x02]),
             "TransferData maximum must exceed its SID/counter overhead.");
+        Check(UdsStandardServices.RequireResponse(
+            [0x34, 0x00, 0x44, 0x80, 0, 0, 0,
+             0, 0, 0, 0x20], [0x74, 0x20, 0x10, 0x02])
+                .SequenceEqual(new byte[] {0x74, 0x20, 0x10, 0x02}),
+            "Shared UDS response correlation requires valid block-size negotiation.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse(
+                [0x35, 0x00, 0x44, 0x80, 0, 0, 0, 0, 0, 0, 0x20],
+                [0x75, 0x20, 0x10]),
+            "RequestUpload response without full negotiated size cannot pass.");
+
 
         Equal(UdsStandardServices.TransferData(3, [0x10, 0x20]),
             "36031020", "TransferData block counter & payload");
