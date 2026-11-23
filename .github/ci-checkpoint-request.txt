@@ -42,3 +42,14 @@ J1850 CRC-8 reference + optional wire CRC check; J2534 CAN_29BIT_ID RX
 validation; corrected fourteen-entry protocol catalog self-test.
 Run one COMPLETE Debug CI checkpoint; NO per-commit builds and no Release.
 Do not claim driver/ECU certification or merge PR95 on CI completion.
+
+23/11/2026 — ISO-TP CAN CLASSIQUE: checkpoint unique de fin de tranche logicielle (#110)
+HEAD des modifications avant checkpoint: 1aa147ed74aa6fc352336e3439f2c6e9a30248da
+Correctifs ISO 15765-2 sur la même PR #95: FC/OVFLW sur FirstFrame dont
+la taille dépasse 1 Mio, limites SF/FF 7/8 et 4095/4096 octets,
+trames avec adresse étendue, réception et émission multi-trames;
+N_Bs/N_Cr paramétrables, budget global inchangé, STmin réservé reçu=127 ms.
+Tests offline spécialisés ajoutés, PAS encore exécutés. Déclencher une
+campagne groupée Debug au SHA de ce commit marqueur: Windows -warnaserror
+et --self-test, Android, noyau natif et connecteurs. Aucune qualification
+électrique sur VCI, ECU ou véhicule; ne pas merger ou publier Release.

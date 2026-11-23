@@ -468,3 +468,18 @@ Le rapport `59 02` est maintenant validé avec le **masque 0x19/0x02 réellement
 ## ISO 14230 KWP2000 — corrélation des identifiants de réponse (23/11/2026)
 
 Le chemin J2534 ISO 14230 propose désormais un contrôle **facultatif et explicite** des octets de paramètre que le service KWP est censé renvoyer : `--kwp-echo-bytes 1` vérifie le premier octet après le SID positif pour une requête compatible (exemple : `1A90` / `5A90...`). Pour une opération constructeur qui n'écho pas de paramètre, laisser `0` (défaut). Le contrôle s'applique après validation de la trame, des adresses et du checksum ; les NRC, dont `78` attente, restent reconnus sans exiger d'écho. Une réponse avec SID correct mais identifiant différent n'est pas acceptée. Aucune liste de SID autorisés et aucun blocage d'écriture supplémentaires. Tests `Kwp2000TransactionSelfTests` enrichis mais **non exécutés** ; initialisation et timing K-Line matériels non qualifiés.
+
+
+## ISO 15765-2 / ISO-TP CAN classique — tranche logicielle et validation (23/11/2026)
+
+Un seul protocole est actif pour ce travail : **ISO-TP CAN classique**, sans basculement automatique sur un autre standard. Le moteur `IsoTpCanFdSession` existant gère trames SF/FF/CF/FC, adressage normal/étendu/mixte et contrôle des séquences. Les correctifs supplémentaires du lot sont :
+
+- FirstFrame déclarant plus que `MaximumPayloadBytes` : réponse **FC/OVFLW (0x32)** envoyée avant allocation ; une trame incohérente courte reste une erreur de cadrage sans FC fictif.
+- Tests des limites classiques **7/8** octets, **4095/4096** octets, compteur CF modulo 16, FC avec adressage étendu, ainsi que la distinction overflow / longueur invalide.
+- Temporisations N_Bs (attente de FC) et N_Cr (attente de chaque CF) distinctes de la limite globale de transaction, défaut **1000 ms**, configurables `--n-bs-ms` / `--n-cr-ms` sur la CLI Windows. Les trames étrangères ne remettent pas ces compteurs à zéro.
+- STmin reçu réservé : application du délai prudent standard de **127 ms**. Le logiciel refuse en revanche d'**annoncer** une valeur réservée dans son propre FC. Vecteurs positifs/négatifs ajoutés aux autotests offline.
+- La couche J2534 filtre déjà les annonces de statut, échos TX et événements auxiliaires ; cette logique existante est réutilisée, pas copiée.
+
+**Statut :** code et tests enregistrés dans la branche PR #95 ; checkpoint Debug unique demandé en fin de tranche. En l'absence du rapport GitHub Actions au SHA exact, écrire **NON VALIDÉ** et garder la valeur d'avancement logiciel indicative précédente. La qualification J2534 matériel, bus-off, timing réel, performances, compatibilité sur plusieurs ECU, opérations OEM d'écriture et restauration/anti-brick restent **OUVERTES**. Une validation logicielle isolée ne clôture pas le protocole au sens de la qualification véhicule.
+
+Références documentaires indépendantes : [Linux ISO-TP](https://docs.kernel.org/networking/iso15765-2.html), [python-can-isotp](https://can-isotp.readthedocs.io/en/latest/isotp/implementation.html). Aucune norme commerciale redistribuée.
