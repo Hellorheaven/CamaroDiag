@@ -2,6 +2,15 @@
 
 > Fichier de continuité du projet. À lire en premier dans tout nouveau chat consacré à CamaroDiag. Mettre ce fichier à jour dès qu'une décision durable, un changement de périmètre, une modification GitHub/PR, un résultat CI ou un état technique important est confirmé. Tenir le changelog propre à chaque PR (`docs/CHANGELOG_PR<number>.md`) à jour sur la branche de cette PR.
 
+## DÉCISIONS LES PLUS RÉCENTES — À APPLIQUER DANS TOUT NOUVEAU CHAT (23/11/2026)
+
+**Lire impérativement [AGENTS.md](../AGENTS.md) et [l'audit de PR #95](AUDIT_PR95_C1_C2_C4_C6_C8.md).** Ces règles priment sur les anciennes indications de PR #35, branche `feat/live-can-monitor`, CI à chaque ~50 commits, verrouillage ECU globalement lecture seule et anciens blocages d'écriture décrits plus bas. Sur GitHub au 23/11/2026 : PR **#95** et branche **`chore/unified-ci`**, non fusionnée ; toujours rafraîchir ce statut en temps réel.
+
+**Demande définitive du propriétaire :** aucun verrou ou licence d'écriture inventé par CamaroDiag. Conserver seulement les licences commerciales, les vraies exigences constructeur/ECU et les vérifications techniques de cohérence/integrité. Pour chaque opération pouvant écrire, afficher **avertissement de risque + responsabilité CamaroDiag (dans les limites légales) + OK**, puis une **deuxième confirmation Oui/Non** : Non, fermer ou perdre la session = zéro transmission. Vérifier avant la transmission que **l'adresse ECU, la région, le secteur d'effacement, la taille, les données et le checksum du bloc réellement envoyé** correspondent exactement au changement demandé ; contrôle pré-effacement et pré-trame ; lecture de vérification après écriture. Ceci concerne tout ECU, tout protocole et tout adaptateur dès lors qu'un pilote réel existe ; pas de fausse compatibilité. Les commandes RAW sans définition mémoire cible ne peuvent pas être déclarées vérifiées bloc-à-bloc.
+
+**Processus** : une seule branche+PR active ; ne pas fusionner sans accord ; une campagne de tests après un chantier terminé, correctifs groupés puis revalidation ; C1/C2/C4/C6/C8 à reprendre/auditer. Les validations logicielles ne prouvent pas la capacité de programmation physique.
+
+
 ## Conservation obligatoire de ce fichier
 
 `docs/PROMPT_REPRISE.md` est le document de continuité demandé par l'utilisateur. Il est indispensable pour reprendre un développement complet et répondre précisément à la question « où en est le développement ? ».
@@ -58,7 +67,7 @@ Une seule PR et une seule branche actives ; pas de fusion sans autorisation. C2 
 - Ne jamais fusionner une PR sans autorisation explicite de l'utilisateur.
 - Ne pas fermer/supprimer des branches ou modifier des noms/structures sans raison et vérification.
 - Le fichier `docs/PROMPT_REPRISE.md` est essentiel à la continuité du projet : **ne jamais le supprimer, le déplacer ou le renommer sans demande explicite de l'utilisateur**. Le maintenir à jour sur `main` conformément à la synchronisation documentaire.
-- Conserver exactement deux branches (`main` et `feat/live-can-monitor`) et une seule PR ouverte (#35), sauf autorisation explicite contraire. Ne jamais créer une nouvelle branche ou PR de sa propre initiative.
+- Conserver `main` et au plus une branche de travail associée à l'unique PR active ; vérifier les noms dans GitHub. Au 23/11/2026 : `chore/unified-ci`, PR #95. Ne jamais créer une nouvelle branche/PR de sa propre initiative.
 - Tous les documents destinés aux utilisateurs doivent expliquer les fonctions, les véhicules, le matériel compatible, l'utilisation et les limites, sans exposer les détails internes de développement. Seuls le backlog et les documents d'évolutions futures sont exemptés et peuvent rester techniques.
 - Respecter le périmètre validé. Pas de dérive fonctionnelle dans une PR en cours.
 - L'utilisateur travaille souvent depuis Android et GitHub Actions ; privilégier les opérations directes dans le dépôt plutôt que de lui demander de téléverser des fichiers quand le dépôt suffit.
