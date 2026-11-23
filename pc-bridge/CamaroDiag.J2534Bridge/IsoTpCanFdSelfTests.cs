@@ -142,6 +142,19 @@ internal static class IsoTpCanFdSelfTests
             !extendedCommand.ExtendedId,
             "CLI ISO-TP logical addresses do not imply 29-bit CAN IDs.");
 
+        var sharedCanId = new IsoTpCanFdSession.Settings(0x7E0, 0x7E0,
+            8, false, TxAddress: 0xF1, RxAddress: 0x10);
+        sharedCanId.Validate();
+        var sharedAddressTx = new QueueLink();
+        Send(sharedAddressTx, sharedCanId, [0x22]);
+        Check(sharedAddressTx.Sent[0].Id == 0x7E0 &&
+            sharedAddressTx.Sent[0].Data[0] == 0xF1,
+            "Distinct logical addresses permit one shared physical CAN ID.");
+        Reject<ArgumentException>(() => new IsoTpCanFdSession.Settings(
+            0x7E0, 0x7E0, 8, false, TxAddress: 0xF1,
+            RxAddress: 0xF1).Validate(),
+            "Shared CAN ID cannot use identical TX and RX logical address.");
+
         var fdExtended = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8,
             12, true, BlockSize: 0, TxAddress: 0xF1, RxAddress: 0x10);
         var fdAddressedSingle = new QueueLink();
