@@ -215,8 +215,16 @@ class BluetoothObdManager(context: Context) {
                 // A stale probe can close only its own handle, never a new OBD session.
                 val probe = ElmUsbTransport(connectorUsbContext)
                 try {
-                    if (CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, probe.availableDevices())) {
+                    val enumerated = probe.availableDevices()
+                    if (CamaroDiagConnectorDiscovery.requiresLegacyKklIsolation(deviceId, enumerated)) {
                         return@withLock Result.failure(IllegalStateException("KKL requires its own qualified transport"))
+                    }
+                    // A discovery-only handshake must never be sent to a generic
+                    // ELM, KKL or unrelated serial adapter selected by stale UI data.
+                    if (!CamaroDiagConnectorDiscovery.requiresDedicatedUsbDiscovery(deviceId, enumerated)) {
+                        return@withLock Result.failure(IllegalStateException(
+                            "Selected USB device is not enumerated as CamaroDiagConnectors"
+                        ))
                     }
                     probe.connect(
                         deviceId, CamaroDiagConnectorDiscovery.BAUD_RATE,
