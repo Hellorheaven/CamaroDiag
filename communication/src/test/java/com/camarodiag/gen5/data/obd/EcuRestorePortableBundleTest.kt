@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.OutputStream
 import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -47,6 +48,37 @@ class EcuRestorePortableBundleTest {
             assertEquals(identity, opened.identity)
             assertEquals(0x1000L, opened.regions.single().geometry.startAddress)
             assertArrayEquals(byteArrayOf(1, 2, 3, 4), opened.regions.single().bytes())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun modifiedSourceDuringExportIsNeverReportedAsVerified() {
+        val root = Files.createTempDirectory("restore-changing-source").toFile()
+        try {
+            val original = sourcePackage(root)
+            val zipped = ByteArrayOutputStream()
+            var modified = false
+            val output = object : OutputStream() {
+                override fun write(b: Int) {
+                    if (!modified) {
+                        modified = true
+                        File(original, "index.ecu-package").appendBytes(byteArrayOf(42))
+                    }
+                    zipped.write(b)
+                }
+                override fun write(b: ByteArray, off: Int, len: Int) {
+                    if (!modified) {
+                        modified = true
+                        File(original, "index.ecu-package").appendBytes(byteArrayOf(42))
+                    }
+                    zipped.write(b, off, len)
+                }
+            }
+            assertTrue(runCatching {
+                EcuRestorePortableBundle.export(original, output)
+            }.isFailure)
+            assertTrue(modified)
         } finally {
             root.deleteRecursively()
         }
