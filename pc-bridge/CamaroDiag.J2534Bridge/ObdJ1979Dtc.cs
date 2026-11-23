@@ -31,6 +31,37 @@ internal static class ObdJ1979Dtc
         return new Code(raw, text);
     }
 
+    /// <summary>
+    /// ISO 15765-4 reassembled application data after positive service
+    /// 0x43 / 0x47 / 0x4A: first byte is the number of DTC entries and
+    /// each declared DTC is a two-byte SAE J2012 code. Optional trailing
+    /// zero-pair padding cannot become a reported fault. This is NOT the
+    /// older K-Line / J1850 response representation.
+    /// </summary>
+    internal static IReadOnlyList<Code> DecodeCanCounted(ReadOnlySpan<byte> data)
+    {
+        if (data.IsEmpty)
+            throw new InvalidDataException("Missing SAE J1979 CAN DTC count.");
+        var declared = data[0];
+        var bytes = data[1..];
+        var requiredBytes = checked(declared * 2);
+        if (bytes.Length < requiredBytes || (bytes.Length % 2) != 0)
+            throw new InvalidDataException("CAN DTC count and payload length disagree.");
+
+        var result = new List<Code>(declared);
+        for (var i = 0; i < declared; i++)
+        {
+            var code = (ushort)((bytes[i * 2] << 8) | bytes[i * 2 + 1]);
+            if (code == 0)
+                throw new InvalidDataException("Declared CAN DTC cannot be zero.");
+            result.Add(Decode(code));
+        }
+
+        if (bytes[requiredBytes..].IndexOfAnyExcept((byte)0) >= 0)
+            throw new InvalidDataException("Nonzero bytes after declared CAN DTC count.");
+        return result;
+    }
+
     internal static IReadOnlyList<Code> DecodePairs(ReadOnlySpan<byte> bytes)
     {
         if ((bytes.Length & 1) != 0)
