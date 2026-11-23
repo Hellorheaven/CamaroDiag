@@ -141,10 +141,18 @@ internal static class J1939FdCmdtSession
             }
             var eom = await ReadCmAsync(link, o, timeout, clock, token,
                 phaseLimit: TimeSpan.FromMilliseconds(750));
+            if (eom.Type == J1939FdTransportFrames.ConnectionAbort)
+                throw new IOException("J1939-22 peer aborted the receive session.");
             if (eom.Type != J1939FdTransportFrames.EndOfMessageStatus ||
                 eom.MessageLength != result.Length || eom.SegmentCount != count ||
                 eom.Aux7 != 0 || eom.Aux8 != 0)
-                throw new InvalidDataException("Mismatching J1939-22 EOM_STATUS.");
+            {
+                if (!token.IsCancellationRequested)
+                    await link.SendAsync(MakeAbort(
+                        o, fromLocal: true, reason: 7), token);
+                throw new InvalidDataException(
+                    "Mismatching J1939-22 EOM_STATUS; CMDT aborted.");
+            }
             await link.SendAsync(MakeCm(o, fromLocal: true,
                 J1939FdTransportFrames.EndOfMessageAck,
                 result.Length, count, 0xFF, 0xFF), token);
@@ -209,6 +217,16 @@ internal static class J1939FdCmdtSession
         {
             var frame = await link.ReceiveAsync(
                 Remaining(timeout, clock, phaseLimit, phaseClock), token);
+            if (Matches(frame, o.Peer, o.Local,
+                    J1939FdTransportFrames.ControlPgn))
+            {
+                var cm = J1939FdTransportFrames.DecodeControl(frame);
+                if (cm.Session == o.Session && cm.TransportedPgn == o.Pgn &&
+                    cm.Type == J1939FdTransportFrames.ConnectionAbort)
+                    throw new IOException(
+                        "J1939-22 peer aborted during FD.TP.DT transfer.");
+                continue;
+            }
             if (!Matches(frame, o.Peer, o.Local,
                 J1939FdTransportFrames.DataPgn)) continue;
             var segment = J1939FdTransportFrames.DecodeData(frame);
