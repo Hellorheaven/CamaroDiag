@@ -128,8 +128,16 @@ internal static class J1939ClassicTpSession
             var pf = (o.Pgn >> 8) & 0xFF;
             byte? directDestination = pf < 240 ?
                 broadcast ? (byte)0xFF : o.RemoteAddress : null;
-            var direct = Enumerable.Repeat((byte)0xFF, 8).ToArray();
-            payload.CopyTo(direct, 0);
+            // SAE J1939-21 PGN 59904 (Request) has precisely 3 bytes on
+            // the wire, unlike the usual 8-byte parameter groups.
+            if (o.Pgn == J1939PgnRequest.RequestPgn && payload.Length != 3)
+                throw new InvalidDataException(
+                    "J1939 Request PGN requires three bytes and DLC 3.");
+            var direct = o.Pgn == J1939PgnRequest.RequestPgn ?
+                payload.ToArray() :
+                Enumerable.Repeat((byte)0xFF, 8).ToArray();
+            if (o.Pgn != J1939PgnRequest.RequestPgn)
+                payload.CopyTo(direct, 0);
             await link.SendAsync(new(ArbitrationId(o.Pgn, o.Priority,
                 o.LocalAddress, directDestination), false, direct), token);
             return;
@@ -265,8 +273,12 @@ internal static class J1939ClassicTpSession
         {
             var frame = await link.ReceiveAsync(timeout, token);
             if (frame.IsFd || frame.Id > 0x1FFFFFFF ||
-                frame.Data is null || frame.Data.Length != 8) continue;
+                frame.Data is null ||
+                frame.Data.Length is not (3 or 8)) continue;
             var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+            if (frame.Data.Length == 3 &&
+                id.Pgn != J1939PgnRequest.RequestPgn)
+                continue;
             if (id.Source != o.RemoteAddress) continue;
             if (id.Pgn == o.Pgn ||
                 (o.AcceptAcknowledgement &&
