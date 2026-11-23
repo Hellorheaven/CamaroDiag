@@ -18,6 +18,7 @@ internal static class StandardProtocolCli
     internal const string RawIsoTpCommand = "--isotp-exchange";
     internal const string J1939Command = "--j1939-transport";
     internal const string J1939FdCommand = "--j1939-fd-multipg";
+    internal const string J1939FdBamCommand = "--j1939-fd-bam";
 
     internal static async Task<int> RunDoIpStatusAsync(string[] args)
     {
@@ -143,7 +144,8 @@ internal static class StandardProtocolCli
 
     internal sealed record J1939FdOptions(int AdapterIndex, uint Bitrate,
         uint? DataBaud, bool Brs, byte Source, byte Target, byte Priority,
-        int? Pgn, string Mode, byte[] Payload, int TimeoutMs);
+        int? Pgn, string Mode, byte[] Payload, int TimeoutMs,
+        bool Bam, byte Session);
 
     internal static J1939FdOptions ParseJ1939Fd(string[] args)
     {
@@ -155,20 +157,38 @@ internal static class StandardProtocolCli
         var brs = bool.Parse(Optional(args, "--brs") ?? "false");
         var source = checked((byte)Number(Required(args, "--source")));
         var target = checked((byte)Number(Required(args, "--target")));
-        var priority = checked((byte)Number(Optional(args, "--priority") ?? "6"));
+        var bam = args.Contains(J1939FdBamCommand,
+            StringComparer.OrdinalIgnoreCase);
+        var session = checked((byte)Number(Optional(args, "--session") ?? "0"));
+        var priority = checked((byte)Number(Optional(args, "--priority") ?? (bam ? "7" : "6")));
         var pgnText = Optional(args, "--pgn");
         int? pgn = pgnText is null ? null : checked((int)Number(pgnText));
         var mode = Required(args, "--mode").ToLowerInvariant();
         var payloadText = Optional(args, "--payload");
-        byte[] payload = payloadText is null ? [] : Hex(payloadText);
+        var payloadFile = Optional(args, "--payload-file");
+        if (payloadText is not null && payloadFile is not null)
+            throw new ArgumentException("Provide payload hex or file, never both.");
+        if (payloadFile is not null)
+        {
+            var fileBytes = new FileInfo(payloadFile).Length;
+            if (fileBytes > (bam ? J1939FdBamSession.MaximumPayload : 60))
+                throw new ArgumentException("J1939-22 payload file exceeds transport limit.");
+        }
+        byte[] payload = payloadText is not null ? Hex(payloadText) :
+            payloadFile is not null ? File.ReadAllBytes(payloadFile) : [];
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
         if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
             source >= 0xFE || target == 0xFE || source == target ||
             (mode == "receive" && target >= 0xFE) ||
             priority > 7 || mode is not ("send" or "receive") ||
-            (mode == "send" && (pgn is null || payload.Length is < 1 or > 60)) ||
-            (mode == "receive" && payloadText is not null) ||
+            (mode == "send" && (pgn is null ||
+                (bam ? payload.Length is <= 60 or > J1939FdBamSession.MaximumPayload :
+                    payload.Length is < 1 or > 60))) ||
+            (mode == "receive" && (payloadText is not null || payloadFile is not null)) ||
+            (bam && (pgn is null || session > 3 ||
+                (mode == "send" && target != 0xFF))) ||
+            (!bam && Optional(args, "--session") is not null) ||
             pgn is < 0 or > 0x3FFFF ||
             (brs && (dataBaud is null or 0)) ||
             (dataBaud.HasValue && dataBaud.Value == 0))
@@ -179,8 +199,10 @@ internal static class StandardProtocolCli
         if (mode == "send" && pgn.HasValue &&
             ((pgn.Value >> 8) & 0xFF) >= 240 && target != 0xFF)
             throw new ArgumentException("J1939-22 PDU2 contained PGN must be broadcast.");
+        if (bam && pgn.HasValue && ((pgn.Value >> 8) & 0xFF) < 240)
+            throw new ArgumentException("J1939-22 broadcast TP requires a PDU2 PGN.");
         return new(index, baud, dataBaud, brs, source, target,
-            priority, pgn, mode, payload, timeout);
+            priority, pgn, mode, payload, timeout, bam, session);
     }
 
     internal static async Task<int> RunJ1939FdAsync(string[] args)
