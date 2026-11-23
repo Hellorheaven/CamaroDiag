@@ -403,6 +403,30 @@ fun CalibrationWorkspaceScreen(
                                 color = TextMuted, fontSize = 11.sp
                             )
                         }
+                        state.fuelHistorySummary?.readings
+                            ?.filter { it.pid != Lfx2012FuelReadOnly.ETHANOL &&
+                                it.reportedCount > 0 &&
+                                it.minimum != null && it.maximum != null }
+                            ?.forEach { reading ->
+                                val label = when (reading.pid) {
+                                    Lfx2012FuelReadOnly.STFT_BANK_1 ->
+                                        R.string.flexfuel_lfx2012_pid_stft_b1
+                                    Lfx2012FuelReadOnly.LTFT_BANK_1 ->
+                                        R.string.flexfuel_lfx2012_pid_ltft_b1
+                                    Lfx2012FuelReadOnly.STFT_BANK_2 ->
+                                        R.string.flexfuel_lfx2012_pid_stft_b2
+                                    else -> R.string.flexfuel_lfx2012_pid_ltft_b2
+                                }
+                                Text(
+                                    stringResource(
+                                        R.string.flexfuel_lfx2012_history_trim_range,
+                                        stringResource(label), reading.reportedCount,
+                                        requireNotNull(reading.minimum),
+                                        requireNotNull(reading.maximum)
+                                    ),
+                                    color = TextMuted, fontSize = 11.sp
+                                )
+                            }
                         if (state.fuelHistoryCount > 0) {
                             OutlinedButton(
                                 onClick = onExportLfx2012FuelHistory,
