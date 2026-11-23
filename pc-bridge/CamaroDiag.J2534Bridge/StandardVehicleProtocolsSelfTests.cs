@@ -55,7 +55,28 @@ internal static class StandardVehicleProtocolsSelfTests
             Check(kwp.Length == (size <= 63 ? 3 : 4) + size + 1 &&
                 kwp[^1] == (byte)(kwp[..^1].Sum(x => (int)x) & 0xFF),
                 "KWP2000 long/short physical frame and checksum.");
+            Check(StandardVehicleProtocols.ParseKwpPhysicalFrame(
+                kwp, 0x33, 0xF1).SequenceEqual(
+                    Enumerable.Repeat((byte)0x22, size)),
+                "KWP physical frame round-trip 1/63/64/255 bytes.");
+            var wrongChecksum = kwp.ToArray();
+            wrongChecksum[^1] ^= 0x80;
+            Reject<InvalidDataException>(() =>
+                StandardVehicleProtocols.ParseKwpPhysicalFrame(
+                    wrongChecksum, 0x33, 0xF1),
+                "KWP checksum mismatch must reject frame.");
+            Reject<InvalidDataException>(() =>
+                StandardVehicleProtocols.ParseKwpPhysicalFrame(
+                    kwp, 0x34, 0xF1),
+                "KWP wrong diagnostic target rejected.");
         }
+        var kwpLength = StandardVehicleProtocols.BuildKwpPhysicalFrame(
+            0x33, 0xF1, [0x22, 0xF1, 0x90]);
+        Reject<InvalidDataException>(() =>
+            StandardVehicleProtocols.ParseKwpPhysicalFrame(
+                kwpLength[..^1], 0x33, 0xF1),
+            "Truncated KWP physical frame rejected.");
+
         Reject<ArgumentException>(() =>
             StandardVehicleProtocols.BuildKwpPhysicalFrame(0x33, 0x33, [0x22]),
             "KWP refuses equal source and target.");
