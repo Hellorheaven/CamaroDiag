@@ -205,8 +205,22 @@ internal static class J1939FdCmdtSession
         var phaseClock = System.Diagnostics.Stopwatch.StartNew();
         for (var tries = 0; tries < 128; tries++)
         {
-            var frame = await link.ReceiveAsync(
-                Remaining(timeout, clock, phaseLimit, phaseClock), token);
+            IsoTpCanFdSession.CanFrame frame;
+            try
+            {
+                frame = await link.ReceiveAsync(
+                    Remaining(timeout, clock, phaseLimit, phaseClock), token);
+            }
+            catch (TimeoutException) when (phaseLimit is null &&
+                timeout - clock.Elapsed > TimeSpan.Zero &&
+                !token.IsCancellationRequested)
+            {
+                // The vendor's per-call 30-second cap does not mean
+                // a longer, user-approved RTS wait has expired.
+                if (clock.Elapsed < TimeSpan.FromMilliseconds(100))
+                    await Task.Delay(25, token);
+                continue;
+            }
             if (!Matches(frame, o.Peer, o.Local,
                 J1939FdTransportFrames.ControlPgn)) continue;
             var cm = J1939FdTransportFrames.DecodeControl(frame);
