@@ -431,7 +431,20 @@ internal static class StandardProtocolCli
         var host = Required(args, "--host");
         var tester = Address(Required(args, "--tester"));
         var ecu = Address(Required(args, "--ecu"));
-        var bytes = Hex(Required(args, "--payload"));
+        var hexPayload = Optional(args, "--payload");
+        var obdDid = Optional(args, "--obd-did");
+        var obdDtcMask = Optional(args, "--obd-dtc-mask");
+        if ((hexPayload is null ? 0 : 1) + (obdDid is null ? 0 : 1) +
+            (obdDtcMask is null ? 0 : 1) != 1)
+            throw new ArgumentException(
+                "Supply exactly one of --payload, --obd-did or --obd-dtc-mask.");
+        var bytes = obdDid is not null ? ObdOnUdsServices.ReadEmissionsData(
+                checked((ushort)uint.Parse(
+                    obdDid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
+                        obdDid[2..] : obdDid,
+                    NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
+            obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
+                checked((byte)Number(obdDtcMask))) : Hex(hexPayload!);
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
         var useTls = bool.Parse(Optional(args, "--tls") ?? "false");
