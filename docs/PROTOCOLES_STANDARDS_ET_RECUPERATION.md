@@ -239,3 +239,15 @@ Toutes les fonctions ci-dessus exigent encore **compilation Windows, auto-tests 
 - `--groups '0xF004:010203;0xFECA:C7FF'` compose plusieurs C-PG en un seul paquet FEFF ou FBFF, avec vérification de la taille totale CAN-FD avant l'accès au pilote ; la forme `--pgn` / `--payload` reste disponible pour un seul C-PG. Le hash de confirmation porte sur les octets effectivement transmis dans la charge utile CAN-FD, pas uniquement sur un élément du groupe.
 - Les réassemblages FD.TP BAM et CMDT contrôlent désormais aussi le remplissage `0xFF` après le dernier octet utile annoncé, sans supprimer des octets légitimes `0xFF` présents dans les données. En CMDT, un remplissage incorrect provoque un Abort au lieu d'un EOM_ACK.
 - Codage et tests hors matériel ajoutés, mais **pas de preuve de conformité intégrale ni de qualification physique**. La mise en circulation d'un émetteur J1939-81 suppose une identité et une adresse source authentiques et autorisées.
+
+
+### SAE J1979-2 / WWH-OBD — données étendues et diagnostic réglementé
+
+Les commandes ISO-TP et DoIP `--obd-did` prennent en charge les familles de DIDs législatives **F400–F5FF** (données instantanées), **F600–F6FF** (surveillance historique, non obligatoirement présente), **F700–F7FF** (autres données OBD) et **F800–F8FF** (informations véhicule, dont `F810` pour l'identification du protocole). La conversion physique de chaque octet n'est pas inventée : elle dépend de SAE J1979DA et de la réponse du véhicule. Les DIDs génériques non législatifs restent accessibles par le service UDS brut `0x22`.
+
+DTC réglementés, en plus du service générique `19 02` :
+- `--obd-wwh-status 0x08 --obd-wwh-severity 0xFF` construit la requête WWH-OBD `19 42 33 FF 08` pour les DTC d'émissions (groupe fonctionnel 0x33), avec filtres de sévérité/statut explicites. Le décodage de `59 42` préserve le masque de statut, le masque de sévérité, le format DTC, la sévérité et le statut de chaque code 24 bits.
+- `--obd-wwh-permanent` construit `19 55 33` pour les codes permanents. Le décodage `59 55` conserve format et statut sans inventer de sévérité absente de ce format.
+- `--obd-readiness-group 0x06` construit `19 56 33 06` et décode le résultat, en vérifiant le groupe de réponse et les enregistrements DTC complets. La valeur du groupe est un exemple : **son sens et sa disponibilité doivent être vérifiés dans la table normative et sur l'ECU**.
+
+Ces sélecteurs sont mutuellement exclusifs des autres sources de requêtes ; le mode ISO-TP `receive` les refuse. Le contrôle UDS de la réponse compare maintenant également l'identifiant du groupe fonctionnel WWH 0x33 et celui du readiness group 0x56. **Tests unitaires ajoutés mais non exécutés sur le dernier HEAD**, aucune qualification fonctionnelle OBDonUDS du véhicule.
