@@ -102,4 +102,38 @@ class Lfx2012FuelReadOnlyTest {
             survey, pids.associateWith { intArrayOf(0) }, 0L
         ) }.isFailure)
     }
+    @Test fun missingPhysicalReplyCannotBePromotedFromUntrustedDecodedBytes() {
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.ELM,
+            pids.toSet(),
+            pids.associateWith { pid -> if (pid == 0x52) null else "reported" }
+        )
+        val decoded = pids.associateWith { intArrayOf(128) }
+        val snapshot = Lfx2012FuelReadOnly.inspect(survey, decoded, 1L)
+        assertNull(snapshot.ethanolPercent)
+        assertEquals(
+            Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE,
+            snapshot.reading(Lfx2012FuelReadOnly.ETHANOL).availability
+        )
+        assertEquals(
+            Lfx2012FuelReadOnly.Availability.REPORTED,
+            snapshot.reading(Lfx2012FuelReadOnly.STFT_BANK_1).availability
+        )
+    }
+
+    @Test fun blankPhysicalReplyIsNotAnObservedPidValue() {
+        val survey = Lfx2012FuelReadOnly.Survey(
+            Lfx2012FuelReadOnly.Source.J2534,
+            pids.toSet(),
+            pids.associateWith { pid -> if (pid == 0x52) "   " else "reported" }
+        )
+        val raw = pids.associateWith { intArrayOf(255) }
+        val snapshot = Lfx2012FuelReadOnly.inspect(survey, raw, 1L)
+        assertNull(snapshot.ethanolPercent)
+        assertEquals(
+            Lfx2012FuelReadOnly.Availability.NO_VALID_RESPONSE,
+            snapshot.reading(Lfx2012FuelReadOnly.ETHANOL).availability
+        )
+    }
+
 }
