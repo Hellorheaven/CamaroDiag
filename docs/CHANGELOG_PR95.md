@@ -220,3 +220,7 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Correctif de réception strictement passive J2534 : `--mode receive` refuse désormais `--kline-init`, car une initialisation 5 bauds/rapide émet physiquement sur le bus. Test de garde ajouté ; non exécuté.
 
 - Correction de conformité ISO-TP : l'adressage mixte N_AE n'est pas limité aux CAN 29 bits ; la CLI autorise désormais aussi les identifiants 11 bits. Tests de mode 11 bits et refus de mélange avec l'adressage logique étendu ajoutés, non exécutés.
+
+## DoIP — états d'entité et d'alimentation (23/11/2026)
+- Ajout des requêtes UDP ISO 13400 `0x4001/0x4002` (sockets, type d'entité et taille maximale) et `0x4003/0x4004` (état d'alimentation diagnostique), par la CLI `--doip-status`.
+- Tests de décodage normal, optionnel et malformé ajoutés, non exécutés. Aucun diagnostic actif ni autorisation de flash impliqués.
