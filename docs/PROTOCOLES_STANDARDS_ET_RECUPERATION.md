@@ -310,3 +310,20 @@ Sur la branche unique de la PR #95, des codecs **logiciels** supplémentaires so
 - Tests offline ajoutés et enregistrés dans `BridgeSelfTests`. **Non exécutés dans cette tranche**, tant que le chantier protocole n'est pas clos ; aucun build vert, qualification matérielle, conformité exhaustive J1979 ou nouveau transport physique n'est revendiqué.
 
 **À développer** : construction complète des requêtes par service et version normative, profil des PID/InfoType et métadonnées J1979DA, décodage des réponses distinctes des services 03/07/0A par transport, recherche multi-ECU et gestion des timeouts, raccordement aux liens SAE J1850/K-Line/CAN et à l'interface, puis tests interopérabilité et matériel. Les codecs n'accordent aucune capacité de programmation OEM.
+
+
+## SAE J1979 : découverte physique des PID (lot protocole 23/11/2026)
+
+La commande Windows `--j1979-pids` utilise un canal **CAN brut SAE J2534** avec un moteur ISO-TP (sans double segmentation). Elle demande explicitement l'adaptateur, le débit et une paire physique TX/RX. Le moteur envoie successivement les pages 00, 20, 40, ... E0 des PID annoncés, sur **un ECU**; un échec de réponse n'est pas converti en liste vide. Les requêtes sont uniquement celles des modes 01 et 02, et un index de freeze frame est exigé pour le mode 02 lorsqu'il diffère de zéro.
+
+Exemple de syntaxe, adresses illustratives (pas de validation sur véhicule) :
+
+```text
+CamaroDiag.J2534Bridge.exe --j1979-pids --adapter-index 0 --tx-id 7E0 --rx-id 7E8 --baud 500000 --j1979-mode 1 --timeout-ms 5000
+CamaroDiag.J2534Bridge.exe --j1979-pids --adapter-index 0 --tx-id 7E0 --rx-id 7E8 --baud 500000 --j1979-mode 2 --freeze-frame 0
+CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-id 7E8 --baud 500000 --fd false --payload 0902 --j1979-decode true
+```
+
+`--j1979-decode true` interprète le message applicatif revenu du lien ISO-TP pour les pages de disponibilité PID, le VIN Mode 09 et les paires DTC classiques 03/07/0A, et laisse les valeurs sans définition normative de PID à l'état **brut**. Elle refuse les erreurs de corrélation, et une réponse négative reste négative. Pour les autres services 01..0A, elle ne prétend pas fournir les échelles J1979DA ou vérifier l'effet d'une commande. La commande générique ISO-TP garde la double confirmation existante avant toute requête sortante, y compris mutatrice.
+
+**Limites** : aucune découverte multi-ECU fonctionnelle ni J1850/K-Line dans cette nouvelle commande, aucune preuve de qualification VCI/ECU, aucune intégration UI Android. La couverture des modes J1979 ainsi que J1979-2 reste incomplète ; les autotests associés sont écrits mais non exécutés lors de ce lot, faute de campagne de clôture.
