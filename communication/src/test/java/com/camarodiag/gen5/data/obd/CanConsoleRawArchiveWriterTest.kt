@@ -119,4 +119,27 @@ class CanConsoleRawArchiveWriterTest {
         assertEquals(false, archive.isComplete)
     }
 
+    @Test fun simultaneousFlushAndCloseFailuresRetainBothStorageCauses() {
+        var closeCalls = 0
+        val sink = object : Writer() {
+            override fun write(cbuf: CharArray, off: Int, len: Int) = Unit
+            override fun flush(): Unit = throw IOException("flush refused")
+            override fun close() {
+                closeCalls++
+                throw IOException("close refused")
+            }
+        }
+        val archive = CanConsoleRawArchiveWriter(sink)
+        archive.append("7E8 01 41")
+        val error = assertThrows(CanCaptureArchiveWriteException::class.java) {
+            archive.close()
+        }
+        assertEquals("flush refused", error.cause?.message)
+        assertEquals(1, error.cause?.suppressed?.size)
+        assertEquals("close refused", error.cause?.suppressed?.single()?.message)
+        assertEquals(1, closeCalls)
+        assertEquals(true, archive.hasFailed)
+        assertEquals(false, archive.isComplete)
+    }
+
 }
