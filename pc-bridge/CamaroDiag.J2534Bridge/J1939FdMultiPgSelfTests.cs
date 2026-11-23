@@ -44,6 +44,25 @@ internal static class J1939FdMultiPgSelfTests
             decoded.SourceAddress == 0xF1 && decoded.DestinationAddress == 0xFF,
             "FEFF Multi-PG single group round-trip.");
 
+        var fbff = J1939FdMultiPg.EncodeFastBroadcast(0x80,
+            [Group(0xF004, 0x11, 0x22, 0x33),
+             Group(0xFECA, 0xC7, 0xFF)]);
+        var fbffRx = J1939FdMultiPg.Decode(fbff);
+        Check(fbff.IsFd && fbff.Id == 0x80 &&
+            fbffRx.FastBroadcast && fbffRx.Priority == 0 &&
+            fbffRx.SourceAddress == 0x80 &&
+            fbffRx.DestinationAddress == 0xFF &&
+            fbffRx.Groups.Count == 2 &&
+            fbffRx.Groups[1].Pgn == 0xFECA,
+            "FBFF uses 11-bit source-address CAN FD ID and global C-PGs.");
+        Reject<ArgumentException>(() =>
+            J1939FdMultiPg.EncodeFastBroadcast(0xFE,
+                [Group(0xF004, 0x11)]),
+            "FBFF cannot use Cannot Claim Address source for data.");
+        Reject<InvalidDataException>(() =>
+            J1939FdMultiPg.Decode(new(0x123, true, fbff.Data)),
+            "FBFF rejects source address outside 0x00-0xFD.");
+
         var packed = J1939FdMultiPg.Encode(0xF1, 0xFF, 6,
             [Group(0xF004, 1, 2, 3),
              Group(0xFECA, 0xC7, 0xFF, 0x00, 0x00)]);
