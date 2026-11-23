@@ -57,6 +57,17 @@ internal static class NativeE39QualifiedBenchCli
             Console.WriteLine("Target SHA-256: " + targetHash);
             Console.WriteLine("Journal: " + journalPath);
             Console.WriteLine("No automatic retry, ECU reset or power cycle is performed.");
+            // Explicit two-step operator consent before creating a write journal,
+            // opening a device or sending any programming command.
+            // Redirected stdin cannot acknowledge a real local warning.
+            if (Console.IsInputRedirected ||
+                !EcuWriteOperatorConsent.AskBeforeProgramming(
+                    Console.ReadLine, Console.WriteLine,
+                    qualified.Family + " / VIN " + q.ExpectedVin + " / cible " + targetHash))
+            {
+                Console.WriteLine("NON ou absence de confirmation : aucune écriture ECU.");
+                return 7;
+            }
             cancel.Token.ThrowIfCancellationRequested();
             // Separate immutable metadata and crash-resilient phase journal.
             // Both must be created and flushed before any ECU is opened.

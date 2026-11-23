@@ -965,4 +965,12 @@
     <string name="can_console_negative_ecu_response">Le calculateur sélectionné a renvoyé une réponse diagnostique négative ; aucune lecture réussie n’a été confirmée.</string>
     <string name="can_console_oversized_line">Lignes de surveillance CAN malformées ignorées : %1$d. La capture brute d’origine est conservée.</string>
     <string name="can_console_response_timeout">Délai dépassé pour la réponse diagnostique CAN ; les trames déjà reçues restent dans la console.</string>
+    <string name="ecu_write_warning_title">Avertissement avant écriture ECU</string>
+    <string name="ecu_write_warning_message">Une commande va être transmise à un calculateur ou à un élément connecté. Elle peut provoquer une écriture, une modification ou un effacement, et endommager ou rendre cet élément inutilisable. CamaroDiag décline toute responsabilité pour les conséquences de cette opération, dans les limites prévues par la loi. Appuyez sur OK pour accéder à la confirmation.</string>
+    <string name="ecu_write_confirm_title">Confirmer l’écriture sur l’élément</string>
+    <string name="ecu_write_confirm_message">Confirmez-vous l’envoi de cette commande pouvant écrire sur l’élément ciblé, en connaissance des risques ? Si vous choisissez Non, aucune commande ne sera envoyée.</string>
+    <string name="ecu_write_ok">OK</string>
+    <string name="ecu_write_yes">Oui</string>
+    <string name="ecu_write_no">Non</string>
+    <string name="ecu_write_cancel">Annuler</string>
 </resources>

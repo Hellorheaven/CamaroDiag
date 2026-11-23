@@ -59,6 +59,7 @@ import com.camarodiag.gen5.data.obd.ParsedCanConsoleRecord
 import com.camarodiag.gen5.data.obd.CanTraceFilter
 import com.camarodiag.gen5.data.obd.RawCanFrameParser
 import com.camarodiag.gen5.data.obd.SafeRawCanTransmitPolicy
+import com.camarodiag.gen5.data.obd.EcuWriteConsentFlow
 import com.camarodiag.gen5.data.obd.CanTraceDirection
 import com.camarodiag.gen5.data.obd.filterCanTrace
 import com.camarodiag.gen5.data.obd.UdsNegativeResponse
@@ -1701,6 +1702,7 @@ fun CanSnifferScreen(
     var monitorCan29Bit by remember { mutableStateOf(false) }
     var monitorFormatMenuExpanded by remember { mutableStateOf(false) }
     var pendingRawFrameInput by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    var writeConsentStep by remember { mutableStateOf(EcuWriteConsentFlow.Step.WARNING) }
     var frameSearch by remember { mutableStateOf("") }
     var canIdFilter by remember { mutableStateOf("") }
     var dataPrefixFilter by remember { mutableStateOf("") }
@@ -1712,6 +1714,7 @@ fun CanSnifferScreen(
     // A vehicle or adapter change invalidates even an already opened TX dialog.
     LaunchedEffect(state.consoleContextGeneration) {
         pendingRawFrameInput = null
+        writeConsentStep = EcuWriteConsentFlow.Step.WARNING
     }
     // The menu describes CAN IDs seen in this session, not assumed ECU identities.
     val observedCanIds = remember(state.observedCanIds, report) {
@@ -2000,6 +2003,7 @@ fun CanSnifferScreen(
                     Button(
                         onClick = {
                             if (RawCanFrameParser.parse(requestInput) != null) {
+                                writeConsentStep = EcuWriteConsentFlow.Step.WARNING
                                 pendingRawFrameInput =
                                     requestInput.trim() to state.consoleContextGeneration
                             } else {
@@ -2319,26 +2323,61 @@ fun CanSnifferScreen(
             busy = state.isCapturing || state.isSendingRequest
         )
         AlertDialog(
-            onDismissRequest = { pendingRawFrameInput = null },
-            title = { Text(stringResource(R.string.can_console_raw_tx_confirm_title)) },
+            onDismissRequest = {
+                pendingRawFrameInput = null
+                writeConsentStep = EcuWriteConsentFlow.Step.WARNING
+            },
+            title = {
+                Text(stringResource(
+                    if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                        R.string.ecu_write_warning_title
+                    else R.string.ecu_write_confirm_title
+                ))
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(frame, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.can_console_raw_tx_confirm_message))
+                    Text(stringResource(
+                        if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_warning_message
+                        else R.string.ecu_write_confirm_message
+                    ))
                 }
             },
             confirmButton = {
                 TextButton(
                     enabled = canConfirm,
                     onClick = {
-                        if (canConfirm) onConfirmRawFrame(frame, pendingEpoch)
-                        pendingRawFrameInput = null
+                        if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING) {
+                            // OK only acknowledges the risk notice: it NEVER sends.
+                            writeConsentStep = EcuWriteConsentFlow.afterWarningOk(writeConsentStep)
+                        } else {
+                            if (EcuWriteConsentFlow.permitsWrite(
+                                    writeConsentStep, confirmedYes = true,
+                                    sameConnection = canConfirm
+                                )) onConfirmRawFrame(frame, pendingEpoch)
+                            pendingRawFrameInput = null
+                            writeConsentStep = EcuWriteConsentFlow.Step.WARNING
+                        }
                     }
-                ) { Text(stringResource(android.R.string.ok)) }
+                ) {
+                    Text(stringResource(
+                        if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_ok
+                        else R.string.ecu_write_yes
+                    ))
+                }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRawFrameInput = null }) {
-                    Text(stringResource(android.R.string.cancel))
+                TextButton(onClick = {
+                    pendingRawFrameInput = null
+                    writeConsentStep = EcuWriteConsentFlow.Step.WARNING
+                }) {
+                    Text(stringResource(
+                        if (writeConsentStep == EcuWriteConsentFlow.Step.WARNING)
+                            R.string.ecu_write_cancel
+                        else R.string.ecu_write_no
+                    ))
                 }
             }
         )

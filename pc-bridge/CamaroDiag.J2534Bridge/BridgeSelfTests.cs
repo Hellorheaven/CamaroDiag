@@ -59,6 +59,23 @@ internal static class BridgeSelfTests
         Assert(!J2534Device.NeedsFreshReceiveQueue(false, false),
             "Standard read-only J2534 console does not require the memory RX policy");
 
+        // The first OK never authorizes a write; a second independent OUI
+        // is mandatory for local programming. No, empty input and EOF cancel.
+        bool Consent(params string?[] answers)
+        {
+            var pending = new Queue<string?>(answers);
+            var messages = new List<string>();
+            return EcuWriteOperatorConsent.AskBeforeProgramming(
+                () => pending.Count > 0 ? pending.Dequeue() : null,
+                messages.Add, "ECU test");
+        }
+        Assert(!Consent(), "Missing warning acknowledgement cannot write");
+        Assert(!Consent("OUI", "OUI"), "Direct YES without initial OK cannot write");
+        Assert(!Consent("OK"), "OK without separate YES cannot write");
+        Assert(!Consent("OK", "NON"), "Explicit NO always cancels the ECU write");
+        Assert(!Consent("OK", null), "Closing the final confirmation cancels");
+        Assert(Consent("OK", "OUI"), "Warning OK followed by explicit YES approves one write");
+
         Assert(NativeEcuWriteAvailability.PhysicalEcuProgrammingEnabled,
             "Dedicated local E39 bench hardware test route is enabled");
         NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();

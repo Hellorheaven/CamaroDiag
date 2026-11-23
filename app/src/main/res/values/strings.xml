@@ -962,4 +962,12 @@
     <string name="can_console_negative_ecu_response">The selected ECU returned a negative diagnostic response; no successful read was confirmed.</string>
     <string name="can_console_oversized_line">Malformed CAN monitor lines discarded: %1$d. The original raw capture is retained.</string>
     <string name="can_console_response_timeout">The CAN diagnostic response timed out; the frames already received remain in the console.</string>
+    <string name="ecu_write_warning_title">ECU write warning</string>
+    <string name="ecu_write_warning_message">A command is about to be sent to an ECU or connected device. It may write, modify or erase data, potentially damaging or disabling the device. CamaroDiag disclaims responsibility for the consequences of this operation to the extent permitted by law. Select OK to proceed to the separate confirmation.</string>
+    <string name="ecu_write_confirm_title">Confirm ECU/device write</string>
+    <string name="ecu_write_confirm_message">Do you confirm sending this command, knowing it may write to the selected device and carries risks? Choosing No sends nothing.</string>
+    <string name="ecu_write_ok">OK</string>
+    <string name="ecu_write_yes">Yes</string>
+    <string name="ecu_write_no">No</string>
+    <string name="ecu_write_cancel">Cancel</string>
 </resources>

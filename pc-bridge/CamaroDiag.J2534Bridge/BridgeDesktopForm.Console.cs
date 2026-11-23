@@ -139,6 +139,38 @@ internal sealed partial class BridgeDesktopForm
         });
     }
 
+    /// <summary>
+    /// Two distinct user actions before an arbitrary CAN/UDS transmission that
+    /// could modify an ECU. The warning OK does NOT transmit. No/cancel/close
+    /// returns before any J2534 driver call. A changed device invalidates it.
+    /// </summary>
+    private bool ConfirmPotentialEcuWrite(J2534Device device, string payloadHex)
+    {
+        var warning = MessageBox.Show(this,
+            "Une commande va être transmise à un calculateur ou à un élément connecté. " +
+            "Elle peut entraîner une écriture, une modification ou un effacement, " +
+            "et rendre cet élément inutilisable.\n\n" +
+            "CamaroDiag décline toute responsabilité pour les conséquences de " +
+            "cette opération, dans les limites prévues par la loi.\n\n" +
+            "Cliquez sur OK pour accéder à la confirmation.\nCommande : " + payloadHex,
+            "Avertissement avant écriture ECU",
+            MessageBoxButtons.OKCancel, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+        if (warning != DialogResult.OK || !ReferenceEquals(consoleDevice, device))
+            return false;
+
+        var confirmation = MessageBox.Show(this,
+            "Confirmez-vous l'envoi de cette commande pouvant écrire sur " +
+            "l'élément ciblé, en connaissance des risques ?\n\n" +
+            "Commande : " + payloadHex + "\n\n" +
+            "Non = aucune commande ne sera envoyée.",
+            "Confirmer l'écriture ECU",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button2);
+        return confirmation == DialogResult.Yes &&
+            ReferenceEquals(consoleDevice, device);
+    }
+
     private async Task ExchangeConsoleAsync(bool noResponse)
     {
         if (busy) return;
@@ -154,6 +186,17 @@ internal sealed partial class BridgeDesktopForm
             payload = Convert.FromHexString(compact);
         }
         catch (ArgumentException ex) { ShowError(ex.Message); return; }
+
+        // This console deliberately accepts OEM-specific services. Because
+        // an unknown payload can mutate an ECU, obtain two-step consent
+        // before ANY raw emission rather than guessing a safe SID list.
+        var confirmedPayload = Convert.ToHexString(payload);
+        if (!ConfirmPotentialEcuWrite(device, confirmedPayload))
+        {
+            ConsoleLine("SYSTEM", "Envoi annulé : aucune commande transmise.",
+                Color.DarkSlateGray);
+            return;
+        }
 
         await RunBusyAsync(async () =>
         {
