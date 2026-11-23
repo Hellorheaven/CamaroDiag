@@ -207,3 +207,7 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Tests ajoutés : chronologie sur 600/620 événements, séparation des sessions, invalidation après nouvelle écriture, erreurs disque/fermeture et neutralisation de formule.
 - Commits de cette suite : `5b0d909`, `e26931f`, `bd07e6d`, `a2299dd`, `0455d68`, `ca997eb`, `ac5dcc4`, `56bf77b`, `01ece43`, `a70c250`, `347e6e5`, `0cbbb66`.
 - **Validation à réaliser** : aucune campagne CI lancée pour ces commits ; l'exact HEAD est susceptible de changer avec l'autre chantier protocoles. Exiger une campagne C1 Android ciblée sur le code figé et ensuite la validation C8 au HEAD final. Les acquittements TX sont journalisés à l'instant de leur émission (état initial pending) ; la suite RX/SYSTEM donne leur résultat, sans inventer de réponse ECU. Aucun essai matériel.
+
+## J1939 — requête standard de PGN (23/11/2026)
+- Codec PGN Request 0xEA00, sérialisation little-endian sur trois octets ; commande `--mode request` pour transmettre la requête dirigée sous double confirmation, puis attendre le PGN demandé. Tests codec/CLI ajoutés, non exécutés.
+- Réponses ACK/NACK PGN 0xE800 et revendication d'adresse physique J1939-81 restent non traitées/qualifiées.
