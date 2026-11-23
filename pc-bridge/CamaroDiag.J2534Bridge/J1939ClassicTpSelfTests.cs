@@ -319,6 +319,33 @@ internal static class J1939ClassicTpSelfTests
             "Cancelled transfer cannot send any PGN.");
         Check(noTx.Outgoing.Count == 0, "No J1939 frames sent after cancellation.");
 
+        const ulong name = 0x12345UL | (0x345UL << 21) |
+            (2UL << 32) | (3UL << 35) | (0x10UL << 40) |
+            (4UL << 49) | (1UL << 56) | (2UL << 60) | (1UL << 63);
+        var addressFrameId = J1939ClassicTpSession.ArbitrationId(
+            J1939AddressClaim.AddressClaimPgn, 6, 0x80, 0xFF);
+        var claim = J1939AddressClaim.Decode(addressFrameId,
+            BitConverter.GetBytes(name));
+        Check(claim.SourceAddress == 0x80 && claim.Name == name &&
+            claim.IdentityNumber == 0x12345 &&
+            claim.ManufacturerCode == 0x345 &&
+            claim.EcuInstance == 2 && claim.FunctionInstance == 3 &&
+            claim.Function == 0x10 && claim.VehicleSystem == 4 &&
+            claim.VehicleSystemInstance == 1 && claim.IndustryGroup == 2 &&
+            claim.ArbitraryAddressCapable,
+            "J1939-81 NAME bit fields decoded from broadcast address claim.");
+        Reject<InvalidDataException>(() => J1939AddressClaim.Decode(
+            addressFrameId, [1, 2, 3]),
+            "Short J1939 address claim is rejected.");
+        Reject<InvalidDataException>(() => J1939AddressClaim.Decode(
+            J1939ClassicTpSession.ArbitrationId(
+                J1939AddressClaim.AddressClaimPgn, 6, 0x80, 0x10),
+            BitConverter.GetBytes(name)),
+            "Unicast J1939 address claim is not a broadcast identity.");
+        Reject<InvalidDataException>(() => J1939AddressClaim.Decode(
+            addressFrameId, Enumerable.Repeat((byte)0xFF, 8).ToArray()),
+            "Unspecified all-FF node NAME is rejected.");
+
         var dm1 = J1939DmDiagnostics.Decode(J1939DmDiagnostics.Dm1Pgn,
             [0xC7, 0xFF, 0x6E, 0x00, 0x05, 0x03, 0xFF, 0xFF]);
         Check(dm1.LampStatus == 0xC7 && dm1.LampFlashStatus == 0xFF &&
