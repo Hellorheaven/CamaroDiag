@@ -1,5 +1,10 @@
 # PR #95 — Évolutions utilisateur
 
+## OBD-II SAE J1979 — correction des données CAN (23 novembre 2026)
+- Les réponses des codes défaut CAN comptabilisent correctement les codes annoncés, sans confondre le nombre de défauts avec un DTC.
+- Ajout de l'affichage des identifiants de calibration et numéros CVN, ainsi que de la distinction entre OBD-II classique et OBDonUDS.
+- Tests logiciels ajoutés, sans qualification matérielle ni campagne finale sur ces modifications.
+
 - Console CAN/OBD avec historique émission/réception et commandes explicites.
 - Amélioration des échanges entre application Android et pont J2534 Windows.
 - Retrait des restrictions de protocole ajoutées par CamaroDiag lorsqu'elles ne sont pas exigées par l'ECU.
