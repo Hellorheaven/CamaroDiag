@@ -237,6 +237,7 @@ fun CalibrationWorkspaceScreen(
     canReadEnhancedUds: Boolean,
     onReadIdentification: () -> Unit,
     onReadGmlanIdentification: () -> Unit,
+    onReadLfx2012FuelSnapshot: () -> Unit,
     onExportIdentification: () -> Unit,
     onCreateVehicleFromEcuVin: (String) -> Unit,
     onSyncVehicleVinFromEcu: (String) -> Unit,
@@ -370,6 +371,71 @@ fun CalibrationWorkspaceScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.flexfuel_lfx2012_title),
                             color = CamaroAmber, fontWeight = FontWeight.Bold)
+
+                        // Independent SAE fuel survey, never an ECU flash/
+                        // FlexFuel activation command. Values are only from
+                        // the physical ELM/STN or J2534 channel selected.
+                        OutlinedButton(
+                            onClick = onReadLfx2012FuelSnapshot,
+                            enabled = (isConnected || state.isJ2534BridgeConnected) &&
+                                !state.isFuelSnapshotReading
+                        ) {
+                            Text(stringResource(R.string.flexfuel_lfx2012_read_fuel))
+                        }
+                        if (state.isFuelSnapshotReading) {
+                            CircularProgressIndicator()
+                            Text(stringResource(R.string.flexfuel_lfx2012_reading_fuel),
+                                color = TextMuted, fontSize = 11.sp)
+                        }
+                        val fuelSnapshot = state.fuelReadOnlySnapshot
+                        if (fuelSnapshot != null) {
+                            val source = if (fuelSnapshot.source == Lfx2012FuelReadOnly.Source.J2534)
+                                stringResource(R.string.flexfuel_lfx2012_source_j2534)
+                            else stringResource(R.string.flexfuel_lfx2012_source_elm)
+                            Text(
+                                stringResource(
+                                    R.string.flexfuel_lfx2012_observed_source, source,
+                                    java.text.DateFormat.getDateTimeInstance()
+                                        .format(java.util.Date(fuelSnapshot.observedAtUtcMillis))
+                                ),
+                                color = TextMuted, fontSize = 11.sp
+                            )
+                            fuelSnapshot.readings.forEach { reading ->
+                                val label = when (reading.pid) {
+                                    Lfx2012FuelReadOnly.ETHANOL ->
+                                        R.string.flexfuel_lfx2012_pid_ethanol
+                                    Lfx2012FuelReadOnly.STFT_BANK_1 ->
+                                        R.string.flexfuel_lfx2012_pid_stft_b1
+                                    Lfx2012FuelReadOnly.LTFT_BANK_1 ->
+                                        R.string.flexfuel_lfx2012_pid_ltft_b1
+                                    Lfx2012FuelReadOnly.STFT_BANK_2 ->
+                                        R.string.flexfuel_lfx2012_pid_stft_b2
+                                    else -> R.string.flexfuel_lfx2012_pid_ltft_b2
+                                }
+                                val value = reading.percent
+                                val reported = when {
+                                    reading.availability == Lfx2012FuelReadOnly.Availability.REPORTED &&
+                                        value != null ->
+                                        stringResource(R.string.flexfuel_lfx2012_reported_percent, value)
+                                    reading.availability == Lfx2012FuelReadOnly.Availability.UNSUPPORTED ->
+                                        stringResource(R.string.flexfuel_lfx2012_pid_unsupported)
+                                    else -> stringResource(R.string.flexfuel_lfx2012_pid_no_response)
+                                }
+                                Text(
+                                    stringResource(label) + ": " + reported,
+                                    color = TextPrimary, fontSize = 12.sp
+                                )
+                            }
+                            Text(stringResource(R.string.flexfuel_lfx2012_observation_warning),
+                                color = CamaroAmber, fontSize = 11.sp)
+                        }
+                        if (state.fuelSnapshotError.isNotBlank()) {
+                            Text(
+                                stringResource(R.string.flexfuel_lfx2012_fuel_failed) +
+                                    " " + state.fuelSnapshotError,
+                                color = WarnRed, fontSize = 11.sp
+                            )
+                        }
                         Lfx2012ControllerReferences.servicePartGroups.forEach { group ->
                             Text(stringResource(R.string.flexfuel_lfx2012_parts,
                                 Lfx2012ControllerReferences.controllerFamily, group.servicePart,
