@@ -206,6 +206,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // A connection started under another Firebase account must never
         // complete after the garage and session ownership have changed.
         connectionAttemptGeneration++
+        invalidateFuelHistoryForConnectionChange()
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
@@ -432,6 +433,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (error is ObdSupersededSessionException) return
         if (!ObdTransportFailurePolicy.isConnectionLoss(error)) return
         connectionAttemptGeneration++
+        invalidateFuelHistoryForConnectionChange()
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
         connectionAttemptJob?.cancel()
@@ -876,6 +878,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var fuelSnapshotGeneration = 0L
     private val fuelHistory = Lfx2012FuelHistoryWindow()
 
+    /** Drop observations immediately when the authenticated/transport context changes. */
+    private fun invalidateFuelHistoryForConnectionChange() {
+        fuelSnapshotGeneration++
+        fuelHistory.clear()
+        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+            isFuelSnapshotReading = false,
+            fuelReadOnlySnapshot = null,
+            fuelHistoryCount = 0,
+            fuelHistorySummary = null,
+            fuelSnapshotError = ""
+        )
+    }
+
 
     private fun clearVehicleEvidence(preserveCanConsole: Boolean = false) {
         calibrationIdentityGeneration++
@@ -1110,6 +1125,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         if (!requirePremiumLicense()) return
         val attempt = ++connectionAttemptGeneration
+        invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
@@ -1201,6 +1217,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun disconnectJ2534Bridge() {
         val attempt = ++connectionAttemptGeneration
+        invalidateFuelHistoryForConnectionChange()
         val pendingConnection = connectionAttemptJob
         pendingConnection?.cancel()
         // Keep the cancelled handshake joinable by a subsequent connection.
@@ -3393,6 +3410,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         discoveryOnly: Boolean = false
     ) {
         val attempt = ++connectionAttemptGeneration
+        invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
@@ -3567,6 +3585,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectSimulatedAdapter(preset: String) {
         val attempt = ++connectionAttemptGeneration
+        invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
         connectionAttemptJob = viewModelScope.launch {
