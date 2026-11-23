@@ -141,6 +141,39 @@ internal static class ObdOnUdsServices
              (byte)dtc, recordNumber]);
     }
 
+    /// <summary>
+    /// UDS 0x19/0x06 reportDTCExtDataRecordByDTCNumber. Records 0x90-0x9F
+    /// are legislated OBD; 0xFE requests all regulated OBD ext records.
+    /// Additional OEM/ISO records are accessible by explicit number.
+    /// </summary>
+    internal static byte[] ReadDtcExtendedData(uint dtc, byte recordNumber)
+    {
+        if (dtc > 0xFFFFFF || recordNumber == 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(dtc), "DTC must fit 24 bits and record must be 1..255.");
+        return UdsStandardServices.ReadDtc(0x06,
+            [(byte)(dtc >> 16), (byte)(dtc >> 8),
+             (byte)dtc, recordNumber]);
+    }
+
+    internal sealed record ExtendedDataReply(uint Dtc, byte Status,
+        byte[] RawExtendedDataRecords);
+
+    internal static ExtendedDataReply DecodeDtcExtendedData(
+        uint expectedDtc, ReadOnlySpan<byte> reply)
+    {
+        if (expectedDtc > 0xFFFFFF || reply.Length < 6 ||
+            reply[0] != 0x59 || reply[1] != 0x06)
+            throw new InvalidDataException(
+                "Invalid UDS DTC extended-data response header.");
+        var dtc = (uint)reply[2] << 16 |
+            (uint)reply[3] << 8 | reply[4];
+        if (dtc != expectedDtc)
+            throw new InvalidDataException(
+                "DTC extended-data response belongs to a different fault.");
+        return new ExtendedDataReply(dtc, reply[5], reply[6..].ToArray());
+    }
+
     internal sealed record SnapshotReply(uint Dtc, byte Status,
         byte[] RawSnapshotRecords);
 
