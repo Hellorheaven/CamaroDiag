@@ -225,6 +225,19 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(j2534Options.ProtocolId == J2534StandardChannel.Iso14230 &&
             j2534Options.KlineInit == "five:33",
             "J2534 K-Line ISO14230 bidirectional channel can initialize via vendor driver.");
+        var kwpWireCli = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0x04", "--baud", "10400",
+            "--data", "83F11022019077",
+            "--kwp-rx-target", "0xF1", "--kwp-rx-source", "0x33"]);
+        Check(kwpWireCli.KwpRxTarget == 0xF1 &&
+            kwpWireCli.KwpRxSource == 0x33,
+            "KWP opt-in physical response framing selects expected addresses.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0x04", "--baud", "10400",
+            "--data", "83F11022019077", "--kwp-rx-target", "0xF1"]),
+            "KWP physical verification needs both RX source and target.");
         Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
             StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
             "--protocol-id", "0xFFFF", "--baud", "10400", "--data", "22F190"]),
