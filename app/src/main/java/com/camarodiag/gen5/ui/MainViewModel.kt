@@ -3679,6 +3679,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectUsb(deviceLabel: String) {
+        val enumerated = _usbDevices.value
+        if (deviceLabel !in enumerated) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_usb_identifier_unavailable)
+            return
+        }
         if (com.camarodiag.gen5.data.obd.CamaroDiagConnectorDiscovery.isLegacyKklUsbLabel(deviceLabel)) {
             _connectionMessage.value = localizedContext.getString(R.string.status_not_verified)
             return
