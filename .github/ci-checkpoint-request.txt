@@ -1,14 +1,11 @@
-C8 full Debug checkpoint — 2026-11-23 exact ECU physical sector backup before programming
-Code HEAD: 95b506a4570d9513d64218e12dc50960e09164c5
-Change: before any destructive ECU operation, acquire actual physical bytes for all
-affected erase sectors, match address/length/region/physical sector, original image and
-independent second ECU read, persist in unique create-new disk sector backup files,
-fsync and read back those files, and verify target frame address/size/payload/checksum.
-Android EcuWriteTransaction + PersistentEcuPhysicalBlockBackup + tests;
-Windows E39 NativeE39WriteSequence + NativeE39FileWriteJournal + selftests;
-native managed kernel integration references updated.
-AGENTS.md, GitHub Copilot and docs/PROMPT_REPRISE.md permanently updated;
-C1/C2/C4/C6/C8 audit matrix and PR95 changelog updated.
-FULL Debug only: Android unit + lint + assemble; Firebase backend unit tests,
-Windows J2534 warnings-as-errors + selftests, native ECU kernel integration,
-all Connectors jobs. No Release/merge; no claim of physical ECU verification.
+C8 RECHECK after grouped Android JUnit correction — 2026-11-23
+Implementation HEAD before checkpoint: 09aefe63ac5f1ec8560d36e5b5866c6890442a4e
+Previous full checkpoint #45134903898: Windows Debug SUCCESS with 0 warnings/0 errors and 644 selftests,
+native C/C# ECU model SUCCESS; ALL connectors CI jobs SUCCESS.
+Android :communication:testDebugUnitTest compiled and ran 481 tests, one test-class
+initialization error because new @Test expression methods returned JUnit AssertionError
+objects instead of Kotlin Unit. Explicit Unit return now corrected; no weakened validation.
+Run the SAME COMPLETE multi-component Debug checkpoint to verify all source,
+Android unit tests + lint + assembleDebug, Windows, native ECU kernel and Connectors.
+Still no claim of real ECU qualification, firmware compatibility or verified full restoration.
+Do not merge PR #95.
