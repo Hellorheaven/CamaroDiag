@@ -822,7 +822,26 @@ internal static class StandardProtocolCli
                 useTls: o.UseTls, protocolVersion: o.Version);
             var reply = await link.ExchangeUdsAsync(o.Request,
                 TimeSpan.FromMilliseconds(o.TimeoutMs), CancellationToken.None);
-            Console.WriteLine("DoIP ECU RX: " + Convert.ToHexString(reply));
+            var replyHash = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(reply));
+            if (o.ReceiveFile is not null)
+            {
+                // Never replace an existing diagnostic capture or original
+                // ECU backup. The path must not exist before this exchange.
+                await using var output = new FileStream(o.ReceiveFile,
+                    FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                await output.WriteAsync(reply);
+                await output.FlushAsync();
+                output.Flush(flushToDisk: true);
+                Console.WriteLine($"DoIP RX saved to {o.ReceiveFile} " +
+                    $"bytes={reply.Length} SHA256={replyHash}");
+            }
+            else if (reply.Length <= 64)
+                Console.WriteLine("DoIP ECU RX: " + Convert.ToHexString(reply));
+            else
+                Console.WriteLine($"DoIP ECU RX: bytes={reply.Length} " +
+                    $"SHA256={replyHash} prefix={Convert.ToHexString(reply.AsSpan(0, 64))} " +
+                    "(use --rx-file to preserve all bytes).");
             PrintObdOnUdsResponse(o.Request, reply);
             return 0;
         }
