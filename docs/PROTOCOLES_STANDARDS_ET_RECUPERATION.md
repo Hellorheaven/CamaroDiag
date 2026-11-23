@@ -361,3 +361,12 @@ Référence de format : SAE J1979 (éditions historiques) et documentation de la
 Le traitement du service 01 PID 01 sait désormais identifier le bit MIL, le nombre de défauts confirmés sur les sept bits restants, ainsi que l'indication de type d'allumage. Les autres octets de disponibilité des moniteurs sont affichés en brut : ils ne sont ni convertis en « tous les tests prêts », ni utilisés pour conclure qu'un véhicule est sain sans validation par édition SAE J1979 et profil calculateur.
 
 Cette prise en charge s'ajoute aux codes défaut CAN comptés, aux PID de capteurs explicitement décodés et aux InfoTypes du mode 09. Les tests associés sont ajoutés au jeu d'autotests logiciels, **mais aucun nouveau build/CI ni essai matériel n'a été exécuté pendant cette tranche.** Les autres PID et les modes 05, 06 et 08 restent partiellement couverts ou bruts.
+
+
+## Mise à jour J1979 classique — nouveaux PID et moniteurs mode 06
+
+Le décodeur logiciel Mode 01/02 de la voie ISO-TP CAN dispose de 10 formules supplémentaires : PID 04 charge, 0E avance, 0F température admission, 1F temps de fonctionnement, 2F niveau carburant, 33 pression barométrique, 42 tension calculateur, 46 température ambiante, 5C température huile, 5E débit de carburant. Les valeurs sont décodées **uniquement si le calculateur retourne exactement les octets attendus**. Un PID non implémenté reste brut ; aucun PID ne prouve à lui seul la présence d'un capteur sur un véhicule particulier.
+
+En Mode 06 ISO 15765-4 CAN, `ObdJ1979Mode06` sait distinguer les réponses de disponibilité des moniteurs (MID 00/20/.../E0, bitmap 32 bits) des résultats de test (enregistrements de 9 octets : MID, TID, UASID, mesure/minimum/maximum 16 bits). Les résultats restent bruts : les facteurs de conversion signés/non signés, unités et conclusions PASS/FAIL dépendant du UASID et de l'édition SAE J1979DA ne sont **pas** présumés. Les variantes hors CAN ne sont pas couvertes par ce décodage.
+
+Des tests offline sont enregistrés dans `BridgeSelfTests`. Ils n'ont **pas encore été exécutés** sur un build du HEAD courant et n'impliquent aucune validation physique. L'intégration exhaustive de J1979 reste ouverte dans #110 : modes 05/08, catalogues complets de PID, données d'in-use performance, échelles UASID et variantes de réponse par transport.
