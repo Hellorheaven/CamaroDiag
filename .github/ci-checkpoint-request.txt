@@ -87,3 +87,14 @@ les nouveaux tests. Le run #45268234408 est vert Windows (1593 tests),
 Android échoue indépendamment sur Lfx2012FuelHistoryCsv.kt; déléguer sa
 correction au chantier Android, sans toucher les protocoles en parallèle.
 PAS de validation physique J2534/ECU, pas de merge/release.
+
+23/11/2026 — ISO-TP CAN classique, STmin CF-à-CF + qualification banc (#110)
+Implémentation HEAD avant checkpoint : ad7bcc27ecabeb6b345ddd806d1bc5db8615200b
+Correction de STmin exclusivement entre CF successives (première CF sans
+attente injustifiée, maintien du chronomètre à travers plusieurs fenêtres FC),
+tests calcul de séparation/WAIT/réservés et protocole de qualification terrain
+avec preuve CAN/J2534 indépendante dans docs/QUALIFICATION_ISOTP_CAN_CLASSIQUE.md.
+UNE campagne Debug groupée sur le SHA de ce commit : Windows -warnaserror,
+--self-test, Android, noyau natif, Connectors. Ne pas conclure qualification
+physique ECU/VCI sur une CI verte, ni exécuter d'écriture destructrice.
+Conserver PR #95 Draft, ne pas fusionner, pas de Release.
