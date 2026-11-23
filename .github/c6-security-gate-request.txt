@@ -1,10 +1,11 @@
-C6 grouped security/bridge checkpoint — 2026-11-23 (live operator context at TX)
-Previous successful C6 checkpoint is historical; do not equate it with this HEAD.
-New non-protocol C6 commits: c34bf9e d99e18b fd18159 51ac6fe a78a145 cca08b3.
-Transport: ELM USB/BLE/Wi-Fi/Classic and certificate-pinned J2534 Windows bridge.
-Operator risk warning OK then independent YES; account/adapter/VIN still current immediately before TX.
-No extra program-signing key, service allowlist or universal ECU write hard stop.
-Same checkpoint includes independent Android compile fixes C2 bfd5dba, C4 7144db3.
-Run the existing C6 grouped Android communication+diagnostic+app unit suites and
-Windows Debug -warnaserror/self-tests; any failure must be reported accurately.
-Do not merge/Release. Physical ECU programming and recovery are NOT qualified.
+C6 grouped retry after #45274227208 — 2026-11-23
+Source HEAD before gate request: f11670edad938def4b187c3ed6fe3fc652ef53a5.
+Previous job: Windows/J2534 success, Android 574 tests and 2 failures.
+Resolved C6 test count: ed26b75; C1 failed-flush handling: 85d031d, ae5b9b6.
+Raw CAN console double-confirmation now carries a real approval from the UI
+to the live transport and rechecks operator/account/adapter/vehicle/console
+at physical CAN payload TX: 8b475e0, 78e5530, 20365b5.
+Existing DTC clear J2534 / ELM at-TX authorization checks preserved.
+Run this C6 Android communication, diagnostic and app suite plus Windows
+Debug -warnaserror/self-tests ONCE; do not merge, release or claim ECU validation.
+Report any failing test by name. No artificial programming keys/service bans.
