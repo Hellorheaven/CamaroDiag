@@ -84,7 +84,7 @@ internal static class J1939ClassicTpSelfTests
         Check(directly.Outgoing.Count == 1 &&
             directly.Outgoing[0].Id ==
                 J1939ClassicTpSession.ArbitrationId(0xF004, 6, o.LocalAddress) &&
-            directly.Outgoing[0].Data.AsSpan(0, 2).SequenceEqual([0x01, 0x02]) &&
+            directly.Outgoing[0].Data.AsSpan(0, 2).SequenceEqual(new byte[] {0x01, 0x02}) &&
             directly.Outgoing[0].Data[7] == 0xFF,
             "Direct <=8-byte PGN emitted with J1939 filler.");
         var directRead = new FakeCan();
