@@ -171,3 +171,12 @@ La prise en charge du format mixte sur identifiants CAN **11 bits** a été conf
 ### DoIP — requêtes UDP d'état
 
 `CamaroDiag.J2534Bridge.exe --doip-status --host 192.0.2.10 --timeout-ms 2000` consulte le statut de l'entité (requête 0x4001, réponse 0x4002), incluant type de nœud, nombre de sockets ouvertes/maximales et taille de message maximale facultative. Ajouter `--power-mode true` pour la requête 0x4003 / réponse 0x4004 : 0=pas prêt, 1=prêt, 2=non pris en charge. Il s'agit de messages **UDP de contrôle/observation**, sans service UDS ni écriture ECU ; le « mode prêt » annoncé ne valide ni l'autorisation de programmation ni l'état réel de la tension. Tests des formats ajoutés, non exécutés ; essais sur passerelle réelle non réalisés.
+
+
+### SAE J1979-2 OBDonUDS — premiers services standardisés
+
+Les commandes ISO-TP et DoIP acceptent maintenant une source d'opération unique `--obd-did 0xF40C` (lecture UDS 0x22 des plages d'émissions F400–F5FF et F700–F7FF), ou `--obd-dtc-mask 0xFF` (UDS ReadDTCInformation 0x19 sous-fonction 0x02). Ces options sont exclusives du `--payload` brut et de `--payload-file`, et ne sont **pas** acceptées en mode ISO-TP `receive` qui reste sans émission de requête. Le moteur conserve les services UDS génériques en lecture **et écriture** : le champ OBD de cette commande n'est pas une liste noire OEM.
+
+Le décodeur lit les réponses `0x62` en conservant les octets du DID sans inventer d'unité ou de formule d'émissions ; il traite les réponses `0x59 0x02` selon le format UDS (masque de statut disponible, DTC 24 bits, octet de statut), avec rejet des trames incomplètes et contrôle du DID. Il ne remplace pas les définitions de paramètres SAE J1979DA, les tables DTC constructeur, ni les autres modes J1979-2 (2026). **Fonctions logicielles ajoutées, tests non exécutés, ni adaptateur ni véhicule qualifiés.**
+
+Les réponses DoIP finales partagent désormais `UdsStandardServices.RequireResponse` avec les autres transports UDS : contrôle de SID, session, niveau SecurityAccess, routine, DID, DTC et compteur de bloc. Les réponses intermédiaires `0x7F ... 0x78` restent acceptées jusqu'au délai borné de session, sans limite arbitraire de 12 messages.
