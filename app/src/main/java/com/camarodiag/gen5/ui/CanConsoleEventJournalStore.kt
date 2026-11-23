@@ -2,7 +2,6 @@ package com.camarodiag.gen5.ui
 
 import com.camarodiag.gen5.data.obd.CanConsoleEventJournalWriter
 import java.io.File
-import java.io.IOException
 
 /**
  * Private, per-console-session on-disk event journal.
@@ -105,10 +104,9 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
         val old = archive
         try {
             writer?.close()
-        } catch (_: IOException) {
-            // Reset never publishes the old journal, even after close failure.
-        } catch (_: IllegalStateException) {
-            // The previous journal already failed and cannot be reused.
+        } catch (_: Exception) {
+            // Teardown must always discard the prior session even if the
+            // wrapped writer fails during flush or close.
         } finally {
             writer = null
             archive = null
