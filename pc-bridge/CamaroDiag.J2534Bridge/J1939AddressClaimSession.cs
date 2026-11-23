@@ -14,8 +14,7 @@ internal static class J1939AddressClaimSession
     internal enum Outcome
     {
         Claimed,
-        LostToHigherPriorityName,
-        DuplicateName
+        LostToHigherPriorityName
     }
 
     internal static async Task<Outcome> ClaimAsync(
