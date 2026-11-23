@@ -895,7 +895,8 @@ internal static class StandardProtocolCli
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
         byte? KwpRxTarget, byte? KwpRxSource, string Mode,
-        bool KwpFunctionalRx = false, uint? SwCanHighSpeedBaud = null);
+        bool KwpFunctionalRx = false, uint? SwCanHighSpeedBaud = null,
+        bool J1850WireCrc = false);
 
     private static string Required(IReadOnlyList<string> args, string option)
     {
@@ -1054,6 +1055,8 @@ internal static class StandardProtocolCli
         var flags = Number(Optional(args, "--flags") ?? "0");
         var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
         var txText = Optional(args, "--data");
+        var j1850WireCrc = bool.Parse(
+            Optional(args, "--j1850-wire-crc") ?? "false");
         var kwpService = Optional(args, "--kwp-service");
         var kwpTxTargetText = Optional(args, "--kwp-tx-target");
         var kwpTxSourceText = Optional(args, "--kwp-tx-source");
@@ -1111,6 +1114,9 @@ internal static class StandardProtocolCli
             (flow != null && mask == null) ||
             (mode == "receive" &&
                 (init != null || flow != null || hsBaud.HasValue)) ||
+            (j1850WireCrc &&
+                protocol is not (J2534StandardChannel.J1850Vpw or
+                                 J2534StandardChannel.J1850Pwm)) ||
             (hsBaud.HasValue &&
                 (protocol != J2534StandardChannel.SwCan ||
                  hsBaud.Value == 0)) ||
@@ -1125,7 +1131,7 @@ internal static class StandardProtocolCli
         return new(index, protocol, baud, flags, data,
             mask, pattern, flow, init, timeout, count,
             kwpRxTarget, kwpRxSource, mode, kwpFunctionalRx,
-            hsBaud);
+            hsBaud, j1850WireCrc);
     }
 
     internal static async Task SaveDoIpReplyAsync(
@@ -1234,6 +1240,13 @@ internal static class StandardProtocolCli
                 if (received == null) break;
                 Console.WriteLine($"J2534 RX protocol=0x{received.ProtocolId:X} " +
                     $"status=0x{received.RxStatus:X} {Convert.ToHexString(received.Data)}");
+                // Only inspect the wire CRC when the operator explicitly
+                // confirms that this vendor J2534 DLL preserves it. Many
+                // compliant drivers have already stripped it on receipt.
+                if (o.J1850WireCrc &&
+                    !J1850Crc.VerifyRawFrame(received.Data))
+                    throw new InvalidDataException(
+                        "Captured J1850 frame has an invalid on-wire CRC.");
                 if (o.KwpRxTarget is byte target && o.KwpRxSource is byte source)
                 {
                     var payload = StandardVehicleProtocols.ParseKwpJ2534(
