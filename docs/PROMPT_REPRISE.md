@@ -1,3 +1,15 @@
+# Hors protocoles — connecteurs, C2, C6 et C8 (23 novembre 2026, dernière tranche)
+
+- **Branche/PR** : `chore/unified-ci`, PR #95 unique en draft. La couche ISO/SAE est traitée dans l'autre chat ; les changements ci-dessous portent sur les connexions et sauvegardes hors protocole.
+- **Connecteur Android USB** : `CamaroDiagConnectorBinaryDiscovery` utilise une limite globale de 3 s depuis **avant l'écriture USB**, contrôles d'annulation après write, tests de port bloqué / session remplacée (`6560598`, `5dfed01`). Cela reste uniquement la découverte du firmware prototype, **sans RX/TX ECU authentifié**.
+- **Pont Windows / connecteur COM** : refus d'une sélection COM absente ou dupliquée à l'instant de la tentative (pas une preuve d'identité de périphérique), tests simulés (`8abec52`, `504ca9d`).
+- **C6 / pont Windows J2534** : la copie du code d'appairage TLS valide exactement le format Android actuel (token base64url 43 caractères + empreinte SHA-256 64 hex), rejette les retours à la ligne et valeurs malformées (`e646551`, `a0852e9`, `e855158`). Sans authentification physique du boîtier Connectors.
+- **C2 / client Python Connectors** : écriture exclusive d'une image et d'un manifeste **hors ligne**, synchronisation de fichiers/dossier POSIX quand disponible, relecture indépendante, publication du manifeste en dernier, nettoyage après échec et test de défaut (`bab2225`, `13888dc`). Réduction mémoire par comparaison incrémentale en blocs de 1 Mio avec test image multi-Mio (`32202fd`, `cb4c321`). Vérification d'un fichier ≠ preuve de source ECU physique ou de récupération.
+- **C8 / CI** : campagne complète demandée au SHA `9d9a723` (run #45277412678) **annulée**, remplacée par la campagne lancée par l'autre chat au SHA `8524168` (run [#45277509716](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45277509716)). A cette étape : Windows/natif/connecteurs y sont réussis, Android encore en cours. Les deux commits C2 `32202fd` et `cb4c321` sont postérieurs à ce checkpoint et nécessitent un contrôle à leur HEAD. N'annoncer aucun résultat final global sans vérification.
+- **Non résolu / blocage** : PR #95 régulièrement marquée `mergeable_state=dirty` ; ne pas merger automatiquement, ne pas toucher aux sources ISO-TP concurrentes. C2/C6 restent **ouverts** sur sauvegarde/restauration réelle, pilotes firmware, vrai RX/TX, alimentation et banc ECU ; C4 lecture seule. Le pont Linux CLI/GUI/.deb est l'évolution future issue #115, **pas** une seconde PR active.
+
+---
+
 ## ISO-TP CAN classique — tests end-to-end J2534 simulés (23/11/2026)
 
 - Périmètre exclusif : ISO 15765-2 sur CAN classique uniquement. Ne pas poursuivre avec un nouveau protocole tant que la qualification VCI/ECU du CAN classique manque. PR #95 unique (Draft), issue #110 ouverte, aucun merge/Release.
