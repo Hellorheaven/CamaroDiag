@@ -137,3 +137,8 @@ de ce commit marqueur. Ne pas certifier de timing réel ECU ni fusionner PR.
 Deux correctifs ISO-TP dans la seule PR #95: ignorer les evenements J2534 TX/status et rejet de RX hors canal ou arrive apres cancellation dans le lien RAW, et appliquer CAN_29BIT_ID aux deux elements du filtre PASS_FILTER pour CAN 29 bits (SAE J2534-1). Autotests simules 11/29 bits, echo, mauvais protocole, cancellation et delai commun ajoutes. Valider Windows Debug -warnaserror et --self-test au SHA precis de ce checkpoint, puis Android, natif et connecteurs. Aucun test physique VCI/ECU, pas de merge, pas de Release.
 
 23/11/2026 — Checkpoint Debug groupe : ISO-TP CAN classique seulement (issue #110), tests J2534 simulés 11-bit BS=1 multi-trames + FC/OVFLW et 29-bit CAN_29BIT_ID ; commits 5b910cf8 et c592e2a4, correctifs précédents 07621a4e et a0e14673. Vérifier Windows 0 warning et autotests complets, Android, natif et connecteurs au SHA de ce commit. Aucune qualification VCI/ECU physique, aucun merge.
+
+23/11/2026 — lot logiciel ISO-TP CAN classique : annulation tardive J2534 et résultat TX incertain (#110).
+Code HEAD avant le checkpoint : 3bdb89a8347cab94a038d161b34e48a96dd2ae3c.
+Deux commits groupés f245429 et 3bdb89a : propagation de cancellation après appel synchrone PassThruWriteMsgs, aucune nouvelle CF après annulation, rejet du flag BRS sur CAN classique, trace CSV TX_UNCONFIRMED quand TX a une issue indéterminée, autotests offline et limites de qualification de banc documentées.
+Déclencher UNE campagne Debug complète sur le SHA de ce marqueur : Windows -warnaserror et --self-test, Android, natif ECU, Connectors. Pas de Release, merge ou revendication de support matériel ECU/VCI.
