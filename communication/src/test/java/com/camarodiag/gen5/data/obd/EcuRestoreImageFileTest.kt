@@ -62,4 +62,32 @@ class EcuRestoreImageFileTest {
             directory.delete()
         }
     }
+    @Test fun invalidIdentityIsRejectedBeforeCreatingARegionImageFile() {
+        val directory = Files.createTempDirectory("ecu-identity").toFile()
+        try {
+            val image = EcuRestoreImage.RegionImage(
+                EcuRestoreImage.MemoryRegion(
+                    EcuBackupCoverage.Region.CALIBRATION, 0x200, 2
+                ),
+                byteArrayOf(1, 2)
+            )
+            assertTrue(runCatching {
+                EcuRestoreImageFile.Identity(
+                    "1G1FA1RXXR0123456", "ECU" + "\n" + "unexpected", "firmware"
+                )
+            }.isFailure)
+            assertTrue(runCatching {
+                EcuRestoreImageFile.Identity(
+                    "1G1FA1RXXR0123456", "ECU", "F".repeat(257)
+                )
+            }.isFailure)
+            val target = File(directory, "new.ecu-image")
+            assertTrue(!target.exists())
+            assertEquals(2, image.byteCount)
+        } finally {
+            directory.listFiles()?.forEach(File::delete)
+            directory.delete()
+        }
+    }
+
 }
