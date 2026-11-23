@@ -1,3 +1,21 @@
+C8 GROUPED CHECKPOINT — connectors discovery / C2 durability / C6 pairing — 2026-11-23
+Exact implementation HEAD before gate: 504ca9dcd25253c7b924233214f5950e36b79265
+Scope of this non-protocol increment:
+- Python host offline backup: durable fsync and independent readback, atomic-ish
+  completion marker is .json written after .bin; simulated sync failure cleanup
+  and verification failure regression.
+- Android USB CamaroDiagConnectors binary discovery: shared timeout starts
+  BEFORE USB write; cancellation and stall unit tests.
+- Windows COM selected-port discovery: reject no longer enumerated or duplicate
+  COM names; simulation self-tests.
+- Windows J2534 bridge: copied TLS pairing code validates the same 43-char
+  base64url token + 64 hex SHA-256 shape required by Android; injection tests.
+Run ONE full Debug C8 checkpoint at the resulting SHA (Android units, lint,
+APK Debug, Windows self-tests, native ECU, connector Python 3.11/3.12/3.13
+and firmware builds, backend). No Release; never equate with ECU hardware tests.
+PR #95 remains draft. Merge conflicts currently pending, do not auto-merge.
+This request is a one-time checkpoint; no CI on ordinary code commits.
+
 C8 RECHECK after grouped Android JUnit correction — 2026-11-23
 Implementation HEAD before checkpoint: 09aefe63ac5f1ec8560d36e5b5866c6890442a4e
 Previous full checkpoint #45134903898: Windows Debug SUCCESS with 0 warnings/0 errors and 644 selftests,
