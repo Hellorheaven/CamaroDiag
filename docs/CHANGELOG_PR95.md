@@ -233,3 +233,12 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Régressions ajoutées : fichier supprimé, réinitialisation après erreur et répertoire de destination non valide.
 - Commits : `cf4230e`, `1356519`, `9b01a3b`, `0421ace`, `7efc7e3`.
 - **Tests non vérifiés au dernier HEAD.** La campagne C1 précédente ne prouve pas ces correctifs. Pas de déclaration de compatibilité physique.
+
+
+## J1979-2 et contrôle UDS homogène (23/11/2026)
+- Helper `ObdOnUdsServices` : construction des requêtes par DID d'émissions ou masque DTC, extraction des réponses UDS DID et DTC 24 bits + statut, sans interprétation constructeur inventée.
+- Options `--obd-did` et `--obd-dtc-mask` pour les commandes ISO-TP/DoIP existantes ; exclusivité des sources TX et interdiction de TX en réception passive. Tests de parseur, requêtes et réponses ajoutés.
+- DoIP : même validation UDS que les autres transports, au lieu de contrôles de SID/DID dupliqués. Les NRC 0x78 / Alive Check / ACK sont limités par le délai de l'opération plutôt que par 12 messages arbitraires.
+- Correctifs CAN : ignorer les trames J1939 non corrélées malformées avant le parseur, refuser les trames ISO-TP CF plus grandes que le RX_DL du FF et les FF sous-dimensionnées. Tests de régression ajoutés.
+- J1939-81 : construction de la trame Address Claimed et comparaison NAME prioritaire hors ligne, sans revendication réelle sur le bus.
+- **Tests ajoutés mais non exécutés** ; CI du lot et qualification matérielle toujours en attente.
