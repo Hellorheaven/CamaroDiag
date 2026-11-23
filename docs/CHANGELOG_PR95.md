@@ -149,3 +149,9 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - DoIP UDP : ajout des requêtes d'identification par VIN (0x0003) ou EID (0x0002) et du traitement explicite des annonces sans VIN disponible. Tests de codecs et de longueurs ajoutés ; non exécutés.
 
 - DoIP : diffusion UDP explicite vers l'adresse indiquée via `--broadcast-ip`, réception bornée à 32 identités, séparation des réponses par adresse source et logique. Aucun UDS envoyé. Tests matériels et intégration réseau non exécutés.
+
+## C1 / C4 — compléments de la session parallèle
+- **C1 :** exports CAN explicites sur leur couverture : fenêtre de 300 derniers événements TX/RX/SYSTEM, archive brute RX intégrale si disponible, sinon extrait mémoire. Affichage d'une notice de limite dans la console et textes FR/EN ; tests de conservation des fragments d'une capture dépassant 128 Kio.
+- **C4 :** l'historique carburant est effacé immédiatement lors des changements de compte, de connexion, de pont J2534 ou de simulation. Les synthèses STFT/LTFT des deux bancs sont affichées lorsqu'il existe des réponses valides. Une réponse PID physique absente ou vide ne peut plus être transformée en mesure par des octets de décodage isolés.
+- **C8 :** tests de parité FR/EN des nouvelles notices et contrôles d'intégrité ajoutés. Le journal persistant complet des événements TX/RX/SYSTEM n'existe pas encore ; il reste une condition de clôture de #59.
+- Le déclenchement d'une campagne C4 Debug ciblée a été demandé une fois sur une révision intermédiaire ; son résultat n'est pas vérifié ici et ne qualifie pas les changements ultérieurs. Aucun essai sur matériel physique ni merge.
