@@ -297,3 +297,16 @@ La réception CAN/J2534 brute vérifie maintenant aussi le bit de statut `CAN_29
 
 
 La commande J2534 générique possède désormais l'option `--j1850-wire-crc true`, réservée à SAE J1850 VPW/PWM ; elle valide uniquement les octets de réponse que le pilote a livrés, lorsque ce pilote **conserve le CRC physique dans les trames RX**. Sans cette garantie fournisseur, laisser l'option à false : un pilote qui a retiré le CRC présenterait forcément un faux échec. L'option ne reconstruit ni les durées d'impulsion, ni la collision de bus, et ne modifie jamais les trames TX.
+
+
+## Tranche SAE J1979 — services classiques et réponses (23/11/2026)
+
+Sur la branche unique de la PR #95, des codecs **logiciels** supplémentaires sont présents dans le pont Windows :
+
+- `ObdJ1979Transaction` : construction des services 01..0A, réponses positives, NRC et corrélation facultative de l'identifiant. Le codec ne bloque pas les commandes mutatrices 04/08, qui restent soumises au consentement utilisateur par la couche de transaction physique.
+- `ObdJ1979PidSupport` : bitmaps de 32 PID pour les modes 01/02, pages 00..E0, bit de page suivante, et numéro de freeze frame pour le service 02 ; refus des réponses incomplètes, incorrectes ou hors plage.
+- `ObdJ1979Vin` : récupération stricte des 17 caractères du VIN depuis la réponse ISO-TP **déjà réassemblée** `49 02 01 + 17 octets ASCII` ; il ne représente pas une reconstruction de messages non-CAN ou J1979-2.
+- `ObdJ1979Dtc` : conversion des paires de deux octets SAE J2012 en codes P/C/B/U, sans prétendre interpréter le contenu spécifique d'un constructeur ou la structure de chacune des réponses de service 03/07/0A.
+- Tests offline ajoutés et enregistrés dans `BridgeSelfTests`. **Non exécutés dans cette tranche**, tant que le chantier protocole n'est pas clos ; aucun build vert, qualification matérielle, conformité exhaustive J1979 ou nouveau transport physique n'est revendiqué.
+
+**À développer** : construction complète des requêtes par service et version normative, profil des PID/InfoType et métadonnées J1979DA, décodage des réponses distinctes des services 03/07/0A par transport, recherche multi-ECU et gestion des timeouts, raccordement aux liens SAE J1850/K-Line/CAN et à l'interface, puis tests interopérabilité et matériel. Les codecs n'accordent aucune capacité de programmation OEM.
