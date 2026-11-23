@@ -264,7 +264,8 @@ internal static class J1939ClassicTpSession
         for (var tries = 0; tries < 64; tries++)
         {
             var frame = await link.ReceiveAsync(timeout, token);
-            if (frame.IsFd || frame.Data.Length != 8) continue;
+            if (frame.IsFd || frame.Id > 0x1FFFFFFF ||
+                frame.Data is null || frame.Data.Length != 8) continue;
             var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
             if (id.Source != o.RemoteAddress) continue;
             if (id.Pgn == o.Pgn ||
@@ -323,8 +324,10 @@ internal static class J1939ClassicTpSession
         for (var count = 0; count < 64; count++)
         {
             var frame = await link.ReceiveAsync(timeout, token);
+            if (frame.IsFd || frame.Id > 0x1FFFFFFF ||
+                frame.Data is null || frame.Data.Length != 8)
+                continue;
             var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
-            if (frame.IsFd || frame.Data.Length != 8) continue;
             if (id.Pgn != TpCmPgn || id.Source != (fromPeer ?
                 o.RemoteAddress : o.LocalAddress)) continue;
             if (id.Destination != (fromPeer ? o.LocalAddress :
@@ -345,8 +348,10 @@ internal static class J1939ClassicTpSession
         for (var attempts = 0; attempts < 64; attempts++)
         {
             var frame = await link.ReceiveAsync(timeout, token);
+            if (frame.IsFd || frame.Id > 0x1FFFFFFF ||
+                frame.Data is null || frame.Data.Length != 8)
+                continue;
             var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
-            if (frame.IsFd || frame.Data.Length != 8) continue;
             // Only an abort for this peer, destination and PGN belongs to
             // the active transport session. Other nodes may transfer different
             // PGNs at the same time on the shared J1939 bus.
