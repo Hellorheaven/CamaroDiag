@@ -299,3 +299,5 @@ Les événements TX sont enregistrés au moment de leur émission avec le statut
 
 - Le magasin intercepte les erreurs de fermeture sans empêcher la remise à zéro du fichier et de la session ; la destruction du ViewModel reste une désactivation définitive.
 - Commit `e27343e`. Tests du correctif non exécutés à la rédaction.
+
+- Renforcement final J1939-22 FD.TP : RTS/CTS dirigé connecté à `--j1939-fd-cmdt`, refus des combinaisons de commandes contradictoires, vérification des champs EOM_ACK/EOM_STATUS, non-régression des sessions CMDT/BAM concurrentes et fenêtres de CTS du pair. Tests écrits, **non exécutés**. Aucune CI par commit ni qualification du pilote J2534 FD_CAN.
