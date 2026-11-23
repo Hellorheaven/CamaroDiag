@@ -253,6 +253,17 @@ internal static class UdsStandardServices
                     !response.Slice(2, 3).SequenceEqual(request.Slice(2, 3)))
                     throw new InvalidDataException(
                         "UDS DTC snapshot/extended-data response has wrong 24-bit DTC.");
+                // 0xFF denotes "all" for snapshots; 0xFE/"all
+                // regulated" and 0xFF/"all" apply to extended data.
+                // A specific record ID in an actual returned record must
+                // match the selected record. An empty response header
+                // without records is not itself a mismatched record.
+                if (request.Length >= 6 && response.Length >= 7 &&
+                    request[5] != 0xFF &&
+                    (request[1] != 0x06 || request[5] != 0xFE) &&
+                    response[6] != request[5])
+                    throw new InvalidDataException(
+                        "UDS DTC record response belongs to another snapshot/extended record.");
             }
             if (request.Length >= 3 && request[1] is 0x42 or 0x55 or 0x56)
             {
