@@ -487,6 +487,17 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun adapterDisconnectAndPairedBridgeLabelsAreSafeInFrenchAndEnglish() {
+        for (locale in listOf("en", "fr")) {
+            val values = strings(locale)
+            assertTrue(values.getValue("adapter_disconnect_label").isNotBlank())
+            assertTrue(values.getValue("adapter_j2534_bridge_connected").contains("J2534"))
+            val notice = values.getValue("adapter_j2534_capabilities_guidance")
+            assertTrue(notice.contains("ECU") || notice.contains("calculateur"))
+            assertTrue(notice.contains("PC") || notice.contains("pont"))
+        }
+    }
+
     @Test fun bridgeFormErrorIsLocalizedAndDoesNotClaimConnectionLoss() {
         val english = strings("en").getValue("msg_j2534_bridge_invalid_form")
         val french = strings("fr").getValue("msg_j2534_bridge_invalid_form")
