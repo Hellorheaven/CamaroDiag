@@ -31,6 +31,8 @@ internal static class J1939FdMultiPg
                 group.Pgn is < 0 or > 0x3FFFF ||
                 ((group.Pgn >> 8) & 0xFF) < 240 &&
                     (group.Pgn & 0xFF) != 0 ||
+                ((group.Pgn >> 8) & 0xFF) >= 240 &&
+                    destination != 0xFF ||
                 group.Payload.Length > 60 ||
                 bytes.Count + 4 + group.Payload.Length > 64)
                 throw new ArgumentException(
@@ -94,7 +96,8 @@ internal static class J1939FdMultiPg
                 (frame.Data[offset + 1] << 8) | frame.Data[offset + 2];
             var length = frame.Data[offset + 3];
             if (length > remaining - 4 ||
-                ((pgn >> 8) & 0xFF) < 240 && (pgn & 0xFF) != 0)
+                ((pgn >> 8) & 0xFF) < 240 && (pgn & 0xFF) != 0 ||
+                ((pgn >> 8) & 0xFF) >= 240 && destination != 0xFF)
                 throw new InvalidDataException("Invalid J1939-22 C-PG PGN or payload length.");
             groups.Add(new ContainedGroup(pgn,
                 frame.Data.AsSpan(offset + 4, length).ToArray()));
