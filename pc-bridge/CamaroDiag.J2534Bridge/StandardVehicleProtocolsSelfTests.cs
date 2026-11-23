@@ -29,6 +29,22 @@ internal static class StandardVehicleProtocolsSelfTests
             "SAE J1850 J2534 IDs.");
         Check(StandardVehicleProtocols.Find("CAN FD + ISO-TP").J2534ProtocolId is null,
             "CAN FD vendor capability must be negotiated.");
+        Check(StandardVehicleProtocols.Find("J1939 CAN FD").TransportPresent &&
+            !StandardVehicleProtocols.Find("J1939 CAN FD").PhysicalWriteQualified &&
+            StandardVehicleProtocols.Find("J1939 CAN FD").Scope
+                .Contains("FBFF/security/concurrency pending", StringComparison.Ordinal),
+            "J1939-22 software transport capability is listed without physical flash claim.");
+        Check(StandardVehicleProtocols.Find("J1939 classical CAN").TransportPresent &&
+            !StandardVehicleProtocols.Find("J1939 classical CAN").PhysicalWriteQualified,
+            "J1939-21 bidirectional codec presence does not imply ECU write qualification.");
+        Check(StandardVehicleProtocols.Find("OBDonUDS").TransportPresent &&
+            StandardVehicleProtocols.Find("OBDonUDS").Scope
+                .Contains("full service mapping pending", StringComparison.Ordinal),
+            "OBDonUDS partial coverage is not represented as complete standard compliance.");
+        Check(StandardVehicleProtocols.Find("CAN FD + ISO-TP").TransportPresent &&
+            !StandardVehicleProtocols.Find("CAN FD + ISO-TP").PhysicalWriteQualified,
+            "ISO-TP CAN FD software support is separate from actual hardware qualification.");
+
         for (int dlc = 0; dlc <= 15; dlc++)
             Check(StandardVehicleProtocols.CanFdLengthToDlc(
                 StandardVehicleProtocols.CanFdDlcToLength(dlc)) == dlc,
