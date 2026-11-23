@@ -40,6 +40,13 @@ Les premières modifications comparaient les images et les trames préparées, *
 - Tests de régression ajoutés dans `EcuWriteConsentFlowTest` : avertissement seul, refus, absence de contexte et changement de génération.
 - Restent bloquants pour déclarer C6 terminé : validation du consentement sur l'ensemble des commandes potentiellement modifiantes, contrôles réels des octets/blocs programmés, sauvegarde restaurable avant effacement, test du rollback sur ECU, compilation/tests complets au HEAD stabilisé. **Aucune clé ou licence de programmation artificielle ajoutée.**
 
+### Complément C6 : refus/déconnexion et changement de VIN
+
+- La boîte de suppression DTC efface la génération de connexion et l'identité véhicule mémorisées sur **Non**, fermeture et changement de contexte. Même si l'écran tarde à se rafraîchir, le ViewModel compare les deux valeurs à la cible courante avant d'autoriser une demande physique.
+- `EcuWriteConsentFlow.approvalForContext` refuse les changements de session ou de véhicule. Tests unitaires de ces cas ajoutés.
+- Le formulaire J2534 n'expose plus les éléments du code d'appairage TLS lors de sa conversion en texte ; le pont est affiché comme appairé au PC, ce qui n'implique pas automatiquement une capacité ECU.
+- Ne pas considérer ces validations applicatives comme la preuve de sauvegarde, effacement, réécriture des blocs, tests post-flash ou récupération physique : **C6 reste en cours**.
+
 ## Anomalies / travaux restant ouverts
 
 1. **Pilotes physiques absents :** `EcuProgrammingDriverContract.registeredHardwareDrivers = emptyList()` ; les voies de programmation Android ne peuvent pas physiquement écrire. Les connecteurs ESP32-S3/STM32 et les chemins autres que banc E39 ne disposent pas de support flash complet démontré. [Issue #109](https://github.com/Hellorheaven/CamaroDiag/issues/109).
