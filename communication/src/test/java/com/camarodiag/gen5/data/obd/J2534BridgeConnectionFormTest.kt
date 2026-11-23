@@ -19,6 +19,15 @@ class J2534BridgeConnectionFormTest {
         host, port, token, request, response, profile
     )
 
+    @Test fun validatedBridgeFormNeverPrintsTlsPairingSecret() {
+        val configured = parse()
+        val printed = configured.toString()
+        assertTrue(printed.contains("REDACTED"))
+        assertFalse(printed.contains(pairing))
+        assertFalse(printed.contains("b".repeat(64)))
+        assertEquals(pairing, configured.pairingCode)
+    }
+
     @Test fun acceptsValidPinnedPrivateLan11And29BitForms() {
         val standard = parse()
         assertEquals("192.168.1.23", standard.host)
