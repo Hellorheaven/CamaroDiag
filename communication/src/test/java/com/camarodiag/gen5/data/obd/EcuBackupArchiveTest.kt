@@ -131,12 +131,28 @@ class EcuBackupArchiveTest {
             metadata.replace("ecu.osId=19088743", "ecu.osId=0"),
             metadata.replace("required=\n", "required=OTHER\n"),
             metadata.replace("capture.0.expected=4", "capture.0.expected=5"),
+            metadata.replace("capture.0.expected=4", "capture.0.expected=04"),
+            metadata.replace("capture.0.start=4096", "capture.0.start=04096"),
+            metadata.replace("capture.0.start=4096", "capture.0.start=4294967296"),
+            metadata.replace("capture.0.start=4096", "capture.0.start=4294967295"),
+            metadata.replace("count=1", "count=01"),
+            metadata.replace("created=1795320000000", "created=01795320000000"),
             metadata.replace("offline archive v3", "offline archive v2")
         )
         for (bad in malformed) {
             assertTrue("Forged or incomplete Windows v3 metadata must be rejected",
                 runCatching { EcuBackupArchive.import(archiveWithManifest(bad).inputStream()) }.isFailure)
         }
+    }
+
+    @Test fun portableJ2534MemoryScopesStayInside32BitAddressAnd16MiBBudget() {
+        assertTrue(EcuBackupArchive.isPortableJ2534Range(0L, 16L * 1024 * 1024))
+        assertTrue(EcuBackupArchive.isPortableJ2534Range(0xFFFF_FFFFL, 1L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(0xFFFF_FFFFL, 2L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(0x1_0000_0000L, 1L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(-1L, 1L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(0L, 0L))
+        assertFalse(EcuBackupArchive.isPortableJ2534Range(0L, 16L * 1024 * 1024 + 1))
     }
 
     @Test fun routedPhysicalV3ArchivesCannotClaimIncompleteMemoryOrFullEcuMap() {
@@ -148,6 +164,12 @@ class EcuBackupArchiveTest {
                 vehicleVin = vin, channel = channel) },
             { EcuBackupArchive.export(ByteArrayOutputStream(),
                 listOf(capture().copy(expectedBytes = 5)), emptySet(),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture().copy(startAddress = 0x1_0000_0000L)), emptySet(),
+                vehicleVin = vin, channel = channel) },
+            { EcuBackupArchive.export(ByteArrayOutputStream(),
+                listOf(capture().copy(startAddress = 0xFFFF_FFFFL)), emptySet(),
                 vehicleVin = vin, channel = channel) },
             { EcuBackupArchive.export(ByteArrayOutputStream(),
                 listOf(capture()), emptySet(), controllerLabel = "X".repeat(129),

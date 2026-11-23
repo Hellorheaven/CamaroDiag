@@ -21,6 +21,12 @@ object EcuBackupArchive {
     private const val MAX_REGION_BYTES = 64 * 1024 * 1024
     private const val MAX_ARCHIVE_BYTES = 256L * 1024 * 1024
 
+    /** J2534 0x23 portable records use a 32-bit address and at most one 16 MiB scope. */
+    internal fun isPortableJ2534Range(address: Long, length: Long): Boolean =
+        address in 0L..0xFFFF_FFFFL &&
+            length in 1L..(16L * 1024 * 1024) &&
+            address + length <= 0x1_0000_0000L
+
     /**
      * A Windows J2534 scoped capture may contain two separate 16 MiB reads.
      * Include room for the manifest; an exact 32 MiB Android import cap
@@ -64,6 +70,9 @@ object EcuBackupArchive {
             // must not advertise complete coverage from a single approved span.
             require(captures.size == 1 && requiredRegions.isEmpty()) {
                 "A physical J2534 archive must contain one scope with unknown ECU-wide coverage."
+            }
+            require(captures.all { isPortableJ2534Range(it.startAddress, it.expectedBytes) }) {
+                "A J2534 archive must contain one physically addressable 32-bit memory scope."
             }
             require(captures.all {
                 it.expectedBytes == it.firstRead.size.toLong() &&
@@ -252,6 +261,17 @@ object EcuBackupArchive {
             require(count == 1 && required.isEmpty()) {
                 "A routed ECU archive cannot claim complete firmware coverage."
             }
+            // Windows writes canonical decimal fields; accepting 00001 or
+            // signs in Android only makes a forged v3 manifest ambiguous.
+            // Keep legacy v1/v2 parsing unchanged for existing files.
+            for (name in listOf("created", "count", "capture.0.start", "capture.0.expected")) {
+                val raw = properties.getProperty(name)
+                    ?: throw IllegalArgumentException("Missing routed ECU archive field $name")
+                val decimal = raw.toLongOrNull()
+                require(decimal != null && decimal >= 0L && decimal.toString() == raw) {
+                    "Noncanonical routed ECU archive field $name"
+                }
+            }
         }
         val captures = (0 until count).map { index ->
             val prefix = "capture.$index."
@@ -283,8 +303,9 @@ object EcuBackupArchive {
         require(files.isEmpty()) { "Unreferenced archive data" }
         if (channel != null) {
             val only = captures.single()
-            require(only.firstRead.size.toLong() == only.expectedBytes) {
-                "A routed ECU backup must contain a complete independent read of its declared span."
+            require(only.firstRead.size.toLong() == only.expectedBytes &&
+                isPortableJ2534Range(only.startAddress, only.expectedBytes)) {
+                "A routed ECU backup must contain a complete, addressable 32-bit read scope."
             }
         }
         val allowedChannelKeys = if (channel != null) setOf(
