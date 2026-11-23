@@ -188,6 +188,26 @@ internal static class J1939FdCmdtSelfTests
         }
         Reject<InvalidDataException>(() => Receive(malformedEom, o),
             "Receiver rejects EOM_STATUS with invalid reserved fields.");
+        var abortDuringDt = new FakeLink();
+        abortDuringDt.RX.Enqueue(Control(o, true,
+            J1939FdTransportFrames.RequestToSend, 131, 3, 2, 0));
+        abortDuringDt.RX.Enqueue(Control(o, true,
+            J1939FdTransportFrames.ConnectionAbort,
+            0xFFFFFF, 0xFFFFFF, 0xFF, 3));
+        Reject<IOException>(() => Receive(abortDuringDt, o),
+            "Peer FD.TP Abort during DT phase terminates promptly.");
+        Check(abortDuringDt.TX.Count == 1 &&
+            J1939FdTransportFrames.DecodeControl(
+                abortDuringDt.TX[0]).Type ==
+                J1939FdTransportFrames.ClearToSend,
+            "Incoming peer abort produces no false EOM_ACK and no redundant abort.");
+
+        Check(malformedEom.TX.Count == 3 &&
+            J1939FdTransportFrames.DecodeControl(
+                malformedEom.TX[^1]).Type ==
+                J1939FdTransportFrames.ConnectionAbort,
+            "Invalid CMDT EOM_STATUS causes explicit local Abort rather than EOM_ACK.");
+
         var noCts = new FakeLink();
         Reject<TimeoutException>(() => Send(noCts, o, Fill(131)),
             "Missing CTS aborts outgoing connection-mode session.");
