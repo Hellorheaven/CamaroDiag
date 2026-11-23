@@ -58,6 +58,28 @@ internal static class UdsStandardServicesSelfTests
         Check(UdsStandardServices.RequireResponse([0x36, 3, 0xFF],
             [0x76, 3]).Length == 2,
             "UDS transfer counter response correlated");
+        Check(UdsStandardServices.RequireResponse([0x10, 0x03],
+            [0x50, 0x03, 0x00, 0x32, 0x01, 0xF4]).Length == 6,
+            "DoIP and CAN share programming-session positive response validation");
+        Check(UdsStandardServices.RequireResponse([0x27, 0x01],
+            [0x67, 0x01, 0xAB, 0xCD]).Length == 4,
+            "Security seed response correlated without generating OEM key");
+        Check(UdsStandardServices.RequireResponse([0x19, 0x02, 0xFF],
+            [0x59, 0x02, 0xFF]).Length == 3,
+            "ReadDTCInformation subfunction echoed in DoIP and CAN");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse([0x27, 0x01],
+                [0x67, 0x02, 0xAA]),
+            "Mismatched security level cannot satisfy active UDS request");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse([0x10, 0x03],
+                [0x50, 0x02]),
+            "Mismatched diagnostic session rejected before continuing");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse([0x19, 0x02, 0xFF],
+                [0x59, 0x06, 0xFF]),
+            "DTC report for another subfunction is rejected");
+
         Reject<InvalidDataException>(() =>
             UdsStandardServices.RequireResponse([0x2E, 0xF1, 0x90, 0x01],
                 [0x6E, 0xF1, 0x91]),
