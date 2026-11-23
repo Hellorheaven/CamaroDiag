@@ -287,6 +287,24 @@ internal static class StandardVehicleProtocolsSelfTests
             "--payload", "2EF19001"]);
         Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
             "DoIP bidirectional CLI accepts WDBI service.");
+        var obdDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-did", "0xF40C"]);
+        Check(obdDoIp.Request.SequenceEqual(new byte[] {0x22, 0xF4, 0x0C}),
+            "DoIP OBDonUDS DID selector constructs the standardized UDS request.");
+        var obdDtcDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-dtc-mask", "0xFF"]);
+        Check(obdDtcDoIp.Request.SequenceEqual(new byte[] {0x19, 0x02, 0xFF}),
+            "DoIP OBDonUDS DTC mask selector shares the UDS request service.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--payload", "22F40C", "--obd-did", "F40C"]),
+            "DoIP mutually exclusive raw and named UDS requests enforced.");
+
         var secureDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "gateway.example.org",
             "--tester", "0E80", "--ecu", "1234", "--tls", "true",
