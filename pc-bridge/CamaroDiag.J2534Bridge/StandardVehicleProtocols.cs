@@ -197,7 +197,7 @@ internal static class DoIpCodec
 
     internal static byte[] Encode(ushort type, ReadOnlySpan<byte> payload, byte version = Version)
     {
-        if (version is not (0x02 or 0x03) || payload.Length > MaxPayload)
+        if (version is not (0x02 or 0x03 or 0x04) || payload.Length > MaxPayload)
             throw new ArgumentOutOfRangeException(nameof(payload));
         var frame = new byte[8 + payload.Length];
         frame[0] = version;
@@ -233,7 +233,7 @@ internal static class DoIpCodec
 
     internal static int ReadPayloadLength(ReadOnlySpan<byte> header)
     {
-        if (header.Length != 8 || header[0] is not (0x02 or 0x03) ||
+        if (header.Length != 8 || header[0] is not (0x02 or 0x03 or 0x04) ||
             header[1] != (byte)~header[0])
             throw new InvalidDataException("DoIP protocol header version/inverse mismatch.");
         var size = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(4, 4));
