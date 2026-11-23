@@ -34,3 +34,8 @@ Grouped C1/C2/C4/C6 connector and bridge integration regression checkpoint — 2
 Source HEAD before checkpoint: 13e5c5650a849c36eeaa945cb4604348a33b57c9
 Unit scope: Android communication/diagnostic/app including DTC consent VIN/session guard, C2 archive, USB and J2534 tests; Windows J2534 Debug self-test.
 This is not the final C8 gate, a vehicle qualification, a Release or a merge.
+
+Final grouped non-protocol C1/C2/C4/C6 connector and bridge checkpoint, 2026-11-23.
+Source HEAD before request: 72bab814d622871624e78db17970bfe891afb24a
+Check all Android communication/diagnostic/app unit tests and Windows J2534 Debug self-test. Includes DTC consent adapter/VIN, portable restore finalization, and J2534 UI credential redaction.
+No per-commit CI, no physical ECU qualification, no merge or Release.
