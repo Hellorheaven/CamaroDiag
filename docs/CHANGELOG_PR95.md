@@ -311,3 +311,13 @@ Les événements TX sont enregistrés au moment de leur émission avec le statut
 ### C1 — intégrité entre deux écritures et avant l'instantané
 
 Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqué ou modifié en longueur **avant** l'instantané ou **entre deux événements** est désormais refusé, plutôt que d'être exporté avec une longueur arbitraire mais une génération valide. Tests sur les deux scénarios. Commits `753e09e` et `9b04e27`. Le contrôle ne remplace pas un hash complet ni la qualification matérielle.
+
+## Connexions application, pont PC et CamaroDiagConnectors — hors protocoles (23/11/2026)
+
+- **USB (ELM/STN et CamaroDiagConnectors) :** les boutons ASCII/CD/1 ne sont proposés que pour une carte explicitement énumérée comme CamaroDiagConnectors ; une carte KKL est exclue. Le ViewModel valide la sélection avant de quitter un adaptateur actif, puis le gestionnaire revalide l'énumération réelle avant de lancer le probe isolé. La découverte ne produit **aucun canal ECU actif**.
+- **CDJ/1 :** l'action UI de capture physique du journal de connecteur a été masquée : le lecteur physique est explicitement reporté au chantier C5, donc une exportation trompeuse n'est plus proposée.
+- **Autorisation Android USB :** nouvel état typé `UsbPermissionPendingException` renvoyé lorsque la boîte de dialogue système est demandée ; l'utilisateur voit une consigne FR/EN d'autoriser puis relancer la connexion, plutôt qu'un échec générique.
+- **Pont Windows J2534 :** les indicateurs de disponibilité de lecture mémoire sont effacés lors d'une perte de liaison ou d'un changement de véhicule. Le formulaire d'appairage est désormais vérifié **avant** de couper une éventuelle connexion fonctionnelle (IPv4 privée, port autorisé, code TLS avec empreinte, identifiants CAN cohérents) ; le transport effectue toujours son contrôle TLS et de session indépendant lors de l'ouverture.
+- Tests ajoutés : sélection USB reconnue versus ELM/KKL, configuration J2534 privée/TLS/11 et 29 bits avec rejets, messages FR/EN de permission et d'erreur de formulaire.
+- Commits de ce lot : `a86fff7`, `38a9c80`, `2c45c05`, `4bd7333`, `c00c294`, `78457c1`, `773c40d`, `7c4607e`, `339690b`, `77c4202`, `ef0d6c2`, `0335be6`, `fa903d7`, `4454797`, `5fbf50e`, `15002c4`, `5fbe181`, `ad9b2f5`, `b370b93`, `9c0cc91`, `494429a`.
+- **Tests non confirmés sur le HEAD final**, aucun essai USB, TLS PC ou ECU physique déclaré. Aucun protocole ISO/SAE, firmware ou commande d'écriture ECU modifié par cette intervention.
