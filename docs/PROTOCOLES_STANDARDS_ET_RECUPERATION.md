@@ -354,3 +354,10 @@ La commande s'appuie sur le pilote fournisseur SAE J2534 et sur CAN brut classiq
 - **Qualification** : tests unitaires ajoutés, pas encore exécutés dans cette tranche. La couverture SAE J1979 n'est pas complète (versions SAE J1979DA, tous les PID/monitor IDs et services, transports J1850/K-Line, expérience véhicule). La conformité logicielle ou matérielle ne peut pas être déclarée sur ces seuls codecs.
 
 Référence de format : SAE J1979 (éditions historiques) et documentation de la procédure d'essai des modes OBD-II ; l'adaptation aux éditions récentes doit être validée séparément.
+
+
+### SAE J1979 mode 01 PID 01 — MIL et état des moniteurs
+
+Le traitement du service 01 PID 01 sait désormais identifier le bit MIL, le nombre de défauts confirmés sur les sept bits restants, ainsi que l'indication de type d'allumage. Les autres octets de disponibilité des moniteurs sont affichés en brut : ils ne sont ni convertis en « tous les tests prêts », ni utilisés pour conclure qu'un véhicule est sain sans validation par édition SAE J1979 et profil calculateur.
+
+Cette prise en charge s'ajoute aux codes défaut CAN comptés, aux PID de capteurs explicitement décodés et aux InfoTypes du mode 09. Les tests associés sont ajoutés au jeu d'autotests logiciels, **mais aucun nouveau build/CI ni essai matériel n'a été exécuté pendant cette tranche.** Les autres PID et les modes 05, 06 et 08 restent partiellement couverts ou bruts.
