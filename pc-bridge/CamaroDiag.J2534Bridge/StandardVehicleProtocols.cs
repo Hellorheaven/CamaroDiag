@@ -285,13 +285,25 @@ internal static class DoIpCodec
         return Encode(RoutingActivationRequest, payload, version);
     }
 
-    internal static void RequireRoutingActive(Message response, ushort testerAddress)
+    internal static byte ReadRoutingActivationCode(
+        Message response, ushort testerAddress)
     {
         if (response.Type != RoutingActivationResponse ||
             response.Payload.Length is not (9 or 13) ||
-            BinaryPrimitives.ReadUInt16BigEndian(response.Payload) != testerAddress ||
-            response.Payload[4] != 0x10)
-            throw new InvalidDataException("DoIP routing activation not positively acknowledged.");
+            BinaryPrimitives.ReadUInt16BigEndian(response.Payload) != testerAddress)
+            throw new InvalidDataException(
+                "DoIP routing activation response has invalid type, size or tester address.");
+        return response.Payload[4];
+    }
+
+    internal static void RequireRoutingActive(Message response, ushort testerAddress)
+    {
+        var code = ReadRoutingActivationCode(response, testerAddress);
+        if (code != 0x10)
+            throw new IOException(
+                code == 0x11 ?
+                    "DoIP routing awaits vehicle-side confirmation; not yet active." :
+                    $"DoIP routing denied or unsupported response code 0x{code:X2}.");
     }
 
     internal static byte[] ReplyToAliveCheck(Message request, ushort testerAddress)
