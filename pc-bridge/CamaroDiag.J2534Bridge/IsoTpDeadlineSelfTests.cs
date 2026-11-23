@@ -54,6 +54,19 @@ internal static class IsoTpDeadlineSelfTests
             Check(rejected, message);
         }
 
+        var remaining = StandardProtocolCli.RemainingIsoTpExchangeBudget(
+            TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(40));
+        Check(remaining == TimeSpan.FromMilliseconds(60),
+            "CLI RX budget is reduced by time spent sending request.");
+        Reject<TimeoutException>(() =>
+            StandardProtocolCli.RemainingIsoTpExchangeBudget(
+                TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100)),
+            "No RX phase may start after full TX deadline is consumed.");
+        Reject<TimeoutException>(() =>
+            StandardProtocolCli.RemainingIsoTpExchangeBudget(
+                TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(120)),
+            "A response that exceeds the TX/RX deadline is never reported as success.");
+
         var settings = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8, 8, false);
         var lateSingle = new SlowLink();
         lateSingle.Incoming.Enqueue(new(0x7E8, false,
