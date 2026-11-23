@@ -32,6 +32,8 @@ class PersistentEcuPhysicalBlockBackupTest {
                 runBlocking { store.preserve(region, ByteArray(8) { it.toByte() }, originalSha) }
             }
         } finally { folder.deleteRecursively() }
+        // Explicit Unit return: JUnit4 requires @Test methods to return void.
+        Unit
     }
 
     @Test fun wrongLiveBytesOrWrongPhysicalSizeCannotBeArchived() = runBlocking {
@@ -53,5 +55,7 @@ class PersistentEcuPhysicalBlockBackupTest {
             }
             assertTrue(store.directory.listFiles().orEmpty().isEmpty())
         } finally { folder.deleteRecursively() }
+        // Explicit Unit return: JUnit4 requires @Test methods to return void.
+        Unit
     }
 }
