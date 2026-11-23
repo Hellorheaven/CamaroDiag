@@ -30,6 +30,16 @@ Les premières modifications comparaient les images et les trames préparées, *
 | **C6 — sûreté du pont et de la programmation** | `BridgeServer.cs`, `J2534BridgeTls.kt`, `UdsClient.kt`, `EcuWriteConsentFlow.kt`, `EcuWriteOperatorConsent.cs`, `NativeE39WriteSequence.cs` : TLS/appairage, vraies exigences OEM, suppression des verrous artificiels, avertissement OK puis Oui/Non, vérification du bloc de flash. | [C6 #45129685889](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45129685889) (avant renforcement des blocs). | Sauvegarde préalable des secteurs live et correspondance exacte des paquets de programmation ajoutées ; nouvelles vérifications à tester au HEAD final ; pas d'essai physique ni de restauration démontrée. |
 | **C8 — contrôle final / intégration** | Workflows `.github/workflows/pr-unit-tests.yml`, `connectors-ci.yml`, `native-ecu-kernel.yml` ; tests Android, Windows, ECU natif, connecteurs et Cloud Functions. | Campagnes ciblées ci-dessus, **mais aucune campagne C8 intégrale récente au dernier HEAD** constatée lors de l'audit. | **EN COURS :** campagne globale [#45133010915](https://github.com/Hellorheaven/CamaroDiag/actions/runs/45133010915) a confirmé Android, backend, Windows et connecteurs, mais échoué sur la compilation de l'intégration managed du noyau pour un fichier C# de vérification non référencé. Référence corrigée dans `NativeKernelIntegration.csproj` (commit `a598d86`). Revalider **au HEAD final**, vérifier conflits/secrets/périmètre avant toute clôture ; ne pas faire de Release ni fusionner sans accord. |
 
+## C6 — reprise explicite des contrôles de session et d'autorisation (23/11/2026)
+
+**C6 reste un chantier actif et non clos.** La couche de sûreté logicielle ne constitue pas une preuve d'écriture ni de récupération physique.
+
+- La confirmation de suppression des DTC normalisés lie désormais l'avertissement initial et le « Oui » à la **même génération d'adaptateur**. Une déconnexion, reconnexion, perte de liaison ou modification du compte invalide la confirmation, même si une autre interface est déjà active.
+- Le ViewModel vérifie à nouveau cette génération avant d'émettre la commande de suppression ; le protocole de suppression n'a pas été modifié.
+- Une déconnexion générale depuis l'écran Adaptateur s'applique aux liaisons USB, Wi-Fi, BLE/Bluetooth, pont J2534 et mode simulé, avec arrêt et jonction des opérations de capture pour éviter d'utiliser un transport obsolète.
+- Tests de régression ajoutés dans `EcuWriteConsentFlowTest` : avertissement seul, refus, absence de contexte et changement de génération.
+- Restent bloquants pour déclarer C6 terminé : validation du consentement sur l'ensemble des commandes potentiellement modifiantes, contrôles réels des octets/blocs programmés, sauvegarde restaurable avant effacement, test du rollback sur ECU, compilation/tests complets au HEAD stabilisé. **Aucune clé ou licence de programmation artificielle ajoutée.**
+
 ## Anomalies / travaux restant ouverts
 
 1. **Pilotes physiques absents :** `EcuProgrammingDriverContract.registeredHardwareDrivers = emptyList()` ; les voies de programmation Android ne peuvent pas physiquement écrire. Les connecteurs ESP32-S3/STM32 et les chemins autres que banc E39 ne disposent pas de support flash complet démontré. [Issue #109](https://github.com/Hellorheaven/CamaroDiag/issues/109).
