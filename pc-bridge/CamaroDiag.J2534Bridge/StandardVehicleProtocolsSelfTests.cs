@@ -125,6 +125,16 @@ internal static class StandardVehicleProtocolsSelfTests
             vehicleIdentity.FurtherAction == 0x10 &&
             vehicleIdentity.VinGidStatus == 0,
             "DoIP UDP response parses VIN, logical address, EID, GID and status.");
+        Check(DoIpVehicleDiscovery.MatchesRequestedIdentity(
+            vehicleIdentity, "12345678901234567", [1, 2, 3, 4, 5, 6]),
+            "DoIP VIN/EID-targeted identification accepts exact matching response.");
+        Check(!DoIpVehicleDiscovery.MatchesRequestedIdentity(
+            vehicleIdentity, "12345678901234568", null),
+            "DoIP VIN mismatch cannot satisfy a targeted discovery.");
+        Check(!DoIpVehicleDiscovery.MatchesRequestedIdentity(
+            vehicleIdentity, null, [1, 2, 3, 4, 5, 7]),
+            "DoIP EID mismatch cannot satisfy a targeted discovery.");
+
         var withoutStatus = DoIpVehicleDiscovery.ParseAnnouncement(
             DoIpCodec.Encode(DoIpCodec.VehicleIdentificationResponse,
                 identityBytes[..32]), discoveryAddress);
