@@ -209,7 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _functionalTestState.value = FunctionalTestState()
         // A connection started under another Firebase account must never
         // complete after the garage and session ownership have changed.
-        connectionAttemptGeneration++
+        nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
@@ -436,7 +436,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // succeeds. Never tear down the replacement adapter for that old error.
         if (error is ObdSupersededSessionException) return
         if (!ObdTransportFailurePolicy.isConnectionLoss(error)) return
-        connectionAttemptGeneration++
+        nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         // Retain the cancelled job until the next connection can join its
         // transport cleanup; clearing it would allow overlapping handshakes.
@@ -1165,7 +1165,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        val attempt = ++connectionAttemptGeneration
+        val attempt = nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
@@ -1244,7 +1244,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * before the manager socket/USB handle can be closed.
      */
     fun disconnectSelectedAdapter() {
-        val attempt = ++connectionAttemptGeneration
+        val attempt = nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         val pendingConnection = connectionAttemptJob
         pendingConnection?.cancel()
@@ -1281,7 +1281,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disconnectJ2534Bridge() {
-        val attempt = ++connectionAttemptGeneration
+        val attempt = nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         val pendingConnection = connectionAttemptJob
         pendingConnection?.cancel()
@@ -3494,6 +3494,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     @Volatile private var connectionAttemptGeneration: Long = 0L
+    private val _connectionGeneration = MutableStateFlow(0L)
+    val connectionGeneration: StateFlow<Long> = _connectionGeneration.asStateFlow()
+
+    /** Shared revision for all physical/simulated adapter transitions.
+     * A consent dialog from an older revision can never authorize a write.
+     */
+    private fun nextConnectionGeneration(): Long {
+        val next = ++connectionAttemptGeneration
+        _connectionGeneration.value = next
+        return next
+    }
     private var connectionAttemptJob: Job? = null
 
     private fun connectWithResult(
@@ -3503,7 +3514,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         endpoint: String,
         discoveryOnly: Boolean = false
     ) {
-        val attempt = ++connectionAttemptGeneration
+        val attempt = nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
@@ -3691,7 +3702,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectSimulatedAdapter(preset: String) {
-        val attempt = ++connectionAttemptGeneration
+        val attempt = nextConnectionGeneration()
         invalidateFuelHistoryForConnectionChange()
         val previousAttempt = connectionAttemptJob
         previousAttempt?.cancel()
@@ -3958,12 +3969,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return if (isFr) entry.second else entry.first
     }
 
-    fun clearDtcs(approval: EcuWriteConsentFlow.Approval) {
+    fun clearDtcs(approval: EcuWriteConsentFlow.Approval, confirmedConnection: Long) {
         require(approval.warningAcknowledged && approval.confirmedYes) {
             "The ECU write warning OK and subsequent YES are required."
         }
+        // The two UI confirmations must refer to the same physical session,
+        // not merely the adapter that happens to be connected at click time.
+        if (confirmedConnection != connectionAttemptGeneration) return
         val account = accountSessionGeneration
-        val connection = connectionAttemptGeneration
+        val connection = confirmedConnection
         fun current() = isCurrentAccountGeneration(account) && connection == connectionAttemptGeneration
         viewModelScope.launch {
             if (!current()) return@launch
@@ -4856,7 +4870,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        connectionAttemptGeneration++
+        nextConnectionGeneration()
         val activeJobs = listOfNotNull(
             canMonitorJob, canRequestJob, detachedCanMonitorJob,
             detachedCanRequestJob, connectionAttemptJob
