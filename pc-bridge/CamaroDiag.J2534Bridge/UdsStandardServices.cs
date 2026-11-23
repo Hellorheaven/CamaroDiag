@@ -183,15 +183,45 @@ internal static class UdsStandardServices
         byte dataFormatIdentifier = 0x00) =>
         UploadDownload(0x35, address, length, dataFormatIdentifier);
 
-    private static byte[] UploadDownload(byte service, uint address, uint length, byte dfi)
+    /// <summary>
+    /// General ISO 14229 RequestDownload with explicit memoryAddress and
+    /// memorySize widths. Each field may use 1–8 big-endian bytes. Address
+    /// values and ranges must fit the selected widths. This only builds a
+    /// PDU; the OEM must authorize the target mapping and memory operation.
+    /// </summary>
+    internal static byte[] RequestDownload(ulong address, ulong length,
+        byte addressBytes, byte lengthBytes, byte dataFormatIdentifier = 0) =>
+        UploadDownload(0x34, address, length,
+            dataFormatIdentifier, addressBytes, lengthBytes);
+
+    internal static byte[] RequestUpload(ulong address, ulong length,
+        byte addressBytes, byte lengthBytes, byte dataFormatIdentifier = 0) =>
+        UploadDownload(0x35, address, length,
+            dataFormatIdentifier, addressBytes, lengthBytes);
+
+    private static byte[] UploadDownload(byte service, uint address, uint length,
+        byte dfi) => UploadDownload(service, (ulong)address, (ulong)length,
+            dfi, addressBytes: 4, lengthBytes: 4);
+
+    private static byte[] UploadDownload(byte service, ulong address,
+        ulong length, byte dfi, byte addressBytes, byte lengthBytes)
     {
-        if (length == 0 || (ulong)address + length > 0x1_0000_0000ul)
-            throw new ArgumentOutOfRangeException(nameof(length));
-        // ALFI 0x44; ECU-specific address/size width can be handled in a
-        // separate profile. DFI is not presumed to imply compression support.
-        return [service, dfi, 0x44,
-            (byte)(address >> 24), (byte)(address >> 16), (byte)(address >> 8), (byte)address,
-            (byte)(length >> 24), (byte)(length >> 16), (byte)(length >> 8), (byte)length];
+        if (length == 0 || length > ulong.MaxValue - address ||
+            addressBytes is < 1 or > 8 || lengthBytes is < 1 or > 8 ||
+            addressBytes < 8 && (address >> (addressBytes * 8)) != 0 ||
+            lengthBytes < 8 && (length >> (lengthBytes * 8)) != 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(length), "UDS upload/download address or size exceeds selected ALFI width.");
+        var pdu = new byte[3 + addressBytes + lengthBytes];
+        pdu[0] = service;
+        pdu[1] = dfi;
+        pdu[2] = (byte)((lengthBytes << 4) | addressBytes);
+        for (var i = 0; i < addressBytes; i++)
+            pdu[3 + i] = (byte)(address >> (8 * (addressBytes - 1 - i)));
+        for (var i = 0; i < lengthBytes; i++)
+            pdu[3 + addressBytes + i] =
+                (byte)(length >> (8 * (lengthBytes - 1 - i)));
+        return pdu;
     }
 
     internal sealed record NegotiatedTransferSize(
