@@ -98,7 +98,8 @@ internal static class StandardProtocolCli
 
     internal sealed record IsoTpOptions(
         int AdapterIndex, uint Bitrate, IsoTpCanFdSession.Settings Settings,
-        byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs, uint? DataBaud);
+        byte[] Request, int TimeoutMs, bool ExtendedId, bool Brs, uint? DataBaud,
+        string Mode);
 
     internal static IsoTpOptions ParseIsoTp(string[] args)
     {
@@ -130,24 +131,29 @@ internal static class StandardProtocolCli
             Number(rate) : (uint?)null;
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
+        var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
-        if ((hexPayload is null) == (payloadFile is null))
-            throw new ArgumentException("Supply exactly one of --payload or --payload-file.");
-        var bytes = payloadFile is null ?
+        if (mode is not ("exchange" or "receive") ||
+            (mode == "exchange" && (hexPayload is null) == (payloadFile is null)) ||
+            (mode == "receive" && (hexPayload is not null || payloadFile is not null)))
+            throw new ArgumentException(
+                "Exchange needs exactly one payload source; receive mode accepts no payload.");
+        var bytes = mode == "receive" ? [] : payloadFile is null ?
             Convert.FromHexString(hexPayload!) : File.ReadAllBytes(payloadFile);
         var setting = new IsoTpCanFdSession.Settings(tx, rx, length, fd,
             bs, stMin, TxAddress: txAddress, RxAddress: rxAddress);
         setting.Validate();
         if (index < 0 || bitrate == 0 || timeout is < 100 or > 30000 ||
-            bytes.Length is < 1 or > IsoTpCanFdSession.MaximumPayloadBytes ||
+            (mode == "exchange" && bytes.Length is < 1 or > IsoTpCanFdSession.MaximumPayloadBytes) ||
             (brs && (!dataBaud.HasValue || dataBaud.Value == 0)) ||
             (dataBaud.HasValue && (!fd || dataBaud.Value == 0)) ||
             tx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
             rx > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
             (!fd && brs))
             throw new ArgumentException("Invalid ISO-TP physical address or J2534 option.");
-        return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud);
+        return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud,
+            mode);
     }
 
     internal static async Task<int> RunIsoTpAsync(string[] args)
@@ -158,7 +164,7 @@ internal static class StandardProtocolCli
             var adapters = J2534Registry.Discover();
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
-            if (!Confirm($"ISO-TP {(o.Settings.CanFd ? "CAN FD" : "CAN")} " +
+            if (o.Mode == "exchange" && !Confirm($"ISO-TP {(o.Settings.CanFd ? "CAN FD" : "CAN")} " +
                 $"TX=0x{o.Settings.TxId:X} RX=0x{o.Settings.RxId:X}, " +
                 $"TX address={o.Settings.TxAddress?.ToString("X2") ?? "normal"} " +
                 $"RX address={o.Settings.RxAddress?.ToString("X2") ?? "normal"}, " +
@@ -182,8 +188,9 @@ internal static class StandardProtocolCli
             var link = new IsoTpJ2534RawCanLink(driver, o.Settings.CanFd,
                 o.ExtendedId, o.Brs);
             var limit = TimeSpan.FromMilliseconds(o.TimeoutMs);
-            await IsoTpCanFdSession.SendAsync(link, o.Settings, o.Request,
-                limit, CancellationToken.None);
+            if (o.Mode == "exchange")
+                await IsoTpCanFdSession.SendAsync(link, o.Settings, o.Request,
+                    limit, CancellationToken.None);
             var reply = await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
                 limit, CancellationToken.None);
             Console.WriteLine("ISO-TP ECU RX: " + Convert.ToHexString(reply));
