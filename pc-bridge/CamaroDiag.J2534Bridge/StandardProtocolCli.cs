@@ -264,7 +264,7 @@ internal static class StandardProtocolCli
     internal sealed record PassThruOptions(int AdapterIndex, uint ProtocolId,
         uint Baud, uint Flags, byte[] Data, byte[]? Mask, byte[]? Pattern,
         byte[]? Flow, string? KlineInit, int TimeoutMs, int ReadFrames,
-        byte? KwpRxTarget, byte? KwpRxSource);
+        byte? KwpRxTarget, byte? KwpRxSource, string Mode);
 
     private static string Required(IReadOnlyList<string> args, string option)
     {
@@ -327,7 +327,13 @@ internal static class StandardProtocolCli
         var protocol = Number(Required(args, "--protocol-id"));
         var baud = Number(Required(args, "--baud"));
         var flags = Number(Optional(args, "--flags") ?? "0");
-        var data = Hex(Required(args, "--data"));
+        var mode = (Optional(args, "--mode") ?? "exchange").ToLowerInvariant();
+        var txText = Optional(args, "--data");
+        if (mode is not ("exchange" or "receive") ||
+            (mode == "exchange" && txText is null) ||
+            (mode == "receive" && txText is not null))
+            throw new ArgumentException("J2534 exchange needs TX data; receive mode must not specify TX data.");
+        var data = txText is null ? Array.Empty<byte>() : Hex(txText);
         var mask = Optional(args, "--mask") is string m ? Hex(m) : null;
         var pattern = Optional(args, "--pattern") is string p ? Hex(p) : null;
         var flow = Optional(args, "--flow-control") is string f ? Hex(f) : null;
@@ -342,6 +348,7 @@ internal static class StandardProtocolCli
             CultureInfo.InvariantCulture);
         if (index < 0 || !J2534StandardChannel.IsKnownProtocol(protocol) ||
             baud == 0 || timeout is < 1 or > 30000 || count is < 0 or > 256 ||
+            (mode == "receive" && count == 0) ||
             data.Length > J2534StandardChannel.MaxData ||
             (mask == null) != (pattern == null) ||
             (flow != null && mask == null) ||
@@ -354,7 +361,7 @@ internal static class StandardProtocolCli
             throw new ArgumentException("Invalid standard J2534 channel configuration.");
         return new(index, protocol, baud, flags, data,
             mask, pattern, flow, init, timeout, count,
-            kwpRxTarget, kwpRxSource);
+            kwpRxTarget, kwpRxSource, mode);
     }
 
     internal static async Task<int> RunDoIpAsync(string[] args)
@@ -389,7 +396,7 @@ internal static class StandardProtocolCli
             var adapters = J2534Registry.Discover();
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
-            if (!Confirm($"SAE J2534 {adapters[o.AdapterIndex].Name}, " +
+            if (o.Mode == "exchange" && !Confirm($"SAE J2534 {adapters[o.AdapterIndex].Name}, " +
                 $"protocol=0x{o.ProtocolId:X} TX={Convert.ToHexString(o.Data)}"))
                 return 2;
             using var driver = J2534StandardChannel.Connect(adapters[o.AdapterIndex],
@@ -409,8 +416,11 @@ internal static class StandardProtocolCli
             }
             if (o.Mask != null && o.Pattern != null)
                 driver.ConfigureFilter(o.Mask, o.Pattern, o.Flow);
-            driver.Transmit(o.Data, timeoutMs: o.TimeoutMs);
-            Console.WriteLine("J2534 TX queued; this does not prove ECU execution.");
+            if (o.Mode == "exchange")
+            {
+                driver.Transmit(o.Data, timeoutMs: o.TimeoutMs);
+                Console.WriteLine("J2534 TX queued; this does not prove ECU execution.");
+            }
             for (var i = 0; i < o.ReadFrames; i++)
             {
                 var received = driver.Receive(o.TimeoutMs);
