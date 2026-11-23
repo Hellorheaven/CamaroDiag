@@ -108,3 +108,4 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Réception multipaquets : les CTS sont limités à la fenêtre maximale déclarée dans le RTS distant, même si la fenêtre locale est plus grande ; BAM reste indépendant de cette limite.
 - Autotest ajouté avec RTS limité à un paquet, trois fenêtres CTS successives, reconstruction des octets et acquittement EOM_ACK.
 - Commits `c849df3`, `071b4c0`. Tests ajoutés **non exécutés** à ce stade ; aucune qualification matérielle ou véhicule revendiquée.
+- Filtrage des abandons `TP.CM Abort` pendant la réception `TP.DT` : une interruption ne s'applique qu'à la destination et au PGN de la session active. Tests ajoutés pour abort d'un autre PGN et abort correspondant (`f8529cb`, `adc71f9`), non encore exécutés.
