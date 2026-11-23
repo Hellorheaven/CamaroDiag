@@ -408,3 +408,12 @@ La commande Windows explicite `--obd-auto-detect-can --adapter-index 0 --baud 50
 | LIN, J1708/J1587, KWP1281, TP2.0, RP1210, D-PDU | 0–10 % | Backlog/architecture, sans pile bout en bout qualifiée | Code transport et matériel/profil à livrer |
 
 **État des validations du lot actuel :** nouveaux tests unitaires ajoutés au lanceur `BridgeSelfTests` mais **non exécutés**, aucune CI finale du HEAD ni banc ECU. Les pourcentages ne doivent pas être utilisés pour déduire que l'écriture d'un calculateur ou sa restauration seraient opérationnelles.
+
+
+## Nouveaux lots protocoles — J1979-2 puis ISO-TP CAN/CAN-FD (23/11/2026 20h)
+
+**SAE J1979-2 / OBDonUDS** : service UDS 0x19 sous-fonction 0x01 (`reportNumberOfDTCByStatusMask`) ajouté. Construction `19 01 [masque]`, analyse de la réponse exacte `59 01 [disponibilité] [format DTC] [nombre sur 16 bits big endian]`. Le chemin explicite `--obd-dtc-count-mask` est branché à `--isotp-exchange` et `--doip-exchange`, avec corrélation/contrôles de réponse existants. Tests software positifs/négatifs intégrés au lanceur.
+
+**ISO 15765-2 / ISO-TP, CAN et CAN-FD** : le timeout d'un échange complet n'est plus réinitialisé à chaque trame CAN, à chaque FlowControl/WAIT ni lors du filtrage de trafic d'autres IDs. Les contrôles de temps sont appliqués avant et après les opérations du lien. Le filtrage d'identité de trame continue jusqu'au délai total, sans perte de réponse après le 64e paquet étranger. Ajout de tests simulant lien très lent, fenêtre FC expirée et bus chargé de 96 trames sans lien avant la réponse. Ces modifications ne qualifient pas le comportement temps réel d'un pilote J2534 donné.
+
+**Niveau de validation** : tests écrits et enregistrés mais **non exécutés** ; aucune campagne de compilation Windows/CI ni essai CAN/CAN-FD physique sur ce lot. Les estimations de couverture logicielle restent **J1979-2 ~45 %, ISO-TP CAN ~72 %, ISO-TP CAN-FD ~62 %**, indicatives uniquement, pas des mesures de conformité. L'ensemble des protocoles et leurs écarts figurent dans la matrice précédente ; la prise en charge de l'écriture ECU reste conditionnée aux vrais droits constructeur, aux sauvegardes des secteurs et au profil matériel qualifié, sans verrou artificiel.
