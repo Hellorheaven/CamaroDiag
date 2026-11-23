@@ -265,3 +265,7 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - **Limitation majeure inchangée** : ces corrections portent uniquement sur la préparation hors ligne d'une image ; elles ne constituent ni une cartographie OEM complète, ni un pilote de flash, ni une récupération réelle d'ECU.
 
 **Validation** : les tests de ces correctifs ne sont pas encore confirmés par un rapport GitHub Actions au SHA final. Ne pas annoncer de compilation réussie ou de qualification véhicule pour ces changements. Aucun protocole standard n'a été modifié dans ce lot.
+
+### C1 — statut des requêtes dans le CSV complet
+
+Les événements TX sont enregistrés au moment de leur émission avec le statut `PENDING`, sans indiquer faussement un échec. Les événements de réception et système portent `OK` ou `FAILED` selon leur résultat observable ; le journal conserve la séquence chronologique et n'infère pas un accusé ECU de la seule confirmation d'un adaptateur. La colonne CSV `succeeded` est remplacée par `status` pour les nouveaux exports. Tests mis à jour (commits `cc74672`, `e3b085d`, `0d5ac24`). Tests et compilation à confirmer à la clôture du lot.
