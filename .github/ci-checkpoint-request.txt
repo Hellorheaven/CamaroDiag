@@ -53,3 +53,11 @@ Tests offline spécialisés ajoutés, PAS encore exécutés. Déclencher une
 campagne groupée Debug au SHA de ce commit marqueur: Windows -warnaserror
 et --self-test, Android, noyau natif et connecteurs. Aucune qualification
 électrique sur VCI, ECU ou véhicule; ne pas merger ou publier Release.
+
+23/11/2026 — recheck groupé après correction Windows Debug ISO-TP (#110)
+Le run #45266205498 a révélé 15 erreurs C# (suite UDS absente,
+local J1979 incorrect et 13 appels SequenceEqual avec type non inféré).
+Correctif de compilation regroupé au SHA 277d5a8d2cdb7806cd098602dbc3cca8060d2981.
+Relancer UNE campagne complète Debug de validation de ce lot,
+Windows -warnaserror + selftests, Android, native ECU, connecteurs.
+Pas de tests par commit; aucune Release, aucun merge, aucune preuve ECU physique.
