@@ -82,6 +82,28 @@ class EcuRestorePortableBundleTest {
         }
     }
 
+    @Test fun indexFirstZipStillPublishesOnlyAfterFullValidation() {
+        val root = Files.createTempDirectory("restore-index-first").toFile()
+        try {
+            val original = sourcePackage(root)
+            val reordered = ByteArrayOutputStream()
+            ZipOutputStream(reordered).use { zip ->
+                for (name in listOf("index.ecu-package", "region-0.ecu-image")) {
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write(File(original, name).readBytes())
+                    zip.closeEntry()
+                }
+            }
+            val imported = EcuRestorePortableBundle.importNew(
+                reordered.toByteArray().inputStream(), File(root, "verified")
+            )
+            assertEquals(identity, imported.identity)
+            assertArrayEquals(byteArrayOf(1, 2, 3, 4), imported.regions.single().bytes())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun invalidPackageIndexIsNeverLeftAuthoritativeAfterImportFailure() {
         val root = Files.createTempDirectory("restore-invalid-index").toFile()
         try {
