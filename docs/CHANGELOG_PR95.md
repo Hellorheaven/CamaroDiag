@@ -224,3 +224,12 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 ## DoIP — états d'entité et d'alimentation (23/11/2026)
 - Ajout des requêtes UDP ISO 13400 `0x4001/0x4002` (sockets, type d'entité et taille maximale) et `0x4003/0x4004` (état d'alimentation diagnostique), par la CLI `--doip-status`.
 - Tests de décodage normal, optionnel et malformé ajoutés, non exécutés. Aucun diagnostic actif ni autorisation de flash impliqués.
+
+### C1 — contrôle d'intégrité du journal, suite
+
+- L'export de la console refuse désormais l'archive en cas d'échec de persistance détecté dans le magasin, de journal absent alors que des événements sont affichés ou de fichier supprimé.
+- L'initialisation qui échoue supprime le fichier temporaire, plutôt que de laisser une archive orpheline présentée comme disponible.
+- Le contrôle du bouton Export n'effectue plus de flush disque à chaque recomposition UI ; la vérification complète du journal reste effectuée au lancement de l'export.
+- Régressions ajoutées : fichier supprimé, réinitialisation après erreur et répertoire de destination non valide.
+- Commits : `cf4230e`, `1356519`, `9b01a3b`, `0421ace`, `7efc7e3`.
+- **Tests non vérifiés au dernier HEAD.** La campagne C1 précédente ne prouve pas ces correctifs. Pas de déclaration de compatibilité physique.
