@@ -135,3 +135,7 @@ La CLI `--j2534-standard` propose `--mode receive` sans `--data`, pour lire un c
 ## J1939-73 — décodage DM1/DM2
 
 Le moteur peut afficher les messages diagnostiques normalisés **DM1 (PGN 0xFECA, défauts actifs)** et **DM2 (PGN 0xFECB, défauts précédemment actifs)** reçus par la CLI J1939. Après reconstruction éventuelle par J1939-21 TP, il extrait l'état et le clignotement des voyants, le SPN 19 bits, le FMI 5 bits, le compteur d'occurrences 7 bits et l'indicateur de méthode de conversion. Un champ de code à zéro n'est pas annoncé comme une panne. Les messages incomplets sont refusés ; les 2 octets de remplissage FF d'un paquet direct sont tolérés. Il ne s'agit ni d'un effacement de DTC, ni d'une base de signification OEM pour tous les SPN, ni d'une qualification véhicule.
+
+## DoIP TCP — Alive Check standard (23/11/2026)
+
+La session DoIP traite désormais les requêtes `Alive Check` TCP de la passerelle (type `0x0007`, charge utile vide), tant durant l'activation de routage que pendant un échange UDS, par une réponse `0x0008` contenant **l'adresse logique réelle du testeur** sur 2 octets, avec la même version DoIP que la requête. Le codec refuse les charges utiles non conformes. Cette réponse de gestion de session **n'est pas** une opération UDS ni une autorisation de programmation. Tests ajoutés mais non exécutés ; ni TLS ni essais réseau physique certifiés.
