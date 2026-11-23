@@ -373,6 +373,11 @@ internal static class J1939ClassicTpSelfTests
         Check(J1939AddressClaim.Compare(claim, 0x80, name) ==
             J1939AddressClaim.ClaimConflict.DuplicateName,
             "Identical NAME is not silently accepted as a valid claim.");
+        var cannotClaim = J1939AddressClaim.Build(0xFE, name);
+        Check(StandardVehicleProtocols.ParseJ1939Id(cannotClaim.Id).Source == 0xFE &&
+            J1939AddressClaim.Decode(cannotClaim.Id, cannotClaim.Data)
+                .SourceAddress == 0xFE,
+            "SAE J1939-81 0xFE Cannot Claim Address is legal only for management.");
         Reject<ArgumentException>(() =>
             J1939AddressClaim.Build(0xFF, name),
             "Broadcast source address cannot claim J1939 identity.");
