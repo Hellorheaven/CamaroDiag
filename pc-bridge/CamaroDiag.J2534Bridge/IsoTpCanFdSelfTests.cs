@@ -84,6 +84,63 @@ internal static class IsoTpCanFdSelfTests
         Check(Receive(rxEscaped, fd12).SequenceEqual(Fill(10)),
             "CAN FD escaped single frame received.");
 
+        // ISO 15765-2 extended addressing adds a logical address in
+        // every SF, FF, CF and FC (not just the initial request).
+        var extendedAddress = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8,
+            8, false, BlockSize: 1, TxAddress: 0xF1, RxAddress: 0x10);
+        var addressedSingle = new QueueLink();
+        Send(addressedSingle, extendedAddress, [0x22, 0xF1, 0x90]);
+        Check(addressedSingle.Sent.Count == 1 &&
+            addressedSingle.Sent[0].Data[0] == 0xF1 &&
+            addressedSingle.Sent[0].Data[1] == 3 &&
+            addressedSingle.Sent[0].Data[2] == 0x22,
+            "Extended addressing sends logical target before SF PCI.");
+
+        var addressedRx = new QueueLink();
+        addressedRx.Replies.Enqueue(RX(false, 0x11, 3, 0, 0, 0, 0, 0, 0));
+        addressedRx.Replies.Enqueue(RX(false, 0x10, 3, 0x62, 0xF1, 0x90, 0, 0, 0));
+        Check(Receive(addressedRx, extendedAddress).SequenceEqual(
+            new byte[] {0x62, 0xF1, 0x90}),
+            "Extended address filters unrelated traffic on the same CAN ID.");
+
+        var addressedMulti = new QueueLink();
+        addressedMulti.Replies.Enqueue(RX(false, 0x10, 0x30, 0, 0, 0, 0, 0, 0));
+        addressedMulti.Replies.Enqueue(RX(false, 0x10, 0x30, 0, 0, 0, 0, 0, 0));
+        Send(addressedMulti, extendedAddress, Fill(13));
+        Check(addressedMulti.Sent.Count == 4 &&
+            addressedMulti.Sent[0].Data[0] == 0xF1 &&
+            addressedMulti.Sent[0].Data[1] == 0x10 &&
+            addressedMulti.Sent[0].Data[2] == 13 &&
+            addressedMulti.Sent[1].Data[0] == 0xF1 &&
+            addressedMulti.Sent[1].Data[1] == 0x21 &&
+            addressedMulti.Sent[2].Data[1] == 0x22 &&
+            addressedMulti.Sent[3].Data[1] == 0x23,
+            "Extended addressing correctly segments 5 + 6 + 2 bytes.");
+
+        var addressedReassembly = new QueueLink();
+        foreach (var frame in addressedMulti.Sent)
+            addressedReassembly.Replies.Enqueue(new(0x7E8, false,
+                new byte[] {0x10}.Concat(frame.Data.AsSpan(1).ToArray()).ToArray()));
+        Check(Receive(addressedReassembly, extendedAddress)
+            .SequenceEqual(Fill(13)) &&
+            addressedReassembly.Sent.Count == 2 &&
+            addressedReassembly.Sent.All(frame =>
+                frame.Data[0] == 0xF1 && frame.Data[1] == 0x30),
+            "Extended addressing reassembles CF and emits addressed FC windows.");
+
+        Reject<ArgumentException>(() => new IsoTpCanFdSession.Settings(
+            0x7E0, 0x7E8, 8, false, TxAddress: 0xF1).Validate(),
+            "One-sided extended address is rejected.");
+        var extendedCommand = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--tx-address", "0xF1",
+            "--rx-address", "0x10", "--payload", "22F190"]);
+        Check(extendedCommand.Settings.TxAddress == 0xF1 &&
+            extendedCommand.Settings.RxAddress == 0x10 &&
+            !extendedCommand.ExtendedId,
+            "CLI ISO-TP logical addresses do not imply 29-bit CAN IDs.");
+
         var multi = new QueueLink();
         multi.Replies.Enqueue(RX(true, 0x30, 1, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         multi.Replies.Enqueue(RX(true, 0x30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
