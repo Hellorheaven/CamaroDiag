@@ -244,9 +244,9 @@ internal static class StandardProtocolCli
         var mixedAddressing = mixedText is not null;
         if (mixedAddressing)
         {
-            if (txAddress.HasValue || rxAddress.HasValue || !extended)
+            if (txAddress.HasValue || rxAddress.HasValue)
                 throw new ArgumentException(
-                    "Mixed addressing requires --extended true (29-bit IDs) and no TX/RX address selectors.");
+                    "Mixed addressing uses --mixed-address instead of TX/RX address selectors.");
             txAddress = checked((byte)Number(mixedText!));
             rxAddress = txAddress;
         }
