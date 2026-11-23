@@ -120,3 +120,8 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - **C4 :** correction des tests d'identifiants CSV, qui vérifient maintenant de véritables caractères de contrôle au lieu des deux caractères littéraux `\\n` / `\\t`. Tests supplémentaires pour changement d'interface et horodatage identique dans l'historique de 512 relevés.
 - **C4 validation :** demande d'un **unique contrôle groupé Debug** déposée via `.github/c4-flexfuel-readonly-gate-request.txt` ; résultat du workflow non confirmé dans cette intervention. Il est interdit de conclure à des tests réussis sans consulter les étapes et le rapport du run.
 - Aucun fichier des transports K-Line/DoIP/CAN-FD/SAE n'a été édité pour ces correctifs. Aucun essai ECU réel et aucune fusion de la PR #95.
+
+## Renforcement sessions ISO-TP et J1939 — 23/11/2026
+- ISO-TP : les transferts partageant un même identifiant CAN restent distinguables par des adresses logiques TX/RX différentes ; un identifiant et des adresses identiques pour les deux directions sont refusés comme ambigus. Scénarios ajoutés pour CAN-FD, FlowControl et identifiant partagé.
+- J1939-21 : messages RTS/BAM/CTS/EOM de PGN concurrents ignorés pendant une autre session ; corrélation stricte de l'abandon en cours, sans rejeter tout le bus partagé.
+- Tests de non-régression ajoutés et enregistrés, **non exécutés** à ce stade ; validation du compilateur et essais hardware en attente. Aucun support J1939-22 revendiqué.
