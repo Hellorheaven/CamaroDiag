@@ -2623,6 +2623,8 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
         AlertDialog(
             onDismissRequest = {
                 confirmClear = false
+                pendingClearGeneration = null
+                pendingClearVehicle = null
                 clearConsentStep = EcuWriteConsentFlow.Step.WARNING
             },
             title = {
@@ -2674,6 +2676,8 @@ fun DtcScreen(dtcs: List<DiagnosticDtc>, vehicle: VehicleProfile, ecuVinComparis
             dismissButton = {
                 TextButton(onClick = {
                     confirmClear = false
+                    pendingClearGeneration = null
+                    pendingClearVehicle = null
                     clearConsentStep = EcuWriteConsentFlow.Step.WARNING
                 }) {
                     Text(stringResource(
