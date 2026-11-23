@@ -85,8 +85,8 @@ internal static class StandardProtocolCli
         var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
             CultureInfo.InvariantCulture);
         var payloadHex = Optional(args, "--payload");
-        if (mode == "send" && payloadHex is null ||
-            mode is "receive" or "request" && payloadHex is not null)
+        if ((mode == "send" && payloadHex is null) ||
+            ((mode is "receive" or "request") && payloadHex is not null))
             throw new ArgumentException("J1939 send requires payload, receive/request forbid it.");
         byte[] data = mode == "send" ? Hex(payloadHex!) :
             mode == "request" ? J1939PgnRequest.Encode(pgn) : [];
@@ -95,7 +95,7 @@ internal static class StandardProtocolCli
         options.Validate();
         if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
             mode is not ("send" or "receive" or "request") ||
-            (mode is "receive" or "request" && broadcast) ||
+            ((mode is "receive" or "request") && broadcast) ||
             data.Length > J1939ClassicTpSession.MaxPayload)
             throw new ArgumentException("Invalid J1939 transport or operating mode.");
         return new(index, baud, options, mode, broadcast, data, timeout);
@@ -140,7 +140,7 @@ internal static class StandardProtocolCli
                     var requestSettings = o.Settings with { Pgn = J1939PgnRequest.RequestPgn };
                     await J1939ClassicTpSession.SendAsync(link,
                         requestSettings, o.Request, broadcast: false,
-                        window, CancellationToken.None);
+                        timeout: window, token: CancellationToken.None);
                 }
                 var response = await J1939ClassicTpSession.ReceiveAsync(
                     link, o.Settings, window, CancellationToken.None);
