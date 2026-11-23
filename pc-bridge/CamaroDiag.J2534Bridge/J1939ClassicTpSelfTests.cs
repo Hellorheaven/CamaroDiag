@@ -95,6 +95,30 @@ internal static class J1939ClassicTpSelfTests
             new byte[] {1,2,3,4,5,6,7,8}),
             "Single J1939 PGN received in full, including application padding.");
 
+        var concurrentControl = new FakeCan();
+        concurrentControl.Incoming.Enqueue(PeerCm(
+            J1939ClassicTpSession.Cts, 1, 1, 0xFF, 0xFF, 0x05, 0xF0, 0));
+        concurrentControl.Incoming.Enqueue(PeerCm(
+            J1939ClassicTpSession.Cts, 2, 1, 0xFF, 0xFF, 0x04, 0xF0, 0));
+        concurrentControl.Incoming.Enqueue(PeerCm(
+            J1939ClassicTpSession.Cts, 1, 3, 0xFF, 0xFF, 0x04, 0xF0, 0));
+        concurrentControl.Incoming.Enqueue(PeerCm(
+            J1939ClassicTpSession.EomAck, 20, 0, 3, 0xFF, 0x04, 0xF0, 0));
+        Send(concurrentControl, o, Data(20));
+        Check(concurrentControl.Outgoing.Count == 4,
+            "Unrelated TP.CM PGN does not interrupt active RTS/CTS send.");
+
+        var unrelatedStart = new FakeCan();
+        var otherStart = J1939ClassicTpSession.MakeControl(
+            o with { Pgn = 0xF005 },
+            J1939ClassicTpSession.Rts, 13, 2, 2, false, false);
+        unrelatedStart.Incoming.Enqueue(otherStart);
+        unrelatedStart.Incoming.Enqueue(new(
+            J1939ClassicTpSession.ArbitrationId(o.Pgn, 6,
+                o.RemoteAddress), false, Data(8)));
+        Check(Receive(unrelatedStart, o).Payload.SequenceEqual(Data(8)),
+            "Unrelated TP.CM PGN ignored before expected direct PGN.");
+
         var send = new FakeCan();
         send.Incoming.Enqueue(PeerCm(0x11, 2, 1, 0xFF, 0xFF, 0x04, 0xF0, 0));
         send.Incoming.Enqueue(PeerCm(0x11, 1, 3, 0xFF, 0xFF, 0x04, 0xF0, 0));
