@@ -143,33 +143,43 @@ internal static class J1939ClassicTpSession
                 (byte)o.Pgn, (byte)(o.Pgn >> 8), (byte)(o.Pgn >> 16)]);
         await link.SendAsync(first, token);
         var sequence = 1;
-        while (sequence <= count)
+        try
         {
-            var window = broadcast ? count - sequence + 1 :
-                await AwaitCtsAsync(link, o, timeout, count, sequence, token);
-            for (var transmitted = 0; transmitted < window; transmitted++)
+            while (sequence <= count)
             {
-                token.ThrowIfCancellationRequested();
-                if (broadcast)
-                    await link.WaitMinimumSeparationAsync(
-                        TimeSpan.FromMilliseconds(50), token);
-                var start = (sequence - 1) * 7;
-                var take = Math.Min(payload.Length - start, 7);
-                await link.SendAsync(MakeData(o, o.LocalAddress, destination,
-                    sequence, payload.AsSpan(start, take)), token);
-                sequence++;
+                var window = broadcast ? count - sequence + 1 :
+                    await AwaitCtsAsync(link, o, timeout, count, sequence, token);
+                for (var transmitted = 0; transmitted < window; transmitted++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (broadcast)
+                        await link.WaitMinimumSeparationAsync(
+                            TimeSpan.FromMilliseconds(50), token);
+                    var start = (sequence - 1) * 7;
+                    var take = Math.Min(payload.Length - start, 7);
+                    await link.SendAsync(MakeData(o, o.LocalAddress, destination,
+                        sequence, payload.AsSpan(start, take)), token);
+                    sequence++;
+                }
+            }
+            if (!broadcast)
+            {
+                var ack = await ReadControlAsync(link, o, fromPeer: true,
+                    timeout, token);
+                if (ack.Data[0] == Abort)
+                    throw new IOException("J1939 peer aborted transport after data transfer.");
+                if (ack.Data[0] != EomAck || ack.Data[1] != (byte)payload.Length ||
+                    ack.Data[2] != (byte)(payload.Length >> 8) ||
+                    ack.Data[3] != count || ack.Data[4] != 0xFF)
+                    throw new InvalidDataException("J1939 EOM_ACK size/packet count mismatch.");
             }
         }
-        if (!broadcast)
+        catch (TimeoutException) when (!broadcast && !token.IsCancellationRequested)
         {
-            var ack = await ReadControlAsync(link, o, fromPeer: true,
-                timeout, token);
-            if (ack.Data[0] == Abort)
-                throw new IOException("J1939 peer aborted transport after data transfer.");
-            if (ack.Data[0] != EomAck || ack.Data[1] != (byte)payload.Length ||
-                ack.Data[2] != (byte)(payload.Length >> 8) ||
-                ack.Data[3] != count || ack.Data[4] != 0xFF)
-                throw new InvalidDataException("J1939 EOM_ACK size/packet count mismatch.");
+            // Sender timeout after RTS is an explicit CMDT abort. Never
+            // emit this additional frame for BAM or an operator cancellation.
+            await link.SendAsync(MakeAbort(o, 3), token);
+            throw;
         }
     }
 
