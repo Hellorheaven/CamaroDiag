@@ -1,10 +1,14 @@
-C8 FINAL full Debug checkpoint — 23 November 2026
-Source HEAD: 0768d20066bed8ab6ccd92a2010326262c950a0a
-Revision includes exact address/sector/length/target bytes/checksum validation before every
-planned ECU write in Kotlin and native E39 Windows, with deliberately corrupted-packet tests.
-Persistent cross-chat rules: AGENTS.md, .github/copilot-instructions.md and docs/PROMPT_REPRISE.md.
-Audit PR95 C1 C2 C4 C6 C8 and updated changelog included.
-FULL single run: Android unit tests+lintDebug+assembleDebug, Firebase account/license offline tests,
-Windows J2534 Debug -warnaserror and selftests, native ECU C toolchain,
-Connectors CI. No Release build and no merge.
-This software check does not claim physical ECU backup/restore/flash.
+C8 full Debug checkpoint — 2026-11-23 exact ECU physical sector backup before programming
+Code HEAD: 95b506a4570d9513d64218e12dc50960e09164c5
+Change: before any destructive ECU operation, acquire actual physical bytes for all
+affected erase sectors, match address/length/region/physical sector, original image and
+independent second ECU read, persist in unique create-new disk sector backup files,
+fsync and read back those files, and verify target frame address/size/payload/checksum.
+Android EcuWriteTransaction + PersistentEcuPhysicalBlockBackup + tests;
+Windows E39 NativeE39WriteSequence + NativeE39FileWriteJournal + selftests;
+native managed kernel integration references updated.
+AGENTS.md, GitHub Copilot and docs/PROMPT_REPRISE.md permanently updated;
+C1/C2/C4/C6/C8 audit matrix and PR95 changelog updated.
+FULL Debug only: Android unit + lint + assemble; Firebase backend unit tests,
+Windows J2534 warnings-as-errors + selftests, native ECU kernel integration,
+all Connectors jobs. No Release/merge; no claim of physical ECU verification.
