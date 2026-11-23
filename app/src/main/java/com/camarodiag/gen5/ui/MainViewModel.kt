@@ -2595,7 +2595,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         append(timestamp)
                         append(" [")
                         append(entry.direction)
-                        if (!entry.succeeded) append(localizedContext.getString(R.string.can_console_export_failed_marker))
+                        if (!entry.succeeded) {
+                            append(' ')
+                            append(localizedContext.getString(R.string.can_console_export_failed_marker))
+                        }
                         append("] ")
                         appendLine(entry.content)
                     }
