@@ -52,4 +52,18 @@ object EcuWriteConsentFlow {
     ): Approval? = if (sameVehicle) {
         approvalForConnection(step, confirmedYes, warningConnection, currentConnection)
     } else null
+
+    /**
+     * A confirmation is not a perpetual permission. The protected transport
+     * invokes this immediately before sending a mutating command, after all
+     * command queues and network mutexes have been acquired.
+     */
+    fun requireCurrentForTransmit(approval: Approval, isContextCurrent: () -> Boolean) {
+        check(approval.warningAcknowledged && approval.confirmedYes) {
+            "ECU risk notice OK and separate YES are required."
+        }
+        check(isContextCurrent()) {
+            "ECU operation cancelled: account, adapter or vehicle changed before transmission."
+        }
+    }
 }
