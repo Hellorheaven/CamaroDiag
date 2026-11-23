@@ -147,24 +147,40 @@ internal static class J1939FdBamSession
         throw new TimeoutException("Missing correlated J1939-22 broadcast EOM_STATUS.");
     }
 
-    private static Task<IsoTpCanFdSession.CanFrame> ReceiveUntilAsync(
+    private static async Task<IsoTpCanFdSession.CanFrame> ReceiveUntilAsync(
         IsoTpCanFdSession.ICanLink link, TimeSpan limit,
         System.Diagnostics.Stopwatch clock, CancellationToken token,
         System.Diagnostics.Stopwatch? phaseClock = null,
         TimeSpan? phaseLimit = null)
     {
-        var remaining = limit - clock.Elapsed;
-        if (phaseClock is not null && phaseLimit.HasValue)
+        while (true)
         {
-            var phaseRemaining = phaseLimit.Value - phaseClock.Elapsed;
-            if (phaseRemaining < remaining) remaining = phaseRemaining;
+            token.ThrowIfCancellationRequested();
+            var remaining = limit - clock.Elapsed;
+            if (phaseClock is not null && phaseLimit.HasValue)
+            {
+                var phaseRemaining = phaseLimit.Value - phaseClock.Elapsed;
+                if (phaseRemaining < remaining) remaining = phaseRemaining;
+            }
+            if (remaining <= TimeSpan.Zero)
+                throw new TimeoutException(
+                    "J1939-22 BAM overall or segment-phase deadline expired.");
+            var slice = remaining > TimeSpan.FromSeconds(30) ?
+                TimeSpan.FromSeconds(30) : remaining;
+            try
+            {
+                return await link.ReceiveAsync(slice, token);
+            }
+            catch (TimeoutException) when (remaining > TimeSpan.FromSeconds(30) &&
+                phaseLimit is null && !token.IsCancellationRequested)
+            {
+                // A 30-second J2534 wait is just one chunk of the
+                // operator's larger 10-minute total discovery deadline.
+                // Prevent instant-failure fake links from busy-spinning.
+                if (clock.Elapsed < TimeSpan.FromMilliseconds(100))
+                    await Task.Delay(25, token);
+            }
         }
-        if (remaining <= TimeSpan.Zero)
-            throw new TimeoutException(
-                "J1939-22 BAM overall or segment-phase deadline expired.");
-        return link.ReceiveAsync(
-            remaining > TimeSpan.FromSeconds(30) ?
-                TimeSpan.FromSeconds(30) : remaining, token);
     }
 
     private static bool Matches(IsoTpCanFdSession.CanFrame frame,
