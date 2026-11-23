@@ -553,6 +553,7 @@ internal static class BridgeSelfTests
         checks += IsoTpCanFdSelfTests.Run();
         checks += J1939ClassicTpSelfTests.Run();
         checks += J1939FdMultiPgSelfTests.Run();
+        checks += J1939FdTransportFramesSelfTests.Run();
         checks += UdsStandardServicesSelfTests.Run();
         checks += EcuPostFlashAssessmentSelfTests.Run();
         checks += NativeEcuSectorSelfTests.Run();
