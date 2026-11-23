@@ -805,6 +805,21 @@ internal static class StandardProtocolCli
             kwpRxTarget, kwpRxSource, mode);
     }
 
+    internal static async Task SaveDoIpReplyAsync(
+        string path, ReadOnlyMemory<byte> reply)
+    {
+        if (string.IsNullOrWhiteSpace(path) ||
+            reply.IsEmpty || reply.Length > DoIpCodec.MaxPayload)
+            throw new ArgumentException("Invalid DoIP reply file or payload.");
+        // CreateNew is essential: an existing ECU snapshot or diagnostic
+        // capture must never be silently replaced.
+        await using var output = new FileStream(path,
+            FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        await output.WriteAsync(reply);
+        await output.FlushAsync();
+        output.Flush(flushToDisk: true);
+    }
+
     internal static async Task<int> RunDoIpAsync(string[] args)
     {
         try
@@ -828,11 +843,7 @@ internal static class StandardProtocolCli
             {
                 // Never replace an existing diagnostic capture or original
                 // ECU backup. The path must not exist before this exchange.
-                await using var output = new FileStream(o.ReceiveFile,
-                    FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                await output.WriteAsync(reply);
-                await output.FlushAsync();
-                output.Flush(flushToDisk: true);
+                await SaveDoIpReplyAsync(o.ReceiveFile, reply);
                 Console.WriteLine($"DoIP RX saved to {o.ReceiveFile} " +
                     $"bytes={reply.Length} SHA256={replyHash}");
             }
