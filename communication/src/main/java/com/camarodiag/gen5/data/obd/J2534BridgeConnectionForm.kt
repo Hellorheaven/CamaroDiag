@@ -57,7 +57,7 @@ object J2534BridgeConnectionForm {
             val number = normalized.toLongOrNull(16)
             val width = normalized.length
             val maximum = if (width == 3) 0x7FFL else 0x1FFFFFFFL
-            require(number != null && number in 0..maximum) {
+            require(number != null && number in 0L..maximum) {
                 "CAN identifier is outside its declared width"
             }
             return number.toInt() to width
