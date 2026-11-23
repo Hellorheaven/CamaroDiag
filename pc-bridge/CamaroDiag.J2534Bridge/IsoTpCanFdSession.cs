@@ -74,6 +74,20 @@ internal static class IsoTpCanFdSession
     /// transfer. Locally advertised STmin remains restricted to defined
     /// codes by ValidateAdvertisedStMin.
     /// </summary>
+    /// <summary>
+    /// Remaining delay relative to the previous completed CF enqueue.
+    /// Physical CAN transmit-completion timestamps still require hardware
+    /// qualification; an offline J2534 queue is not bus timing evidence.
+    /// </summary>
+    internal static TimeSpan RemainingCfSeparation(
+        TimeSpan configured, TimeSpan sincePreviousCf)
+    {
+        if (configured < TimeSpan.Zero || sincePreviousCf < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(sincePreviousCf));
+        return configured > sincePreviousCf ?
+            configured - sincePreviousCf : TimeSpan.Zero;
+    }
+
     internal static TimeSpan DecodeStMin(byte value) => value switch
     {
         <= 0x7F => TimeSpan.FromMilliseconds(value),
@@ -158,6 +172,11 @@ internal static class IsoTpCanFdSession
 
         var nextSequence = 1;
         var sentInBlock = 0;
+        // STmin is measured between consecutive CF transmissions, never
+        // from FC to the very first CF. Preserve the previous CF timestamp
+        // across block boundaries; time consumed awaiting the next FC
+        // already counts towards the next CF's separation.
+        long? previousCfCompletedAt = null;
         var flow = await AwaitCtsAsync(link, settings,
             Remaining(timeout, clock), token);
         while (offset < payload.Length)
@@ -169,7 +188,11 @@ internal static class IsoTpCanFdSession
                 sentInBlock = 0;
             }
             _ = Remaining(timeout, clock);
-            await link.WaitMinimumSeparationAsync(flow.Separation, token);
+            var sincePreviousCf = previousCfCompletedAt is long previous ?
+                Stopwatch.GetElapsedTime(previous) : flow.Separation;
+            var separationToWait = RemainingCfSeparation(
+                flow.Separation, sincePreviousCf);
+            await link.WaitMinimumSeparationAsync(separationToWait, token);
             _ = Remaining(timeout, clock);
             var cf = Pad(settings);
             SetAddress(cf, settings);
@@ -177,6 +200,7 @@ internal static class IsoTpCanFdSession
             var take = Math.Min(payload.Length - offset, cf.Length - 1 - addressWidth);
             payload.AsSpan(offset, take).CopyTo(cf.AsSpan(1 + addressWidth));
             await link.SendAsync(new(settings.TxId, settings.CanFd, cf), token);
+            previousCfCompletedAt = Stopwatch.GetTimestamp();
             offset += take;
             nextSequence = (nextSequence + 1) & 0x0F;
             sentInBlock++;

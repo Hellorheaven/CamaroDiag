@@ -394,9 +394,24 @@ internal static class IsoTpCanFdSelfTests
             multi.Sent[3].Data[0] == 0x23,
             "CAN FD first frame/flow-control window/consecutive sequences.");
         Check(multi.Separations.Count == 3 &&
-            multi.Separations[0] == TimeSpan.FromMilliseconds(5) &&
-            multi.Separations[1] == TimeSpan.Zero,
-            "Sender honors peer BS and STmin in each window.");
+            multi.Separations[0] == TimeSpan.Zero &&
+            multi.Separations[1] == TimeSpan.Zero &&
+            multi.Separations[2] == TimeSpan.Zero,
+            "STmin does not delay the first CF or an FC-cleared zero-STmin block.");
+        Check(IsoTpCanFdSession.RemainingCfSeparation(
+                TimeSpan.FromMilliseconds(5), TimeSpan.Zero) ==
+                    TimeSpan.FromMilliseconds(5) &&
+            IsoTpCanFdSession.RemainingCfSeparation(
+                TimeSpan.FromMilliseconds(5),
+                TimeSpan.FromMilliseconds(2)) == TimeSpan.FromMilliseconds(3) &&
+            IsoTpCanFdSession.RemainingCfSeparation(
+                TimeSpan.FromMilliseconds(5),
+                TimeSpan.FromMilliseconds(8)) == TimeSpan.Zero,
+            "STmin subtracts elapsed time since last CF; no cumulative over-delay.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            IsoTpCanFdSession.RemainingCfSeparation(
+                TimeSpan.FromMilliseconds(5), TimeSpan.FromTicks(-1)),
+            "Negative elapsed CF timestamp is not accepted.");
 
         var reconstruct = new QueueLink();
         foreach (var frame in multi.Sent)
@@ -459,8 +474,23 @@ internal static class IsoTpCanFdSelfTests
         wait.Replies.Enqueue(RX(false, 0x30, 0, 0xF2, 0, 0, 0, 0, 0));
         Send(wait, classic, Fill(14));
         Check(wait.Separations.Count == 2 &&
-            wait.Separations[0] == TimeSpan.FromTicks(2000),
-            "FC/WAIT then CTS microsecond STmin decoded correctly.");
+            wait.Separations[0] == TimeSpan.Zero &&
+            wait.Separations[1] > TimeSpan.Zero &&
+            wait.Separations[1] <= TimeSpan.FromTicks(2000),
+            "FC/WAIT then CTS: microsecond STmin separates CFs, not FC to first CF.");
+
+        // A short FC/CTS processing interval is itself part of the
+        // separation between two CF transmissions. It must not be
+        // followed by a full extra STmin delay on the next block.
+        var blockBoundary = new QueueLink();
+        blockBoundary.Replies.Enqueue(RX(false, 0x30, 1, 0, 0, 0, 0, 0, 0));
+        blockBoundary.Replies.Enqueue(RX(false, 0x30, 0, 5, 0, 0, 0, 0, 0));
+        Send(blockBoundary, classic, Fill(20));
+        Check(blockBoundary.Sent.Count == 3 &&
+            blockBoundary.Separations.Count == 2 &&
+            blockBoundary.Separations[0] == TimeSpan.Zero &&
+            blockBoundary.Separations[1] <= TimeSpan.FromMilliseconds(5),
+            "Reissued FC across BS boundary cannot reset CF-to-CF separation timing.");
 
         var boundedWait = new QueueLink();
         boundedWait.Replies.Enqueue(RX(false, 0x31, 0, 0, 0, 0, 0, 0, 0));
@@ -527,9 +557,10 @@ internal static class IsoTpCanFdSelfTests
             0x30, 0, 0x80, 0, 0, 0, 0, 0));
         Send(peerReservedMin, classic, Fill(14));
         Check(peerReservedMin.Separations.Count == 2 &&
-            peerReservedMin.Separations.All(x =>
-                x == TimeSpan.FromMilliseconds(127)),
-            "Peer reserved STmin keeps both outgoing CF at longest separation.");
+            peerReservedMin.Separations[0] == TimeSpan.Zero &&
+            peerReservedMin.Separations[1] > TimeSpan.Zero &&
+            peerReservedMin.Separations[1] <= TimeSpan.FromMilliseconds(127),
+            "Reserved peer STmin regulates only CF-to-CF, not the first CF.");
         Reject<ArgumentException>(() => Send(new QueueLink(),
             new IsoTpCanFdSession.Settings(0x7E0, 0x7E0, 12, true), [0x22]),
             "Identical physical TX/RX arbitration IDs rejected.");
