@@ -1,12 +1,7 @@
-C6 final validation after first Android unit-test correction — 2026-11-23
-HEAD: efdd747780fece7ffac003704d05cc860a2052c9
-Changes: optional actual-ECU SecurityAccess, session handling, raw CAN console,
-local Windows J2534 raw exchange, paired TLS Android-to-J2534 raw UDS,
-Android STN UDS write policy, no unconditional ELM or E39-family admission,
-no textual fake signing/authorization keys; no extra typed bench challenge.
-Regression fix: CanConsoleRecordParserTest now expects raw 2E to be allowed on
-a valid physical console session, while stale-session / disconnected / busy
-checks still reject.
-Expected: Windows Debug 0 errors/0 warnings + J2534 self-tests;
-Android diagnostic/communication/app unit tests all success.
-No physical flash, no claim of all-hardware implementation, no merge.
+C6 final clean validation — user-requested ECU programming unblock 2026-11-23
+Implementation HEAD before CI marker: a94c58c0018730a83e04881939f36aff30428602
+Software changes already validated on predecessor run 45126220384 (Android and Windows SUCCESS).
+This run also validates the small Kotlin boxed-Boolean warning correction in J2534BridgeTransport.
+Expected C6: J2534 Windows Debug build warnings-as-errors + 607+ selftests;
+Android communication, diagnostic, app unit tests; CI regression script.
+No claim of actual ECU flash, no fictitious driver, no merge.
