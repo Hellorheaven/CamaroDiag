@@ -1,9 +1,11 @@
-C6 group validation: two-stage user confirmation before any potentially modifying ECU command
-Source HEAD before marker: 4dd761c8f2d93483cc364d8ebe5212e1a0c14346
-Android CAN UI: risk + CamaroDiag responsibility warning with OK, then distinct Yes/No; NO or dismiss never sends.
-Windows local J2534 console: two dialogs; cancellation before physical driver calls; changed channel cancels.
-Native E39 bench CLI: warning OK followed by explicit OUI; no/rejection/EOF cancels before opening ECU.
-Paired Android/Windows J2534 raw exchange: requires both warningAcknowledged and writeConfirmed per request;
-Android API accepts only approval from the consent flow; standard diagnostic paths unchanged.
-OEM seed/key and CamaroDiag product licenses unchanged. No physical flash tests.
-Run grouped Windows J2534 Debug warnings-as-errors and self-tests, Android communication/diagnostic/app unit tests.
+C6 grouped final validation — 2026-11-23 two-stage ECU operator risk confirmation
+Code HEAD before checkpoint: f6f3e6944ae2a6a346dfab0c21c9cceef539c67e
+Android raw CAN: explicit risk/liability warning OK, then separate Yes/No; no/dismiss/changed connection cancels.
+Android DTC clear: same two-step warning OK then Yes/No; NO cancels without clearing.
+Windows J2534 console: warning OK then separate Yes/No with No as default; refuses before driver send.
+Native E39 CLI: OK then OUI; NO/EOF/redirected stdin refuses prior to ECU opening.
+Paired Android-Windows raw J2534 UDS: require warningAcknowledged:true + writeConfirmed:true
+both in strict canonical schema and before native emission, while preserving TLS pairing.
+Pure flow and bridge regression tests check OK alone / no / missing / wrong input / changed link.
+No additional CamaroDiag signing key, license enforcement, OEM bypass or hardware compatibility claim.
+Run Windows Debug -warnaserror + all bridge self-tests; Android communication/diagnostic/app unit tests once for completed lot.
