@@ -405,6 +405,56 @@ class BluetoothObdManager(context: Context) {
     }
 
     /**
+     * One physical, read-only Mode 01 survey of the fuel-composition and trim
+     * PIDs on the same connection epoch. An unsupported PID is NOT read.
+     * No ELM fallback while a J2534 bridge is selected, and no simulator.
+     */
+    suspend fun readPhysicalFuelSurvey(): Lfx2012FuelReadOnly.Survey {
+        check(!isDemoMode && !isSimulationActive) {
+            "FlexFuel observations require a physical ECU connection, never demo data."
+        }
+        val epoch = transportSessionEpoch.capture()
+        if (isJ2534BridgeConnected()) {
+            return commandSessionMutex.withLock {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                check(isJ2534StandardObdAvailable()) {
+                    "The connected J2534 channel cannot read standard OBD fuel PIDs."
+                }
+                val bridge = checkNotNull(j2534BridgeTransport)
+                val supported = bridge.discoverStandardObdPids()
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                val replies = linkedMapOf<Int, String?>()
+                for (pid in Lfx2012FuelReadOnly.PIDS) {
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                    replies[pid] = if (pid in supported)
+                        bridge.readStandardObdPid(pid) else null
+                    transportSessionEpoch.requireQueuedCurrent(epoch)
+                }
+                Lfx2012FuelReadOnly.Survey(
+                    Lfx2012FuelReadOnly.Source.J2534, supported, replies
+                )
+            }
+        }
+        check(isObdCommandChannelAvailable) {
+            "No physical ELM/STN OBD channel is connected for the fuel survey."
+        }
+        return withObdCommandSession { engine ->
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            val supported = engine.discoverSupportedPids()
+            transportSessionEpoch.requireQueuedCurrent(epoch)
+            val replies = linkedMapOf<Int, String?>()
+            for (pid in Lfx2012FuelReadOnly.PIDS) {
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+                replies[pid] = engine.readMode01PidIfSupported(pid, supported)
+                transportSessionEpoch.requireQueuedCurrent(epoch)
+            }
+            Lfx2012FuelReadOnly.Survey(
+                Lfx2012FuelReadOnly.Source.ELM, supported, replies
+            )
+        }
+    }
+
+    /**
      * Console operator read, using the active real transport without silently
      * falling back from J2534 to an ELM adapter or to simulation.
      */
