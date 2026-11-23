@@ -26,6 +26,13 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
         check(!disposed) { "Console event journal already disposed" }
         check(!failed) { "Console event journal previously failed" }
         try {
+            // A deleted/renamed file can still accept writes through an open
+            // descriptor on some filesystems; never keep an unexportable journal.
+            if (writer != null) {
+                check(archive?.isFile == true) {
+                    "Console event journal file disappeared during capture"
+                }
+            }
             if (writer == null) {
                 val file = File.createTempFile("camarodiag-console-events-", ".csv", directory)
                 try {
