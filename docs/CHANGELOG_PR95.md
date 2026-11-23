@@ -411,3 +411,12 @@ L'interface n'affiche déjà plus le bouton de capture physique CDJ/1 non implé
 - UDS ISO 14229 : construction de requêtes de lecture **multi-DID** avec extraction strictement ordonnée de réponses à longueurs explicites et tests tronquage/réordonnancement.
 - CLI ISO-TP et DoIP : option `--uds-dids DID:longueur,DID:longueur`, validation de réponse commune, tests d'options exclusives et de réception passive.
 - Tests écrits et committés, **non exécutés** ; aucune compatibilité matérielle ou écriture/restauration ECU certifiée par ces changements.
+
+
+## ISO 14229 Upload / J1850 CRC / J2534 RX (23/11/2026)
+
+- `UdsStandardServices` : support générique des adresses/tailles ALFI 1–8 octets, parsing partagé du `maxNumberOfBlockLength` des réponses `0x74/0x75` et validation dans `RequireResponse`. Le moteur natif RequestDownload réutilise le parseur. Tests des limites et régression wrap 32 bits.
+- `NativeUdsUploadProtocol` : transport de lecture `0x35/0x36/0x37`, négociation des limites et compteurs, exactitude des octets, mode double acquisition et SHA-256 seulement si égalité stricte ; tests simulation acceptation/refus et compteurs à rebouclage.
+- `J1850Crc` : codec CRC-8 SAE J1850 de référence hors pilote, tests vectoriels `0x4B` et erreurs. Aucun CRC injecté automatiquement dans les messages J2534.
+- `IsoTpJ2534RawCanLink` : vérifier `CAN_29BIT_ID` RX pour rejeter les frames standard/extended attribuées au mauvais format ; tests ajoutés.
+- Aucun build Windows ni campagne CI au dernier HEAD n'a encore démontré la compilation. Aucun test sur ECU réel ni sauvegarde/restauration physiquement validée.
