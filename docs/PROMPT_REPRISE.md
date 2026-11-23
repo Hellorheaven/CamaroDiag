@@ -1,3 +1,12 @@
+# 23/11/2026 — ISO-TP CAN CLASSIQUE : point de reprise de fin de tranche
+
+- Chantier de protocole **exclusivement ISO 15765-2 ISO-TP CAN classique**. Aucun nouveau protocole démarré, aucune autre branche/PR, aucune fusion. PR #95 Draft `chore/unified-ci`, issue #110.
+- Logiciel : FF/CF/FC, DLC/longueurs, N_Bs/N_Cr et limite globale, STmin entre CF successives et **repli 127 ms verrouillé pour le transfert entier si un FC annonce un STmin réservé**, prise en charge des blocages FC/WAIT/OVFLW.
+- Frontière pilote J2534 couverte par simulation ; nouvel enregistrement facultatif `--trace-file <chemin-neuf.csv>` autour de `--isotp-exchange` : `TX_REQUEST/TX_QUEUED/RX` et timestamp **hôte uniquement**, fichier CreateNew (ne pas écraser), données ECU/VIN à garder privées. `TX_QUEUED` n'est PAS un acquittement ou un timestamp sur bus.
+- **Preuve vérifiée : commit `bf7953fcb66b3397da05106d1bbdc6efc5fdba67`, Actions #45274333738 : Windows Debug succès, 0 erreur, 0 warning, 1618 autotests hardware-free exécutés et réussis.** Native ECU et la majorité des connecteurs réussis ; Android et ESP32 étaient encore en cours lors de cette vérification. Ne pas conclure CI globale verte sans contrôler le rapport final. Les changements ultérieurs éventuels sur la branche ne sont pas couverts par ce SHA.
+- Le protocole reste **non terminé physiquement** : qualification réelle VCI J2534/ECU, CAN 11/29, timing de bus (STmin), réponse aux pertes/bus-off, preuves de lecture/écriture OEM avec sauvegardes physiques. Critères de tests dans `docs/QUALIFICATION_ISOTP_CAN_CLASSIQUE.md`. Valeur indicative historique de couverture globale ISO-TP CAN classique : 75 % ; pas une mesure normative.
+- Les autres protocoles restent en attente. Ne pas modifier leurs moteurs pendant cette tranche ; respecter les fichiers de C6/C2/Android possédés par les autres sessions. **Ne pas merger / Release.**
+
 # Session hors protocoles — reprise C6 / ponts / C2 / C4 (23/11/2026)
 
 **PR unique** : #95 sur `chore/unified-ci`. L'autre chat reste responsable des standards/protocoles ISO/SAE. **C6 reste OUVERT**, en particulier les essais matériels, l'intégrité physique, la sauvegarde/restauration prouvées et la qualification OEM. N'ajouter ni signature/clé de programmation CamaroDiag, ni blocage universel de services d'écriture. Ne pas fusionner.
