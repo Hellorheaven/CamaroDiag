@@ -167,3 +167,8 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Ressources FR/EN des notices d'export et de l'historique CAN vérifiées présentes chacune une seule fois ; correction de l'espacement du marqueur d'échec à l'export, sans compter sur les espaces initiaux des traductions Android.
 - Tests C1 révisés pour importer les assertions nécessaires et utiliser des retours CRLF réels dans la simulation de capture longue.
 - **Statut de validation :** un déclenchement C4 ciblé a été demandé, mais l'accès courant ne confirme ni l'exécution ni sa réussite. Les derniers commits ne sont donc pas qualifiés sur un build Debug/CI final, et la restitution du chantier reste partielle tant que l'historique TX/RX persistant et la recette matérielle manquent.
+
+## SAE J1939-21 — fermeture des transferts CMDT en erreur (23/11/2026)
+- Construction des trames TP.CM Conn_Abort avec PGN et adresse pair ; émission de reason 3 en cas de timeout CTS/DT et reason 7 après erreur de séquence DT. Aucun abandon sur BAM ni après annulation de l'opérateur.
+- Tests de régression ajoutés pour expiration CTS, expiration après CTS, mauvaise séquence DT et format des octets d'abandon.
+- Limite : aucune retransmission TP.DT facultative ni gestion multi-session complète, et **tests non exécutés / matériel non qualifié**.
