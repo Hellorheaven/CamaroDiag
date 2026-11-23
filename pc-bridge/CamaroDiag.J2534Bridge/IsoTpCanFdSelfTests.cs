@@ -301,6 +301,18 @@ internal static class IsoTpCanFdSelfTests
         Reject<InvalidDataException>(() => Receive(corruptedPeerDl, local64),
             "Premature short peer CF rejected using RX_DL from its FF.");
 
+        var tooLongCf = new QueueLink();
+        tooLongCf.Replies.Enqueue(new(0x7E8, true, multi.Sent[0].Data));
+        tooLongCf.Replies.Enqueue(new(0x7E8, true,
+            new byte[] {0x21}.Concat(Fill(15)).ToArray()));
+        Reject<InvalidDataException>(() => Receive(tooLongCf, local64),
+            "Peer CF longer than RX_DL announced in FF is rejected.");
+
+        var undersizedFirst = new QueueLink();
+        undersizedFirst.Replies.Enqueue(RX(true, 0x10, 0x20, 0x11, 0x22));
+        Reject<InvalidDataException>(() => Receive(undersizedFirst, fd12),
+            "Segmented FirstFrame with less than eight CAN bytes is rejected.");
+
         var longTx = new QueueLink();
         longTx.Replies.Enqueue(RX(true, 0x30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         var fd64 = new IsoTpCanFdSession.Settings(0x7E0, 0x7E8, 64, true,
