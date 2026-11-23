@@ -2497,6 +2497,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             message = null,
             consoleHistory = (currentState.consoleHistory + txEvent).takeLast(300)
         )
+        recordConsoleEvents(listOf(txEvent))
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
