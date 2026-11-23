@@ -40,6 +40,35 @@ internal static class ObdJ1979PidValuesSelfTests
         Check(ObdJ1979PidValues.Decode([0x01, 0x90],
             [0x41, 0x90, 0x01]) is null,
             "No invented units for unknown manufacturer-defined PID.");
+        Check(Math.Abs(Read(0x04, 0xFF).Number - 100) < 0.001,
+            "Calculated load full-scale is 100 percent.");
+        Check(Read(0x0E, 0x80).Number == 0 &&
+            Read(0x0E, 0).Number == -64,
+            "Timing advance offset formula.");
+        Check(Read(0x0F, 0x28).Number == 0,
+            "Intake air temperature Celsius offset.");
+        Check(Read(0x1F, 0x01, 0x02).Number == 258,
+            "Engine runtime two-byte big-endian seconds.");
+        Check(Math.Abs(Read(0x2F, 0xFF).Number - 100) < 0.001,
+            "Fuel tank level percentage.");
+        Check(Read(0x33, 101).Number == 101,
+            "Barometric pressure in kPa.");
+        Check(Read(0x42, 0x30, 0x39).Number == 12.345,
+            "Control module voltage in volts.");
+        Check(Read(0x46, 0x28).Number == 0,
+            "Ambient temperature Celsius offset.");
+        Check(Read(0x5C, 0x78).Number == 80,
+            "Engine oil temperature Celsius offset.");
+        Check(Read(0x5E, 0x00, 0xC8).Number == 10,
+            "Engine fuel rate in litres per hour.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979PidValues.Decode([0x01, 0x42],
+                [0x41, 0x42, 0x30]),
+            "Module voltage requires two bytes.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979PidValues.Decode([0x01, 0x5E],
+                [0x41, 0x5E, 0x00, 0xC8, 0x00]),
+            "Engine fuel rate rejects surplus bytes.");
         Check(ObdJ1979PidValues.Format(Read(0x0D, 100))
             .Contains("vehicle-speed=100 km/h"),
             "Invariant unit label for calibrated signal.");
