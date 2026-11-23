@@ -162,3 +162,8 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Tests de CLI ajoutés, aucune exécution/qualification matérielle à ce stade.
 
 - DoIP : une réponse d'identification ciblée par VIN ou EID doit maintenant correspondre exactement à l'identifiant demandé, en découverte unicast comme broadcast. Tests de rejet des autres identifiants ajoutés (non exécutés).
+
+## C8 — revue statique des derniers correctifs C1/C4
+- Ressources FR/EN des notices d'export et de l'historique CAN vérifiées présentes chacune une seule fois ; correction de l'espacement du marqueur d'échec à l'export, sans compter sur les espaces initiaux des traductions Android.
+- Tests C1 révisés pour importer les assertions nécessaires et utiliser des retours CRLF réels dans la simulation de capture longue.
+- **Statut de validation :** un déclenchement C4 ciblé a été demandé, mais l'accès courant ne confirme ni l'exécution ni sa réussite. Les derniers commits ne sont donc pas qualifiés sur un build Debug/CI final, et la restitution du chantier reste partielle tant que l'historique TX/RX persistant et la recette matérielle manquent.
