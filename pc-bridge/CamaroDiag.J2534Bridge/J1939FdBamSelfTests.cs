@@ -8,6 +8,7 @@ internal static class J1939FdBamSelfTests
         internal readonly Queue<IsoTpCanFdSession.CanFrame> Incoming = new();
         internal readonly List<IsoTpCanFdSession.CanFrame> Outgoing = [];
         internal readonly List<TimeSpan> Delays = [];
+        internal bool SimulateOneLongWaitTimeout;
         internal readonly List<TimeSpan> ReceiveTimeouts = [];
         public Task SendAsync(IsoTpCanFdSession.CanFrame frame, CancellationToken token)
         {
@@ -20,6 +21,11 @@ internal static class J1939FdBamSelfTests
         {
             token.ThrowIfCancellationRequested();
             ReceiveTimeouts.Add(timeout);
+            if (SimulateOneLongWaitTimeout)
+            {
+                SimulateOneLongWaitTimeout = false;
+                throw new TimeoutException("Simulated 30-second vendor chunk timeout.");
+            }
             if (Incoming.Count == 0)
                 throw new TimeoutException("Fake J1939-22 BAM input exhausted.");
             return Task.FromResult(Incoming.Dequeue());
@@ -87,6 +93,14 @@ internal static class J1939FdBamSelfTests
             receiver.ReceiveTimeouts.Skip(2).All(t =>
                 t > TimeSpan.Zero && t <= TimeSpan.FromMilliseconds(750)),
             "BAM receive sends a bounded 750ms phase timeout to the CAN adapter.");
+
+        var longDeadline = new FakeLink { SimulateOneLongWaitTimeout = true };
+        foreach (var frame in sender.Outgoing)
+            longDeadline.Incoming.Enqueue(frame);
+        Check(J1939FdBamSession.ReceiveAsync(longDeadline, 0xF1, 0xF004,
+                TimeSpan.FromSeconds(31), CancellationToken.None)
+                .GetAwaiter().GetResult().SequenceEqual(Fill(131)),
+            "J1939-22 BAM does not fail after one vendor 30-second timeout before global deadline.");
 
         var badSequence = new FakeLink();
         foreach (var frame in sender.Outgoing)
