@@ -78,3 +78,10 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 - Les cellules numériques absentes restent vides (pas de substitution par 0 %) ; les identifiants de session sont échappés pour le format CSV et les préfixes de formules tableur neutralisés.
 - Tests ajoutés pour 0 % déclaré, mesure absente, CSV et rejet de sessions mélangées avant écriture dans le fichier.
 - Module de génération hors ligne **non encore relié à un bouton d'export utilisateur** ; aucun protocole ni commande ECU modifié. Nouveaux tests **non exécutés** avant la campagne du chantier.
+
+## C4 — raccordement Android des relevés carburant et export CSV
+- L'écran LFX 2012 propose maintenant l'export CSV des relevés accumulés lorsqu'un historique est présent ; les libellés et notifications sont en ressources **français/anglais**.
+- `MainViewModel` conserve une fenêtre bornée à 512 relevés au plus, liée au VIN sélectionné, à la génération de compte/connexion et au transport observé ; tout changement de contexte ou chronologie incompatible remet le jeu de mesures à zéro.
+- L'export utilise le dépôt privé `CamaroDiagExportStorage`, une vérification du contexte avant publication et les données réellement issues des lectures précédentes. Aucune commande ECU supplémentaire ni programmation FlexFuel.
+- Les identifiants de session refusent les caractères de contrôle et les tailles excessives ; le CSV protège aussi les préfixes de formules précédés d'espaces. Nouveaux tests écrits.
+- **Statut : code et IHM raccordés, compilation / tests du HEAD actuel non exécutés, aucune recette matérielle.** Ne pas confondre cet export de mesures avec une preuve d'installation d'un capteur FlexFuel ou d'activation E85.
