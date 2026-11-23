@@ -355,6 +355,31 @@ internal static class J1939ClassicTpSelfTests
         Reject<InvalidDataException>(() => J1939AddressClaim.Decode(
             addressFrameId, Enumerable.Repeat((byte)0xFF, 8).ToArray()),
             "Unspecified all-FF node NAME is rejected.");
+        var claimBuilt = J1939AddressClaim.Build(0x80, name);
+        Check(claimBuilt.Id == addressFrameId &&
+            claimBuilt.Data.SequenceEqual(BitConverter.GetBytes(name)) &&
+            J1939AddressClaim.Decode(claimBuilt.Id, claimBuilt.Data).Name == name,
+            "J1939-81 address claim frame round-trips the 64-bit NAME.");
+        var strongerName = name - 1;
+        Check(J1939AddressClaim.Compare(claim, 0x80, strongerName) ==
+            J1939AddressClaim.ClaimConflict.LocalNameWins,
+            "Lower numeric NAME wins address-claim priority.");
+        Check(J1939AddressClaim.Compare(claim, 0x80, name + 1) ==
+            J1939AddressClaim.ClaimConflict.PeerNameWins,
+            "Higher numeric NAME yields address to peer.");
+        Check(J1939AddressClaim.Compare(claim, 0x81, name) ==
+            J1939AddressClaim.ClaimConflict.DifferentAddress,
+            "Peer claim on another source address does not conflict.");
+        Check(J1939AddressClaim.Compare(claim, 0x80, name) ==
+            J1939AddressClaim.ClaimConflict.DuplicateName,
+            "Identical NAME is not silently accepted as a valid claim.");
+        Reject<ArgumentException>(() =>
+            J1939AddressClaim.Build(0xFF, name),
+            "Broadcast source address cannot claim J1939 identity.");
+        Reject<ArgumentException>(() =>
+            J1939AddressClaim.Build(0x80, ulong.MaxValue),
+            "Unspecified all-FF NAME cannot be claimed.");
+
 
         var dm1 = J1939DmDiagnostics.Decode(J1939DmDiagnostics.Dm1Pgn,
             [0xC7, 0xFF, 0x6E, 0x00, 0x05, 0x03, 0xFF, 0xFF]);
