@@ -95,6 +95,52 @@ internal static class StandardVehicleProtocols
     }
 
     /// <summary>
+    /// ISO 14230-2 KWP2000 functional addressing, with format bits 11,
+    /// target/source addresses, optional extended-length byte and additive
+    /// checksum. This is wire framing only; no real K-Line init is performed.
+    /// </summary>
+    internal static byte[] BuildKwpFunctionalFrame(
+        byte functionalTarget, byte source, byte[] payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        if (functionalTarget == source || payload.Length is < 1 or > 255)
+            throw new ArgumentException("Invalid KWP functional target or payload.");
+        var shortHeader = payload.Length <= 63;
+        var headerLength = shortHeader ? 3 : 4;
+        var frame = new byte[headerLength + payload.Length + 1];
+        frame[0] = shortHeader ?
+            (byte)(0xC0 | payload.Length) : (byte)0xC0;
+        frame[1] = functionalTarget;
+        frame[2] = source;
+        if (!shortHeader) frame[3] = (byte)payload.Length;
+        payload.CopyTo(frame, headerLength);
+        frame[^1] = (byte)(frame.AsSpan(0, frame.Length - 1).ToArray()
+            .Aggregate(0, (sum, b) => sum + b) & 0xFF);
+        return frame;
+    }
+
+    internal static byte[] ParseKwpFunctionalFrame(
+        ReadOnlySpan<byte> frame, byte expectedFunctionalTarget, byte expectedSource)
+    {
+        if (frame.Length < 5 || (frame[0] & 0xC0) != 0xC0)
+            throw new InvalidDataException("Expected ISO 14230 functional KWP header.");
+        var length = frame[0] & 0x3F;
+        var extended = length == 0;
+        var headerLength = extended ? 4 : 3;
+        if (extended && frame.Length >= 4) length = frame[3];
+        if (length == 0 || frame.Length != headerLength + length + 1 ||
+            frame[1] != expectedFunctionalTarget ||
+            frame[2] != expectedSource)
+            throw new InvalidDataException("Functional KWP length or logical addressing mismatch.");
+        var checksum = 0;
+        for (var i = 0; i < frame.Length - 1; i++)
+            checksum = (checksum + frame[i]) & 0xFF;
+        if (frame[^1] != checksum)
+            throw new InvalidDataException("Functional KWP checksum mismatch.");
+        return frame.Slice(headerLength, length).ToArray();
+    }
+
+    /// <summary>
     /// ISO 14230 physical-addressing long header with additive checksum.
     /// This only frames KWP messages: it does NOT perform K-Line initialization.
     /// </summary>
