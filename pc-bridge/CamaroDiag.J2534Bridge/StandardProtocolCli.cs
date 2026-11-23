@@ -165,6 +165,7 @@ internal static class StandardProtocolCli
             CultureInfo.InvariantCulture);
         if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
             source >= 0xFE || target == 0xFE || source == target ||
+            (mode == "receive" && target >= 0xFE) ||
             priority > 7 || mode is not ("send" or "receive") ||
             (mode == "send" && (pgn is null || payload.Length is < 1 or > 60)) ||
             (mode == "receive" && payloadText is not null) ||
