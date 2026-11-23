@@ -251,7 +251,19 @@ class ElmWifiTransport {
 class UsbPermissionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        // Android USB permission result is reflected by UsbManager.hasPermission().
+        if (intent.action != ACTION) return
+        val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, android.hardware.usb.UsbDevice::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra<android.hardware.usb.UsbDevice>(UsbManager.EXTRA_DEVICE)
+        } ?: return
+        val manager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+        // A positive intent flag alone is not evidence of permission: verify
+        // the actual Android grant before any automatic retry can be offered.
+        val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false) &&
+            manager.hasPermission(device)
+        UsbPermissionResultBus.publish(device.deviceId, granted)
     }
 
     companion object {
