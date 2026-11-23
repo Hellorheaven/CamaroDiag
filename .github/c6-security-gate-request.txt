@@ -1,11 +1,10 @@
-C6 grouped final validation — 2026-11-23 two-stage ECU operator risk confirmation
-Code HEAD before checkpoint: f6f3e6944ae2a6a346dfab0c21c9cceef539c67e
-Android raw CAN: explicit risk/liability warning OK, then separate Yes/No; no/dismiss/changed connection cancels.
-Android DTC clear: same two-step warning OK then Yes/No; NO cancels without clearing.
-Windows J2534 console: warning OK then separate Yes/No with No as default; refuses before driver send.
-Native E39 CLI: OK then OUI; NO/EOF/redirected stdin refuses prior to ECU opening.
-Paired Android-Windows raw J2534 UDS: require warningAcknowledged:true + writeConfirmed:true
-both in strict canonical schema and before native emission, while preserving TLS pairing.
-Pure flow and bridge regression tests check OK alone / no / missing / wrong input / changed link.
-No additional CamaroDiag signing key, license enforcement, OEM bypass or hardware compatibility claim.
-Run Windows Debug -warnaserror + all bridge self-tests; Android communication/diagnostic/app unit tests once for completed lot.
+C6 post-correction grouped consent validation — November 23, 2026
+Code HEAD before run marker: e21f8b38fc3b6f9a7ca942a88c217bee49d1f7d0
+Previous grouped CI 45128965049: Android success and Windows success.
+Final change: DTC clearing now carries user warning OK + explicit YES approval
+from Compose DtcScreen through MainViewModel and BluetoothObdManager into
+J2534BridgeTransport and BridgeServer; raw console and local bench consent unchanged.
+Strict server schema rejects No/missing flags before any native Mode 04 call.
+Retain OEM keys, actual compatibility checks, CamaroDiag commercial licenses.
+Run Android communication, diagnostic, app unit suites + Windows Debug -warnaserror/self-tests.
+No physical ECU writing and no merge.
