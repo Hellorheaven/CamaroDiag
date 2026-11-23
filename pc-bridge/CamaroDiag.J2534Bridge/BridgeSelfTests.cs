@@ -552,6 +552,7 @@ internal static class BridgeSelfTests
         checks += StandardVehicleProtocolsSelfTests.Run();
         checks += IsoTpCanFdSelfTests.Run();
         checks += J1939ClassicTpSelfTests.Run();
+        checks += J1939AddressClaimSessionSelfTests.Run();
         checks += J1939FdMultiPgSelfTests.Run();
         checks += J1939FdTransportFramesSelfTests.Run();
         checks += J1939FdBamSelfTests.Run();
