@@ -19,3 +19,8 @@ Grouped connector / J2534 bridge integration checkpoint (Android + communication
 Source HEAD before request: 0688222fbec8b72de84a6ff9f0abc6a9c869e517
 Scope: USB device routing, permission feedback, J2534 TLS form preflight and stale capability clearing.
 No physical connector / ECU tests, no code for ISO/SAE transports, no merge.
+
+Final grouped non-protocol connector/bridge/adapter validation checkpoint.
+Source SHA: ca4f48abe81b009240fcc585313fefce1cee4405
+Scope: Android UI + communication tests + Windows J2534 debug self-tests; USB routing, permissions, J2534 form/busy flags, Wi-Fi/Bluetooth preflight.
+No physical-ECU qualification; no standards protocol changes, merge, release or new PR.
