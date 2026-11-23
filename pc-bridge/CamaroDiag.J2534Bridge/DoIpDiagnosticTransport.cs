@@ -41,7 +41,7 @@ internal sealed class DoIpDiagnosticTransport : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(host) || host.Length > 253 ||
             tester == ecu || timeout <= TimeSpan.Zero ||
             timeout > TimeSpan.FromSeconds(30) ||
-            protocolVersion is not (0x02 or 0x03) ||
+            protocolVersion is not (0x02 or 0x03 or 0x04) ||
             (clientCertificateThumbprint is not null && !useTls))
             throw new ArgumentException("Explicit gateway, distinct logical addresses and timeout required.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
