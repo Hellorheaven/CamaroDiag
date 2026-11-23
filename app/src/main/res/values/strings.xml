@@ -973,4 +973,5 @@
     <string name="flexfuel_lfx2012_export_history">Export %1$d fuel readings (CSV)</string>
     <string name="flexfuel_lfx2012_history_saved">Read-only fuel history exported.</string>
     <string name="flexfuel_lfx2012_history_failed">Could not export fuel history.</string>
+    <string name="flexfuel_lfx2012_history_range">Ethanol: %1$d valid readings, min %2$.2f %% / max %3$.2f %%</string>
 </resources>
