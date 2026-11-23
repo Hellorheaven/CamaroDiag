@@ -460,7 +460,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isUdsReading = false,
             isObdbSignalReading = false,
             isJ2534BridgeConnecting = false,
-            isJ2534BridgeConnected = false
+            isJ2534BridgeConnected = false,
+            isJ2534MemoryReadAvailable = false
         )
         val restoration = when (error) {
             is CanAdapterRestorationException -> error
@@ -921,6 +922,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                 isJ2534BridgeConnecting = false,
                 isJ2534BridgeConnected = false,
+                isJ2534MemoryReadAvailable = false,
                 j2534BridgeMessage = localizedContext.getString(R.string.vm_bridge_disconnected_vehicle_changed)
             )
         }
@@ -3442,7 +3444,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _modules.value = CamaroUdsProtocol.buildTopology(_vehicle.value, _adapter.value)
         _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
             isJ2534BridgeConnecting = false,
-            isJ2534BridgeConnected = false
+            isJ2534BridgeConnected = false,
+            isJ2534MemoryReadAvailable = false
         )
         clearVehicleEvidence(preserveCanConsole = true)
         _isObdScanning.value = false
