@@ -134,6 +134,31 @@ internal static class J1939ClassicTpSelfTests
             receive.Outgoing[2].Data[1] == 20,
             "Receiver sends correct CTS windows and final EOM ACK.");
 
+        // The sender's RTS maximum packets per CTS is authoritative.
+        // A receiver with a larger local window must still honor that limit.
+        var limitedRts = new FakeCan();
+        limitedRts.Incoming.Enqueue(J1939ClassicTpSession.MakeControl(o,
+            J1939ClassicTpSession.Rts, 20, 3, 1, false, false));
+        for (int i = 0; i < 3; i++)
+        {
+            var data = Data(20);
+            var offset = i * 7;
+            limitedRts.Incoming.Enqueue(J1939ClassicTpSession.MakeData(o,
+                o.RemoteAddress, o.LocalAddress, i + 1,
+                data.AsSpan(offset, Math.Min(7, data.Length - offset))));
+        }
+        Check(Receive(limitedRts, o).Payload.SequenceEqual(Data(20)),
+            "Peer-limited RTS transfer reconstructs all packets.");
+        Check(limitedRts.Outgoing.Count == 4 &&
+            limitedRts.Outgoing[0].Data[1] == 1 &&
+            limitedRts.Outgoing[0].Data[2] == 1 &&
+            limitedRts.Outgoing[1].Data[1] == 1 &&
+            limitedRts.Outgoing[1].Data[2] == 2 &&
+            limitedRts.Outgoing[2].Data[1] == 1 &&
+            limitedRts.Outgoing[2].Data[2] == 3 &&
+            limitedRts.Outgoing[3].Data[0] == J1939ClassicTpSession.EomAck,
+            "CTS windows never exceed the peer RTS maximum.");
+
         var bamSender = new FakeCan();
         Send(bamSender, o, Data(17), broadcast: true);
         Check(bamSender.Outgoing.Count == 4 &&
