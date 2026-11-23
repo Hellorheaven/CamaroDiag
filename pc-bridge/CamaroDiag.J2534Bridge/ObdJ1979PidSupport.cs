@@ -37,7 +37,10 @@ internal static class ObdJ1979PidSupport
         {
             if ((result.Data[1 + bit / 8] & (0x80 >> (bit % 8))) == 0)
                 continue;
-            supported.Add(checked((byte)(basePid + bit + 1)));
+            var pid = basePid + bit + 1;
+            if (pid > byte.MaxValue)
+                throw new InvalidDataException("PID support page sets a bit beyond PID FF.");
+            supported.Add((byte)pid);
         }
         var nextPage = basePid < 0xE0 &&
             supported.Contains((byte)(basePid + 0x20));
