@@ -192,7 +192,7 @@ internal static class StandardProtocolCli
         catch (Exception ex) when (ex is ArgumentException or IOException or
             InvalidOperationException or TimeoutException or
             DllNotFoundException or BadImageFormatException or
-            EntryPointNotFoundException)
+            EntryPointNotFoundException or OverflowException or InvalidDataException)
         {
             Console.Error.WriteLine("ISO-TP exchange failed: " + ex.Message);
             return 6;
