@@ -84,10 +84,15 @@ class CanConsoleRawArchiveWriterTest {
     }
 
     @Test fun failedFlushMakesArchivePermanentlyIncomplete() {
+        var actualCloses = 0
+        var actualFlushes = 0
         val sink = object : Writer() {
             override fun write(cbuf: CharArray, off: Int, len: Int) = Unit
-            override fun flush() { throw IOException("failed to flush") }
-            override fun close() = Unit
+            override fun flush() {
+                actualFlushes++
+                throw IOException("failed to flush")
+            }
+            override fun close() { actualCloses++ }
         }
         val archive = CanConsoleRawArchiveWriter(sink)
         archive.append("7E8 01 41")
@@ -100,6 +105,8 @@ class CanConsoleRawArchiveWriterTest {
         archive.close()
         assertEquals(true, archive.hasFailed)
         assertEquals(false, archive.isComplete)
+        assertEquals(1, actualFlushes)
+        assertEquals(1, actualCloses)
     }
 
     @Test fun flushFailureDuringCloseStillClosesSinkAndReportsIncomplete() {
