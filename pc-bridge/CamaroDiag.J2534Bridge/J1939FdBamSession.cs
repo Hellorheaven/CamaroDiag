@@ -59,7 +59,7 @@ internal static class J1939FdBamSession
         ArgumentNullException.ThrowIfNull(link);
         if (remoteSource >= 0xFE || !IsValidPgn(transportedPgn) ||
             ((transportedPgn >> 8) & 0xFF) < 240 ||
-            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
+            timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes(10))
             throw new ArgumentException("Invalid J1939-22 BAM peer, PGN or receive timeout.");
 
         // A single deadline covers the complete BAM message, not 30 seconds
@@ -145,7 +145,9 @@ internal static class J1939FdBamSession
         if (remaining <= TimeSpan.Zero)
             throw new TimeoutException(
                 "J1939-22 BAM overall receive deadline expired.");
-        return link.ReceiveAsync(remaining, token);
+        return link.ReceiveAsync(
+            remaining > TimeSpan.FromSeconds(30) ?
+                TimeSpan.FromSeconds(30) : remaining, token);
     }
 
     private static bool Matches(IsoTpCanFdSession.CanFrame frame,
