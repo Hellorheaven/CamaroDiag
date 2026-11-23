@@ -1,5 +1,11 @@
 # PR #95 — Évolutions utilisateur
 
+## J1979/J1979-2 — extension diagnostic standard (23 novembre 2026)
+- Prise en charge de nouveaux paramètres OBD-II normalisés et des résultats de moniteurs (sans interprétation inventée).
+- Détection automatique CAN entre OBDonUDS et OBD-II classique, avec indication lorsque le protocole ne peut pas être confirmé.
+- Lecture du VIN OBDonUDS et contrôles renforcés en cas de réponses contradictoires.
+- Tests logiciels ajoutés ; essai sur adaptateur/ECU et validation finale encore nécessaires.
+
 ## OBD-II SAE J1979 — correction des données CAN (23 novembre 2026)
 - Les réponses des codes défaut CAN comptabilisent correctement les codes annoncés, sans confondre le nombre de défauts avec un DTC.
 - Ajout de l'affichage des identifiants de calibration et numéros CVN, ainsi que de la distinction entre OBD-II classique et OBDonUDS.
