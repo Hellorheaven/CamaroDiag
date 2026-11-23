@@ -26,6 +26,11 @@ object EcuRestoreImage {
         val geometry: MemoryRegion,
         source: ByteArray
     ) {
+        init {
+            require(geometry.length == source.size.toLong() && source.isNotEmpty()) {
+                "ECU restoration region geometry and bytes must match exactly"
+            }
+        }
         private val original = source.copyOf()
         val sha256: String = digest(original)
         val byteCount: Int get() = original.size
