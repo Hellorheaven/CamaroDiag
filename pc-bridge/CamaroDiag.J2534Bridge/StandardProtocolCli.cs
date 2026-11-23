@@ -212,7 +212,7 @@ internal static class StandardProtocolCli
         uint? DataBaud, bool Brs, byte Source, byte Target, byte Priority,
         int? Pgn, string Mode, byte[] Payload, int TimeoutMs,
         bool Bam, byte Session, bool Cmdt, byte Window,
-        ulong? Name = null);
+        ulong? Name = null, bool FastBroadcast = false);
 
     internal static J1939FdOptions ParseJ1939Fd(string[] args)
     {
@@ -225,6 +225,7 @@ internal static class StandardProtocolCli
         var source = checked((byte)Number(Required(args, "--source")));
         var target = checked((byte)Number(Required(args, "--target")));
         var name = ParseJ1939Name(args);
+        var fbff = bool.Parse(Optional(args, "--fbff") ?? "false");
         var bam = args.Contains(J1939FdBamCommand,
             StringComparer.OrdinalIgnoreCase);
         var cmdt = args.Contains(J1939FdCmdtCommand,
@@ -238,7 +239,7 @@ internal static class StandardProtocolCli
         var window = checked((byte)Number(Optional(args, "--window") ?? "8"));
         var session = checked((byte)Number(Optional(args, "--session") ?? "0"));
         var priority = checked((byte)Number(Optional(args, "--priority") ??
-            (bam || cmdt ? "7" : "6")));
+            (fbff ? "0" : bam || cmdt ? "7" : "6")));
         var pgnText = Optional(args, "--pgn");
         int? pgn = pgnText is null ? null : checked((int)Number(pgnText));
         var mode = Required(args, "--mode").ToLowerInvariant();
@@ -275,6 +276,8 @@ internal static class StandardProtocolCli
                 target >= 0xFE || window == 0)) ||
             (!bam && !cmdt && Optional(args, "--session") is not null) ||
             (!cmdt && Optional(args, "--window") is not null) ||
+            (fbff && (!multiPg || name.HasValue ||
+                priority != 0 || (mode == "send" && target != 0xFF))) ||
             pgn is < 0 or > 0x3FFFF ||
             (brs && (dataBaud is null or 0)) ||
             (dataBaud.HasValue && dataBaud.Value == 0))
@@ -291,7 +294,7 @@ internal static class StandardProtocolCli
             throw new ArgumentException("J1939-22 directed FD.TP requires a PDU1 PGN.");
         return new(index, baud, dataBaud, brs, source, target,
             priority, pgn, mode, payload, timeout, bam, session, cmdt, window,
-            name);
+            name, fbff);
     }
 
     internal static async Task<int> RunJ1939FdAsync(string[] args)
@@ -303,7 +306,8 @@ internal static class StandardProtocolCli
             if (o.AdapterIndex >= adapters.Count)
                 throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
             if ((o.Mode == "send" || o.Name.HasValue) &&
-                !Confirm($"SAE J1939-22 {(o.Bam ? "FD.TP BAM" : o.Cmdt ? "FD.TP CMDT" : "FEFF Multi-PG")} " +
+                !Confirm($"SAE J1939-22 {(o.Bam ? "FD.TP BAM" : o.Cmdt ? "FD.TP CMDT" :
+                        o.FastBroadcast ? "FBFF Multi-PG" : "FEFF Multi-PG")} " +
                     $"TX source=0x{o.Source:X2} destination=0x{o.Target:X2} " +
                     $"NAME={(o.Name.HasValue ? $"0x{o.Name.Value:X16} CLAIM" : "not claimed here")} " +
                     $"PGN=0x{o.Pgn:X} length={o.Payload.Length} " +
@@ -320,7 +324,7 @@ internal static class StandardProtocolCli
                 driver.SetCanFdDataPhaseRate(o.DataBaud.Value);
             driver.ConfigureFilter(new byte[4], new byte[4]);
             var link = new IsoTpJ2534RawCanLink(driver, canFd: true,
-                extendedId: true, bitRateSwitch: o.Brs);
+                extendedId: !o.FastBroadcast, bitRateSwitch: o.Brs);
             if (o.Name.HasValue)
             {
                 var claim = await J1939AddressClaimSession.ClaimAsync(
@@ -354,9 +358,15 @@ internal static class StandardProtocolCli
                 }
                 else
                 {
-                    var packet = J1939FdMultiPg.Encode(
-                        o.Source, o.Target, o.Priority,
-                        [new J1939FdMultiPg.ContainedGroup(o.Pgn!.Value, o.Payload)]);
+                    var groups = new[]
+                    {
+                        new J1939FdMultiPg.ContainedGroup(
+                            o.Pgn!.Value, o.Payload)
+                    };
+                    var packet = o.FastBroadcast ?
+                        J1939FdMultiPg.EncodeFastBroadcast(o.Source, groups) :
+                        J1939FdMultiPg.Encode(
+                            o.Source, o.Target, o.Priority, groups);
                     await link.SendAsync(packet, CancellationToken.None);
                     Console.WriteLine("J1939-22 Multi-PG frame queued; ECU processing not verified.");
                 }
@@ -390,13 +400,24 @@ internal static class StandardProtocolCli
                 if (remaining <= TimeSpan.Zero)
                     break;
                 var frame = await link.ReceiveAsync(remaining, CancellationToken.None);
-                if (frame.Id > 0x1FFFFFFF) continue;
-                var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
-                if (id.Pgn != J1939FdMultiPg.MultiPgPgn ||
-                    id.Source != o.Target ||
-                    (id.Destination != o.Source && id.Destination != 0xFF))
+                if (!frame.IsFd || frame.Id > 0x1FFFFFFF)
                     continue;
+                if (o.FastBroadcast)
+                {
+                    if (frame.Id != o.Target)
+                        continue;
+                }
+                else
+                {
+                    var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
+                    if (id.Pgn != J1939FdMultiPg.MultiPgPgn ||
+                        id.Source != o.Target ||
+                        (id.Destination != o.Source && id.Destination != 0xFF))
+                        continue;
+                }
                 var received = J1939FdMultiPg.Decode(frame);
+                if (received.FastBroadcast != o.FastBroadcast)
+                    continue;
                 var groups = o.Pgn.HasValue ?
                     received.Groups.Where(g => g.Pgn == o.Pgn.Value).ToArray() :
                     received.Groups.ToArray();
