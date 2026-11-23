@@ -508,6 +508,58 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(j2534Options.ProtocolId == J2534StandardChannel.Iso14230 &&
             j2534Options.KlineInit == "five:33",
             "J2534 K-Line ISO14230 bidirectional channel can initialize via vendor driver.");
+        var functionalCli = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x04",
+            "--baud", "10400", "--kwp-service", "81",
+            "--kwp-functional", "true",
+            "--kwp-tx-target", "0x33", "--kwp-tx-source", "0xF1",
+            "--kwp-rx-target", "0xF1", "--kwp-rx-source", "0x33"]);
+        Check(functionalCli.Data.SequenceEqual(
+                StandardVehicleProtocols.BuildKwpFunctionalFrame(
+                    0x33, 0xF1, [0x81])) &&
+            functionalCli.Mode == "exchange",
+            "KWP ISO14230 functional TX constructor generates full wire message.");
+        var physicalCli = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x04",
+            "--baud", "10400", "--kwp-service", "22F190",
+            "--kwp-tx-target", "0x33", "--kwp-tx-source", "0xF1"]);
+        Check(physicalCli.Data.SequenceEqual(
+                StandardVehicleProtocols.BuildKwpPhysicalFrame(
+                    0x33, 0xF1, [0x22, 0xF1, 0x90])),
+            "KWP ISO14230 physical TX constructor builds addressed frame.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x04",
+            "--baud", "10400", "--mode", "receive",
+            "--kwp-service", "22F190", "--kwp-tx-target", "0x33",
+            "--kwp-tx-source", "0xF1"]),
+            "KWP passive receive cannot inject a service request.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x03",
+            "--baud", "10400", "--kwp-service", "22F190",
+            "--kwp-tx-target", "0x33", "--kwp-tx-source", "0xF1"]),
+            "KWP service constructor requires ISO14230 vendor channel.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x04",
+            "--baud", "10400", "--data", "81",
+            "--kwp-service", "22F190", "--kwp-tx-target", "0x33",
+            "--kwp-tx-source", "0xF1"]),
+            "Raw J2534 and built KWP wire frames cannot both be TX sources.");
+        var functionalReceiveCli = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand,
+            "--adapter-index", "0", "--protocol-id", "0x04",
+            "--baud", "10400", "--mode", "receive",
+            "--kwp-rx-target", "0x33", "--kwp-rx-source", "0xF1",
+            "--kwp-rx-functional", "true"]);
+        Check(functionalReceiveCli.KwpFunctionalRx &&
+            functionalReceiveCli.Mode == "receive" &&
+            functionalReceiveCli.Data.Length == 0,
+            "KWP functional parser opt-in does not start a K-Line transaction.");
+
         var kwpWireCli = StandardProtocolCli.ParseJ2534([
             StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
             "--protocol-id", "0x04", "--baud", "10400",
