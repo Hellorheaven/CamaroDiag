@@ -70,6 +70,11 @@ internal class CanConsoleEventJournalStore(private val directory: File) {
         !failed && archive == snapshot.file && generation == snapshot.generation &&
             writer?.eventCount == snapshot.eventCount && snapshot.file.isFile
 
+    /** Cheap UI capability check; snapshot() performs the final file flush. */
+    @Synchronized
+    fun isAvailable(): Boolean =
+        !failed && writer != null && archive?.isFile == true
+
     @Synchronized
     fun hasFailed(): Boolean = failed
 
