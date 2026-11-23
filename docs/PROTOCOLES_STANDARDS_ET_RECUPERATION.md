@@ -257,3 +257,11 @@ Ces sélecteurs sont mutuellement exclusifs des autres sources de requêtes ; le
 
 
 **ISO 14229 / SAE J1979-2 : données étendues DTC `0x19/0x06`**. Les commandes ISO-TP et DoIP comprennent `--obd-extended-dtc 0x123456 --obd-extended-record 0x90`. Le numéro `0x90` sélectionne un enregistrement réglementé ; sans `--obd-extended-record`, la valeur `0xFE` demande tous les enregistrements OBD réglementés. L'ECU peut refuser une requête non prise en charge. Le décodeur extrait le DTC 24 bits, son statut et le reste des enregistrements **en octets bruts** : leur géométrie et leurs unités varient selon le calculateur. Les réponses `59 06` d'un autre DTC sont rejetées. L'option ne transmet pas en mode ISO-TP `receive`. Tests de codec, CLI et corrélation ajoutés et non exécutés.
+
+
+### Compléments de garde-fous (23 novembre 2026)
+
+- En SAE J1939-22, le canal J2534 `FD_CAN` est ouvert en mode **11 bits** pour `--fbff true`, et en mode **29 bits** pour FEFF/FD.TP. Les tests de parseur vérifient les drapeaux de connexion demandés au pilote. Le mode `--groups '0xEF00:;0xFECA:11'` représente explicitement un C-PG sans octet utile : l'implémentation ne rajoute pas de données fictives.
+- La validation UDS `19 04` et `19 06` compare aussi l'identifiant du **record effectivement retourné** lorsqu'un numéro de record spécifique est demandé. Les sélecteurs `FF` (tous les enregistrements) et `FE` (tous les enregistrements étendus réglementés pour `19 06`) restent des demandes multi-enregistrements et ne sont pas rejetés sur une seule valeur de record de la réponse.
+- Le dernier segment de chaque transfert J1939-22 FD.TP vérifie désormais son remplissage `FF` après la quantité utile annoncée. En CMDT, l'incohérence entraîne un Abort explicite.
+- Ces changements sont enregistrés et accompagnés de **tests écrits non exécutés**. Ils ne valent pas une recette sur ECU ni une compilation validée par Windows.
