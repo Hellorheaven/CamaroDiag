@@ -194,3 +194,7 @@ Les compatibilités d'écriture non testées sur calculateur réel restent à va
 
 ## J1939-81 — identification passive (23/11/2026)
 - Ajout du décodeur des annonces `Address Claimed` (PGN EE00), extraction NAME 64 bits et de ses champs d'identité ; affichage dans le mode réception J1939. Aucun `Address Claim` actif ni conflit d'adresses implémenté. Tests unitaires ajoutés, non exécutés.
+
+## DoIP — connexion TLS certifiée (23/11/2026)
+- Option CLI `--tls true` ; transport TCP 3496 sous TLS 1.2/1.3, validation système du certificat, nom d'hôte et révocation ; pas de mode « accepter tout » ou de repli implicite sur TCP 13400.
+- Tests de parsing CLI ajoutés (non exécutés) ; certificats clients et autorités OEM privées non intégrés, essais matériels absents.
