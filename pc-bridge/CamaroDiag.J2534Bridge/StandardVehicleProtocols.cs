@@ -34,7 +34,7 @@ internal static class StandardVehicleProtocols
         new("J1939 classical CAN", "SAE J1939-21 / J1939-73", "network/application", null, true, false,
             "J1939-21 BAM/RTS/CTS, Request, DM1/DM2, initial NAME claim; hardware unverified"),
         new("J1939 CAN FD", "SAE J1939-22", "network/transport", null, true, false,
-            "FEFF Multi-PG and FD.TP BAM/CMDT TOS2 no assurance; FBFF/security/concurrency pending"),
+            "FEFF 29-bit and FBFF 11-bit Multi-PG, FD.TP BAM/CMDT, TOS2/TF0 only; physical arbitration, assurance and concurrent sessions unqualified"),
     ];
 
     internal static Entry Find(string name) => Catalog.Single(p => p.Name == name);
