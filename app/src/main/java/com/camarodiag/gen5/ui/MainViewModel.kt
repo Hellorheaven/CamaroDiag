@@ -3985,9 +3985,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _connectionMessage.value = localizedContext.getString(R.string.msg_dtc_demo_cleared)
                 } else if (obdManager.isJ2534StandardObdClearAvailable()) {
                     obdManager.clearJ2534StandardDtcs(approval) {
-                        check(current()) {
-                            "ECU clear cancelled: account, adapter or vehicle changed before transmission."
-                        }
+                        EcuWriteConsentFlow.requireCurrentForTransmit(approval) { current() }
                     }
                     if (!current()) return@launch
                     // Mode 04 does not erase permanent emissions DTCs. Preserve
@@ -4007,9 +4005,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } else {
                     val response = obdManager.sendAtCommand("04", 2500L) {
-                        check(current()) {
-                            "ECU clear cancelled: account, adapter or vehicle changed before transmission."
-                        }
+                        EcuWriteConsentFlow.requireCurrentForTransmit(approval) { current() }
                     }
                     if (!current()) return@launch
                     if (com.camarodiag.gen5.data.obd.StandardObdClearEvidence.acknowledged(response)) {
