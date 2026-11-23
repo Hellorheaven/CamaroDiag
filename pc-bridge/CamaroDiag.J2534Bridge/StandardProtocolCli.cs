@@ -1053,17 +1053,26 @@ internal static class StandardProtocolCli
             var link = new IsoTpJ2534RawCanLink(driver, o.Settings.CanFd,
                 o.ExtendedId, o.Brs);
             var limit = TimeSpan.FromMilliseconds(o.TimeoutMs);
+            // The CLI request/reply budget includes TX and all RX frames.
+            // Neither the send phase nor a series of 0x78 pending replies
+            // restarts the selected operator timeout.
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
             if (o.Mode == "exchange")
                 await IsoTpCanFdSession.SendAsync(link, o.Settings, o.Request,
                     limit, CancellationToken.None);
+            var remainingBudget = limit - elapsed.Elapsed;
+            if (remainingBudget <= TimeSpan.Zero)
+                throw new TimeoutException("ISO-TP request used the whole exchange deadline.");
             var reply = o.Mode == "exchange" && o.ValidateUds ?
                 await UdsResponseSequence.AwaitFinalAsync(
                     o.Request,
                     (remaining, token) => IsoTpCanFdSession.ReceiveAsync(
                         link, o.Settings, remaining, token),
-                    limit, CancellationToken.None) :
+                    remainingBudget, CancellationToken.None) :
                 await IsoTpCanFdSession.ReceiveAsync(link, o.Settings,
-                    limit, CancellationToken.None);
+                    remainingBudget, CancellationToken.None);
+            if (elapsed.Elapsed >= limit)
+                throw new TimeoutException("ISO-TP reply exceeded the request/reply deadline.");
             Console.WriteLine("ISO-TP ECU RX: " + Convert.ToHexString(reply));
             if (o.InterpretJ1979)
             {
