@@ -54,6 +54,48 @@ class EcuWriteConsentFlowTest {
         ) != null)
     }
 
+    @Test fun operatorAuthorizationIsRecheckedWhenQueuedWriteActuallyStarts() {
+        val approval = EcuWriteConsentFlow.approvalForContext(
+            EcuWriteConsentFlow.Step.CONFIRMATION, true, 21L, 21L, sameVehicle = true
+        )!!
+        var accountActive = true
+        var adapterGeneration = 21L
+        var vehicleStillSelected = true
+        var checks = 0
+        val verify = {
+            EcuWriteConsentFlow.requireCurrentForTransmit(approval) {
+                checks++
+                accountActive && adapterGeneration == 21L && vehicleStillSelected
+            }
+        }
+        // The closure must read fresh state on every invocation, not capture
+        // an initially true boolean when the user clicks YES.
+        verify()
+        assertEquals(1, checks)
+        adapterGeneration++
+        assertTrue(runCatching { verify() }.isFailure)
+        vehicleStillSelected = false
+        assertTrue(runCatching { verify() }.isFailure)
+        adapterGeneration = 21L
+        assertTrue(runCatching { verify() }.isFailure)
+        vehicleStillSelected = true
+        accountActive = false
+        assertTrue(runCatching { verify() }.isFailure)
+        assertEquals(4, checks)
+    }
+
+    @Test fun transmitGateRejectsAnAbsentYesAndNeverConsultsTheContext() {
+        val warningOnly = EcuWriteConsentFlow.Approval(true, false)
+        var called = false
+        assertTrue(runCatching {
+            EcuWriteConsentFlow.requireCurrentForTransmit(warningOnly) {
+                called = true
+                true
+            }
+        }.isFailure)
+        assertFalse(called)
+    }
+
     @Test fun closeOrNoOrChangedPhysicalConnectionNeverWrites() {
         val confirmation = EcuWriteConsentFlow.Step.CONFIRMATION
         assertFalse(EcuWriteConsentFlow.permitsWrite(confirmation, false, false))
