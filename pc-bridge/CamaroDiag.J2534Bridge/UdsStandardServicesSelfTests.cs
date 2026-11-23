@@ -25,6 +25,39 @@ internal static class UdsStandardServicesSelfTests
         Equal(UdsStandardServices.TesterPresent(true), "3E80",
             "Tester present suppress positive");
         Equal(UdsStandardServices.ReadDid(0xF190), "22F190", "Read DID");
+        var requestedDids = UdsStandardServices.ReadDids(
+            new ushort[] { 0xF190, 0xF187 });
+        Equal(requestedDids, "22F190F187",
+            "ISO 14229 multi-DID request uses ordered big-endian DIDs.");
+        var didReply = UdsStandardServices.DecodeDids(
+            requestedDids, [0x62, 0xF1, 0x90, 0x41, 0x42,
+                            0xF1, 0x87, 0x12, 0x34, 0x56],
+            new[] { 2, 3 });
+        Check(didReply.Count == 2 && didReply[0].Did == 0xF190 &&
+            didReply[0].Data.SequenceEqual(new byte[] {0x41, 0x42}) &&
+            didReply[1].Did == 0xF187 &&
+            didReply[1].Data.SequenceEqual(new byte[] {0x12, 0x34, 0x56}),
+            "Multi-DID response uses explicit data lengths and preserves order.");
+        Reject<ArgumentException>(() =>
+            UdsStandardServices.ReadDids(new ushort[] {0xF190, 0xF190}),
+            "Duplicate DID requests cannot be silently assigned to one response.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.DecodeDids(requestedDids,
+                [0x62, 0xF1, 0x87, 0x12, 0x34, 0x56,
+                 0xF1, 0x90, 0x41, 0x42], new[] {2, 3}),
+            "Reordered DID replies are not attributed to the original request.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.DecodeDids(requestedDids,
+                [0x62, 0xF1, 0x90, 0x41, 0x42,
+                 0xF1, 0x87, 0x12, 0x34], new[] {2, 3}),
+            "Truncated second DID data cannot pass the transport parser.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.DecodeDids(requestedDids,
+                [0x62, 0xF1, 0x90, 0x41, 0x42,
+                 0xF1, 0x87, 0x12, 0x34, 0x56, 0xFF],
+                 new[] {2, 3}),
+            "Unrequested trailing data cannot be accepted as part of DID response.");
+
         Equal(UdsStandardServices.ReadScalingDid(0xF190),
             "24F190", "ReadScalingDataByIdentifier standard wire payload.");
         Equal(UdsStandardServices.ControlIo(0x1234, [0x03, 0x42]),
