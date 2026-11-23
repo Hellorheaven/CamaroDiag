@@ -1,7 +1,12 @@
-C6/C2 non-OEM gate cleanup — final grouped correction validation
-Code HEAD before marker commit: 9bb57ecb0a8b72849a25e5e027bc57794a93fe73
-Local E39 bench enabled; TrustedKeys and .sig removed; optional J2534 DLL pin;
-physical VIN check via F190 or GM GMLAN 1A/90 with per-connection dialect cache;
-C8 dangling CDJ/USB reference fixed; remote bridge remains read-only.
-Expected: Windows Debug -warnaserror plus 607+ hardware-free self-tests; Android communication/diagnostic/app tests.
-No physical ECU or restoration qualification, no Release build, no merge.
+C6 protocol/transport user policy — grouped software validation (23 November 2026)
+Source code HEAD: 11e55d498f093d3a05338d77e11e39ceaabb085b
+Changes tested: optional OEM SecurityAccess; default session permitted where ECU specifies;
+no fabricated documentation/signature key; explicitly entered raw CAN and local J2534
+commands no longer limited to a CamaroDiag read-only service allowlist;
+ELM/STN transport no blanket writer ban when a real compatible driver exists;
+bench planning accepts any identified ECU family when the matching hardware driver exists;
+Android STN UDS sessions accept an ECU-specific write policy.
+Preserve: CamaroDiag license gates, OEM seed/key where necessary, exact identity/firmware,
+image integrity, actual voltage and power, backup/readback, physically supported routes.
+One grouped Android communication+diagnostic+app tests and Windows Debug bridge self-tests.
+No fictitious driver, no firmware capability claim, no hardware flashing, no merge.
