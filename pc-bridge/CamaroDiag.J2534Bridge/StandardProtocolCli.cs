@@ -731,6 +731,7 @@ internal static class StandardProtocolCli
         var udsValidate = bool.Parse(Optional(args, "--uds-validate") ?? "false");
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
+        var udsDids = Optional(args, "--uds-dids");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var wwhStatus = Optional(args, "--obd-wwh-status");
@@ -755,6 +756,7 @@ internal static class StandardProtocolCli
             StringComparer.OrdinalIgnoreCase);
         var payloadSources = (hexPayload is null ? 0 : 1) +
             (payloadFile is null ? 0 : 1) +
+            (udsDids is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
             (wwhStatus is null ? 0 : 1) +
@@ -770,6 +772,8 @@ internal static class StandardProtocolCli
                 "Exchange needs exactly one payload, file, OBD DID or DTC mask; receive mode accepts none.");
         byte[] bytes = mode == "receive" ? Array.Empty<byte>() :
             obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
+            udsDids is not null ? UdsMultiDidCli.BuildRequest(
+                UdsMultiDidCli.Parse(udsDids)) :
             obdDid is not null ? ObdOnUdsServices.ReadObdDid(
                 checked((ushort)ParseCanId(obdDid))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
@@ -803,7 +807,7 @@ internal static class StandardProtocolCli
             throw new ArgumentException("Invalid ISO-TP physical address or J2534 option.");
         return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud,
             mode, udsValidate || obdDid is not null ||
-                obdDtcMask is not null || wwhStatus is not null ||
+                udsDids is not null || obdDtcMask is not null || wwhStatus is not null ||
                 wwhPermanent || wwhReadiness is not null ||
                 snapshotDtc is not null || extendedDtc is not null ||
                 obdIdentify);
@@ -940,6 +944,7 @@ internal static class StandardProtocolCli
         var ecu = Address(Required(args, "--ecu"));
         var hexPayload = Optional(args, "--payload");
         var payloadFile = Optional(args, "--payload-file");
+        var udsDids = Optional(args, "--uds-dids");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
         var wwhStatus = Optional(args, "--obd-wwh-status");
@@ -964,6 +969,7 @@ internal static class StandardProtocolCli
             StringComparer.OrdinalIgnoreCase);
         if ((hexPayload is null ? 0 : 1) +
             (payloadFile is null ? 0 : 1) +
+            (udsDids is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
             (wwhStatus is null ? 0 : 1) +
@@ -979,6 +985,8 @@ internal static class StandardProtocolCli
             throw new ArgumentException(
                 "DoIP file payload exceeds the bounded in-memory PDU capacity.");
         var bytes = obdIdentify ? ObdOnUdsServices.ReadProtocolIdentification() :
+            udsDids is not null ? UdsMultiDidCli.BuildRequest(
+                UdsMultiDidCli.Parse(udsDids)) :
             obdDid is not null ? ObdOnUdsServices.ReadObdDid(
                 checked((ushort)uint.Parse(
                     obdDid.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
