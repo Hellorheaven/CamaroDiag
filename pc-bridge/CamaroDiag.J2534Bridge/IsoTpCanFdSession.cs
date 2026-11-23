@@ -75,7 +75,11 @@ internal static class IsoTpCanFdSession
         {
             var sf = Pad(settings);
             var header = settings.TxFrameLength > 8 ? 2 : 1;
-            if (header == 2) sf[1] = checked((byte)payload.Length);
+            if (header == 2)
+            {
+                sf[0] = 0x00; // ISO-TP escaped SF_DL for CAN FD with CAN_DL > 8
+                sf[1] = checked((byte)payload.Length);
+            }
             else sf[0] = checked((byte)payload.Length);
             payload.CopyTo(sf, header);
             await link.SendAsync(new(settings.TxId, settings.CanFd, sf), token);
