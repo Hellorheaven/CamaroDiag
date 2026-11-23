@@ -396,3 +396,6 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 ### Connecteurs CDJ/1 — ancien point d'entrée désactivé sans coupure de liaison
 
 L'interface n'affiche déjà plus le bouton de capture physique CDJ/1 non implémentée. Le point d'entrée restant du ViewModel se limite maintenant à un état « non vérifié », **sans appel au gestionnaire des transports ni désactivation d'un adaptateur actif**. Aucun faux fichier de récupération n'est créé. Commit `86f3647`. La vraie capture matérielle est toujours reportée au chantier firmware/connecteurs.
+
+
+- Garde-fous protocoles : drapeau J2534 11 bits pour FBFF, 29 bits pour FEFF/FD.TP ; C-PG de longueur zéro autorisé explicitement ; contrôle du remplissage de fin FD.TP ; contrôle des numéros de record DTC `19 04` / `19 06` avec exception `FE`/`FF` pour la sélection multi-records. Tests enregistrés, non exécutés.
