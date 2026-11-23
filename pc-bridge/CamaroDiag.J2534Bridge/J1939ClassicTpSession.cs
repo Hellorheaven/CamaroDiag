@@ -304,8 +304,14 @@ internal static class J1939ClassicTpSession
             var frame = await link.ReceiveAsync(timeout, token);
             var id = StandardVehicleProtocols.ParseJ1939Id(frame.Id);
             if (frame.IsFd || frame.Data.Length != 8) continue;
+            // Only an abort for this peer, destination and PGN belongs to
+            // the active transport session. Other nodes may transfer different
+            // PGNs at the same time on the shared J1939 bus.
             if (id.Pgn == TpCmPgn && id.Source == o.RemoteAddress &&
-                frame.Data[0] == Abort)
+                id.Destination == (broadcast ? 0xFF : o.LocalAddress) &&
+                frame.Data[0] == Abort &&
+                (frame.Data[5] | frame.Data[6] << 8 |
+                    frame.Data[7] << 16) == o.Pgn)
                 throw new IOException("J1939 peer aborted active TP.DT session.");
             if (id.Pgn == TpDtPgn && id.Source == o.RemoteAddress &&
                 id.Destination == (broadcast ? 0xFF : o.LocalAddress))
