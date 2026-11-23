@@ -48,6 +48,9 @@ internal static class Program
         if (args.Contains(StandardProtocolCli.RawIsoTpCommand,
             StringComparer.OrdinalIgnoreCase))
             return await StandardProtocolCli.RunIsoTpAsync(args);
+        if (args.Contains(StandardProtocolCli.J1979PidDiscoveryCommand,
+            StringComparer.OrdinalIgnoreCase))
+            return await StandardProtocolCli.RunJ1979PidDiscoveryAsync(args);
         if (args.Contains(StandardProtocolCli.ObdCanDiscoverCommand,
             StringComparer.OrdinalIgnoreCase))
             return await StandardProtocolCli.RunObdCanDiscoveryAsync(args);
