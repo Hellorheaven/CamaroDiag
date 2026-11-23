@@ -179,7 +179,8 @@ internal static class DoIpCodec
 
     internal static void RequireRoutingActive(Message response, ushort testerAddress)
     {
-        if (response.Type != RoutingActivationResponse || response.Payload.Length < 9 ||
+        if (response.Type != RoutingActivationResponse ||
+            response.Payload.Length is not (9 or 13) ||
             BinaryPrimitives.ReadUInt16BigEndian(response.Payload) != testerAddress ||
             response.Payload[4] != 0x10)
             throw new InvalidDataException("DoIP routing activation not positively acknowledged.");
@@ -225,7 +226,10 @@ internal static class DoIpCodec
             BinaryPrimitives.ReadUInt16BigEndian(response.Payload.AsSpan(2)) != testerAddress)
             return false;
         if (response.Type == DiagnosticNegativeAck)
-            throw new IOException("DoIP gateway refused diagnostic message.");
+            throw new IOException($"DoIP gateway negative ACK code 0x{response.Payload[4]:X2}.");
+        if (response.Payload[4] != 0x00)
+            throw new InvalidDataException(
+                "DoIP positive diagnostic acknowledgement must use code 0x00.");
         return true;
     }
 }
