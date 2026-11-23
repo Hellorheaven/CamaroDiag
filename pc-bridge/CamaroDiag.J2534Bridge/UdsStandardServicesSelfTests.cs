@@ -49,6 +49,24 @@ internal static class UdsStandardServicesSelfTests
             "14FFFFFF", "Clear DTC group");
         Equal(UdsStandardServices.ReadDtc(0x02, [0xFF]),
             "1902FF", "Read DTC by mask");
+        Equal(ObdOnUdsServices.ReadProtocolIdentification(),
+            "22F810", "SAE J1979-2 standard F810 protocol detection query.");
+        var obdProtocol = ObdOnUdsServices.DecodeProtocolIdentification(
+            [0x62, 0xF8, 0x10, 0x01]);
+        Check(obdProtocol.Value == 1 && obdProtocol.IsObdOnUds,
+            "F810 value 1 identifies a compliant OBDonUDS ECU.");
+        Check(!ObdOnUdsServices.DecodeProtocolIdentification(
+            [0x62, 0xF8, 0x10, 0x00]).IsObdOnUds,
+            "Unrecognized protocol value never claims OBDonUDS support.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeProtocolIdentification(
+                [0x62, 0xF8, 0x11, 0x01]),
+            "Protocol identification from another DID is not accepted.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeProtocolIdentification(
+                [0x62, 0xF8, 0x10]),
+            "Truncated F810 protocol identification is rejected.");
+
         Equal(ObdOnUdsServices.ReadEmissionsData(0xF40C),
             "22F40C", "OBDonUDS current emissions DID maps to ISO 14229 0x22.");
         Equal(ObdOnUdsServices.ReadEmissionsData(0xF701),
