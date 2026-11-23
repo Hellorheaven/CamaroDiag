@@ -44,3 +44,7 @@ Group C1/C4/C6 + connector integration checkpoint — 2026-11-23 evening.
 Target HEAD before marker 1c23cb08e6498e83f403b0719ad486847d27cb9a
 Run Android communication/diagnostic/app unit tests including UsbPermissionReconnectPolicy, EcuWriteConsentFlow, SafeRawCanTransmitPolicy, Lfx2012FuelSessionHistory, CanConsoleEventJournalStore; Windows J2534 Debug self-test.
 This is an integration checkpoint only: no physical ECU validation, no release, no merge.
+
+Final non-protocol C1/C2/C4/C6 + adapter bridge integration checkpoint, 2026-11-23 evening.
+Source HEAD: eca192d302621680a0e8b628a17f45d5917f9fcb
+Run communication/diagnostic/app Debug unit tests + Windows J2534 Debug build/self-test on this marker SHA. Includes Android USB permission retry, connector discovery, exact restore map coverage, console SHA256 journal and stale fuel observations. No destructive ECU test, no release, no merge.
