@@ -58,6 +58,7 @@ import com.camarodiag.gen5.data.obd.CanCaptureArchiveWriteException
 import com.camarodiag.gen5.data.obd.CanConsoleRawArchiveWriter
 import com.camarodiag.gen5.data.obd.UsbPermissionPendingException
 import com.camarodiag.gen5.data.obd.J2534BridgeConnectionForm
+import com.camarodiag.gen5.data.obd.AdapterEndpointPreflight
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeException
 import com.camarodiag.gen5.data.obd.CanConsolePhysicalExchangeCancelled
 import com.camarodiag.gen5.data.obd.CanConsoleExportPolicy
@@ -3546,11 +3547,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectWifi(host: String, port: Int) {
+        val endpoint = try {
+            AdapterEndpointPreflight.wifi(host, port)
+        } catch (_: IllegalArgumentException) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_wifi_connection_failed)
+            return
+        }
         connectWithResult(
-            connect = { obdManager.connectWifi(host.trim(), port) },
+            connect = { obdManager.connectWifi(endpoint.host, endpoint.port) },
             fallbackMessage = localizedContext.getString(R.string.msg_wifi_connection_failed),
             transport = "wifi",
-            endpoint = "${host.trim()}:$port"
+            endpoint = "${endpoint.host}:${endpoint.port}"
         )
     }
 
@@ -3685,16 +3692,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectRealBluetooth(macAddress: String) {
-        val selectedName = _pairedDevices.value.firstOrNull { it.second == macAddress }?.first.orEmpty()
+        val selectedAddress = try {
+            AdapterEndpointPreflight.bluetoothMac(macAddress)
+        } catch (_: IllegalArgumentException) {
+            _connectionMessage.value = localizedContext.getString(R.string.msg_bluetooth_connection_failed)
+            return
+        }
+        val selectedName = _pairedDevices.value.firstOrNull {
+            it.second.equals(selectedAddress, ignoreCase = true)
+        }?.first.orEmpty()
         if (selectedName.contains("OBDLink CX", ignoreCase = true)) {
             _connectionMessage.value = localizedContext.getString(R.string.msg_obdlink_cx_not_gm_compatible)
             return
         }
         connectWithResult(
-            connect = { obdManager.connectAndProbe(macAddress) },
+            connect = { obdManager.connectAndProbe(selectedAddress) },
             fallbackMessage = localizedContext.getString(R.string.msg_bluetooth_connection_failed),
             transport = "bluetooth",
-            endpoint = "$selectedName ($macAddress)"
+            endpoint = "$selectedName ($selectedAddress)"
         )
     }
 
