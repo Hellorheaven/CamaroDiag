@@ -487,6 +487,17 @@ class LocaleResourcesIntegrityTest {
         }
     }
 
+    @Test fun usbPermissionPromptHasActionableFrenchAndEnglishGuidance() {
+        val english = strings("en").getValue("msg_usb_permission_pending")
+        val french = strings("fr").getValue("msg_usb_permission_pending")
+        assertTrue(english.contains("USB"))
+        assertTrue(english.contains("Android"))
+        assertTrue(french.contains("USB"))
+        assertTrue(french.contains("Android"))
+        assertFalse(english == french)
+        assertTrue(english.isNotBlank() && french.isNotBlank())
+    }
+
     @Test fun currentCanExportAndFuelHistoryGuidanceIsTranslatedAndNotMisleading() {
         val required = setOf(
             "can_console_history_recent_scope",
