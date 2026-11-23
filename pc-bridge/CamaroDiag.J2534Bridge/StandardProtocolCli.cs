@@ -15,12 +15,78 @@ internal static class StandardProtocolCli
     internal const string DoIpDiscoverCommand = "--doip-discover";
     internal const string DoIpStatusCommand = "--doip-status";
     internal const string ObdCanDiscoverCommand = "--obd-discover-can";
+    internal const string J1979PidDiscoveryCommand = "--j1979-pids";
     internal const string PassThruCommand = "--j2534-standard";
     internal const string RawIsoTpCommand = "--isotp-exchange";
     internal const string J1939Command = "--j1939-transport";
     internal const string J1939FdCommand = "--j1939-fd-multipg";
     internal const string J1939FdBamCommand = "--j1939-fd-bam";
     internal const string J1939FdCmdtCommand = "--j1939-fd-cmdt";
+
+    /// <summary>
+    /// Explicit physical J1979 discovery for one CAN ECU. No functional
+    /// broadcast, mutation, or guessed defaults for the physical addresses.
+    /// </summary>
+    internal static async Task<int> RunJ1979PidDiscoveryAsync(string[] args)
+    {
+        try
+        {
+            var adapterIndex = int.Parse(Required(args, "--adapter-index"),
+                CultureInfo.InvariantCulture);
+            var txId = uint.Parse(Required(args, "--tx-id").Replace("0x", "",
+                StringComparison.OrdinalIgnoreCase), NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture);
+            var rxId = uint.Parse(Required(args, "--rx-id").Replace("0x", "",
+                StringComparison.OrdinalIgnoreCase), NumberStyles.AllowHexSpecifier,
+                CultureInfo.InvariantCulture);
+            var baud = Number(Required(args, "--baud"));
+            var mode = checked((byte)Number(Optional(args, "--j1979-mode") ?? "1"));
+            var frame = checked((byte)Number(Optional(args, "--freeze-frame") ?? "0"));
+            var extended = bool.Parse(Optional(args, "--extended") ?? "false");
+            var timeoutMs = int.Parse(Optional(args, "--timeout-ms") ?? "5000",
+                CultureInfo.InvariantCulture);
+            if (adapterIndex < 0 || baud == 0 || timeoutMs is < 100 or > 30000 ||
+                mode is not (0x01 or 0x02) || (mode == 1 && frame != 0) ||
+                txId > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
+                rxId > (extended ? 0x1FFF_FFFFu : 0x7FFu) ||
+                txId == rxId)
+                throw new ArgumentException("Invalid J1979 CAN discovery options.");
+            var settings = new IsoTpCanFdSession.Settings(txId, rxId, 8, false);
+            settings.Validate();
+            var adapters = J2534Registry.Discover();
+            if (adapterIndex >= adapters.Count)
+                throw new ArgumentOutOfRangeException(nameof(adapterIndex));
+            using var driver = J2534StandardChannel.Connect(
+                adapters[adapterIndex], J2534StandardChannel.Can,
+                baud, extended ? 0x100u : 0u);
+            var mask = new byte[4];
+            var pattern = new byte[4];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(
+                mask, extended ? 0x1FFF_FFFFu : 0x7FFu);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(pattern, rxId);
+            driver.ConfigureFilter(mask, pattern);
+            var link = new IsoTpJ2534RawCanLink(driver,
+                canFd: false, extendedId: extended, bitRateSwitch: false);
+            var discovery = await ObdJ1979PidDiscovery.DiscoverAsync(
+                link, settings, mode, frame,
+                TimeSpan.FromMilliseconds(timeoutMs), CancellationToken.None);
+            foreach (var page in discovery.Pages)
+                Console.WriteLine($"J1979 mode=0x{mode:X2} page=0x{page.RequestedBase:X2} " +
+                    $"supported={string.Join(",", page.SupportedPids.Select(x => x.ToString("X2")))} " +
+                    $"next={page.HasNextPage}");
+            Console.WriteLine($"J1979 ECU RX=0x{rxId:X} pages={discovery.Pages.Count} " +
+                $"supported={discovery.SupportedPids.Count}; PID support does not establish scaling, " +
+                "write permission, or ECU physical programming capability.");
+            return 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or
+            IOException or TimeoutException or DllNotFoundException or
+            BadImageFormatException or EntryPointNotFoundException or OverflowException)
+        {
+            Console.Error.WriteLine("SAE J1979 PID discovery failed: " + ex.Message);
+            return 6;
+        }
+    }
 
     internal sealed record ObdCanDiscoveryOptions(
         int AdapterIndex, uint Baud, int TimeoutMs);
