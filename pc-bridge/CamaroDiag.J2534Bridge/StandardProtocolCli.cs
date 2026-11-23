@@ -146,7 +146,8 @@ internal static class StandardProtocolCli
     internal sealed record J1939FdOptions(int AdapterIndex, uint Bitrate,
         uint? DataBaud, bool Brs, byte Source, byte Target, byte Priority,
         int? Pgn, string Mode, byte[] Payload, int TimeoutMs,
-        bool Bam, byte Session, bool Cmdt, byte Window);
+        bool Bam, byte Session, bool Cmdt, byte Window,
+        ulong? Name = null);
 
     internal static J1939FdOptions ParseJ1939Fd(string[] args)
     {
@@ -158,6 +159,7 @@ internal static class StandardProtocolCli
         var brs = bool.Parse(Optional(args, "--brs") ?? "false");
         var source = checked((byte)Number(Required(args, "--source")));
         var target = checked((byte)Number(Required(args, "--target")));
+        var name = ParseJ1939Name(args);
         var bam = args.Contains(J1939FdBamCommand,
             StringComparer.OrdinalIgnoreCase);
         var cmdt = args.Contains(J1939FdCmdtCommand,
@@ -223,7 +225,8 @@ internal static class StandardProtocolCli
         if (cmdt && pgn.HasValue && ((pgn.Value >> 8) & 0xFF) >= 240)
             throw new ArgumentException("J1939-22 directed FD.TP requires a PDU1 PGN.");
         return new(index, baud, dataBaud, brs, source, target,
-            priority, pgn, mode, payload, timeout, bam, session, cmdt, window);
+            priority, pgn, mode, payload, timeout, bam, session, cmdt, window,
+            name);
     }
 
     internal static async Task<int> RunJ1939FdAsync(string[] args)
@@ -340,7 +343,8 @@ internal static class StandardProtocolCli
 
     internal sealed record J1939Options(
         int AdapterIndex, uint Bitrate, J1939ClassicTpSession.Options Settings,
-        string Mode, bool Broadcast, byte[] Request, int TimeoutMs);
+        string Mode, bool Broadcast, byte[] Request, int TimeoutMs,
+        ulong? Name = null);
 
     internal static J1939Options ParseJ1939(string[] args)
     {
@@ -349,6 +353,7 @@ internal static class StandardProtocolCli
         var baud = Number(Required(args, "--baud"));
         var source = checked((byte)Number(Required(args, "--source")));
         var target = checked((byte)Number(Required(args, "--target")));
+        var name = ParseJ1939Name(args);
         var pgn = checked((int)Number(Required(args, "--pgn")));
         var priority = checked((byte)Number(Optional(args, "--priority") ?? "6"));
         var window = checked((byte)Number(Optional(args, "--receive-window") ?? "16"));
@@ -370,7 +375,8 @@ internal static class StandardProtocolCli
             ((mode is "receive" or "request") && broadcast) ||
             data.Length > J1939ClassicTpSession.MaxPayload)
             throw new ArgumentException("Invalid J1939 transport or operating mode.");
-        return new(index, baud, options, mode, broadcast, data, timeout);
+        return new(index, baud, options, mode, broadcast, data, timeout,
+            name);
     }
 
     internal static async Task<int> RunJ1939Async(string[] args)
@@ -629,6 +635,22 @@ internal static class StandardProtocolCli
         var i = Array.FindIndex(args.ToArray(), x =>
             x.Equals(option, StringComparison.OrdinalIgnoreCase));
         return i == -1 ? null : Required(args, option);
+    }
+
+    private static ulong? ParseJ1939Name(string[] args)
+    {
+        var raw = Optional(args, "--name");
+        if (raw is null) return null;
+        var hex = raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ?
+            raw[2..] : raw;
+        if (hex.Length != 16 || !hex.All(Uri.IsHexDigit))
+            throw new ArgumentException(
+                "J1939-81 NAME must be an explicit 16-character hex identifier.");
+        var value = ulong.Parse(hex, NumberStyles.AllowHexSpecifier,
+            CultureInfo.InvariantCulture);
+        if (value == ulong.MaxValue)
+            throw new ArgumentException("All-FF J1939 NAME is unassigned.");
+        return value;
     }
 
     private static uint Number(string value)
