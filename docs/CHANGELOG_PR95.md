@@ -321,3 +321,9 @@ Le magasin garde la taille confirmée par le dernier `flush`. Un fichier tronqu�
 - Tests ajoutés : sélection USB reconnue versus ELM/KKL, configuration J2534 privée/TLS/11 et 29 bits avec rejets, messages FR/EN de permission et d'erreur de formulaire.
 - Commits de ce lot : `a86fff7`, `38a9c80`, `2c45c05`, `4bd7333`, `c00c294`, `78457c1`, `773c40d`, `7c4607e`, `339690b`, `77c4202`, `ef0d6c2`, `0335be6`, `fa903d7`, `4454797`, `5fbf50e`, `15002c4`, `5fbe181`, `ad9b2f5`, `b370b93`, `9c0cc91`, `494429a`.
 - **Tests non confirmés sur le HEAD final**, aucun essai USB, TLS PC ou ECU physique déclaré. Aucun protocole ISO/SAE, firmware ou commande d'écriture ECU modifié par cette intervention.
+
+### Connexions Wi-Fi / Bluetooth — prévalidation du choix d'interface
+
+- Le formulaire Wi-Fi OBD refuse un hôte vide, un URI, une adresse comprenant des espaces/contrôles ou un port TCP hors de 1..65535 **avant** de réinitialiser une session fonctionnelle. Les hôtes locaux ordinaires et les noms compatibles restent autorisés ; aucune modification du protocole OBD/ELM.
+- Les adresses Bluetooth sont normalisées en six octets hexadécimaux séparés par des deux-points avant toute tentative de connexion, avec message d'erreur sans basculement d'adaptateur si la saisie est invalide.
+- Tests unitaires de prévalidation ajoutés ; commits `333d8bc`, `8b6a9c2`, `7da6bc8`. Pas de tests sur périphérique physique confirmés.
