@@ -162,6 +162,19 @@ internal static class StandardVehicleProtocolsSelfTests
             DoIpCodec.Encode(DoIpCodec.DiagnosticMessage, identityBytes),
             discoveryAddress), "Diagnostic DoIP packet cannot masquerade as discovery.");
 
+        var nackReason = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.GenericNegativeAck, [0x02]));
+        Reject<IOException>(() =>
+            DoIpCodec.RequireNoGenericNack(nackReason),
+            "DoIP generic header NACK code 2 rejects oversized transport payload.");
+        Reject<InvalidDataException>(() =>
+            DoIpCodec.RequireNoGenericNack(DoIpCodec.Decode(
+                DoIpCodec.Encode(DoIpCodec.GenericNegativeAck, [0x00, 0x02]))),
+            "Malformed generic DoIP NACK must never be accepted.");
+        DoIpCodec.RequireNoGenericNack(DoIpCodec.Decode(
+            DoIpCodec.Encode(DoIpCodec.EntityStatusResponse, [0, 1, 1])));
+        Check(true, "DoIP generic NACK classifier leaves ordinary messages untouched.");
+
         var statusRequest = DoIpCodec.Decode(DoIpCodec.Encode(
             DoIpCodec.EntityStatusRequest, []));
         Check(statusRequest.Type == 0x4001 &&
