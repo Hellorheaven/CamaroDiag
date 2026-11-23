@@ -343,6 +343,8 @@ internal static class UdsStandardServices
             if (response[i] != expected)
                 throw new InvalidDataException("Stale/misdirected UDS reply identifier.");
         }
+        if (request[0] is 0x34 or 0x35)
+            _ = DecodeTransferParameters(request[0], response);
         if (request[0] == 0x19)
         {
             // ISO 14229 WWH-OBD subfunctions echo the functional group
