@@ -10,6 +10,31 @@ namespace CamaroDiag.J2534Bridge;
 /// </summary>
 internal static class ObdOnUdsServices
 {
+    internal const ushort ProtocolIdentificationDid = 0xF810;
+
+    internal sealed record ProtocolIdentification(byte Value)
+    {
+        internal bool IsObdOnUds => Value == 1;
+    }
+
+    /// <summary>
+    /// SAE J1979-2 / ISO 15765-4 detection query. This is a physical
+    /// single-ECU query helper; full functional discovery and OBD Classic
+    /// fallback are handled separately.
+    /// </summary>
+    internal static byte[] ReadProtocolIdentification() =>
+        UdsStandardServices.ReadDid(ProtocolIdentificationDid);
+
+    internal static ProtocolIdentification DecodeProtocolIdentification(
+        ReadOnlySpan<byte> response)
+    {
+        if (response.Length != 4 || response[0] != 0x62 ||
+            response[1] != 0xF8 || response[2] != 0x10)
+            throw new InvalidDataException(
+                "OBDonUDS protocol identification requires exactly 62 F8 10 xx.");
+        return new ProtocolIdentification(response[3]);
+    }
+
     internal sealed record DiagnosticTroubleCode(uint Code, byte Status);
     internal sealed record DtcStatusReport(byte AvailabilityMask,
         IReadOnlyList<DiagnosticTroubleCode> Codes);
