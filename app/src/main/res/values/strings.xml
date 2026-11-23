@@ -980,4 +980,5 @@
     <string name="can_console_export_direction_legend"># TX = sent, RX = received, SYSTEM = application event</string>
     <string name="can_console_export_full_raw_rx"># RX RAW - full archived adapter output (unaltered text)</string>
     <string name="can_console_export_recent_raw_rx"># RX RAW - recent in-memory excerpt only, not a complete capture</string>
+    <string name="can_console_export_failed_marker"> FAILED</string>
 </resources>
