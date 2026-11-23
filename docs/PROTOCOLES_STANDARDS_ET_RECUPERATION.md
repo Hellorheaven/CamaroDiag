@@ -327,3 +327,10 @@ CamaroDiag.J2534Bridge.exe --isotp-exchange --adapter-index 0 --tx-id 7E0 --rx-i
 `--j1979-decode true` interprète le message applicatif revenu du lien ISO-TP pour les pages de disponibilité PID, le VIN Mode 09 et les paires DTC classiques 03/07/0A, et laisse les valeurs sans définition normative de PID à l'état **brut**. Elle refuse les erreurs de corrélation, et une réponse négative reste négative. Pour les autres services 01..0A, elle ne prétend pas fournir les échelles J1979DA ou vérifier l'effet d'une commande. La commande générique ISO-TP garde la double confirmation existante avant toute requête sortante, y compris mutatrice.
 
 **Limites** : aucune découverte multi-ECU fonctionnelle ni J1850/K-Line dans cette nouvelle commande, aucune preuve de qualification VCI/ECU, aucune intégration UI Android. La couverture des modes J1979 ainsi que J1979-2 reste incomplète ; les autotests associés sont écrits mais non exécutés lors de ce lot, faute de campagne de clôture.
+
+
+### Première tranche de valeurs SAE J1979 normalisées
+
+Le décodage du flux applicatif `--isotp-exchange --j1979-decode true` inclut désormais les PID classiques **05** (température), **06/07/08/09** (corrections carburant par banque), **0C** (régime), **0D** (vitesse), **10** (débit d'air), **11** (papillon) et **52** (pourcentage éthanol) en modes 01/02 lorsque la longueur et l'identifiant de la réponse correspondent à la requête. Les formules connues sont appliquées ; aucune lecture physique, présence de capteur, adaptation E85 ni capacité d'écriture n'est déduite de l'existence du décodeur. Les PID sans formule implémentée sont toujours affichés **bruts**. Les réponses absentes, tronquées ou incohérentes ne reçoivent aucune valeur par défaut.
+
+Des tests offline positifs/négatifs ont été **écrits, non exécutés** sur ce nouveau lot. Le reste des valeurs SAE J1979DA par édition et profil reste à développer, ainsi que leur validation sur calculateur réel.
