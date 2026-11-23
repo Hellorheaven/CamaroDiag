@@ -105,6 +105,25 @@ internal static class UdsStandardServicesSelfTests
         Check(UdsStandardServices.RequireResponse([0x19, 0x02, 0xFF],
             [0x59, 0x02, 0xFF]).Length == 3,
             "ReadDTCInformation subfunction echoed in DoIP and CAN");
+        Check(UdsStandardServices.RequireResponse([0x3E, 0x00],
+            [0x7E, 0x00]).Length == 2,
+            "TesterPresent response subfunction echoes requested zero.");
+        Check(UdsStandardServices.RequireResponse([0x2F, 0xF1, 0x90, 0x03],
+            [0x6F, 0xF1, 0x90, 0x03]).Length == 4,
+            "InputOutputControlByIdentifier positive response matches DID.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse([0x2F, 0xF1, 0x90, 0x03],
+                [0x6F, 0xF1, 0x91, 0x03]),
+            "IO control cannot accept another DID response.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse([0x3E, 0x00],
+                [0x7E, 0x01]),
+            "TesterPresent cannot accept stale subfunction response.");
+        Reject<InvalidDataException>(() =>
+            UdsStandardServices.RequireResponse([0x85, 0x01],
+                [0xC5, 0x02]),
+            "ControlDTCSetting response must echo subfunction.");
+
         Reject<InvalidDataException>(() =>
             UdsStandardServices.RequireResponse([0x27, 0x01],
                 [0x67, 0x02, 0xAA]),
