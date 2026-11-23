@@ -1172,67 +1172,67 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         connectionAttemptJob = viewModelScope.launch {
             beginBusyOperation()
             try {
-            try {
-                previousAttempt?.join()
-                if (attempt != connectionAttemptGeneration) return@launch
-                val activeMonitor = canMonitorJob
-                val activeRequest = detachCanRequest()
-                markAdapterDisconnected()
-                val detachedMonitor = detachedCanMonitorJob
-                val detachedRequest = detachedCanRequestJob
-                activeMonitor?.join()
-                activeRequest?.join()
-                detachedMonitor?.join()
-                detachedRequest?.join()
-                if (attempt != connectionAttemptGeneration) return@launch
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            }
-            _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                isJ2534BridgeConnecting = true,
-                isJ2534BridgeConnected = false,
-                isJ2534MemoryReadAvailable = false,
-                j2534BridgeMessage = ""
-            )
-            try {
-                val result = obdManager.connectJ2534Bridge(
-                    host = connectionForm.host,
-                    port = connectionForm.port,
-                    pairingToken = connectionForm.pairingCode,
-                    requestCanId = connectionForm.requestCanId,
-                    responseCanId = connectionForm.responseCanId,
-                    can29Bit = connectionForm.can29Bit,
-                    protocolNumber = connectionForm.protocolNumber
-                ).getOrThrow()
-                if (attempt != connectionAttemptGeneration) {
-                    obdManager.disconnect()
-                    return@launch
+                try {
+                    previousAttempt?.join()
+                    if (attempt != connectionAttemptGeneration) return@launch
+                    val activeMonitor = canMonitorJob
+                    val activeRequest = detachCanRequest()
+                    markAdapterDisconnected()
+                    val detachedMonitor = detachedCanMonitorJob
+                    val detachedRequest = detachedCanRequestJob
+                    activeMonitor?.join()
+                    activeRequest?.join()
+                    detachedMonitor?.join()
+                    detachedRequest?.join()
+                    if (attempt != connectionAttemptGeneration) return@launch
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 }
                 _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
-                    isJ2534BridgeConnecting = false,
-                    isJ2534BridgeConnected = true,
-                    isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
-                    j2534BridgeMessage = localizedContext.getString(R.string.vm_j2534_connected, result)
+                    isJ2534BridgeConnecting = true,
+                    isJ2534BridgeConnected = false,
+                    isJ2534MemoryReadAvailable = false,
+                    j2534BridgeMessage = ""
                 )
-            } catch (cancelled: CancellationException) {
-                if (attempt == connectionAttemptGeneration) {
-                    _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
-                }
-                throw cancelled
-            } catch (error: Exception) {
-                if (attempt == connectionAttemptGeneration) {
+                try {
+                    val result = obdManager.connectJ2534Bridge(
+                        host = connectionForm.host,
+                        port = connectionForm.port,
+                        pairingToken = connectionForm.pairingCode,
+                        requestCanId = connectionForm.requestCanId,
+                        responseCanId = connectionForm.responseCanId,
+                        can29Bit = connectionForm.can29Bit,
+                        protocolNumber = connectionForm.protocolNumber
+                    ).getOrThrow()
+                    if (attempt != connectionAttemptGeneration) {
+                        obdManager.disconnect()
+                        return@launch
+                    }
                     _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
                         isJ2534BridgeConnecting = false,
-                        isJ2534BridgeConnected = false,
-                        isJ2534MemoryReadAvailable = false,
-                        j2534BridgeMessage = localizedContext.getString(R.string.msg_j2534_bridge_connect_failed)
+                        isJ2534BridgeConnected = true,
+                        isJ2534MemoryReadAvailable = obdManager.isJ2534MemoryReadAvailable(),
+                        j2534BridgeMessage = localizedContext.getString(R.string.vm_j2534_connected, result)
                     )
+                } catch (cancelled: CancellationException) {
+                    if (attempt == connectionAttemptGeneration) {
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(isJ2534BridgeConnecting = false)
+                    }
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (attempt == connectionAttemptGeneration) {
+                        _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                            isJ2534BridgeConnecting = false,
+                            isJ2534BridgeConnected = false,
+                            isJ2534MemoryReadAvailable = false,
+                            j2534BridgeMessage = localizedContext.getString(R.string.msg_j2534_bridge_connect_failed)
+                        )
+                    }
+                } finally {
+                    if (attempt == connectionAttemptGeneration) {
+                        connectionAttemptJob = null
+                    }
                 }
-            } finally {
-                if (attempt == connectionAttemptGeneration) {
-                    connectionAttemptJob = null
-                }
-            }
             } finally {
                 endBusyOperation()
             }
