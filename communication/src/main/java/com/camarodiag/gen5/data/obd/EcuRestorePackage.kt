@@ -48,6 +48,11 @@ object EcuRestorePackage {
             }
             requestedBytes += region.length
         }
+        val coverage = EcuRestoreCoveragePreview.inspect(archive, map)
+        require(coverage.coversSuppliedMap) {
+            "Supplied ECU restoration map has ${coverage.missing.size} missing or " +
+                "unverified address spans and ${coverage.unaccountedCaptureCount} unmapped captures"
+        }
         val images = EcuRestoreImage.assemble(archive, map)
         check(directory.mkdir()) { "ECU image package directory must be new" }
         images.forEachIndexed { index, image ->
