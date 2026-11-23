@@ -152,6 +152,25 @@ internal static class NativeUdsUploadSelfTests
         Reject<IOException>(() => Upload(negative),
             "OEM security denial must propagate without invented seed/key.");
 
+        var failedExit = new FakeExchange();
+        failedExit.Enqueue(UploadRequest(0x80001000, 3), [0x75, 0x10, 0x05]);
+        failedExit.Enqueue([0x36, 0x01], [0x76, 0x01, 0x01, 0x02, 0x03]);
+        failedExit.Enqueue([0x37], [0x7F, 0x37, 0x72]);
+        Reject<IOException>(() =>
+            Upload(failedExit, 3),
+            "UDS upload completion must reject a negative TransferExit.");
+
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        var cancelledLink = new FakeExchange();
+        Reject<OperationCanceledException>(() =>
+            NativeUdsUploadProtocol.UploadAsync(cancelledLink,
+                0x80001000u, 3, cancelled.Token)
+                .GetAwaiter().GetResult(),
+            "Cancelled UDS upload does not send a RequestUpload packet.");
+        Check(cancelledLink.Sent == 0,
+            "No UDS upload request is transmitted after user cancellation.");
+
         var overflow = new FakeExchange();
         Reject<ArgumentOutOfRangeException>(() => Upload(
             overflow, 8, 0xFFFFFFFC),
