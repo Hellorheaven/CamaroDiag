@@ -94,6 +94,80 @@ internal static class ObdJ1979PidValuesSelfTests
         Reject<InvalidDataException>(() =>
             ObdJ1979PidValues.Decode([0x01, 0x0D], [0x41, 0x0C, 20]),
             "Wrong echoed PID rejected.");
+
+        // Additional classic J1979 scalars. All values come from offline
+        // application payloads, without assuming any ECU advertises the PID.
+        Check(Read(0x0A, 0xFF).Number == 765 &&
+            Read(0x0A, 0xFF).Unit == "kPa",
+            "Gauge fuel pressure uses the factor three.");
+        Check(Read(0x0B, 100).Number == 100,
+            "Intake manifold absolute pressure is one byte in kPa.");
+        Check(Read(0x21, 0x01, 0x00).Number == 256,
+            "Distance with MIL on is an unsigned big-endian word.");
+        Check(Math.Abs(Read(0x22, 0x01, 0x00).Number - 20.224) < 0.0001,
+            "Fuel rail relative vacuum pressure scaling.");
+        Check(Read(0x23, 0x01, 0x00).Number == 2560,
+            "Direct injection rail pressure 10-kPa increments.");
+        Check(Read(0x2C, 0xFF).Number == 100 &&
+            Read(0x2E, 0xFF).Number == 100,
+            "Commanded EGR and purge both use 0..100-percent scaling.");
+        Check(Read(0x2D, 0x80).Number == 0 &&
+            Read(0x2D, 0x00).Number == -100,
+            "Signed EGR error midpoint and low endpoint.");
+        Check(Read(0x30, 0x05).Number == 5 &&
+            Read(0x30, 0x05).Unit == "count",
+            "Warm-up count is a count, not a duration.");
+        Check(Read(0x31, 0x12, 0x34).Number == 0x1234,
+            "Distance since DTC clear is big-endian.");
+        Check(Read(0x32, 0xFF, 0xFC).Number == -1 &&
+            Read(0x32, 0x00, 0x04).Number == 1,
+            "EVAP pressure is signed two's-complement quarter-pascals.");
+        foreach (byte catalystPid in new byte[] { 0x3C, 0x3D, 0x3E, 0x3F })
+            Check(Read(catalystPid, 0x02, 0x58).Number == 20,
+                $"Catalyst sensor PID {catalystPid:X2} includes -40 Celsius offset.");
+        Check(Math.Abs(Read(0x43, 0x00, 0xFF).Number - 100) < 0.0001,
+            "Absolute load uses the 255 divisor.");
+        Check(Read(0x44, 0x80, 0x00).Number == 1,
+            "Commanded equivalence ratio uses 32768 divisor.");
+        foreach (byte positionPid in new byte[] {
+            0x45, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x5A, 0x5B })
+            Check(Read(positionPid, 0xFF).Number == 100,
+                $"One-byte percentage PID {positionPid:X2} full-scale.");
+        Check(Read(0x4D, 0x01, 0x00).Number == 256 &&
+            Read(0x4D, 0x01, 0x00).Unit == "min" &&
+            Read(0x4E, 0x01, 0x00).Number == 256,
+            "MIL and DTC clear timers use minutes.");
+        Check(Read(0x53, 0x00, 0xC8).Number == 1 &&
+            Read(0x54, 0x7F, 0xFF).Number == 0,
+            "Evap pressures distinguish absolute and offset formulas.");
+        Check(Read(0x59, 0x00, 0x64).Number == 1000,
+            "Absolute fuel rail pressure uses ten-kPa increments.");
+        Check(Read(0x5D, 0x69, 0x00).Number == 0,
+            "Injection timing signed offset at word 26880.");
+        Check(Read(0x61, 125).Number == 0 &&
+            Read(0x62, 126).Number == 1,
+            "Torque percentages use 125 offset.");
+        Check(Read(0x63, 0x12, 0x34).Number == 0x1234 &&
+            Read(0x63, 0x12, 0x34).Unit == "Nm",
+            "Engine reference torque uses full unsigned word.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979PidValues.Decode([0x01, 0x32], [0x41, 0x32, 0xFF]),
+            "Signed pressure rejects truncated word.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979PidValues.Decode([0x01, 0x43],
+                [0x41, 0x43, 0x00, 0xFF, 0x01]),
+            "Absolute load rejects surplus bytes.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979PidValues.Decode([0x02, 0x23, 0],
+                [0x42, 0x23, 1, 0x00, 0x10]),
+            "Mode 02 decoder requires the correct freeze-frame number.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979PidValues.Decode([0x01, 0x44],
+                [0x7F, 0x01, 0x12]),
+            "Unsupported equivalence ratio is a negative response.");
+        Check(ObdJ1979PidValues.Decode([0x01, 0x34],
+            [0x41, 0x34, 0x00, 0x01, 0x00, 0x02]) is null,
+            "Four-byte oxygen sensor ratio remains raw, not guessed.");
         return count;
     }
 }

@@ -451,3 +451,10 @@ Cette tranche a traité successivement **SAE J1979-2 / OBDonUDS**, **ISO 15765-2
 | LIN, J1708/J1587, TP2.0, KWP1281, RP1210, D-PDU | 0–10 % | Couverture standard et matériel à développer |
 
 **Validation :** les nouvelles suites de tests sont écrites et référencées dans `BridgeSelfTests`, mais **pas exécutées** sur ce lot. Aucune compilation Windows, CI finale ni essai banc n'a été exécuté ; ne pas déduire « build OK », « ECU flash OK » ou taux de conformité de cette matrice. Selon AGENTS.md, tests/CI regroupés à la clôture du chantier et maintien de la PR #95 sans merge.
+
+
+## SAE J1979 classique — enrichissement des valeurs de PID (23/11/2026)
+
+Lot logiciel sur PR #95 : 35 PID supplémentaires de diagnostic Mode 01/02 disposent désormais de formules explicites (pressions carburant et admission, EGR, EVAP signé, kilométrages/durées depuis défauts, catalyseurs, charges, ratio commandé, commandes accélérateur, couple, injection). Chaque décodeur exige la longueur exacte des octets et la corrélation de la trame ; les PID à structure complexe non implémentés restent bruts. Aucun PID n'est présumé disponible avant découverte sur un ECU. La conversion est **SAE J1979 classique uniquement**, pas SAE J1979-2.
+
+Tests offline positifs et négatifs ajoutés à `ObdJ1979PidValuesSelfTests`, **non exécutés dans cette tranche** ; aucun build/CI ou test véhicule nouveau. La matrice indicative précédente n'est pas rehaussée sans validation. Les modes 05/08, certains PID complexes, les éditions normatives modernes et les transports K-Line/J1850 restent incomplets. Références d'interopérabilité : SAE J1979 et tableau public d'usage https://www.motor-car.net/innovation/electrical/item/14857-car-obd-ii-codes (confrontation à la version normative applicable toujours nécessaire).
