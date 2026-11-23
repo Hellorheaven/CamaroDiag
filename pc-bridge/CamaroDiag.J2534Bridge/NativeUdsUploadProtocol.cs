@@ -15,6 +15,35 @@ internal static class NativeUdsUploadProtocol
     internal sealed record Result(ulong Address, byte[] Image, int Blocks,
         byte LastSequenceCounter);
 
+    internal sealed record DoubleReadResult(ulong Address, byte[] Image,
+        string Sha256, int FirstTransferBlocks, int SecondTransferBlocks);
+
+    /// <summary>
+    /// Perform two independent UDS RequestUpload transactions and compare
+    /// the exact returned bytes. The caller must still check identity, supply
+    /// a qualified ECU region, and durably persist/verify the physical image.
+    /// This does not attest that an ECU image is complete or restorable.
+    /// </summary>
+    internal static async Task<DoubleReadResult> UploadTwiceAsync(
+        NativeUdsDownloadProtocol.IExchange link,
+        ulong address, int length, byte addressBytes,
+        byte lengthBytes, CancellationToken token)
+    {
+        var first = await UploadAsync(link, address, length,
+            addressBytes, lengthBytes, token);
+        token.ThrowIfCancellationRequested();
+        var second = await UploadAsync(link, address, length,
+            addressBytes, lengthBytes, token);
+        if (first.Address != second.Address ||
+            !first.Image.AsSpan().SequenceEqual(second.Image))
+            throw new InvalidDataException(
+                "Two physical UDS upload acquisitions differ; no validated backup image.");
+        return new(address, first.Image,
+            Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(first.Image)),
+            first.Blocks, second.Blocks);
+    }
+
     internal static Task<Result> UploadAsync(
         NativeUdsDownloadProtocol.IExchange link,
         uint address, int length, CancellationToken token) =>
