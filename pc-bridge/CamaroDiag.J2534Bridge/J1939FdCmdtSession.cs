@@ -80,7 +80,7 @@ internal static class J1939FdCmdtSession
     {
         ArgumentNullException.ThrowIfNull(link);
         o.Validate();
-        if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromSeconds(30))
+        if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes(10))
             throw new ArgumentOutOfRangeException(nameof(timeout));
         var clock = System.Diagnostics.Stopwatch.StartNew();
         J1939FdTransportFrames.Control? start = null;
