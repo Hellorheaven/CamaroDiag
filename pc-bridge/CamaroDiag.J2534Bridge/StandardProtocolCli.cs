@@ -213,7 +213,10 @@ internal static class StandardProtocolCli
         int? Pgn, string Mode, byte[] Payload, int TimeoutMs,
         bool Bam, byte Session, bool Cmdt, byte Window,
         ulong? Name = null, bool FastBroadcast = false,
-        IReadOnlyList<J1939FdMultiPg.ContainedGroup>? Groups = null);
+        IReadOnlyList<J1939FdMultiPg.ContainedGroup>? Groups = null)
+    {
+        internal uint J2534ConnectFlags => FastBroadcast ? 0u : 0x100u;
+    }
 
     internal static J1939FdOptions ParseJ1939Fd(string[] args)
     {
@@ -348,7 +351,7 @@ internal static class StandardProtocolCli
             // an 11-bit FBFF data frame through it.
             using var driver = J2534StandardChannel.Connect(
                 adapters[o.AdapterIndex], J2534StandardChannel.FdCan,
-                o.Bitrate, flags: o.FastBroadcast ? 0u : 0x100u);
+                o.Bitrate, flags: o.J2534ConnectFlags);
             if (o.DataBaud.HasValue)
                 driver.SetCanFdDataPhaseRate(o.DataBaud.Value);
             driver.ConfigureFilter(new byte[4], new byte[4]);
