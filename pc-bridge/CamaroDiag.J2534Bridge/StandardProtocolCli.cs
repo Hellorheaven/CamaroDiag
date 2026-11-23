@@ -440,6 +440,15 @@ internal static class StandardProtocolCli
                 Console.WriteLine($"DTC=0x{dtc.Code:X6} status=0x{dtc.Status:X2}");
         }
         else if (request.Length == 3 && request[0] == 0x19 &&
+            request[1] == 0x01 && response.Length > 0 && response[0] == 0x59)
+        {
+            var count = ObdOnUdsServices.DecodeDtcCountByStatusMask(response);
+            Console.WriteLine($"UDS DTC count by status mask=0x{request[2]:X2} " +
+                $"available-mask=0x{count.StatusAvailabilityMask:X2} " +
+                $"format=0x{count.DtcFormatIdentifier:X2} count={count.Count} " +
+                "(DTC count does not prove vehicle readiness).");
+        }
+        else if (request.Length == 3 && request[0] == 0x19 &&
             request[1] == 0x02 && response.Length > 0 && response[0] == 0x59)
         {
             var report = ObdOnUdsServices.DecodeDtcByStatusMask(response);
@@ -918,6 +927,7 @@ internal static class StandardProtocolCli
         var udsDids = Optional(args, "--uds-dids");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
+        var obdDtcCountMask = Optional(args, "--obd-dtc-count-mask");
         var wwhStatus = Optional(args, "--obd-wwh-status");
         var wwhReadiness = Optional(args, "--obd-readiness-group");
         var snapshotDtc = Optional(args, "--obd-snapshot");
@@ -943,6 +953,7 @@ internal static class StandardProtocolCli
             (udsDids is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
+            (obdDtcCountMask is null ? 0 : 1) +
             (wwhStatus is null ? 0 : 1) +
             (wwhReadiness is null ? 0 : 1) +
             (snapshotDtc is null ? 0 : 1) +
@@ -964,6 +975,8 @@ internal static class StandardProtocolCli
                 checked((ushort)ParseCanId(obdDid))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(obdDtcMask))) :
+            obdDtcCountMask is not null ? ObdOnUdsServices.ReadDtcCountByStatusMask(
+                checked((byte)Number(obdDtcCountMask))) :
             wwhStatus is not null ? ObdOnUdsServices.ReadWwhEmissionsDtcs(
                 checked((byte)Number(wwhStatus)),
                 wwhSeverity is null ? (byte)0xFF :
@@ -1001,7 +1014,8 @@ internal static class StandardProtocolCli
             throw new ArgumentException("Invalid ISO-TP physical address or J2534 option.");
         return new(index, bitrate, setting, bytes, timeout, extended, brs, dataBaud,
             mode, udsValidate || obdDid is not null ||
-                udsDids is not null || obdDtcMask is not null || wwhStatus is not null ||
+                udsDids is not null || obdDtcMask is not null ||
+                obdDtcCountMask is not null || wwhStatus is not null ||
                 wwhPermanent || wwhReadiness is not null ||
                 snapshotDtc is not null || extendedDtc is not null ||
                 obdIdentify, interpretJ1979);
@@ -1151,6 +1165,7 @@ internal static class StandardProtocolCli
         var udsDids = Optional(args, "--uds-dids");
         var obdDid = Optional(args, "--obd-did");
         var obdDtcMask = Optional(args, "--obd-dtc-mask");
+        var obdDtcCountMask = Optional(args, "--obd-dtc-count-mask");
         var wwhStatus = Optional(args, "--obd-wwh-status");
         var wwhReadiness = Optional(args, "--obd-readiness-group");
         var snapshotDtc = Optional(args, "--obd-snapshot");
@@ -1176,6 +1191,7 @@ internal static class StandardProtocolCli
             (udsDids is null ? 0 : 1) +
             (obdDid is null ? 0 : 1) +
             (obdDtcMask is null ? 0 : 1) +
+            (obdDtcCountMask is null ? 0 : 1) +
             (wwhStatus is null ? 0 : 1) +
             (wwhReadiness is null ? 0 : 1) +
             (snapshotDtc is null ? 0 : 1) +
@@ -1198,6 +1214,8 @@ internal static class StandardProtocolCli
                     NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture))) :
             obdDtcMask is not null ? ObdOnUdsServices.ReadDtcByStatusMask(
                 checked((byte)Number(obdDtcMask))) :
+            obdDtcCountMask is not null ? ObdOnUdsServices.ReadDtcCountByStatusMask(
+                checked((byte)Number(obdDtcCountMask))) :
             wwhStatus is not null ? ObdOnUdsServices.ReadWwhEmissionsDtcs(
                 checked((byte)Number(wwhStatus)),
                 wwhSeverity is null ? (byte)0xFF :
