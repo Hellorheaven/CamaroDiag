@@ -239,6 +239,23 @@ internal static class NativeScopedBackupArchiveSelfTests
             Check(NativeScopedBackupImport.VerifyZip(commentedPath, scope).ChannelBound,
                 "A complete ZIP with a bounded EOCD comment stays importable");
             File.Delete(commentedPath);
+            var forgedLabelPath = Path.Combine(directory, "forged-controller.zip");
+            File.Copy(zipPath, forgedLabelPath);
+            using (var forged = ZipFile.Open(forgedLabelPath, ZipArchiveMode.Update))
+            {
+                var entry = forged.GetEntry("manifest.properties")!;
+                string metadata;
+                using (var reader = new StreamReader(entry.Open(), Encoding.ASCII))
+                    metadata = reader.ReadToEnd();
+                entry.Delete();
+                using var writer = new StreamWriter(
+                    forged.CreateEntry("manifest.properties").Open(), Encoding.ASCII);
+                writer.Write(metadata.Replace("controller=\n",
+                    "controller=ECU\\u000Auntrusted\n"));
+            }
+            Reject<InvalidDataException>(() =>
+                NativeScopedBackupImport.VerifyZip(forgedLabelPath, scope));
+            File.Delete(forgedLabelPath);
             var originalZip = File.ReadAllBytes(zipPath);
             var alteredPath = Path.Combine(directory, "altered.zip");
             File.WriteAllBytes(alteredPath, originalZip);

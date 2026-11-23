@@ -137,6 +137,8 @@ class EcuBackupArchiveTest {
             metadata.replace("capture.0.start=4096", "capture.0.start=4294967295"),
             metadata.replace("count=1", "count=01"),
             metadata.replace("created=1795320000000", "created=01795320000000"),
+            metadata.replace("controller=\n", "controller=ECU\\u000Abad\n"),
+            metadata.replace("controller=\n", "controller=" + "X".repeat(129) + "\n"),
             metadata.replace("offline archive v3", "offline archive v2")
         )
         for (bad in malformed) {

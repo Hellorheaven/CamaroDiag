@@ -290,6 +290,8 @@ internal static class NativeScopedBackupImport
             if (decoded.Length > 128)
                 throw new InvalidDataException("Controller label too long.");
         }
+        if (decoded.Length > 128 || decoded.ToString().Any(char.IsControl))
+            throw new InvalidDataException("Controller label contains control characters.");
         return decoded.ToString();
     }
 

@@ -258,6 +258,10 @@ object EcuBackupArchive {
         // its existence can never establish a complete ECU memory map.
         // Preserve legacy v1/v2 archive semantics for offline imports.
         if (channel != null) {
+            val label = properties.getProperty("controller").orEmpty()
+            require(label.length <= 128 && label.none(Character::isISOControl)) {
+                "Routed ECU archive controller labels may not contain control characters."
+            }
             require(count == 1 && required.isEmpty()) {
                 "A routed ECU archive cannot claim complete firmware coverage."
             }
