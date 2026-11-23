@@ -65,6 +65,23 @@ internal static class StandardVehicleProtocolsSelfTests
         Check(identificationRequest.Type == DoIpCodec.VehicleIdentificationRequest &&
             identificationRequest.Payload.Length == 0,
             "DoIP UDP identification request has 0x0001 and empty payload.");
+        var vinRequest = DoIpCodec.Decode(
+            DoIpVehicleDiscovery.BuildVinRequest("12345678901234567"));
+        Check(vinRequest.Type == DoIpCodec.VehicleIdentificationRequestVin &&
+            System.Text.Encoding.ASCII.GetString(vinRequest.Payload) ==
+                "12345678901234567",
+            "DoIP type 0x0003 VIN-specific UDP request.");
+        var eidRequest = DoIpCodec.Decode(
+            DoIpVehicleDiscovery.BuildEidRequest([1, 2, 3, 4, 5, 6]));
+        Check(eidRequest.Type == DoIpCodec.VehicleIdentificationRequestEid &&
+            eidRequest.Payload.SequenceEqual(new byte[] {1, 2, 3, 4, 5, 6}),
+            "DoIP type 0x0002 EID-specific UDP request.");
+        Reject<ArgumentException>(() =>
+            DoIpVehicleDiscovery.BuildVinRequest("short"),
+            "Invalid VIN length is rejected before transmitting.");
+        Reject<ArgumentException>(() =>
+            DoIpVehicleDiscovery.BuildEidRequest([1, 2, 3]),
+            "Invalid EID length is rejected before transmitting.");
         var identityBytes = new byte[33];
         System.Text.Encoding.ASCII.GetBytes("12345678901234567").CopyTo(identityBytes, 0);
         identityBytes[17] = 0x12;
