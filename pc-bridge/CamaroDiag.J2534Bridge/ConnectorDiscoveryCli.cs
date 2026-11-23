@@ -10,9 +10,20 @@ internal static class ConnectorDiscoveryCli
     internal static bool IsValidPort(string port) =>
         Regex.IsMatch(port, @"\ACOM[1-9][0-9]{0,3}\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// A cached UI selection cannot authorize probing a port that disappeared
+    /// after USB hot-unplug. The OS port name is only a routing hint, never a
+    /// cryptographic device identity or permission for vehicle communication.
+    /// </summary>
+    internal static bool IsPortStillEnumerated(string port, IEnumerable<string> available) =>
+        IsValidPort(port) &&
+        available.Count(name => string.Equals(name, port, StringComparison.OrdinalIgnoreCase)) == 1;
+
     internal static string[] VerifyPort(string port)
     {
         if (!IsValidPort(port)) throw new ArgumentException("Invalid COM port.", nameof(port));
+        if (!IsPortStillEnumerated(port, SerialPort.GetPortNames()))
+            throw new IOException("Selected connector COM port is no longer enumerated; refresh the list.");
         using var serial = new SerialPort(port, 115200, Parity.None, 8, StopBits.One)
         {
             Handshake = Handshake.None, DtrEnable = true, RtsEnable = false,
