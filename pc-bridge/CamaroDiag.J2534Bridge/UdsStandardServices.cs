@@ -200,8 +200,16 @@ internal static class UdsStandardServices
             dataFormatIdentifier, addressBytes, lengthBytes);
 
     private static byte[] UploadDownload(byte service, uint address, uint length,
-        byte dfi) => UploadDownload(service, (ulong)address, (ulong)length,
+        byte dfi)
+    {
+        // Preserve the legacy 32-bit memory-space boundary even though the
+        // generalized ALFI helper also supports explicit 64-bit addresses.
+        if (length == 0 || (ulong)address + length > 0x1_0000_0000UL)
+            throw new ArgumentOutOfRangeException(nameof(length),
+                "32-bit ECU memory range wraps the selected address space.");
+        return UploadDownload(service, (ulong)address, (ulong)length,
             dfi, addressBytes: 4, lengthBytes: 4);
+    }
 
     private static byte[] UploadDownload(byte service, ulong address,
         ulong length, byte dfi, byte addressBytes, byte lengthBytes)
