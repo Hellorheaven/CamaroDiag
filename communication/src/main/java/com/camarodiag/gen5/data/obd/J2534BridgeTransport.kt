@@ -563,7 +563,7 @@ class J2534BridgeTransport(
 internal object J2534BridgeProtocol {
     const val MAX_PAYLOAD_BYTES = 4091
 
-    fun isTerminalFailureFlag(value: Any?): Boolean = value === true
+    fun isTerminalFailureFlag(value: Any?): Boolean = value is Boolean && value
     private const val MAX_RESPONSE_LINE_CHARS = 32 * 1024
 
     fun boundedTimeoutMs(timeoutMs: Long): Int = timeoutMs.coerceIn(100L, 10_000L).toInt()
