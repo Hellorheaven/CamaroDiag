@@ -44,7 +44,7 @@ internal static class J1939FdMultiPgSelfTests
             decoded.SourceAddress == 0xF1 && decoded.DestinationAddress == 0xFF,
             "FEFF Multi-PG single group round-trip.");
 
-        var packed = J1939FdMultiPg.Encode(0xF1, 0x10, 6,
+        var packed = J1939FdMultiPg.Encode(0xF1, 0xFF, 6,
             [Group(0xF004, 1, 2, 3),
              Group(0xFECA, 0xC7, 0xFF, 0x00, 0x00)]);
         var groups = J1939FdMultiPg.Decode(packed);
@@ -53,8 +53,18 @@ internal static class J1939FdMultiPgSelfTests
             groups.Groups[0].Pgn == 0xF004 &&
             groups.Groups[1].Pgn == 0xFECA &&
             groups.Groups[1].Payload.Length == 4 &&
-            groups.DestinationAddress == 0x10,
+            groups.DestinationAddress == 0xFF,
             "Two C-PGs with explicit payload sizes are preserved.");
+
+        var directed = J1939FdMultiPg.Encode(0xF1, 0x10, 6,
+            [Group(0xEF00, 0x11, 0x22)]);
+        Check(J1939FdMultiPg.Decode(directed).DestinationAddress == 0x10 &&
+            J1939FdMultiPg.Decode(directed).Groups[0].Pgn == 0xEF00,
+            "J1939-22 PDU1 contained group may use directed destination.");
+        Reject<ArgumentException>(() =>
+            J1939FdMultiPg.Encode(0xF1, 0x10, 6,
+                [Group(0xF004, 0x11)]),
+            "J1939-22 PDU2 group is broadcast, not unicast.");
 
         var full = J1939FdMultiPg.Encode(0xF1, 0xFF, 6,
             [Group(0xF004, Enumerable.Repeat((byte)0xAA, 60).ToArray())]);
