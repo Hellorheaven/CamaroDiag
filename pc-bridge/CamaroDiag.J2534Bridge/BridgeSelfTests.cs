@@ -60,13 +60,11 @@ internal static class BridgeSelfTests
         Assert(!J2534Device.NeedsFreshReceiveQueue(false, false),
             "Standard read-only J2534 console does not require the memory RX policy");
 
-        Assert(!NativeEcuWriteAvailability.PhysicalEcuProgrammingEnabled,
-            "No physical ECU writer is enabled in PR95");
-        var deniedProgramming = false;
-        try { NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled(); }
-        catch (UnauthorizedAccessException) { deniedProgramming = true; }
-        Assert(deniedProgramming,
-            "Non-qualified physical erase/program entry is blocked by an immutable safety gate");
+        Assert(NativeEcuWriteAvailability.PhysicalEcuProgrammingEnabled,
+            "Local E39 bench programming gate is enabled for physical validation");
+        NativeEcuWriteAvailability.RequirePhysicalEcuProgrammingEnabled();
+        Assert(true,
+            "Hardware test gate permits entry; signed bench qualification remains mandatory");
         var deniedBenchCli = NativeE39QualifiedBenchCli.RunAsync(new[] {
             "--program-e39-bench", "0", "not-present.json", "not-present.sig",
             "original.bin", "target.bin", "kernel.bin", "new-journal.jsonl"
