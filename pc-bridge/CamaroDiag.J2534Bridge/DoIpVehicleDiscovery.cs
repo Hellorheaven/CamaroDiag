@@ -61,6 +61,18 @@ internal static class DoIpVehicleDiscovery
             payload[31], payload.Length == 33 ? payload[32] : null, source);
     }
 
+    internal static bool MatchesRequestedIdentity(Identity found,
+        string? expectedVin, byte[]? expectedEid)
+    {
+        ArgumentNullException.ThrowIfNull(found);
+        if (expectedVin is not null &&
+            !string.Equals(found.Vin, expectedVin, StringComparison.Ordinal))
+            return false;
+        if (expectedEid is not null && !found.Eid.AsSpan().SequenceEqual(expectedEid))
+            return false;
+        return true;
+    }
+
     /// <summary>
     /// Explicit UDP broadcast vehicle-identification request. Collects responses
     /// only for the bounded discovery window; never probes another network or
@@ -105,6 +117,8 @@ internal static class DoIpVehicleDiscovery
             {
                 var found = ParseAnnouncement(received.Buffer,
                     received.RemoteEndPoint.Address);
+                if (!MatchesRequestedIdentity(found, vin, eid))
+                    continue;
                 var key = found.Source + ":" + found.LogicalAddress.ToString("X4");
                 identified[key] = found;
             }
@@ -143,7 +157,11 @@ internal static class DoIpVehicleDiscovery
                 continue;
             // Reject invalid announcements from the selected gateway rather
             // than silently interpreting arbitrary UDP traffic as an ECU.
-            return ParseAnnouncement(received.Buffer, received.RemoteEndPoint.Address);
+            var found = ParseAnnouncement(received.Buffer,
+                received.RemoteEndPoint.Address);
+            if (!MatchesRequestedIdentity(found, vin, eid))
+                continue;
+            return found;
         }
     }
 }
