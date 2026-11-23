@@ -87,6 +87,27 @@ internal static class J1939AddressClaimSessionSelfTests
             unrelated.TX.Count == 1,
             "Unrelated addresses and possible adapter self-echo do not cause false collisions.");
 
+        var addressRequest = new FakeCan();
+        addressRequest.RX.Enqueue(new(
+            J1939ClassicTpSession.ArbitrationId(
+                J1939PgnRequest.RequestPgn, 6, 0x10, 0xFF),
+            false, [0x00, 0xEE, 0x00]));
+        result = Claim(addressRequest, localName);
+        Check(result == J1939AddressClaimSession.Outcome.Claimed &&
+            addressRequest.TX.Count == 2 &&
+            addressRequest.TX[0].Data.SequenceEqual(
+                addressRequest.TX[1].Data),
+            "J1939-81 claim answers a global request for PGN 60928.");
+        var unrelatedRequest = new FakeCan();
+        unrelatedRequest.RX.Enqueue(new(
+            J1939ClassicTpSession.ArbitrationId(
+                J1939PgnRequest.RequestPgn, 6, 0x10, 0xFF),
+            false, [0xCA, 0xFE, 0x00]));
+        result = Claim(unrelatedRequest, localName);
+        Check(result == J1939AddressClaimSession.Outcome.Claimed &&
+            unrelatedRequest.TX.Count == 1,
+            "J1939-81 does not treat a DM1 Request as an address enquiry.");
+
         var aborted = new FakeCan();
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
