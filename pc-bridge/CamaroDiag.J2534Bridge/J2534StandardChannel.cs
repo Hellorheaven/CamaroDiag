@@ -31,6 +31,10 @@ internal sealed class J2534StandardChannel : IDisposable
     internal const uint RxPaddingError = 0x10;
     internal const int MaxData = 4128;
 
+    internal static bool IsAuxiliaryReceiveStatus(uint status) =>
+        (status & (RxTxEcho | RxStartOfMessage |
+            RxBreak | RxTxIndication | RxPaddingError)) != 0;
+
     internal static bool IsKnownProtocol(uint id) => id is J1850Vpw or J1850Pwm
         or Iso9141 or Iso14230 or Can or Iso15765 or FdCan or FdIso15765;
 
@@ -189,8 +193,7 @@ internal sealed class J2534StandardChannel : IDisposable
             Require(result, "PassThruReadMsgs");
             if (count != 1) continue;
             var frame = received[0];
-            if ((frame.RxStatus & (RxTxEcho | RxStartOfMessage |
-                RxBreak | RxTxIndication | RxPaddingError)) != 0)
+            if (IsAuxiliaryReceiveStatus(frame.RxStatus))
                 continue;
             if (frame.ProtocolId != protocolId ||
                 frame.Data is null || frame.DataSize > MaxData ||
