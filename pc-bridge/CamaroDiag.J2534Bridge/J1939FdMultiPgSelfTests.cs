@@ -117,6 +117,33 @@ internal static class J1939FdMultiPgSelfTests
             J1939FdMultiPg.Decode(new(packed.Id, true,
                 packed.Data.AsSpan(0, 9).ToArray())),
             "Noncanonical CAN FD DLC is rejected.");
+        var fbffCli = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--data-baud", "2000000",
+            "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--fbff", "true",
+            "--pgn", "0xF004", "--payload", "112233"]);
+        Check(fbffCli.FastBroadcast && fbffCli.Priority == 0 &&
+            fbffCli.Mode == "send" && fbffCli.Target == 0xFF,
+            "CLI requests FBFF using priority-0 standard CAN FD broadcast.");
+        var fbffReceive = StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0xF1", "--target", "0x80",
+            "--mode", "receive", "--fbff", "true"]);
+        Check(fbffReceive.FastBroadcast && fbffReceive.Payload.Length == 0,
+            "FBFF CLI receives an 11-bit source without transmitting.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0x10",
+            "--mode", "send", "--fbff", "true", "--pgn", "0xF004",
+            "--payload", "11"]),
+            "FBFF cannot send directed data on standard 11-bit CAN.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ1939Fd([
+            StandardProtocolCli.J1939FdBamCommand, "--adapter-index", "0",
+            "--baud", "500000", "--source", "0x80", "--target", "0xFF",
+            "--mode", "send", "--fbff", "true", "--pgn", "0xF004",
+            "--payload", Convert.ToHexString(new byte[100])]),
+            "FBFF is not an alias for FD.TP BAM.");
         var transmit = StandardProtocolCli.ParseJ1939Fd([
             StandardProtocolCli.J1939FdCommand,
             "--adapter-index", "0", "--baud", "500000",
