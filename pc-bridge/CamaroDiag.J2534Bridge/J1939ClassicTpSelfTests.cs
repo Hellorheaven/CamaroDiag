@@ -216,6 +216,15 @@ internal static class J1939ClassicTpSelfTests
             "Wrong next sequence in CTS stops subsequent writes.");
         Check(wrongCts.Outgoing.Count == 1, "No TP.DT sent after corrupt CTS.");
 
+        var missingCts = new FakeCan();
+        Reject<TimeoutException>(() => Send(missingCts, o, Data(20)),
+            "Missing J1939 CTS times out a sender after RTS.");
+        Check(missingCts.Outgoing.Count == 2 &&
+            missingCts.Outgoing[0].Data[0] == J1939ClassicTpSession.Rts &&
+            missingCts.Outgoing[1].Data[0] == J1939ClassicTpSession.Abort &&
+            missingCts.Outgoing[1].Data[1] == 3,
+            "Sender timeout closes CMDT with TP.Conn_Abort reason 3.");
+
         var negative = new FakeCan();
         negative.Incoming.Enqueue(PeerCm(0xFF, 0, 0, 0, 0, 0x04, 0xF0, 0));
         Reject<IOException>(() => Send(negative, o, Data(20)),
