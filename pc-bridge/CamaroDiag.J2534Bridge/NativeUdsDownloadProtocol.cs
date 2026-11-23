@@ -66,19 +66,17 @@ internal static class NativeUdsDownloadProtocol
 
     internal static int ParseMaximumBlockLength(byte[] reply)
     {
+        ArgumentNullException.ThrowIfNull(reply);
+        // The native programming backend and the bidirectional standard
+        // transports use the same ISO 14229 LFI parser. Keep native block
+        // allocation explicitly bounded to an int and four-byte LFI.
         CheckPositiveReply(reply, requestService: 0x34, positiveService: 0x74);
-        if (reply.Length < 3 || (reply[1] & 0x0F) != 0)
-            throw new InvalidDataException("Invalid UDS RequestDownload block length format.");
-        var sizeWidth = reply[1] >> 4;
-        if (sizeWidth is < 1 or > 4 || reply.Length != sizeWidth + 2)
-            throw new InvalidDataException("Unexpected UDS maxNumberOfBlockLength encoding.");
-        var max = 0UL;
-        for (var i = 0; i < sizeWidth; i++)
-            max = (max << 8) | reply[i + 2];
-        if (max < 3 || max > int.MaxValue)
-            throw new InvalidDataException("ECU reported an unsupported transfer block size.");
-        // maxNumberOfBlockLength includes the 0x36 service and the block counter.
-        return (int)max - 2;
+        var response = UdsStandardServices.DecodeTransferParameters(0x34, reply);
+        if (response.LengthFieldBytes > 4 ||
+            response.MaxNumberOfBlockLength > int.MaxValue)
+            throw new InvalidDataException(
+                "ECU reported an unsupported native transfer block size.");
+        return checked((int)response.MaxDataBytes);
     }
 
     internal static void CheckPositiveReply(
