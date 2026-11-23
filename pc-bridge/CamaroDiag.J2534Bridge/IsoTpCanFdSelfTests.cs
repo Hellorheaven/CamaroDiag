@@ -953,6 +953,39 @@ internal static class IsoTpCanFdSelfTests
                 StringComparison.Ordinal),
             "Trace records TX intent/queued/RX without claiming physical bus timing.");
 
+        using var failedTraceWriter = new StringWriter(
+            System.Globalization.CultureInfo.InvariantCulture);
+        var failedTrace = new IsoTpHostTraceLink(failingLink, failedTraceWriter);
+        Reject<IOException>(() => failedTrace.SendAsync(
+                new(0x7E0, false, Fill(8)), CancellationToken.None)
+                .GetAwaiter().GetResult(),
+            "Vendor TX error propagates through optional ISO-TP trace.");
+        Check(failedTraceWriter.ToString().Contains(",TX_UNCONFIRMED,",
+                StringComparison.Ordinal) &&
+            !failedTraceWriter.ToString().Contains(",TX_QUEUED,",
+                StringComparison.Ordinal),
+            "A failed vendor TX has uncertain outcome, not a fictitious queued ACK.");
+        using var cancelTraceToken = new CancellationTokenSource();
+        var cancelTraceVendor = new FakeRawJ2534
+        {
+            AfterTransmit = cancelTraceToken.Cancel
+        };
+        using var cancelTraceWriter = new StringWriter(
+            System.Globalization.CultureInfo.InvariantCulture);
+        var cancelTrace = new IsoTpHostTraceLink(
+            new IsoTpJ2534RawCanLink(cancelTraceVendor, false, false, false),
+            cancelTraceWriter);
+        Reject<OperationCanceledException>(() => cancelTrace.SendAsync(
+                new(0x7E0, false, Fill(8)), cancelTraceToken.Token)
+                .GetAwaiter().GetResult(),
+            "Cancellation inside vendor TX propagates through optional host trace.");
+        Check(cancelTraceVendor.Transmitted.Count == 1 &&
+            cancelTraceWriter.ToString().Contains(",TX_UNCONFIRMED,",
+                StringComparison.Ordinal) &&
+            !cancelTraceWriter.ToString().Contains(",TX_QUEUED,",
+                StringComparison.Ordinal),
+            "Host trace records unknown TX outcome if cancellation arrives after queueing.");
+
         var passiveTrace = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",

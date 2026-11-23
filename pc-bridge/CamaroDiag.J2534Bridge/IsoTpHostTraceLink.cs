@@ -39,7 +39,23 @@ internal sealed class IsoTpHostTraceLink : IsoTpCanFdSession.ICanLink
         token.ThrowIfCancellationRequested();
         // A log failure before this call prevents sending an unrecorded frame.
         Record("TX_REQUEST", frame);
-        await inner.SendAsync(frame, token);
+        try
+        {
+            await inner.SendAsync(frame, token);
+        }
+        catch (OperationCanceledException)
+        {
+            // A blocking vendor call may have queued TX before cancellation.
+            // Its physical outcome is UNKNOWN, not a confirmed no-send.
+            Record("TX_UNCONFIRMED", frame);
+            throw;
+        }
+        catch (IOException)
+        {
+            // Driver failure does not establish whether a CAN frame was sent.
+            Record("TX_UNCONFIRMED", frame);
+            throw;
+        }
         // A log failure after queuing cannot undo transmission. No auto retry.
         Record("TX_QUEUED", frame);
     }
