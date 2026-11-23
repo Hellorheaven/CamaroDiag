@@ -1,0 +1,147 @@
+namespace CamaroDiag.J2534Bridge;
+
+internal static class StandardVehicleProtocolsSelfTests
+{
+    internal static int Run()
+    {
+        var count = 0;
+        void Check(bool condition, string description)
+        {
+            count++;
+            if (!condition) throw new InvalidOperationException("Protocol test failed: " + description);
+        }
+        void Reject<T>(Action operation, string description) where T : Exception
+        {
+            var rejected = false;
+            try { operation(); }
+            catch (T) { rejected = true; }
+            Check(rejected, description);
+        }
+
+        Check(StandardVehicleProtocols.Catalog.Count == 13 &&
+            StandardVehicleProtocols.Catalog.All(p => !p.PhysicalWriteQualified),
+            "No transport silently certifies physical flash/rollback.");
+        Check(StandardVehicleProtocols.Find("K-Line KWP2000").J2534ProtocolId == 4 &&
+            !StandardVehicleProtocols.Find("K-Line KWP2000").TransportPresent,
+            "J2534 K-Line ID is recognized, initialization not invented.");
+        Check(StandardVehicleProtocols.Find("J1850 VPW").J2534ProtocolId == 1 &&
+            StandardVehicleProtocols.Find("J1850 PWM").J2534ProtocolId == 2,
+            "SAE J1850 J2534 IDs.");
+        Check(StandardVehicleProtocols.Find("CAN FD + ISO-TP").J2534ProtocolId is null,
+            "CAN FD vendor capability must be negotiated.");
+        for (int dlc = 0; dlc <= 15; dlc++)
+            Check(StandardVehicleProtocols.CanFdLengthToDlc(
+                StandardVehicleProtocols.CanFdDlcToLength(dlc)) == dlc,
+                "CAN FD DLC round-trip.");
+        Reject<ArgumentOutOfRangeException>(
+            () => StandardVehicleProtocols.CanFdLengthToDlc(9), "Noncanonical FD length.");
+        Reject<ArgumentOutOfRangeException>(
+            () => StandardVehicleProtocols.CanFdDlcToLength(16), "Invalid FD DLC.");
+        var j1939 = StandardVehicleProtocols.ParseJ1939Id(0x18DA10F1);
+        Check(j1939.Priority == 6 && j1939.Pgn == 0xDA00 &&
+            j1939.Destination == 0x10 && j1939.Source == 0xF1,
+            "J1939 PDU1 target and PGN.");
+        var j1939Broadcast = StandardVehicleProtocols.ParseJ1939Id(0x18F00401);
+        Check(j1939Broadcast.Pgn == 0xF004 && j1939Broadcast.Destination is null,
+            "J1939 PDU2 PGN includes group extension.");
+        Reject<ArgumentOutOfRangeException>(
+            () => StandardVehicleProtocols.ParseJ1939Id(0x80000000),
+            "J1939 29-bit limit.");
+
+        foreach (int size in new[] { 1, 63, 64, 255 })
+        {
+            var kwp = StandardVehicleProtocols.BuildKwpPhysicalFrame(
+                0x33, 0xF1, Enumerable.Repeat((byte)0x22, size).ToArray());
+            Check(kwp.Length == (size <= 63 ? 3 : 4) + size + 1 &&
+                kwp[^1] == (byte)(kwp[..^1].Sum(x => (int)x) & 0xFF),
+                "KWP2000 long/short physical frame and checksum.");
+        }
+        Reject<ArgumentException>(() =>
+            StandardVehicleProtocols.BuildKwpPhysicalFrame(0x33, 0x33, [0x22]),
+            "KWP refuses equal source and target.");
+
+        var route = DoIpCodec.Decode(DoIpCodec.RoutingActivation(0x0E80));
+        Check(route.Type == DoIpCodec.RoutingActivationRequest &&
+              route.Payload.Length == 7, "ISO 13400 route request.");
+        var routeResponse = DoIpCodec.Decode(DoIpCodec.Encode(
+            DoIpCodec.RoutingActivationResponse, [0x0E, 0x80, 0x12, 0x34, 0x10, 0, 0, 0, 0]));
+        DoIpCodec.RequireRoutingActive(routeResponse, 0x0E80);
+        Reject<InvalidDataException>(() =>
+            DoIpCodec.RequireRoutingActive(routeResponse, 0x0E81),
+            "DoIP routing response to another tester.");
+        Reject<InvalidDataException>(() => DoIpCodec.RequireRoutingActive(
+            DoIpCodec.Decode(DoIpCodec.Encode(
+                DoIpCodec.RoutingActivationResponse, [0x0E, 0x80, 0x12, 0x34, 0x11, 0, 0, 0, 0])),
+            0x0E80), "DoIP refused routing activation.");
+        var diag = DoIpCodec.Decode(DoIpCodec.Diagnostic(
+            0x0E80, 0x1234, [0x22, 0xF1, 0x90]));
+        Check(diag.Type == 0x8001 && diag.Payload.Length == 7 &&
+            diag.Payload[4] == 0x22, "DoIP diagnostic target and UDS payload.");
+        var reply = DoIpCodec.Decode(DoIpCodec.Encode(0x8001,
+            [0x12, 0x34, 0x0E, 0x80, 0x62, 0xF1, 0x90, 0x41]));
+        Check(DoIpCodec.RequireDiagnosticResponse(reply, 0x0E80, 0x1234)
+            .SequenceEqual(new byte[] {0x62, 0xF1, 0x90, 0x41}),
+            "DoIP ECU source / tester target correlation.");
+        Reject<InvalidDataException>(() =>
+            DoIpCodec.RequireDiagnosticResponse(reply, 0x0E81, 0x1234),
+            "DoIP wrong tester address.");
+        var nack = DoIpCodec.Decode(DoIpCodec.Encode(0x8003,
+            [0x12, 0x34, 0x0E, 0x80, 0x02]));
+        Reject<IOException>(() => DoIpCodec.IsCorrelatedDiagnosticAck(
+            nack, 0x0E80, 0x1234), "DoIP diagnostic gateway negative acknowledgment.");
+        var badInverse = DoIpCodec.Diagnostic(0x0E80, 0x1234, [0x22, 0xF1, 0x90]);
+        badInverse[1] ^= 0x02;
+        Reject<InvalidDataException>(() => DoIpCodec.Decode(badInverse),
+            "DoIP bad protocol/inverse version.");
+        var truncated = DoIpCodec.Diagnostic(0x0E80, 0x1234, [0x22, 0xF1, 0x90]);
+        Reject<InvalidDataException>(() => DoIpCodec.Decode(truncated[..^1]),
+            "DoIP frame truncated.");
+        var oversizedHeader = DoIpCodec.Diagnostic(0x0E80, 0x1234, [0x22, 0xF1, 0x90]);
+        oversizedHeader[4] = 0xFF;
+        Reject<InvalidDataException>(() => DoIpCodec.Decode(oversizedHeader),
+            "DoIP oversized declared length.");
+
+        // The same DoIP transport carries read, write, erase, and transfer
+        // services. No invented SID blacklist at the network layer.
+        foreach (byte[] request in new byte[][] {
+            [0x22, 0xF1, 0x90], [0x2E, 0xF1, 0x90, 0x42],
+            [0x31, 0x01, 0xFF, 0x00], [0x34, 0, 0x44],
+            [0x36, 1, 0xAA], [0x37], [0x11, 1]
+        })
+        {
+            Check(DoIpCodec.Decode(DoIpCodec.Diagnostic(
+                0x0E80, 0x1234, request)).Payload.AsSpan(4).SequenceEqual(request),
+                "DoIP protocol preserves arbitrary UDS read AND write SID.");
+        }
+        Check(J2534StandardChannel.IsKnownProtocol(J2534StandardChannel.Iso9141) &&
+              J2534StandardChannel.IsKnownProtocol(J2534StandardChannel.Iso14230) &&
+              J2534StandardChannel.IsKnownProtocol(J2534StandardChannel.J1850Vpw) &&
+              J2534StandardChannel.IsKnownProtocol(J2534StandardChannel.J1850Pwm) &&
+              J2534StandardChannel.IsKnownProtocol(J2534StandardChannel.FdIso15765) &&
+              !J2534StandardChannel.IsKnownProtocol(0xFFFF),
+            "SAE J2534 standard and FD extended protocols recognized.");
+        var parsed = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--payload", "2EF19001"]);
+        Check(parsed.Request.SequenceEqual(new byte[] { 0x2E, 0xF1, 0x90, 1 }),
+            "DoIP bidirectional CLI accepts WDBI service.");
+        var j2534Options = StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0x04", "--baud", "10400",
+            "--data", "83F11022019077", "--kline-init", "five:33"]);
+        Check(j2534Options.ProtocolId == J2534StandardChannel.Iso14230 &&
+            j2534Options.KlineInit == "five:33",
+            "J2534 K-Line ISO14230 bidirectional channel can initialize via vendor driver.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0xFFFF", "--baud", "10400", "--data", "22F190"]),
+            "Unknown SAE J2534 ProtocolId fails before DLL load.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "0E80", "--payload", "22F190"]),
+            "DoIP equal logical tester/target rejected.");
+
+        return count;
+    }
+}
