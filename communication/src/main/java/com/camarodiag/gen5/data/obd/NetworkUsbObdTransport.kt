@@ -15,6 +15,9 @@ import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
 import java.net.Socket
 
+/** The Android USB permission dialog is pending; this is not a failed handshake. */
+class UsbPermissionPendingException : SecurityException("USB device permission requested")
+
 /** USB serial ELM/STN transport. Device permission is requested by Android when opened. */
 class ElmUsbTransport(private val context: Context) {
 
@@ -81,9 +84,7 @@ class ElmUsbTransport(private val context: Context) {
                 usbManager.requestPermission(driver.device, permissionIntent)
 
                 return@withContext Result.failure(
-                    SecurityException(
-                        "Autorisation USB demandée. Validez la fenêtre Android puis reconnectez l'adaptateur."
-                    )
+                    UsbPermissionPendingException()
                 )
             }
 
