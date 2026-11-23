@@ -39,4 +39,17 @@ object EcuWriteConsentFlow {
         sameConnection = warningConnection != null &&
             warningConnection == currentConnection
     )
+
+    /** The selected vehicle/profile must also remain identical from the
+     * warning until the separate YES. Equality is checked again before TX.
+     */
+    fun approvalForContext(
+        step: Step,
+        confirmedYes: Boolean,
+        warningConnection: Long?,
+        currentConnection: Long,
+        sameVehicle: Boolean
+    ): Approval? = if (sameVehicle) {
+        approvalForConnection(step, confirmedYes, warningConnection, currentConnection)
+    } else null
 }
