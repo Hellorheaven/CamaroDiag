@@ -2571,7 +2571,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun canExportCanCapture(): Boolean {
         val state = _liveCanMonitorState.value
         val archive = activeCanCaptureFile?.takeIf { it.isFile }
-        return !consoleEventJournalFailed &&
+        val journal = consoleEventJournal.snapshot()
+        return !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
+            (state.consoleHistory.isEmpty() || journal != null) &&
             CanConsoleExportPolicy.canExport(
             isCapturing = state.isCapturing,
             archiveFailed = state.rawArchiveFailed,
@@ -2598,7 +2600,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fun current() = canResumeExport(exportGeneration, owner) &&
             _vehicle.value == profile && hasPremiumLicense() &&
             activeCanCaptureFile == selectedArchive &&
-            !consoleEventJournalFailed &&
+            !consoleEventJournalFailed && !consoleEventJournal.hasFailed() &&
             (journalSnapshot == null || consoleEventJournal.isCurrent(journalSnapshot)) &&
             !_liveCanMonitorState.value.isCapturing &&
             !_liveCanMonitorState.value.isSendingRequest &&
