@@ -910,7 +910,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _liveCanMonitorState.value.rawArchiveFailed, interruptedCapture
                 )
             )
-        } else LiveCanMonitorState(consoleContextGeneration = newCanContext)
+        } else {
+            resetConsoleEventJournal()
+            LiveCanMonitorState(consoleContextGeneration = newCanContext)
+        }
         obdManager.invalidateObdPidSupportCache()
         if (obdManager.isJ2534BridgeConnected()) {
             obdManager.disconnect()
@@ -959,6 +962,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var canMonitorJob: Job? = null
     /** Complete raw recording on private storage; rawText is only a bounded UI preview. */
     @Volatile private var activeCanCaptureFile: File? = null
+    private val consoleEventJournal = CanConsoleEventJournalStore(application.cacheDir)
+    @Volatile private var consoleEventJournalFailed = false
+
+    /** Persistence failures affect export completeness, never adapter communications. */
+    private fun recordConsoleEvents(events: List<CanConsoleHistoryEntry>) {
+        if (events.isEmpty() || consoleEventJournalFailed) return
+        try {
+            consoleEventJournal.append(events)
+        } catch (_: Exception) {
+            consoleEventJournalFailed = true
+        }
+    }
+
+    private fun resetConsoleEventJournal() {
+        consoleEventJournal.reset()
+        consoleEventJournalFailed = false
+    }
     private var canRequestJob: Job? = null
 
     private fun loadNativeCamaroSignalCatalog() {
@@ -1939,6 +1959,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             content = message,
             succeeded = succeeded
         )
+        recordConsoleEvents(listOf(event))
         _liveCanMonitorState.value = current.copy(
             consoleHistory = (current.consoleHistory + event).takeLast(300)
         )
@@ -2003,6 +2024,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             message = null,
             consoleHistory = (previousState.consoleHistory + startEvent).takeLast(300)
         )
+        recordConsoleEvents(listOf(startEvent))
         // Install the job reference before it can execute. A lazy start also lets the
         // finally block compare its identity, so an older cancelled capture cannot clear
         // or overwrite the state of a newer capture started immediately afterward.
@@ -2051,6 +2073,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         // Parse complete lines before enforcing the incomplete-line limit.
                         // The raw archive always receives the original unmodified chunk.
                         val receiveEvents = framedEvents(framer.append(chunk))
+                        recordConsoleEvents(receiveEvents)
                         val history = (current.consoleHistory + receiveEvents).takeLast(300)
                         _liveCanMonitorState.value = current.copy(
                             rawText = raw, consoleHistory = history,
@@ -2068,6 +2091,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val raw = captured.takeLast(131_072)
                     val currentBeforeReport = _liveCanMonitorState.value
                     val trailingEvents = framedEvents(framer.drainTrailing())
+                    recordConsoleEvents(trailingEvents)
                     val historyWithTrailing =
                         (currentBeforeReport.consoleHistory + trailingEvents).takeLast(300)
                     val report = CanTraceAnalyzer.analyze(
@@ -2086,6 +2110,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         timestampMillis = System.currentTimeMillis(),
                         content = localizedContext.getString(R.string.can_sniffer_capture_complete)
                     )
+                    recordConsoleEvents(listOf(completeEvent))
                     _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
                         rawText = raw,
@@ -2115,6 +2140,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ),
                         succeeded = !archiveFailed
                     )
+                    recordConsoleEvents(trailingEvents + stoppedEvent)
                     val report = runCatching {
                         CanTraceAnalyzer.analyze(
                             raw.replace("\r\n", "\n").replace('\r', '\n'),
@@ -2148,6 +2174,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         content = failureMessage,
                         succeeded = false
                     )
+                    recordConsoleEvents(trailingEvents + failureEvent)
                     _liveCanMonitorState.value = current.copy(
                         isCapturing = false,
                         rawText = raw,
@@ -2207,6 +2234,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (current.isSendingRequest || current.isCapturing) return
         activeCanCaptureFile?.delete()
         activeCanCaptureFile = null
+        resetConsoleEventJournal()
         _liveCanMonitorState.value = current.copy(
             consoleContextGeneration = ++canConsoleContextGeneration,
             rawText = "",
@@ -2308,6 +2336,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             message = null,
             consoleHistory = (currentState.consoleHistory + txEvent).takeLast(300)
         )
+        recordConsoleEvents(listOf(txEvent))
         lateinit var requestJob: Job
         requestJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
