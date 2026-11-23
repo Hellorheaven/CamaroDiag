@@ -42,11 +42,17 @@ internal static class BridgePairingDetails
             throw new ArgumentOutOfRangeException(nameof(port));
         if (string.IsNullOrWhiteSpace(pairingCode))
             throw new ArgumentException("Start the TLS bridge before copying the pairing fields.");
+        // Exactly match the Android certificate-pin parser and the Windows
+        // bridge's generated 32-byte base64url token. A fabricated copied
+        // pairing field with embedded CR/LF must never enter the UI instructions.
         var separator = pairingCode.LastIndexOf('.');
-        if (separator <= 0 || separator == pairingCode.Length - 1 ||
-            pairingCode.Length - separator - 1 != 64 ||
+        if (separator != 43 || pairingCode.Length != 43 + 1 + 64 ||
+            pairingCode[..separator].Any(c =>
+                !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                  (c >= '0' && c <= '9') || c == '-' || c == '_')) ||
             pairingCode[(separator + 1)..].Any(c => !Uri.IsHexDigit(c)))
-            throw new ArgumentException("The TLS pairing code must contain the certificate SHA-256 fingerprint.");
+            throw new ArgumentException(
+                "The TLS pairing code must contain a 43-character session token and SHA-256 fingerprint.");
 
         return "CamaroDiag Android - pont Windows J2534" + Environment.NewLine +
                "Adresse IP : " + ip + Environment.NewLine +
