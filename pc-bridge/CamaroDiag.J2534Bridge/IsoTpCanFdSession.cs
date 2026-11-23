@@ -211,10 +211,23 @@ internal static class IsoTpCanFdSession
         // RX_DL is defined by the peer's FirstFrame CAN_DL, not the
         // length we use for our own outgoing CAN/FC frames.
         var rxDl = data.Length;
+        // ISO 15765-2: a well-formed FF declaring more data than the
+        // configured receive buffer can hold is rejected with FC/OVFLW.
+        // Do so *before* any large allocation, and do not confuse malformed
+        // lengths (which are framing errors) with receiver exhaustion.
+        if (lengthLong > MaximumPayloadBytes)
+        {
+            _ = Remaining(timeout, clock);
+            await link.SendAsync(new(settings.TxId, settings.CanFd,
+                BuildFlowControl(settings.TxFrameLength, 2, settings.BlockSize,
+                    settings.StMin, settings.Padding, settings.TxAddress)), token);
+            _ = Remaining(timeout, clock);
+            throw new InvalidDataException(
+                "ISO-TP peer declared a FirstFrame larger than the configured receive buffer (FC/OVFLW sent).");
+        }
         if (lengthLong <= (rxDl == 8 ?
                 (uint)(7 - addressWidth) :
                 (uint)(rxDl - 2 - addressWidth)) ||
-            lengthLong > MaximumPayloadBytes ||
             (extendedSize && lengthLong <= 4095))
             throw new InvalidDataException("ISO-TP first frame has invalid declared size.");
 

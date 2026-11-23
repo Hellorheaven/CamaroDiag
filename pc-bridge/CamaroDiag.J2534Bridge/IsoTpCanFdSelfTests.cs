@@ -73,6 +73,110 @@ internal static class IsoTpCanFdSelfTests
         Check(Receive(rxClassic, classic).SequenceEqual(new byte[] {0x62, 0xF1, 0x90}),
             "Classic single-frame reception.");
 
+        var classicSingleBoundary = new QueueLink();
+        Send(classicSingleBoundary, classic, Fill(7));
+        Check(classicSingleBoundary.Sent.Count == 1 &&
+            classicSingleBoundary.Sent[0].Data[0] == 7,
+            "Classic CAN accepts the largest seven-byte single frame.");
+        var classicSegmentBoundary = new QueueLink();
+        classicSegmentBoundary.Replies.Enqueue(RX(false, 0x30, 0, 0, 0, 0, 0, 0, 0));
+        Send(classicSegmentBoundary, classic, Fill(8));
+        Check(classicSegmentBoundary.Sent.Count == 2 &&
+            classicSegmentBoundary.Sent[0].Data[0] == 0x10 &&
+            classicSegmentBoundary.Sent[0].Data[1] == 8 &&
+            classicSegmentBoundary.Sent[1].Data[0] == 0x21,
+            "Classic CAN eight-byte payload uses FF/FC/CF, never invalid SF.");
+
+        var classicOverCapacity = new QueueLink();
+        // 0x00100001 (1 MiB + 1) is valid 32-bit FF_DL syntax, but
+        // exceeds this application's explicit bounded reassembly buffer.
+        classicOverCapacity.Replies.Enqueue(RX(false,
+            0x10, 0x00, 0x00, 0x10, 0x00, 0x01, 0xAB, 0xCD));
+        Reject<InvalidDataException>(() => Receive(classicOverCapacity, classic),
+            "An over-capacity classic FirstFrame is rejected before allocation.");
+        Check(classicOverCapacity.Sent.Count == 1 &&
+            classicOverCapacity.Sent[0].Id == classic.TxId &&
+            classicOverCapacity.Sent[0].Data.Length == 8 &&
+            classicOverCapacity.Sent[0].Data[0] == 0x32,
+            "Classic CAN receiver sends standard FC/OVFLW for oversized FF.");
+
+        var fdOverCapacity = new QueueLink();
+        fdOverCapacity.Replies.Enqueue(RX(true,
+            0x10, 0x00, 0x00, 0x10, 0x00, 0x01,
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06));
+        Reject<InvalidDataException>(() => Receive(fdOverCapacity, fd12),
+            "An over-capacity CAN-FD FirstFrame is rejected without allocating.");
+        Check(fdOverCapacity.Sent.Count == 1 &&
+            fdOverCapacity.Sent[0].Data.Length == 12 &&
+            fdOverCapacity.Sent[0].Data[0] == 0x32,
+            "CAN-FD FlowControl overflow follows the selected TX_DL.");
+
+        var addressedOverCapacity = new QueueLink();
+        addressedOverCapacity.Replies.Enqueue(RX(false,
+            0x10, 0x10, 0x00, 0x00, 0x10, 0x00, 0x01, 0xAB));
+        Reject<InvalidDataException>(() =>
+            Receive(addressedOverCapacity, extendedAddress),
+            "ISO-TP extended logical address does not bypass receive limit.");
+        Check(addressedOverCapacity.Sent.Count == 1 &&
+            addressedOverCapacity.Sent[0].Data[0] == 0xF1 &&
+            addressedOverCapacity.Sent[0].Data[1] == 0x32,
+            "Overflow FC preserves selected TX logical addressing.");
+
+        var malformedFirst = new QueueLink();
+        malformedFirst.Replies.Enqueue(RX(false,
+            0x10, 0x05, 0, 0, 0, 0, 0, 0));
+        Reject<InvalidDataException>(() => Receive(malformedFirst, classic),
+            "Impossible FF shorter than SF capacity is a framing error.");
+        Check(malformedFirst.Sent.Count == 0,
+            "Malformed classic FF does not pretend to be receiver overflow.");
+
+        var maxClassicPayload = Fill(4095);
+        var maxClassicTx = new QueueLink();
+        maxClassicTx.Replies.Enqueue(RX(false,
+            0x30, 0x00, 0x00, 0, 0, 0, 0, 0));
+        Send(maxClassicTx, classic, maxClassicPayload);
+        Check(maxClassicTx.Sent.Count > 580 &&
+            maxClassicTx.Sent[0].Data[0] == 0x1F &&
+            maxClassicTx.Sent[0].Data[1] == 0xFF,
+            "Classic CAN accepts FF_DL 4095 without a 32-bit escape.");
+        var maxClassicRx = new QueueLink();
+        foreach (var frame in maxClassicTx.Sent)
+            maxClassicRx.Replies.Enqueue(new(0x7E8, false, frame.Data));
+        Check(Receive(maxClassicRx, classic with { BlockSize = 0 })
+            .SequenceEqual(maxClassicPayload) &&
+            maxClassicRx.Sent.Count == 1 &&
+            maxClassicRx.Sent[0].Data[0] == 0x30,
+            "Classic CAN reassembles 4095 bytes and wraps CF sequence.");
+
+        var longClassic = new QueueLink();
+        longClassic.Replies.Enqueue(RX(false,
+            0x30, 0, 0, 0, 0, 0, 0, 0));
+        Send(longClassic, classic, Fill(4096));
+        Check(longClassic.Sent[0].Data[0] == 0x10 &&
+            longClassic.Sent[0].Data[1] == 0 &&
+            longClassic.Sent[0].Data[2] == 0 &&
+            longClassic.Sent[0].Data[3] == 0 &&
+            longClassic.Sent[0].Data[4] == 0x10 &&
+            longClassic.Sent[0].Data[5] == 0 &&
+            longClassic.Sent.Count > 580,
+            "Classic CAN 4096-byte payload uses the extended 32-bit FF_DL.");
+        var longClassicRx = new QueueLink();
+        foreach (var frame in longClassic.Sent)
+            longClassicRx.Replies.Enqueue(new(0x7E8, false, frame.Data));
+        Check(Receive(longClassicRx, classic with { BlockSize = 0 })
+            .SequenceEqual(Fill(4096)),
+            "Classic CAN 32-bit FF_DL is reassembled across sequence wraps.");
+
+        Check(J2534StandardChannel.IsAuxiliaryReceiveStatus(
+            J2534StandardChannel.RxTxEcho) &&
+            J2534StandardChannel.IsAuxiliaryReceiveStatus(
+                J2534StandardChannel.RxStartOfMessage) &&
+            J2534StandardChannel.IsAuxiliaryReceiveStatus(
+                J2534StandardChannel.RxTxIndication) &&
+            !J2534StandardChannel.IsAuxiliaryReceiveStatus(0) &&
+            !J2534StandardChannel.IsAuxiliaryReceiveStatus(0x100),
+            "Raw CAN J2534 receive path already discards TX echoes/status, not 29-bit ID.");
+
         var escaped = new QueueLink();
         Send(escaped, fd12, Fill(10));
         Check(escaped.Sent.Count == 1 && escaped.Sent[0].Data[0] == 0 &&
