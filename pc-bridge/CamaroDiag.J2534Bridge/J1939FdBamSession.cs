@@ -14,11 +14,11 @@ internal static class J1939FdBamSession
     internal static async Task SendAsync(
         IsoTpCanFdSession.ICanLink link, byte localSource,
         int transportedPgn, byte session, byte[] payload,
-        CancellationToken token)
+        CancellationToken token, byte priority = 7)
     {
         ArgumentNullException.ThrowIfNull(link);
         ArgumentNullException.ThrowIfNull(payload);
-        if (localSource >= 0xFE || session > 3 ||
+        if (localSource >= 0xFE || session > 3 || priority > 7 ||
             payload.Length is <= SegmentBytes or > MaximumPayload ||
             !IsValidPgn(transportedPgn) ||
             ((transportedPgn >> 8) & 0xFF) < 240)
@@ -27,7 +27,7 @@ internal static class J1939FdBamSession
         var start = new J1939FdTransportFrames.Control(
             localSource, 0xFF, session,
             J1939FdTransportFrames.BroadcastAnnouncement,
-            payload.Length, count, 0xFF, 0, transportedPgn, 7);
+            payload.Length, count, 0xFF, 0, transportedPgn, priority);
         await link.SendAsync(J1939FdTransportFrames.EncodeControl(start), token);
         for (var number = 1; number <= count; number++)
         {
@@ -40,7 +40,7 @@ internal static class J1939FdBamSession
             var segment = new J1939FdTransportFrames.Segment(
                 localSource, 0xFF, session, number, 0,
                 payload.AsSpan(offset,
-                    Math.Min(SegmentBytes, payload.Length - offset)).ToArray(), 7);
+                    Math.Min(SegmentBytes, payload.Length - offset)).ToArray(), priority);
             await link.SendAsync(J1939FdTransportFrames.EncodeData(segment), token);
         }
         var done = start with
