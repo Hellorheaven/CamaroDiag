@@ -25,3 +25,7 @@ J2534 raw CAN-FD adapter, SET_CONFIG FD data phase rate, CLI dispatch,
 negative regression tests and updated docs. One full Debug checkpoint only
 after coherent protocol chantier. C2 parallel changes require separate
 assessment; do not merge PR #95 and never claim real vehicle proof.
+
+23/11/2026 — grouped Windows CAN-FD/J1939 compilation corrections:
+resolve CS0136 x2 and CS1929 after first full checkpoint #45145349219.
+Retest Debug bridge, protocol suites; other C2 Android work is owned by concurrent chat.
