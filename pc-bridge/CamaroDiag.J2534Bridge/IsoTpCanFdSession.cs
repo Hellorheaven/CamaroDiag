@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 
 namespace CamaroDiag.J2534Bridge;
 
@@ -94,6 +95,7 @@ internal static class IsoTpCanFdSession
             timeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(payload));
 
+        var clock = Stopwatch.StartNew();
         var addressWidth = AddressWidth(settings);
         var singleCapacity = settings.TxFrameLength == 8 ?
             7 - addressWidth : settings.TxFrameLength - 2 - addressWidth;
@@ -134,15 +136,19 @@ internal static class IsoTpCanFdSession
 
         var nextSequence = 1;
         var sentInBlock = 0;
-        var flow = await AwaitCtsAsync(link, settings, timeout, token);
+        var flow = await AwaitCtsAsync(link, settings,
+            Remaining(timeout, clock), token);
         while (offset < payload.Length)
         {
             if (flow.BlockSize != 0 && sentInBlock >= flow.BlockSize)
             {
-                flow = await AwaitCtsAsync(link, settings, timeout, token);
+                flow = await AwaitCtsAsync(link, settings,
+                    Remaining(timeout, clock), token);
                 sentInBlock = 0;
             }
+            _ = Remaining(timeout, clock);
             await link.WaitMinimumSeparationAsync(flow.Separation, token);
+            _ = Remaining(timeout, clock);
             var cf = Pad(settings);
             SetAddress(cf, settings);
             cf[addressWidth] = (byte)(0x20 | (nextSequence & 0x0F));
@@ -162,7 +168,9 @@ internal static class IsoTpCanFdSession
         settings.Validate();
         if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
 
-        var first = await ReceiveCorrelatedAsync(link, settings, timeout, token);
+        var clock = Stopwatch.StartNew();
+        var first = await ReceiveCorrelatedAsync(link, settings,
+            Remaining(timeout, clock), token);
         var data = first.Data;
         var addressWidth = AddressWidth(settings);
         if (data.Length <= addressWidth)
@@ -218,7 +226,8 @@ internal static class IsoTpCanFdSession
         var framesInBlock = 0;
         while (collected < length)
         {
-            var next = await ReceiveCorrelatedAsync(link, settings, timeout, token);
+            var next = await ReceiveCorrelatedAsync(link, settings,
+                Remaining(timeout, clock), token);
             var cf = next.Data;
             if (cf.Length < addressWidth + 2 || cf.Length > rxDl ||
                 (cf[addressWidth] & 0xF0) != 0x20 ||
@@ -250,9 +259,11 @@ internal static class IsoTpCanFdSession
     private static async Task<Flow> AwaitCtsAsync(
         ICanLink link, Settings config, TimeSpan timeout, CancellationToken token)
     {
+        var clock = Stopwatch.StartNew();
         for (var wait = 0; wait <= config.MaxWaitFrames; wait++)
         {
-            var frame = await ReceiveCorrelatedAsync(link, config, timeout, token);
+            var frame = await ReceiveCorrelatedAsync(link, config,
+                Remaining(timeout, clock), token);
             var pci = AddressWidth(config);
             if (frame.Data.Length < pci + 3 ||
                 (frame.Data[pci] & 0xF0) != 0x30)
@@ -269,9 +280,10 @@ internal static class IsoTpCanFdSession
     private static async Task<CanFrame> ReceiveCorrelatedAsync(
         ICanLink link, Settings config, TimeSpan timeout, CancellationToken token)
     {
+        var clock = Stopwatch.StartNew();
         for (var attempts = 0; attempts < 64; attempts++)
         {
-            var frame = await link.ReceiveAsync(timeout, token);
+            var frame = await link.ReceiveAsync(Remaining(timeout, clock), token);
             if (frame.Id != config.RxId) continue; // Ignore unrelated bus traffic
             if (frame.IsFd != config.CanFd ||
                 frame.Data is null || frame.Data.Length is < 1 or > 64 ||
@@ -285,6 +297,20 @@ internal static class IsoTpCanFdSession
             return frame;
         }
         throw new TimeoutException("No correlated ISO-TP peer frame.");
+    }
+
+    /// <summary>
+    /// The caller's timeout covers the complete transport exchange,
+    /// including unrelated RX frames and FC/WAIT, rather than restarting
+    /// at every CAN frame. Link implementations must also respect each
+    /// remaining timeout passed to ReceiveAsync.
+    /// </summary>
+    private static TimeSpan Remaining(TimeSpan budget, Stopwatch clock)
+    {
+        var left = budget - clock.Elapsed;
+        if (left <= TimeSpan.Zero)
+            throw new TimeoutException("ISO-TP transaction deadline exceeded.");
+        return left;
     }
 
     private static byte[] Pad(Settings s) =>
