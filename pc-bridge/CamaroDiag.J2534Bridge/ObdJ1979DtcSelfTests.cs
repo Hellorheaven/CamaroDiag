@@ -37,6 +37,34 @@ internal static class ObdJ1979DtcSelfTests
             "No-DTC payload is valid.");
         Reject<InvalidDataException>(() => ObdJ1979Dtc.DecodePairs([0x01]),
             "Incomplete final code pair rejected.");
+        // ISO-TP has removed PCI and frame padding. SAE J1979 CAN DTC
+        // replies contain a count byte before the two-byte code pairs.
+        var counted = ObdJ1979Dtc.DecodeCanCounted(
+            [0x02, 0x01, 0x33, 0xC1, 0x00]);
+        Check(counted.Count == 2 &&
+            counted[0].Display == "P0133" &&
+            counted[1].Display == "U0100",
+            "Counted CAN DTC reply decodes exactly two faults.");
+        Check(ObdJ1979Dtc.DecodeCanCounted([0x00]).Count == 0,
+            "CAN count zero is an empty result, not an invented DTC.");
+        Check(ObdJ1979Dtc.DecodeCanCounted(
+                [0x01, 0x01, 0x33, 0x00, 0x00]).Count == 1,
+            "Zero-pair padding beyond declared count is permitted.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979Dtc.DecodeCanCounted([]),
+            "CAN DTC count is mandatory.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979Dtc.DecodeCanCounted([0x02, 0x01, 0x33]),
+            "A truncated count cannot become a partial DTC list.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979Dtc.DecodeCanCounted([0x01, 0x00, 0x00]),
+            "A declared fault cannot contain zero code.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979Dtc.DecodeCanCounted([0x01, 0x01, 0x33, 0xC1, 0x00]),
+            "Undeclared nonzero additional DTC must be rejected.");
+        Reject<InvalidDataException>(() =>
+            ObdJ1979Dtc.DecodeCanCounted([0x01, 0x01, 0x33, 0x00]),
+            "Odd trailing CAN DTC bytes must be rejected.");
         return checks;
     }
 }
