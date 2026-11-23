@@ -129,6 +129,52 @@ internal static class UdsStandardServicesSelfTests
                 [0x62, 0xF4, 0x0D, 0x12]),
             "OBDonUDS DID response cannot be confused with another DID.");
 
+        Equal(ObdOnUdsServices.ReadWwhEmissionsDtcs(0x08),
+            "194233FF08", "OBDonUDS confirmed emission DTCs use WWH 0x42.");
+        Equal(ObdOnUdsServices.ReadWwhEmissionsDtcs(0x04, 0x80),
+            "1942338004", "WWH DTC requests retain explicit severity and pending masks.");
+        Equal(ObdOnUdsServices.ReadWwhPermanentEmissionsDtcs(),
+            "195533", "Permanent WWH emission DTC request uses 0x55 and group 0x33.");
+        var wwh = ObdOnUdsServices.DecodeWwhEmissionsDtcs(
+            [0x59, 0x42, 0x33, 0xAF, 0xA0, 0x04,
+             0x40, 0x12, 0x34, 0x56, 0x08,
+             0x80, 0xAB, 0xCD, 0xEF, 0x04]);
+        Check(wwh.FunctionalGroup == 0x33 &&
+            wwh.StatusAvailabilityMask == 0xAF &&
+            wwh.SeverityAvailabilityMask == 0xA0 &&
+            wwh.DtcFormatIdentifier == 4 &&
+            wwh.Codes.Count == 2 &&
+            wwh.Codes[0].Code == 0x123456 &&
+            wwh.Codes[0].Severity == 0x40 &&
+            wwh.Codes[0].Status == 0x08 &&
+            wwh.Codes[1].Code == 0xABCDEF &&
+            wwh.Codes[1].Severity == 0x80,
+            "WWH 0x42 positive reply retains severity, status, format and 24-bit DTC.");
+        Check(ObdOnUdsServices.DecodeWwhEmissionsDtcs(
+            [0x59, 0x42, 0x33, 0xFF, 0xFF, 0x04]).Codes.Count == 0,
+            "Empty WWH 0x42 record cannot create fictitious DTCs.");
+        var permanent = ObdOnUdsServices.DecodeWwhPermanentEmissionsDtcs(
+            [0x59, 0x55, 0x33, 0xFF, 0x04,
+             0x12, 0x34, 0x56, 0x08]);
+        Check(permanent.Codes.Count == 1 &&
+            permanent.Codes[0].Code == 0x123456 &&
+            permanent.Codes[0].Status == 0x08 &&
+            permanent.Codes[0].Severity is null,
+            "WWH 0x55 permanent DTC format omits severity but preserves status.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeWwhEmissionsDtcs(
+                [0x59, 0x42, 0x33, 0xAF, 0xA0, 0x04,
+                 0x40, 0x12, 0x34]),
+            "WWH 0x42 refuses a truncated five-byte DTC record.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeWwhPermanentEmissionsDtcs(
+                [0x59, 0x55, 0xD0, 0xFF, 0x04]),
+            "Emissions mode cannot misinterpret a safety-system group as emissions.");
+        Reject<InvalidDataException>(() =>
+            ObdOnUdsServices.DecodeWwhPermanentEmissionsDtcs(
+                [0x59, 0x55, 0x33, 0xFF, 0x04, 0x12, 0x34]),
+            "WWH 0x55 refuses partial permanent DTC records.");
+
         Equal(ObdOnUdsServices.ReadDtcByStatusMask(0xFF),
             "1902FF", "OBDonUDS DTC status-mask diagnostic request.");
         var obdCodes = ObdOnUdsServices.DecodeDtcByStatusMask(
