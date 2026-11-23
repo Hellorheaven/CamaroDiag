@@ -1239,6 +1239,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Disconnect any selected adapter (USB, BLE, Wi-Fi, J2534 or simulation).
+     * Obsolete connection attempts and console jobs must complete teardown
+     * before the manager socket/USB handle can be closed.
+     */
+    fun disconnectSelectedAdapter() {
+        val attempt = ++connectionAttemptGeneration
+        invalidateFuelHistoryForConnectionChange()
+        val pendingConnection = connectionAttemptJob
+        pendingConnection?.cancel()
+        viewModelScope.launch {
+            beginBusyOperation()
+            try {
+                val activeMonitor = canMonitorJob
+                val activeRequest = detachCanRequest()
+                stopCanMonitor()
+                val detachedMonitor = detachedCanMonitorJob
+                val detachedRequest = detachedCanRequestJob
+                pendingConnection?.join()
+                activeMonitor?.join()
+                activeRequest?.join()
+                detachedMonitor?.join()
+                detachedRequest?.join()
+                if (attempt != connectionAttemptGeneration) return@launch
+                obdManager.disconnect()
+                markAdapterDisconnected()
+                _connectionMessage.value = null
+                _calibrationWorkspace.value = _calibrationWorkspace.value.copy(
+                    isJ2534BridgeConnecting = false,
+                    isJ2534BridgeConnected = false,
+                    isJ2534MemoryReadAvailable = false,
+                    j2534BridgeMessage = localizedContext.getString(R.string.vm_pc_bridge_disconnected)
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                if (attempt == connectionAttemptGeneration) connectionAttemptJob = null
+                endBusyOperation()
+            }
+        }
+    }
+
     fun disconnectJ2534Bridge() {
         val attempt = ++connectionAttemptGeneration
         invalidateFuelHistoryForConnectionChange()
