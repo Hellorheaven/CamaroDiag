@@ -37,6 +37,13 @@ object EcuRestoreCoverageAssessment {
                 archive.manifest, archive.captures, archive.requiredRegions
             ).consistent
         ) return invalid("ECU capture integrity is not verified")
+        if (map.size > 128 || map.any { it.length > 64L * 1024 * 1024 } ||
+            map.fold(0L) { sum, r ->
+                if (sum > 256L * 1024 * 1024 - r.length) Long.MAX_VALUE
+                else sum + r.length
+            } > 256L * 1024 * 1024) {
+            return invalid("ECU restoration memory map exceeds supported archive bounds")
+        }
         val ordered = map.sortedWith(
             compareBy<EcuRestoreImage.MemoryRegion>({ it.region.ordinal }, { it.startAddress })
         )
