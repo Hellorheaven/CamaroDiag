@@ -31,7 +31,13 @@ class CanConsoleEventJournalWriter(private val destination: Writer) : Closeable 
         require(utcMillis >= 0L)
         check(count < Long.MAX_VALUE)
         val next = count + 1L
-        val escaped = content.replace("\r", "\\r").replace("\n", "\\n")
+        // ECU and adapter text is untrusted: quoted CSV alone does not stop
+        // spreadsheet programs from evaluating leading formula operators.
+        val trimmed = content.trimStart()
+        val formula = trimmed.startsWith('=') || trimmed.startsWith('+') ||
+            trimmed.startsWith('-') || trimmed.startsWith('@')
+        val safeContent = if (formula) "'$content" else content
+        val escaped = safeContent.replace("\r", "\\r").replace("\n", "\\n")
             .replace("\"", "\"\"")
         writeOrFail {
             destination.write("$next,$utcMillis,${direction.name},$succeeded,\"$escaped\"\n")
