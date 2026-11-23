@@ -1346,7 +1346,7 @@ internal static class StandardProtocolCli
             (kwpFunctionalRx && !kwpRxTarget.HasValue) ||
             (kwpRxTarget.HasValue && protocol != J2534StandardChannel.Iso14230) ||
             (kwpValidate && (kwpService is null || mode != "exchange" ||
-                kwpRxTarget is null || kwpRxSource is null)) ||
+                kwpRxTarget is null || kwpRxSource is null || count == 0)) ||
             (init != null && protocol is not (J2534StandardChannel.Iso9141
                                              or J2534StandardChannel.Iso14230)) ||
             (init != null && !init.StartsWith("five:", StringComparison.OrdinalIgnoreCase) &&
