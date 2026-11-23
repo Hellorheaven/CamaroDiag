@@ -492,6 +492,21 @@ internal static class IsoTpCanFdSelfTests
             "--obd-wwh-permanent"]),
             "ISO-TP passive receive cannot silently request permanent DTCs.");
 
+        var readinessIsoTp = StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--obd-readiness-group", "0x06"]);
+        Check(readinessIsoTp.Request.SequenceEqual(
+                new byte[] {0x19, 0x56, 0x33, 0x06}) &&
+            readinessIsoTp.ValidateUds,
+            "ISO-TP readiness query enforces standard UDS reply correlation.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseIsoTp([
+            StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
+            "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
+            "--fd", "false", "--mode", "receive",
+            "--obd-readiness-group", "0x06"]),
+            "Passive ISO-TP mode forbids an outgoing readiness request.");
+
         var obdIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
             "--tx-id", "7E0", "--rx-id", "7E8", "--baud", "500000",
