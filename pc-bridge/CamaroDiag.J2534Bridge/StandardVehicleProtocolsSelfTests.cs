@@ -475,6 +475,14 @@ internal static class StandardVehicleProtocolsSelfTests
             "--kline-init", "five:33"]),
             "Passive J2534 receive mode cannot initiate K-Line signalling.");
 
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseJ2534([
+            StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
+            "--protocol-id", "0x06", "--baud", "500000",
+            "--mode", "receive", "--read-frames", "1",
+            "--mask", "FFFFFFFF", "--pattern", "000007E8",
+            "--flow-control", "000007E0"]),
+            "Passive J2534 mode must reject vendor automatic ISO-TP FC transmission.");
+
         var passiveVpw = StandardProtocolCli.ParseJ2534([
             StandardProtocolCli.PassThruCommand, "--adapter-index", "0",
             "--protocol-id", "0x01", "--baud", "10400",
