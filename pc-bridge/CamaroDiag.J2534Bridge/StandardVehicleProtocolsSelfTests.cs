@@ -468,6 +468,20 @@ internal static class StandardVehicleProtocolsSelfTests
             "--obd-readiness-group", "0x06", "--obd-wwh-permanent"]),
             "DoIP readiness and permanent DTC queries are exclusive.");
 
+        var snapshotDoIp = StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-snapshot", "0x123456",
+            "--obd-snapshot-record", "0x02"]);
+        Check(snapshotDoIp.Request.SequenceEqual(
+            new byte[] {0x19, 0x04, 0x12, 0x34, 0x56, 0x02}),
+            "DoIP DTC snapshot request preserves DTC and record number.");
+        Reject<ArgumentException>(() => StandardProtocolCli.ParseDoIp([
+            StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
+            "--tester", "0E80", "--ecu", "1234",
+            "--obd-snapshot-record", "0x02", "--payload", "22F190"]),
+            "DoIP snapshot record is forbidden without a DTC.");
+
         var obdDoIp = StandardProtocolCli.ParseDoIp([
             StandardProtocolCli.DoIpCommand, "--host", "127.0.0.1",
             "--tester", "0E80", "--ecu", "1234",
