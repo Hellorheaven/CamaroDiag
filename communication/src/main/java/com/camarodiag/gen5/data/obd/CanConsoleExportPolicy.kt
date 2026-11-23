@@ -10,6 +10,16 @@ object CanConsoleExportPolicy {
     fun archiveFailedAfterDisconnect(alreadyFailed: Boolean, wasCapturing: Boolean): Boolean =
         alreadyFailed || wasCapturing
 
+    /**
+     * An operator Stop may export the capture made up to that point only when
+     * the writer really completed its final flush and close. If cancellation
+     * suppressed an IOException from close, the archive is still incomplete.
+     */
+    fun archiveFailedAfterStop(
+        alreadyFailed: Boolean,
+        writerCompleted: Boolean
+    ): Boolean = alreadyFailed || !writerCompleted
+
     fun canExport(
         isCapturing: Boolean,
         archiveFailed: Boolean,
