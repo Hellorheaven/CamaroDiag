@@ -170,6 +170,27 @@ internal static class IsoTpCanFdSelfTests
         Check(Receive(mixedRx, mixed).SequenceEqual(
             new byte[] {0x62, 0xF1, 0x90}),
             "Mixed ISO-TP correlates response by RX CAN ID and N_AE.");
+        var mixedMultiTx = new QueueLink();
+        mixedMultiTx.Replies.Enqueue(new(mixed.RxId, false,
+            [0xA7, 0x30, 0, 0, 0, 0, 0, 0]));
+        Send(mixedMultiTx, mixed, Fill(19));
+        Check(mixedMultiTx.Sent.Count == 4 &&
+            mixedMultiTx.Sent[0].Data[0] == 0xA7 &&
+            mixedMultiTx.Sent[0].Data[1] == 0x10 &&
+            mixedMultiTx.Sent[1].Data[1] == 0x21 &&
+            mixedMultiTx.Sent[2].Data[1] == 0x22 &&
+            mixedMultiTx.Sent[3].Data[1] == 0x23,
+            "Mixed-addressed multi-frame TX uses the same N_AE for FF and CF.");
+        var mixedMultiRx = new QueueLink();
+        foreach (var frame in mixedMultiTx.Sent)
+            mixedMultiRx.Replies.Enqueue(new(mixed.RxId, false,
+                frame.Data.ToArray()));
+        Check(Receive(mixedMultiRx, mixed).SequenceEqual(Fill(19)) &&
+            mixedMultiRx.Sent.Count == 1 &&
+            mixedMultiRx.Sent[0].Id == mixed.TxId &&
+            mixedMultiRx.Sent[0].Data[0] == 0xA7 &&
+            mixedMultiRx.Sent[0].Data[1] == 0x30,
+            "Mixed-addressed RX reassembles 19 bytes and emits addressed FC.");
         Reject<ArgumentException>(() =>
             (mixed with { RxAddress = 0xA8 }).Validate(),
             "Mixed ISO-TP rejects different TX/RX address extensions.");
