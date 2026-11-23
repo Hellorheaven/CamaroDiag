@@ -14,13 +14,39 @@ internal sealed class IsoTpJ2534RawCanLink : IsoTpCanFdSession.ICanLink
     private const uint Can29BitId = 0x100;
     private const uint FdCanBrs = 0x0008_0000;
     private const uint FdCanFormat = 0x0010_0000;
-    private readonly J2534StandardChannel channel;
+    /// <summary>
+    /// Narrow J2534 raw-frame seam. The actual vendor DLL remains
+    /// J2534StandardChannel; this contract makes TX flags, arbitration
+    /// prefix, receive statuses and errors independently testable offline.
+    /// </summary>
+    internal interface IRawChannel
+    {
+        uint ProtocolId { get; }
+        void Transmit(byte[] data, uint flags);
+        J2534StandardChannel.Frame? Receive(int timeoutMs);
+    }
+
+    private sealed class VendorChannel(J2534StandardChannel device) : IRawChannel
+    {
+        private readonly J2534StandardChannel device =
+            device ?? throw new ArgumentNullException(nameof(device));
+        public uint ProtocolId => device.ProtocolId;
+        public void Transmit(byte[] data, uint flags) => device.Transmit(data, flags);
+        public J2534StandardChannel.Frame? Receive(int timeoutMs) =>
+            device.Receive(timeoutMs);
+    }
+
+    private readonly IRawChannel channel;
     private readonly bool fd;
     private readonly bool extendedId;
     private readonly bool brs;
 
     internal IsoTpJ2534RawCanLink(
         J2534StandardChannel channel, bool canFd, bool extendedId, bool bitRateSwitch)
+        : this(new VendorChannel(channel), canFd, extendedId, bitRateSwitch) { }
+
+    internal IsoTpJ2534RawCanLink(
+        IRawChannel channel, bool canFd, bool extendedId, bool bitRateSwitch)
     {
         ArgumentNullException.ThrowIfNull(channel);
         if (channel.ProtocolId != (canFd ?

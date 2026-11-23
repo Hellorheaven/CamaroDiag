@@ -32,6 +32,25 @@ internal static class IsoTpCanFdSelfTests
         }
     }
 
+    private sealed class FakeRawJ2534 : IsoTpJ2534RawCanLink.IRawChannel
+    {
+        internal readonly List<(byte[] Data, uint Flags)> Transmitted = [];
+        internal readonly Queue<J2534StandardChannel.Frame?> Incoming = new();
+        internal readonly List<int> RequestedTimeouts = [];
+        internal bool FailTransmit;
+        public uint ProtocolId { get; init; } = J2534StandardChannel.Can;
+        public void Transmit(byte[] bytes, uint flags)
+        {
+            if (FailTransmit) throw new IOException("Simulated vendor write failure.");
+            Transmitted.Add((bytes.ToArray(), flags));
+        }
+        public J2534StandardChannel.Frame? Receive(int timeoutMs)
+        {
+            RequestedTimeouts.Add(timeoutMs);
+            return Incoming.Count == 0 ? null : Incoming.Dequeue();
+        }
+    }
+
     internal static int Run()
     {
         var checkedCount = 0;
@@ -556,6 +575,106 @@ internal static class IsoTpCanFdSelfTests
             IsoTpJ2534RawCanLink.Pack(0x800,
                 [1, 2, 3], extended: false),
             "J2534 11-bit arbitration ID overflow rejected.");
+
+        // Exercise the actual J2534 raw-channel adapter contract without
+        // loading a vendor DLL, not only ISO-TP reassembly with QueueLink.
+        var vendorClassic = new FakeRawJ2534();
+        var classicLink = new IsoTpJ2534RawCanLink(vendorClassic,
+            canFd: false, extendedId: false, bitRateSwitch: false);
+        var classicPayload = new byte[] { 3, 0x22, 0xF1, 0x90, 0, 0, 0, 0 };
+        classicLink.SendAsync(new(0x7E0, false, classicPayload),
+            CancellationToken.None).GetAwaiter().GetResult();
+        Check(vendorClassic.Transmitted.Count == 1 &&
+            vendorClassic.Transmitted[0].Flags == 0 &&
+            vendorClassic.Transmitted[0].Data.SequenceEqual(
+                IsoTpJ2534RawCanLink.Pack(0x7E0, classicPayload, false)),
+            "Classic J2534 emits raw 4-byte CAN ID and zero FD/29-bit flags.");
+        vendorClassic.Incoming.Enqueue(new(J2534StandardChannel.Can,
+            0, 0, IsoTpJ2534RawCanLink.Pack(0x7E8,
+                [3, 0x62, 0xF1, 0x90, 0, 0, 0, 0], false)));
+        var classicRead = classicLink.ReceiveAsync(
+            TimeSpan.FromMilliseconds(230), CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Check(classicRead.Id == 0x7E8 && !classicRead.IsFd &&
+            classicRead.Data[1] == 0x62 &&
+            vendorClassic.RequestedTimeouts.SequenceEqual(new[] { 230 }),
+            "Classic J2534 unpacks one real-shape RX and honors timeout milliseconds.");
+
+        var vendorFdExtended = new FakeRawJ2534
+        {
+            ProtocolId = J2534StandardChannel.FdCan
+        };
+        var fdLink = new IsoTpJ2534RawCanLink(vendorFdExtended,
+            canFd: true, extendedId: true, bitRateSwitch: true);
+        var fdWirePayload = Fill(12);
+        fdLink.SendAsync(new(0x18DA10F1, true, fdWirePayload),
+            CancellationToken.None).GetAwaiter().GetResult();
+        Check(vendorFdExtended.Transmitted.Count == 1 &&
+            vendorFdExtended.Transmitted[0].Flags ==
+                (0x100u | 0x0008_0000u | 0x0010_0000u) &&
+            vendorFdExtended.Transmitted[0].Data.SequenceEqual(
+                IsoTpJ2534RawCanLink.Pack(
+                    0x18DA10F1, fdWirePayload, true)),
+            "FD J2534 sends 29-bit CAN ID plus FD_CAN_FORMAT and BRS bits.");
+        vendorFdExtended.Incoming.Enqueue(new(J2534StandardChannel.FdCan,
+            0x100u | 0x0010_0000u, 0,
+            IsoTpJ2534RawCanLink.Pack(0x18DAF110, Fill(12), true)));
+        var fdRead = fdLink.ReceiveAsync(
+            TimeSpan.FromMilliseconds(400), CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Check(fdRead.Id == 0x18DAF110 && fdRead.IsFd &&
+            fdRead.Data.Length == 12,
+            "FD J2534 reconstructs 29-bit CAN RX from actual raw PDU shape.");
+
+        Reject<ArgumentException>(() => new IsoTpJ2534RawCanLink(
+            new FakeRawJ2534 { ProtocolId = J2534StandardChannel.Iso15765 },
+            false, false, false),
+            "Pre-segmented ISO15765 channel cannot double-apply ISO-TP.");
+        Reject<ArgumentException>(() => new IsoTpJ2534RawCanLink(
+            vendorClassic, false, false, true),
+            "Classic CAN cannot advertise FD bit-rate switching.");
+        Reject<ArgumentException>(() => new IsoTpJ2534RawCanLink(
+            vendorClassic, true, false, false),
+            "Raw CAN channel cannot masquerade as FD_CAN.");
+        Reject<InvalidDataException>(() =>
+            classicLink.SendAsync(new(0x7E0, true, Fill(8)),
+                CancellationToken.None).GetAwaiter().GetResult(),
+            "Frame CAN-FD cannot leak into the classical J2534 channel.");
+        Reject<ArgumentOutOfRangeException>(() =>
+            classicLink.SendAsync(new(0x800, false, Fill(8)),
+                CancellationToken.None).GetAwaiter().GetResult(),
+            "11-bit J2534 link rejects arbitration ID 0x800.");
+        Check(vendorClassic.Transmitted.Count == 1,
+            "Invalid CAN frames do not reach vendor PassThruWriteMsgs.");
+
+        var vendorFailure = new FakeRawJ2534 { FailTransmit = true };
+        var failingLink = new IsoTpJ2534RawCanLink(vendorFailure,
+            false, false, false);
+        Reject<IOException>(() =>
+            failingLink.SendAsync(new(0x7E0, false, Fill(8)),
+                CancellationToken.None).GetAwaiter().GetResult(),
+            "Vendor PassThruWriteMsgs failure propagates unmodified.");
+        Reject<TimeoutException>(() =>
+            failingLink.ReceiveAsync(TimeSpan.FromMilliseconds(10),
+                CancellationToken.None).GetAwaiter().GetResult(),
+            "Vendor timeout with no RX is not interpreted as a valid frame.");
+        var faultyRxVendor = new FakeRawJ2534();
+        var faultyRxLink = new IsoTpJ2534RawCanLink(faultyRxVendor,
+            false, false, false);
+        faultyRxVendor.Incoming.Enqueue(new(J2534StandardChannel.Can,
+            0x100, 0, IsoTpJ2534RawCanLink.Pack(0x7E8, Fill(8), false)));
+        Reject<InvalidDataException>(() =>
+            faultyRxLink.ReceiveAsync(TimeSpan.FromMilliseconds(100),
+                CancellationToken.None).GetAwaiter().GetResult(),
+            "Vendor 29-bit RX flag mismatch is never accepted on 11-bit bus.");
+        using var cancelledJ2534 = new CancellationTokenSource();
+        cancelledJ2534.Cancel();
+        Reject<OperationCanceledException>(() =>
+            classicLink.SendAsync(new(0x7E0, false, Fill(8)),
+                cancelledJ2534.Token).GetAwaiter().GetResult(),
+            "Canceled J2534 send never calls vendor DLL.");
+        Check(vendorClassic.Transmitted.Count == 1,
+            "Canceled raw J2534 send leaves vendor TX queue unchanged.");
 
         var protocolIsoTp = StandardProtocolCli.ParseIsoTp([
             StandardProtocolCli.RawIsoTpCommand, "--adapter-index", "0",
