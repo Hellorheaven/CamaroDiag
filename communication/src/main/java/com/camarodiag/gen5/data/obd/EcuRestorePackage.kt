@@ -57,31 +57,40 @@ object EcuRestorePackage {
         }
         val manifest = File(directory, "index.ecu-package")
         check(manifest.createNewFile()) { "Image index already exists" }
-        FileOutputStream(manifest).use { stream ->
-            DataOutputStream(stream).use { data ->
-                data.writeUTF(MAGIC)
-                data.writeUTF(identity.vin)
-                data.writeUTF(identity.controllerId)
-                data.writeUTF(identity.firmwareId)
-                data.writeInt(images.size)
-                images.forEachIndexed { index, image ->
-                    data.writeUTF(fileName(index))
-                    data.writeUTF(image.geometry.region.name)
-                    data.writeLong(image.geometry.startAddress)
-                    data.writeLong(image.geometry.length)
-                    data.writeUTF(image.sha256)
+        var finalized = false
+        try {
+            FileOutputStream(manifest).use { stream ->
+                DataOutputStream(stream).use { data ->
+                    data.writeUTF(MAGIC)
+                    data.writeUTF(identity.vin)
+                    data.writeUTF(identity.controllerId)
+                    data.writeUTF(identity.firmwareId)
+                    data.writeInt(images.size)
+                    images.forEachIndexed { index, image ->
+                        data.writeUTF(fileName(index))
+                        data.writeUTF(image.geometry.region.name)
+                        data.writeLong(image.geometry.startAddress)
+                        data.writeLong(image.geometry.length)
+                        data.writeUTF(image.sha256)
+                    }
+                    data.flush()
+                    stream.fd.sync()
                 }
-                data.flush()
-                stream.fd.sync()
             }
+            val reopened = open(directory)
+            check(reopened.identity == identity && reopened.regions.size == images.size &&
+                reopened.regions.zip(images).all { (stored, original) ->
+                    stored.geometry == original.geometry &&
+                        stored.bytes().contentEquals(original.bytes())
+                }) { "Stored ECU restoration image package failed disk re-verification" }
+            finalized = true
+            return reopened
+        } finally {
+            // Publishing an index before re-verification is not completion.
+            // Any failed write, cancellation or verification must leave an
+            // incomplete package that open() will reject.
+            if (!finalized) manifest.delete()
         }
-        val reopened = open(directory)
-        check(reopened.identity == identity && reopened.regions.size == images.size &&
-            reopened.regions.zip(images).all { (stored, original) ->
-                stored.geometry == original.geometry &&
-                    stored.bytes().contentEquals(original.bytes())
-            }) { "Stored ECU restoration image package failed disk re-verification" }
-        return reopened
     }
 
     fun open(directory: File): Contents {
