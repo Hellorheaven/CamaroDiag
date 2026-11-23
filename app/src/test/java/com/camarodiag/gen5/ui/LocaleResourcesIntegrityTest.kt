@@ -489,6 +489,7 @@ class LocaleResourcesIntegrityTest {
 
     @Test fun currentCanExportAndFuelHistoryGuidanceIsTranslatedAndNotMisleading() {
         val required = setOf(
+            "can_console_history_recent_scope",
             "can_console_export_header",
             "can_console_export_events_limited",
             "can_console_export_direction_legend",
