@@ -225,7 +225,7 @@ internal static class UdsStandardServices
         // request. This does not assert that the ECU memory was programmed.
         var echoed = request[0] switch
         {
-            0x22 or 0x2E or 0x2F => 2,
+            0x22 or 0x24 or 0x2E or 0x2F => 2,
             0x31 => 3,
             0x10 or 0x11 or 0x27 or 0x36 or 0x19 or
                 0x28 or 0x3E or 0x85 => 1,
