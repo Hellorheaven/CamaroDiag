@@ -18,6 +18,8 @@ internal sealed class J2534StandardChannel : IDisposable
     internal const uint Iso14230 = 0x04;
     internal const uint Can = 0x05;
     internal const uint Iso15765 = 0x06;
+    internal const uint SwIso15765 = 0x8007; // SAE J2534-2 optional single-wire ISO-TP
+    internal const uint SwCan = 0x8008; // SAE J2534-2 optional SAE J2411/SW-CAN
     internal const uint FdCan = 0x8011; // SAE J2534-2 extended IDs, requires vendor support
     internal const uint FdIso15765 = 0x8012;
     internal const uint FiveBaudInitIoctl = 0x04;
@@ -36,7 +38,8 @@ internal sealed class J2534StandardChannel : IDisposable
             RxBreak | RxTxIndication | RxPaddingError)) != 0;
 
     internal static bool IsKnownProtocol(uint id) => id is J1850Vpw or J1850Pwm
-        or Iso9141 or Iso14230 or Can or Iso15765 or FdCan or FdIso15765;
+        or Iso9141 or Iso14230 or Can or Iso15765 or
+            SwIso15765 or SwCan or FdCan or FdIso15765;
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     private struct Msg
