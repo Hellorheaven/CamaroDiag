@@ -14,12 +14,69 @@ internal static class StandardProtocolCli
     internal const string DoIpCommand = "--doip-exchange";
     internal const string DoIpDiscoverCommand = "--doip-discover";
     internal const string DoIpStatusCommand = "--doip-status";
+    internal const string ObdCanDiscoverCommand = "--obd-discover-can";
     internal const string PassThruCommand = "--j2534-standard";
     internal const string RawIsoTpCommand = "--isotp-exchange";
     internal const string J1939Command = "--j1939-transport";
     internal const string J1939FdCommand = "--j1939-fd-multipg";
     internal const string J1939FdBamCommand = "--j1939-fd-bam";
     internal const string J1939FdCmdtCommand = "--j1939-fd-cmdt";
+
+    internal sealed record ObdCanDiscoveryOptions(
+        int AdapterIndex, uint Baud, int TimeoutMs);
+
+    internal static ObdCanDiscoveryOptions ParseObdCanDiscovery(string[] args)
+    {
+        var index = int.Parse(Required(args, "--adapter-index"),
+            CultureInfo.InvariantCulture);
+        var baud = Number(Required(args, "--baud"));
+        var timeout = int.Parse(Optional(args, "--timeout-ms") ?? "2500",
+            CultureInfo.InvariantCulture);
+        if (index < 0 || baud == 0 || timeout is < 100 or > 30000 ||
+            Optional(args, "--payload") is not null ||
+            Optional(args, "--payload-file") is not null)
+            throw new ArgumentException(
+                "OBDonUDS functional CAN discovery accepts only adapter, rate and timeout.");
+        return new(index, baud, timeout);
+    }
+
+    internal static async Task<int> RunObdCanDiscoveryAsync(string[] args)
+    {
+        try
+        {
+            var o = ParseObdCanDiscovery(args);
+            var adapters = J2534Registry.Discover();
+            if (o.AdapterIndex >= adapters.Count)
+                throw new ArgumentOutOfRangeException(nameof(o.AdapterIndex));
+            using var driver = J2534StandardChannel.Connect(
+                adapters[o.AdapterIndex], J2534StandardChannel.Can, o.Baud);
+            // Multiple physical responders (7E8..7EF) require a broad
+            // passive J2534 pass filter. The only TX PDU is fixed 22F810.
+            driver.ConfigureFilter(new byte[4], new byte[4]);
+            var link = new IsoTpJ2534RawCanLink(driver,
+                canFd: false, extendedId: false,
+                bitRateSwitch: false);
+            var found = await ObdOnUdsCanDiscovery.DiscoverAsync(link,
+                TimeSpan.FromMilliseconds(o.TimeoutMs),
+                CancellationToken.None);
+            foreach (var ecu in found)
+                Console.WriteLine(
+                    $"OBDonUDS physical RX=0x{ecu.ResponseId:X3} F810=" +
+                    $"0x{ecu.ProtocolValue:X2} " +
+                    $"status={(ecu.IsObdOnUds ? "identified" : "not confirmed")}");
+            Console.WriteLine($"OBDonUDS found={found.Count}; only F810 is probed. " +
+                "No writing, ECU programming or manufacturer permissions inferred.");
+            return 0;
+        }
+        catch (Exception ex) when (ex is ArgumentException or
+            InvalidOperationException or IOException or TimeoutException or
+            DllNotFoundException or BadImageFormatException or
+            EntryPointNotFoundException or OverflowException)
+        {
+            Console.Error.WriteLine("OBDonUDS CAN discovery failed: " + ex.Message);
+            return 6;
+        }
+    }
 
     internal static async Task<int> RunDoIpStatusAsync(string[] args)
     {
