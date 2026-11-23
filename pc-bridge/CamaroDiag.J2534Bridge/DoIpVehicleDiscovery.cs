@@ -13,7 +13,7 @@ namespace CamaroDiag.J2534Bridge;
 /// </summary>
 internal static class DoIpVehicleDiscovery
 {
-    internal sealed record Identity(string Vin, ushort LogicalAddress,
+    internal sealed record Identity(string? Vin, ushort LogicalAddress,
         byte[] Eid, byte[] Gid, byte FurtherAction, byte? VinGidStatus,
         IPAddress Source);
 
@@ -29,8 +29,14 @@ internal static class DoIpVehicleDiscovery
             decoded.Payload.Length is not (32 or 33))
             throw new InvalidDataException("Invalid DoIP vehicle announcement type or payload length.");
         var payload = decoded.Payload;
-        var vin = Encoding.ASCII.GetString(payload, 0, 17);
-        if (vin.Any(c => c < 0x20 || c > 0x7E))
+        // DoIP can announce before the VIN is available. Preserve that
+        // distinction instead of inventing an identity from invalidity bytes.
+        var vinBytes = payload.AsSpan(0, 17);
+        var vinUnavailable = vinBytes.IndexOfAnyExcept((byte)0x00) < 0 ||
+            vinBytes.IndexOfAnyExcept((byte)0xFF) < 0;
+        string? vin = vinUnavailable ? null :
+            Encoding.ASCII.GetString(payload, 0, 17);
+        if (vin is not null && vin.Any(c => c < 0x20 || c > 0x7E))
             throw new InvalidDataException("DoIP VIN contains invalid bytes.");
         return new Identity(vin,
             BinaryPrimitives.ReadUInt16BigEndian(payload.AsSpan(17, 2)),
